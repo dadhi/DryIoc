@@ -5,7 +5,7 @@
 // - Add condition to Decorator.
 // - Convert SkipCache flag to enum.
 // - Evaluate Code Coverage.
-// - Rename FunIoc to more stand out DryIoc.
+// + Rename FunIoc to more stand out DryIoc.
 // + Add CustomReuse (reuse in custom scope?) example test, e.g. for ThreadStatic singleton.
 // + Rename Singletons.
 
