@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests.Playground
 {
     [TestFixture]
-    public class InitializerTests
+    public class InitializerPlayTests
     {
         [Test]
         public void Should_be_able_init_service_registered_with_impl_type()

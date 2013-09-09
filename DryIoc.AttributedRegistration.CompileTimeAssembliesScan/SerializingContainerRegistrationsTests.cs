@@ -30,9 +30,9 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
 
             // Then
             var loadedModel = CreateModel();
-            ServiceInfo[] infos;
+            ExportInfo[] infos;
             using (var file = File.OpenRead(DATA_FILE))
-                infos = (ServiceInfo[])loadedModel.Deserialize(file, null, typeof(ServiceInfo[]));
+                infos = (ExportInfo[])loadedModel.Deserialize(file, null, typeof(ExportInfo[]));
 
             Assert.AreEqual(services.Length, infos.Length);
             for (int i = 0; i < services.Length; i++)
@@ -54,9 +54,9 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
                 model.Serialize(file, services);
 
             var loadedModel = CreateModel();
-            ServiceInfo[] infos;
+            ExportInfo[] infos;
             using (var file = File.OpenRead(DATA_FILE))
-                infos = (ServiceInfo[])loadedModel.Deserialize(file, null, typeof(ServiceInfo[]));
+                infos = (ExportInfo[])loadedModel.Deserialize(file, null, typeof(ExportInfo[]));
 
             // When
             var container = new Container();
@@ -71,7 +71,7 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
         {
             var model = TypeModel.Create();
 
-            var serializedTypes = new[] { typeof(ServiceContract), typeof(ServiceInfo) };
+            var serializedTypes = new[] { typeof(ServiceContract), typeof(ExportInfo) };
 
             foreach (var type in serializedTypes)
                 model.Add(type, false).Add(type.GetFields().Select(x => x.Name).ToArray());

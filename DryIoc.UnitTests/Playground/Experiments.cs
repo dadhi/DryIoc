@@ -12,7 +12,7 @@ namespace DryIoc.UnitTests.Playground
 {
 	[TestFixture]
     [Ignore]
-	public class ExperimentalTests
+	public class Experiments
 	{
 		[Test]
 		public void Can_add_to_null_delegate()

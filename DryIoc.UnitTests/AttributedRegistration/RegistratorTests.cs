@@ -164,7 +164,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
 		private void WhenIRegisterAllExportedTypes()
 		{
 			_container = new Container();
-			_container.ScanAndRegisterExports(_assembly);
+			_container.RegisterExports(_assembly);
 		}
 
 		private void GivenAssemblyWithExportedTypes()

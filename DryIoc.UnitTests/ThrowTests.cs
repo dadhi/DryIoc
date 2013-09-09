@@ -46,10 +46,10 @@ namespace DryIoc.UnitTests
             Exception loggedError = null;
             Action<Exception> logError = ex => { loggedError = ex; };
 
-            var original = Throw.CreateException;
+            var original = Throw.GetException;
             try
             {
-                Throw.CreateException = message =>
+                Throw.GetException = message =>
                 {
                     logError(error);
                     return error;
@@ -60,7 +60,7 @@ namespace DryIoc.UnitTests
             catch {}
             finally
             {
-                Throw.CreateException = original;
+                Throw.GetException = original;
             }
 
             Assert.That(loggedError, Is.SameAs(error));

@@ -22,12 +22,29 @@ namespace DryIoc
     {
         public static bool SingletonByDefault = true;
 
-        public static void ScanAndRegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
+        public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
         {
             registrator.RegisterExports(Scan(assemblies));
         }
 
-        public static IEnumerable<ServiceInfo> Scan(IEnumerable<Assembly> assemblies)
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<ImplementationInfo> infos)
+        {
+            foreach (var info in infos)
+            {
+                var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
+                var metadata = info.MetadataAttributeIndex == -1 ? null : FindMetadata(info.ImplementationType, info.MetadataAttributeIndex);
+                var factory = new ReflectionFactory(info.ImplementationType, reuse, FindSingleImportingConstructor, new FactoryOptions(metadata: metadata));
+
+                var contracts = info.Contracts;
+                for (var i = 0; i < contracts.Length; i++)
+                {
+                    var contract = contracts[i];
+                    registrator.Register(factory, contract.ServiceType, contract.ServiceName);
+                }
+            }
+        }
+
+        public static IEnumerable<ImplementationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
             var implementationTypes = assemblies.SelectMany(a => a.GetTypes()).Where(TypeIsForScan);
 
@@ -91,30 +108,13 @@ namespace DryIoc
                     }
                 }
 
-                yield return new ServiceInfo
+                yield return new ImplementationInfo
                 {
                     Contracts = contracts,
                     ImplementationType = implementationType,
                     IsSingleton = isSingleton,
                     MetadataAttributeIndex = metadataAttributeIndex
                 };
-            }
-        }
-
-        public static void RegisterExports(this IRegistrator registrator, IEnumerable<ServiceInfo> serviceInfos)
-        {
-            foreach (var info in serviceInfos)
-            {
-                var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
-                var metadata = info.MetadataAttributeIndex == -1 ? null : FindMetadata(info.ImplementationType, info.MetadataAttributeIndex);
-                var factory = new ReflectionFactory(info.ImplementationType, reuse, FindSingleImportingConstructor, new FactoryOptions(metadata: metadata));
-
-                var contracts = info.Contracts;
-                for (var i = 0; i < contracts.Length; i++)
-                {
-                    var contract = contracts[i];
-                    registrator.Register(factory, contract.ServiceType, contract.ServiceName);
-                }
             }
         }
 
@@ -214,7 +214,6 @@ namespace DryIoc
     public sealed class ServiceContract
     {
         public Type ServiceType;
-
         public string ServiceName;
 
         public override bool Equals(object obj)
@@ -225,7 +224,7 @@ namespace DryIoc
     }
 
     [Serializable]
-    public sealed class ServiceInfo
+    public sealed class ImplementationInfo
     {
         public ServiceContract[] Contracts;
 
@@ -237,7 +236,7 @@ namespace DryIoc
 
         public override bool Equals(object obj)
         {
-            var other = obj as ServiceInfo;
+            var other = obj as ImplementationInfo;
             if (other == null)
                 return false;
 

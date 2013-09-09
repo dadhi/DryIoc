@@ -163,7 +163,7 @@ namespace DryIoc.UnitTests
 
             container.Register(
                 typeof(IService<>),
-                new ContextFactoryProvider((request, _) => new ReflectionFactory(
+                new CustomFactoryProvider((request, _) => new ReflectionFactory(
                     typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericArguments()),
                     Reuse.Singleton)));
 
@@ -181,7 +181,7 @@ namespace DryIoc.UnitTests
 
             container.Register(
                 typeof(IService<>),
-                new ContextFactoryProvider((request, _) => new ReflectionFactory(
+                new CustomFactoryProvider((request, _) => new ReflectionFactory(
                     typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericArguments()),
                     Reuse.Singleton)));
 

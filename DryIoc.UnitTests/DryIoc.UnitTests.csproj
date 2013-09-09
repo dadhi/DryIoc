@@ -62,9 +62,10 @@
     <Compile Include="MetadataTests.cs" />
     <Compile Include="Performance\HashTreeAccessSpeedTests.cs" />
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
-    <Compile Include="Playground\ExperimentalTests.cs" />
-    <Compile Include="Playground\InitializerTests.cs" />
-    <Compile Include="Playground\OptionsTests.cs" />
+    <Compile Include="Playground\Experiments.cs" />
+    <Compile Include="Playground\ExportGenericWrapperPlayTests.cs" />
+    <Compile Include="Playground\InitializerPlayTests.cs" />
+    <Compile Include="Playground\OptionsPlayTests.cs" />
     <Compile Include="Playground\ThrowPlayTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PropertyResolutionTests.cs" />

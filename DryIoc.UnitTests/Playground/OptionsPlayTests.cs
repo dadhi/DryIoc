@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests.Playground
 {
     [TestFixture]
-    public class OptionsTests
+    public class OptionsPlayTests
     {
         [Test]
         [Ignore]
