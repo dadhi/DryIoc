@@ -20,6 +20,8 @@
 // - Move Container Setup related code to dedicated class/container-property Setup.
 //
 // Internals:
+// - Rename request to DependencyChain.
+// - Remove Factory.PrototypeID.
 // - Change IReuse signature to use ContainerScope and CurrentScope instead of IRegistry.
 // - Remove Container Singleton parameter from CompiledFactory.
 // - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
@@ -408,7 +410,6 @@ namespace DryIoc
         public delegate object CompiledFactory(Scope openScope, Scope resolutionRootScope);
 
         private HashTree<Type, CompiledFactory> _defaultResolutionCache;
-
         private HashTree<Type, KeyedResolutionCacheEntry> _keyedResolutionCache;
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, bool shouldReturnNull)
@@ -672,12 +673,14 @@ namespace DryIoc
                 else
                 {
                     var usedDecorators = new List<int>(2);
-                    for (; parent != null && parent.FactoryType == FactoryType.Decorator;
-                        parent = parent.TryGetNonWrapperParent())
-                        usedDecorators.Add(parent.FactoryPrototypeOrSelfID);
+                    while (parent != null && parent.FactoryType == FactoryType.Decorator)
+                    {
+                        usedDecorators.Add(parent.FactoryProviderID);
+                        parent = parent.TryGetNonWrapperParent();
+                    }
 
                     for (var i = Decorators.Count - 1; i >= 0 && result == null; i--)
-                        if (!usedDecorators.Contains(Decorators[i].PrototypeOrSelfID))
+                        if (!usedDecorators.Contains(Decorators[i].FactoryProviderID))
                             result = Decorators[i];
                 }
 
@@ -1126,14 +1129,14 @@ namespace DryIoc
         public static volatile int Count;
 
         public readonly int ID;
+        
+        public virtual int FactoryProviderID { get { return ID; } }
 
         public readonly IReuse Reuse;
 
         public readonly FactoryOptions Options;
 
         public virtual Type ImplementationType { get { return null; } }
-
-        public virtual int PrototypeOrSelfID { get { return ID; } }
 
         protected Factory(IReuse reuse = null, FactoryOptions options = null)
         {
@@ -1199,7 +1202,7 @@ namespace DryIoc
     {
         public override Type ImplementationType { get { return _implementationType; } }
 
-        public override int PrototypeOrSelfID { get { return _prototypeOrSelfID; } }
+        public override int FactoryProviderID { get { return _factoryProviderID; } }
 
         public ReflectionFactory(Type implementationType, IReuse reuse = null, ConstructorSelector selectConstructor = null, FactoryOptions options = null)
             : base(reuse, options)
@@ -1208,7 +1211,7 @@ namespace DryIoc
                 .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
 
             _selectConstructor = selectConstructor;
-            _prototypeOrSelfID = ID;
+            _factoryProviderID = ID;
         }
 
         public override bool RequiresContext
@@ -1219,7 +1222,7 @@ namespace DryIoc
         public override Factory TryGetFactoryForContext(Request request, IRegistry _)
         {
             var closedImplType = _implementationType.MakeGenericType(request.ServiceType.GetGenericArguments());
-            return new ReflectionFactory(closedImplType, Reuse, _selectConstructor, Options) { _prototypeOrSelfID = ID };
+            return new ReflectionFactory(closedImplType, Reuse, _selectConstructor, Options) { _factoryProviderID = ID };
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -1239,7 +1242,7 @@ namespace DryIoc
                 }
             }
 
-            return AddInitializer(Expression.New(ctor, paramExprs), request, registry);
+            return WithInitializer(Expression.New(ctor, paramExprs), request, registry);
         }
 
         protected override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry)
@@ -1279,7 +1282,7 @@ namespace DryIoc
             }
 
             var newExpr = Expression.New(ctor, ctorParamExprs);
-            return Expression.Lambda(funcType, AddInitializer(newExpr, request, registry), funcInputParamExprs);
+            return Expression.Lambda(funcType, WithInitializer(newExpr, request, registry), funcInputParamExprs);
         }
 
         #region Implementation
@@ -1288,7 +1291,7 @@ namespace DryIoc
 
         private readonly ConstructorSelector _selectConstructor;
 
-        private int _prototypeOrSelfID;
+        private int _factoryProviderID;
 
         private ConstructorInfo SelectConstructor()
         {
@@ -1301,7 +1304,7 @@ namespace DryIoc
             return _selectConstructor(_implementationType);
         }
 
-        private Expression AddInitializer(NewExpression newService, Request request, IRegistry registry)
+        private Expression WithInitializer(NewExpression newService, Request request, IRegistry registry)
         {
             if (!registry.ShouldResolvePropertyOrField)
                 return newService;
@@ -1392,30 +1395,25 @@ namespace DryIoc
     public sealed class Request : IEnumerable<Request>
     {
         public readonly Request Parent; // can be null for resolution root
-
         public readonly Type ServiceType;
-
+        public readonly Type OpenGenericServiceType;
         public readonly object ServiceKey; // null, string name or integer index
 
         public FactoryType FactoryType { get; private set; }
-
         public int FactoryID { get; private set; }
-
-        public int FactoryPrototypeOrSelfID { get; private set; }
-
+        public int FactoryProviderID { get; private set; }
         public Type ImplementationType { get; private set; }
-
-        public Type OpenGenericServiceType
-        {
-            get { return _openGenericType ?? (_openGenericType = ServiceType.IsGenericType ? ServiceType.GetGenericTypeDefinition() : null); }
-        }
 
         public Request(Type serviceType, object serviceKey, Request parent = null)
         {
-            ServiceType = serviceType.ThrowIfNull()
+            ServiceType = serviceType
+                .ThrowIfNull()
                 .ThrowIf(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
+            
             ServiceKey = serviceKey;
             Parent = parent;
+
+            OpenGenericServiceType = ServiceType.IsGenericType ? ServiceType.GetGenericTypeDefinition() : null;
         }
 
         public Request TryGetNonWrapperParent()
@@ -1447,7 +1445,7 @@ namespace DryIoc
         public void SetResult(Factory factory, FactoryType factoryType = FactoryType.Service)
         {
             FactoryID = factory.ID;
-            FactoryPrototypeOrSelfID = factory.PrototypeOrSelfID;
+            FactoryProviderID = factory.FactoryProviderID;
             ImplementationType = factory.ImplementationType;
             FactoryType = factoryType;
             Throw.If(TryGetParent(r => r.FactoryID == FactoryID) != null, Error.DEPENDENCY_CYCLE_DETECTED, this);
@@ -1486,8 +1484,6 @@ namespace DryIoc
         {
             return GetEnumerator();
         }
-
-        private Type _openGenericType;
     }
 
     public sealed class Scope : IDisposable
