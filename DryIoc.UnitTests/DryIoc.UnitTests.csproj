@@ -1,0 +1,100 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{E9D09703-354F-4BEB-A4A9-F614485BEC61}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>DryIoc.UnitTests</RootNamespace>
+    <AssemblyName>DryIoc.UnitTests</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="nunit.framework">
+      <HintPath>..\lib\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AttributedRegistration\ExportAsDecoratorOrGenericWrapperTests.cs" />
+    <Compile Include="AttributedRegistration\ImportUsingTests.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="AttributedRegistration\ExportPublicTypesTests.cs" />
+    <Compile Include="AttributedRegistration\PerformanceTests.cs" />
+    <Compile Include="AttributedRegistration\RegistratorTests.cs" />
+    <Compile Include="CompositePatternTests.cs" />
+    <Compile Include="ContainerCustomizationTests.cs" />
+    <Compile Include="ContainerTests.cs" />
+    <Compile Include="ContextDependentResolutionTests.cs" />
+    <Compile Include="DiagnosticsTests.cs" />
+    <Compile Include="DecoratorTests.cs" />
+    <Compile Include="DynamicFactoryTests.cs" />
+    <Compile Include="EnumerableAndArrayTests.cs" />
+    <Compile Include="FuncTests.cs" />
+    <Compile Include="OpenGenericsTests.cs" />
+    <Compile Include="GenericWrapperTests.cs" />
+    <Compile Include="HashTreeTests.cs" />
+    <Compile Include="LambdaRegistrationTests.cs" />
+    <Compile Include="LazyTests.cs" />
+    <Compile Include="MetadataTests.cs" />
+    <Compile Include="Performance\HashTreeAccessSpeedTests.cs" />
+    <Compile Include="Performance\ReflectionPerformanceTests.cs" />
+    <Compile Include="Playground\ExperimentalTests.cs" />
+    <Compile Include="Playground\InitializerTests.cs" />
+    <Compile Include="Playground\OptionsTests.cs" />
+    <Compile Include="Playground\ThrowPlayTests.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="PropertyResolutionTests.cs" />
+    <Compile Include="RegisterPublicTypesTests.cs" />
+    <Compile Include="ReuseTests.cs" />
+    <Compile Include="SugarTests.cs" />
+    <Compile Include="ThrowTests.cs" />
+    <Compile Include="TypeCSharpNameFormattingTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DryIoc.UnitTests.CUT\DryIoc.UnitTests.CUT.csproj">
+      <Project>{D704FFFE-4359-4401-B8D6-7ACCB3FA39C4}</Project>
+      <Name>DryIoc.UnitTests.CUT</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
+      <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
+      <Name>DryIoc</Name>
+      <Private>False</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

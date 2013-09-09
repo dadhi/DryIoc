@@ -1,0 +1,15 @@
+syntax:glob
+bin/*
+obj/*
+ClientBin/*
+out/*
+.svn/*
+*ReSharper*
+*.suo
+*.xap
+*.user
+syntax: glob
+.hg.*
+*.ncrunch*
+*.crunch*
+*.dtp.*
