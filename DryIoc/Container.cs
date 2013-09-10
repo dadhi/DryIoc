@@ -145,10 +145,11 @@ namespace DryIoc
             {
                 // Decorator.
                 RegistryEntry entry;
+                Decorator decorator;
                 if (_registry.TryGetValue(request.ServiceType, out entry) &&
-                    entry.TryGetDecoratorFactory(out result, request))
+                    entry.TryGetDecorator(out decorator, request))
                 {
-                    result = result.TryProvideSpecificFactory(request, this) ?? result;
+                    result = decorator.Factory.TryProvideFactoryFor(request, this) ?? decorator.Factory;
                     request.SetResult(result, FactoryType.Decorator);
                     return result;
                 }
@@ -157,19 +158,22 @@ namespace DryIoc
                 RegistryEntry openGenericEntry = null;
                 if (request.OpenGenericServiceType != null &&
                     _registry.TryGetValue(request.OpenGenericServiceType, out openGenericEntry) &&
-                    openGenericEntry.TryGetDecoratorFactory(out result, request) &&
-                    (result = result.TryProvideSpecificFactory(request, this)) != null)
+                    openGenericEntry.TryGetDecorator(out decorator, request) &&
+                    (decorator = decorator.TryProvideDecoratorFor(request, this)) != null)
                 {
-                    request.SetResult(result, FactoryType.Decorator);
-                    RegisterDecorator(result, request.ServiceType); // TODO: May be by providing ServiceKey we could stop using SkipCache.
-                    return result;
+                    request.SetResult(decorator.Factory, FactoryType.Decorator);
+
+                    RegisterDecorator(decorator, request.ServiceType); // TODO: May be by providing ServiceKey we could stop using SkipCache.
+                                                                       // TODO: Do we need to register closed gen decorator at all?
+                        
+                    return decorator.Factory;
                 }
 
                 // Service.
                 if (entry != null && 
                     entry.TryGetServiceFactory(out result, request.ServiceType, request.ServiceKey))
                 {
-                    result = result.TryProvideSpecificFactory(request, this) ?? result;
+                    result = result.TryProvideFactoryFor(request, this) ?? result;
                     request.SetResult(result);
                     return result;
                 }
@@ -177,7 +181,7 @@ namespace DryIoc
                 // Open-generic Service.
                 if (openGenericEntry != null &&
                     openGenericEntry.TryGetServiceFactory(out result, request.ServiceType, request.ServiceKey) &&
-                    (result = result.TryProvideSpecificFactory(request, this)) != null)
+                    (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
                     request.SetResult(result);
                     Register(result, request.ServiceType, request.ServiceKey as string);
@@ -188,7 +192,7 @@ namespace DryIoc
                 GenericWrapperEntry wrapper;
                 if (request.OpenGenericServiceType != null &&
                     (wrapper = _genericWrappers.TryGet(request.OpenGenericServiceType)) != null &&
-                    (result = wrapper.Factory.TryProvideSpecificFactory(request, this)) != null)
+                    (result = wrapper.Factory.TryProvideFactoryFor(request, this)) != null)
                 {
                     request.SetResult(result, FactoryType.GenericWrapper);
                     Register(result, request.ServiceType, request.ServiceKey as string);
@@ -344,15 +348,15 @@ namespace DryIoc
             }
         }
 
-        public void RegisterDecorator(Factory factory, Type serviceType)
+        public void RegisterDecorator(Decorator decorator, Type serviceType)
         {
-            ThrowIfServiceTypeIsNotImplementedBy(factory, serviceType);
-            factory.ThrowIf(!factory.Options.SkipCache, Error.DECORATOR_FACTORY_SHOULD_NOT_CACHE_EXPRESSION, serviceType);
+            ThrowIfServiceTypeIsNotImplementedBy(decorator.Factory, serviceType);
+            Throw.If(!decorator.Factory.Options.SkipCache, Error.DECORATOR_FACTORY_SHOULD_NOT_CACHE_EXPRESSION, serviceType);
             lock (_syncRoot)
             {
                 var entry = _registry.GetOrAdd(serviceType, _ => new RegistryEntry());
-                if (entry.Decorators == null) entry.Decorators = new List<Factory>();
-                entry.Decorators.Add(factory);
+                if (entry.Decorators == null) entry.Decorators = new List<Decorator>();
+                entry.Decorators.Add(decorator);
             }
         }
 
@@ -626,7 +630,7 @@ namespace DryIoc
             public Factory LastDefault;
             public List<Factory> Defaults;
             public Dictionary<string, Factory> Named;
-            public List<Factory> Decorators;
+            public List<Decorator> Decorators;
 
             public bool TryGetServiceFactory(out Factory result, Type serviceType, object serviceKey)
             {
@@ -658,29 +662,28 @@ namespace DryIoc
                 return result != null;
             }
 
-            public bool TryGetDecoratorFactory(out Factory result, Request request)
+            public bool TryGetDecorator(out Decorator result, Request request)
             {
                 result = null;
                 if (Decorators == null)
                     return false;
 
                 var parent = request.TryGetNonWrapperParent();
+                // If parent is not another Decorator - no decorator nesting.
                 if (parent == null || parent.FactoryType != FactoryType.Decorator)
                 {
-                    result = Decorators[Decorators.Count - 1];
+                    result = Decorators.FindLast(d => d.IsAplicable(request));
                 }
-                else
+                else // If we already have Decorator parent(s), do no apply them again to prevent recursion.
                 {
-                    var usedDecorators = new List<int>(2);
+                    var applied = new List<int>(2);
                     while (parent != null && parent.FactoryType == FactoryType.Decorator)
                     {
-                        usedDecorators.Add(parent.FactoryProviderID);
+                        applied.Add(parent.FactoryProviderID);
                         parent = parent.TryGetNonWrapperParent();
                     }
 
-                    for (var i = Decorators.Count - 1; i >= 0 && result == null; i--)
-                        if (!usedDecorators.Contains(Decorators[i].FactoryProviderID))
-                            result = Decorators[i];
+                    result = Decorators.FindLast(d => !applied.Contains(d.Factory.ProviderID) && d.IsAplicable(request));
                 }
 
                 return result != null;
@@ -702,6 +705,30 @@ namespace DryIoc
         #endregion
     }
 
+    public class Decorator
+    {
+        public Factory Factory;
+
+        public Decorator(Factory factory, Func<Request, bool> isApplicable = null)
+        {
+            Factory = factory;
+            _isApplicable = isApplicable;
+        }
+
+        public bool IsAplicable(Request request)
+        {
+            return _isApplicable == null || _isApplicable(request);
+        }
+
+        public Decorator TryProvideDecoratorFor(Request request, IRegistry registry)
+        {
+            var specificFactory = Factory.TryProvideFactoryFor(request, registry);
+            return specificFactory == null ? null : new Decorator(specificFactory, _isApplicable);
+        }
+
+        private readonly Func<Request, bool> _isApplicable;
+    }
+
     public abstract class FactoryProvider : Factory
     {
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -712,7 +739,7 @@ namespace DryIoc
 
     public class FuncFactory : FactoryProvider
     {
-        public override Factory TryProvideSpecificFactory(Request request, IRegistry registry)
+        public override Factory TryProvideFactoryFor(Request request, IRegistry registry)
         {
             return new CustomFactory(CreateFunc, DryIoc.Reuse.Singleton);
         }
@@ -846,9 +873,10 @@ namespace DryIoc
             "Container is no longer available (has been garbage-collected already).";
 
         public static readonly string DECORATOR_FACTORY_SHOULD_NOT_CACHE_EXPRESSION =
-            "Decorator factory of {0} should not cache expression.";
+            "Decorator factory of {0} should not cache expression. Please specify FactoryOptions.SkipCache=true.";
 
-        public static readonly string DUPLICATE_SERVICE_NAME_REGISTRATION = "Service {0} with duplicate name '{1}' is already registered with implementation {2}.";
+        public static readonly string DUPLICATE_SERVICE_NAME_REGISTRATION = 
+            "Service {0} with duplicate name '{1}' is already registered with implementation {2}.";
     }
 
     public static class Registrator
@@ -1020,8 +1048,8 @@ namespace DryIoc
         public static void Decorate(this IRegistrator registrator,
             Type serviceType, Type decoratorType, ConstructorSelector withConstructor = null)
         {
-            var factory = new ReflectionFactory(decoratorType, Reuse.Transient, withConstructor, new FactoryOptions(skipCache: true));
-            registrator.RegisterDecorator(factory, serviceType);
+            var factory = new ReflectionFactory(decoratorType, Reuse.Transient, withConstructor, new FactoryOptions(true));
+            registrator.RegisterDecorator(new Decorator(factory), serviceType);
         }
 
         /// <summary>
@@ -1165,7 +1193,7 @@ namespace DryIoc
 
         public readonly int ID;
 
-        public virtual int FactoryProviderID { get { return ID; } }
+        public virtual int ProviderID { get { return ID; } }
 
         public readonly IReuse Reuse;
 
@@ -1210,7 +1238,7 @@ namespace DryIoc
             return func;
         }
 
-        public abstract Factory TryProvideSpecificFactory(Request request, IRegistry registry);
+        public abstract Factory TryProvideFactoryFor(Request request, IRegistry registry);
         
         protected abstract Expression CreateExpression(Request request, IRegistry registry);
 
@@ -1232,23 +1260,23 @@ namespace DryIoc
     {
         public override Type ImplementationType { get { return _implementationType; } }
 
-        public override int FactoryProviderID { get { return _factoryProviderID; } }
+        public override int ProviderID { get { return _providerID; } }
 
-        public ReflectionFactory(Type implementationType, IReuse reuse = null, ConstructorSelector selectConstructor = null, FactoryOptions options = null)
+        public ReflectionFactory(Type implementationType, IReuse reuse = null, ConstructorSelector selectConstructor = null, 
+            FactoryOptions options = null)
             : base(reuse, options)
         {
-            _implementationType = implementationType
-                .ThrowIfNull()
-                .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
+            _implementationType = implementationType.ThrowIfNull();
+             Throw.If(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
             _selectConstructor = selectConstructor;
-            _factoryProviderID = ID;
+            _providerID = ID;
         }
 
-        public override Factory TryProvideSpecificFactory(Request request, IRegistry _)
+        public override Factory TryProvideFactoryFor(Request request, IRegistry _)
         {
             if (!_implementationType.IsGenericTypeDefinition) return null;
             var closedImplType = _implementationType.MakeGenericType(request.ServiceType.GetGenericArguments());
-            return new ReflectionFactory(closedImplType, Reuse, _selectConstructor, Options) { _factoryProviderID = ID };
+            return new ReflectionFactory(closedImplType, Reuse, _selectConstructor, Options) { _providerID = ID };
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -1317,7 +1345,7 @@ namespace DryIoc
 
         private readonly ConstructorSelector _selectConstructor;
 
-        private int _factoryProviderID;
+        private int _providerID;
 
         private ConstructorInfo SelectConstructor()
         {
@@ -1372,7 +1400,7 @@ namespace DryIoc
             _getExpression = getExpression.ThrowIfNull();
         }
 
-        public override Factory TryProvideSpecificFactory(Request request, IRegistry registry)
+        public override Factory TryProvideFactoryFor(Request request, IRegistry registry)
         {
             return null;
         }
@@ -1398,7 +1426,7 @@ namespace DryIoc
             _tryGetFactory = tryGetFactory.ThrowIfNull();
         }
 
-        public override Factory TryProvideSpecificFactory(Request request, IRegistry registry)
+        public override Factory TryProvideFactoryFor(Request request, IRegistry registry)
         {
             return _tryGetFactory(request, registry);
         }
@@ -1431,14 +1459,13 @@ namespace DryIoc
 
         public Request(Type serviceType, object serviceKey, Request parent = null)
         {
-            ServiceType = serviceType
-                .ThrowIfNull()
-                .ThrowIf(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
-
+            ServiceType = serviceType.ThrowIfNull();
+            Throw.If(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
+            
+            OpenGenericServiceType = serviceType.IsGenericType ? serviceType.GetGenericTypeDefinition() : null;
+            
             ServiceKey = serviceKey;
             Parent = parent;
-
-            OpenGenericServiceType = ServiceType.IsGenericType ? ServiceType.GetGenericTypeDefinition() : null;
         }
 
         public Request TryGetNonWrapperParent()
@@ -1470,7 +1497,7 @@ namespace DryIoc
         public void SetResult(Factory factory, FactoryType factoryType = FactoryType.Service)
         {
             FactoryID = factory.ID;
-            FactoryProviderID = factory.FactoryProviderID;
+            FactoryProviderID = factory.ProviderID;
             ImplementationType = factory.ImplementationType;
             FactoryType = factoryType;
             Throw.If(TryGetParent(r => r.FactoryID == FactoryID) != null, Error.DEPENDENCY_CYCLE_DETECTED, this);
@@ -1643,7 +1670,7 @@ namespace DryIoc
     {
         void Register(Factory factory, Type serviceType, string serviceName);
 
-        void RegisterDecorator(Factory factory, Type serviceType);
+        void RegisterDecorator(Decorator factory, Type serviceType);
 
         void RegisterGenericWrapper(Factory factory, Type serviceType, SelectGenericTypeArg getWrappedServiceType);
 
