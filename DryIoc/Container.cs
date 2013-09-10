@@ -668,23 +668,17 @@ namespace DryIoc
                 if (Decorators == null)
                     return false;
 
-                var parent = request.TryGetNonWrapperParent();
-                // If parent is not another Decorator - no decorator nesting.
-                if (parent == null || parent.FactoryType != FactoryType.Decorator)
+                List<int> appliedDecoratorIDs = null; // gather already applied decorators to check for recursion
+                for (var p = request.TryGetNonWrapperParent();
+                   p != null && p.FactoryType == FactoryType.Decorator;
+                   p = p.TryGetNonWrapperParent())
                 {
-                    result = Decorators.FindLast(d => d.IsAplicable(request));
+                   (appliedDecoratorIDs ?? (appliedDecoratorIDs = new List<int>())).Add(p.FactoryProviderID);
                 }
-                else // If we already have Decorator parent(s), do no apply them again to prevent recursion.
-                {
-                    var applied = new List<int>(2);
-                    while (parent != null && parent.FactoryType == FactoryType.Decorator)
-                    {
-                        applied.Add(parent.FactoryProviderID);
-                        parent = parent.TryGetNonWrapperParent();
-                    }
 
-                    result = Decorators.FindLast(d => !applied.Contains(d.Factory.ProviderID) && d.IsAplicable(request));
-                }
+                result = Decorators.FindLast(d =>
+                    (appliedDecoratorIDs == null || !appliedDecoratorIDs.Contains(d.Factory.ProviderID)) && 
+                    d.IsAplicable(request));
 
                 return result != null;
             }
@@ -1450,7 +1444,7 @@ namespace DryIoc
         public readonly Request Parent; // can be null for resolution root
         public readonly Type ServiceType;
         public readonly Type OpenGenericServiceType;
-        public readonly object ServiceKey; // null, string name or integer index
+        public readonly object ServiceKey; // null for default, string for named or integer index for multiple defaults.
 
         public FactoryType FactoryType { get; private set; }
         public int FactoryID { get; private set; }
@@ -1461,9 +1455,7 @@ namespace DryIoc
         {
             ServiceType = serviceType.ThrowIfNull();
             Throw.If(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
-            
             OpenGenericServiceType = serviceType.IsGenericType ? serviceType.GetGenericTypeDefinition() : null;
-            
             ServiceKey = serviceKey;
             Parent = parent;
         }

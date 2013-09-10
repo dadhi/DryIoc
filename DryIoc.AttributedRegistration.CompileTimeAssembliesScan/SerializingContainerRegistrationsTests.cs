@@ -10,7 +10,28 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
     [TestFixture]
     public class SerializingContainerRegistrationsTests
     {
-        private const string DATA_FILE = "RegistrationData.bin";
+        private const string DATA_FILE = "DryExports.bin";
+
+        private string _originalDirectory;
+        private string _temporaryTestDirectory;
+
+        [SetUp]
+        public void SetupTestDirectory()
+        {
+            _temporaryTestDirectory = Path.GetRandomFileName();
+            Directory.CreateDirectory(_temporaryTestDirectory);
+
+            _originalDirectory = Directory.GetCurrentDirectory();
+            Directory.SetCurrentDirectory(_temporaryTestDirectory);
+        }
+
+        [TearDown]
+        public void TearDownTestDirectory()
+        {
+            Directory.SetCurrentDirectory(_originalDirectory);
+            if (Directory.Exists(_temporaryTestDirectory))
+                Directory.Delete(_temporaryTestDirectory, true);
+        }
 
         [Test]
         //[Ignore]

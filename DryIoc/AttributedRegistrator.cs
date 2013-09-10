@@ -214,7 +214,6 @@ namespace DryIoc
     public sealed class ExportInfo
     {
         public Type ServiceType;
-
         public string ServiceName;
 
         public override bool Equals(object obj)
