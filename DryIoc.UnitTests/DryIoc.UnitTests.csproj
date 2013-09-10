@@ -38,7 +38,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AttributedRegistration\ExportAsDecoratorOrGenericWrapperTests.cs" />
     <Compile Include="AttributedRegistration\ImportUsingTests.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -62,6 +61,7 @@
     <Compile Include="MetadataTests.cs" />
     <Compile Include="Performance\HashTreeAccessSpeedTests.cs" />
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
+    <Compile Include="Playground\DecoratorConditionPlayTests.cs" />
     <Compile Include="Playground\Experiments.cs" />
     <Compile Include="Playground\ExportGenericWrapperPlayTests.cs" />
     <Compile Include="Playground\InitializerPlayTests.cs" />
