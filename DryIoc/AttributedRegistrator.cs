@@ -22,12 +22,29 @@ namespace DryIoc
     {
         public static bool SingletonByDefault = true;
 
-        public static void ScanAndRegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
+        public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
         {
             registrator.RegisterExports(Scan(assemblies));
         }
 
-        public static IEnumerable<ServiceInfo> Scan(IEnumerable<Assembly> assemblies)
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<RegistrationInfo> infos)
+        {
+            foreach (var info in infos)
+            {
+                var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
+                var metadata = info.MetadataAttributeIndex == -1 ? null : FindMetadata(info.ImplementationType, info.MetadataAttributeIndex);
+                var factory = new ReflectionFactory(info.ImplementationType, reuse, FindSingleImportingConstructor, new FactoryOptions(metadata: metadata));
+
+                var contracts = info.Exports;
+                for (var i = 0; i < contracts.Length; i++)
+                {
+                    var contract = contracts[i];
+                    registrator.Register(factory, contract.ServiceType, contract.ServiceName);
+                }
+            }
+        }
+
+        public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
             var implementationTypes = assemblies.SelectMany(a => a.GetTypes()).Where(TypeIsForScan);
 
@@ -35,7 +52,7 @@ namespace DryIoc
             {
                 var attributes = implementationType.GetCustomAttributes(false);
 
-                ServiceContract[] contracts = null;
+                ExportInfo[] exportInfos = null;
                 var isSingleton = SingletonByDefault; // default is singleton
                 var metadataAttributeIndex = -1;
 
@@ -45,39 +62,39 @@ namespace DryIoc
                     if (attribute is ExportAttribute)
                     {
                         var export = (ExportAttribute)attribute;
-                        var newContract = new ServiceContract
+                        var exportInfo = new ExportInfo
                         {
                             ServiceType = export.ContractType ?? implementationType,
                             ServiceName = export.ContractName
                         };
 
-                        if (contracts == null)
+                        if (exportInfos == null)
                         {
-                            contracts = new[] { newContract };
+                            exportInfos = new[] {exportInfo};
                         }
-                        else if (!contracts.Contains(newContract))
+                        else if (!exportInfos.Contains(exportInfo))
                         {
-                            contracts = contracts.AddOrUpdateCopy(newContract);
+                            exportInfos = exportInfos.AddOrUpdateCopy(exportInfo);
                         }
                     }
                     else if (attribute is ExportPublicTypesAttribute)
                     {
-                        var exportAll = (ExportPublicTypesAttribute)attribute;
-                        var newContracts = exportAll.SelectServiceTypes(implementationType)
-                            .Select(type => new ServiceContract { ServiceType = type })
+                        var exportPublic = (ExportPublicTypesAttribute)attribute;
+                        var exportPublicInfos = exportPublic.SelectServiceTypes(implementationType)
+                            .Select(type => new ExportInfo { ServiceType = type })
                             .ToArray();
 
-                        if (contracts != null)
+                        if (exportInfos != null)
                         {
-                            for (var index = 0; index < contracts.Length; index++)
+                            for (var index = 0; index < exportInfos.Length; index++)
                             {
-                                var contract = contracts[index];
-                                if (!newContracts.Contains(contract))
-                                    newContracts = newContracts.AddOrUpdateCopy(contract);
+                                var exportInfo = exportInfos[index];
+                                if (!exportPublicInfos.Contains(exportInfo))
+                                    exportPublicInfos = exportPublicInfos.AddOrUpdateCopy(exportInfo);
                             }
                         }
 
-                        contracts = newContracts;
+                        exportInfos = exportPublicInfos;
 
                     }
                     else if (attribute is PartCreationPolicyAttribute)
@@ -91,30 +108,13 @@ namespace DryIoc
                     }
                 }
 
-                yield return new ServiceInfo
+                yield return new RegistrationInfo
                 {
-                    Contracts = contracts,
+                    Exports = exportInfos,
                     ImplementationType = implementationType,
                     IsSingleton = isSingleton,
                     MetadataAttributeIndex = metadataAttributeIndex
                 };
-            }
-        }
-
-        public static void RegisterExports(this IRegistrator registrator, IEnumerable<ServiceInfo> serviceInfos)
-        {
-            foreach (var info in serviceInfos)
-            {
-                var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
-                var metadata = info.MetadataAttributeIndex == -1 ? null : FindMetadata(info.ImplementationType, info.MetadataAttributeIndex);
-                var factory = new ReflectionFactory(info.ImplementationType, reuse, FindSingleImportingConstructor, new FactoryOptions(metadata: metadata));
-
-                var contracts = info.Contracts;
-                for (var i = 0; i < contracts.Length; i++)
-                {
-                    var contract = contracts[i];
-                    registrator.Register(factory, contract.ServiceType, contract.ServiceName);
-                }
             }
         }
 
@@ -211,7 +211,7 @@ namespace DryIoc
 
 #pragma warning disable 659
     [Serializable]
-    public sealed class ServiceContract
+    public sealed class ExportInfo
     {
         public Type ServiceType;
 
@@ -219,15 +219,15 @@ namespace DryIoc
 
         public override bool Equals(object obj)
         {
-            var other = obj as ServiceContract;
+            var other = obj as ExportInfo;
             return other != null && other.ServiceType == ServiceType && other.ServiceName == ServiceName;
         }
     }
 
     [Serializable]
-    public sealed class ServiceInfo
+    public sealed class RegistrationInfo
     {
-        public ServiceContract[] Contracts;
+        public ExportInfo[] Exports;
 
         public Type ImplementationType;
 
@@ -237,15 +237,15 @@ namespace DryIoc
 
         public override bool Equals(object obj)
         {
-            var other = obj as ServiceInfo;
+            var other = obj as RegistrationInfo;
             if (other == null)
                 return false;
 
-            if (Contracts.Length != other.Contracts.Length)
+            if (Exports.Length != other.Exports.Length)
                 return false;
 
-            for (var i = 0; i < Contracts.Length; i++)
-                if (!Contracts[i].Equals(other.Contracts[i]))
+            for (var i = 0; i < Exports.Length; i++)
+                if (!Exports[i].Equals(other.Exports[i]))
                     return false;
 
             return ImplementationType == other.ImplementationType

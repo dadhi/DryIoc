@@ -21,7 +21,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
 			for (int i = 0; i < times; i++)
 			{
 				var container = new Container();
-				container.ScanAndRegisterExports(currentAssembly);
+				container.RegisterExports(currentAssembly);
 			}
 
 			stopwatch.Stop();
