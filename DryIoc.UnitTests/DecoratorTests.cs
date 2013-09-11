@@ -196,7 +196,7 @@ namespace DryIoc.UnitTests
         public void Should_propogate_metadata_to_Meta_wrapper()
         {
             var container = new Container();
-            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), with: new FactoryOptions(metadata: "blah"));
+            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Factory.WithMetadata("blah"));
             container.Decorate(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>));
             container.RegisterPublicTypes(typeof(OperationUser<>));
 

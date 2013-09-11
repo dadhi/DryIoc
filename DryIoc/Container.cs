@@ -54,7 +54,7 @@ namespace DryIoc
     ///	<item>Transient or Singleton instance reuse (Transient means - not reuse, so it just a null). 
     /// Custom reuse policy is possible via specifying your own <see cref="IReuse"/> implementation.</item>
     /// <item>Arbitrary lambda factory to return service.</item>
-    ///	<item>Options service name.</item>
+    ///	<item>Optional service name.</item>
     ///	<item>Open generics are registered the same way as concrete types.</item>
     ///	<item>User-defined service metadata.</item>
     /// <item>Check if service is registered via <see cref="Registrator.IsRegistered"/>.</item>
@@ -353,7 +353,7 @@ namespace DryIoc
         public void RegisterDecorator(Decorator decorator, Type serviceType)
         {
             ThrowIfServiceTypeIsNotImplementedBy(decorator.Factory, serviceType);
-            Throw.If(!decorator.Factory.Options.SkipCache, Error.DECORATOR_FACTORY_SHOULD_NOT_CACHE_EXPRESSION, serviceType);
+            Throw.If(!decorator.Factory.Setup.SkipCache, Error.DECORATOR_FACTORY_SHOULD_NOT_CACHE_EXPRESSION, serviceType);
             lock (_syncRoot)
             {
                 var entry = _registry.GetOrAdd(serviceType, _ => new RegistryEntry());
@@ -516,7 +516,7 @@ namespace DryIoc
 
         private static object TryGetTypedMetadata(Factory factory, Type metadataType)
         {
-            var metadata = factory.Options.Metadata;
+            var metadata = factory.Setup.Metadata;
             return metadata != null && metadataType.IsInstanceOfType(metadata) ? metadata : null;
         }
 
@@ -538,7 +538,7 @@ namespace DryIoc
                         : EnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
                     return Expression.Call(resolver, resolveMethod, Expression.Constant(request));
                 },
-                options: new FactoryOptions(skipCache: true));
+                setup: Factory.With(skipCache: true));
         }
 
         internal sealed class EnumerableResolver
@@ -907,15 +907,15 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceType">The service type to register.</param>
         /// <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
-        /// <param name="reuse">Options <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="withConstructor">Options strategy to select constructor when multiple available.</param>
-        /// <param name="with">Additional registration options as provided in <see cref="FactoryOptions"/></param>
+        /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
+        /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register(this IRegistrator registrator, Type serviceType,
-            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactoryOptions with = null,
+            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
-            registrator.Register(new ReflectionFactory(implementationType, reuse, withConstructor, with), serviceType, named);
+            registrator.Register(new ReflectionFactory(implementationType, reuse, withConstructor, setup), serviceType, named);
         }
 
         /// <summary>
@@ -923,15 +923,15 @@ namespace DryIoc
         /// </summary>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
-        /// <param name="reuse">Options <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
+        /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
-        /// <param name="with">Additional registration options as provided in <see cref="FactoryOptions"/></param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactoryOptions with = null,
+            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
-            registrator.Register(new ReflectionFactory(implementationType, reuse, withConstructor, with), implementationType, named);
+            registrator.Register(new ReflectionFactory(implementationType, reuse, withConstructor, setup), implementationType, named);
         }
 
         /// <summary>
@@ -942,14 +942,14 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
-        /// <param name="with">Additional registration options as provided in <see cref="FactoryOptions"/></param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, ConstructorSelector withConstructor = null, FactoryOptions with = null,
+            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             string named = null)
             where TImplementation : TService
         {
-            registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, with), typeof(TService), named);
+            registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup), typeof(TService), named);
         }
 
         /// <summary>
@@ -959,13 +959,13 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
-        /// <param name="with">Additional registration options as provided in <see cref="FactoryOptions"/></param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, ConstructorSelector withConstructor = null, FactoryOptions with = null,
+            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
-            registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, with), typeof(TImplementation), named);
+            registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup), typeof(TImplementation), named);
         }
 
         /// <summary>
@@ -975,13 +975,13 @@ namespace DryIoc
         /// <param name="implementationType">Service implementation type. Concrete and open-generic class are supported.</param>
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
-        /// <param name="with">Additional registration options as provided in <see cref="FactoryOptions"/></param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void RegisterPublicTypes(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactoryOptions with = null,
+            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
-            var registration = new ReflectionFactory(implementationType, reuse, withConstructor, with);
+            var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
             foreach (var serviceType in implementationType.GetSelfAndImplemented().Where(Container.PublicTypes))
                 registrator.Register(registration, serviceType, named);
         }
@@ -993,13 +993,13 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
-        /// <param name="with">Additional registration options as provided in <see cref="FactoryOptions"/></param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void RegisterPublicTypes<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, ConstructorSelector withConstructor = null, FactoryOptions with = null,
+            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
-            registrator.RegisterPublicTypes(typeof(TImplementation), reuse, withConstructor, with, named);
+            registrator.RegisterPublicTypes(typeof(TImplementation), reuse, withConstructor, setup, named);
         }
 
         /// <summary>
@@ -1009,14 +1009,14 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="lambda">The delegate used to create a instance of <typeparamref name="TService"/>.</param>
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="with">Additional registration options as provided in <see cref="FactoryOptions"/></param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional service name.</param>
         public static void RegisterLambda<TService>(this IRegistrator registrator,
-            Func<TService> lambda, IReuse reuse = null, FactoryOptions with = null,
+            Func<TService> lambda, IReuse reuse = null, FactorySetup setup = null,
             string named = null)
         {
             var lambdaCall = Expression.Call(Expression.Constant(lambda), "Invoke", null, null);
-            registrator.Register(new CustomFactory((_, __) => lambdaCall, reuse, with), typeof(TService), named);
+            registrator.Register(new CustomFactory((_, __) => lambdaCall, reuse, setup), typeof(TService), named);
         }
 
         /// <summary>
@@ -1025,13 +1025,13 @@ namespace DryIoc
         /// <typeparam name="TService">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="instance">The pre-created instance of <typeparamref name="TService"/>.</param>
-        /// <param name="options">Additional registration options as provided in <see cref="FactoryOptions"/></param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional service name.</param>
         public static void RegisterInstance<TService>(this IRegistrator registrator,
-            TService instance, FactoryOptions options = null,
+            TService instance, FactorySetup setup = null,
             string named = null)
         {
-            registrator.RegisterLambda(() => instance, Reuse.Transient, options, named);
+            registrator.RegisterLambda(() => instance, Reuse.Transient, setup, named);
         }
 
         /// <summary>
@@ -1044,7 +1044,7 @@ namespace DryIoc
         public static void Decorate(this IRegistrator registrator,
             Type serviceType, Type decoratorType, ConstructorSelector withConstructor = null)
         {
-            var factory = new ReflectionFactory(decoratorType, Reuse.Transient, withConstructor, new FactoryOptions(true));
+            var factory = new ReflectionFactory(decoratorType, Reuse.Transient, withConstructor, new FactorySetup.Decorator());
             registrator.RegisterDecorator(new Decorator(factory), serviceType);
         }
 
@@ -1167,22 +1167,64 @@ namespace DryIoc
 
     public delegate Expression Init(Expression source);
 
-    public class FactoryOptions
+    public abstract class FactorySetup
     {
-        public static readonly FactoryOptions Default = new FactoryOptions();
+        public static readonly FactorySetup Default = new Service();
 
-        public readonly bool SkipCache;
-        public readonly Init Init;
-        public readonly object Metadata;
+        public virtual Init Init { get { return null; } }
+        public virtual bool SkipCache { get { return false; } }
+        public virtual object Metadata { get { return null; } }
 
-        public FactoryOptions(bool skipCache = false, Init init = null, object metadata = null)
+        public class Service : FactorySetup
         {
-            SkipCache = skipCache;
-            Init = init;
-            Metadata = metadata;
+            public override Init Init { get { return _init; } }
+            public override bool SkipCache { get { return _skipCache; } }
+            public override object Metadata { get { return _metadata; } }
+
+            public Service(Init init = null, bool skipCache = false, object metadata = null)
+            {
+                _init = init;
+                _skipCache = skipCache;
+                _metadata = metadata;
+            }
+
+            private readonly Init _init;
+            private readonly bool _skipCache;
+            private readonly object _metadata;
+        }
+
+        public class GenericWrapper : FactorySetup
+        {
+            public readonly SelectGenericTypeArg SelectGenericTypeArg;
+
+            public GenericWrapper(SelectGenericTypeArg selectGenericTypeArg = null)
+            {
+                SelectGenericTypeArg = selectGenericTypeArg ?? SelectSingleOrThrow;
+            }
+
+            private static Type SelectSingleOrThrow(Type[] typeArgs)
+            {
+                return typeArgs.ThrowIf(typeArgs.Length != 1)[0];
+            }
+        }
+
+        public class Decorator : FactorySetup
+        {
+            public override bool SkipCache { get { return true; } }
+            public readonly Func<Request, bool> IsApplicable;
+
+            public Decorator(Func<Request, bool> isApplicable = null)
+            {
+                IsApplicable = isApplicable ?? ApplicableIndeed;
+            }
+
+            private static bool ApplicableIndeed(Request _)
+            {
+                return true;
+            }
         }
     }
-
+    
     public abstract class Factory
     {
         public static volatile int Count;
@@ -1193,27 +1235,27 @@ namespace DryIoc
 
         public readonly IReuse Reuse;
 
-        public readonly FactoryOptions Options;
+        public readonly FactorySetup Setup;
 
         public virtual Type ImplementationType { get { return null; } }
 
-        protected Factory(IReuse reuse = null, FactoryOptions options = null)
+        protected Factory(IReuse reuse = null, FactorySetup setup = null)
         {
             ID = Interlocked.Increment(ref Count);
             Reuse = reuse;
-            Options = options ?? FactoryOptions.Default;
+            Setup = setup ?? FactorySetup.Default;
         }
 
         public Expression GetExpression(Request request, IRegistry registry)
         {
-            if (Options.SkipCache || _cachedExpression == null)
+            if (Setup.SkipCache || _cachedExpression == null)
             {
                 var expression = CreateExpression(request, registry);
-                if (Options.Init != null)
-                    expression = Options.Init(expression);
+                if (Setup.Init != null)
+                    expression = Setup.Init(expression);
                 if (Reuse != null)
                     expression = Reuse.Of(request, registry, ID, expression);
-                if (Options.SkipCache)
+                if (Setup.SkipCache)
                     return expression;
                 Interlocked.CompareExchange(ref _cachedExpression, expression, null);
             }
@@ -1227,8 +1269,8 @@ namespace DryIoc
             if (func == null)
                 return null;
             var expression = func.Body;
-            if (Options.Init != null)
-                expression = Options.Init(expression);
+            if (Setup.Init != null)
+                expression = Setup.Init(expression);
             if (Reuse != null)
                 func = Expression.Lambda(funcType, Reuse.Of(request, registry, ID, expression), func.Parameters);
             return func;
@@ -1248,6 +1290,16 @@ namespace DryIoc
         private volatile Expression _cachedExpression;
 
         #endregion
+
+        public static FactorySetup With(Init init = null, bool skipCache = false, object metadata = null)
+        {
+            return new FactorySetup.Service(init, skipCache, metadata);
+        }
+
+        public static FactorySetup WithMetadata(object metadata)
+        {
+            return new FactorySetup.Service(metadata: metadata);
+        }
     }
 
     public delegate ConstructorInfo ConstructorSelector(Type implementationType);
@@ -1259,8 +1311,8 @@ namespace DryIoc
         public override int ProviderID { get { return _providerID; } }
 
         public ReflectionFactory(Type implementationType, IReuse reuse = null, ConstructorSelector selectConstructor = null, 
-            FactoryOptions options = null)
-            : base(reuse, options)
+            FactorySetup setup = null)
+            : base(reuse, setup)
         {
             _implementationType = implementationType.ThrowIfNull();
              Throw.If(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
@@ -1272,7 +1324,7 @@ namespace DryIoc
         {
             if (!_implementationType.IsGenericTypeDefinition) return null;
             var closedImplType = _implementationType.MakeGenericType(request.ServiceType.GetGenericArguments());
-            return new ReflectionFactory(closedImplType, Reuse, _selectConstructor, Options) { _providerID = ID };
+            return new ReflectionFactory(closedImplType, Reuse, _selectConstructor, Setup) { _providerID = ID };
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -1390,8 +1442,8 @@ namespace DryIoc
 
     public class CustomFactory : Factory
     {
-        public CustomFactory(Func<Request, IRegistry, Expression> getExpression, IReuse reuse = null, FactoryOptions options = null)
-            : base(reuse, options)
+        public CustomFactory(Func<Request, IRegistry, Expression> getExpression, IReuse reuse = null, FactorySetup setup = null)
+            : base(reuse, setup)
         {
             _getExpression = getExpression.ThrowIfNull();
         }

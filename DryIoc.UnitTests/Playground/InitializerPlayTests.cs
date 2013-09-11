@@ -11,8 +11,8 @@ namespace DryIoc.UnitTests.Playground
         public void Should_be_able_init_service_registered_with_impl_type()
         {
             var container = new Container();
-            container.Register<Boo>(with: new FactoryOptions(
-                init: x => Expression.MemberInit((NewExpression)x, Expression.Bind(typeof(Boo).GetMember("Flag")[0], Expression.Constant(1)))));
+            container.Register<Boo>(setup: Factory.With(
+                x => Expression.MemberInit((NewExpression)x, Expression.Bind(typeof(Boo).GetMember("Flag")[0], Expression.Constant(1)))));
 
             var boo = container.Resolve<Boo>();
 
@@ -39,8 +39,8 @@ namespace DryIoc.UnitTests.Playground
 
             Func<Boo, Boo> setFlagToOne = _ => _.Do(x => x.Flag = 1);
 
-            container.RegisterLambda(() => new Boo(), with: new FactoryOptions(
-                init: x => Expression.Call(Expression.Constant(setFlagToOne), "Invoke", null, x)));
+            container.RegisterLambda(() => new Boo(), setup: Factory.With(
+                x => Expression.Call(Expression.Constant(setFlagToOne), "Invoke", null, x)));
 
             var boo = container.Resolve<Boo>();
 

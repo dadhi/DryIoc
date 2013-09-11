@@ -33,7 +33,7 @@ namespace DryIoc
             {
                 var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
                 var metadata = info.MetadataAttributeIndex == -1 ? null : FindMetadata(info.ImplementationType, info.MetadataAttributeIndex);
-                var factory = new ReflectionFactory(info.ImplementationType, reuse, FindSingleImportingConstructor, new FactoryOptions(metadata: metadata));
+                var factory = new ReflectionFactory(info.ImplementationType, reuse, FindSingleImportingConstructor, Factory.With(metadata: metadata));
 
                 var contracts = info.Exports;
                 for (var i = 0; i < contracts.Length; i++)
@@ -70,7 +70,7 @@ namespace DryIoc
 
                         if (exportInfos == null)
                         {
-                            exportInfos = new[] {exportInfo};
+                            exportInfos = new[] { exportInfo };
                         }
                         else if (!exportInfos.Contains(exportInfo))
                         {
@@ -160,7 +160,7 @@ namespace DryIoc
 
             var attribute = (ImportWithMetadataAttribute)attributes[0];
             var serviceType = registry.GetWrappedServiceTypeOrSelf(parameter.ParameterType);
-            var serviceKey = registry.GetKeys(serviceType, f => attribute.Metadata.Equals(f.Options.Metadata)).FirstOrDefault();
+            var serviceKey = registry.GetKeys(serviceType, f => attribute.Metadata.Equals(f.Setup.Metadata)).FirstOrDefault();
 
             return serviceKey.ThrowIfNull(UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, attribute.Metadata);
         }
@@ -179,7 +179,7 @@ namespace DryIoc
 
             var implementationType = import.ImplementationType ?? serviceType;
             var reuse = import.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
-            var options = import.Metadata == null ? FactoryOptions.Default : new FactoryOptions(metadata: import.Metadata);
+            var options = import.Metadata == null ? FactorySetup.Default : Factory.WithMetadata(import.Metadata);
             ConstructorSelector withConstructor = t => t.GetConstructor(import.ConstructorSignature);
 
             registry.Register(serviceType, implementationType, reuse, withConstructor, options, serviceName);

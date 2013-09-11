@@ -13,7 +13,7 @@ namespace DryIoc.UnitTests.Playground
             container.Register<IHandler, SlowHandler>(named: "slow");
             container.RegisterDecorator(
                 new Decorator(
-                    new ReflectionFactory(typeof(LoggingHandlerDecorator), options: new FactoryOptions(true)),
+                    new ReflectionFactory(typeof(LoggingHandlerDecorator), setup: Factory.With(skipCache: true)),
                     request => Equals(request.ServiceKey, "slow")),
                 typeof(IHandler));
 
