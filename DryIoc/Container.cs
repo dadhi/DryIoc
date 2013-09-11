@@ -147,11 +147,10 @@ namespace DryIoc
             {
                 // Decorator.
                 RegistryEntry entry;
-                Decorator decorator;
                 if (_registry.TryGetValue(request.ServiceType, out entry) &&
-                    entry.TryGetDecorator(out decorator, request))
+                    entry.TryGetDecorator(out result, request))
                 {
-                    result = decorator.Factory.TryProvideFactoryFor(request, this) ?? decorator.Factory;
+                    result = result.TryProvideFactoryFor(request, this) ?? result;
                     request.SetResult(result, FactoryType.Decorator);
                     return result;
                 }
@@ -160,19 +159,20 @@ namespace DryIoc
                 RegistryEntry openGenericEntry = null;
                 if (request.OpenGenericServiceType != null &&
                     _registry.TryGetValue(request.OpenGenericServiceType, out openGenericEntry) &&
-                    openGenericEntry.TryGetDecorator(out decorator, request) &&
-                    (decorator = decorator.TryProvideDecoratorFor(request, this)) != null)
+                    openGenericEntry.TryGetDecorator(out result, request) &&
+                    (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
-                    request.SetResult(decorator.Factory, FactoryType.Decorator);
+                    request.SetResult(result, FactoryType.Decorator); // TODO: I don't need to provide FactoryType here, it can be figured out from result
 
-                    RegisterDecorator(decorator, request.ServiceType); // TODO: May be by providing ServiceKey we could stop using SkipCache.
-                                                                       // TODO: Do we need to register closed gen decorator at all?
-                        
-                    return decorator.Factory;
+                    Register(result, request.ServiceType, null); // TODO: May be by providing ServiceKey we could stop using SkipCache. 
+                                                                 //       May be implemented by storing Decorator as normal factory in Named and Indexed collections.
+                                                                 // TODO: Do we need to register closed gen decorator at all?
+
+                    return result;
                 }
 
                 // Service.
-                if (entry != null && 
+                if (entry != null &&
                     entry.TryGetServiceFactory(out result, request.ServiceType, request.ServiceKey))
                 {
                     result = result.TryProvideFactoryFor(request, this) ?? result;
@@ -318,14 +318,30 @@ namespace DryIoc
 
         public void Register(Factory factory, Type serviceType, string serviceName)
         {
-            ThrowIfServiceTypeIsNotImplementedBy(factory, serviceType);
+            ThrowIfNotImplemented(serviceType.ThrowIfNull(), factory.ThrowIfNull().ImplementationType);
             lock (_syncRoot)
             {
                 var entry = _registry.GetOrAdd(serviceType, _ => new RegistryEntry());
-                if (serviceName != null)
+
+                if (factory.Setup is FactorySetup.Decorator)
                 {
-                    if (entry.Named == null)
-                        entry.Named = new Dictionary<string, Factory>();
+                    entry.Decorators = entry.Decorators ?? new List<Factory>();
+                    entry.Decorators.Add(factory);
+                    return;
+                }
+
+                if (serviceName == null)
+                {
+                    if (entry.LastDefault != null)
+                    {
+                        entry.Defaults = entry.Defaults ?? new List<Factory> { entry.LastDefault };
+                        entry.Defaults.Add(factory);
+                    }
+                    entry.LastDefault = factory;
+                }
+                else
+                {
+                    entry.Named = entry.Named ?? new Dictionary<string, Factory>();
                     try
                     {
                         entry.Named.Add(serviceName, factory);
@@ -337,34 +353,12 @@ namespace DryIoc
                             serviceType, serviceName, implType != null ? implType.Print() : "<custom>");
                     }
                 }
-                else
-                {
-                    if (entry.LastDefault != null)
-                    {
-                        if (entry.Defaults == null)
-                            entry.Defaults = new List<Factory> { entry.LastDefault };
-                        entry.Defaults.Add(factory);
-                    }
-                    entry.LastDefault = factory;
-                }
-            }
-        }
-
-        public void RegisterDecorator(Decorator decorator, Type serviceType)
-        {
-            ThrowIfServiceTypeIsNotImplementedBy(decorator.Factory, serviceType);
-            Throw.If(!decorator.Factory.Setup.SkipCache, Error.DECORATOR_FACTORY_SHOULD_NOT_CACHE_EXPRESSION, serviceType);
-            lock (_syncRoot)
-            {
-                var entry = _registry.GetOrAdd(serviceType, _ => new RegistryEntry());
-                if (entry.Decorators == null) entry.Decorators = new List<Decorator>();
-                entry.Decorators.Add(decorator);
             }
         }
 
         public void RegisterGenericWrapper(Factory factory, Type serviceType, SelectGenericTypeArg getWrappedServiceType)
         {
-            ThrowIfServiceTypeIsNotImplementedBy(factory, serviceType);
+            ThrowIfNotImplemented(serviceType, factory.ImplementationType);
             lock (_syncRoot)
                 _genericWrappers = _genericWrappers.AddOrUpdate(serviceType, new GenericWrapperEntry(factory, getWrappedServiceType));
         }
@@ -376,10 +370,8 @@ namespace DryIoc
                    _genericWrappers.TryGet(serviceType.GetGenericTypeDefinition()) != null;
         }
 
-        private static void ThrowIfServiceTypeIsNotImplementedBy(Factory factory, Type serviceType)
+        private static void ThrowIfNotImplemented(Type serviceType, Type implementationType)
         {
-            serviceType.ThrowIfNull();
-            var implementationType = factory.ThrowIfNull().ImplementationType;
             if (implementationType != null && serviceType != typeof(object))
                 Throw.If(!implementationType.GetSelfAndImplemented().Contains(serviceType),
                     Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
@@ -632,7 +624,7 @@ namespace DryIoc
             public Factory LastDefault;
             public List<Factory> Defaults;
             public Dictionary<string, Factory> Named;
-            public List<Decorator> Decorators;
+            public List<Factory> Decorators;
 
             public bool TryGetServiceFactory(out Factory result, Type serviceType, object serviceKey)
             {
@@ -664,7 +656,7 @@ namespace DryIoc
                 return result != null;
             }
 
-            public bool TryGetDecorator(out Decorator result, Request request)
+            public bool TryGetDecorator(out Factory result, Request request)
             {
                 result = null;
                 if (Decorators == null)
@@ -675,12 +667,12 @@ namespace DryIoc
                    p != null && p.FactoryType == FactoryType.Decorator;
                    p = p.TryGetNonWrapperParent())
                 {
-                   (appliedDecoratorIDs ?? (appliedDecoratorIDs = new List<int>())).Add(p.FactoryProviderID);
+                    (appliedDecoratorIDs ?? (appliedDecoratorIDs = new List<int>())).Add(p.FactoryProviderID);
                 }
 
                 result = Decorators.FindLast(d =>
-                    (appliedDecoratorIDs == null || !appliedDecoratorIDs.Contains(d.Factory.ProviderID)) && 
-                    d.IsApplicable(request));
+                    (appliedDecoratorIDs == null || !appliedDecoratorIDs.Contains(d.ProviderID)) &&
+                    ((FactorySetup.Decorator)d.Setup).IsApplicable(request));
 
                 return result != null;
             }
@@ -699,30 +691,6 @@ namespace DryIoc
         }
 
         #endregion
-    }
-
-    public class Decorator
-    {
-        public Factory Factory;
-
-        public Decorator(Factory factory, Func<Request, bool> isApplicable = null)
-        {
-            Factory = factory;
-            _isApplicable = isApplicable;
-        }
-
-        public bool IsApplicable(Request request)
-        {
-            return _isApplicable == null || _isApplicable(request);
-        }
-
-        public Decorator TryProvideDecoratorFor(Request request, IRegistry registry)
-        {
-            var specificFactory = Factory.TryProvideFactoryFor(request, registry);
-            return specificFactory == null ? null : new Decorator(specificFactory, _isApplicable);
-        }
-
-        private readonly Func<Request, bool> _isApplicable;
     }
 
     public abstract class FactoryProvider : Factory
@@ -868,10 +836,7 @@ namespace DryIoc
         public static readonly string CONTAINER_IS_GARBAGE_COLLECTED =
             "Container is no longer available (has been garbage-collected already).";
 
-        public static readonly string DECORATOR_FACTORY_SHOULD_NOT_CACHE_EXPRESSION =
-            "Decorator factory of {0} should not cache expression. Please specify FactoryOptions.SkipCache=true.";
-
-        public static readonly string DUPLICATE_SERVICE_NAME_REGISTRATION = 
+        public static readonly string DUPLICATE_SERVICE_NAME_REGISTRATION =
             "Service {0} with duplicate name '{1}' is already registered with implementation {2}.";
     }
 
@@ -1032,33 +997,6 @@ namespace DryIoc
             string named = null)
         {
             registrator.RegisterLambda(() => instance, Reuse.Transient, setup, named);
-        }
-
-        /// <summary>
-        /// Registers decorator of <paramref name="decoratorType"/> type for instances of <paramref name="serviceType"/> type.
-        /// </summary>
-        /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="serviceType">The service type to register.</param>
-        /// <param name="decoratorType">Implementation type. Concrete and open-generic class are supported.</param>
-        /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
-        public static void Decorate(this IRegistrator registrator,
-            Type serviceType, Type decoratorType, ConstructorSelector withConstructor = null)
-        {
-            var factory = new ReflectionFactory(decoratorType, Reuse.Transient, withConstructor, new FactorySetup.Decorator());
-            registrator.RegisterDecorator(new Decorator(factory), serviceType);
-        }
-
-        /// <summary>
-        /// Registers decorator of <typeparamref name="TDecorator"/> type for instances of <typeparamref name="TService"/> type.
-        /// </summary>
-        /// <typeparam name="TService">The type of service.</typeparam>
-        /// <typeparam name="TDecorator">The type of service.</typeparam>
-        /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
-        public static void Decorate<TService, TDecorator>(this IRegistrator registrator, ConstructorSelector withConstructor = null)
-            where TDecorator : TService
-        {
-            registrator.Decorate(typeof(TService), typeof(TDecorator));
         }
 
         /// <summary>
@@ -1224,7 +1162,7 @@ namespace DryIoc
             }
         }
     }
-    
+
     public abstract class Factory
     {
         public static volatile int Count;
@@ -1277,7 +1215,7 @@ namespace DryIoc
         }
 
         public abstract Factory TryProvideFactoryFor(Request request, IRegistry registry);
-        
+
         protected abstract Expression CreateExpression(Request request, IRegistry registry);
 
         protected virtual LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry)
@@ -1300,6 +1238,11 @@ namespace DryIoc
         {
             return new FactorySetup.Service(metadata: metadata);
         }
+
+        public static FactorySetup Decorator(Func<Request, bool> isApplicable = null)
+        {
+            return new FactorySetup.Decorator(isApplicable);
+        }
     }
 
     public delegate ConstructorInfo ConstructorSelector(Type implementationType);
@@ -1310,12 +1253,12 @@ namespace DryIoc
 
         public override int ProviderID { get { return _providerID; } }
 
-        public ReflectionFactory(Type implementationType, IReuse reuse = null, ConstructorSelector selectConstructor = null, 
+        public ReflectionFactory(Type implementationType, IReuse reuse = null, ConstructorSelector selectConstructor = null,
             FactorySetup setup = null)
             : base(reuse, setup)
         {
             _implementationType = implementationType.ThrowIfNull();
-             Throw.If(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
+            Throw.If(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
             _selectConstructor = selectConstructor;
             _providerID = ID;
         }
@@ -1715,8 +1658,6 @@ namespace DryIoc
     public interface IRegistrator
     {
         void Register(Factory factory, Type serviceType, string serviceName);
-
-        void RegisterDecorator(Decorator factory, Type serviceType);
 
         void RegisterGenericWrapper(Factory factory, Type serviceType, SelectGenericTypeArg getWrappedServiceType);
 
