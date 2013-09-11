@@ -205,6 +205,17 @@ namespace DryIoc.UnitTests
             Assert.That(user.GetOperation.Metadata, Is.EqualTo("blah"));
             Assert.That(user.GetOperation.Value(), Is.InstanceOf<MeasureExecutionTimeOperationDecorator<object>>());
         }
+
+        [Test]
+        public void Resolving_Func_with_parameters_of_decorated_service_is_NOT_supported()
+        {
+            var container = new Container();
+            container.Register<IOperation, ParemeterizedOperation>();
+            container.Decorate<IOperation, RetryOperationDecorator>();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<Func<object, IOperation>>());
+        }
     }
 
     public class OperationUser<T>
@@ -222,6 +233,16 @@ namespace DryIoc.UnitTests
     public class SomeOperation : IOperation { }
 
     public class AnotherOperation : IOperation { }
+
+    public class ParemeterizedOperation : IOperation
+    {
+        public object Param { get; set; }
+
+        public ParemeterizedOperation(object param)
+        {
+            Param = param;
+        }
+    }
 
     public class MeasureExecutionTimeOperationDecorator : IOperation
     {

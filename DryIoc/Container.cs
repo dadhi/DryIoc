@@ -18,6 +18,7 @@
 // - Make Request to return Empty for resolution root parent. So it will simplify ImplementationType checks. May be add IsResolutionRoot property as well.
 // - Make a single consistent approach to ResolveProperties and PropertyOrFieldResolutionRules.
 // - Move Container Setup related code to dedicated class/container-property Setup.
+// - Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
 //
 // Internals:
 // - Rename request to DependencyChain.
@@ -103,7 +104,8 @@ namespace DryIoc
                     //RegisterGenericWrapper(new CustomFactoryProvider(TryResolveFunc), funcType, t => t[t.Length - 1]);
                     RegisterGenericWrapper(new FuncFactory(), funcType, t => t[t.Length - 1]);
 
-                RegisterGenericWrapper(new ReflectionFactory(typeof(Lazy<>), selectConstructor: t => t.GetConstructor(new[] { typeof(Func<>) })),
+                RegisterGenericWrapper(
+                    new ReflectionFactory(typeof(Lazy<>), selectConstructor: t => t.GetConstructor(new[] { typeof(Func<>) })),
                     typeof(Lazy<>), t => t[0]);
 
                 RegisterGenericWrapper(new CustomFactoryProvider(TryResolveMeta), typeof(Meta<,>), t => t[0]);
@@ -678,7 +680,7 @@ namespace DryIoc
 
                 result = Decorators.FindLast(d =>
                     (appliedDecoratorIDs == null || !appliedDecoratorIDs.Contains(d.Factory.ProviderID)) && 
-                    d.IsAplicable(request));
+                    d.IsApplicable(request));
 
                 return result != null;
             }
@@ -709,7 +711,7 @@ namespace DryIoc
             _isApplicable = isApplicable;
         }
 
-        public bool IsAplicable(Request request)
+        public bool IsApplicable(Request request)
         {
             return _isApplicable == null || _isApplicable(request);
         }
