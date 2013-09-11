@@ -88,29 +88,31 @@ namespace DryIoc
         public Container(bool coreOnly = false)
         {
             _syncRoot = new object();
-            _registry = new Dictionary<Type, RegistryEntry>();
+            _serviceFactories = new Dictionary<Type, RegistryEntry>();
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
-            _genericWrappers = HashTree<Type, GenericWrapperEntry>.Empty;
+            _genericWrapperFactories = HashTree<Type, Factory>.Empty;
 
             Setup = new Setup();
             CurrentScope = SingletonScope = new Scope();
 
-            if (!coreOnly) // Default setup, May I just pass custom setup instead flag?
+            if (!coreOnly) // TODO: Default setup, May I just pass custom setup instead flag?
             {
                 Setup.AddNonRegisteredServiceResolutionRule(TryResolveEnumerableOrArray);
 
+                var funcFactory = new FuncFactory();
                 foreach (var funcType in FuncTypes)
                     //RegisterGenericWrapper(new CustomFactoryProvider(TryResolveFunc), funcType, t => t[t.Length - 1]);
-                    RegisterGenericWrapper(new FuncFactory(), funcType, t => t[t.Length - 1]);
+                    Register(funcFactory, funcType, serviceName: null);
 
-                RegisterGenericWrapper(
-                    new ReflectionFactory(typeof(Lazy<>), selectConstructor: t => t.GetConstructor(new[] { typeof(Func<>) })),
-                    typeof(Lazy<>), t => t[0]);
+                Register(new ReflectionFactory(typeof(Lazy<>), null, t => t.GetConstructor(new[] { typeof(Func<>) }), new FactorySetup.GenericWrapper()),
+                    typeof(Lazy<>), serviceName: null);
 
-                RegisterGenericWrapper(new CustomFactoryProvider(TryResolveMeta), typeof(Meta<,>), t => t[0]);
+                Register(new CustomFactoryProvider(TryResolveMeta, new FactorySetup.GenericWrapper(t => t[0])),
+                    typeof(Meta<,>), serviceName: null);
 
-                RegisterGenericWrapper(new CustomFactoryProvider(TryResolveFactoryExpression), typeof(FactoryExpression<>), t => t[0]);
+                Register(new CustomFactoryProvider(TryResolveFactoryExpression, new FactorySetup.GenericWrapper()),
+                    typeof(FactoryExpression<>), serviceName: null);
             }
         }
 
@@ -147,7 +149,7 @@ namespace DryIoc
             {
                 // Decorator.
                 RegistryEntry entry;
-                if (_registry.TryGetValue(request.ServiceType, out entry) &&
+                if (_serviceFactories.TryGetValue(request.ServiceType, out entry) &&
                     entry.TryGetDecorator(out result, request))
                 {
                     result = result.TryProvideFactoryFor(request, this) ?? result;
@@ -158,15 +160,15 @@ namespace DryIoc
                 // Open-generic Decorator.
                 RegistryEntry openGenericEntry = null;
                 if (request.OpenGenericServiceType != null &&
-                    _registry.TryGetValue(request.OpenGenericServiceType, out openGenericEntry) &&
+                    _serviceFactories.TryGetValue(request.OpenGenericServiceType, out openGenericEntry) &&
                     openGenericEntry.TryGetDecorator(out result, request) &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
                     request.SetResult(result, FactoryType.Decorator); // TODO: I don't need to provide FactoryType here, it can be figured out from result
 
                     Register(result, request.ServiceType, null); // TODO: May be by providing ServiceKey we could stop using SkipCache. 
-                                                                 //       May be implemented by storing Decorator as normal factory in Named and Indexed collections.
-                                                                 // TODO: Do we need to register closed gen decorator at all?
+                    //       May be implemented by storing Decorator as normal factory in Named and Indexed collections.
+                    // TODO: Do we need to register closed gen decorator at all?
 
                     return result;
                 }
@@ -191,10 +193,9 @@ namespace DryIoc
                 }
 
                 // Open-generic Wrapper.
-                GenericWrapperEntry wrapper;
                 if (request.OpenGenericServiceType != null &&
-                    (wrapper = _genericWrappers.TryGet(request.OpenGenericServiceType)) != null &&
-                    (result = wrapper.Factory.TryProvideFactoryFor(request, this)) != null)
+                    (result = _genericWrapperFactories.TryGet(request.OpenGenericServiceType)) != null &&
+                    (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
                     request.SetResult(result, FactoryType.GenericWrapper);
                     Register(result, request.ServiceType, request.ServiceKey as string);
@@ -265,11 +266,11 @@ namespace DryIoc
             if (!serviceType.IsGenericType)
                 return serviceType;
 
-            var entry = _genericWrappers.TryGet(serviceType.GetGenericTypeDefinition());
-            if (entry == null)
+            var factory = _genericWrapperFactories.TryGet(serviceType.GetGenericTypeDefinition());
+            if (factory == null)
                 return serviceType;
 
-            var wrappedType = entry.GetWrappedServiceType(serviceType.GetGenericArguments());
+            var wrappedType = ((FactorySetup.GenericWrapper)factory.Setup).GetWrappedServiceType(serviceType.GetGenericArguments());
             return wrappedType == serviceType ? serviceType
                 : ((IRegistry)this).GetWrappedServiceTypeOrSelf(wrappedType); // unwrap further.
         }
@@ -300,8 +301,8 @@ namespace DryIoc
 
         private bool TryFindEntry(out RegistryEntry entry, Type serviceType)
         {
-            return _registry.TryGetValue(serviceType, out entry) || serviceType.IsGenericType &&
-                   _registry.TryGetValue(serviceType.GetGenericTypeDefinition().ThrowIfNull(), out entry);
+            return _serviceFactories.TryGetValue(serviceType, out entry) || serviceType.IsGenericType &&
+                   _serviceFactories.TryGetValue(serviceType.GetGenericTypeDefinition().ThrowIfNull(), out entry);
         }
 
         private static void ThrowUnexpectedMultipleDefaults(ICollection<Factory> factories, Type serviceType)
@@ -321,7 +322,13 @@ namespace DryIoc
             ThrowIfNotImplemented(serviceType.ThrowIfNull(), factory.ThrowIfNull().ImplementationType);
             lock (_syncRoot)
             {
-                var entry = _registry.GetOrAdd(serviceType, _ => new RegistryEntry());
+                var entry = _serviceFactories.GetOrAdd(serviceType, _ => new RegistryEntry());
+
+                if (factory.Setup is FactorySetup.GenericWrapper)
+                {
+                    _genericWrapperFactories = _genericWrapperFactories.AddOrUpdate(serviceType, factory);
+                    return;
+                }
 
                 if (factory.Setup is FactorySetup.Decorator)
                 {
@@ -356,18 +363,11 @@ namespace DryIoc
             }
         }
 
-        public void RegisterGenericWrapper(Factory factory, Type serviceType, SelectGenericTypeArg getWrappedServiceType)
-        {
-            ThrowIfNotImplemented(serviceType, factory.ImplementationType);
-            lock (_syncRoot)
-                _genericWrappers = _genericWrappers.AddOrUpdate(serviceType, new GenericWrapperEntry(factory, getWrappedServiceType));
-        }
-
         public bool IsRegistered(Type serviceType, string serviceName)
         {
             return ((IRegistry)this).TryGetFactory(serviceType.ThrowIfNull(), serviceName) != null ||
                    serviceName == null && serviceType.IsGenericType &&
-                   _genericWrappers.TryGet(serviceType.GetGenericTypeDefinition()) != null;
+                   _genericWrapperFactories.TryGet(serviceType.GetGenericTypeDefinition()) != null;
         }
 
         private static void ThrowIfNotImplemented(Type serviceType, Type implementationType)
@@ -446,27 +446,6 @@ namespace DryIoc
         public static Func<Type, bool> PublicTypes = t => (t.IsPublic || t.IsNestedPublic) && t != typeof(object);
 
         public static Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
-
-        public static Factory TryResolveFunc(Request _, IRegistry __)
-        {
-            return new CustomFactory(CreateFunc, Reuse.Singleton);
-        }
-
-        private static Expression CreateFunc(Request request, IRegistry registry)
-        {
-            var funcType = request.ServiceType;
-            var funcTypeArgs = funcType.GetGenericArguments();
-            var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
-
-            var serviceRequest = request.PushPreservingKey(serviceType);
-            var serviceFactory = registry.GetOrAddFactory(serviceRequest, false);
-
-            if (funcTypeArgs.Length == 1)
-                return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
-
-            var funcExpr = serviceFactory.TryGetFuncWithArgsExpression(funcType, serviceRequest, registry);
-            return funcExpr.ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
-        }
 
         public static Factory TryResolveMeta(Request request, IRegistry registry)
         {
@@ -609,15 +588,15 @@ namespace DryIoc
             SingletonScope = source.SingletonScope;
             Setup = source.Setup;
             _syncRoot = source._syncRoot;
-            _registry = source._registry;
-            _genericWrappers = source._genericWrappers;
+            _serviceFactories = source._serviceFactories;
+            _genericWrapperFactories = source._genericWrapperFactories;
             _keyedResolutionCache = source._keyedResolutionCache;
             _defaultResolutionCache = source._defaultResolutionCache;
         }
 
         private readonly object _syncRoot;
-        private readonly Dictionary<Type, RegistryEntry> _registry;
-        private HashTree<Type, GenericWrapperEntry> _genericWrappers;
+        private readonly Dictionary<Type, RegistryEntry> _serviceFactories;
+        private HashTree<Type, Factory> _genericWrapperFactories;
 
         private sealed class RegistryEntry
         {
@@ -678,34 +657,21 @@ namespace DryIoc
             }
         }
 
-        private sealed class GenericWrapperEntry
-        {
-            public readonly Factory Factory;
-            public readonly SelectGenericTypeArg GetWrappedServiceType;
-
-            public GenericWrapperEntry(Factory factory, SelectGenericTypeArg getWrappedServiceType)
-            {
-                Factory = factory.ThrowIfNull();
-                GetWrappedServiceType = getWrappedServiceType.ThrowIfNull();
-            }
-        }
-
         #endregion
     }
 
-    public abstract class FactoryProvider : Factory
+    public class FuncFactory : Factory
     {
-        protected override Expression CreateExpression(Request request, IRegistry registry)
-        {
-            throw new NotSupportedException();
-        }
-    }
+        public FuncFactory() : base(setup: new FactorySetup.GenericWrapper(args => args[args.Length - 1])) { }
 
-    public class FuncFactory : FactoryProvider
-    {
         public override Factory TryProvideFactoryFor(Request request, IRegistry registry)
         {
             return new CustomFactory(CreateFunc, DryIoc.Reuse.Singleton);
+        }
+
+        protected override Expression CreateExpression(Request request, IRegistry registry)
+        {
+            throw new NotSupportedException();
         }
 
         private static Expression CreateFunc(Request request, IRegistry registry)
@@ -877,7 +843,7 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register(this IRegistrator registrator, Type serviceType,
-            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
             registrator.Register(new ReflectionFactory(implementationType, reuse, withConstructor, setup), serviceType, named);
@@ -893,7 +859,7 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
             registrator.Register(new ReflectionFactory(implementationType, reuse, withConstructor, setup), implementationType, named);
@@ -910,7 +876,7 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
             where TImplementation : TService
         {
@@ -927,7 +893,7 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
             registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup), typeof(TImplementation), named);
@@ -943,7 +909,7 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void RegisterPublicTypes(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
             var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
@@ -961,7 +927,7 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void RegisterPublicTypes<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
             registrator.RegisterPublicTypes(typeof(TImplementation), reuse, withConstructor, setup, named);
@@ -1133,14 +1099,14 @@ namespace DryIoc
 
         public class GenericWrapper : FactorySetup
         {
-            public readonly SelectGenericTypeArg SelectGenericTypeArg;
+            public readonly SelectGenericTypeArg GetWrappedServiceType;
 
             public GenericWrapper(SelectGenericTypeArg selectGenericTypeArg = null)
             {
-                SelectGenericTypeArg = selectGenericTypeArg ?? SelectSingleOrThrow;
+                GetWrappedServiceType = selectGenericTypeArg ?? SelectSingleByDefault;
             }
 
-            private static Type SelectSingleOrThrow(Type[] typeArgs)
+            private static Type SelectSingleByDefault(Type[] typeArgs)
             {
                 return typeArgs.ThrowIf(typeArgs.Length != 1)[0];
             }
@@ -1153,10 +1119,10 @@ namespace DryIoc
 
             public Decorator(Func<Request, bool> isApplicable = null)
             {
-                IsApplicable = isApplicable ?? ApplicableIndeed;
+                IsApplicable = isApplicable ?? IsApplicableByDefault;
             }
 
-            private static bool ApplicableIndeed(Request _)
+            private static bool IsApplicableByDefault(Request _)
             {
                 return true;
             }
@@ -1245,7 +1211,7 @@ namespace DryIoc
         }
     }
 
-    public delegate ConstructorInfo ConstructorSelector(Type implementationType);
+    public delegate ConstructorInfo SelectConstructor(Type implementationType);
 
     public sealed class ReflectionFactory : Factory
     {
@@ -1253,13 +1219,13 @@ namespace DryIoc
 
         public override int ProviderID { get { return _providerID; } }
 
-        public ReflectionFactory(Type implementationType, IReuse reuse = null, ConstructorSelector selectConstructor = null,
+        public ReflectionFactory(Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null,
             FactorySetup setup = null)
             : base(reuse, setup)
         {
             _implementationType = implementationType.ThrowIfNull();
             Throw.If(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
-            _selectConstructor = selectConstructor;
+            _withConstructor = withConstructor;
             _providerID = ID;
         }
 
@@ -1267,7 +1233,7 @@ namespace DryIoc
         {
             if (!_implementationType.IsGenericTypeDefinition) return null;
             var closedImplType = _implementationType.MakeGenericType(request.ServiceType.GetGenericArguments());
-            return new ReflectionFactory(closedImplType, Reuse, _selectConstructor, Setup) { _providerID = ID };
+            return new ReflectionFactory(closedImplType, Reuse, _withConstructor, Setup) { _providerID = ID };
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -1334,7 +1300,7 @@ namespace DryIoc
 
         private readonly Type _implementationType;
 
-        private readonly ConstructorSelector _selectConstructor;
+        private readonly SelectConstructor _withConstructor;
 
         private int _providerID;
 
@@ -1345,8 +1311,8 @@ namespace DryIoc
                 return constructors[0];
 
             Throw.If(constructors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, _implementationType);
-            _selectConstructor.ThrowIfNull(Error.UNABLE_TO_SELECT_CONSTRUCTOR, constructors.Length, _implementationType);
-            return _selectConstructor(_implementationType);
+            _withConstructor.ThrowIfNull(Error.UNABLE_TO_SELECT_CONSTRUCTOR, constructors.Length, _implementationType);
+            return _withConstructor(_implementationType);
         }
 
         private Expression WithInitializer(NewExpression newService, Request request, IRegistry registry)
@@ -1412,7 +1378,7 @@ namespace DryIoc
 
     public class CustomFactoryProvider : Factory
     {
-        public CustomFactoryProvider(TryGetFactory tryGetFactory)
+        public CustomFactoryProvider(TryGetFactory tryGetFactory, FactorySetup setup = null) : base(setup: setup)
         {
             _tryGetFactory = tryGetFactory.ThrowIfNull();
         }
@@ -1658,8 +1624,6 @@ namespace DryIoc
     public interface IRegistrator
     {
         void Register(Factory factory, Type serviceType, string serviceName);
-
-        void RegisterGenericWrapper(Factory factory, Type serviceType, SelectGenericTypeArg getWrappedServiceType);
 
         bool IsRegistered(Type serviceType, string serviceName);
     }
