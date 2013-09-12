@@ -272,14 +272,14 @@ namespace DryIoc.UnitTests.Performance
 
         public IEnumerator<HashTreeV2<V>> GetEnumerator()
         {
-            var leftNodes = Stack<HashTreeV2<V>>.Empty;
-            for (var node = this; !node.IsEmpty || !leftNodes.IsEmpty; node = node.Right) // Go right from last returned left node.
+            Stack<HashTreeV2<V>> leftNodes = null;
+            for (var node = this; !node.IsEmpty || leftNodes != null; node = node.Right)
             {
-                for (; !node.IsEmpty; node = node.Left)  // Go left until leaf
-                    leftNodes = leftNodes.Push(node);    // and collect nodes for later.
+                for (; !node.IsEmpty; node = node.Left)
+                    leftNodes = new Stack<HashTreeV2<V>>(node, leftNodes);
                 node = leftNodes.Head;
                 leftNodes = leftNodes.Tail;
-                yield return node;                       // Return node from last collected left node.
+                yield return node;
             }
         }
 

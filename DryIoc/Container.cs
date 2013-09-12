@@ -101,7 +101,6 @@ namespace DryIoc
 
                 var funcFactory = new FuncWrapper();
                 foreach (var funcType in FuncTypes)
-                    //RegisterGenericWrapper(new CustomFactoryProvider(TryResolveFunc), funcType, t => t[t.Length - 1]);
                     Register(funcFactory, funcType, serviceKey: null);
 
                 Register(new ReflectionFactory(typeof(Lazy<>), null, t => t.GetConstructor(new[] { typeof(Func<>) }), new FactorySetup.GenericWrapper()),
@@ -1873,16 +1872,27 @@ namespace DryIoc
             return current.Height != 0 ? current.Value : defaultValue;
         }
 
+        // Depth-first In-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         public IEnumerator<HashTree<V>> GetEnumerator()
         {
-            var leftNodes = Stack<HashTree<V>>.Empty;
-            for (var node = this; !node.IsEmpty || !leftNodes.IsEmpty; node = node.Right) // Go right from last returned left node.
+            Stack<HashTree<V>> parents = null;
+            var node = this;
+            while (node.Height != 0 || parents != null)
             {
-                for (; !node.IsEmpty; node = node.Left)  // Go left until leaf
-                    leftNodes = leftNodes.Push(node);    // and collect nodes for later.
-                node = leftNodes.Head;
-                leftNodes = leftNodes.Tail;
-                yield return node;                       // Return node from last collected left node.
+                if (node.Height != 0)
+                {
+                    parents = new Stack<HashTree<V>>(node, parents);
+                    node = node.Left;
+                }
+                else
+                {
+// ReSharper disable PossibleNullReferenceException
+                    node = parents.Head;
+// ReSharper restore PossibleNullReferenceException
+                    parents = parents.Tail;
+                    yield return node;
+                    node = node.Right;
+                }
             }
         }
 
@@ -2004,18 +2014,10 @@ namespace DryIoc
 
     public sealed class Stack<T>
     {
-        public static readonly Stack<T> Empty = new Stack<T>(default(T), null);
-        public bool IsEmpty { get { return Tail == null; } }
-
         public readonly T Head;
         public readonly Stack<T> Tail;
 
-        public Stack<T> Push(T tree)
-        {
-            return new Stack<T>(tree, this);
-        }
-
-        private Stack(T head, Stack<T> tail)
+        public Stack(T head, Stack<T> tail = null)
         {
             Head = head;
             Tail = tail;
