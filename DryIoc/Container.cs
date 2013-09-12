@@ -100,7 +100,7 @@ namespace DryIoc
             {
                 Setup.AddNonRegisteredServiceResolutionRule(TryResolveEnumerableOrArray);
 
-                var funcFactory = new FuncFactory();
+                var funcFactory = new FuncWrapper();
                 foreach (var funcType in FuncTypes)
                     //RegisterGenericWrapper(new CustomFactoryProvider(TryResolveFunc), funcType, t => t[t.Length - 1]);
                     Register(funcFactory, funcType, serviceName: null);
@@ -324,13 +324,13 @@ namespace DryIoc
             {
                 var entry = _serviceFactories.GetOrAdd(serviceType, _ => new RegistryEntry());
 
-                if (factory.Setup is FactorySetup.GenericWrapper)
+                if (factory.Setup.Type == FactoryType.GenericWrapper)
                 {
                     _genericWrapperFactories = _genericWrapperFactories.AddOrUpdate(serviceType, factory);
                     return;
                 }
 
-                if (factory.Setup is FactorySetup.Decorator)
+                if (factory.Setup.Type == FactoryType.Decorator)
                 {
                     entry.Decorators = entry.Decorators ?? new List<Factory>();
                     entry.Decorators.Add(factory);
@@ -660,9 +660,9 @@ namespace DryIoc
         #endregion
     }
 
-    public class FuncFactory : Factory
+    public class FuncWrapper : Factory
     {
-        public FuncFactory() : base(setup: new FactorySetup.GenericWrapper(args => args[args.Length - 1])) { }
+        public FuncWrapper() : base(setup: new FactorySetup.GenericWrapper(args => args[args.Length - 1])) { }
 
         public override Factory TryProvideFactoryFor(Request request, IRegistry registry)
         {
@@ -794,7 +794,7 @@ namespace DryIoc
             "Expecting closed-generic service type but found {0}.";
 
         public static readonly string DEPENDENCY_CYCLE_DETECTED =
-            "Recursive dependency is detected in resolution request:\n{0}.";
+            "Recursive dependency is detected in resolution of:\n{0}.";
 
         public static readonly string SCOPE_IS_DISPOSED =
             "Scope is disposed and all in-scope instances are no longer available.";
@@ -1075,12 +1075,16 @@ namespace DryIoc
     {
         public static readonly FactorySetup Default = new Service();
 
+        public abstract FactoryType Type { get; }
+
         public virtual Init Init { get { return null; } }
         public virtual bool SkipCache { get { return false; } }
         public virtual object Metadata { get { return null; } }
 
         public class Service : FactorySetup
         {
+            public override FactoryType Type { get { return FactoryType.Service; } }
+
             public override Init Init { get { return _init; } }
             public override bool SkipCache { get { return _skipCache; } }
             public override object Metadata { get { return _metadata; } }
@@ -1099,6 +1103,8 @@ namespace DryIoc
 
         public class GenericWrapper : FactorySetup
         {
+            public override FactoryType Type { get { return FactoryType.GenericWrapper; } }
+            
             public readonly SelectGenericTypeArg GetWrappedServiceType;
 
             public GenericWrapper(SelectGenericTypeArg selectGenericTypeArg = null)
@@ -1114,7 +1120,10 @@ namespace DryIoc
 
         public class Decorator : FactorySetup
         {
+            public override FactoryType Type { get { return FactoryType.Decorator; } }
+            
             public override bool SkipCache { get { return true; } }
+
             public readonly Func<Request, bool> IsApplicable;
 
             public Decorator(Func<Request, bool> isApplicable = null)
@@ -1378,7 +1387,8 @@ namespace DryIoc
 
     public class CustomFactoryProvider : Factory
     {
-        public CustomFactoryProvider(TryGetFactory tryGetFactory, FactorySetup setup = null) : base(setup: setup)
+        public CustomFactoryProvider(TryGetFactory tryGetFactory, FactorySetup setup = null)
+            : base(setup: setup)
         {
             _tryGetFactory = tryGetFactory.ThrowIfNull();
         }
@@ -1451,10 +1461,10 @@ namespace DryIoc
 
         public void SetResult(Factory factory, FactoryType factoryType = FactoryType.Service)
         {
+            FactoryType = factory.Setup.Type;
             FactoryID = factory.ID;
             FactoryProviderID = factory.ProviderID;
             ImplementationType = factory.ImplementationType;
-            FactoryType = factoryType;
             Throw.If(TryGetParent(r => r.FactoryID == FactoryID) != null, Error.DEPENDENCY_CYCLE_DETECTED, this);
         }
 
@@ -1464,15 +1474,13 @@ namespace DryIoc
                 yield return x;
         }
 
-        public string PrintServiceInfo(bool outputIndex = false)
+        public string PrintServiceInfo(bool showIndex = false)
         {
             var message = ServiceType.Print();
-            if (ServiceKey is string)
-                message += " named \"" + ServiceKey + "\"";
-            else if (ServiceKey is int && outputIndex)
-                message += " #" + ServiceKey;
-            else
-                message += " without name";
+            
+            message += ServiceKey is string ? " (\"" + ServiceKey + "\")" 
+                : showIndex && ServiceKey is int ? " (#" + ServiceKey + ")" 
+                : " (unnamed)";
 
             if (ImplementationType != null && ImplementationType != ServiceType)
                 message = ImplementationType.Print() + " : " + message;
