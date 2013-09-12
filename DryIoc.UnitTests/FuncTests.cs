@@ -237,7 +237,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void It_is_possible_to_resolve_Func_or_Func()
+        public void Possible_to_resolve_Func_or_Func()
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
@@ -249,7 +249,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void It_is_possible_to_resolve_Func_of_Lazy()
+        public void Possible_to_resolve_Func_of_Lazy()
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
@@ -282,6 +282,18 @@ namespace DryIoc.UnitTests
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
+        }
+
+        [Test]
+        public void Possible_to_register_and_resolve_delegate_as_instance()
+        {
+            var container = new Container();
+            Func<int, string> toString = i => i.ToString();
+            container.RegisterInstance(toString);
+
+            var func = container.Resolve<Func<int, string>>();
+
+            Assert.That(func, Is.SameAs(toString));
         }
     }
 }

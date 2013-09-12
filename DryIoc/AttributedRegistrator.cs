@@ -180,7 +180,7 @@ namespace DryIoc
             var implementationType = import.ImplementationType ?? serviceType;
             var reuse = import.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
             var options = import.Metadata == null ? FactorySetup.Default : Factory.WithMetadata(import.Metadata);
-            ConstructorSelector withConstructor = t => t.GetConstructor(import.ConstructorSignature);
+            SelectConstructor withConstructor = t => t.GetConstructor(import.ConstructorSignature);
 
             registry.Register(serviceType, implementationType, reuse, withConstructor, options, serviceName);
             return serviceName;
