@@ -60,6 +60,7 @@
     <Compile Include="LazyTests.cs" />
     <Compile Include="MetadataTests.cs" />
     <Compile Include="Performance\HashTreeAccessSpeedTests.cs" />
+    <Compile Include="Performance\HashTreeEnumerationSpeedTests.cs" />
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
     <Compile Include="Playground\DecoratorConditionPlayTests.cs" />
     <Compile Include="Playground\Experiments.cs" />

@@ -12,12 +12,10 @@ namespace DryIoc.UnitTests
 		[Test]
 		public void Resolving_array_with_default_and_one_named_service_will_return_both_services()
 		{
-			// Arrange
 			var container = new Container();
 			container.Register(typeof(IService), typeof(Service));
 			container.Register(typeof(IService), typeof(AnotherService), named: "another");
 
-			// Act
 			var services = container.Resolve<Func<IService>[]>();
 
             Assert.That(services.Length, Is.EqualTo(2));
@@ -26,11 +24,9 @@ namespace DryIoc.UnitTests
 		[Test]
 		public void I_can_resolve_array_of_singletons()
 		{
-			// Arrange
 			var container = new Container();
 			container.Register(typeof(IService), typeof(Service), Reuse.Singleton);
 
-			// Act
 			var services = container.Resolve<IService[]>();
 
             Assert.That(services.Length, Is.EqualTo(1));
@@ -39,12 +35,10 @@ namespace DryIoc.UnitTests
 		[Test]
 		public void I_can_resolve_mixed_array_of_singletons_and_transients()
 		{
-			// Arrange
 			var container = new Container();
 			container.Register(typeof(IService), typeof(Service), Reuse.Singleton);
 			container.Register(typeof(IService), typeof(AnotherService), named: "another");
 
-			// Act
 			var services = container.Resolve<IService[]>();
 
             Assert.That(services.Length, Is.EqualTo(2));
@@ -53,11 +47,9 @@ namespace DryIoc.UnitTests
 		[Test]
 		public void Resolving_enumerable_of_service_should_return_enumerable_type()
 		{
-			// Arrange
 			var container = new Container();
 			container.Register(typeof(IService), typeof(Service));
 
-			// Act
 			var services = container.Resolve<IEnumerable<IService>>();
 
             Assert.That(services, Is.InstanceOf<IEnumerable<IService>>());
@@ -78,11 +70,9 @@ namespace DryIoc.UnitTests
 		[Test]
 		public void Resolving_enumerable_of_service_registered_with_func_should_return_enumerable_with_single_service()
 		{
-			// Arrange
 			var container = new Container();
 			container.RegisterLambda<IService<string>>(() => new ClosedGenericClass());
 
-			// Act
 			var services = container.Resolve<IEnumerable<IService<string>>>();
 
 			Assert.That(services.Single(), Is.Not.Null);
@@ -106,11 +96,9 @@ namespace DryIoc.UnitTests
 		[Test]
 		public void I_can_resolve_array_of_open_generics()
 		{
-			// Arrange
 			var container = new Container();
 			container.Register(typeof(IService<>), typeof(Service<>), Reuse.Singleton);
 
-			// Act
 			var services = container.Resolve<IEnumerable<IService<int>>>();
 
             Assert.That(services.Single(), Is.InstanceOf<Service<int>>());

@@ -14,15 +14,28 @@ namespace ImmutableHashTree_SpeedTest
 		static void Main()
 		{
 			Thread.CurrentThread.Priority = ThreadPriority.Highest;
+            CompareHashTreeEnumeration();
+		    //CompareHashTreeGet();
+            //CompareTypesForEquality(typeof(string));
+			Console.ReadKey();
+		}
+
+	    private static void CompareHashTreeEnumeration()
+	    {
+	        HashTreeEnumerationSpeedTests.CompareListVsHashTree();
+            Console.WriteLine();
+	        HashTreeEnumerationSpeedTests.CompareListVsHashTree();
+	    }
+
+	    private static void CompareHashTreeGet()
+	    {
             GC.Collect();
             GetDictVsHashTree2OfType(itemCount: 2000);
             Console.WriteLine();
             GetDictVsHashTree2OfType(itemCount: 2000);
-            //TypeComparisonSpeedTest(typeof(string));
-			Console.ReadKey();
-		}
+	    }
 
-	    private static void TypeComparisonSpeedTest(Type actual)
+	    private static void CompareTypesForEquality(Type actual)
 	    {
             var times = 5 * 1000 * 1000;
 	        

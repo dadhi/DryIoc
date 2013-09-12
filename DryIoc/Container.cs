@@ -88,10 +88,9 @@ namespace DryIoc
         public Container(bool coreOnly = false)
         {
             _syncRoot = new object();
-            _serviceFactories = new Dictionary<Type, RegistryEntry>();
+            _registry = new Dictionary<Type, RegistryEntry>();
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
-            _genericWrapperFactories = HashTree<Type, Factory>.Empty;
 
             Setup = new Setup();
             CurrentScope = SingletonScope = new Scope();
@@ -103,16 +102,16 @@ namespace DryIoc
                 var funcFactory = new FuncWrapper();
                 foreach (var funcType in FuncTypes)
                     //RegisterGenericWrapper(new CustomFactoryProvider(TryResolveFunc), funcType, t => t[t.Length - 1]);
-                    Register(funcFactory, funcType, serviceName: null);
+                    Register(funcFactory, funcType, serviceKey: null);
 
                 Register(new ReflectionFactory(typeof(Lazy<>), null, t => t.GetConstructor(new[] { typeof(Func<>) }), new FactorySetup.GenericWrapper()),
-                    typeof(Lazy<>), serviceName: null);
+                    typeof(Lazy<>), serviceKey: null);
 
                 Register(new CustomFactoryProvider(TryResolveMeta, new FactorySetup.GenericWrapper(t => t[0])),
-                    typeof(Meta<,>), serviceName: null);
+                    typeof(Meta<,>), serviceKey: null);
 
                 Register(new CustomFactoryProvider(TryResolveFactoryExpression, new FactorySetup.GenericWrapper()),
-                    typeof(FactoryExpression<>), serviceName: null);
+                    typeof(FactoryExpression<>), serviceKey: null);
             }
         }
 
@@ -149,33 +148,33 @@ namespace DryIoc
             {
                 // Decorator.
                 RegistryEntry entry;
-                if (_serviceFactories.TryGetValue(request.ServiceType, out entry) &&
+                if (_registry.TryGetValue(request.ServiceType, out entry) &&
                     entry.TryGetDecorator(out result, request))
                 {
                     result = result.TryProvideFactoryFor(request, this) ?? result;
-                    request.SetResult(result, FactoryType.Decorator);
+                    request.SetResult(result);
                     return result;
                 }
 
                 // Open-generic Decorator.
                 RegistryEntry openGenericEntry = null;
                 if (request.OpenGenericServiceType != null &&
-                    _serviceFactories.TryGetValue(request.OpenGenericServiceType, out openGenericEntry) &&
+                    _registry.TryGetValue(request.OpenGenericServiceType, out openGenericEntry) &&
                     openGenericEntry.TryGetDecorator(out result, request) &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
-                    request.SetResult(result, FactoryType.Decorator); // TODO: I don't need to provide FactoryType here, it can be figured out from result
+                    request.SetResult(result);
 
-                    Register(result, request.ServiceType, null); // TODO: May be by providing ServiceKey we could stop using SkipCache. 
+                    // TODO: May be by providing ServiceKey we could stop using SkipCache. 
                     //       May be implemented by storing Decorator as normal factory in Named and Indexed collections.
                     // TODO: Do we need to register closed gen decorator at all?
-
+                    Register(result, request.ServiceType, null);
                     return result;
                 }
 
                 // Service.
                 if (entry != null &&
-                    entry.TryGetServiceFactory(out result, request.ServiceType, request.ServiceKey))
+                    entry.TryGetFactory(out result, request.ServiceType, request.ServiceKey))
                 {
                     result = result.TryProvideFactoryFor(request, this) ?? result;
                     request.SetResult(result);
@@ -184,21 +183,22 @@ namespace DryIoc
 
                 // Open-generic Service.
                 if (openGenericEntry != null &&
-                    openGenericEntry.TryGetServiceFactory(out result, request.ServiceType, request.ServiceKey) &&
+                    openGenericEntry.TryGetFactory(out result, request.ServiceType, request.ServiceKey) &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
                     request.SetResult(result);
-                    Register(result, request.ServiceType, request.ServiceKey as string);
+                    Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
 
-                // Open-generic Wrapper.
-                if (request.OpenGenericServiceType != null &&
-                    (result = _genericWrapperFactories.TryGet(request.OpenGenericServiceType)) != null &&
+                // Generic wrapper.
+                if (openGenericEntry != null && request.ServiceKey != null && // if null it means we are already looked for it above.
+                    openGenericEntry.TryGetFactory(out result, request.ServiceType, null) &&
+                    result.Setup.Type == FactoryType.GenericWrapper &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
-                    request.SetResult(result, FactoryType.GenericWrapper);
-                    Register(result, request.ServiceType, request.ServiceKey as string);
+                    request.SetResult(result);
+                    Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
             }
@@ -210,7 +210,7 @@ namespace DryIoc
                 if (result != null)
                 {
                     request.SetResult(result);
-                    Register(result, request.ServiceType, request.ServiceKey as string);
+                    Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
             }
@@ -226,11 +226,11 @@ namespace DryIoc
                 RegistryEntry entry;
                 if (TryFindEntry(out entry, serviceType))
                 {
-                    if (entry.Defaults != null)
+                    if (entry.Indexed != null)
                     {
-                        for (var i = 0; i < entry.Defaults.Count; i++)
-                            if (condition == null || condition(entry.Defaults[i]))
-                                yield return i;
+                        foreach (var item in entry.Indexed)
+                            if (condition == null || condition(item.Value))
+                                yield return item.Key;
                     }
                     else if (entry.LastDefault != null)
                     {
@@ -255,7 +255,7 @@ namespace DryIoc
                 RegistryEntry entry;
                 Factory factory;
                 if (TryFindEntry(out entry, serviceType) &&
-                    entry.TryGetServiceFactory(out factory, serviceType, serviceKey))
+                    entry.TryGetFactory(out factory, serviceType, serviceKey))
                     return factory;
                 return null;
             }
@@ -266,8 +266,8 @@ namespace DryIoc
             if (!serviceType.IsGenericType)
                 return serviceType;
 
-            var factory = _genericWrapperFactories.TryGet(serviceType.GetGenericTypeDefinition());
-            if (factory == null)
+            var factory = ((IRegistry)this).TryGetFactory(serviceType.GetGenericTypeDefinition(), null);
+            if (factory == null || factory.Setup.Type != FactoryType.GenericWrapper)
                 return serviceType;
 
             var wrappedType = ((FactorySetup.GenericWrapper)factory.Setup).GetWrappedServiceType(serviceType.GetGenericArguments());
@@ -301,34 +301,28 @@ namespace DryIoc
 
         private bool TryFindEntry(out RegistryEntry entry, Type serviceType)
         {
-            return _serviceFactories.TryGetValue(serviceType, out entry) || serviceType.IsGenericType &&
-                   _serviceFactories.TryGetValue(serviceType.GetGenericTypeDefinition().ThrowIfNull(), out entry);
+            return _registry.TryGetValue(serviceType, out entry) || serviceType.IsGenericType &&
+                   _registry.TryGetValue(serviceType.GetGenericTypeDefinition().ThrowIfNull(), out entry);
         }
 
-        private static void ThrowUnexpectedMultipleDefaults(ICollection<Factory> factories, Type serviceType)
+        private static void ThrowUnexpectedMultipleDefaults(Factory[] factories, Type serviceType)
         {
             var implementations = factories.Select(x => x.ImplementationType).Aggregate(
                 new StringBuilder().AppendLine(),
                 (i, t) => i.AppendLine(t != null ? t.Print() + ";" : "[not provided]"));
-            Throw.If(true, Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, factories.Count, implementations);
+            Throw.If(true, Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, factories.Length, implementations);
         }
 
         #endregion
 
         #region IRegistrator
 
-        public void Register(Factory factory, Type serviceType, string serviceName)
+        public void Register(Factory factory, Type serviceType, object serviceKey)
         {
             ThrowIfNotImplemented(serviceType.ThrowIfNull(), factory.ThrowIfNull().ImplementationType);
             lock (_syncRoot)
             {
-                var entry = _serviceFactories.GetOrAdd(serviceType, _ => new RegistryEntry());
-
-                if (factory.Setup.Type == FactoryType.GenericWrapper)
-                {
-                    _genericWrapperFactories = _genericWrapperFactories.AddOrUpdate(serviceType, factory);
-                    return;
-                }
+                var entry = _registry.GetOrAdd(serviceType, _ => new RegistryEntry());
 
                 if (factory.Setup.Type == FactoryType.Decorator)
                 {
@@ -337,27 +331,34 @@ namespace DryIoc
                     return;
                 }
 
-                if (serviceName == null)
+                if (serviceKey == null)
                 {
                     if (entry.LastDefault != null)
                     {
-                        entry.Defaults = entry.Defaults ?? new List<Factory> { entry.LastDefault };
-                        entry.Defaults.Add(factory);
+                        entry.Indexed = entry.Indexed ?? HashTree<Factory>.Empty.AddOrUpdate(entry.MaxIndex++, entry.LastDefault);
+                        entry.Indexed = entry.Indexed.AddOrUpdate(entry.MaxIndex++, factory);
                     }
                     entry.LastDefault = factory;
                 }
-                else
+                else if (serviceKey is int)
                 {
+                    var index = (int)serviceKey;
+                    entry.Indexed = (entry.Indexed ?? HashTree<Factory>.Empty).AddOrUpdate(index, factory);
+                    entry.MaxIndex = Math.Max(entry.MaxIndex, index) + 1;
+                }
+                else if (serviceKey is string)
+                {
+                    var name = serviceKey.ToString();
                     entry.Named = entry.Named ?? new Dictionary<string, Factory>();
                     try
                     {
-                        entry.Named.Add(serviceName, factory);
+                        entry.Named.Add(name, factory);
                     }
                     catch (ArgumentException)
                     {
-                        var implType = entry.Named[serviceName].ImplementationType;
+                        var implType = entry.Named[name].ImplementationType;
                         Throw.If(true, Error.DUPLICATE_SERVICE_NAME_REGISTRATION,
-                            serviceType, serviceName, implType != null ? implType.Print() : "<custom>");
+                            serviceType, serviceKey, implType != null ? implType.Print() : "<custom>");
                     }
                 }
             }
@@ -365,9 +366,7 @@ namespace DryIoc
 
         public bool IsRegistered(Type serviceType, string serviceName)
         {
-            return ((IRegistry)this).TryGetFactory(serviceType.ThrowIfNull(), serviceName) != null ||
-                   serviceName == null && serviceType.IsGenericType &&
-                   _genericWrapperFactories.TryGet(serviceType.GetGenericTypeDefinition()) != null;
+            return ((IRegistry)this).TryGetFactory(serviceType.ThrowIfNull(), serviceName) != null;
         }
 
         private static void ThrowIfNotImplemented(Type serviceType, Type implementationType)
@@ -588,31 +587,29 @@ namespace DryIoc
             SingletonScope = source.SingletonScope;
             Setup = source.Setup;
             _syncRoot = source._syncRoot;
-            _serviceFactories = source._serviceFactories;
-            _genericWrapperFactories = source._genericWrapperFactories;
+            _registry = source._registry;
             _keyedResolutionCache = source._keyedResolutionCache;
             _defaultResolutionCache = source._defaultResolutionCache;
         }
 
         private readonly object _syncRoot;
-        private readonly Dictionary<Type, RegistryEntry> _serviceFactories;
-        private HashTree<Type, Factory> _genericWrapperFactories;
+        private readonly Dictionary<Type, RegistryEntry> _registry;
 
         private sealed class RegistryEntry
         {
             public Factory LastDefault;
-            public List<Factory> Defaults;
+            public HashTree<Factory> Indexed;
+            public int MaxIndex;
             public Dictionary<string, Factory> Named;
             public List<Factory> Decorators;
 
-            public bool TryGetServiceFactory(out Factory result, Type serviceType, object serviceKey)
+            public bool TryGetFactory(out Factory result, Type serviceType, object serviceKey)
             {
                 result = null;
-
                 if (serviceKey == null)
                 {
-                    if (Defaults != null)
-                        ThrowUnexpectedMultipleDefaults(Defaults, serviceType);
+                    if (Indexed != null)
+                        ThrowUnexpectedMultipleDefaults(Indexed.Select(x => x.Value).ToArray(), serviceType);
                     result = LastDefault;
                 }
                 else
@@ -625,10 +622,10 @@ namespace DryIoc
                     else if (serviceKey is int)
                     {
                         var index = (int)serviceKey;
-                        if (Defaults == null && index == 0)
+                        if (Indexed == null && index == 0)
                             result = LastDefault;
-                        else if (Defaults != null && index < Defaults.Count)
-                            result = Defaults[index];
+                        else if (Indexed != null)
+                            result = Indexed.TryGet(index);
                     }
                 }
 
@@ -646,7 +643,8 @@ namespace DryIoc
                    p != null && p.FactoryType == FactoryType.Decorator;
                    p = p.TryGetNonWrapperParent())
                 {
-                    (appliedDecoratorIDs ?? (appliedDecoratorIDs = new List<int>())).Add(p.FactoryProviderID);
+                    appliedDecoratorIDs = appliedDecoratorIDs ?? new List<int>();
+                    appliedDecoratorIDs.Add(p.FactoryProviderID);
                 }
 
                 result = Decorators.FindLast(d =>
@@ -666,7 +664,7 @@ namespace DryIoc
 
         public override Factory TryProvideFactoryFor(Request request, IRegistry registry)
         {
-            return new CustomFactory(CreateFunc, DryIoc.Reuse.Singleton);
+            return new CustomFactory(CreateFunc, DryIoc.Reuse.Singleton, Setup);
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -793,7 +791,7 @@ namespace DryIoc
         public static readonly string EXPECTED_CLOSED_GENERIC_SERVICE_TYPE =
             "Expecting closed-generic service type but found {0}.";
 
-        public static readonly string DEPENDENCY_CYCLE_DETECTED =
+        public static readonly string RECURSIVE_DEPENDENCY_DETECTED =
             "Recursive dependency is detected in resolution of:\n{0}.";
 
         public static readonly string SCOPE_IS_DISPOSED =
@@ -1104,7 +1102,7 @@ namespace DryIoc
         public class GenericWrapper : FactorySetup
         {
             public override FactoryType Type { get { return FactoryType.GenericWrapper; } }
-            
+
             public readonly SelectGenericTypeArg GetWrappedServiceType;
 
             public GenericWrapper(SelectGenericTypeArg selectGenericTypeArg = null)
@@ -1121,7 +1119,7 @@ namespace DryIoc
         public class Decorator : FactorySetup
         {
             public override FactoryType Type { get { return FactoryType.Decorator; } }
-            
+
             public override bool SkipCache { get { return true; } }
 
             public readonly Func<Request, bool> IsApplicable;
@@ -1459,13 +1457,13 @@ namespace DryIoc
             return new Request(serviceType, ServiceKey, this);
         }
 
-        public void SetResult(Factory factory, FactoryType factoryType = FactoryType.Service)
+        public void SetResult(Factory factory)
         {
             FactoryType = factory.Setup.Type;
             FactoryID = factory.ID;
             FactoryProviderID = factory.ProviderID;
             ImplementationType = factory.ImplementationType;
-            Throw.If(TryGetParent(r => r.FactoryID == FactoryID) != null, Error.DEPENDENCY_CYCLE_DETECTED, this);
+            Throw.If(TryGetParent(r => r.FactoryID == FactoryID) != null, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
         }
 
         public IEnumerator<Request> GetEnumerator()
@@ -1477,9 +1475,9 @@ namespace DryIoc
         public string PrintServiceInfo(bool showIndex = false)
         {
             var message = ServiceType.Print();
-            
-            message += ServiceKey is string ? " (\"" + ServiceKey + "\")" 
-                : showIndex && ServiceKey is int ? " (#" + ServiceKey + ")" 
+
+            message += ServiceKey is string ? " (\"" + ServiceKey + "\")"
+                : showIndex && ServiceKey is int ? " (#" + ServiceKey + ")"
                 : " (unnamed)";
 
             if (ImplementationType != null && ImplementationType != ServiceType)
@@ -1631,7 +1629,7 @@ namespace DryIoc
 
     public interface IRegistrator
     {
-        void Register(Factory factory, Type serviceType, string serviceName);
+        void Register(Factory factory, Type serviceType, object serviceKey);
 
         bool IsRegistered(Type serviceType, string serviceName);
     }
