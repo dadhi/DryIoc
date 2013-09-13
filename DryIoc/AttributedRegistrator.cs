@@ -23,12 +23,17 @@ namespace DryIoc
     {
         public static bool SingletonByDefault = true;
 
-        public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
+        public static void RegisterExportedAssemblies(this IRegistrator registrator, params Assembly[] assemblies)
         {
-            registrator.RegisterExports(Scan(assemblies));
+            registrator.RegisterExported(ScanAssemblies(assemblies));
         }
 
-        public static void RegisterExports(this IRegistrator registrator, IEnumerable<RegistrationInfo> infos)
+        public static void RegisterExportedTypes(this IRegistrator registrator, IEnumerable<Type> types)
+        {
+            registrator.RegisterExported(ScanTypes(types));
+        }
+
+        public static void RegisterExported(this IRegistrator registrator, IEnumerable<RegistrationInfo> infos)
         {
             foreach (var info in infos)
             {
@@ -55,13 +60,16 @@ namespace DryIoc
             }
         }
 
-        public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
+        public static IEnumerable<RegistrationInfo> ScanAssemblies(IEnumerable<Assembly> assemblies)
         {
-            var implementationTypes = assemblies.SelectMany(a => a.GetTypes()).Where(TypeIsForScan);
+            return ScanTypes(assemblies.SelectMany(a => a.GetTypes()).Where(TypeCouldBeExported));
+        }
 
-            foreach (var implementationType in implementationTypes)
+        public static IEnumerable<RegistrationInfo> ScanTypes(IEnumerable<Type> types)
+        {
+            foreach (var type in types)
             {
-                var attributes = implementationType.GetCustomAttributes(false);
+                var attributes = type.GetCustomAttributes(false);
 
                 ExportInfo[] exports = null;
                 var isSingleton = SingletonByDefault; // default is singleton
@@ -76,7 +84,7 @@ namespace DryIoc
                         var exportAttribute = (ExportAttribute)attribute;
                         var export = new ExportInfo
                         {
-                            ServiceType = exportAttribute.ContractType ?? implementationType,
+                            ServiceType = exportAttribute.ContractType ?? type,
                             ServiceName = exportAttribute.ContractName
                         };
 
@@ -92,8 +100,8 @@ namespace DryIoc
                     else if (attribute is ExportPublicTypesAttribute)
                     {
                         var autoExportAttribute = (ExportPublicTypesAttribute)attribute;
-                        var autoExports = autoExportAttribute.SelectServiceTypes(implementationType)
-                            .Select(type => new ExportInfo { ServiceType = type })
+                        var autoExports = autoExportAttribute.SelectServiceTypes(type)
+                            .Select(t => new ExportInfo { ServiceType = t })
                             .ToArray();
 
                         if (exports != null)
@@ -107,7 +115,6 @@ namespace DryIoc
                         }
 
                         exports = autoExports;
-
                     }
                     else if (attribute is PartCreationPolicyAttribute)
                     {
@@ -118,7 +125,8 @@ namespace DryIoc
                         factoryType = FactoryType.GenericWrapper;
                     }
 
-                    if (factoryType == FactoryType.Service && // Metadata is supported only for Service setup, so no need to check for other types.
+                    if (factoryType == FactoryType.Service &&
+                        // Metadata is supported only for Service setup, so no need to check for other types.
                         Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), false))
                     {
                         metadataAttributeIndex = attributeIndex;
@@ -128,7 +136,7 @@ namespace DryIoc
                 yield return new RegistrationInfo
                 {
                     Exports = exports,
-                    ImplementationType = implementationType,
+                    ImplementationType = type,
                     IsSingleton = isSingleton,
                     MetadataAttributeIndex = metadataAttributeIndex,
                     FactoryType = factoryType
@@ -138,7 +146,7 @@ namespace DryIoc
 
         #region Tools
 
-        public static bool TypeIsForScan(Type type)
+        public static bool TypeCouldBeExported(Type type)
         {
             return type.IsClass && !type.IsAbstract &&
                 (Attribute.IsDefined(type, typeof(ExportAttribute), false) ||

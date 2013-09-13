@@ -64,7 +64,7 @@
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
     <Compile Include="Playground\DecoratorConditionPlayTests.cs" />
     <Compile Include="Playground\Experiments.cs" />
-    <Compile Include="Playground\ExportGenericWrapperPlayTests.cs" />
+    <Compile Include="AttributedRegistration\ExportGenericWrapperTests.cs" />
     <Compile Include="Playground\InitializerPlayTests.cs" />
     <Compile Include="Playground\OptionsPlayTests.cs" />
     <Compile Include="Playground\ThrowPlayTests.cs" />

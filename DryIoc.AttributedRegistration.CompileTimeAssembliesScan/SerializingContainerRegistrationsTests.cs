@@ -39,7 +39,7 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
         {
             // Given
             var assembly = typeof(TransientService).Assembly;
-            var services = AttributedRegistrator.Scan(new[] { assembly }).ToArray();
+            var services = AttributedRegistrator.ScanAssemblies(new[] { assembly }).ToArray();
 
             // When
             if (File.Exists(DATA_FILE))
@@ -65,7 +65,7 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
         {
             // Given
             var assembly = typeof(TransientService).Assembly;
-            var services = AttributedRegistrator.Scan(new[] { assembly }).ToArray();
+            var services = AttributedRegistrator.ScanAssemblies(new[] { assembly }).ToArray();
 
             if (File.Exists(DATA_FILE))
                 File.Delete(DATA_FILE);
@@ -81,7 +81,7 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
 
             // When
             var container = new Container();
-            container.RegisterExports(infos);
+            container.RegisterExported(infos);
 
             // Then
             var factories = container.Resolve<Meta<Func<IServiceWithMetadata>, IViewMetadata>[]>();

@@ -10,7 +10,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         public void Exporting_IFactory_as_genric_wrapper_should_work()
         {
             var container = new Container();
-            container.RegisterExports(GetType().Assembly);
+            container.RegisterExportedTypes(new[] { typeof(FactoryConsumer), typeof(One), typeof(DryFactory<>) });
 
             var consumer = container.Resolve<FactoryConsumer>();
 
