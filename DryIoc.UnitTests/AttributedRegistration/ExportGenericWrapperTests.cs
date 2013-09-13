@@ -1,13 +1,13 @@
 ﻿using System;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.Playground
+namespace DryIoc.UnitTests.AttributedRegistration
 {
     [TestFixture]
-    public class ExportGenericWrapperPlayTests
+    public class ExportGenericWrapperTests
     {
         [Test]
-        public void Injecting_IFactory_should_work()
+        public void Exporting_IFactory_as_genric_wrapper_should_work()
         {
             var container = new Container();
             container.RegisterExports(GetType().Assembly);
@@ -17,6 +17,8 @@ namespace DryIoc.UnitTests.Playground
             Assert.That(consumer.One, Is.Not.Null);
         }
     }
+
+    #region CUT
 
     [Export]
     public class FactoryConsumer
@@ -30,7 +32,9 @@ namespace DryIoc.UnitTests.Playground
     }
 
     [Export("one"), Export("two")]
-    public class One { }
+    public class One
+    {
+    }
 
     public interface IFactory<TService>
     {
@@ -38,7 +42,7 @@ namespace DryIoc.UnitTests.Playground
     }
 
     [ExportPublicTypes, ExportAsGenericWrapper]
-    class DryFactory<TService> : IFactory<TService>
+    internal class DryFactory<TService> : IFactory<TService>
     {
         public DryFactory(Func<TService> create)
         {
@@ -52,6 +56,8 @@ namespace DryIoc.UnitTests.Playground
 
         private readonly Func<TService> _create;
     }
+
+    #endregion
 }
 
 

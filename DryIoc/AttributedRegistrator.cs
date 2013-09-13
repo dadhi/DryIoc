@@ -117,7 +117,8 @@ namespace DryIoc
                         factoryType = FactoryType.GenericWrapper;
                     }
 
-                    if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), false))
+                    if (factoryType == FactoryType.Service && // Metadata is supported only for Service setup, so no need to check for other types.
+                        Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), false))
                     {
                         metadataAttributeIndex = attributeIndex;
                     }
