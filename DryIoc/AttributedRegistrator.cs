@@ -1,5 +1,6 @@
 ﻿// TODO:
-// - Add ExportAsDecorator/GenericWrapper.
+// - Add IFactory<,, and more> support.
+// - Add ExportAsDecorator.
 // + Aggregate rules that using attributes into one and to GetCustomAttributes only once and improve speed.
 // + Split WithMetadata to Export and Import.
 // + Add ImportUsing(ImplType, Reuse, Name, Metadata, ConstructorSignature)
