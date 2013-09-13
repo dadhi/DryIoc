@@ -1,6 +1,6 @@
 ﻿// TODO:
-// - Add IFactory<,, and more> support.
 // - Add ExportAsDecorator.
+// + Add IFactory<,, and more> support.
 // + Aggregate rules that using attributes into one and to GetCustomAttributes only once and improve speed.
 // + Split WithMetadata to Export and Import.
 // + Add ImportUsing(ImplType, Reuse, Name, Metadata, ConstructorSignature)
@@ -28,7 +28,7 @@ namespace DryIoc
             registrator.RegisterExported(ScanAssemblies(assemblies));
         }
 
-        public static void RegisterExportedTypes(this IRegistrator registrator, IEnumerable<Type> types)
+        public static void RegisterExportedTypes(this IRegistrator registrator, params Type[] types)
         {
             registrator.RegisterExported(ScanTypes(types));
         }
@@ -45,7 +45,8 @@ namespace DryIoc
                 }
                 else if (info.FactoryType == FactoryType.GenericWrapper)
                 {
-                    setup = Factory.GenericWrapper();
+                    var serviceTypeIndex = info.GenericWrapperServiceTypeIndex;
+                    setup = Factory.GenericWrapper(types => types[serviceTypeIndex]);
                 }
 
                 var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
@@ -62,12 +63,12 @@ namespace DryIoc
 
         public static IEnumerable<RegistrationInfo> ScanAssemblies(IEnumerable<Assembly> assemblies)
         {
-            return ScanTypes(assemblies.SelectMany(a => a.GetTypes()).Where(TypeCouldBeExported));
+            return ScanTypes(assemblies.SelectMany(a => a.GetTypes()));
         }
 
         public static IEnumerable<RegistrationInfo> ScanTypes(IEnumerable<Type> types)
         {
-            foreach (var type in types)
+            foreach (var type in types.Where(TypeCouldBeExported))
             {
                 var attributes = type.GetCustomAttributes(false);
 
@@ -75,6 +76,7 @@ namespace DryIoc
                 var isSingleton = SingletonByDefault; // default is singleton
                 var metadataAttributeIndex = -1;
                 var factoryType = FactoryType.Service;
+                var genericWrapperServiceTypeArgIndex = 0;
 
                 for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
                 {
@@ -123,10 +125,10 @@ namespace DryIoc
                     else if (attribute is ExportAsGenericWrapperAttribute)
                     {
                         factoryType = FactoryType.GenericWrapper;
+                        genericWrapperServiceTypeArgIndex = ((ExportAsGenericWrapperAttribute) attribute).ServiceTypeArgIndex;
                     }
 
-                    if (factoryType == FactoryType.Service &&
-                        // Metadata is supported only for Service setup, so no need to check for other types.
+                    if (factoryType == FactoryType.Service && // Metadata is supported only for Service setup, so no need to check for other types.
                         Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), false))
                     {
                         metadataAttributeIndex = attributeIndex;
@@ -139,7 +141,8 @@ namespace DryIoc
                     ImplementationType = type,
                     IsSingleton = isSingleton,
                     MetadataAttributeIndex = metadataAttributeIndex,
-                    FactoryType = factoryType
+                    FactoryType = factoryType,
+                    GenericWrapperServiceTypeIndex = genericWrapperServiceTypeArgIndex
                 };
             }
         }
@@ -263,10 +266,19 @@ namespace DryIoc
 
         public FactoryType FactoryType;
 
+        public int GenericWrapperServiceTypeIndex;
+
         public override bool Equals(object obj)
         {
             var other = obj as RegistrationInfo;
             if (other == null)
+                return false;
+
+            if (FactoryType != other.FactoryType ||
+                ImplementationType != other.ImplementationType ||
+                IsSingleton != other.IsSingleton ||
+                MetadataAttributeIndex != other.MetadataAttributeIndex ||
+                GenericWrapperServiceTypeIndex != other.GenericWrapperServiceTypeIndex)
                 return false;
 
             if (Exports.Length != other.Exports.Length)
@@ -276,9 +288,7 @@ namespace DryIoc
                 if (!Exports[i].Equals(other.Exports[i]))
                     return false;
 
-            return ImplementationType == other.ImplementationType
-                && IsSingleton == other.IsSingleton
-                && MetadataAttributeIndex == other.MetadataAttributeIndex;
+            return true;
         }
     }
 #pragma warning restore 659
@@ -384,7 +394,15 @@ namespace DryIoc
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
-    public class ExportAsGenericWrapperAttribute : Attribute { }
+    public class ExportAsGenericWrapperAttribute : Attribute
+    {
+        public int ServiceTypeArgIndex { get; set; }
+
+        public ExportAsGenericWrapperAttribute(int serviceTypeArgumentIndex = 0)
+        {
+            ServiceTypeArgIndex = serviceTypeArgumentIndex.ThrowIf(serviceTypeArgumentIndex < 0);
+        }
+    }
 
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = true)]

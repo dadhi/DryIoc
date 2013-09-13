@@ -801,6 +801,9 @@ namespace DryIoc
 
         public static readonly string DUPLICATE_SERVICE_NAME_REGISTRATION =
             "Service {0} with duplicate name '{1}' is already registered with implementation {2}.";
+
+        public static readonly string GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT =
+            "Generic Wrapper expects single type argument by default, but found many: {0}.";
     }
 
     public static class Registrator
@@ -1115,7 +1118,8 @@ namespace DryIoc
 
             private static Type SelectSingleByDefault(Type[] typeArgs)
             {
-                return typeArgs.ThrowIf(typeArgs.Length != 1)[0];
+                Throw.If(typeArgs.Length != 1, Error.GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT, typeArgs.Print(t => t.Print()));
+                return typeArgs[0];
             }
         }
 
@@ -1217,7 +1221,7 @@ namespace DryIoc
 
         public static FactorySetup GenericWrapper(Func<Type[], Type> selectServiceTypeFromGenericArgs = null)
         {
-            return selectServiceTypeFromGenericArgs == null 
+            return selectServiceTypeFromGenericArgs == null
                 ? FactorySetup.GenericWrapper.Default
                 : new FactorySetup.GenericWrapper(selectServiceTypeFromGenericArgs);
         }
@@ -1766,7 +1770,7 @@ namespace DryIoc
 
         #endregion
     }
-    
+
     public static class Sugar
     {
         public static string Print(this Type type, Func<Type, string> output = null /* prints Type.FullName by default */)
@@ -1781,6 +1785,13 @@ namespace DryIoc
                 name = name.Substring(0, name.IndexOf('`')) + "<" + genericArgsString + ">";
             }
             return name.Replace('+', '.'); // for nested classes
+        }
+
+        public static string Print<T>(this IEnumerable<T> items, Func<T, string> print = null, string separator = ", ")
+        {
+            print = print ?? (x => x.ToString());
+            return items.Aggregate(new StringBuilder(),
+                (s, x) => (s.Length != 0 ? s.Append(separator) : s).Append(print(x))).ToString();
         }
 
         public static Type[] GetSelfAndImplemented(this Type type)
@@ -1893,9 +1904,9 @@ namespace DryIoc
                 }
                 else
                 {
-// ReSharper disable PossibleNullReferenceException
+                    // ReSharper disable PossibleNullReferenceException
                     node = parents.Head;
-// ReSharper restore PossibleNullReferenceException
+                    // ReSharper restore PossibleNullReferenceException
                     parents = parents.Tail;
                     yield return node;
                     node = node.Right;
