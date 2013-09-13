@@ -1,13 +1,10 @@
 ﻿// TODO:
 // For version 1.0.0
+// - Add condition to Decorator.
 // - Consolidate code related to rules in Setup class.
 // - Adjust ResolveProperties to be consistent with Import property or field.
-// - Add condition to Decorator.
 // - Convert SkipCache flag to enum.
 // - Evaluate Code Coverage.
-// + Rename FunIoc to more stand out DryIoc.
-// + Add CustomReuse (reuse in custom scope?) example test, e.g. for ThreadStatic singleton.
-// + Rename Singletons.
 
 // Goals:
 // - Finalize Public API.
@@ -19,6 +16,9 @@
 // - Make a single consistent approach to ResolveProperties and PropertyOrFieldResolutionRules.
 // - Move Container Setup related code to dedicated class/container-property Setup.
 // - Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
+// - When resolving as Func with Arguments take properties into account.
+// - Add parameter to Resolve to skip resolution cache, and probably all other caches.
+// - Rename ExportPublicTypes to AutoExport.
 //
 // Internals:
 // - Rename request to DependencyChain.
@@ -1066,12 +1066,12 @@ namespace DryIoc
         }
     }
 
+    public enum FactoryType { Service, Decorator, GenericWrapper };
+
     public delegate Expression Init(Expression source);
 
     public abstract class FactorySetup
     {
-        public static readonly FactorySetup Default = new Service();
-
         public abstract FactoryType Type { get; }
 
         public virtual Init Init { get { return null; } }
@@ -1080,6 +1080,8 @@ namespace DryIoc
 
         public class Service : FactorySetup
         {
+            public static readonly FactorySetup Default = new Service();
+
             public override FactoryType Type { get { return FactoryType.Service; } }
 
             public override Init Init { get { return _init; } }
@@ -1100,13 +1102,15 @@ namespace DryIoc
 
         public class GenericWrapper : FactorySetup
         {
+            public static readonly FactorySetup Default = new GenericWrapper();
+
             public override FactoryType Type { get { return FactoryType.GenericWrapper; } }
 
-            public readonly SelectGenericTypeArg GetWrappedServiceType;
+            public readonly Func<Type[], Type> GetWrappedServiceType;
 
-            public GenericWrapper(SelectGenericTypeArg selectGenericTypeArg = null)
+            public GenericWrapper(Func<Type[], Type> selectServiceTypeFromGenericArgs = null)
             {
-                GetWrappedServiceType = selectGenericTypeArg ?? SelectSingleByDefault;
+                GetWrappedServiceType = selectServiceTypeFromGenericArgs ?? SelectSingleByDefault;
             }
 
             private static Type SelectSingleByDefault(Type[] typeArgs)
@@ -1153,7 +1157,7 @@ namespace DryIoc
         {
             ID = Interlocked.Increment(ref Count);
             Reuse = reuse;
-            Setup = setup ?? FactorySetup.Default;
+            Setup = setup ?? FactorySetup.Service.Default;
         }
 
         public Expression GetExpression(Request request, IRegistry registry)
@@ -1206,9 +1210,16 @@ namespace DryIoc
             return new FactorySetup.Service(init, skipCache, metadata);
         }
 
-        public static FactorySetup WithMetadata(object metadata)
+        public static FactorySetup WithMetadata(object metadata = null)
         {
-            return new FactorySetup.Service(metadata: metadata);
+            return metadata == null ? FactorySetup.Service.Default : new FactorySetup.Service(metadata: metadata);
+        }
+
+        public static FactorySetup GenericWrapper(Func<Type[], Type> selectServiceTypeFromGenericArgs = null)
+        {
+            return selectServiceTypeFromGenericArgs == null 
+                ? FactorySetup.GenericWrapper.Default
+                : new FactorySetup.GenericWrapper(selectServiceTypeFromGenericArgs);
         }
 
         public static FactorySetup Decorator(Func<Request, bool> isApplicable = null)
@@ -1406,8 +1417,6 @@ namespace DryIoc
 
         #endregion
     }
-
-    public enum FactoryType { Service, Decorator, GenericWrapper };
 
     public sealed class Request : IEnumerable<Request>
     {
@@ -1624,8 +1633,6 @@ namespace DryIoc
         object ResolveKeyed(Type serviceType, object serviceKey, bool shouldReturnNull);
     }
 
-    public delegate Type SelectGenericTypeArg(Type[] typeArgs);
-
     public interface IRegistrator
     {
         void Register(Factory factory, Type serviceType, object serviceKey);
@@ -1759,7 +1766,7 @@ namespace DryIoc
 
         #endregion
     }
-
+    
     public static class Sugar
     {
         public static string Print(this Type type, Func<Type, string> output = null /* prints Type.FullName by default */)

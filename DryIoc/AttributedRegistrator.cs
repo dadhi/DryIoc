@@ -31,15 +31,25 @@ namespace DryIoc
         {
             foreach (var info in infos)
             {
-                var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
-                var metadata = info.MetadataAttributeIndex == -1 ? null : FindMetadata(info.ImplementationType, info.MetadataAttributeIndex);
-                var factory = new ReflectionFactory(info.ImplementationType, reuse, FindSingleImportingConstructor, Factory.With(metadata: metadata));
-
-                var contracts = info.Exports;
-                for (var i = 0; i < contracts.Length; i++)
+                var setup = FactorySetup.Service.Default;
+                if (info.FactoryType == FactoryType.Service)
                 {
-                    var contract = contracts[i];
-                    registrator.Register(factory, contract.ServiceType, contract.ServiceName);
+                    var metadata = info.MetadataAttributeIndex == -1 ? null : FindMetadata(info.ImplementationType, info.MetadataAttributeIndex);
+                    setup = Factory.WithMetadata(metadata);
+                }
+                else if (info.FactoryType == FactoryType.GenericWrapper)
+                {
+                    setup = Factory.GenericWrapper();
+                }
+
+                var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
+                var factory = new ReflectionFactory(info.ImplementationType, reuse, FindSingleImportingConstructor, setup);
+
+                var exports = info.Exports;
+                for (var i = 0; i < exports.Length; i++)
+                {
+                    var export = exports[i];
+                    registrator.Register(factory, export.ServiceType, export.ServiceName);
                 }
             }
         }
@@ -52,54 +62,59 @@ namespace DryIoc
             {
                 var attributes = implementationType.GetCustomAttributes(false);
 
-                ExportInfo[] exportInfos = null;
+                ExportInfo[] exports = null;
                 var isSingleton = SingletonByDefault; // default is singleton
                 var metadataAttributeIndex = -1;
+                var factoryType = FactoryType.Service;
 
                 for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
                 {
                     var attribute = attributes[attributeIndex];
                     if (attribute is ExportAttribute)
                     {
-                        var export = (ExportAttribute)attribute;
-                        var exportInfo = new ExportInfo
+                        var exportAttribute = (ExportAttribute)attribute;
+                        var export = new ExportInfo
                         {
-                            ServiceType = export.ContractType ?? implementationType,
-                            ServiceName = export.ContractName
+                            ServiceType = exportAttribute.ContractType ?? implementationType,
+                            ServiceName = exportAttribute.ContractName
                         };
 
-                        if (exportInfos == null)
+                        if (exports == null)
                         {
-                            exportInfos = new[] { exportInfo };
+                            exports = new[] { export };
                         }
-                        else if (!exportInfos.Contains(exportInfo))
+                        else if (!exports.Contains(export))
                         {
-                            exportInfos = exportInfos.AddOrUpdateCopy(exportInfo);
+                            exports = exports.AddOrUpdateCopy(export);
                         }
                     }
                     else if (attribute is ExportPublicTypesAttribute)
                     {
-                        var exportPublic = (ExportPublicTypesAttribute)attribute;
-                        var exportPublicInfos = exportPublic.SelectServiceTypes(implementationType)
+                        var autoExportAttribute = (ExportPublicTypesAttribute)attribute;
+                        var autoExports = autoExportAttribute.SelectServiceTypes(implementationType)
                             .Select(type => new ExportInfo { ServiceType = type })
                             .ToArray();
 
-                        if (exportInfos != null)
+                        if (exports != null)
                         {
-                            for (var index = 0; index < exportInfos.Length; index++)
+                            for (var index = 0; index < exports.Length; index++)
                             {
-                                var exportInfo = exportInfos[index];
-                                if (!exportPublicInfos.Contains(exportInfo))
-                                    exportPublicInfos = exportPublicInfos.AddOrUpdateCopy(exportInfo);
+                                var export = exports[index];
+                                if (!autoExports.Contains(export))
+                                    autoExports = autoExports.AddOrUpdateCopy(export);
                             }
                         }
 
-                        exportInfos = exportPublicInfos;
+                        exports = autoExports;
 
                     }
                     else if (attribute is PartCreationPolicyAttribute)
                     {
                         isSingleton = ((PartCreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
+                    }
+                    else if (attribute is ExportAsGenericWrapperAttribute)
+                    {
+                        factoryType = FactoryType.GenericWrapper;
                     }
 
                     if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), false))
@@ -110,10 +125,11 @@ namespace DryIoc
 
                 yield return new RegistrationInfo
                 {
-                    Exports = exportInfos,
+                    Exports = exports,
                     ImplementationType = implementationType,
                     IsSingleton = isSingleton,
-                    MetadataAttributeIndex = metadataAttributeIndex
+                    MetadataAttributeIndex = metadataAttributeIndex,
+                    FactoryType = factoryType
                 };
             }
         }
@@ -179,10 +195,10 @@ namespace DryIoc
 
             var implementationType = import.ImplementationType ?? serviceType;
             var reuse = import.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
-            var options = import.Metadata == null ? FactorySetup.Default : Factory.WithMetadata(import.Metadata);
             SelectConstructor withConstructor = t => t.GetConstructor(import.ConstructorSignature);
+            var setup = Factory.WithMetadata(import.Metadata);
 
-            registry.Register(serviceType, implementationType, reuse, withConstructor, options, serviceName);
+            registry.Register(serviceType, implementationType, reuse, withConstructor, setup, serviceName);
             return serviceName;
         }
 
@@ -214,6 +230,7 @@ namespace DryIoc
     public sealed class ExportInfo
     {
         public Type ServiceType;
+
         public string ServiceName;
 
         public override bool Equals(object obj)
@@ -233,6 +250,8 @@ namespace DryIoc
         public bool IsSingleton;
 
         public int MetadataAttributeIndex;
+
+        public FactoryType FactoryType;
 
         public override bool Equals(object obj)
         {
@@ -354,11 +373,8 @@ namespace DryIoc
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
-    public class ExportAsDecorator : Attribute { }
-
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
-    public class ExportAsGenericWrapper : Attribute { }
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+    public class ExportAsGenericWrapperAttribute : Attribute { }
 
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = true)]
