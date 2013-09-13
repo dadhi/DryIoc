@@ -101,16 +101,13 @@ namespace DryIoc
 
                 var funcFactory = new FuncWrapper();
                 foreach (var funcType in FuncTypes)
-                    Register(funcFactory, funcType, serviceKey: null);
+                    this.Register(funcType, funcFactory);
 
-                Register(new ReflectionFactory(typeof(Lazy<>), null, t => t.GetConstructor(new[] { typeof(Func<>) }), new FactorySetup.GenericWrapper()),
-                    typeof(Lazy<>), serviceKey: null);
+                this.Register(typeof(Lazy<>), Reuse.Transient, t => t.GetConstructor(new[] { typeof(Func<>) }), FactorySetup.AsGenericWrapper());
 
-                Register(new CustomFactoryProvider(TryResolveMeta, new FactorySetup.GenericWrapper(t => t[0])),
-                    typeof(Meta<,>), serviceKey: null);
+                this.Register(typeof(Meta<,>), new CustomFactoryProvider(TryResolveMeta, FactorySetup.AsGenericWrapper(t => t[0])));
 
-                Register(new CustomFactoryProvider(TryResolveFactoryExpression, new FactorySetup.GenericWrapper()),
-                    typeof(FactoryExpression<>), serviceKey: null);
+                this.Register(typeof(FactoryExpression<>), new CustomFactoryProvider(TryResolveFactoryExpression, FactorySetup.AsGenericWrapper()));
             }
         }
 
@@ -507,7 +504,7 @@ namespace DryIoc
                         : EnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
                     return Expression.Call(resolver, resolveMethod, Expression.Constant(request));
                 },
-                setup: Factory.With(skipCache: true));
+                setup: FactorySetup.With(skipCache: true));
         }
 
         internal sealed class EnumerableResolver
@@ -659,7 +656,8 @@ namespace DryIoc
 
     public class FuncWrapper : Factory
     {
-        public FuncWrapper() : base(setup: new FactorySetup.GenericWrapper(args => args[args.Length - 1])) { }
+        public FuncWrapper() 
+            : base(setup: FactorySetup.AsGenericWrapper(types => types[types.Length - 1])) { }
 
         public override Factory TryProvideFactoryFor(Request request, IRegistry registry)
         {
@@ -1076,22 +1074,40 @@ namespace DryIoc
     public abstract class FactorySetup
     {
         public abstract FactoryType Type { get; }
-
         public virtual Init Init { get { return null; } }
         public virtual bool SkipCache { get { return false; } }
         public virtual object Metadata { get { return null; } }
+
+        public static FactorySetup WithMetadata(object metadata = null)
+        {
+            return metadata == null ? Service.Default : new Service(metadata: metadata);
+        }
+
+        public static FactorySetup With(Init init = null, bool skipCache = false, object metadata = null)
+        {
+            return new Service(init, skipCache, metadata);
+        }
+
+        public static FactorySetup AsGenericWrapper(Func<Type[], Type> selectServiceType = null)
+        {
+            return selectServiceType == null ? GenericWrapper.Default : new GenericWrapper(selectServiceType);
+        }
+
+        public static FactorySetup AsDecorator(Func<Request, bool> isApplicable = null)
+        {
+            return isApplicable == null ? Decorator.Default : new Decorator(isApplicable);
+        }
 
         public class Service : FactorySetup
         {
             public static readonly FactorySetup Default = new Service();
 
             public override FactoryType Type { get { return FactoryType.Service; } }
-
             public override Init Init { get { return _init; } }
             public override bool SkipCache { get { return _skipCache; } }
             public override object Metadata { get { return _metadata; } }
 
-            public Service(Init init = null, bool skipCache = false, object metadata = null)
+            internal Service(Init init = null, bool skipCache = false, object metadata = null)
             {
                 _init = init;
                 _skipCache = skipCache;
@@ -1108,10 +1124,9 @@ namespace DryIoc
             public static readonly FactorySetup Default = new GenericWrapper();
 
             public override FactoryType Type { get { return FactoryType.GenericWrapper; } }
-
             public readonly Func<Type[], Type> GetWrappedServiceType;
 
-            public GenericWrapper(Func<Type[], Type> selectServiceTypeFromGenericArgs = null)
+            internal GenericWrapper(Func<Type[], Type> selectServiceTypeFromGenericArgs = null)
             {
                 GetWrappedServiceType = selectServiceTypeFromGenericArgs ?? SelectSingleByDefault;
             }
@@ -1125,10 +1140,10 @@ namespace DryIoc
 
         public class Decorator : FactorySetup
         {
+            public static readonly FactorySetup Default = new Decorator();
+
             public override FactoryType Type { get { return FactoryType.Decorator; } }
-
             public override bool SkipCache { get { return true; } }
-
             public readonly Func<Request, bool> IsApplicable;
 
             public Decorator(Func<Request, bool> isApplicable = null)
@@ -1208,28 +1223,6 @@ namespace DryIoc
         private volatile Expression _cachedExpression;
 
         #endregion
-
-        public static FactorySetup With(Init init = null, bool skipCache = false, object metadata = null)
-        {
-            return new FactorySetup.Service(init, skipCache, metadata);
-        }
-
-        public static FactorySetup WithMetadata(object metadata = null)
-        {
-            return metadata == null ? FactorySetup.Service.Default : new FactorySetup.Service(metadata: metadata);
-        }
-
-        public static FactorySetup GenericWrapper(Func<Type[], Type> selectServiceTypeFromGenericArgs = null)
-        {
-            return selectServiceTypeFromGenericArgs == null
-                ? FactorySetup.GenericWrapper.Default
-                : new FactorySetup.GenericWrapper(selectServiceTypeFromGenericArgs);
-        }
-
-        public static FactorySetup Decorator(Func<Request, bool> isApplicable = null)
-        {
-            return new FactorySetup.Decorator(isApplicable);
-        }
     }
 
     public delegate ConstructorInfo SelectConstructor(Type implementationType);

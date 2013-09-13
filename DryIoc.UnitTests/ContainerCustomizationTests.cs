@@ -113,8 +113,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Setup.AddConstructorParamServiceKeyResolutionRule(AttributedRegistrator.TryGetKeyWithMetadataAttribute);
 
-            container.Register(typeof(IFooService), typeof(FooHey), setup: Factory.WithMetadata(FooMetadata.Hey));
-            container.Register(typeof(IFooService), typeof(FooBlah), setup: Factory.WithMetadata(FooMetadata.Blah));
+            container.Register(typeof(IFooService), typeof(FooHey), setup: FactorySetup.WithMetadata(FooMetadata.Hey));
+            container.Register(typeof(IFooService), typeof(FooBlah), setup: FactorySetup.WithMetadata(FooMetadata.Blah));
             container.Register(typeof(FooConsumer));
 
             var service = container.Resolve<FooConsumer>();
