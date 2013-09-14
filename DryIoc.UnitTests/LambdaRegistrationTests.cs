@@ -1,6 +1,5 @@
 ﻿using System;
 using DryIoc.UnitTests.CUT;
-using DryIoc.UnitTests.Playground;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -12,7 +11,7 @@ namespace DryIoc.UnitTests
         public void Given_Lambda_registration_Resolving_service_should_be_of_Lambda_provided_implementation()
         {
             var container = new Container();
-            container.RegisterLambda<IService>(() => new Service());
+            container.RegisterLambda<IService>(_ => new Service());
 
             var service = container.Resolve<IService>();
 
@@ -23,7 +22,7 @@ namespace DryIoc.UnitTests
         public void Lambda_registration_without_specified_service_type_should_use_implementation_type_as_service_type()
         {
             var container = new Container();
-            container.RegisterLambda(() => new Service());
+            container.RegisterLambda(_ => new Service());
 
             Assert.Throws<ContainerException>(() => container.Resolve<IService>());
 
@@ -35,7 +34,7 @@ namespace DryIoc.UnitTests
         public void Lambda_registration_could_be_resolved_as_Func()
         {
             var container = new Container();
-            container.RegisterLambda<IService>(() => new Service());
+            container.RegisterLambda<IService>(_ => new Service());
 
             var func = container.Resolve<Func<IService>>();
 
@@ -46,7 +45,7 @@ namespace DryIoc.UnitTests
         public void Lambda_registration_could_be_resolved_as_Lazy()
         {
             var container = new Container();
-            container.RegisterLambda<IService>(() => new Service());
+            container.RegisterLambda<IService>(_ => new Service());
 
             var service = container.Resolve<Lazy<IService>>();
 
@@ -60,11 +59,53 @@ namespace DryIoc.UnitTests
             container.Register<ServiceWithDependency>();
 
             var dependency = new Dependency();
-            container.RegisterLambda<IDependency>(() => dependency);
+            container.RegisterLambda<IDependency>(_ => dependency);
 
             var service = container.Resolve<ServiceWithDependency>();
 
             Assert.That(service.Dependency, Is.SameAs(dependency));
         }
+
+        [Test]
+        public void While_registering_It_is_possible_to_resolve_lambda_parameters_from_container()
+        {
+            var container = new Container();
+            container.Register<IDependency, Dependency>();
+            container.RegisterLambda(r => new ServiceWithDependency(r.Resolve<IDependency>()));
+
+            var service = container.Resolve<ServiceWithDependency>();
+
+            Assert.That(service.Dependency, Is.InstanceOf<Dependency>());
+        }
+
+        [Test]
+        public void Resolving_non_registered_dependency_inside_lambda_should_throw()
+        {
+            var container = new Container();
+            container.RegisterLambda(r => new ServiceWithDependency(r.Resolve<IDependency>()));
+
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<ServiceWithDependency>());
+        }
+
+        [Test]
+        public void Registration_with_resolver_as_param_should_NOT_hold_reference_to_container_when_it_is_GCed()
+        {
+            var container = new Container();
+            var containerWeakRef = new WeakReference(container);
+
+            container.Register<IDependency, Dependency>();
+            container.RegisterLambda(r => new ServiceWithDependency(r.Resolve<IDependency>()));
+            container.Resolve<ServiceWithDependency>();
+            container.Dispose();
+// ReSharper disable RedundantAssignment
+            container = null;
+// ReSharper restore RedundantAssignment
+            
+            GC.Collect();
+
+            Assert.That(containerWeakRef.IsAlive, Is.False);
+        }
     }
 }
+

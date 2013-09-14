@@ -963,7 +963,9 @@ namespace DryIoc
         }
 
         /// <summary>
-        /// Registers a factory delegate for creating an instance of <typeparamref name="TService"/> 
+        /// Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
+        /// Delegate can use <see cref="IResolver"/> parameter to resolve any required dependencies, e.g.:
+        /// <code>RegisterLambda&lt;ICar&gt;(r => new Car(r.Resolve&lt;IEngine&gt;()))</code>
         /// </summary>
         /// <typeparam name="TService">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
@@ -972,11 +974,13 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional service name.</param>
         public static void RegisterLambda<TService>(this IRegistrator registrator,
-            Func<TService> lambda, IReuse reuse = null, FactorySetup setup = null,
+            Func<IResolver, TService> lambda, IReuse reuse = null, FactorySetup setup = null,
             string named = null)
         {
-            var lambdaCall = Expression.Call(Expression.Constant(lambda), "Invoke", null, null);
-            registrator.Register(new CustomFactory((_, __) => lambdaCall, reuse, setup), typeof(TService), named);
+            var factory = new CustomFactory(
+                (_, r) => Expression.Call(Expression.Constant(lambda), "Invoke", null, Expression.Constant(r, typeof(IResolver))),
+                reuse, setup);
+            registrator.Register(factory, typeof(TService), named);
         }
 
         /// <summary>
@@ -991,7 +995,7 @@ namespace DryIoc
             TService instance, FactorySetup setup = null,
             string named = null)
         {
-            registrator.RegisterLambda(() => instance, Reuse.Transient, setup, named);
+            registrator.RegisterLambda(_ => instance, Reuse.Transient, setup, named);
         }
 
         /// <summary>
@@ -1391,7 +1395,7 @@ namespace DryIoc
 
     public class CustomFactory : Factory
     {
-        public CustomFactory(Func<Request, IRegistry, Expression> getExpression, 
+        public CustomFactory(Func<Request, IRegistry, Expression> getExpression,
             IReuse reuse = null, FactorySetup setup = null,
             Func<Request, IRegistry, Type, LambdaExpression> getFuncWithArgsExpression = null)
             : base(reuse, setup)

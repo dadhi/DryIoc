@@ -71,7 +71,7 @@ namespace DryIoc.UnitTests
 		public void Resolving_enumerable_of_service_registered_with_func_should_return_enumerable_with_single_service()
 		{
 			var container = new Container();
-			container.RegisterLambda<IService<string>>(() => new ClosedGenericClass());
+			container.RegisterLambda<IService<string>>(_ => new ClosedGenericClass());
 
 			var services = container.Resolve<IEnumerable<IService<string>>>();
 
@@ -82,7 +82,7 @@ namespace DryIoc.UnitTests
 		public void ResolveEnumerableOfFunc_ServiceRegisteredWithFunc_ShouldReturnEnumerableOfFunc()
 		{
 			var container = new Container();
-			container.RegisterLambda<IService<string>>(() => new ClosedGenericClass());
+			container.RegisterLambda<IService<string>>(_ => new ClosedGenericClass());
 
 			var services = container.Resolve<IEnumerable<Func<IService<string>>>>();
 

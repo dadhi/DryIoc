@@ -218,6 +218,7 @@ namespace DryIoc.UnitTests
         //}
 
         [Test]
+        [Ignore]
         public void Possible_to_register_custom_decorator_specified_by_Func_of_decorated_service()
         {
             var container = new Container();
