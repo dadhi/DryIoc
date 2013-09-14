@@ -6,6 +6,7 @@ namespace DryIoc.UnitTests.Playground
     public class DecoratorConditionPlayTests
     {
         [Test]
+        [Ignore]
         public void Register_decorator_with_condition()
         {
             var container = new Container();

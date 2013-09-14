@@ -2,6 +2,7 @@
 // For version 1.0.0
 // - Add condition to Decorator.
 // - Consolidate code related to rules in Setup class.
+// - Add registration for lambda with IResolver parameter for something like RegisterLambda(c => new Blah(c.Resolve(IDependency))).
 // - Adjust ResolveProperties to be consistent with Import property or field.
 // - Convert SkipCache flag to enum.
 // - Evaluate Code Coverage.
@@ -11,24 +12,23 @@
 // + Add distinctive features:. ImportUsing.
 //
 // Features:
+// - Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
 // - Add distinctive features: Export CustomFactory<TService>.
 // - Make Request to return Empty for resolution root parent. So it will simplify ImplementationType checks. May be add IsResolutionRoot property as well.
 // - Make a single consistent approach to ResolveProperties and PropertyOrFieldResolutionRules.
 // - Move Container Setup related code to dedicated class/container-property Setup.
-// - Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
 // - When resolving as Func with Arguments take properties into account.
 // - Add parameter to Resolve to skip resolution cache, and probably all other caches.
 // - Rename ExportPublicTypes to AutoExport.
 //
 // Internals:
+// - Make Decorator caching work without SkipCache=true;
+// - Automatically propagate Setup on Factory.TryGetFactoryFor(Request ...).
 // - Rename request to DependencyChain.
-// - Remove Factory.PrototypeID.
-// - Change IReuse signature to use ContainerScope and CurrentScope instead of IRegistry.
-// - Remove Container Singleton parameter from CompiledFactory.
 // - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
 // - Rename Request.TryGetNonWrapperParent to just Parent and make it to return default value.
-// - Make Decorator caching work without SkipCache=true;
 // - Remove non required custom delegates, the ones easy to figure out with good parameters.
+// + Remove Container Singleton parameter from CompiledFactory.
 
 #define SYSTEM_LAZY_IS_NOT_AVAILABLE
 #pragma warning disable 420 // a reference to a volatile field will not be treated as volatile
@@ -85,7 +85,9 @@ namespace DryIoc
     {
         public readonly Setup Setup;
 
-        public Container(bool coreOnly = false)
+        public Container() : this(false) { }
+
+        public Container(bool coreOnly)
         {
             _syncRoot = new object();
             _registry = new Dictionary<Type, RegistryEntry>();
@@ -142,34 +144,34 @@ namespace DryIoc
             Factory result;
             lock (_syncRoot)
             {
-                // Decorator.
-                RegistryEntry entry;
-                if (_registry.TryGetValue(request.ServiceType, out entry) &&
-                    entry.TryGetDecorator(out result, request))
-                {
-                    result = result.TryProvideFactoryFor(request, this) ?? result;
-                    request.SetResult(result);
-                    return result;
-                }
+                //// Decorator.
+                //RegistryEntry entry;
+                //if (_registry.TryGetValue(request.ServiceType, out entry) &&
+                //    entry.TryGetDecorator(out result, request))
+                //{
+                //    result = result.TryProvideFactoryFor(request, this) ?? result;
+                //    request.SetResult(result);
+                //    return result;
+                //}
+                //// Open-generic Decorator.
+                //RegistryEntry openGenericEntry = null;
+                //if (request.OpenGenericServiceType != null &&
+                //    _registry.TryGetValue(request.OpenGenericServiceType, out openGenericEntry) &&
+                //    openGenericEntry.TryGetDecorator(out result, request) &&
+                //    (result = result.TryProvideFactoryFor(request, this)) != null)
+                //{
+                //    request.SetResult(result);
 
-                // Open-generic Decorator.
-                RegistryEntry openGenericEntry = null;
-                if (request.OpenGenericServiceType != null &&
-                    _registry.TryGetValue(request.OpenGenericServiceType, out openGenericEntry) &&
-                    openGenericEntry.TryGetDecorator(out result, request) &&
-                    (result = result.TryProvideFactoryFor(request, this)) != null)
-                {
-                    request.SetResult(result);
-
-                    // TODO: May be by providing ServiceKey we could stop using SkipCache. 
-                    //       May be implemented by storing Decorator as normal factory in Named and Indexed collections.
-                    // TODO: Do we need to register closed gen decorator at all?
-                    Register(result, request.ServiceType, null);
-                    return result;
-                }
+                //    // TODO: May be by providing ServiceKey we could stop using SkipCache. 
+                //    //       May be implemented by storing Decorator as normal factory in Named and Indexed collections.
+                //    // TODO: Do we need to register closed gen decorator at all?
+                //    Register(result, request.ServiceType, null);
+                //    return result;
+                //}
 
                 // Service.
-                if (entry != null &&
+                RegistryEntry entry;
+                if (_registry.TryGetValue(request.ServiceType, out entry) &&
                     entry.TryGetFactory(out result, request.ServiceType, request.ServiceKey))
                 {
                     result = result.TryProvideFactoryFor(request, this) ?? result;
@@ -178,7 +180,9 @@ namespace DryIoc
                 }
 
                 // Open-generic Service.
-                if (openGenericEntry != null &&
+                RegistryEntry openGenericEntry = null;
+                if (request.OpenGenericServiceType != null &&
+                    _registry.TryGetValue(request.OpenGenericServiceType, out openGenericEntry) &&
                     openGenericEntry.TryGetFactory(out result, request.ServiceType, request.ServiceKey) &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
@@ -212,6 +216,32 @@ namespace DryIoc
             }
 
             Throw.If(!shouldReturnNull, Error.UNABLE_TO_RESOLVE_SERVICE, request, request.PrintServiceInfo());
+            return null;
+        }
+
+        LambdaExpression IRegistry.TryGetOrAddDecoratorFunc(Request request)
+        {
+            var serviceType = request.ServiceType;
+            var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
+
+            // Search for custom decorator Func and try select one applicable.
+            lock (_syncRoot)
+            {
+                RegistryEntry entry;
+                if (_registry.TryGetValue(decoratorFuncType, out entry))
+                {
+                    Factory decoratorFuncFactory;
+                    if (entry.TryGetDecorator(out decoratorFuncFactory, request))
+                    {
+                        // Recursion cycle!!!
+                        //var expr = decoratorFuncFactory.GetExpression(request, this);
+                    }
+                }
+            }
+
+            // Search for closed type decorator
+            // Search for open-generic type decorator
+
             return null;
         }
 
@@ -266,9 +296,10 @@ namespace DryIoc
             if (factory == null || factory.Setup.Type != FactoryType.GenericWrapper)
                 return serviceType;
 
-            var wrappedType = ((FactorySetup.GenericWrapper)factory.Setup).GetWrappedServiceType(serviceType.GetGenericArguments());
+            var wrapperSetup = ((FactorySetup.GenericWrapper)factory.Setup);
+            var wrappedType = wrapperSetup.GetWrappedServiceType(serviceType.GetGenericArguments());
             return wrappedType == serviceType ? serviceType
-                : ((IRegistry)this).GetWrappedServiceTypeOrSelf(wrappedType); // unwrap further.
+                : ((IRegistry)this).GetWrappedServiceTypeOrSelf(wrappedType); // unwrap recursively.
         }
 
         object IRegistry.TryGetConstructorParamKey(ParameterInfo parameter, Request parent)
@@ -656,7 +687,7 @@ namespace DryIoc
 
     public class FuncWrapper : Factory
     {
-        public FuncWrapper() 
+        public FuncWrapper()
             : base(setup: FactorySetup.AsGenericWrapper(types => types[types.Length - 1])) { }
 
         public override Factory TryProvideFactoryFor(Request request, IRegistry registry)
@@ -1074,7 +1105,6 @@ namespace DryIoc
     public abstract class FactorySetup
     {
         public abstract FactoryType Type { get; }
-        public virtual Init Init { get { return null; } }
         public virtual bool SkipCache { get { return false; } }
         public virtual object Metadata { get { return null; } }
 
@@ -1085,7 +1115,7 @@ namespace DryIoc
 
         public static FactorySetup With(Init init = null, bool skipCache = false, object metadata = null)
         {
-            return new Service(init, skipCache, metadata);
+            return new Service(skipCache, metadata);
         }
 
         public static FactorySetup AsGenericWrapper(Func<Type[], Type> selectServiceType = null)
@@ -1103,18 +1133,15 @@ namespace DryIoc
             public static readonly FactorySetup Default = new Service();
 
             public override FactoryType Type { get { return FactoryType.Service; } }
-            public override Init Init { get { return _init; } }
             public override bool SkipCache { get { return _skipCache; } }
             public override object Metadata { get { return _metadata; } }
 
-            internal Service(Init init = null, bool skipCache = false, object metadata = null)
+            internal Service(bool skipCache = false, object metadata = null)
             {
-                _init = init;
                 _skipCache = skipCache;
                 _metadata = metadata;
             }
 
-            private readonly Init _init;
             private readonly bool _skipCache;
             private readonly object _metadata;
         }
@@ -1184,8 +1211,10 @@ namespace DryIoc
             if (Setup.SkipCache || _cachedExpression == null)
             {
                 var expression = CreateExpression(request, registry);
-                if (Setup.Init != null)
-                    expression = Setup.Init(expression);
+
+                // Try find first applicable Decorator if any.
+                var decoratorFunc = registry.TryGetOrAddDecoratorFunc(request);
+
                 if (Reuse != null)
                     expression = Reuse.Of(request, registry, ID, expression);
                 if (Setup.SkipCache)
@@ -1199,13 +1228,11 @@ namespace DryIoc
         public LambdaExpression TryGetFuncWithArgsExpression(Type funcType, Request request, IRegistry registry)
         {
             var func = TryCreateFuncWithArgsExpression(funcType, request, registry);
-            if (func == null)
-                return null;
-            var expression = func.Body;
-            if (Setup.Init != null)
-                expression = Setup.Init(expression);
-            if (Reuse != null)
+            if (func != null && Reuse != null)
+            {
+                var expression = func.Body;
                 func = Expression.Lambda(funcType, Reuse.Of(request, registry, ID, expression), func.Parameters);
+            }
             return func;
         }
 
@@ -1233,8 +1260,7 @@ namespace DryIoc
 
         public override int ProviderID { get { return _providerID; } }
 
-        public ReflectionFactory(Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null,
-            FactorySetup setup = null)
+        public ReflectionFactory(Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
             _implementationType = implementationType.ThrowIfNull();
@@ -1365,9 +1391,12 @@ namespace DryIoc
 
     public class CustomFactory : Factory
     {
-        public CustomFactory(Func<Request, IRegistry, Expression> getExpression, IReuse reuse = null, FactorySetup setup = null)
+        public CustomFactory(Func<Request, IRegistry, Expression> getExpression, 
+            IReuse reuse = null, FactorySetup setup = null,
+            Func<Request, IRegistry, Type, LambdaExpression> getFuncWithArgsExpression = null)
             : base(reuse, setup)
         {
+            _getFuncWithArgsExpression = getFuncWithArgsExpression;
             _getExpression = getExpression.ThrowIfNull();
         }
 
@@ -1381,9 +1410,15 @@ namespace DryIoc
             return _getExpression(request, registry);
         }
 
+        protected override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry)
+        {
+            return _getFuncWithArgsExpression == null ? null : _getFuncWithArgsExpression(request, registry, funcType);
+        }
+
         #region Implementation
 
         private readonly Func<Request, IRegistry, Expression> _getExpression;
+        private readonly Func<Request, IRegistry, Type, LambdaExpression> _getFuncWithArgsExpression;
 
         #endregion
     }
@@ -1645,6 +1680,8 @@ namespace DryIoc
         Factory GetOrAddFactory(Request request, bool returnNullOnError);
 
         Factory TryGetFactory(Type serviceType, object serviceKey);
+
+        LambdaExpression TryGetOrAddDecoratorFunc(Request request);
 
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
