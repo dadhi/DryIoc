@@ -298,31 +298,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Possible_to_register_Service_with_Func_of_argument_and_Resolve_it_as_Func()
-        {
-            var container = new Container();
-
-            Func<TwoCtors> func = () => new TwoCtors();
-            Func<string, TwoCtors> getTwo = s => new TwoCtors(s);
-
-            container.Register<TwoCtors>(new CustomFactory(
-                (_, __) => Expression.Call(Expression.Constant(func), "Invoke", null, null),
-                getFuncWithArgsExpression: (_, __, funcType) =>
-                {
-                    if (funcType != getTwo.GetType()) return null;
-                    var arg0 = Expression.Parameter(funcType.GetGenericArguments()[0], "arg0");
-                    return Expression.Lambda(
-                        funcType,
-                        Expression.Call(Expression.Constant(getTwo), "Invoke", null, arg0), 
-                        arg0);
-                }));
-
-            var getTwoResolved = container.Resolve<Func<string, TwoCtors>>();
-
-            Assert.That(getTwoResolved("cool").Message, Is.EqualTo("cool"));
-        }
-
-        [Test]
         public void Possible_to_register_Instance_of_Func_of_argument_and_Resolve_it_as_Func()
         {
             var container = new Container();

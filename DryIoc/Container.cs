@@ -2,10 +2,10 @@
 // For version 1.0.0
 // - Add condition to Decorator.
 // - Consolidate code related to rules in Setup class.
-// - Add registration for lambda with IResolver parameter for something like RegisterLambda(c => new Blah(c.Resolve(IDependency))).
 // - Adjust ResolveProperties to be consistent with Import property or field.
 // - Convert SkipCache flag to enum.
 // - Evaluate Code Coverage.
+// + Add registration for lambda with IResolver parameter for something like RegisterLambda(c => new Blah(c.Resolve(IDependency))).
 
 // Goals:
 // - Finalize Public API.
@@ -22,6 +22,7 @@
 // - Rename ExportPublicTypes to AutoExport.
 //
 // Internals:
+// - Remake Request ResolveTo to not mutate Request.
 // - Make Decorator caching work without SkipCache=true;
 // - Automatically propagate Setup on Factory.TryGetFactoryFor(Request ...).
 // - Rename request to DependencyChain.
@@ -150,7 +151,7 @@ namespace DryIoc
                 //    entry.TryGetDecorator(out result, request))
                 //{
                 //    result = result.TryProvideFactoryFor(request, this) ?? result;
-                //    request.SetResult(result);
+                //    request.ResolveTo(result);
                 //    return result;
                 //}
                 //// Open-generic Decorator.
@@ -160,7 +161,7 @@ namespace DryIoc
                 //    openGenericEntry.TryGetDecorator(out result, request) &&
                 //    (result = result.TryProvideFactoryFor(request, this)) != null)
                 //{
-                //    request.SetResult(result);
+                //    request.ResolveTo(result);
 
                 //    // TODO: May be by providing ServiceKey we could stop using SkipCache. 
                 //    //       May be implemented by storing Decorator as normal factory in Named and Indexed collections.
@@ -175,7 +176,7 @@ namespace DryIoc
                     entry.TryGetFactory(out result, request.ServiceType, request.ServiceKey))
                 {
                     result = result.TryProvideFactoryFor(request, this) ?? result;
-                    request.SetResult(result);
+                    request.ResolveTo(result);
                     return result;
                 }
 
@@ -186,7 +187,7 @@ namespace DryIoc
                     openGenericEntry.TryGetFactory(out result, request.ServiceType, request.ServiceKey) &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
-                    request.SetResult(result);
+                    request.ResolveTo(result);
                     Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
@@ -197,7 +198,7 @@ namespace DryIoc
                     result.Setup.Type == FactoryType.GenericWrapper &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
-                    request.SetResult(result);
+                    request.ResolveTo(result);
                     Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
@@ -209,7 +210,7 @@ namespace DryIoc
                 result = rules[i].Invoke(request, this);
                 if (result != null)
                 {
-                    request.SetResult(result);
+                    request.ResolveTo(result);
                     Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
@@ -219,30 +220,70 @@ namespace DryIoc
             return null;
         }
 
-        LambdaExpression IRegistry.TryGetOrAddDecoratorFunc(Request request)
+        Expression IRegistry.ApplyDecorators(Expression expression, Request request)
         {
+            // # Stop recursion by checking that we are already have decorator in Request.
+            if (request.FactoryType == FactoryType.Decorator)
+                return expression;
+
+            // # Find all applicable decorators in order.
+            var customDecorators = new List<Factory>();
+            var serviceDecorators = new List<Factory>();
+
             var serviceType = request.ServiceType;
             var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
 
-            // Search for custom decorator Func and try select one applicable.
             lock (_syncRoot)
             {
                 RegistryEntry entry;
-                if (_registry.TryGetValue(decoratorFuncType, out entry))
+
+                // Add registered Func<TService, TService> first.
+                if (_registry.TryGetValue(decoratorFuncType, out entry) &&
+                    entry.Decorators != null)
                 {
-                    Factory decoratorFuncFactory;
-                    if (entry.TryGetDecorator(out decoratorFuncFactory, request))
-                    {
-                        // Recursion cycle!!!
-                        //var expr = decoratorFuncFactory.GetExpression(request, this);
-                    }
+                    customDecorators.AddRange(entry.Decorators.OfType<CustomFactory>().Cast<Factory>()
+                        .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request)));
+                }
+
+                // Add registered Service decorators.
+                if (_registry.TryGetValue(serviceType, out entry) &&
+                    entry.Decorators != null)
+                {
+                    serviceDecorators.AddRange(entry.Decorators
+                        .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request)));
+                }
+
+                // Add registered Open-generic decorators
+                if (request.OpenGenericServiceType != null &&
+                    _registry.TryGetValue(request.OpenGenericServiceType, out entry) &&
+                    entry.Decorators != null)
+                {
+                    serviceDecorators.AddRange(entry.Decorators
+                        .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request))
+                        .Select(f => f.TryProvideFactoryFor(request, this)));
                 }
             }
 
-            // Search for closed type decorator
-            // Search for open-generic type decorator
+            // # Apply decorators.
+            if (customDecorators.Count != 0)
+            {
+                var decoratorRequest = new Request(decoratorFuncType, null, request.Parent);
+                for (var i = 0; i < customDecorators.Count; i++)
+                {
+                    var decorator = customDecorators[i];
+                    decoratorRequest.ResolveTo(decorator);
+                    
+                    // returns something alike: (r => service => Decorate(service))(container)
+                    var funcExpr = decorator.GetExpression(decoratorRequest, this);
+                    
+                    // i should construct: 
+                    // var decorate = (r => service => Decorate(service))(container);
+                    // decorate(expression)
+                    expression = Expression.Call(funcExpr, "Invoke", null, expression);
+                }
+            }
 
-            return null;
+            return expression;
         }
 
         IEnumerable<object> IRegistry.GetKeys(Type serviceType, Func<Factory, bool> condition)
@@ -1215,10 +1256,7 @@ namespace DryIoc
             if (Setup.SkipCache || _cachedExpression == null)
             {
                 var expression = CreateExpression(request, registry);
-
-                // Try find first applicable Decorator if any.
-                var decoratorFunc = registry.TryGetOrAddDecoratorFunc(request);
-
+                expression = registry.ApplyDecorators(expression, request);
                 if (Reuse != null)
                     expression = Reuse.Of(request, registry, ID, expression);
                 if (Setup.SkipCache)
@@ -1395,12 +1433,9 @@ namespace DryIoc
 
     public class CustomFactory : Factory
     {
-        public CustomFactory(Func<Request, IRegistry, Expression> getExpression,
-            IReuse reuse = null, FactorySetup setup = null,
-            Func<Request, IRegistry, Type, LambdaExpression> getFuncWithArgsExpression = null)
+        public CustomFactory(Func<Request, IRegistry, Expression> getExpression, IReuse reuse = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            _getFuncWithArgsExpression = getFuncWithArgsExpression;
             _getExpression = getExpression.ThrowIfNull();
         }
 
@@ -1414,15 +1449,9 @@ namespace DryIoc
             return _getExpression(request, registry);
         }
 
-        protected override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry)
-        {
-            return _getFuncWithArgsExpression == null ? null : _getFuncWithArgsExpression(request, registry, funcType);
-        }
-
         #region Implementation
 
         private readonly Func<Request, IRegistry, Expression> _getExpression;
-        private readonly Func<Request, IRegistry, Type, LambdaExpression> _getFuncWithArgsExpression;
 
         #endregion
     }
@@ -1501,7 +1530,7 @@ namespace DryIoc
             return new Request(serviceType, ServiceKey, this);
         }
 
-        public void SetResult(Factory factory)
+        public void ResolveTo(Factory factory)
         {
             FactoryType = factory.Setup.Type;
             FactoryID = factory.ID;
@@ -1685,7 +1714,7 @@ namespace DryIoc
 
         Factory TryGetFactory(Type serviceType, object serviceKey);
 
-        LambdaExpression TryGetOrAddDecoratorFunc(Request request);
+        Expression ApplyDecorators(Expression expression, Request request);
 
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
