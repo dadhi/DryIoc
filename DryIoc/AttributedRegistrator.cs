@@ -126,12 +126,13 @@ namespace DryIoc
                     else if (attribute is ExportAsGenericWrapperAttribute)
                     {
                         factoryType = FactoryType.GenericWrapper;
-                        genericWrapperServiceTypeArgIndex = ((ExportAsGenericWrapperAttribute) attribute).ServiceTypeArgIndex;
+                        genericWrapperServiceTypeArgIndex = ((ExportAsGenericWrapperAttribute)attribute).ServiceTypeArgIndex;
                     }
 
                     if (factoryType == FactoryType.Service && // Metadata is supported only for Service setup, so no need to check for other types.
                         Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), false))
                     {
+                        Throw.If(metadataAttributeIndex != -1, Error.UNABLE_TO_SELECT_FROM_MULTIPLE_METADATA, type);
                         metadataAttributeIndex = attributeIndex;
                     }
                 }
@@ -161,7 +162,7 @@ namespace DryIoc
         {
             return type.GetConstructors()
                 .SingleOrDefault(x => Attribute.IsDefined(x, typeof(ImportingConstructorAttribute)))
-                .ThrowIfNull(UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, type);
+                .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, type);
         }
 
         public static object FindMetadata(Type type, int metadataAttributeIndex)
@@ -192,7 +193,7 @@ namespace DryIoc
             var serviceType = registry.GetWrappedServiceTypeOrSelf(parameter.ParameterType);
             var serviceKey = registry.GetKeys(serviceType, f => attribute.Metadata.Equals(f.Setup.Metadata)).FirstOrDefault();
 
-            return serviceKey.ThrowIfNull(UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, attribute.Metadata);
+            return serviceKey.ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, attribute.Metadata);
         }
 
         public static object TryImportUsing(ParameterInfo param, Request parent, IRegistry registry)
@@ -227,16 +228,19 @@ namespace DryIoc
         }
 
         #endregion
+    }
 
-        #region Implementation
-
-        private static readonly string UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE =
+    public static partial class Error
+    {
+        public static readonly string UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE =
             "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}.";
 
-        private static string UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA =
+        public static readonly string UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA =
             "Unable to resolve dependency {0} with metadata [{1}]";
 
-        #endregion
+        public static readonly string UNABLE_TO_SELECT_FROM_MULTIPLE_METADATA =
+            "Unable to select from multiple metadata defined when Exporting {0}." + Environment.NewLine +
+            " Only single metadata is allowed per implementation type.";
     }
 
 #pragma warning disable 659

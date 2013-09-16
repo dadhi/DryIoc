@@ -239,7 +239,6 @@ namespace DryIoc
             {
                 RegistryEntry entry;
 
-                // Add registered Func<TService, TService> first.
                 if (_registry.TryGetValue(decoratorFuncType, out entry) &&
                     entry.Decorators != null)
                 {
@@ -247,7 +246,6 @@ namespace DryIoc
                         .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request)).ToArray();
                 }
 
-                // Add registered Service decorators.
                 if (_registry.TryGetValue(serviceType, out entry) &&
                     entry.Decorators != null)
                 {
@@ -255,7 +253,6 @@ namespace DryIoc
                         .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request)));
                 }
 
-                // Add registered Open-generic decorators
                 if (request.OpenGenericServiceType != null &&
                     _registry.TryGetValue(request.OpenGenericServiceType, out entry) &&
                     entry.Decorators != null)
@@ -813,7 +810,7 @@ namespace DryIoc
         }
     }
 
-    public static class Error
+    public partial static class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
             "Unable to resolve service {0}." + Environment.NewLine +

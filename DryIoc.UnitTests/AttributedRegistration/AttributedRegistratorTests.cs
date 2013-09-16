@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests.AttributedRegistration
 {
 	[TestFixture]
-	public class RegistratorTests
+	public class AttributedRegistratorTests
 	{
 		[Test]
 		public void I_can_resolve_service_with_dependencies()
@@ -139,17 +139,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
 
 		}
 
-		[Test]
-		public void Resolving_service_with_multiple_constructors_without_importing_attribute_should_fail()
-		{
-			GivenAssemblyWithExportedTypes();
-			WhenIRegisterAllExportedTypes();
-
-            Assert.Throws<ContainerException>(
-				() => _container.Resolve<ServiceWithMultipleCostructors>());
-		}
-
-		[Test]
+	    [Test]
 		public void Service_with_metadata_can_be_resolved_without_name()
 		{
 			GivenAssemblyWithExportedTypes();
@@ -159,7 +149,26 @@ namespace DryIoc.UnitTests.AttributedRegistration
 				() => _container.Resolve<SingleServiceWithMetadata>());
 		}
 
-		#region Implementation
+	    [Test]
+	    public void Registering_service_with_metadata_provided_with_multiple_attributes_should_fail_Cause_of_underministic_behavior()
+	    {
+	        var container = new Container();
+
+            Assert.Throws<ContainerException>(() => 
+                container.RegisterExportedTypes(typeof(OneWithManyMeta)));
+	    }
+
+	    [Test]
+	    public void Resolving_service_with_multiple_constructors_without_importing_attribute_should_fail()
+	    {
+	        GivenAssemblyWithExportedTypes();
+	        WhenIRegisterAllExportedTypes();
+
+	        Assert.Throws<ContainerException>(
+	            () => _container.Resolve<ServiceWithMultipleCostructors>());
+	    }
+
+	    #region Implementation
 
 		private void WhenIRegisterAllExportedTypes()
 		{
@@ -178,4 +187,14 @@ namespace DryIoc.UnitTests.AttributedRegistration
 
 		#endregion
 	}
+
+    #region CUT
+
+    [ExportWithDisplayName(DisplayName = "blah")]
+    [ExportWithMetadata("hey")]
+    public class OneWithManyMeta
+    {
+    }
+
+    #endregion
 }

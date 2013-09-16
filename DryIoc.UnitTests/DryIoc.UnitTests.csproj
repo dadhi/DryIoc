@@ -43,7 +43,7 @@
     </Compile>
     <Compile Include="AttributedRegistration\ExportPublicTypesTests.cs" />
     <Compile Include="AttributedRegistration\PerformanceTests.cs" />
-    <Compile Include="AttributedRegistration\RegistratorTests.cs" />
+    <Compile Include="AttributedRegistration\AttributedRegistratorTests.cs" />
     <Compile Include="CompositePatternTests.cs" />
     <Compile Include="ContainerCustomizationTests.cs" />
     <Compile Include="ContainerTests.cs" />

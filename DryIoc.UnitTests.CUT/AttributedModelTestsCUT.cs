@@ -73,7 +73,7 @@ namespace DryIoc.UnitTests.CUT
         string Message { get; }
     }
 
-    [ExportView(ContractType = typeof(IServiceWithMultipleImplentations), DisplayName = "One")]
+    [ExportWithDisplayName(ContractType = typeof(IServiceWithMultipleImplentations), DisplayName = "One")]
     [PartCreationPolicy(CreationPolicy.NonShared)]
     public class OneTransientService : IServiceWithMultipleImplentations
     {
@@ -101,12 +101,12 @@ namespace DryIoc.UnitTests.CUT
     {
     }
 
-    [ExportView(ContractType = typeof(IServiceWithMetadata), DisplayName = "Up")]
+    [ExportWithDisplayName(ContractType = typeof(IServiceWithMetadata), DisplayName = "Up")]
     public class OneServiceWithMetadata : IServiceWithMetadata
     {
     }
 
-    [ExportView(ContractType = typeof(IServiceWithMetadata), DisplayName = "Down")]
+    [ExportWithDisplayName(ContractType = typeof(IServiceWithMetadata), DisplayName = "Down")]
     [PartCreationPolicy(CreationPolicy.NonShared)]
     public class AnotherServiceWithMetadata : IServiceWithMetadata
     {
@@ -129,7 +129,7 @@ namespace DryIoc.UnitTests.CUT
     }
 
     [MetadataAttribute]
-    public class ExportViewAttribute : ExportAttribute, IViewMetadata
+    public class ExportWithDisplayNameAttribute : ExportAttribute, IViewMetadata
     {
         public string DisplayName { get; set; }
     }

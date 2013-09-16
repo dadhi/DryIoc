@@ -171,6 +171,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
             container.Register<IOperation, LazyDecorator>(setup: FactorySetup.AsDecorator());
+            //container.Register<IOperation, LazyDecorator>(setup: new DecoratorSetup());
 
             var operation = container.Resolve<IOperation>();
 
@@ -243,6 +244,8 @@ namespace DryIoc.UnitTests
         }
     }
 
+    #region CUT
+
     public class OperationUser<T>
     {
         public Meta<Func<IOperation<T>>, string> GetOperation { get; set; }
@@ -253,11 +256,17 @@ namespace DryIoc.UnitTests
         }
     }
 
-    public interface IOperation { }
+    public interface IOperation
+    {
+    }
 
-    public class SomeOperation : IOperation { }
+    public class SomeOperation : IOperation
+    {
+    }
 
-    public class AnotherOperation : IOperation { }
+    public class AnotherOperation : IOperation
+    {
+    }
 
     public class ParemeterizedOperation : IOperation
     {
@@ -280,15 +289,19 @@ namespace DryIoc.UnitTests
 
         public static IOperation MeasureWith(IOperation operation, IMeasurer measurer)
         {
-            return new MeasureExecutionTimeOperationDecorator(operation) { Measurer = measurer };
+            return new MeasureExecutionTimeOperationDecorator(operation) {Measurer = measurer};
         }
 
         public IMeasurer Measurer { get; set; }
     }
 
-    public interface IMeasurer { }
+    public interface IMeasurer
+    {
+    }
 
-    class Measurer : IMeasurer { }
+    internal class Measurer : IMeasurer
+    {
+    }
 
     public class RetryOperationDecorator : IOperation
     {
@@ -300,9 +313,13 @@ namespace DryIoc.UnitTests
         }
     }
 
-    public interface IOperation<T> { }
+    public interface IOperation<T>
+    {
+    }
 
-    public class SomeOperation<T> : IOperation<T> { }
+    public class SomeOperation<T> : IOperation<T>
+    {
+    }
 
     public class RetryOperationDecorator<T> : IOperation<T>
     {
@@ -333,4 +350,6 @@ namespace DryIoc.UnitTests
             Decorated = decorated;
         }
     }
+
+    #endregion
 }
