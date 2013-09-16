@@ -810,7 +810,7 @@ namespace DryIoc
         }
     }
 
-    public partial static class Error
+    public static partial class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
             "Unable to resolve service {0}." + Environment.NewLine +
@@ -1216,21 +1216,17 @@ namespace DryIoc
 
     public abstract class Factory
     {
-        public static volatile int Count;
+        public static volatile int IDSeedAndCount;
 
         public readonly int ID;
-
-        public virtual int ProviderID { get { return ID; } }
-
         public readonly IReuse Reuse;
-
         public readonly FactorySetup Setup;
 
         public virtual Type ImplementationType { get { return null; } }
 
         protected Factory(IReuse reuse = null, FactorySetup setup = null)
         {
-            ID = Interlocked.Increment(ref Count);
+            ID = Interlocked.Increment(ref IDSeedAndCount);
             Reuse = reuse;
             Setup = setup ?? FactorySetup.Service.Default;
         }
@@ -1284,22 +1280,19 @@ namespace DryIoc
     {
         public override Type ImplementationType { get { return _implementationType; } }
 
-        public override int ProviderID { get { return _providerID; } }
-
         public ReflectionFactory(Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            _implementationType = implementationType.ThrowIfNull();
-            Throw.If(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
+            _implementationType = implementationType.ThrowIfNull()
+                .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
             _withConstructor = withConstructor;
-            _providerID = ID;
         }
 
         public override Factory TryProvideFactoryFor(Request request, IRegistry _)
         {
             if (!_implementationType.IsGenericTypeDefinition) return null;
             var closedImplType = _implementationType.MakeGenericType(request.ServiceType.GetGenericArguments());
-            return new ReflectionFactory(closedImplType, Reuse, _withConstructor, Setup) { _providerID = ID };
+            return new ReflectionFactory(closedImplType, Reuse, _withConstructor, Setup);
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -1319,7 +1312,7 @@ namespace DryIoc
                 }
             }
 
-            return WithInitializer(Expression.New(ctor, paramExprs), request, registry);
+            return AddInitializerIfRequired(Expression.New(ctor, paramExprs), request, registry);
         }
 
         protected override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry)
@@ -1359,7 +1352,7 @@ namespace DryIoc
             }
 
             var newExpr = Expression.New(ctor, ctorParamExprs);
-            return Expression.Lambda(funcType, WithInitializer(newExpr, request, registry), funcInputParamExprs);
+            return Expression.Lambda(funcType, AddInitializerIfRequired(newExpr, request, registry), funcInputParamExprs);
         }
 
         #region Implementation
@@ -1367,8 +1360,6 @@ namespace DryIoc
         private readonly Type _implementationType;
 
         private readonly SelectConstructor _withConstructor;
-
-        private int _providerID;
 
         private ConstructorInfo SelectConstructor()
         {
@@ -1381,7 +1372,7 @@ namespace DryIoc
             return _withConstructor(_implementationType);
         }
 
-        private Expression WithInitializer(NewExpression newService, Request request, IRegistry registry)
+        private Expression AddInitializerIfRequired(NewExpression newService, Request request, IRegistry registry)
         {
             if (!registry.ShouldResolvePropertyOrField)
                 return newService;
@@ -1476,7 +1467,6 @@ namespace DryIoc
 
         public FactoryType FactoryType { get; private set; }
         public int FactoryID { get; private set; }
-        public int FactoryProviderID { get; private set; }
         public Type ImplementationType { get; private set; }
 
         public Request(Type serviceType, object serviceKey, Request parent = null)
@@ -1518,7 +1508,6 @@ namespace DryIoc
         {
             FactoryType = factory.Setup.Type;
             FactoryID = factory.ID;
-            FactoryProviderID = factory.ProviderID;
             ImplementationType = factory.ImplementationType;
             Throw.If(TryGetParent(r => r.FactoryID == FactoryID) != null, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
         }
