@@ -287,7 +287,10 @@ namespace DryIoc
 
                     if (decoratorSetup.CachedFuncExpr == null)
                     {
-                        decoratorSetup.CachedFuncExpr = decorator.TryGetFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this);
+                        IList<Type> unusedFuncParams;
+                        decoratorSetup.CachedFuncExpr =
+                            decorator.TryCreateFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this,
+                                out unusedFuncParams);
                     }
 
                     expression = Expression.Call(decoratorSetup.CachedFuncExpr, "Invoke", null, expression);
@@ -742,7 +745,16 @@ namespace DryIoc
             if (funcTypeArgs.Length == 1)
                 return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
 
-            var funcExpr = serviceFactory.TryGetFuncWithArgsExpression(funcType, serviceRequest, registry);
+            IList<Type> unusedFuncParams;
+            var funcExpr = serviceFactory.TryCreateFuncWithArgsExpression(funcType, serviceRequest, registry, out unusedFuncParams);
+            Throw.If(unusedFuncParams != null, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncParams.Print(), request);
+
+            if (funcExpr != null && serviceFactory.Reuse != null) // apply Reuse.
+            {
+                var serviceExpr = serviceFactory.Reuse.Of(serviceRequest, registry, serviceFactory.ID, funcExpr.Body);
+                funcExpr = Expression.Lambda(funcType, serviceExpr, funcExpr.Parameters);
+            }
+
             return funcExpr.ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
         }
     }
@@ -864,8 +876,8 @@ namespace DryIoc
         public static readonly string GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT =
             "Generic Wrapper expects single type argument by default, but found many: {0}.";
 
-        public static string CONSTRUCTOR_MISSES_SOME_FUNC_PARAMS = 
-            "Resolving {0} is failed because constructor {1} of {2} misses parameters of type: {3}.";
+        public static string SOME_FUNC_PARAMS_ARE_UNUSED =
+            "Some of Func parameters ({0}) are unused when resolving: {1}.";
     }
 
     public static class Registrator
@@ -1197,7 +1209,7 @@ namespace DryIoc
 
             private static Type SelectSingleByDefault(Type[] typeArgs)
             {
-                Throw.If(typeArgs.Length != 1, Error.GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT, typeArgs.Print(t => t.Print()));
+                Throw.If(typeArgs.Length != 1, Error.GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT, typeArgs.Print());
                 return typeArgs[0];
             }
         }
@@ -1239,6 +1251,8 @@ namespace DryIoc
             Setup = setup ?? FactorySetup.Service.Default;
         }
 
+        public abstract Factory TryProvideFactoryFor(Request request, IRegistry registry);
+
         public Expression GetExpression(Request request, IRegistry registry)
         {
             if (Setup.SkipCache || _cachedExpression == null)
@@ -1255,23 +1269,11 @@ namespace DryIoc
             return _cachedExpression;
         }
 
-        public LambdaExpression TryGetFuncWithArgsExpression(Type funcType, Request request, IRegistry registry)
-        {
-            var func = TryCreateFuncWithArgsExpression(funcType, request, registry);
-            if (func != null && Reuse != null)
-            {
-                var expression = func.Body;
-                func = Expression.Lambda(funcType, Reuse.Of(request, registry, ID, expression), func.Parameters);
-            }
-            return func;
-        }
-
-        public abstract Factory TryProvideFactoryFor(Request request, IRegistry registry);
-
         protected abstract Expression CreateExpression(Request request, IRegistry registry);
 
-        protected virtual LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry)
+        public virtual LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
+            unusedFuncParams = null;
             return null;
         }
 
@@ -1323,35 +1325,33 @@ namespace DryIoc
             return AddInitializerIfRequired(Expression.New(ctor, paramExprs), request, registry);
         }
 
-        protected override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry)
+        public override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
+            unusedFuncParams = null;
+
             var funcParamTypes = funcType.GetGenericArguments();
             funcParamTypes.ThrowIf(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
 
             var ctor = SelectConstructor();
             var ctorParams = ctor.GetParameters();
-            var ctorParamCount = ctorParams.Length;
+            var ctorParamExprs = new Expression[ctorParams.Length];
+            var funcInputParamExprs = new ParameterExpression[funcParamTypes.Length - 1]; // (minus Func return parameter).
 
-            var funcInputParamCount = funcParamTypes.Length - 1;
-            var funcInputParamTypes = funcParamTypes.Take(funcInputParamCount).ToArray();
-            ThrowIfConstructorMissesSomeFuncParams(ctor, ctorParams, funcType, funcInputParamTypes);
-
-            var ctorParamExprs = new Expression[ctorParamCount];
-            var funcInputParamExprs = new ParameterExpression[funcInputParamCount];
-
-            for (var cp = 0; cp < ctorParamCount; cp++)
+            for (var cp = 0; cp < ctorParams.Length; cp++)
             {
                 var ctorParam = ctorParams[cp];
-                ParameterExpression funcInputParamExpr = null;
-                for (var fp = 0; fp < funcInputParamCount && funcInputParamExpr == null; fp++)
-                    if (funcInputParamTypes[fp] == ctorParam.ParameterType && funcInputParamExprs[fp] == null)
-                        funcInputParamExprs[fp] = funcInputParamExpr = Expression.Parameter(ctorParam.ParameterType, ctorParam.Name);
-
-                if (funcInputParamExpr != null)
+                for (var fp = 0; fp < funcParamTypes.Length - 1; fp++)
                 {
-                    ctorParamExprs[cp] = funcInputParamExpr;
+                    var funcParamType = funcParamTypes[fp];
+                    if (ctorParam.ParameterType == funcParamType &&
+                        funcInputParamExprs[fp] == null) // Skip if Func parameter was already used for constructor.
+                    {
+                        ctorParamExprs[cp] = funcInputParamExprs[fp] = Expression.Parameter(funcParamType, ctorParam.Name);
+                        break;
+                    }
                 }
-                else
+
+                if (ctorParamExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
                     var paramKey = registry.TryGetConstructorParamKey(ctorParam, request);
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
@@ -1359,9 +1359,65 @@ namespace DryIoc
                 }
             }
 
+            // Find unused Func parameters (present in Func but not in constructor) and create "_" (ignored) Parameter expressions for them.
+            // In addition store unused parameter in output list for client review.
+            for (var fp = 0; fp < funcInputParamExprs.Length; fp++)
+            {
+                if (funcInputParamExprs[fp] == null) // unused parameter
+                {
+                    if (unusedFuncParams == null) unusedFuncParams = new List<Type>(2);
+                    var funcParamType = funcParamTypes[fp];
+                    unusedFuncParams.Add(funcParamType);
+                    funcInputParamExprs[fp] = Expression.Parameter(funcParamType, "_");
+                }
+            }
+
             var newExpr = Expression.New(ctor, ctorParamExprs);
             return Expression.Lambda(funcType, AddInitializerIfRequired(newExpr, request, registry), funcInputParamExprs);
         }
+
+
+        //protected override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, bool skipMissedParametersCheck)
+        //{
+        //    var funcParamTypes = funcType.GetGenericArguments();
+        //    funcParamTypes.ThrowIf(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
+
+        //    var ctor = SelectConstructor();
+        //    var ctorParams = ctor.GetParameters();
+        //    var ctorParamCount = ctorParams.Length;
+
+        //    var funcInputParamCount = funcParamTypes.Length - 1;
+        //    var funcInputParamTypes = funcParamTypes.Take(funcInputParamCount).ToArray(); // TODO Remove as not required
+
+        //    if (!skipMissedParametersCheck)
+        //        ThrowIfConstructorMissesSomeFuncParams(ctor, ctorParams, funcType, funcInputParamTypes);
+
+        //    var ctorParamExprs = new Expression[ctorParamCount];
+        //    var funcInputParamExprs = new ParameterExpression[funcInputParamCount];
+
+        //    for (var cp = 0; cp < ctorParamCount; cp++)
+        //    {
+        //        var ctorParam = ctorParams[cp];
+        //        ParameterExpression funcInputParamExpr = null;
+        //        for (var fp = 0; fp < funcInputParamCount && funcInputParamExpr == null; fp++)
+        //            if (funcInputParamTypes[fp] == ctorParam.ParameterType && funcInputParamExprs[fp] == null)
+        //                funcInputParamExprs[fp] = funcInputParamExpr = Expression.Parameter(ctorParam.ParameterType, ctorParam.Name);
+
+        //        if (funcInputParamExpr != null)
+        //        {
+        //            ctorParamExprs[cp] = funcInputParamExpr;
+        //        }
+        //        else
+        //        {
+        //            var paramKey = registry.TryGetConstructorParamKey(ctorParam, request);
+        //            var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
+        //            ctorParamExprs[cp] = registry.GetOrAddFactory(paramRequest, false).GetExpression(paramRequest, registry);
+        //        }
+        //    }
+
+        //    var newExpr = Expression.New(ctor, ctorParamExprs);
+        //    return Expression.Lambda(funcType, AddInitializerIfRequired(newExpr, request, registry), funcInputParamExprs);
+        //}
 
         #region Implementation
 
@@ -1409,24 +1465,6 @@ namespace DryIoc
             }
 
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
-        }
-
-        private void ThrowIfConstructorMissesSomeFuncParams(ConstructorInfo ctor, ParameterInfo[] ctorParams, Type funcType, Type[] funcInputParamTypes)
-        {
-            List<Type> missedParams = null;
-            for (var i = 0; i < funcInputParamTypes.Length; i++)
-            {
-                var funcInputParamType = funcInputParamTypes[i];
-                if (ctorParams.All(p => p.ParameterType != funcInputParamType))
-                {
-                    if (missedParams == null) missedParams = new List<Type>(2);
-                    missedParams.Add(funcInputParamType);
-                }
-            }
-
-            if (missedParams != null)
-                Throw.If(true, Error.CONSTRUCTOR_MISSES_SOME_FUNC_PARAMS,
-                    funcType, ctor, ImplementationType, missedParams.Print(t => t.Print()));
         }
 
         #endregion
@@ -1852,7 +1890,7 @@ namespace DryIoc
         public static string Print<T>(this IEnumerable<T> items, Func<T, string> print = null, string separator = ", ")
         {
             if (items == null) return null;
-            print = print ?? (x => x.ToString());
+            print = print ?? (x => x is Type ? (x as Type).Print() : x.ToString());
             return items.Aggregate(new StringBuilder(),
                 (s, x) => (s.Length != 0 ? s.Append(separator) : s).Append(print(x))).ToString();
         }

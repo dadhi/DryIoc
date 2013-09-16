@@ -155,14 +155,16 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_NOT_support_decorator_implementation_without_decorated_service_argument_in_constructor()
+        public void Should_support_decorator_implementation_without_decorated_service_argument_in_constructor()
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
             container.Register<IOperation, AnotherOperation>(setup: FactorySetup.AsDecorator());
 
-            Assert.Throws<ContainerException>(() => 
-                container.Resolve<IOperation>());
+            var operation = container.Resolve<IOperation>();
+            //var operationExpr = container.Resolve<Container.FactoryExpression<IOperation>>();
+
+            Assert.That(operation, Is.InstanceOf<AnotherOperation>());
         }
 
         [Test]
