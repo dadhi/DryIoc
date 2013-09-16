@@ -309,17 +309,34 @@ namespace DryIoc.UnitTests
 
             Assert.That(getTwoResolved("cool").Message, Is.EqualTo("cool"));
         }
+
+        [Test]
+        public void Resolving_func_with_parameters_using_constructor_that_misses_some_of_func_parameters_should_Throw()
+        {
+            var container = new Container();
+            container.Register<ServiceWithDependency>();
+            container.Register<IDependency, Dependency>();
+
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<Func<string, ServiceWithDependency>>());
+        }
     }
+
+    #region CUT
 
     public class TwoCtors
     {
         public string Message { get; set; }
 
-        public TwoCtors() : this("Hey!") { }
+        public TwoCtors() : this("Hey!")
+        {
+        }
 
         public TwoCtors(string message)
         {
             Message = message;
         }
     }
+
+    #endregion
 }

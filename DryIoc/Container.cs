@@ -225,7 +225,7 @@ namespace DryIoc
         Expression IRegistry.ApplyDecorators(Expression expression, Request request)
         {
             // # Stop recursion by checking that we are already have decorator in Request.
-            if (request.FactoryType == FactoryType.Decorator)
+            if (request.Any(r => r.FactoryType == FactoryType.Decorator))
                 return expression;
 
             // # Find all applicable decorators in order.
@@ -264,7 +264,7 @@ namespace DryIoc
             }
 
             // # Apply decorators.
-            var decoratorRequest = new Request(decoratorFuncType, null, request.Parent);
+            var decoratorRequest = new Request(decoratorFuncType, request.ServiceKey, request.Parent);
 
             if (customDecorators != null && customDecorators.Length != 0)
             {
@@ -282,9 +282,14 @@ namespace DryIoc
                 for (var i = 0; i < serviceDecorators.Count; i++)
                 {
                     var decorator = serviceDecorators[i];
+                    decoratorRequest.ResolveTo(decorator);
                     var decoratorSetup = ((FactorySetup.Decorator)decorator.Setup);
+
                     if (decoratorSetup.CachedFuncExpr == null)
+                    {
                         decoratorSetup.CachedFuncExpr = decorator.TryGetFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this);
+                    }
+
                     expression = Expression.Call(decoratorSetup.CachedFuncExpr, "Invoke", null, expression);
                 }
             }
@@ -831,7 +836,7 @@ namespace DryIoc
         public static readonly string NO_PUBLIC_CONSTRUCTOR_DEFINED =
             "There is no public constructor defined for {0}.";
 
-        public static readonly string CONSTRUCTOR_MISSES_PARAMETERS =
+        public static readonly string CONSTRUCTOR_MISSES_SOME_PARAMETERS =
             "Constructor [{0}] of {1} misses some arguments required for {2} dependency.";
 
         public static readonly string UNABLE_TO_SELECT_CONSTRUCTOR =
@@ -858,6 +863,9 @@ namespace DryIoc
 
         public static readonly string GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT =
             "Generic Wrapper expects single type argument by default, but found many: {0}.";
+
+        public static string CONSTRUCTOR_MISSES_SOME_FUNC_PARAMS = 
+            "Resolving {0} is failed because constructor {1} of {2} misses parameters of type: {3}.";
     }
 
     public static class Registrator
@@ -1326,7 +1334,7 @@ namespace DryIoc
 
             var funcInputParamCount = funcParamTypes.Length - 1;
             var funcInputParamTypes = funcParamTypes.Take(funcInputParamCount).ToArray();
-            Throw.If(ctorParamCount < funcInputParamCount, Error.CONSTRUCTOR_MISSES_PARAMETERS, ctor, ImplementationType, funcType);
+            ThrowIfConstructorMissesSomeFuncParams(ctor, ctorParams, funcType, funcInputParamTypes);
 
             var ctorParamExprs = new Expression[ctorParamCount];
             var funcInputParamExprs = new ParameterExpression[funcInputParamCount];
@@ -1401,6 +1409,24 @@ namespace DryIoc
             }
 
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
+        }
+
+        private void ThrowIfConstructorMissesSomeFuncParams(ConstructorInfo ctor, ParameterInfo[] ctorParams, Type funcType, Type[] funcInputParamTypes)
+        {
+            List<Type> missedParams = null;
+            for (var i = 0; i < funcInputParamTypes.Length; i++)
+            {
+                var funcInputParamType = funcInputParamTypes[i];
+                if (ctorParams.All(p => p.ParameterType != funcInputParamType))
+                {
+                    if (missedParams == null) missedParams = new List<Type>(2);
+                    missedParams.Add(funcInputParamType);
+                }
+            }
+
+            if (missedParams != null)
+                Throw.If(true, Error.CONSTRUCTOR_MISSES_SOME_FUNC_PARAMS,
+                    funcType, ctor, ImplementationType, missedParams.Print(t => t.Print()));
         }
 
         #endregion
@@ -1631,7 +1657,7 @@ namespace DryIoc
             {
                 var singletonScope = registry.SingletonScope;
 
-                // Create lazy scoped singleton if we have Func somewhere in dependency chain. TODO: check that "dependency chain" buzzword appeared.
+                // Create lazy scoped singleton if we have Func somewhere in dependency chain.
                 var funcParent = request.TryGetParent(r =>
                     r.OpenGenericServiceType != null && Container.FuncTypes.Contains(r.OpenGenericServiceType));
                 if (funcParent != null)
@@ -1771,29 +1797,29 @@ namespace DryIoc
     {
         public static Func<string, Exception> GetException = message => new ContainerException(message);
 
-        public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
+        public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null) where T : class
         {
             if (arg != null) return arg;
-            throw GetException(message == null ? Format(ARG_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2));
+            throw GetException(message == null ? Format(ARG_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2, arg3));
         }
 
-        public static T ThrowIf<T>(this T arg, bool throwCondition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null)
+        public static T ThrowIf<T>(this T arg, bool throwCondition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition) return arg;
-            throw GetException(message == null ? Format(ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
+            throw GetException(message == null ? Format(ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2, arg3));
         }
 
-        public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition) return;
-            throw GetException(Format(message, arg0, arg1, arg2));
+            throw GetException(Format(message, arg0, arg1, arg2, arg3));
         }
 
         #region Implementation
 
-        private static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        private static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            return string.Format(message, Print(arg0), Print(arg1), Print(arg2));
+            return string.Format(message, Print(arg0), Print(arg1), Print(arg2), Print(arg3));
         }
 
         private static string Print(object obj)
@@ -1825,6 +1851,7 @@ namespace DryIoc
 
         public static string Print<T>(this IEnumerable<T> items, Func<T, string> print = null, string separator = ", ")
         {
+            if (items == null) return null;
             print = print ?? (x => x.ToString());
             return items.Aggregate(new StringBuilder(),
                 (s, x) => (s.Length != 0 ? s.Append(separator) : s).Append(print(x))).ToString();
