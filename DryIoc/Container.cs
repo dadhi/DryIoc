@@ -104,7 +104,7 @@ namespace DryIoc
             {
                 Setup.AddNonRegisteredServiceResolutionRule(TryResolveEnumerableOrArray);
 
-                var funcFactory = new FuncWrapper();
+                var funcFactory = new FuncGenericWrapper();
                 foreach (var funcType in FuncTypes)
                     this.Register(funcType, funcFactory);
 
@@ -718,9 +718,9 @@ namespace DryIoc
         #endregion
     }
 
-    public class FuncWrapper : Factory
+    public class FuncGenericWrapper : Factory
     {
-        public FuncWrapper()
+        public FuncGenericWrapper()
             : base(setup: FactorySetup.AsGenericWrapper(types => types[types.Length - 1])) { }
 
         public override Factory TryProvideFactoryFor(Request request, IRegistry registry)
@@ -877,7 +877,7 @@ namespace DryIoc
             "Generic Wrapper expects single type argument by default, but found many: {0}.";
 
         public static string SOME_FUNC_PARAMS_ARE_UNUSED =
-            "Some of Func parameters ({0}) are unused when resolving: {1}.";
+            "Found some unused Func parameters ({0}) when resolving: {1}.";
     }
 
     public static class Registrator
