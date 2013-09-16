@@ -5,7 +5,9 @@
 // - Adjust ResolveProperties to be consistent with Import property or field.
 // - Convert SkipCache flag to enum.
 // - Evaluate Code Coverage.
-// + Add registration for lambda with IResolver parameter for something like RegisterLambda(c => new Blah(c.Resolve(IDependency))).
+// - Fix code generation example.
+// - Review performance one again with fresh view.
+// + Add registration for lambda with IResolver parameter for something like RegisterDelegate(c => new Blah(c.Resolve(IDependency))).
 
 // Goals:
 // - Finalize Public API.
@@ -13,7 +15,7 @@
 //
 // Features:
 // - Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
-// - Add distinctive features: Export CustomFactory<TService>.
+// - Add distinctive features: Export DelegateFactory<TService>.
 // - Make Request to return Empty for resolution root parent. So it will simplify ImplementationType checks. May be add IsResolutionRoot property as well.
 // - Make a single consistent approach to ResolveProperties and PropertyOrFieldResolutionRules.
 // - Move Container Setup related code to dedicated class/container-property Setup.
@@ -547,7 +549,7 @@ namespace DryIoc
             if (resultMetadata == null)
                 return null;
 
-            return new CustomFactory((_, __) =>
+            return new DelegateFactory((_, __) =>
             {
                 var serviceRequest = request.Push(serviceType, serviceKey);
                 var serviceFactory = registry.GetOrAddFactory(serviceRequest, false);
@@ -570,7 +572,7 @@ namespace DryIoc
             if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
 
-            return new CustomFactory((request, registry) =>
+            return new DelegateFactory((request, registry) =>
                 {
                     var collectionType = request.ServiceType;
                     var collectionIsArray = collectionType.IsArray;
@@ -649,7 +651,7 @@ namespace DryIoc
             var serviceExpr = registry.GetOrAddFactory(serviceRequest, false).GetExpression(serviceRequest, registry);
             var newFactory = Expression.New(factoryCtor, Expression.Lambda<CompiledFactory>(serviceExpr, Reuse.Parameters));
 
-            return new CustomFactory((_, __) => newFactory);
+            return new DelegateFactory((_, __) => newFactory);
         }
 
         #endregion
@@ -706,28 +708,6 @@ namespace DryIoc
 
                 return result != null;
             }
-
-            public bool TryGetDecorator(out Factory result, Request request)
-            {
-                result = null;
-                if (Decorators == null)
-                    return false;
-
-                List<int> appliedDecoratorIDs = null; // gather already applied decorators to check for recursion
-                for (var p = request.TryGetNonWrapperParent();
-                   p != null && p.FactoryType == FactoryType.Decorator;
-                   p = p.TryGetNonWrapperParent())
-                {
-                    appliedDecoratorIDs = appliedDecoratorIDs ?? new List<int>();
-                    appliedDecoratorIDs.Add(p.FactoryProviderID);
-                }
-
-                result = Decorators.FindLast(d =>
-                    (appliedDecoratorIDs == null || !appliedDecoratorIDs.Contains(d.ProviderID)) &&
-                    ((FactorySetup.Decorator)d.Setup).IsApplicable(request));
-
-                return result != null;
-            }
         }
 
         #endregion
@@ -740,7 +720,7 @@ namespace DryIoc
 
         public override Factory TryProvideFactoryFor(Request request, IRegistry registry)
         {
-            return new CustomFactory(CreateFunc, DryIoc.Reuse.Singleton, Setup);
+            return new DelegateFactory(CreateFunc, DryIoc.Reuse.Singleton, Setup);
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -1013,7 +993,7 @@ namespace DryIoc
         /// <summary>
         /// Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
         /// Delegate can use <see cref="IResolver"/> parameter to resolve any required dependencies, e.g.:
-        /// <code>RegisterLambda&lt;ICar&gt;(r => new Car(r.Resolve&lt;IEngine&gt;()))</code>
+        /// <code>RegisterDelegate&lt;ICar&gt;(r => new Car(r.Resolve&lt;IEngine&gt;()))</code>
         /// </summary>
         /// <typeparam name="TService">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
@@ -1021,11 +1001,11 @@ namespace DryIoc
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="FactorySetup.Service"/>)</param>
         /// <param name="named">Optional service name.</param>
-        public static void RegisterLambda<TService>(this IRegistrator registrator,
+        public static void RegisterDelegate<TService>(this IRegistrator registrator,
             Func<IResolver, TService> lambda, IReuse reuse = null, FactorySetup setup = null,
             string named = null)
         {
-            var factory = new CustomFactory(
+            var factory = new DelegateFactory(
                 (_, r) => Expression.Call(Expression.Constant(lambda), "Invoke", null, Expression.Constant(r, typeof(IResolver))),
                 reuse, setup);
             registrator.Register(factory, typeof(TService), named);
@@ -1043,7 +1023,7 @@ namespace DryIoc
             TService instance, FactorySetup setup = null,
             string named = null)
         {
-            registrator.RegisterLambda(_ => instance, Reuse.Transient, setup, named);
+            registrator.RegisterDelegate(_ => instance, Reuse.Transient, setup, named);
         }
 
         /// <summary>
@@ -1177,7 +1157,7 @@ namespace DryIoc
 
         public static FactorySetup AsDecorator(Func<Request, bool> isApplicable = null)
         {
-            return isApplicable == null ? Decorator.Default : new Decorator(isApplicable);
+            return new Decorator(isApplicable);
         }
 
         public class Service : FactorySetup
@@ -1219,13 +1199,11 @@ namespace DryIoc
 
         public class Decorator : FactorySetup
         {
-            public static readonly FactorySetup Default = new Decorator();
-
             public override FactoryType Type { get { return FactoryType.Decorator; } }
             public override bool SkipCache { get { return true; } }
 
             public readonly Func<Request, bool> IsApplicable;
-            public LambdaExpression CachedFuncExpr;
+            public LambdaExpression CachedFuncExpr; // Decorator delegate
 
             public Decorator(Func<Request, bool> isApplicable = null)
             {
@@ -1440,9 +1418,9 @@ namespace DryIoc
         #endregion
     }
 
-    public class CustomFactory : Factory
+    public class DelegateFactory : Factory
     {
-        public CustomFactory(Func<Request, IRegistry, Expression> getExpression, IReuse reuse = null, FactorySetup setup = null)
+        public DelegateFactory(Func<Request, IRegistry, Expression> getExpression, IReuse reuse = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
             _getExpression = getExpression.ThrowIfNull();
