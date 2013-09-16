@@ -6,17 +6,17 @@ namespace DryIoc.UnitTests
     [TestFixture]
     public class DecoratorTests
     {
-        //[Test]
-        //public void Should_resolve_decorator()
-        //{
-        //    var container = new Container();
-        //    container.Register<IOperation, SomeOperation>();
-        //    container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: FactorySetup.AsDecorator());
+        [Test]
+        public void Should_resolve_decorator()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: FactorySetup.AsDecorator());
 
-        //    var decorator = container.Resolve<IOperation>();
+            var decorator = container.Resolve<IOperation>();
 
-        //    Assert.That(decorator, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
-        //}
+            Assert.That(decorator, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
+        }
 
         //[Test]
         //public void Should_resolve_decorator_of_decorator()

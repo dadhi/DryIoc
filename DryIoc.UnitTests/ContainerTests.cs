@@ -253,5 +253,16 @@ namespace DryIoc.UnitTests
             Assert.Throws<ContainerException>(
                 () => container.Resolve<ServiceWithoutPublicConstructor>());
         }
+
+        [Test]
+        public void Possible_to_register_and_resolve_object_as_service_type()
+        {
+            var container = new Container();
+            container.Register<object, Service>();
+
+            var service = container.Resolve<object>();
+
+            Assert.That(service, Is.InstanceOf<Service>());
+        }
     }
 }

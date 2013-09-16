@@ -1,5 +1,6 @@
 ﻿// TODO:
-// - Add ExportAsDecorator.
+// - Check and throw when Metadata is specified in multiple attributes, to provide determined behavior for the User.
+// - Add ExportAsDecorator(ForName, ForMetadata, ForImplementationType).
 // + Add IFactory<,, and more> support.
 // + Aggregate rules that using attributes into one and to GetCustomAttributes only once and improve speed.
 // + Split WithMetadata to Export and Import.

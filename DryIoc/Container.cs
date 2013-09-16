@@ -227,7 +227,7 @@ namespace DryIoc
                 return expression;
 
             // # Find all applicable decorators in order.
-            var customDecorators = new List<Factory>();
+            Factory[] customDecorators = null;
             var serviceDecorators = new List<Factory>();
 
             var serviceType = request.ServiceType;
@@ -241,8 +241,8 @@ namespace DryIoc
                 if (_registry.TryGetValue(decoratorFuncType, out entry) &&
                     entry.Decorators != null)
                 {
-                    customDecorators.AddRange(entry.Decorators.OfType<CustomFactory>().Cast<Factory>()
-                        .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request)));
+                    customDecorators = entry.Decorators
+                        .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request)).ToArray();
                 }
 
                 // Add registered Service decorators.
@@ -265,21 +265,28 @@ namespace DryIoc
             }
 
             // # Apply decorators.
-            if (customDecorators.Count != 0)
+            var decoratorRequest = new Request(decoratorFuncType, null, request.Parent);
+
+            if (customDecorators != null && customDecorators.Length != 0)
             {
-                var decoratorRequest = new Request(decoratorFuncType, null, request.Parent);
-                for (var i = 0; i < customDecorators.Count; i++)
+                for (var i = 0; i < customDecorators.Length; i++)
                 {
                     var decorator = customDecorators[i];
                     decoratorRequest.ResolveTo(decorator);
-                    
-                    // returns something alike: (r => service => Decorate(service))(container)
                     var funcExpr = decorator.GetExpression(decoratorRequest, this);
-                    
-                    // i should construct: 
-                    // var decorate = (r => service => Decorate(service))(container);
-                    // decorate(expression)
                     expression = Expression.Call(funcExpr, "Invoke", null, expression);
+                }
+            }
+
+            if (serviceDecorators.Count != 0)
+            {
+                for (var i = 0; i < serviceDecorators.Count; i++)
+                {
+                    var decorator = serviceDecorators[i];
+                    var decoratorSetup = ((FactorySetup.Decorator)decorator.Setup);
+                    if (decoratorSetup.CachedFuncExpr == null)
+                        decoratorSetup.CachedFuncExpr = decorator.TryGetFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this);
+                    expression = Expression.Call(decoratorSetup.CachedFuncExpr, "Invoke", null, expression);
                 }
             }
 
@@ -1216,7 +1223,9 @@ namespace DryIoc
 
             public override FactoryType Type { get { return FactoryType.Decorator; } }
             public override bool SkipCache { get { return true; } }
+
             public readonly Func<Request, bool> IsApplicable;
+            public LambdaExpression CachedFuncExpr;
 
             public Decorator(Func<Request, bool> isApplicable = null)
             {
