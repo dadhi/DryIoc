@@ -83,44 +83,44 @@ namespace DryIoc.UnitTests
             Assert.That(operation, Is.InstanceOf<MeasureExecutionTimeOperationDecorator<int>>());
         }
 
-        [Test]
-        public void Should_resolve_generic_decorator_of_decorator()
-        {
-            var container = new Container();
-            container.Register(typeof(IOperation<>), typeof(SomeOperation<>));
-            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: FactorySetup.AsDecorator());
-            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: FactorySetup.AsDecorator());
+        //[Test]
+        //public void Should_resolve_generic_decorator_of_decorator()
+        //{
+        //    var container = new Container();
+        //    container.Register(typeof(IOperation<>), typeof(SomeOperation<>));
+        //    container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: FactorySetup.AsDecorator());
+        //    container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: FactorySetup.AsDecorator());
 
-            var decorator = (RetryOperationDecorator<int>)container.Resolve<IOperation<int>>();
+        //    var decorator = (RetryOperationDecorator<int>)container.Resolve<IOperation<int>>();
 
-            Assert.That(decorator.Decorated, Is.InstanceOf<MeasureExecutionTimeOperationDecorator<int>>());
-        }
+        //    Assert.That(decorator.Decorated, Is.InstanceOf<MeasureExecutionTimeOperationDecorator<int>>());
+        //}
 
-        [Test]
-        public void Should_resolve_generic_decorator_of_closed_decorator_of_generic_service()
-        {
-            var container = new Container();
-            container.Register(typeof(IOperation<>), typeof(SomeOperation<>));
-            container.Register(typeof(IOperation<int>), typeof(MeasureExecutionTimeOperationDecorator<int>), setup: FactorySetup.AsDecorator());
-            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: FactorySetup.AsDecorator());
+        //[Test]
+        //public void Should_resolve_generic_decorator_of_closed_decorator_of_generic_service()
+        //{
+        //    var container = new Container();
+        //    container.Register(typeof(IOperation<>), typeof(SomeOperation<>));
+        //    container.Register(typeof(IOperation<int>), typeof(MeasureExecutionTimeOperationDecorator<int>), setup: FactorySetup.AsDecorator());
+        //    container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: FactorySetup.AsDecorator());
 
-            var decorator = (RetryOperationDecorator<int>)container.Resolve<IOperation<int>>();
+        //    var decorator = (RetryOperationDecorator<int>)container.Resolve<IOperation<int>>();
 
-            Assert.That(decorator.Decorated, Is.InstanceOf<MeasureExecutionTimeOperationDecorator<int>>());
-        }
+        //    Assert.That(decorator.Decorated, Is.InstanceOf<MeasureExecutionTimeOperationDecorator<int>>());
+        //}
 
-        [Test]
-        public void Resolve_could_NOT_select_closed_over_generic_decorator_cause_their_are_not_related()
-        {
-            var container = new Container();
-            container.Register(typeof(IOperation<>), typeof(SomeOperation<>));
-            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: FactorySetup.AsDecorator());
-            container.Register(typeof(IOperation<int>), typeof(MeasureExecutionTimeOperationDecorator<int>), setup: FactorySetup.AsDecorator());
+        //[Test]
+        //public void Resolve_could_NOT_select_closed_over_generic_decorator_cause_their_are_not_related()
+        //{
+        //    var container = new Container();
+        //    container.Register(typeof(IOperation<>), typeof(SomeOperation<>));
+        //    container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: FactorySetup.AsDecorator());
+        //    container.Register(typeof(IOperation<int>), typeof(MeasureExecutionTimeOperationDecorator<int>), setup: FactorySetup.AsDecorator());
 
-            var decorator = (MeasureExecutionTimeOperationDecorator<int>)container.Resolve<IOperation<int>>();
+        //    var decorator = (MeasureExecutionTimeOperationDecorator<int>)container.Resolve<IOperation<int>>();
 
-            Assert.That(decorator.Decorated, Is.InstanceOf<MeasureExecutionTimeOperationDecorator<int>>());
-        }
+        //    Assert.That(decorator.Decorated, Is.InstanceOf<MeasureExecutionTimeOperationDecorator<int>>());
+        //}
 
         [Test]
         public void Should_resolve_decorator_array()
@@ -167,18 +167,18 @@ namespace DryIoc.UnitTests
             Assert.That(operation, Is.InstanceOf<AnotherOperation>());
         }
 
-        [Test]
-        public void Should_support_decorating_of_wrapped_service()
-        {
-            var container = new Container();
-            container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, LazyDecorator>(setup: FactorySetup.AsDecorator());
-            //container.Register<IOperation, LazyDecorator>(setup: new DecoratorSetup());
+        //[Test]
+        //public void Should_support_decorating_of_wrapped_service()
+        //{
+        //    var container = new Container();
+        //    container.Register<IOperation, SomeOperation>();
+        //    container.Register<IOperation, LazyDecorator>(setup: FactorySetup.AsDecorator());
+        //    //container.Register<IOperation, LazyDecorator>(setup: new DecoratorSetup());
 
-            var operation = container.Resolve<IOperation>();
+        //    var operation = container.Resolve<IOperation>();
 
-            Assert.That(operation, Is.InstanceOf<LazyDecorator>());
-        }
+        //    Assert.That(operation, Is.InstanceOf<LazyDecorator>());
+        //}
 
         //[Test]
         //public void Should_support_decorating_of_wrapped_named_service()
@@ -230,20 +230,20 @@ namespace DryIoc.UnitTests
             Assert.That(operation, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
         }
 
-        [Test]
-        public void Possible_to_register_decorator_as_delegate_of_decorated_service_with_additional_dependencies_resolved_from_Container()
-        {
-            var container = new Container();
-            container.Register<IOperation, SomeOperation>();
-            container.Register<IMeasurer, Measurer>();
-            container.RegisterDelegate<Func<IOperation, IOperation>>(
-                r => (service => MeasureExecutionTimeOperationDecorator.MeasureWith(service, r.Resolve<IMeasurer>())),
-                setup: FactorySetup.AsDecorator());
+        //[Test]
+        //public void Possible_to_register_decorator_as_delegate_of_decorated_service_with_additional_dependencies_resolved_from_Container()
+        //{
+        //    var container = new Container();
+        //    container.Register<IOperation, SomeOperation>();
+        //    container.Register<IMeasurer, Measurer>();
+        //    container.RegisterDelegate<Func<IOperation, IOperation>>(
+        //        r => (service => MeasureExecutionTimeOperationDecorator.MeasureWith(service, r.Resolve<IMeasurer>())),
+        //        setup: FactorySetup.AsDecorator());
 
-            var operation = container.Resolve<IOperation>();
+        //    var operation = container.Resolve<IOperation>();
 
-            Assert.That(operation, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
-        }
+        //    Assert.That(operation, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
+        //}
     }
 
     #region CUT
