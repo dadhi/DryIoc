@@ -179,42 +179,43 @@ namespace DryIoc.UnitTests
             Assert.That(operation, Is.InstanceOf<LazyDecorator>());
         }
 
-        //[Test]
-        //public void Should_support_decorating_of_wrapped_named_service()
-        //{
-        //    var container = new Container();
-        //    container.Register<IOperation, SomeOperation>(named: "some");
-        //    container.Register<IOperation, LazyDecorator>(setup: FactorySetup.AsDecorator());
+        [Test]
+        public void Should_support_decorating_of_wrapped_named_service()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>(named: "some");
+            container.Register<IOperation, LazyDecorator>(setup: FactorySetup.AsDecorator());
 
-        //    var operation = container.Resolve<IOperation>("some");
+            var operation = container.Resolve<IOperation>("some");
 
-        //    Assert.That(operation, Is.InstanceOf<LazyDecorator>());
-        //}
+            Assert.That(operation, Is.InstanceOf<LazyDecorator>());
+        }
 
-        //[Test]
-        //public void Should_propogate_metadata_to_Meta_wrapper()
-        //{
-        //    var container = new Container();
-        //    container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: FactorySetup.WithMetadata("blah"));
-        //    container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: FactorySetup.AsDecorator());
-        //    container.RegisterPublicTypes(typeof(OperationUser<>));
+        [Test]
+        public void Should_apply_decorator_When_resolving_Func_of_decorated_service()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: FactorySetup.AsDecorator());
 
-        //    var user = container.Resolve<OperationUser<object>>();
+            var operation = container.Resolve<Func<IOperation>>();
 
-        //    Assert.That(user.GetOperation.Metadata, Is.EqualTo("blah"));
-        //    Assert.That(user.GetOperation.Value(), Is.InstanceOf<MeasureExecutionTimeOperationDecorator<object>>());
-        //}
+            Assert.That(operation(), Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
+        }
 
-        //[Test]
-        //public void Resolving_Func_with_parameters_of_decorated_service_is_NOT_supported()
-        //{
-        //    var container = new Container();
-        //    container.Register<IOperation, ParemeterizedOperation>();
-        //    container.Register<IOperation, RetryOperationDecorator>(setup: FactorySetup.AsDecorator());
+        [Test]
+        public void Should_propogate_metadata_to_Meta_wrapper()
+        {
+            var container = new Container();
+            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: FactorySetup.WithMetadata("blah"));
+            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: FactorySetup.AsDecorator());
+            container.RegisterPublicTypes(typeof(OperationUser<>));
 
-        //    Assert.Throws<ContainerException>(() =>
-        //        container.Resolve<Func<object, IOperation>>());
-        //}
+            var user = container.Resolve<OperationUser<object>>();
+
+            Assert.That(user.GetOperation.Metadata, Is.EqualTo("blah"));
+            Assert.That(user.GetOperation.Value(), Is.InstanceOf<MeasureExecutionTimeOperationDecorator<object>>());
+        }
 
         [Test]
         public void Possible_to_register_decorator_as_delegate_of_decorated_service()
@@ -229,20 +230,32 @@ namespace DryIoc.UnitTests
             Assert.That(operation, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
         }
 
-        //[Test]
-        //public void Possible_to_register_decorator_as_delegate_of_decorated_service_with_additional_dependencies_resolved_from_Container()
-        //{
-        //    var container = new Container();
-        //    container.Register<IOperation, SomeOperation>();
-        //    container.Register<IMeasurer, Measurer>();
-        //    container.RegisterDelegate<Func<IOperation, IOperation>>(
-        //        r => (service => MeasureExecutionTimeOperationDecorator.MeasureWith(service, r.Resolve<IMeasurer>())),
-        //        setup: FactorySetup.AsDecorator());
+        [Test]
+        public void Possible_to_register_decorator_as_delegate_of_decorated_service_with_additional_dependencies_resolved_from_Container()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>();
+            container.Register<IMeasurer, Measurer>();
+            container.RegisterDelegate<Func<IOperation, IOperation>>(
+                r => (service => MeasureExecutionTimeOperationDecorator.MeasureWith(service, r.Resolve<IMeasurer>())),
+                setup: FactorySetup.AsDecorator());
 
-        //    var operation = container.Resolve<IOperation>();
+            var operation = container.Resolve<IOperation>();
 
-        //    Assert.That(operation, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
-        //}
+            Assert.That(operation, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
+        }
+
+        [Test]
+        public void Should_support_resolving_Func_with_parameters_of_decorated_service()
+        {
+            var container = new Container();
+            container.Register<IOperation, ParemeterizedOperation>();
+            container.Register<IOperation, RetryOperationDecorator>(setup: FactorySetup.AsDecorator());
+
+            var operation = container.Resolve<Func<object, IOperation>>();
+
+            Assert.That(operation("blah"), Is.InstanceOf<RetryOperationDecorator>());
+        }
     }
 
     #region CUT

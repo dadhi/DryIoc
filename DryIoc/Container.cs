@@ -385,11 +385,16 @@ namespace DryIoc
 
         object IRegistry.TryGetConstructorParamKey(ParameterInfo parameter, Request parent)
         {
-            var rules = Setup.ConstructorParamServiceKeyResolutionRules;
+            if (parent.FactoryType == FactoryType.GenericWrapper ||
+                parent.FactoryType == FactoryType.Decorator)
+                return parent.ServiceKey; // propagate key from wrapper or decorator.
+
             object resultKey = null;
-            for (var i = 0; i < rules.Length && resultKey == null; i++)
-                resultKey = rules[i].Invoke(parameter, parent, this);
-            return resultKey ?? (parent.FactoryType != FactoryType.Service ? parent.ServiceKey : null);
+            var rules = Setup.ConstructorParamServiceKeyResolutionRules;
+            if (rules != null)
+                for (var i = 0; i < rules.Length && resultKey == null; i++)
+                    resultKey = rules[i].Invoke(parameter, parent, this);
+            return resultKey;
         }
 
         bool IRegistry.ShouldResolvePropertyOrField
@@ -1363,8 +1368,6 @@ namespace DryIoc
 
         public override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
-            unusedFuncParams = null;
-
             var funcParamTypes = funcType.GetGenericArguments();
             funcParamTypes.ThrowIf(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
 
@@ -1397,6 +1400,7 @@ namespace DryIoc
 
             // Find unused Func parameters (present in Func but not in constructor) and create "_" (ignored) Parameter expressions for them.
             // In addition store unused parameter in output list for client review.
+            unusedFuncParams = null;
             for (var fp = 0; fp < funcInputParamExprs.Length; fp++)
             {
                 if (funcInputParamExprs[fp] == null) // unused parameter
