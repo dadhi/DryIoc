@@ -272,9 +272,8 @@ namespace DryIoc
 
             // # Apply decorators.
             var decoratorRequest = new Request(decoratorFuncType, request.ServiceKey, request.Parent);
-            var decoratedParamExpr = Expression.Parameter(serviceType, "decorated");
 
-            LambdaExpression combinedFuncExpr = null;
+            LambdaExpression resultFuncExpr = null;
             if (customDecorators != null && customDecorators.Length != 0)
             {
                 for (var i = 0; i < customDecorators.Length; i++)
@@ -282,13 +281,14 @@ namespace DryIoc
                     var decorator = customDecorators[i];
                     decoratorRequest.ResolveTo(decorator);
                     var funcObjectExpr = decorator.GetExpression(decoratorRequest, this);
-                    if (combinedFuncExpr == null)
+                    if (resultFuncExpr == null)
                     {
-                        combinedFuncExpr = Expression.Lambda(Expression.Invoke(funcObjectExpr, decoratedParamExpr), decoratedParamExpr);
+                        var decoratedParamExpr = Expression.Parameter(serviceType, "decorated");
+                        resultFuncExpr = Expression.Lambda(Expression.Invoke(funcObjectExpr, decoratedParamExpr), decoratedParamExpr);
                     }
                     else
                     {
-                        // combine
+                        resultFuncExpr = Expression.Lambda(Expression.Invoke(funcObjectExpr, resultFuncExpr.Body), resultFuncExpr.Parameters[0]);
                     }
                 }
             }
@@ -309,21 +309,15 @@ namespace DryIoc
                         decoratorSetup.IsDecoratedServiceIgnored = unusedFuncParams != null;
                     }
 
-                    if (combinedFuncExpr == null)
-                    {
-                        combinedFuncExpr = Expression.Lambda(Expression.Invoke(funcExpr, decoratedParamExpr), decoratedParamExpr);
-                    }
-                    else
-                    {
-                        combinedFuncExpr = Expression.Lambda(Expression.Invoke(funcExpr, combinedFuncExpr.Body), decoratedParamExpr);
-                    }
+                    resultFuncExpr = resultFuncExpr == null ? funcExpr 
+                        : Expression.Lambda(Expression.Invoke(funcExpr, resultFuncExpr.Body), resultFuncExpr.Parameters[0]);
 
                     // Once ignored, decorated service should stay ignored.
                     isDecoratedServiceIgnored = !isDecoratedServiceIgnored && decoratorSetup.IsDecoratedServiceIgnored;
                 }
             }
 
-            return combinedFuncExpr;
+            return resultFuncExpr;
         }
 
         IEnumerable<object> IRegistry.GetKeys(Type serviceType, Func<Factory, bool> condition)
@@ -777,16 +771,27 @@ namespace DryIoc
                 return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
 
             IList<Type> unusedFuncParams;
-            var funcExpr = serviceFactory.TryCreateFuncWithArgsExpression(funcType, serviceRequest, registry, out unusedFuncParams);
-            Throw.If(unusedFuncParams != null, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncParams.Print(), request);
+            var funcExpr = serviceFactory
+                .TryCreateFuncWithArgsExpression(funcType, serviceRequest, registry, out unusedFuncParams)
+                .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
+            
+            if (unusedFuncParams != null)
+                Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncParams.Print(), request);
 
-            if (funcExpr != null && serviceFactory.Reuse != null) // apply Reuse.
+            if (serviceFactory.Reuse != null)
             {
                 var serviceExpr = serviceFactory.Reuse.Of(serviceRequest, registry, serviceFactory.ID, funcExpr.Body);
                 funcExpr = Expression.Lambda(funcType, serviceExpr, funcExpr.Parameters);
             }
 
-            return funcExpr.ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
+            bool isDecoratedServiceIgnored;
+            var decoratorExpr = registry.TryGetDecoratorFuncExpression(serviceRequest, out isDecoratedServiceIgnored);
+            if (decoratorExpr != null)
+            {
+                funcExpr = Expression.Lambda(funcType, Expression.Invoke(decoratorExpr, funcExpr.Body), funcExpr.Parameters);
+            }
+
+            return funcExpr;
         }
     }
 
@@ -1251,7 +1256,7 @@ namespace DryIoc
             public override bool SkipCache { get { return true; } }
 
             public readonly Func<Request, bool> IsApplicable;
-            public Expression CachedDecoratorFuncExpr;
+            public LambdaExpression CachedDecoratorFuncExpr;
             public bool IsDecoratedServiceIgnored;
 
             public Decorator(Func<Request, bool> isApplicable = null)
@@ -1748,7 +1753,7 @@ namespace DryIoc
 
         Factory TryGetFactory(Type serviceType, object serviceKey);
 
-        LambdaExpression TryGetDecoratorFuncExpression(Request request, out bool isIgnoringDecoratedService);
+        LambdaExpression TryGetDecoratorFuncExpression(Request request, out bool isDecoratedServiceIgnored);
 
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
