@@ -15,6 +15,7 @@
 //
 // Features:
 // - Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
+// - Include properties Func with arguments support. What properties should be included: only marked for container resolution or all settable?
 // - Add distinctive features: Export DelegateFactory<TService>.
 // - Make Request to return Empty for resolution root parent. So it will simplify ImplementationType checks. May be add IsResolutionRoot property as well.
 // - Make a single consistent approach to ResolveProperties and PropertyOrFieldResolutionRules.
@@ -317,9 +318,8 @@ namespace DryIoc
                         combinedFuncExpr = Expression.Lambda(Expression.Invoke(funcExpr, combinedFuncExpr.Body), decoratedParamExpr);
                     }
 
-                    // Once ignored, decorated service should stay.
-                    if (!isDecoratedServiceIgnored)
-                        isDecoratedServiceIgnored = decoratorSetup.IsDecoratedServiceIgnored;
+                    // Once ignored, decorated service should stay ignored.
+                    isDecoratedServiceIgnored = !isDecoratedServiceIgnored && decoratorSetup.IsDecoratedServiceIgnored;
                 }
             }
 
@@ -1282,29 +1282,27 @@ namespace DryIoc
 
         public Expression GetExpression(Request request, IRegistry registry)
         {
-            if (Setup.SkipCache || _cachedExpression == null)
+            if (!Setup.SkipCache && _cachedExpression != null)
+                return _cachedExpression;
+
+            Expression result = null;
+
+            bool isDecoratedServiceIgnored;
+            var decorator = registry.TryGetDecoratorFuncExpression(request, out isDecoratedServiceIgnored);
+            if (decorator == null || !isDecoratedServiceIgnored) 
             {
-                bool isDecoratedServiceIgnored;
-                var decorator = registry.TryGetDecoratorFuncExpression(request, out isDecoratedServiceIgnored);
-
-                // Use default(TService) expression only when decorator found AND service is ignored by found decorator.
-                var expression = decorator != null && isDecoratedServiceIgnored
-                    ? request.ServiceType.GetDefaultExpression()
-                    : CreateExpression(request, registry);
-
-                if (decorator != null)
-                    expression = Expression.Invoke(decorator, expression);
-
+                // Normal expression creation pipeline, not affected by decorator.
+                result = CreateExpression(request, registry);
                 if (Reuse != null)
-                    expression = Reuse.Of(request, registry, ID, expression);
-
-                if (Setup.SkipCache)
-                    return expression;
-                
-                Interlocked.CompareExchange(ref _cachedExpression, expression, null);
+                    result = Reuse.Of(request, registry, ID, result);
+                if (!Setup.SkipCache)
+                    Interlocked.CompareExchange(ref _cachedExpression, result, null);
             }
 
-            return _cachedExpression;
+            if (decorator != null)
+                result = Expression.Invoke(decorator, result ?? request.ServiceType.GetDefaultExpression());
+
+            return result;
         }
 
         protected abstract Expression CreateExpression(Request request, IRegistry registry);
@@ -1413,49 +1411,6 @@ namespace DryIoc
             var newExpr = Expression.New(ctor, ctorParamExprs);
             return Expression.Lambda(funcType, AddInitializerIfRequired(newExpr, request, registry), funcInputParamExprs);
         }
-
-
-        //protected override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, bool skipMissedParametersCheck)
-        //{
-        //    var funcParamTypes = funcType.GetGenericArguments();
-        //    funcParamTypes.ThrowIf(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
-
-        //    var ctor = SelectConstructor();
-        //    var ctorParams = ctor.GetParameters();
-        //    var ctorParamCount = ctorParams.Length;
-
-        //    var funcInputParamCount = funcParamTypes.Length - 1;
-        //    var funcInputParamTypes = funcParamTypes.Take(funcInputParamCount).ToArray(); // TODO Remove as not required
-
-        //    if (!skipMissedParametersCheck)
-        //        ThrowIfConstructorMissesSomeFuncParams(ctor, ctorParams, funcType, funcInputParamTypes);
-
-        //    var ctorParamExprs = new Expression[ctorParamCount];
-        //    var funcInputParamExprs = new ParameterExpression[funcInputParamCount];
-
-        //    for (var cp = 0; cp < ctorParamCount; cp++)
-        //    {
-        //        var ctorParam = ctorParams[cp];
-        //        ParameterExpression funcInputParamExpr = null;
-        //        for (var fp = 0; fp < funcInputParamCount && funcInputParamExpr == null; fp++)
-        //            if (funcInputParamTypes[fp] == ctorParam.ParameterType && funcInputParamExprs[fp] == null)
-        //                funcInputParamExprs[fp] = funcInputParamExpr = Expression.Parameter(ctorParam.ParameterType, ctorParam.Name);
-
-        //        if (funcInputParamExpr != null)
-        //        {
-        //            ctorParamExprs[cp] = funcInputParamExpr;
-        //        }
-        //        else
-        //        {
-        //            var paramKey = registry.TryGetConstructorParamKey(ctorParam, request);
-        //            var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
-        //            ctorParamExprs[cp] = registry.GetOrAddFactory(paramRequest, false).GetExpression(paramRequest, registry);
-        //        }
-        //    }
-
-        //    var newExpr = Expression.New(ctor, ctorParamExprs);
-        //    return Expression.Lambda(funcType, AddInitializerIfRequired(newExpr, request, registry), funcInputParamExprs);
-        //}
 
         #region Implementation
 
