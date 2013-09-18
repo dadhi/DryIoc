@@ -61,12 +61,14 @@
     <Compile Include="MetadataTests.cs" />
     <Compile Include="Performance\HashTreeAccessSpeedTests.cs" />
     <Compile Include="Performance\HashTreeEnumerationSpeedTests.cs" />
+    <Compile Include="Performance\MethodArgumentsPassingSpeedComparison.cs" />
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
     <Compile Include="Playground\DecoratorConditionPlayTests.cs" />
     <Compile Include="Playground\Experiments.cs" />
     <Compile Include="AttributedRegistration\ExportGenericWrapperTests.cs" />
     <Compile Include="Playground\OptionsPlayTests.cs" />
     <Compile Include="Playground\ThrowPlayTests.cs" />
+    <Compile Include="Playground\TypeTree.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PropertyResolutionTests.cs" />
     <Compile Include="RegisterPublicTypesTests.cs" />

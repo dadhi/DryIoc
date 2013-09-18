@@ -6,6 +6,7 @@ using System.Threading;
 using DryIoc;
 using DryIoc.UnitTests;
 using DryIoc.UnitTests.Performance;
+using DryIoc.UnitTests.Playground;
 
 namespace ImmutableHashTree_SpeedTest
 {
@@ -14,11 +15,19 @@ namespace ImmutableHashTree_SpeedTest
 		static void Main()
 		{
 			Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            CompareHashTreeEnumeration();
-		    //CompareHashTreeGet();
-            //CompareTypesForEquality(typeof(string));
+            CompareHashTreeGet();
+		    //CompareHashTreeEnumeration();
+		    //CompareMethodArgumentPassing();
+		    //CompareTypesForEquality(typeof(string));
 			Console.ReadKey();
 		}
+
+	    private static void CompareMethodArgumentPassing()
+	    {
+            MethodArgumentsPassingSpeedComparison.Compare();
+	        Console.WriteLine();
+	        MethodArgumentsPassingSpeedComparison.Compare();
+	    }
 
 	    private static void CompareHashTreeEnumeration()
 	    {
@@ -29,10 +38,9 @@ namespace ImmutableHashTree_SpeedTest
 
 	    private static void CompareHashTreeGet()
 	    {
-            GC.Collect();
-            GetDictVsHashTree2OfType(itemCount: 2000);
+            GetTypeTreeVsHashTree(itemCount: 30);
             Console.WriteLine();
-            GetDictVsHashTree2OfType(itemCount: 2000);
+            GetTypeTreeVsHashTree(itemCount: 30);
 	    }
 
 	    private static void CompareTypesForEquality(Type actual)
@@ -80,7 +88,6 @@ namespace ImmutableHashTree_SpeedTest
             time.Stop();
             Console.WriteLine("ReferenceEquals(type1, type2) || type1.Equals(type2) took {0} milliseconds to complete.", time.ElapsedMilliseconds);
             GC.Collect();
-
 
             //var expectedHandle = expected.TypeHandle;
             //var actualHandle = actual.TypeHandle;
@@ -150,6 +157,35 @@ namespace ImmutableHashTree_SpeedTest
             Console.WriteLine("V4 - " + v4GetTime);
             Console.WriteLine("V1 - " + v1GetTime);
         }
+
+        public static void GetTypeTreeVsHashTree(int itemCount)
+        {
+            var key = typeof(HashTreeTests.DictVsMap);
+            var value = "hey";
+
+            var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
+
+            var typeTree = TypeTree<string>.Empty;
+            var hashTree = HashTree<Type, string>.Empty;
+
+            var typeTreeAddTime = TypeTreeAdd(ref typeTree, keys, key, value);
+            var hashTreeAddTime = HashTree4Add(ref hashTree, keys, key, value);
+
+            Console.WriteLine("Adding {0} items (ms):", itemCount);
+            Console.WriteLine("TypeTree - " + typeTreeAddTime);
+            Console.WriteLine("HashTree - " + hashTreeAddTime);
+            Console.WriteLine();
+
+            var getTimes = 1 * 1000 * 1000;
+
+            var typeTreeGetTime = TypeTreeGet(typeTree, key, getTimes);
+            var hashTreeGetTime = HashTree4Get(hashTree, key, getTimes);
+
+            Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
+            Console.WriteLine("TypeTree - " + typeTreeGetTime);
+            Console.WriteLine("HashTree - " + hashTreeGetTime);
+        }
+
 
         public static void GetHashTree2vs1ofType(int itemCount)
         {
@@ -374,6 +410,26 @@ namespace ImmutableHashTree_SpeedTest
             return treeTime.ElapsedMilliseconds;
         }
 
+        private static long TypeTreeAdd<V>(ref TypeTree<V> tree, Type[] keys, Type key, V value)
+        {
+            var ignored = default(V);
+            var treeTime = Stopwatch.StartNew();
+
+            for (var i = 0; i < keys.Length; i++)
+            {
+                var k = keys[i];
+                Interlocked.Exchange(ref tree, tree.AddOrUpdate(k, ignored));
+            }
+
+            Interlocked.Exchange(ref tree, tree.AddOrUpdate(key, value));
+
+            treeTime.Stop();
+            GC.KeepAlive(ignored);
+            GC.Collect();
+            return treeTime.ElapsedMilliseconds;
+        }
+
+
         private static long HashTree2Add<V>(ref HashTree2<Type, V> tree, Type[] keys, Type key, V value)
         {
             var ignored = default(V);
@@ -413,6 +469,23 @@ namespace ImmutableHashTree_SpeedTest
 		}
 
         private static long HashTree4Get<T>(HashTree<Type, T> tree, Type key, int times)
+        {
+            T ignored = default(T);
+
+            var treeWatch = Stopwatch.StartNew();
+
+            for (int i = 0; i < times; i++)
+            {
+                ignored = tree.TryGet(key);
+            }
+
+            treeWatch.Stop();
+            GC.KeepAlive(ignored);
+            GC.Collect();
+            return treeWatch.ElapsedMilliseconds;
+        }
+
+        private static long TypeTreeGet<T>(TypeTree<T> tree, Type key, int times)
         {
             T ignored = default(T);
 

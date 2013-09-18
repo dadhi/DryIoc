@@ -26,10 +26,10 @@
 //
 // Internals:
 // - Speedup:
-// - # Replace Stack in HashTree enumeration with array.
 // - # Replace HashTrees in RegistryEntry with arrays.
-// - # Make Type specific HashTree with reference equality comparison.
-// - # Test speed of removing return value from HashTree.TryGet.
+// + # Test speed of removing return value from HashTree.TryGet. - No difference.
+// + # Make Type specific HashTree with reference equality comparison. - No difference with Generic HashTree.
+// + # Replace Stack in HashTree enumeration with array. - Got 5/6 speed improvement.
 // - Remake Request ResolveTo to not mutate Request.
 // - Automatically propagate Setup on Factory.TryGetFactoryFor(Request ...).
 // - Rename request to DependencyChain.
@@ -1971,23 +1971,22 @@ namespace DryIoc
         }
 
         // Depth-first In-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        // The only difference is using fixed size array instead of stack to speed-up: 5/6 vs. stack.
         public IEnumerator<HashTree<V>> GetEnumerator()
         {
-            Stack<HashTree<V>> parents = null;
+            var parents = new HashTree<V>[Height];
+            var parentCount = -1;
             var node = this;
-            while (node.Height != 0 || parents != null)
+            while (node.Height != 0 || parentCount != -1)
             {
                 if (node.Height != 0)
                 {
-                    parents = new Stack<HashTree<V>>(node, parents);
+                    parents[++parentCount] = node;
                     node = node.Left;
                 }
                 else
                 {
-                    // ReSharper disable PossibleNullReferenceException
-                    node = parents.Head;
-                    // ReSharper restore PossibleNullReferenceException
-                    parents = parents.Tail;
+                    node = parents[parentCount--];
                     yield return node;
                     node = node.Right;
                 }
@@ -2108,18 +2107,6 @@ namespace DryIoc
         }
 
         #endregion
-    }
-
-    public sealed class Stack<T>
-    {
-        public readonly T Head;
-        public readonly Stack<T> Tail;
-
-        public Stack(T head, Stack<T> tail = null)
-        {
-            Head = head;
-            Tail = tail;
-        }
     }
 }
 

@@ -324,6 +324,18 @@ namespace DryIoc.UnitTests.Performance
             return new HashTreeV2<V>(Key, Value, left, right);
         }
 
+        private sealed class Stack<T>
+        {
+            public readonly T Head;
+            public readonly Stack<T> Tail;
+
+            public Stack(T head, Stack<T> tail = null)
+            {
+                Head = head;
+                Tail = tail;
+            }
+        }
+
         #endregion
     }
 }
