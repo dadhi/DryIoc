@@ -14,15 +14,15 @@
 // + Add distinctive features:. ImportUsing.
 //
 // Features:
-// - Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
+// - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
 // - Include properties Func with arguments support. What properties should be included: only marked for container resolution or all settable?
 // - Add distinctive features: Export DelegateFactory<TService>.
 // - Make Request to return Empty for resolution root parent. So it will simplify ImplementationType checks. May be add IsResolutionRoot property as well.
 // - Make a single consistent approach to ResolveProperties and PropertyOrFieldResolutionRules.
 // - Move Container Setup related code to dedicated class/container-property Setup.
-// - When resolving as Func with Arguments take properties into account.
 // - Add parameter to Resolve to skip resolution cache, and probably all other caches.
-// - Rename ExportPublicTypes to AutoExport.
+// - Rename ExportPublicTypes to AutoExport or something more concise.
+// + Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
 //
 // Internals:
 // - Speedup:
@@ -31,12 +31,9 @@
 // - # Make Type specific HashTree with reference equality comparison.
 // - # Test speed of removing return value from HashTree.TryGet.
 // - Remake Request ResolveTo to not mutate Request.
-// - Make Decorator caching work without SkipCache=true;
 // - Automatically propagate Setup on Factory.TryGetFactoryFor(Request ...).
 // - Rename request to DependencyChain.
-// - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
-// - Rename Request.TryGetNonWrapperParent to just Parent and make it to return default value.
-// - Remove non required custom delegates, the ones easy to figure out with good parameters.
+// + Make Decorator caching work without SkipCache=true;
 // + Remove Container Singleton parameter from CompiledFactory.
 
 #define SYSTEM_LAZY_IS_NOT_AVAILABLE
@@ -153,31 +150,6 @@ namespace DryIoc
             Factory result;
             lock (_syncRoot)
             {
-                //// Decorator.
-                //RegistryEntry entry;
-                //if (_registry.TryGetValue(request.ServiceType, out entry) &&
-                //    entry.TryGetDecorator(out result, request))
-                //{
-                //    result = result.TryProvideFactoryFor(request, this) ?? result;
-                //    request.ResolveTo(result);
-                //    return result;
-                //}
-                //// Open-generic Decorator.
-                //RegistryEntry openGenericEntry = null;
-                //if (request.OpenGenericServiceType != null &&
-                //    _registry.TryGetValue(request.OpenGenericServiceType, out openGenericEntry) &&
-                //    openGenericEntry.TryGetDecorator(out result, request) &&
-                //    (result = result.TryProvideFactoryFor(request, this)) != null)
-                //{
-                //    request.ResolveTo(result);
-
-                //    // TODO: May be by providing ServiceKey we could stop using SkipCache. 
-                //    //       May be implemented by storing Decorator as normal factory in Named and Indexed collections.
-                //    // TODO: Do we need to register closed gen decorator at all?
-                //    Register(result, request.ServiceType, null);
-                //    return result;
-                //}
-
                 // Service.
                 RegistryEntry entry;
                 if (_registry.TryGetValue(request.ServiceType, out entry) &&
