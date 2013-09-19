@@ -204,88 +204,85 @@ namespace DryIoc
         {
             isDecoratedServiceIgnored = false;
 
-            // # Stop recursion by checking that we are already have decorator in Request.
-            if (request.Any(r => r.FactoryType == FactoryType.Decorator))
+            // Decorators for non service types are not supported.
+            if (request.FactoryType != FactoryType.Service)
                 return null;
 
-            Factory[] customDecorators = null;
-            var serviceDecorators = new List<Factory>();
+            // We are already resolving decorator for the service, so stop now.
+            var parent = request.TryGetNonWrapperParent();
+            if (parent != null && parent.DecoratedFactoryID == request.FactoryID)
+                return null;
 
             var serviceType = request.ServiceType;
             var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
+            
+            LambdaExpression resultFuncExpr = null;
 
             lock (_syncRoot)
             {
                 RegistryEntry entry;
-
-                if (_registry.TryGetValue(decoratorFuncType, out entry) &&
-                    entry.Decorators != null)
+                if (_registry.TryGetValue(decoratorFuncType, out entry) && entry.Decorators != null)
                 {
-                    customDecorators = entry.Decorators
-                        .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request)).ToArray();
+                    var decoratorRequest = new Request(decoratorFuncType, request.ServiceKey, request.Parent);
+                    for (var i = 0; i < entry.Decorators.Count; i++)
+                    {
+                        var decorator = entry.Decorators[i];
+                        if (((FactorySetup.Decorator)decorator.Setup).IsApplicable(request))
+                        {
+                            decoratorRequest.ResolveTo(decorator);
+                            var funcObjectExpr = decorator.GetExpression(decoratorRequest, this);
+                            if (resultFuncExpr == null)
+                            {
+                                var decoratedParamExpr = Expression.Parameter(serviceType, "decorated");
+                                resultFuncExpr = Expression.Lambda(Expression.Invoke(funcObjectExpr, decoratedParamExpr), decoratedParamExpr);
+                            }
+                            else
+                            {
+                                resultFuncExpr = Expression.Lambda(Expression.Invoke(funcObjectExpr, resultFuncExpr.Body), resultFuncExpr.Parameters[0]);
+                            }
+                        }
+                    }
                 }
 
-                if (_registry.TryGetValue(serviceType, out entry) &&
-                    entry.Decorators != null)
+                var serviceDecorators = new List<Factory>();
+
+                if (_registry.TryGetValue(serviceType, out entry) && entry.Decorators != null)
                 {
                     serviceDecorators.AddRange(entry.Decorators
                         .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request)));
                 }
 
                 if (request.OpenGenericServiceType != null &&
-                    _registry.TryGetValue(request.OpenGenericServiceType, out entry) &&
-                    entry.Decorators != null)
+                    _registry.TryGetValue(request.OpenGenericServiceType, out entry) && entry.Decorators != null)
                 {
                     serviceDecorators.AddRange(entry.Decorators
                         .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request))
                         .Select(f => f.TryProvideFactoryFor(request, this)));
                 }
-            }
 
-            // # Apply decorators.
-            var decoratorRequest = new Request(decoratorFuncType, request.ServiceKey, request.Parent);
-
-            LambdaExpression resultFuncExpr = null;
-            if (customDecorators != null && customDecorators.Length != 0)
-            {
-                for (var i = 0; i < customDecorators.Length; i++)
+                if (serviceDecorators.Count != 0)
                 {
-                    var decorator = customDecorators[i];
-                    decoratorRequest.ResolveTo(decorator);
-                    var funcObjectExpr = decorator.GetExpression(decoratorRequest, this);
-                    if (resultFuncExpr == null)
+                    var decoratorRequest = new Request(request.ServiceType, request.ServiceKey, request.Parent);
+                    for (var i = 0; i < serviceDecorators.Count; i++)
                     {
-                        var decoratedParamExpr = Expression.Parameter(serviceType, "decorated");
-                        resultFuncExpr = Expression.Lambda(Expression.Invoke(funcObjectExpr, decoratedParamExpr), decoratedParamExpr);
-                    }
-                    else
-                    {
-                        resultFuncExpr = Expression.Lambda(Expression.Invoke(funcObjectExpr, resultFuncExpr.Body), resultFuncExpr.Parameters[0]);
-                    }
-                }
-            }
+                        var decorator = serviceDecorators[i];
+                        decoratorRequest.ResolveTo(decorator, request.FactoryID);
+                        var decoratorSetup = ((FactorySetup.Decorator)decorator.Setup);
+                        var funcExpr = decoratorSetup.CachedDecoratorFuncExpr;
+                        if (funcExpr == null)
+                        {
+                            IList<Type> unusedFuncParams;
+                            funcExpr = decorator.TryCreateFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
+                            decoratorSetup.CachedDecoratorFuncExpr = funcExpr;
+                            decoratorSetup.IsDecoratedServiceIgnored = unusedFuncParams != null;
+                        }
 
-            if (serviceDecorators.Count != 0)
-            {
-                for (var i = 0; i < serviceDecorators.Count; i++)
-                {
-                    var decorator = serviceDecorators[i];
-                    decoratorRequest.ResolveTo(decorator);
-                    var decoratorSetup = ((FactorySetup.Decorator)decorator.Setup);
-                    var funcExpr = decoratorSetup.CachedDecoratorFuncExpr;
-                    if (funcExpr == null)
-                    {
-                        IList<Type> unusedFuncParams;
-                        funcExpr = decorator.TryCreateFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
-                        decoratorSetup.CachedDecoratorFuncExpr = funcExpr;
-                        decoratorSetup.IsDecoratedServiceIgnored = unusedFuncParams != null;
+                        resultFuncExpr = resultFuncExpr == null ? funcExpr
+                            : Expression.Lambda(Expression.Invoke(funcExpr, resultFuncExpr.Body), resultFuncExpr.Parameters[0]);
+
+                        // Once ignored, decorated service should stay ignored.
+                        isDecoratedServiceIgnored = !isDecoratedServiceIgnored && decoratorSetup.IsDecoratedServiceIgnored;
                     }
-
-                    resultFuncExpr = resultFuncExpr == null ? funcExpr 
-                        : Expression.Lambda(Expression.Invoke(funcExpr, resultFuncExpr.Body), resultFuncExpr.Parameters[0]);
-
-                    // Once ignored, decorated service should stay ignored.
-                    isDecoratedServiceIgnored = !isDecoratedServiceIgnored && decoratorSetup.IsDecoratedServiceIgnored;
                 }
             }
 
@@ -746,7 +743,7 @@ namespace DryIoc
             var funcExpr = serviceFactory
                 .TryCreateFuncWithArgsExpression(funcType, serviceRequest, registry, out unusedFuncParams)
                 .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
-            
+
             if (unusedFuncParams != null)
                 Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncParams.Print(), request);
 
@@ -756,10 +753,14 @@ namespace DryIoc
                 funcExpr = Expression.Lambda(funcType, serviceExpr, funcExpr.Parameters);
             }
 
-            bool isDecoratedServiceIgnored;
+            bool isDecoratedServiceIgnored; // TODO: When it could be set to true?
             var decoratorExpr = registry.TryGetDecoratorFuncExpression(serviceRequest, out isDecoratedServiceIgnored);
             if (decoratorExpr != null)
             {
+                if (isDecoratedServiceIgnored)
+                {
+
+                }
                 funcExpr = Expression.Lambda(funcType, Expression.Invoke(decoratorExpr, funcExpr.Body), funcExpr.Parameters);
             }
 
@@ -1271,7 +1272,7 @@ namespace DryIoc
 
             bool isDecoratedServiceIgnored;
             var decorator = registry.TryGetDecoratorFuncExpression(request, out isDecoratedServiceIgnored);
-            if (decorator == null || !isDecoratedServiceIgnored) 
+            if (decorator == null || !isDecoratedServiceIgnored)
             {
                 // Normal expression creation pipeline, not affected by decorator.
                 result = CreateExpression(request, registry);
@@ -1505,6 +1506,7 @@ namespace DryIoc
 
         public FactoryType FactoryType { get; private set; }
         public int FactoryID { get; private set; }
+        public int DecoratedFactoryID { private set; get; }
         public Type ImplementationType { get; private set; }
 
         public Request(Type serviceType, object serviceKey, Request parent = null)
@@ -1542,10 +1544,11 @@ namespace DryIoc
             return new Request(serviceType, ServiceKey, this);
         }
 
-        public void ResolveTo(Factory factory)
+        public void ResolveTo(Factory factory, int decoratedFactoryID = -1)
         {
             FactoryType = factory.Setup.Type;
             FactoryID = factory.ID;
+            DecoratedFactoryID = decoratedFactoryID;
             ImplementationType = factory.ImplementationType;
             Throw.If(TryGetParent(r => r.FactoryID == FactoryID) != null, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
         }
@@ -1971,7 +1974,7 @@ namespace DryIoc
         }
 
         // Depth-first In-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        // The only difference is using fixed size array instead of stack to speed-up: 5/6 vs. stack.
+        // The only difference is using fixed size array instead of stack for speed-up: 5/6 vs. stack.
         public IEnumerator<HashTree<V>> GetEnumerator()
         {
             var parents = new HashTree<V>[Height];

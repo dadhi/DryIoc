@@ -192,18 +192,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_support_resolving_Func_with_parameters_of_wrapped_of_decorated_service()
-        {
-            var container = new Container();
-            container.Register<IOperation, ParameterizedOperation>();
-            container.Register<IOperation, FuncWithArgDecorator>(setup: FactorySetup.AsDecorator());
-
-            var operation = container.Resolve<Func<object, IOperation>>();
-
-            Assert.That(operation("blah"), Is.InstanceOf<RetryOperationDecorator>());
-        }
-
-        [Test]
         public void Should_apply_decorator_When_resolving_Func_of_decorated_service()
         {
             var container = new Container();
@@ -216,7 +204,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_propogate_metadata_to_Meta_wrapper()
+        public void Should_propagate_metadata_to_Meta_wrapper()
         {
             var container = new Container();
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: FactorySetup.WithMetadata("blah"));
@@ -299,18 +287,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_support_decorator_of_Func_with_argument_registered_as_delegate()
-        {
-            var container = new Container();
-            container.RegisterDelegate<Func<object, IOperation>>(_ => param => new ParameterizedOperation(param));
-            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: FactorySetup.AsDecorator());
-
-            var operation = container.Resolve<Func<object, IOperation>>();
-
-            Assert.That(operation("blah!"), Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
-        }
-
-        [Test]
         public void Should_support_resolving_Func_with_parameters_of_decorated_service()
         {
             var container = new Container();
@@ -320,6 +296,29 @@ namespace DryIoc.UnitTests
             var operation = container.Resolve<Func<object, IOperation>>();
 
             Assert.That(operation("blah"), Is.InstanceOf<RetryOperationDecorator>());
+        }
+
+        [Test]
+        public void Should_support_resolving_Func_with_parameters_of_Lazy_service()
+        {
+            var container = new Container();
+            container.Register<IOperation, ParameterizedOperation>();
+            container.Register<IOperation, LazyDecorator>(setup: FactorySetup.AsDecorator());
+
+            var operation = container.Resolve<Func<object, IOperation>>();
+
+            Assert.That(operation("blah"), Is.InstanceOf<LazyDecorator>());
+        }
+
+        [Test]
+        public void Should_NOT_support_decorator_of_Func_with_parameters_of_service__CAUSE_TOO_COMPLICATED()
+        {
+            var container = new Container();
+            container.Register<IOperation, ParameterizedOperation>();
+            container.Register<IOperation, FuncWithArgDecorator>(setup: FactorySetup.AsDecorator());
+
+            Assert.Throws<ContainerException>(
+                () => container.Resolve<Func<object, IOperation>>());
         }
 
         [Test]
