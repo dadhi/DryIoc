@@ -266,13 +266,14 @@ namespace DryIoc
                     for (var i = 0; i < serviceDecorators.Count; i++)
                     {
                         var decorator = serviceDecorators[i];
-                        decoratorRequest.ResolveTo(decorator, request.FactoryID);
+                        //decoratorRequest.ResolveTo(decorator, request.FactoryID);
                         var decoratorSetup = ((FactorySetup.Decorator)decorator.Setup);
                         var funcExpr = decoratorSetup.CachedDecoratorFuncExpr;
                         if (funcExpr == null)
                         {
                             IList<Type> unusedFuncParams;
-                            funcExpr = decorator.TryCreateFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
+                            funcExpr = decorator
+                                .TryGetFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
                             decoratorSetup.CachedDecoratorFuncExpr = funcExpr;
                             decoratorSetup.IsDecoratedServiceIgnored = unusedFuncParams != null;
                         }
@@ -741,32 +742,13 @@ namespace DryIoc
             if (funcTypeArgs.Length == 1)
                 return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
 
-
-
             IList<Type> unusedFuncParams;
             var funcExpr = serviceFactory
-                .TryCreateFuncWithArgsExpression(funcType, serviceRequest, registry, out unusedFuncParams)
+                .TryGetFuncWithArgsExpression(funcType, serviceRequest, registry, out unusedFuncParams)
                 .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
 
             if (unusedFuncParams != null)
                 Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncParams.Print(), request);
-
-            if (serviceFactory.Reuse != null)
-            {
-                var serviceExpr = serviceFactory.Reuse.Of(serviceRequest, registry, serviceFactory.ID, funcExpr.Body);
-                funcExpr = Expression.Lambda(funcType, serviceExpr, funcExpr.Parameters);
-            }
-
-            bool isDecoratedServiceIgnored; // TODO: When it could be set to true?
-            var decoratorExpr = registry.TryGetDecoratorFuncExpression(serviceRequest, out isDecoratedServiceIgnored);
-            if (decoratorExpr != null)
-            {
-                if (isDecoratedServiceIgnored)
-                {
-
-                }
-                funcExpr = Expression.Lambda(funcType, Expression.Invoke(decoratorExpr, funcExpr.Body), funcExpr.Parameters);
-            }
 
             return funcExpr;
         }
@@ -1269,31 +1251,57 @@ namespace DryIoc
 
         public Expression GetExpression(Request request, IRegistry registry)
         {
-            request.ResolveTo(this);
-            if (!Setup.SkipCache && _cachedExpression != null)
-                return _cachedExpression;
-
-            Expression result = null;
+            request.ResolveTo(this); request.ResolveTo(this);
 
             bool isDecoratedServiceIgnored;
             var decorator = registry.TryGetDecoratorFuncExpression(request, out isDecoratedServiceIgnored);
-            if (decorator == null || !isDecoratedServiceIgnored)
+            if (decorator != null && isDecoratedServiceIgnored)
+                return decorator.Body;
+
+            var result = _cachedExpression;
+            if (result == null)
             {
-                // Normal expression creation pipeline, not affected by decorator.
                 result = CreateExpression(request, registry);
                 if (Reuse != null)
                     result = Reuse.Of(request, registry, ID, result);
                 if (!Setup.SkipCache)
-                    Interlocked.CompareExchange(ref _cachedExpression, result, null);
+                    Interlocked.Exchange(ref _cachedExpression, result);
             }
 
             if (decorator != null)
-                result = Expression.Invoke(decorator, result ?? request.ServiceType.GetDefaultExpression());
+                result = Expression.Invoke(decorator, result);
 
             return result;
         }
 
         protected abstract Expression CreateExpression(Request request, IRegistry registry);
+
+        public LambdaExpression TryGetFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
+        {
+            request.ResolveTo(this);
+
+            var func = TryCreateFuncWithArgsExpression(funcType, request, registry, out unusedFuncParams);
+            if (func == null)
+                return null;
+
+            bool isDecoratedServiceIgnored;
+            var decorator = registry.TryGetDecoratorFuncExpression(request, out isDecoratedServiceIgnored);
+            if (decorator != null && isDecoratedServiceIgnored)
+            {
+                // _ => decorate(); Ignore Func arguments, because decorator ignores them.
+                var funcParams = funcType.GetGenericArguments();
+                return Expression.Lambda(funcType, decorator.Body,
+                    funcParams.Take(funcParams.Length - 1).Select(type => Expression.Parameter(type, "_")));
+            }
+
+            if (Reuse != null)
+                func = Expression.Lambda(funcType, Reuse.Of(request, registry, ID, func.Body), func.Parameters);
+
+            if (decorator != null)
+                func = Expression.Lambda(funcType, Expression.Invoke(decorator, func.Body), func.Parameters);
+
+            return func;
+        }
 
         public virtual LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
@@ -1566,16 +1574,15 @@ namespace DryIoc
 
         public string PrintServiceInfo(bool showIndex = false)
         {
-            var message = ServiceType.Print();
+            var keyPrefix = ServiceKey is string ? "\"" + ServiceKey + "\""
+                : showIndex && ServiceKey is int ? "#" + ServiceKey
+                : "unnamed";
 
-            message += ServiceKey is string ? " (\"" + ServiceKey + "\")"
-                : showIndex && ServiceKey is int ? " (#" + ServiceKey + ")"
-                : " (unnamed)";
+            var serviceInfo = ImplementationType != null && ImplementationType != ServiceType
+                ? ImplementationType.Print() + " : " + ServiceType.Print()
+                : ServiceType.Print();
 
-            if (ImplementationType != null && ImplementationType != ServiceType)
-                message = ImplementationType.Print() + " : " + message;
-
-            return message;
+            return keyPrefix + " " + serviceInfo;
         }
 
         public override string ToString()
@@ -1965,7 +1972,7 @@ namespace DryIoc
         {
             return Height == 0 ? new HashTree<V>(key, value, Empty, Empty)
                 : (key == Key ? new HashTree<V>(key, update == null ? value : update(Value, value), Left, Right)
-                : (key < Key 
+                : (key < Key
                     ? With(Left.AddOrUpdate(key, value), Right)
                     : With(Left, Right.AddOrUpdate(key, value))).EnsureBalanced());
         }
