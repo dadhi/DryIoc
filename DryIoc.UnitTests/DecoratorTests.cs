@@ -250,8 +250,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.RegisterDelegate<Func<IOperation, IOperation>>(
-                r => _ => new LazyDecorator(r.Resolve<Lazy<IOperation>>()), setup: FactorySetup.AsDecorator());
+            container.RegisterDelegate<Func<IOperation, IOperation>>(r => 
+                _ => new LazyDecorator(r.Resolve<Lazy<IOperation>>()), setup: FactorySetup.AsDecorator());
 
             var operation = container.Resolve<IOperation>();
 

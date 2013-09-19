@@ -156,7 +156,6 @@ namespace DryIoc
                     entry.TryGetFactory(out result, request.ServiceType, request.ServiceKey))
                 {
                     result = result.TryProvideFactoryFor(request, this) ?? result;
-                    //request.ResolveTo(result);
                     return result;
                 }
 
@@ -167,7 +166,6 @@ namespace DryIoc
                     openGenericEntry.TryGetFactory(out result, request.ServiceType, request.ServiceKey) &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
-                    //request.ResolveTo(result);
                     Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
@@ -178,7 +176,6 @@ namespace DryIoc
                     result.Setup.Type == FactoryType.GenericWrapper &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
-                    //request.ResolveTo(result);
                     Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
@@ -190,7 +187,6 @@ namespace DryIoc
                 result = rules[i].Invoke(request, this);
                 if (result != null)
                 {
-                    //request.ResolveTo(result);
                     Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
@@ -224,12 +220,12 @@ namespace DryIoc
                 if (_registry.TryGetValue(decoratorFuncType, out entry) && entry.Decorators != null)
                 {
                     var decoratorRequest = new Request(decoratorFuncType, request.ServiceKey, request.Parent);
+                    decoratorRequest.DecoratedFactoryID = request.FactoryID;
                     for (var i = 0; i < entry.Decorators.Count; i++)
                     {
                         var decorator = entry.Decorators[i];
                         if (((FactorySetup.Decorator)decorator.Setup).IsApplicable(request))
                         {
-                            //decoratorRequest.ResolveTo(decorator);
                             var funcObjectExpr = decorator.GetExpression(decoratorRequest, this);
                             if (resultFuncExpr == null)
                             {
@@ -263,10 +259,10 @@ namespace DryIoc
                 if (serviceDecorators.Count != 0)
                 {
                     var decoratorRequest = new Request(request.ServiceType, request.ServiceKey, request.Parent);
+                    decoratorRequest.DecoratedFactoryID = request.FactoryID;
                     for (var i = 0; i < serviceDecorators.Count; i++)
                     {
                         var decorator = serviceDecorators[i];
-                        //decoratorRequest.ResolveTo(decorator, request.FactoryID);
                         var decoratorSetup = ((FactorySetup.Decorator)decorator.Setup);
                         var funcExpr = decoratorSetup.CachedDecoratorFuncExpr;
                         if (funcExpr == null)
@@ -274,6 +270,7 @@ namespace DryIoc
                             IList<Type> unusedFuncParams;
                             funcExpr = decorator
                                 .TryGetFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
+
                             decoratorSetup.CachedDecoratorFuncExpr = funcExpr;
                             decoratorSetup.IsDecoratedServiceIgnored = unusedFuncParams != null;
                         }
@@ -1251,7 +1248,7 @@ namespace DryIoc
 
         public Expression GetExpression(Request request, IRegistry registry)
         {
-            request.ResolveTo(this); request.ResolveTo(this);
+            request.ResolveTo(this);
 
             bool isDecoratedServiceIgnored;
             var decorator = registry.TryGetDecoratorFuncExpression(request, out isDecoratedServiceIgnored);
@@ -1287,12 +1284,7 @@ namespace DryIoc
             bool isDecoratedServiceIgnored;
             var decorator = registry.TryGetDecoratorFuncExpression(request, out isDecoratedServiceIgnored);
             if (decorator != null && isDecoratedServiceIgnored)
-            {
-                // _ => decorate(); Ignore Func arguments, because decorator ignores them.
-                var funcParams = funcType.GetGenericArguments();
-                return Expression.Lambda(funcType, decorator.Body,
-                    funcParams.Take(funcParams.Length - 1).Select(type => Expression.Parameter(type, "_")));
-            }
+                return Expression.Lambda(funcType, decorator.Body, func.Parameters);
 
             if (Reuse != null)
                 func = Expression.Lambda(funcType, Reuse.Of(request, registry, ID, func.Body), func.Parameters);
@@ -1303,7 +1295,7 @@ namespace DryIoc
             return func;
         }
 
-        public virtual LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
+        protected virtual LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
             unusedFuncParams = null;
             return null;
@@ -1357,7 +1349,7 @@ namespace DryIoc
             return AddInitializerIfRequired(Expression.New(ctor, paramExprs), request, registry);
         }
 
-        public override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
+        protected override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
             var funcParamTypes = funcType.GetGenericArguments();
             funcParamTypes.ThrowIf(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
@@ -1516,10 +1508,10 @@ namespace DryIoc
         public readonly Type ServiceType;
         public readonly Type OpenGenericServiceType;
         public readonly object ServiceKey; // null for default, string for named or integer index for multiple defaults.
+        public int DecoratedFactoryID;
 
         public FactoryType FactoryType { get; private set; }
         public int FactoryID { get; private set; }
-        public int DecoratedFactoryID { private set; get; }
         public Type ImplementationType { get; private set; }
 
         public Request(Type serviceType, object serviceKey, Request parent = null)
@@ -1557,11 +1549,10 @@ namespace DryIoc
             return new Request(serviceType, ServiceKey, this);
         }
 
-        public void ResolveTo(Factory factory, int decoratedFactoryID = -1)
+        public void ResolveTo(Factory factory)
         {
             FactoryType = factory.Setup.Type;
             FactoryID = factory.ID;
-            DecoratedFactoryID = decoratedFactoryID;
             ImplementationType = factory.ImplementationType;
             Throw.If(TryGetParent(r => r.FactoryID == FactoryID) != null, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
         }
@@ -1574,15 +1565,15 @@ namespace DryIoc
 
         public string PrintServiceInfo(bool showIndex = false)
         {
-            var keyPrefix = ServiceKey is string ? "\"" + ServiceKey + "\""
+            var key = ServiceKey is string ? "\"" + ServiceKey + "\""
                 : showIndex && ServiceKey is int ? "#" + ServiceKey
                 : "unnamed";
 
-            var serviceInfo = ImplementationType != null && ImplementationType != ServiceType
+            var types = ImplementationType != null && ImplementationType != ServiceType
                 ? ImplementationType.Print() + " : " + ServiceType.Print()
                 : ServiceType.Print();
 
-            return keyPrefix + " " + serviceInfo;
+            return key + " " + types;
         }
 
         public override string ToString()
@@ -1692,6 +1683,7 @@ namespace DryIoc
 
                 // Otherwise we can create singleton instance right here, and put it into Scope for later disposal.
                 var currentScope = registry.CurrentScope;
+
                 // Save into separate var to prevent closure on registry variable in factory lambda below.
                 var singletonInstance = singletonScope.GetOrAdd(factoryID,
                     () => Container.CompileExpression(factoryExpr)(currentScope, null));
@@ -1948,11 +1940,6 @@ namespace DryIoc
             Array.Copy(source, target, sourceLength);
             target[index] = value;
             return target;
-        }
-
-        public static Expression GetDefaultExpression(this Type type)
-        {
-            return type.IsValueType ? (Expression)Expression.New(type) : Expression.Constant(null, type);
         }
     }
 
