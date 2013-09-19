@@ -303,7 +303,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, ParameterizedOperation>();
-            container.Register<IOperation, LazyDecorator>(setup: FactorySetup.AsDecorator());
+            container.Register<IOperation, FuncWithArgDecorator>(setup: FactorySetup.AsDecorator());
 
             var operation = container.Resolve<Func<object, IOperation>>();
 

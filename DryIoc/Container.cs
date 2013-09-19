@@ -156,7 +156,7 @@ namespace DryIoc
                     entry.TryGetFactory(out result, request.ServiceType, request.ServiceKey))
                 {
                     result = result.TryProvideFactoryFor(request, this) ?? result;
-                    request.ResolveTo(result);
+                    //request.ResolveTo(result);
                     return result;
                 }
 
@@ -167,7 +167,7 @@ namespace DryIoc
                     openGenericEntry.TryGetFactory(out result, request.ServiceType, request.ServiceKey) &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
-                    request.ResolveTo(result);
+                    //request.ResolveTo(result);
                     Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
@@ -178,7 +178,7 @@ namespace DryIoc
                     result.Setup.Type == FactoryType.GenericWrapper &&
                     (result = result.TryProvideFactoryFor(request, this)) != null)
                 {
-                    request.ResolveTo(result);
+                    //request.ResolveTo(result);
                     Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
@@ -190,7 +190,7 @@ namespace DryIoc
                 result = rules[i].Invoke(request, this);
                 if (result != null)
                 {
-                    request.ResolveTo(result);
+                    //request.ResolveTo(result);
                     Register(result, request.ServiceType, request.ServiceKey);
                     return result;
                 }
@@ -215,7 +215,7 @@ namespace DryIoc
 
             var serviceType = request.ServiceType;
             var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
-            
+
             LambdaExpression resultFuncExpr = null;
 
             lock (_syncRoot)
@@ -229,7 +229,7 @@ namespace DryIoc
                         var decorator = entry.Decorators[i];
                         if (((FactorySetup.Decorator)decorator.Setup).IsApplicable(request))
                         {
-                            decoratorRequest.ResolveTo(decorator);
+                            //decoratorRequest.ResolveTo(decorator);
                             var funcObjectExpr = decorator.GetExpression(decoratorRequest, this);
                             if (resultFuncExpr == null)
                             {
@@ -458,8 +458,8 @@ namespace DryIoc
 
         public object ResolveDefault(Type serviceType, bool shouldReturnNull)
         {
-            var result = _defaultResolutionCache.TryGet(serviceType) ?? ResolveAndCacheFactory(serviceType, shouldReturnNull);
-            return result == null ? null : result(CurrentScope, null/* resolutionRootScope */);
+            return (_defaultResolutionCache.TryGet(serviceType)
+                ?? ResolveAndCacheFactory(serviceType, shouldReturnNull)).Invoke(CurrentScope, null/* resolutionRootScope */);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, bool shouldReturnNull)
@@ -488,11 +488,13 @@ namespace DryIoc
         {
             var request = new Request(serviceType, null);
             var factory = ((IRegistry)this).GetOrAddFactory(request, shouldReturnNull);
-            if (factory == null) return null;
+            if (factory == null) return FactoryReturningNull;
             var result = CompileExpression(factory.GetExpression(request, this));
             _defaultResolutionCache = _defaultResolutionCache.AddOrUpdate(serviceType, result);
             return result;
         }
+
+        private static object FactoryReturningNull(Scope openScope, Scope resolutionRootsScope) { return null; }
 
         private sealed class KeyedResolutionCacheEntry
         {
@@ -738,6 +740,8 @@ namespace DryIoc
 
             if (funcTypeArgs.Length == 1)
                 return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
+
+
 
             IList<Type> unusedFuncParams;
             var funcExpr = serviceFactory
@@ -1265,6 +1269,7 @@ namespace DryIoc
 
         public Expression GetExpression(Request request, IRegistry registry)
         {
+            request.ResolveTo(this);
             if (!Setup.SkipCache && _cachedExpression != null)
                 return _cachedExpression;
 
@@ -1956,21 +1961,21 @@ namespace DryIoc
 
         public delegate V UpdateValue(V old, V added);
 
-        public HashTree<V> AddOrUpdate(int key, V newValue, UpdateValue update = null)
+        public HashTree<V> AddOrUpdate(int key, V value, UpdateValue update = null)
         {
-            return Height == 0 ? new HashTree<V>(key, newValue, Empty, Empty)
-                : (key == Key ? new HashTree<V>(key, update == null ? newValue : update(Value, newValue), Left, Right)
-                    : (key < Key
-                        ? With(Left.AddOrUpdate(key, newValue), Right)
-                        : With(Left, Right.AddOrUpdate(key, newValue))).EnsureBalanced());
+            return Height == 0 ? new HashTree<V>(key, value, Empty, Empty)
+                : (key == Key ? new HashTree<V>(key, update == null ? value : update(Value, value), Left, Right)
+                : (key < Key 
+                    ? With(Left.AddOrUpdate(key, value), Right)
+                    : With(Left, Right.AddOrUpdate(key, value))).EnsureBalanced());
         }
 
         public V TryGet(int key, V defaultValue = default(V))
         {
-            var current = this;
-            while (current.Height != 0 && key != current.Key)
-                current = key < current.Key ? current.Left : current.Right;
-            return current.Height != 0 ? current.Value : defaultValue;
+            var node = this;
+            while (node.Height != 0 && key != node.Key)
+                node = key < node.Key ? node.Left : node.Right;
+            return node.Height != 0 ? node.Value : defaultValue;
         }
 
         // Depth-first In-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
