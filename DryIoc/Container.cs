@@ -6,7 +6,7 @@
 // - Convert SkipCache flag to enum.
 // - Evaluate Code Coverage.
 // - Fix code generation example.
-// - Review performance one again with fresh view.
+// + Review performance one again with fresh view.
 // + Add registration for lambda with IResolver parameter for something like RegisterDelegate(c => new Blah(c.Resolve(IDependency))).
 
 // Goals:
@@ -15,20 +15,21 @@
 //
 // Features:
 // - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
-// - Include properties Func with arguments support. What properties should be included: only marked for container resolution or all settable?
 // - Add distinctive features: Export DelegateFactory<TService>.
 // - Make Request to return Empty for resolution root parent. So it will simplify ImplementationType checks. May be add IsResolutionRoot property as well.
 // - Make a single consistent approach to ResolveProperties and PropertyOrFieldResolutionRules.
 // - Move Container Setup related code to dedicated class/container-property Setup.
 // - Add parameter to Resolve to skip resolution cache, and probably all other caches.
 // - Rename ExportPublicTypes to AutoExport or something more concise.
+// ? Include properties Func with arguments support. What properties should be included: only marked for container resolution or all settable?
 // + Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
 //
 // Internals:
 // - Move decorator cachedExpression from Setup to Factory itself. Make setup immutable again.
-// - Remake Request ResolveTo to not mutate Request.
+// - Speed-up recursive dependency check as it happens on every Request resolution.
 // - Automatically propagate Setup on Factory.TryGetFactoryFor(Request ...).
-// - Rename request to DependencyChain.
+// ? Rename request to DependencyChain.
+// + Remake Request ResolveTo to not mutate Request.
 // + Make Decorator caching work without SkipCache=true;
 // + Remove Container Singleton parameter from CompiledFactory.
 
@@ -207,8 +208,7 @@ namespace DryIoc
                 RegistryEntry entry;
                 if (_registry.TryGetValue(decoratorFuncType, out entry) && entry.Decorators != null)
                 {
-                    var decoratorRequest = new Request(decoratorFuncType, request.ServiceKey, request.Parent);
-                    decoratorRequest.DecoratedFactoryID = request.FactoryID;
+                    var decoratorRequest = new Request(request.Parent, decoratorFuncType, request.ServiceKey, request.FactoryID);
                     for (var i = 0; i < entry.Decorators.Count; i++)
                     {
                         var decorator = entry.Decorators[i];
@@ -246,8 +246,7 @@ namespace DryIoc
 
                 if (serviceDecorators.Count != 0)
                 {
-                    var decoratorRequest = new Request(request.ServiceType, request.ServiceKey, request.Parent);
-                    decoratorRequest.DecoratedFactoryID = request.FactoryID;
+                    var decoratorRequest = new Request(request.Parent, request.ServiceType, request.ServiceKey, request.FactoryID);
                     for (var i = 0; i < serviceDecorators.Count; i++)
                     {
                         var decorator = serviceDecorators[i];
@@ -454,7 +453,7 @@ namespace DryIoc
             var result = entry != null ? entry.TryGet(serviceKey.ThrowIfNull()) : null;
             if (result == null) // nothing in cache, try resolve and cache.
             {
-                var request = new Request(serviceType, serviceKey);
+                var request = new Request(null, serviceType, serviceKey);
                 var factory = ((IRegistry)this).GetOrAddFactory(request, shouldReturnNull);
                 if (factory == null) return null;
                 result = CompileExpression(factory.GetExpression(request, this));
@@ -472,7 +471,7 @@ namespace DryIoc
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, bool shouldReturnNull)
         {
-            var request = new Request(serviceType, null);
+            var request = new Request(null, serviceType, null);
             var factory = ((IRegistry)this).GetOrAddFactory(request, shouldReturnNull);
             if (factory == null) return FactoryReturningNull;
             var result = CompileExpression(factory.GetExpression(request, this));
@@ -1237,7 +1236,7 @@ namespace DryIoc
 
         public Expression GetExpression(Request request, IRegistry registry)
         {
-            request.ResolveTo(this);
+            request = request.ResolveTo(this);
 
             bool isDecoratedServiceIgnored;
             var decorator = registry.TryGetDecoratorFuncExpression(request, out isDecoratedServiceIgnored);
@@ -1264,7 +1263,7 @@ namespace DryIoc
 
         public LambdaExpression TryGetFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
-            request.ResolveTo(this);
+            request = request.ResolveTo(this);
 
             var func = TryCreateFuncWithArgsExpression(funcType, request, registry, out unusedFuncParams);
             if (func == null)
@@ -1495,21 +1494,30 @@ namespace DryIoc
     {
         public readonly Request Parent; // can be null for resolution root
         public readonly Type ServiceType;
-        public readonly Type OpenGenericServiceType;
         public readonly object ServiceKey; // null for default, string for named or integer index for multiple defaults.
+        
+        public readonly Type OpenGenericServiceType;
+
+        public readonly FactoryType FactoryType;
+        public readonly int FactoryID;
+        public readonly Type ImplementationType;
+
         public int DecoratedFactoryID;
 
-        public FactoryType FactoryType { get; private set; }
-        public int FactoryID { get; private set; }
-        public Type ImplementationType { get; private set; }
-
-        public Request(Type serviceType, object serviceKey, Request parent = null)
+        public Request(Request parent, Type serviceType, object serviceKey, int decoratedFactoryID = 0, Factory factory = null)
         {
+            Parent = parent;
             ServiceType = serviceType.ThrowIfNull();
             Throw.If(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
             OpenGenericServiceType = serviceType.IsGenericType ? serviceType.GetGenericTypeDefinition() : null;
             ServiceKey = serviceKey;
-            Parent = parent;
+            DecoratedFactoryID = decoratedFactoryID;
+            if (factory != null)
+            {
+                FactoryType = factory.Setup.Type;
+                FactoryID = factory.ID;
+                ImplementationType = factory.ImplementationType;
+            }
         }
 
         public Request TryGetNonWrapperParent()
@@ -1530,20 +1538,18 @@ namespace DryIoc
 
         public Request Push(Type serviceType, object serviceKey)
         {
-            return new Request(serviceType, serviceKey, this);
+            return new Request(this, serviceType, serviceKey);
         }
 
         public Request PushWithParentKey(Type serviceType)
         {
-            return new Request(serviceType, ServiceKey, this);
+            return new Request(this, serviceType, ServiceKey);
         }
 
-        public void ResolveTo(Factory factory)
+        public Request ResolveTo(Factory factory)
         {
-            FactoryType = factory.Setup.Type;
-            FactoryID = factory.ID;
-            ImplementationType = factory.ImplementationType;
-            Throw.If(TryGetParent(r => r.FactoryID == FactoryID) != null, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
+            Throw.If(TryGetParent(r => r.FactoryID == factory.ID) != null, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
+            return new Request(Parent, ServiceType, ServiceKey, DecoratedFactoryID, factory);
         }
 
         public IEnumerator<Request> GetEnumerator()
