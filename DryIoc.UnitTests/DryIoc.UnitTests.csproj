@@ -69,6 +69,7 @@
     <Compile Include="Playground\OptionsPlayTests.cs" />
     <Compile Include="Playground\ThrowPlayTests.cs" />
     <Compile Include="Playground\TypeTree.cs" />
+    <Compile Include="Playground\HashTreeWithMonoidUpdate.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PropertyResolutionTests.cs" />
     <Compile Include="RegisterPublicTypesTests.cs" />

@@ -25,11 +25,7 @@
 // + Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
 //
 // Internals:
-// - Speedup:
-// - # Replace HashTrees in RegistryEntry with arrays.
-// + # Test speed of removing return value from HashTree.TryGet. - No difference.
-// + # Make Type specific HashTree with reference equality comparison. - No difference with Generic HashTree.
-// + # Replace Stack in HashTree enumeration with array. - Got 5/6 speed improvement.
+// - Move decorator cachedExpression from Setup to Factory itself. Make setup immutable again.
 // - Remake Request ResolveTo to not mutate Request.
 // - Automatically propagate Setup on Factory.TryGetFactoryFor(Request ...).
 // - Rename request to DependencyChain.
@@ -97,6 +93,7 @@ namespace DryIoc
         {
             _syncRoot = new object();
             _registry = new Dictionary<Type, RegistryEntry>();
+            _decorators = HashTree<Type, Factory[]>.Empty;
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
 
@@ -637,7 +634,7 @@ namespace DryIoc
             var factoryCtor = request.ServiceType.GetConstructors()[0];
             var serviceType = request.ServiceType.GetGenericArguments()[0];
 
-            var serviceRequest = request.PushPreservingKey(serviceType);
+            var serviceRequest = request.PushWithParentKey(serviceType);
             var serviceExpr = registry.GetOrAddFactory(serviceRequest, false).GetExpression(serviceRequest, registry);
             var newFactory = Expression.New(factoryCtor, Expression.Lambda<CompiledFactory>(serviceExpr, Reuse.Parameters));
 
@@ -655,12 +652,14 @@ namespace DryIoc
             Setup = source.Setup;
             _syncRoot = source._syncRoot;
             _registry = source._registry;
+            _decorators = source._decorators;
             _keyedResolutionCache = source._keyedResolutionCache;
             _defaultResolutionCache = source._defaultResolutionCache;
         }
 
         private readonly object _syncRoot;
         private readonly Dictionary<Type, RegistryEntry> _registry;
+        private HashTree<Type, Factory[]> _decorators;
 
         private sealed class RegistryEntry
         {
@@ -724,7 +723,7 @@ namespace DryIoc
             var funcTypeArgs = funcType.GetGenericArguments();
             var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
 
-            var serviceRequest = request.PushPreservingKey(serviceType);
+            var serviceRequest = request.PushWithParentKey(serviceType);
             var serviceFactory = registry.GetOrAddFactory(serviceRequest, false);
 
             if (funcTypeArgs.Length == 1)
@@ -737,7 +736,6 @@ namespace DryIoc
 
             if (unusedFuncParams != null)
                 Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncParams.Print(), request);
-
             return funcExpr;
         }
     }
@@ -1535,7 +1533,7 @@ namespace DryIoc
             return new Request(serviceType, serviceKey, this);
         }
 
-        public Request PushPreservingKey(Type serviceType)
+        public Request PushWithParentKey(Type serviceType)
         {
             return new Request(serviceType, ServiceKey, this);
         }
@@ -1963,8 +1961,8 @@ namespace DryIoc
             return node.Height != 0 ? node.Value : defaultValue;
         }
 
-        // Depth-first In-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        // The only difference is using fixed size array instead of stack for speed-up: 5/6 vs. stack.
+        /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        /// The only difference is using fixed size array instead of stack for speed-up: 5/6 vs. stack.</summary>
         public IEnumerator<HashTree<V>> GetEnumerator()
         {
             var parents = new HashTree<V>[Height];
@@ -2030,7 +2028,7 @@ namespace DryIoc
         #endregion
     }
 
-    public sealed class HashTree<K, V> : IEnumerable<HashTree<K, V>>
+    public sealed class HashTree<K, V>
     {
         public static readonly HashTree<K, V> Empty = new HashTree<K, V>(HashTree<KV>.Empty);
 
@@ -2043,16 +2041,6 @@ namespace DryIoc
         {
             var item = _tree.TryGet(key.GetHashCode());
             return item != null && (ReferenceEquals(key, item.Key) || key.Equals(item.Key)) ? item.Value : TryGetConflicted(item, key);
-        }
-
-        public IEnumerator<HashTree<K, V>> GetEnumerator()
-        {
-            return _tree.Select(t => new HashTree<K, V>(t)).GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
         }
 
         #region Implementation
@@ -2074,7 +2062,6 @@ namespace DryIoc
 
             var newConflicts = conflicts == null ? new[] { added }
                 : conflicts.AddOrUpdateCopy(added, Array.FindIndex(conflicts, x => Equals(x.Key, added.Key)));
-
             return new KVWithConflicts { Key = old.Key, Value = old.Value, Conflicts = newConflicts };
         }
 

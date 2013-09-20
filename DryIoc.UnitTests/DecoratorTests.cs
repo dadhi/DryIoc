@@ -336,7 +336,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_NOT_throw_when_registering_and_resolving_two_decorators_of_the_same_type()
+        public void Should_allow_Register_and_Resolve_of_two_decorators_of_the_same_type()
         {
             var container = new Container();
             container.RegisterDelegate<IOperation>(_ => new SomeOperation());
@@ -348,11 +348,46 @@ namespace DryIoc.UnitTests
             Assert.That(operation, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
             Assert.That(((MeasureExecutionTimeOperationDecorator)operation).Decorated, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
         }
+
+        [Test]
+        public void Should_support_multiple_decorator_in_object_graph()
+        {
+            var container = new Container();
+            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: FactorySetup.WithMetadata("some"));
+            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: FactorySetup.AsDecorator());
+
+            container.Register<IOperationUser<int>, OperationUser<int>>();
+            container.Register(typeof(IOperationUser<>), typeof(LogUserOps<>), setup: FactorySetup.AsDecorator());
+
+            var user = container.Resolve<IOperationUser<int>>();
+            Assert.That(user, Is.InstanceOf<LogUserOps<int>>());
+            Assert.That(((LogUserOps<int>)user).Decorated, Is.InstanceOf<OperationUser<int>>());
+
+            var operation = user.GetOperation.Value();
+            Assert.That(operation, Is.InstanceOf<RetryOperationDecorator<int>>());
+            Assert.That(((RetryOperationDecorator<int>)operation).Decorated, Is.InstanceOf<SomeOperation<int>>());
+        }
     }
 
     #region CUT
 
-    public class OperationUser<T>
+    public interface IOperationUser<T>
+    {
+        Meta<Func<IOperation<T>>, string> GetOperation { get; }
+    }
+
+    public class LogUserOps<T> : IOperationUser<T>
+    {
+        public readonly IOperationUser<T> Decorated;
+        public Meta<Func<IOperation<T>>, string> GetOperation { get { return Decorated.GetOperation; }}
+
+        public LogUserOps(IOperationUser<T> decorated)
+        {
+            Decorated = decorated;
+        }
+    }
+
+    public class OperationUser<T> : IOperationUser<T>
     {
         public Meta<Func<IOperation<T>>, string> GetOperation { get; set; }
 
