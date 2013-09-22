@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests.Playground
@@ -13,11 +12,11 @@ namespace DryIoc.UnitTests.Playground
         [Test]
         public void Can_combine_arrays_into_one_AND_get_it_by_key()
         {
-            var tree = new HashTreeX<int, string[]>(ConcatArrays);
+            var tree = HashTreeX<int, string[]>.Create(ConcatArrays);
             var list = new List<string[]>(100);
             for (var i = 0; i < 100; i++)
             {
-                tree.Add(i, new[] { i.ToString() });
+                tree = tree.AddOrUpdate(i, new[] { i.ToString() });
                 list.Add(new[] { i.ToString() });
             }
 
@@ -27,12 +26,10 @@ namespace DryIoc.UnitTests.Playground
         [Test]
         public void Can_concat_arrays()
         {
-            var tree = new HashTreeX<int, string[]>(ConcatArrays)
-            {
-                {0, new[] {"a"}},
-                {0, new[] {"b"}},
-                {0, new[] {"c"}},
-            };
+            var tree = HashTreeX<int, string[]>.Create(ConcatArrays)
+                .AddOrUpdate(0, new[] {"a"})
+                .AddOrUpdate(0, new[] {"b"})
+                .AddOrUpdate(0, new[] {"c"});
 
             Assert.That(tree.TryGet(0), Is.EqualTo(new[] { "a", "b", "c" }));
         }
@@ -51,17 +48,14 @@ namespace DryIoc.UnitTests.Playground
 
     public sealed class HashTreeX<K, V> : IEnumerable<KV<K, V>>
     {
-        public HashTreeX(Func<V, V, V> updateValue = null) : this(HashTree<KV<K, V>>.Empty, updateValue) { }
-
-        public HashTreeX(HashTree<KV<K, V>> tree, Func<V, V, V> updateValue = null)
+        public static HashTreeX<K, V> Create(Func<V, V, V> updateValue = null)
         {
-            _tree = tree;
-            _updateValue = updateValue;
+            return updateValue == null ? _empty : new HashTreeX<K, V>(HashTree<KV<K, V>>.Empty, updateValue);
         }
 
-        public void Add(K key, V value)
+        public HashTreeX<K, V> AddOrUpdate(K key, V value)
         {
-            Interlocked.Exchange(ref _tree, _tree.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), Update));
+            return new HashTreeX<K, V>(_tree.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), Update), _updateValue);
         }
 
         public V TryGet(K key)
@@ -91,7 +85,15 @@ namespace DryIoc.UnitTests.Playground
 
         #region Implementation
 
-        private volatile HashTree<KV<K, V>> _tree;
+        private HashTreeX(HashTree<KV<K, V>> tree, Func<V, V, V> updateValue)
+        {
+            _tree = tree;
+            _updateValue = updateValue;
+        }
+
+        private static readonly HashTreeX<K, V> _empty = new HashTreeX<K, V>(HashTree<KV<K, V>>.Empty, null);
+        
+        private readonly HashTree<KV<K, V>> _tree;
         private readonly Func<V, V, V> _updateValue;
 
         private KV<K, V> Update(KV<K, V> old, KV<K, V> added)

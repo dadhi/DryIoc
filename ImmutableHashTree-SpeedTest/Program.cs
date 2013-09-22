@@ -165,7 +165,7 @@ namespace ImmutableHashTree_SpeedTest
 
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
-            var typeTree = new HashTreeX<Type, string>();
+            var typeTree = HashTreeX<Type, string>.Create();
             var hashTree = HashTree<Type, string>.Empty;
 
             var typeTreeAddTime = HashTreeXAdd(ref typeTree, keys, key, value);
@@ -417,10 +417,10 @@ namespace ImmutableHashTree_SpeedTest
             for (var i = 0; i < keys.Length; i++)
             {
                 var k = keys[i];
-                tree.Add(k, ignored);
+                tree.AddOrUpdate(k, ignored);
             }
 
-            tree.Add(key, value);
+            tree.AddOrUpdate(key, value);
 
             treeTime.Stop();
             GC.KeepAlive(ignored);
