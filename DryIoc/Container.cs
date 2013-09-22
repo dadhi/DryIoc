@@ -1527,14 +1527,6 @@ namespace DryIoc
             return p;
         }
 
-        public Request TryGetParent(Func<Request, bool> condition)
-        {
-            var p = Parent;
-            while (p != null && !condition(p))
-                p = p.Parent;
-            return p;
-        }
-
         public Request Push(Type serviceType, object serviceKey)
         {
             return new Request(this, serviceType, serviceKey);
@@ -1547,7 +1539,8 @@ namespace DryIoc
 
         public Request ResolveTo(Factory factory)
         {
-            Throw.If(TryGetParent(r => r.FactoryID == factory.ID) != null, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
+            for (var p = Parent; p != null; p = p.Parent)
+                Throw.If(p.FactoryID == factory.ID, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
             return new Request(Parent, ServiceType, ServiceKey, DecoratedFactoryID, factory);
         }
 
@@ -1675,9 +1668,11 @@ namespace DryIoc
                 var singletonScope = registry.SingletonScope;
 
                 // Create lazy scoped singleton if we have Func somewhere in dependency chain.
-                var funcParent = request.TryGetParent(r =>
-                    r.OpenGenericServiceType != null && Container.FuncTypes.Contains(r.OpenGenericServiceType));
-                if (funcParent != null)
+                var parent = request.Parent;
+                if (parent != null)
+                    parent = parent.FirstOrDefault(p =>
+                      p.OpenGenericServiceType != null && Container.FuncTypes.Contains(p.OpenGenericServiceType));
+                if (parent != null)
                     return GetScopedServiceExpression(Expression.Constant(singletonScope), factoryID, factoryExpr);
 
                 // Otherwise we can create singleton instance right here, and put it into Scope for later disposal.
