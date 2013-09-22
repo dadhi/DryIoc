@@ -159,9 +159,8 @@ namespace DryIoc
                 {
                     Factory genericFactory;
                     if (entry.TryGetFactory(out genericFactory, request.ServiceType, request.ServiceKey) ||
-                        // OR try find generic-wrapper by ignoring service key.
                         request.ServiceKey != null &&
-                        entry.TryGetFactory(out genericFactory, request.ServiceType, null) &&
+                        entry.TryGetFactory(out genericFactory, request.ServiceType) && // OR try find generic-wrapper by ignoring service key.
                         genericFactory.Setup.Type == FactoryType.GenericWrapper)
                     {
                         newFactory = genericFactory.TryProvideSpecificFactory(request, this);
@@ -208,7 +207,7 @@ namespace DryIoc
                 RegistryEntry entry;
                 if (_registry.TryGetValue(decoratorFuncType, out entry) && entry.Decorators != null)
                 {
-                    var decoratorRequest = new Request(request.Parent, decoratorFuncType, request.ServiceKey, request.FactoryID);
+                    var decoratorRequest = request.MakeDecorated();
                     for (var i = 0; i < entry.Decorators.Count; i++)
                     {
                         var decorator = entry.Decorators[i];
@@ -246,7 +245,7 @@ namespace DryIoc
 
                 if (serviceDecorators.Count != 0)
                 {
-                    var decoratorRequest = new Request(request.Parent, request.ServiceType, request.ServiceKey, request.FactoryID);
+                    var decoratorRequest = request.MakeDecorated();
                     for (var i = 0; i < serviceDecorators.Count; i++)
                     {
                         var decorator = serviceDecorators[i];
@@ -668,7 +667,7 @@ namespace DryIoc
             public Dictionary<string, Factory> Named;
             public List<Factory> Decorators;
 
-            public bool TryGetFactory(out Factory result, Type serviceType, object serviceKey)
+            public bool TryGetFactory(out Factory result, Type serviceType, object serviceKey = null)
             {
                 result = null;
                 if (serviceKey == null)
@@ -1552,6 +1551,11 @@ namespace DryIoc
             return new Request(Parent, ServiceType, ServiceKey, DecoratedFactoryID, factory);
         }
 
+        public Request MakeDecorated()
+        {
+            return new Request(Parent, ServiceType, ServiceKey, FactoryID);
+        }
+
         public IEnumerator<Request> GetEnumerator()
         {
             for (var x = this; x != null; x = x.Parent)
@@ -1943,10 +1947,11 @@ namespace DryIoc
         public static readonly HashTree<V> Empty = new HashTree<V>();
         public bool IsEmpty { get { return Height == 0; } }
 
-        public readonly HashTree<V> Left, Right;
-        public readonly int Height;
         public readonly int Key;
         public readonly V Value;
+
+        public readonly int Height;
+        public readonly HashTree<V> Left, Right;
 
         public delegate V UpdateValue(V old, V added);
 
