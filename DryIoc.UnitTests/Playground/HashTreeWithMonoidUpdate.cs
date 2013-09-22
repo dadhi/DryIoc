@@ -55,7 +55,7 @@ namespace DryIoc.UnitTests.Playground
 
         public HashTreeX<K, V> AddOrUpdate(K key, V value)
         {
-            return new HashTreeX<K, V>(_tree.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), Update), _updateValue);
+            return new HashTreeX<K, V>(_tree.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateConflicts), _updateValue);
         }
 
         public V TryGet(K key)
@@ -96,15 +96,15 @@ namespace DryIoc.UnitTests.Playground
         private readonly HashTree<KV<K, V>> _tree;
         private readonly Func<V, V, V> _updateValue;
 
-        private KV<K, V> Update(KV<K, V> old, KV<K, V> added)
+        private KV<K, V> UpdateConflicts(KV<K, V> old, KV<K, V> added)
         {
-            if (!(old is KVWithConflicts))
-                return ReferenceEquals(old.Key, added.Key) || old.Key.Equals(added.Key)
-                    ? UpdateValue(old, added) : new KVWithConflicts(old, new[] { added });
-
-            var conflicts = ((KVWithConflicts)old).Conflicts;
+            var conflicts = old is KVWithConflicts ? ((KVWithConflicts)old).Conflicts : null;
             if (ReferenceEquals(old.Key, added.Key) || old.Key.Equals(added.Key))
-                return new KVWithConflicts(UpdateValue(old, added), conflicts);
+                return conflicts == null ? UpdateValue(old, added)
+                     : new KVWithConflicts(UpdateValue(old, added), conflicts);
+            
+            if (conflicts == null)
+                return new KVWithConflicts(old, new[] { added });
 
             var i = conflicts.Length - 1;
             while (i >= 0 && !Equals(conflicts[i].Key, added.Key)) --i;
