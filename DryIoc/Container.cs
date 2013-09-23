@@ -100,7 +100,7 @@ namespace DryIoc
 
             if (!coreOnly) // TODO: Default setup, May I just pass custom setup instead flag?
             {
-                Setup.AddNonRegisteredServiceResolutionRule(TryResolveEnumerableOrArray);
+                Setup.AddNonRegisteredServiceResolutionRule(GetEnumerableFactoryOrNull);
 
                 var funcFactory = new FuncGenericWrapper();
                 foreach (var funcType in FuncTypes)
@@ -108,7 +108,7 @@ namespace DryIoc
 
                 this.Register(typeof(Lazy<>), Reuse.Transient, t => t.GetConstructor(new[] { typeof(Func<>) }), GenericWrapperSetup.Default);
 
-                this.Register(typeof(Meta<,>), new CustomFactoryProvider(TryResolveMeta, GenericWrapperSetup.Of(t => t[0])));
+                this.Register(typeof(Meta<,>), new CustomFactoryProvider(GetMetaFactoryOrNull, GenericWrapperSetup.Of(t => t[0])));
 
                 this.Register(typeof(FactoryExpression<>), new CustomFactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
             }
@@ -119,7 +119,7 @@ namespace DryIoc
             return new Container(this);
         }
 
-        public TryGetFactory UseRegistrationsFrom(IRegistry anotherRegistry)
+        public GetFactoryOrNull UseRegistrationsFrom(IRegistry anotherRegistry)
         {
             return Setup.AddNonRegisteredServiceResolutionRule((request, _) => anotherRegistry.GetOrAddFactory(request, true));
         }
@@ -148,7 +148,7 @@ namespace DryIoc
                 Factory factory;
                 if (_registry.TryGetValue(request.ServiceType, out entry) &&
                     entry.TryGetFactory(out factory, request.ServiceType, request.ServiceKey))
-                    return factory.TryProduceSpecificFactory(request, this) ?? factory;
+                    return factory.GetRequestSpecificFactoryOrNull(request, this) ?? factory;
 
                 if (request.OpenGenericServiceType != null &&
                     _registry.TryGetValue(request.OpenGenericServiceType, out entry))
@@ -159,7 +159,7 @@ namespace DryIoc
                         entry.TryGetFactory(out genericFactory, request.ServiceType) && // OR try find generic-wrapper by ignoring service key.
                         genericFactory.Setup.Type == FactoryType.GenericWrapper)
                     {
-                        newFactory = genericFactory.TryProduceSpecificFactory(request, this);
+                        newFactory = genericFactory.GetRequestSpecificFactoryOrNull(request, this);
                     }
                 }
             }
@@ -180,7 +180,7 @@ namespace DryIoc
             return newFactory;
         }
 
-        LambdaExpression IRegistry.TryGetDecoratorFunc(Request request, out bool isDecoratedServiceIgnored)
+        LambdaExpression IRegistry.GetDecoratorFuncOrNull(Request request, out bool isDecoratedServiceIgnored)
         {
             isDecoratedServiceIgnored = false;
 
@@ -189,7 +189,7 @@ namespace DryIoc
                 return null;
 
             // We are already resolving decorator for the service, so stop now.
-            var parent = request.TryGetNonWrapperParent();
+            var parent = request.GetNonWrapperParentOrNull();
             if (parent != null && parent.DecoratedFactoryID == request.FactoryID)
                 return null;
 
@@ -197,7 +197,7 @@ namespace DryIoc
             var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
 
             LambdaExpression result = null;
-            var funcDecorators = _decorators.TryGet(decoratorFuncType);
+            var funcDecorators = _decorators.GetOrDefault(decoratorFuncType);
             if (funcDecorators != null)
             {
                 var decoratorRequest = request.MakeDecorated();
@@ -218,11 +218,11 @@ namespace DryIoc
                 }
             }
 
-            IEnumerable<Factory> decorators = _decorators.TryGet(serviceType);
+            IEnumerable<Factory> decorators = _decorators.GetOrDefault(serviceType);
             var openGenericDecoratorIndex = decorators == null ? 0 : ((Factory[])decorators).Length;
             if (request.OpenGenericServiceType != null)
             {
-                var openGenericDecorators = _decorators.TryGet(request.OpenGenericServiceType);
+                var openGenericDecorators = _decorators.GetOrDefault(request.OpenGenericServiceType);
                 if (openGenericDecorators != null)
                     decorators = decorators == null ? openGenericDecorators : decorators.Concat(openGenericDecorators);
             }
@@ -239,14 +239,14 @@ namespace DryIoc
                     {
                         // Cache closed generic registration produced by open-generic decorator.
                         if (decoratorIndex++ >= openGenericDecoratorIndex) 
-                            decorator = Register(decorator.TryProduceSpecificFactory(request, this), serviceType, null);
+                            decorator = Register(decorator.GetRequestSpecificFactoryOrNull(request, this), serviceType, null);
 
                         var setup = ((DecoratorSetup)decorator.Setup);
                         var func = setup.CachedFunc;
                         if (func == null)
                         {
                             IList<Type> unusedFuncParams;
-                            func = decorator.TryGetFuncWithArgs(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
+                            func = decorator.GetFuncWithArgsOrNull(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
                             setup.CachedFunc = func.ThrowIfNull(Error.DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION, decoratorFuncType);
                             setup.IsDecoratedServiceIgnored = unusedFuncParams != null;
                         }
@@ -292,7 +292,7 @@ namespace DryIoc
             }
         }
 
-        Factory IRegistry.TryGetFactory(Type serviceType, object serviceKey)
+        Factory IRegistry.GetFactoryOrNull(Type serviceType, object serviceKey)
         {
             lock (_syncRoot)
             {
@@ -310,7 +310,7 @@ namespace DryIoc
             if (!serviceType.IsGenericType)
                 return serviceType;
 
-            var factory = ((IRegistry)this).TryGetFactory(serviceType.GetGenericTypeDefinition(), null);
+            var factory = ((IRegistry)this).GetFactoryOrNull(serviceType.GetGenericTypeDefinition(), null);
             if (factory == null || factory.Setup.Type != FactoryType.GenericWrapper)
                 return serviceType;
 
@@ -320,7 +320,7 @@ namespace DryIoc
                 : ((IRegistry)this).GetWrappedServiceTypeOrSelf(wrappedType); // unwrap recursively.
         }
 
-        object IRegistry.TryGetConstructorParamKey(ParameterInfo parameter, Request parent)
+        object IRegistry.GetConstructorParamKeyOrNull(ParameterInfo parameter, Request parent)
         {
             if (parent.FactoryType == FactoryType.GenericWrapper ||
                 parent.FactoryType == FactoryType.Decorator)
@@ -416,7 +416,7 @@ namespace DryIoc
 
         public bool IsRegistered(Type serviceType, string serviceName)
         {
-            return ((IRegistry)this).TryGetFactory(serviceType.ThrowIfNull(), serviceName) != null;
+            return ((IRegistry)this).GetFactoryOrNull(serviceType.ThrowIfNull(), serviceName) != null;
         }
 
         private static void ThrowIfNotImplemented(Type serviceType, Type implementationType)
@@ -432,14 +432,14 @@ namespace DryIoc
 
         public object ResolveDefault(Type serviceType, bool shouldReturnNull)
         {
-            return (_defaultResolutionCache.TryGet(serviceType)
+            return (_defaultResolutionCache.GetOrDefault(serviceType)
                 ?? ResolveAndCacheFactory(serviceType, shouldReturnNull)).Invoke(CurrentScope, null/* resolutionRootScope */);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, bool shouldReturnNull)
         {
-            var entry = _keyedResolutionCache.TryGet(serviceType);
-            var result = entry != null ? entry.TryGet(serviceKey.ThrowIfNull()) : null;
+            var entry = _keyedResolutionCache.GetOrDefault(serviceType);
+            var result = entry != null ? entry.GetCompiledFactoryOrNull(serviceKey.ThrowIfNull()) : null;
             if (result == null) // nothing in cache, try resolve and cache.
             {
                 var request = new Request(null, serviceType, serviceKey);
@@ -477,9 +477,9 @@ namespace DryIoc
             private IntTree<CompiledFactory> _indexed = IntTree<CompiledFactory>.Empty;
             private HashTree<string, CompiledFactory> _named = HashTree<string, CompiledFactory>.Empty;
 
-            public CompiledFactory TryGet(object key)
+            public CompiledFactory GetCompiledFactoryOrNull(object key)
             {
-                return key is int ? _indexed.TryGet((int)key) : _named.TryGet((string)key);
+                return key is int ? _indexed.GetOrDefault((int)key) : _named.GetOrDefault((string)key);
             }
 
             public KeyedResolutionCacheEntry Add(object key, CompiledFactory factory)
@@ -498,7 +498,7 @@ namespace DryIoc
 
         public static Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
 
-        public static Factory TryResolveMeta(Request request, IRegistry registry)
+        public static Factory GetMetaFactoryOrNull(Request request, IRegistry registry)
         {
             var genericArgs = request.ServiceType.GetGenericArguments();
             var serviceType = genericArgs[0];
@@ -510,15 +510,15 @@ namespace DryIoc
             if (serviceKey == null)
             {
                 var resultKey = registry.GetKeys(wrappedServiceType, factory =>
-                    (resultMetadata = TryGetTypedMetadata(factory, metadataType)) != null).FirstOrDefault();
+                    (resultMetadata = GetTypedMetadataOrNull(factory, metadataType)) != null).FirstOrDefault();
                 if (resultKey != null)
                     serviceKey = resultKey;
             }
             else
             {
-                var factory = registry.TryGetFactory(wrappedServiceType, serviceKey);
+                var factory = registry.GetFactoryOrNull(wrappedServiceType, serviceKey);
                 if (factory != null)
-                    resultMetadata = TryGetTypedMetadata(factory, metadataType);
+                    resultMetadata = GetTypedMetadataOrNull(factory, metadataType);
             }
 
             if (resultMetadata == null)
@@ -536,13 +536,13 @@ namespace DryIoc
             });
         }
 
-        private static object TryGetTypedMetadata(Factory factory, Type metadataType)
+        private static object GetTypedMetadataOrNull(Factory factory, Type metadataType)
         {
             var metadata = factory.Setup.Metadata;
             return metadata != null && metadataType.IsInstanceOfType(metadata) ? metadata : null;
         }
 
-        public static Factory TryResolveEnumerableOrArray(Request req, IRegistry _)
+        public static Factory GetEnumerableFactoryOrNull(Request req, IRegistry _)
         {
             if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
@@ -579,7 +579,7 @@ namespace DryIoc
             {
                 var registry = (_registry.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
 
-                var parent = request.TryGetNonWrapperParent(); // Composite pattern support: filter out composite root from available keys.
+                var parent = request.GetNonWrapperParentOrNull(); // Composite pattern support: filter out composite root from available keys.
                 var keys = parent != null && parent.ServiceType == _unwrappedItemType
                     ? registry.GetKeys(_unwrappedItemType, factory => factory.ID != parent.FactoryID)
                     : registry.GetKeys(_unwrappedItemType, null);
@@ -689,7 +689,7 @@ namespace DryIoc
                         if (Indexed == null && index == 0)
                             result = LastDefault;
                         else if (Indexed != null)
-                            result = Indexed.TryGet(index);
+                            result = Indexed.GetOrDefault(index);
                     }
                 }
 
@@ -705,7 +705,7 @@ namespace DryIoc
         public FuncGenericWrapper()
             : base(setup: GenericWrapperSetup.Of(types => types[types.Length - 1])) { }
 
-        public override Factory TryProduceSpecificFactory(Request request, IRegistry registry)
+        public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry)
         {
             return new DelegateFactory(CreateFunc, DryIoc.Reuse.Singleton, Setup);
         }
@@ -729,7 +729,7 @@ namespace DryIoc
 
             IList<Type> unusedFuncParams;
             var funcExpr = serviceFactory
-                .TryGetFuncWithArgs(funcType, serviceRequest, registry, out unusedFuncParams)
+                .GetFuncWithArgsOrNull(funcType, serviceRequest, registry, out unusedFuncParams)
                 .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
 
             if (unusedFuncParams != null)
@@ -742,47 +742,47 @@ namespace DryIoc
     {
         public Setup()
         {
-            NonRegisteredServiceResolutionRules = new TryGetFactory[0];
-            ConstructorParamServiceKeyResolutionRules = new TryGetConstructorParamServiceKey[0];
+            NonRegisteredServiceResolutionRules = new GetFactoryOrNull[0];
+            ConstructorParamServiceKeyResolutionRules = new GetConstructorParamServiceKeyOrNull[0];
             PropertyOrFieldResolutionRules = new TryGetPropertyOrFieldServiceKey[0];
         }
 
-        public delegate object TryGetConstructorParamServiceKey(ParameterInfo parameter, Request parent, IRegistry registry);
+        public delegate object GetConstructorParamServiceKeyOrNull(ParameterInfo parameter, Request parent, IRegistry registry);
 
         public delegate bool TryGetPropertyOrFieldServiceKey(out object resultKey, MemberInfo propertyOrField, Request parent, IRegistry registry);
 
-        public TryGetFactory[] NonRegisteredServiceResolutionRules { get; private set; }
+        public GetFactoryOrNull[] NonRegisteredServiceResolutionRules { get; private set; }
 
-        public void SetNonRegisteredServiceResolutionRules(IEnumerable<TryGetFactory> newRules)
+        public void SetNonRegisteredServiceResolutionRules(IEnumerable<GetFactoryOrNull> newRules)
         {
             NonRegisteredServiceResolutionRules = newRules.ThrowIfNull().ToArray();
         }
 
-        public TryGetFactory AddNonRegisteredServiceResolutionRule(TryGetFactory rule)
+        public GetFactoryOrNull AddNonRegisteredServiceResolutionRule(GetFactoryOrNull rule)
         {
             SetNonRegisteredServiceResolutionRules(NonRegisteredServiceResolutionRules.Concat(new[] { rule }));
             return rule;
         }
 
-        public void RemoveNonRegisteredServiceResolutionRule(TryGetFactory rule)
+        public void RemoveNonRegisteredServiceResolutionRule(GetFactoryOrNull rule)
         {
             SetNonRegisteredServiceResolutionRules(NonRegisteredServiceResolutionRules.Except(new[] { rule }));
         }
 
-        public TryGetConstructorParamServiceKey[] ConstructorParamServiceKeyResolutionRules { get; private set; }
+        public GetConstructorParamServiceKeyOrNull[] ConstructorParamServiceKeyResolutionRules { get; private set; }
 
-        public void SetConstructorParamServiceKeyResolutionRules(IEnumerable<TryGetConstructorParamServiceKey> newRules)
+        public void SetConstructorParamServiceKeyResolutionRules(IEnumerable<GetConstructorParamServiceKeyOrNull> newRules)
         {
             ConstructorParamServiceKeyResolutionRules = newRules.ThrowIfNull().ToArray();
         }
 
-        public TryGetConstructorParamServiceKey AddConstructorParamServiceKeyResolutionRule(TryGetConstructorParamServiceKey rule)
+        public GetConstructorParamServiceKeyOrNull AddConstructorParamServiceKeyResolutionRule(GetConstructorParamServiceKeyOrNull rule)
         {
             SetConstructorParamServiceKeyResolutionRules(ConstructorParamServiceKeyResolutionRules.Concat(new[] { rule }));
             return rule;
         }
 
-        public void RemoveConstructorParamServiceKeyResolutionRule(TryGetConstructorParamServiceKey rule)
+        public void RemoveConstructorParamServiceKeyResolutionRule(GetConstructorParamServiceKeyOrNull rule)
         {
             SetConstructorParamServiceKeyResolutionRules(ConstructorParamServiceKeyResolutionRules.Except(new[] { rule }));
         }
@@ -1248,14 +1248,14 @@ namespace DryIoc
             Setup = setup ?? ServiceSetup.Default;
         }
 
-        public abstract Factory TryProduceSpecificFactory(Request request, IRegistry registry);
+        public abstract Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry);
 
         public Expression GetExpression(Request request, IRegistry registry)
         {
             request = request.ResolveTo(this);
 
             bool isDecoratedServiceIgnored;
-            var decorator = registry.TryGetDecoratorFunc(request, out isDecoratedServiceIgnored);
+            var decorator = registry.GetDecoratorFuncOrNull(request, out isDecoratedServiceIgnored);
             if (decorator != null && isDecoratedServiceIgnored)
                 return decorator.Body;
 
@@ -1277,16 +1277,16 @@ namespace DryIoc
 
         protected abstract Expression CreateExpression(Request request, IRegistry registry);
 
-        public LambdaExpression TryGetFuncWithArgs(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
+        public LambdaExpression GetFuncWithArgsOrNull(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
             request = request.ResolveTo(this);
 
-            var func = TryCreateFuncWithArgs(funcType, request, registry, out unusedFuncParams);
+            var func = CreateFuncWithArgsOrNull(funcType, request, registry, out unusedFuncParams);
             if (func == null)
                 return null;
 
             bool isDecoratedServiceIgnored;
-            var decorator = registry.TryGetDecoratorFunc(request, out isDecoratedServiceIgnored);
+            var decorator = registry.GetDecoratorFuncOrNull(request, out isDecoratedServiceIgnored);
             if (decorator != null && isDecoratedServiceIgnored)
                 return Expression.Lambda(funcType, decorator.Body, func.Parameters);
 
@@ -1299,7 +1299,7 @@ namespace DryIoc
             return func;
         }
 
-        protected virtual LambdaExpression TryCreateFuncWithArgs(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
+        protected virtual LambdaExpression CreateFuncWithArgsOrNull(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
             unusedFuncParams = null;
             return null;
@@ -1326,7 +1326,7 @@ namespace DryIoc
             _withConstructor = withConstructor;
         }
 
-        public override Factory TryProduceSpecificFactory(Request request, IRegistry _)
+        public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry _)
         {
             if (!_implementationType.IsGenericTypeDefinition) return null;
             var closedImplType = _implementationType.MakeGenericType(request.ServiceType.GetGenericArguments());
@@ -1344,7 +1344,7 @@ namespace DryIoc
                 for (var i = 0; i < ctorParams.Length; i++)
                 {
                     var ctorParam = ctorParams[i];
-                    var paramKey = registry.TryGetConstructorParamKey(ctorParam, request);
+                    var paramKey = registry.GetConstructorParamKeyOrNull(ctorParam, request);
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
                     paramExprs[i] = registry.GetOrAddFactory(paramRequest, false).GetExpression(paramRequest, registry);
                 }
@@ -1353,7 +1353,7 @@ namespace DryIoc
             return AddInitializerIfRequired(Expression.New(ctor, paramExprs), request, registry);
         }
 
-        protected override LambdaExpression TryCreateFuncWithArgs(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
+        protected override LambdaExpression CreateFuncWithArgsOrNull(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
             var funcParamTypes = funcType.GetGenericArguments();
             funcParamTypes.ThrowIf(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
@@ -1379,7 +1379,7 @@ namespace DryIoc
 
                 if (ctorParamExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
-                    var paramKey = registry.TryGetConstructorParamKey(ctorParam, request);
+                    var paramKey = registry.GetConstructorParamKeyOrNull(ctorParam, request);
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
                     ctorParamExprs[cp] = registry.GetOrAddFactory(paramRequest, false).GetExpression(paramRequest, registry);
                 }
@@ -1462,7 +1462,7 @@ namespace DryIoc
             _getExpression = getExpression.ThrowIfNull();
         }
 
-        public override Factory TryProduceSpecificFactory(Request request, IRegistry registry)
+        public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry)
         {
             return null;
         }
@@ -1479,19 +1479,19 @@ namespace DryIoc
         #endregion
     }
 
-    public delegate Factory TryGetFactory(Request request, IRegistry registry);
+    public delegate Factory GetFactoryOrNull(Request request, IRegistry registry);
 
     public class CustomFactoryProvider : Factory
     {
-        public CustomFactoryProvider(TryGetFactory tryGetFactory, FactorySetup setup = null)
+        public CustomFactoryProvider(GetFactoryOrNull getFactoryOrNull, FactorySetup setup = null)
             : base(setup: setup)
         {
-            _tryGetFactory = tryGetFactory.ThrowIfNull();
+            _getFactoryOrNull = getFactoryOrNull.ThrowIfNull();
         }
 
-        public override Factory TryProduceSpecificFactory(Request request, IRegistry registry)
+        public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry)
         {
-            return _tryGetFactory(request, registry);
+            return _getFactoryOrNull(request, registry);
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -1501,7 +1501,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private readonly TryGetFactory _tryGetFactory;
+        private readonly GetFactoryOrNull _getFactoryOrNull;
 
         #endregion
     }
@@ -1536,7 +1536,7 @@ namespace DryIoc
             }
         }
 
-        public Request TryGetNonWrapperParent()
+        public Request GetNonWrapperParentOrNull()
         {
             var p = Parent;
             while (p != null && p.FactoryType == FactoryType.GenericWrapper)
@@ -1605,7 +1605,7 @@ namespace DryIoc
             Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
             lock (_syncRoot)
             {
-                var item = _items.TryGet(id);
+                var item = _items.GetOrDefault(id);
                 if (item == null)
                     _items = _items.AddOrUpdate(id, item = factory());
                 return (T)item;
@@ -1741,15 +1741,15 @@ namespace DryIoc
 
         Factory GetOrAddFactory(Request request, bool returnNullOnError);
 
-        Factory TryGetFactory(Type serviceType, object serviceKey);
+        Factory GetFactoryOrNull(Type serviceType, object serviceKey);
 
-        LambdaExpression TryGetDecoratorFunc(Request request, out bool isDecoratedServiceIgnored);
+        LambdaExpression GetDecoratorFuncOrNull(Request request, out bool isDecoratedServiceIgnored);
 
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
         Type GetWrappedServiceTypeOrSelf(Type serviceType);
 
-        object TryGetConstructorParamKey(ParameterInfo parameter, Request parent);
+        object GetConstructorParamKeyOrNull(ParameterInfo parameter, Request parent);
 
         bool ShouldResolvePropertyOrField { get; }
 
@@ -1977,7 +1977,7 @@ namespace DryIoc
                     : With(Left, Right.AddOrUpdate(key, value))).EnsureBalanced());
         }
 
-        public V TryGet(int key, V defaultValue = default(V))
+        public V GetOrDefault(int key, V defaultValue = default(V))
         {
             var node = this;
             while (node.Height != 0 && key != node.Key)
@@ -2066,10 +2066,10 @@ namespace DryIoc
             return new HashTree<K, V>(_tree.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateConflicts), _updateValue);
         }
 
-        public V TryGet(K key)
+        public V GetOrDefault(K key)
         {
-            var item = _tree.TryGet(key.GetHashCode());
-            return item != null && (ReferenceEquals(key, item.Key) || key.Equals(item.Key)) ? item.Value : TryGetConflicted(item, key);
+            var item = _tree.GetOrDefault(key.GetHashCode());
+            return item != null && (ReferenceEquals(key, item.Key) || key.Equals(item.Key)) ? item.Value : GetConflictedOrDefault(item, key);
         }
 
         public IEnumerator<KV<K, V>> GetEnumerator()
@@ -2123,7 +2123,7 @@ namespace DryIoc
             return _updateValue == null ? added : new KV<K, V>(existing.Key, _updateValue(existing.Value, added.Value));
         }
 
-        private static V TryGetConflicted(KV<K, V> item, K key)
+        private static V GetConflictedOrDefault(KV<K, V> item, K key)
         {
             var conflicts = item is KVWithConflicts ? ((KVWithConflicts)item).Conflicts : null;
             if (conflicts != null)

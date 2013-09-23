@@ -13,7 +13,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Service>();
 
-            container.Setup.RemoveNonRegisteredServiceResolutionRule(Container.TryResolveEnumerableOrArray);
+            container.Setup.RemoveNonRegisteredServiceResolutionRule(Container.GetEnumerableFactoryOrNull);
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service[]>());
@@ -96,7 +96,7 @@ namespace DryIoc.UnitTests
         public void When_service_registered_with_name_Then_it_could_be_resolved_with_ctor_parameter_ImportAttribute()
         {
             var container = new Container();
-            container.Setup.AddConstructorParamServiceKeyResolutionRule(AttributedRegistrator.TryGetKeyFromImportAttribute);
+            container.Setup.AddConstructorParamServiceKeyResolutionRule(AttributedRegistrator.GetKeyFromImportAttributeOrNull);
 
             container.Register(typeof(INamedService), typeof(NamedService));
             container.Register(typeof(INamedService), typeof(AnotherNamedService), named: "blah");
@@ -111,7 +111,7 @@ namespace DryIoc.UnitTests
         public void I_should_be_able_to_import_single_service_based_on_specified_metadata()
         {
             var container = new Container();
-            container.Setup.AddConstructorParamServiceKeyResolutionRule(AttributedRegistrator.TryGetKeyWithMetadataAttribute);
+            container.Setup.AddConstructorParamServiceKeyResolutionRule(AttributedRegistrator.GetKeyFromMetadataAttributeOrNull);
 
             container.Register(typeof(IFooService), typeof(FooHey), setup: ServiceSetup.WithMetadata(FooMetadata.Hey));
             container.Register(typeof(IFooService), typeof(FooBlah), setup: ServiceSetup.WithMetadata(FooMetadata.Blah));

@@ -16,7 +16,7 @@ namespace DryIoc.UnitTests.Playground
 
         public V TryGet(Type key)
         {
-            var item = _tree.TryGet(key.GetHashCode());
+            var item = _tree.GetOrDefault(key.GetHashCode());
             return item != null && key == item.Key ? item.Value : TryGetConflicted(item, key);
         }
 

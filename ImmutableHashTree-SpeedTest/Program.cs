@@ -368,7 +368,7 @@ namespace ImmutableHashTree_SpeedTest
 			var treeWatch = Stopwatch.StartNew();
 
 			for (int i = 0; i < times; i++)
-                ignored = tree.TryGet(key);
+                ignored = tree.GetOrDefault(key);
 
 			treeWatch.Stop();
             GC.KeepAlive(ignored);
@@ -474,7 +474,7 @@ namespace ImmutableHashTree_SpeedTest
 
             for (int i = 0; i < times; i++)
             {
-                ignored = tree.TryGet(key);
+                ignored = tree.GetOrDefault(key);
             }
 
             treeWatch.Stop();

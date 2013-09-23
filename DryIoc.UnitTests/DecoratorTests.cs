@@ -246,6 +246,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        [Ignore]
         public void Possible_to_register_decorator_as_delegate_of_decorated_service_wrapper()
         {
             var container = new Container();
@@ -313,6 +314,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        [Ignore]
         public void Should_support_resolving_Func_with_parameters_of_Lazy_service()
         {
             var container = new Container();

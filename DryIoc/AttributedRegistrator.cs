@@ -173,13 +173,13 @@ namespace DryIoc
 
         #region Rules
 
-        public static object TryGetKeyFromImportAttribute(ParameterInfo parameter, Request _, IRegistry __)
+        public static object GetKeyFromImportAttributeOrNull(ParameterInfo parameter, Request _, IRegistry __)
         {
             var imports = parameter.GetCustomAttributes(typeof(ImportAttribute), false);
             return imports.Length == 1 ? ((ImportAttribute)imports[0]).ContractName : null;
         }
 
-        public static object TryGetKeyWithMetadataAttribute(ParameterInfo parameter, Request parent, IRegistry registry)
+        public static object GetKeyFromMetadataAttributeOrNull(ParameterInfo parameter, Request parent, IRegistry registry)
         {
             var attributes = parameter.GetCustomAttributes(typeof(ImportWithMetadataAttribute), false);
             if (attributes.Length == 0)
@@ -192,7 +192,7 @@ namespace DryIoc
             return serviceKey.ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, attribute.Metadata);
         }
 
-        public static object TryImportUsing(ParameterInfo param, Request parent, IRegistry registry)
+        public static object GetNameFromImportUsingAttributeOrNull(ParameterInfo param, Request parent, IRegistry registry)
         {
             var imports = param.GetCustomAttributes(typeof(ImportUsing), false);
             if (imports.Length == 0)
