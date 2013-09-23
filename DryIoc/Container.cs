@@ -106,11 +106,11 @@ namespace DryIoc
                 foreach (var funcType in FuncTypes)
                     this.Register(funcType, funcFactory);
 
-                this.Register(typeof(Lazy<>), Reuse.Transient, t => t.GetConstructor(new[] { typeof(Func<>) }), FactorySetup.AsGenericWrapper());
+                this.Register(typeof(Lazy<>), Reuse.Transient, t => t.GetConstructor(new[] { typeof(Func<>) }), GenericWrapperSetup.Default);
 
-                this.Register(typeof(Meta<,>), new CustomFactoryProvider(TryResolveMeta, FactorySetup.AsGenericWrapper(t => t[0])));
+                this.Register(typeof(Meta<,>), new CustomFactoryProvider(TryResolveMeta, GenericWrapperSetup.Of(t => t[0])));
 
-                this.Register(typeof(FactoryExpression<>), new CustomFactoryProvider(TryResolveFactoryExpression, FactorySetup.AsGenericWrapper()));
+                this.Register(typeof(FactoryExpression<>), new CustomFactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
             }
         }
 
@@ -561,7 +561,7 @@ namespace DryIoc
                         : EnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
                     return Expression.Call(resolver, resolveMethod, Expression.Constant(request));
                 },
-                setup: FactorySetup.With(FactoryCachePolicy.DoNotCacheExpression));
+                setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
         }
 
         internal sealed class EnumerableResolver
@@ -704,7 +704,7 @@ namespace DryIoc
     public class FuncGenericWrapper : Factory
     {
         public FuncGenericWrapper()
-            : base(setup: FactorySetup.AsGenericWrapper(types => types[types.Length - 1])) { }
+            : base(setup: GenericWrapperSetup.Of(types => types[types.Length - 1])) { }
 
         public override Factory TryProduceSpecificFactory(Request request, IRegistry registry)
         {
@@ -1134,79 +1134,89 @@ namespace DryIoc
     public abstract class FactorySetup
     {
         public abstract FactoryType Type { get; }
-
-        public virtual FactoryCachePolicy SkipCache { get { return FactoryCachePolicy.CacheExpression; } }
+        public virtual FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.CacheExpression; } }
         public virtual object Metadata { get { return null; } }
-
-        public static FactorySetup WithMetadata(object metadata = null)
-        {
-            return metadata == null ? ServiceSetup.Default : new ServiceSetup(metadata: metadata);
-        }
-
-        public static FactorySetup With(FactoryCachePolicy skipCache = FactoryCachePolicy.CacheExpression, object metadata = null)
-        {
-            return new ServiceSetup(skipCache, metadata);
-        }
-
-        public static FactorySetup AsGenericWrapper(Func<Type[], Type> selectServiceType = null)
-        {
-            return selectServiceType == null ? GenericWrapperSetup.Default : new GenericWrapperSetup(selectServiceType);
-        }
-
-        public static FactorySetup AsDecorator(Func<Request, bool> isApplicable = null)
-        {
-            return new DecoratorSetup(isApplicable);
-        }
     }
 
     public class ServiceSetup : FactorySetup
     {
-        public static readonly FactorySetup Default = new ServiceSetup();
+        public static readonly ServiceSetup Default = new ServiceSetup();
+
+        public static ServiceSetup With(FactoryCachePolicy cachePolicy, object metadata = null)
+        {
+            return cachePolicy == FactoryCachePolicy.CacheExpression && metadata == null ? Default : new ServiceSetup(cachePolicy, metadata);
+        }
+
+        public static ServiceSetup WithMetadata(object metadata = null)
+        {
+            return metadata == null ? Default : new ServiceSetup(metadata: metadata);
+        }
 
         public override FactoryType Type { get { return FactoryType.Service; } }
-
-        public override FactoryCachePolicy SkipCache { get { return _skipCache; } }
+        public override FactoryCachePolicy CachePolicy { get { return _cachePolicy; } }
         public override object Metadata { get { return _metadata; } }
 
-        internal ServiceSetup(FactoryCachePolicy skipCache = FactoryCachePolicy.CacheExpression, object metadata = null)
+        #region Implementation
+
+        private ServiceSetup(FactoryCachePolicy cachePolicy = FactoryCachePolicy.CacheExpression, object metadata = null)
         {
-            _skipCache = skipCache;
+            _cachePolicy = cachePolicy;
             _metadata = metadata;
         }
 
-        private readonly FactoryCachePolicy _skipCache;
+        private readonly FactoryCachePolicy _cachePolicy;
+
         private readonly object _metadata;
+
+        #endregion
     }
 
     public class GenericWrapperSetup : FactorySetup
     {
         public static readonly FactorySetup Default = new GenericWrapperSetup();
 
+        public static FactorySetup Of(Func<Type[], Type> selectServiceType)
+        {
+            return selectServiceType == null ? Default : new GenericWrapperSetup(selectServiceType);
+        }
+
         public override FactoryType Type { get { return FactoryType.GenericWrapper; } }
         public readonly Func<Type[], Type> GetWrappedServiceType;
 
-        internal GenericWrapperSetup(Func<Type[], Type> selectServiceTypeFromGenericArgs = null)
+        #region Implementation
+
+        private GenericWrapperSetup(Func<Type[], Type> selectServiceTypeFromGenericArgs = null)
         {
             GetWrappedServiceType = selectServiceTypeFromGenericArgs ?? SelectSingleByDefault;
         }
 
         private static Type SelectSingleByDefault(Type[] typeArgs)
         {
-            Throw.If(typeArgs.Length != 1, Error.GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT, typeArgs.Print());
+            if (typeArgs.Length != 1)
+                Throw.If(true, Error.GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT, typeArgs.Print());
             return typeArgs[0];
         }
+
+        #endregion
     }
 
     public class DecoratorSetup : FactorySetup
     {
-        public override FactoryType Type { get { return FactoryType.Decorator; } }
-        public override FactoryCachePolicy SkipCache { get { return FactoryCachePolicy.DoNotCacheExpression; } }
+        public static FactorySetup Of(Func<Request, bool> isApplicable = null)
+        {
+            return new DecoratorSetup(isApplicable);
+        }
 
+        public override FactoryType Type { get { return FactoryType.Decorator; } }
+        public override FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.DoNotCacheExpression; } }
         public readonly Func<Request, bool> IsApplicable;
+
         public LambdaExpression CachedDecoratorFunc;
         public bool IsDecoratedServiceIgnored;
 
-        public DecoratorSetup(Func<Request, bool> isApplicable = null)
+        #region Implementation
+
+        private DecoratorSetup(Func<Request, bool> isApplicable = null)
         {
             IsApplicable = isApplicable ?? IsApplicableByDefault;
         }
@@ -1215,6 +1225,8 @@ namespace DryIoc
         {
             return true;
         }
+
+        #endregion
     }
 
     public abstract class Factory
@@ -1251,7 +1263,7 @@ namespace DryIoc
                 result = CreateExpression(request, registry);
                 if (Reuse != null)
                     result = Reuse.Of(request, registry, ID, result);
-                if (Setup.SkipCache == FactoryCachePolicy.CacheExpression)
+                if (Setup.CachePolicy == FactoryCachePolicy.CacheExpression)
                     Interlocked.Exchange(ref _cachedExpression, result);
             }
 
@@ -1757,6 +1769,7 @@ namespace DryIoc
 
 #if SYSTEM_LAZY_IS_NOT_AVAILABLE
     [DebuggerStepThrough]
+    [DebuggerDisplay("{Value}")]
     public sealed class Lazy<T>
     {
         public Lazy(Func<T> valueFactory)

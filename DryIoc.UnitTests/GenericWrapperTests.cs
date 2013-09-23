@@ -61,7 +61,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(IService), typeof(Service), setup: FactorySetup.WithMetadata("007"));
+            container.Register(typeof(IService), typeof(Service), setup: ServiceSetup.WithMetadata("007"));
             var services = container.Resolve<IEnumerable<Meta<Lazy<IService>, string>>>();
 
             var containerWeakRef = new WeakReference(container);

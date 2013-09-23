@@ -38,12 +38,12 @@ namespace DryIoc
                 if (info.FactoryType == FactoryType.GenericWrapper)
                 {
                     var serviceTypeIndex = info.GenericWrapperServiceTypeIndex;
-                    setup = FactorySetup.AsGenericWrapper(types => types[serviceTypeIndex]);
+                    setup = GenericWrapperSetup.Of(types => types[serviceTypeIndex]);
                 }
                 else
                 {
                     var metadata = info.MetadataAttributeIndex == -1 ? null : FindMetadata(info.ImplementationType, info.MetadataAttributeIndex);
-                    setup = FactorySetup.WithMetadata(metadata);
+                    setup = ServiceSetup.WithMetadata(metadata);
                 }
 
                 var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
@@ -207,7 +207,7 @@ namespace DryIoc
             var implementationType = import.ImplementationType ?? serviceType;
             var reuse = import.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
             SelectConstructor withConstructor = t => t.GetConstructor(import.ConstructorSignature);
-            var setup = FactorySetup.WithMetadata(import.Metadata);
+            var setup = ServiceSetup.WithMetadata(import.Metadata);
 
             registry.Register(serviceType, implementationType, reuse, withConstructor, setup, serviceName);
             return serviceName;

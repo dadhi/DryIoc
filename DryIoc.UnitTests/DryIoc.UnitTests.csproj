@@ -63,7 +63,7 @@
     <Compile Include="Performance\HashTreeEnumerationSpeedTests.cs" />
     <Compile Include="Performance\MethodArgumentsPassingSpeedComparison.cs" />
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
-    <Compile Include="Playground\DecoratorConditionPlayTests.cs" />
+    <Compile Include="DecoratorConditionTests.cs" />
     <Compile Include="Playground\Experiments.cs" />
     <Compile Include="AttributedRegistration\ExportGenericWrapperTests.cs" />
     <Compile Include="Playground\OptionsPlayTests.cs" />
