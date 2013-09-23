@@ -137,7 +137,6 @@ namespace DryIoc
         #region IRegistry
 
         public Scope SingletonScope { get; private set; }
-
         public Scope CurrentScope { get; private set; }
 
         Factory IRegistry.GetOrAddFactory(Request request, bool shouldReturnNull)
@@ -181,7 +180,7 @@ namespace DryIoc
             return newFactory;
         }
 
-        LambdaExpression IRegistry.TryGetDecoratorFuncExpression(Request request, out bool isDecoratedServiceIgnored)
+        LambdaExpression IRegistry.TryGetDecoratorFunc(Request request, out bool isDecoratedServiceIgnored)
         {
             isDecoratedServiceIgnored = false;
 
@@ -243,12 +242,12 @@ namespace DryIoc
                             decorator = Register(decorator.TryProduceSpecificFactory(request, this), serviceType, null);
 
                         var setup = ((DecoratorSetup)decorator.Setup);
-                        var func = setup.CachedDecoratorFunc;
+                        var func = setup.CachedFunc;
                         if (func == null)
                         {
                             IList<Type> unusedFuncParams;
-                            func = decorator.TryGetFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
-                            setup.CachedDecoratorFunc = func; // TODO Save Func in cacheExpression instead of Setup.
+                            func = decorator.TryGetFuncWithArgs(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
+                            setup.CachedFunc = func.ThrowIfNull(Error.DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION, decoratorFuncType);
                             setup.IsDecoratedServiceIgnored = unusedFuncParams != null;
                         }
 
@@ -730,7 +729,7 @@ namespace DryIoc
 
             IList<Type> unusedFuncParams;
             var funcExpr = serviceFactory
-                .TryGetFuncWithArgsExpression(funcType, serviceRequest, registry, out unusedFuncParams)
+                .TryGetFuncWithArgs(funcType, serviceRequest, registry, out unusedFuncParams)
                 .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
 
             if (unusedFuncParams != null)
@@ -858,6 +857,9 @@ namespace DryIoc
 
         public static string SOME_FUNC_PARAMS_ARE_UNUSED =
             "Found some unused Func parameters ({0}) when resolving: {1}.";
+
+        public static string DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION = 
+            "Decorator factory should support resolution as {0}, but it does not.";
     }
 
     public static class Registrator
@@ -1202,7 +1204,7 @@ namespace DryIoc
 
     public class DecoratorSetup : FactorySetup
     {
-        public static FactorySetup Of(Func<Request, bool> isApplicable = null)
+        public static FactorySetup New(Func<Request, bool> isApplicable = null)
         {
             return new DecoratorSetup(isApplicable);
         }
@@ -1211,7 +1213,7 @@ namespace DryIoc
         public override FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.DoNotCacheExpression; } }
         public readonly Func<Request, bool> IsApplicable;
 
-        public LambdaExpression CachedDecoratorFunc;
+        public LambdaExpression CachedFunc;
         public bool IsDecoratedServiceIgnored;
 
         #region Implementation
@@ -1253,7 +1255,7 @@ namespace DryIoc
             request = request.ResolveTo(this);
 
             bool isDecoratedServiceIgnored;
-            var decorator = registry.TryGetDecoratorFuncExpression(request, out isDecoratedServiceIgnored);
+            var decorator = registry.TryGetDecoratorFunc(request, out isDecoratedServiceIgnored);
             if (decorator != null && isDecoratedServiceIgnored)
                 return decorator.Body;
 
@@ -1275,16 +1277,16 @@ namespace DryIoc
 
         protected abstract Expression CreateExpression(Request request, IRegistry registry);
 
-        public LambdaExpression TryGetFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
+        public LambdaExpression TryGetFuncWithArgs(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
             request = request.ResolveTo(this);
 
-            var func = TryCreateFuncWithArgsExpression(funcType, request, registry, out unusedFuncParams);
+            var func = TryCreateFuncWithArgs(funcType, request, registry, out unusedFuncParams);
             if (func == null)
                 return null;
 
             bool isDecoratedServiceIgnored;
-            var decorator = registry.TryGetDecoratorFuncExpression(request, out isDecoratedServiceIgnored);
+            var decorator = registry.TryGetDecoratorFunc(request, out isDecoratedServiceIgnored);
             if (decorator != null && isDecoratedServiceIgnored)
                 return Expression.Lambda(funcType, decorator.Body, func.Parameters);
 
@@ -1297,7 +1299,7 @@ namespace DryIoc
             return func;
         }
 
-        protected virtual LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
+        protected virtual LambdaExpression TryCreateFuncWithArgs(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
             unusedFuncParams = null;
             return null;
@@ -1351,7 +1353,7 @@ namespace DryIoc
             return AddInitializerIfRequired(Expression.New(ctor, paramExprs), request, registry);
         }
 
-        protected override LambdaExpression TryCreateFuncWithArgsExpression(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
+        protected override LambdaExpression TryCreateFuncWithArgs(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncParams)
         {
             var funcParamTypes = funcType.GetGenericArguments();
             funcParamTypes.ThrowIf(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
@@ -1741,7 +1743,7 @@ namespace DryIoc
 
         Factory TryGetFactory(Type serviceType, object serviceKey);
 
-        LambdaExpression TryGetDecoratorFuncExpression(Request request, out bool isDecoratedServiceIgnored);
+        LambdaExpression TryGetDecoratorFunc(Request request, out bool isDecoratedServiceIgnored);
 
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
