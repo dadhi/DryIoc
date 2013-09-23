@@ -94,7 +94,7 @@ namespace DryIoc
         {
             _syncRoot = new object();
             _registry = new Dictionary<Type, RegistryEntry>();
-            _decorators = HashTree<Type, Factory[]>.Empty;
+            _decorators = HashTree<Type, Factory[]>.Using(ConcatArrays);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
 
@@ -152,7 +152,7 @@ namespace DryIoc
                 Factory factory;
                 if (_registry.TryGetValue(request.ServiceType, out entry) &&
                     entry.TryGetFactory(out factory, request.ServiceType, request.ServiceKey))
-                    return factory.TryProvideSpecificFactory(request, this) ?? factory;
+                    return factory.TryProduceSpecificFactory(request, this) ?? factory;
 
                 if (request.OpenGenericServiceType != null &&
                     _registry.TryGetValue(request.OpenGenericServiceType, out entry))
@@ -163,7 +163,7 @@ namespace DryIoc
                         entry.TryGetFactory(out genericFactory, request.ServiceType) && // OR try find generic-wrapper by ignoring service key.
                         genericFactory.Setup.Type == FactoryType.GenericWrapper)
                     {
-                        newFactory = genericFactory.TryProvideSpecificFactory(request, this);
+                        newFactory = genericFactory.TryProduceSpecificFactory(request, this);
                     }
                 }
             }
@@ -200,77 +200,71 @@ namespace DryIoc
             var serviceType = request.ServiceType;
             var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
 
-            LambdaExpression resultFuncExpr = null;
-
-            lock (_syncRoot)
+            LambdaExpression result = null;
+            var funcDecorators = _decorators.TryGet(decoratorFuncType);
+            if (funcDecorators != null)
             {
-                RegistryEntry entry;
-                if (_registry.TryGetValue(decoratorFuncType, out entry) && entry.Decorators != null)
+                var decoratorRequest = request.MakeDecorated();
+                for (var i = 0; i < funcDecorators.Length; i++)
                 {
-                    var decoratorRequest = request.MakeDecorated();
-                    for (var i = 0; i < entry.Decorators.Count; i++)
+                    var decorator = funcDecorators[i];
+                    if (((FactorySetup.Decorator)decorator.Setup).IsApplicable(request))
                     {
-                        var decorator = entry.Decorators[i];
-                        if (((FactorySetup.Decorator)decorator.Setup).IsApplicable(request))
+                        var func = decorator.GetExpression(decoratorRequest, this);
+                        if (result != null)
+                            result = Expression.Lambda(Expression.Invoke(func, result.Body), result.Parameters[0]);
+                        else
                         {
-                            var funcObjectExpr = decorator.GetExpression(decoratorRequest, this);
-                            if (resultFuncExpr == null)
-                            {
-                                var decoratedParamExpr = Expression.Parameter(serviceType, "decorated");
-                                resultFuncExpr = Expression.Lambda(Expression.Invoke(funcObjectExpr, decoratedParamExpr), decoratedParamExpr);
-                            }
-                            else
-                            {
-                                resultFuncExpr = Expression.Lambda(Expression.Invoke(funcObjectExpr, resultFuncExpr.Body), resultFuncExpr.Parameters[0]);
-                            }
+                            var decoratedParam = Expression.Parameter(serviceType, "decorated");
+                            result = Expression.Lambda(Expression.Invoke(func, decoratedParam), decoratedParam);
                         }
-                    }
-                }
-
-                var serviceDecorators = new List<Factory>();
-
-                if (_registry.TryGetValue(serviceType, out entry) && entry.Decorators != null)
-                {
-                    serviceDecorators.AddRange(entry.Decorators
-                        .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request)));
-                }
-
-                if (request.OpenGenericServiceType != null &&
-                    _registry.TryGetValue(request.OpenGenericServiceType, out entry) && entry.Decorators != null)
-                {
-                    serviceDecorators.AddRange(entry.Decorators
-                        .Where(f => ((FactorySetup.Decorator)f.Setup).IsApplicable(request))
-                        .Select(f => f.TryProvideSpecificFactory(request, this)));
-                }
-
-                if (serviceDecorators.Count != 0)
-                {
-                    var decoratorRequest = request.MakeDecorated();
-                    for (var i = 0; i < serviceDecorators.Count; i++)
-                    {
-                        var decorator = serviceDecorators[i];
-                        var decoratorSetup = ((FactorySetup.Decorator)decorator.Setup);
-                        var funcExpr = decoratorSetup.CachedDecoratorFuncExpr;
-                        if (funcExpr == null)
-                        {
-                            IList<Type> unusedFuncParams;
-                            funcExpr = decorator
-                                .TryGetFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
-
-                            decoratorSetup.CachedDecoratorFuncExpr = funcExpr;
-                            decoratorSetup.IsDecoratedServiceIgnored = unusedFuncParams != null;
-                        }
-
-                        resultFuncExpr = resultFuncExpr == null ? funcExpr
-                            : Expression.Lambda(Expression.Invoke(funcExpr, resultFuncExpr.Body), resultFuncExpr.Parameters[0]);
-
-                        // Once ignored, decorated service should stay ignored.
-                        isDecoratedServiceIgnored = !isDecoratedServiceIgnored && decoratorSetup.IsDecoratedServiceIgnored;
                     }
                 }
             }
 
-            return resultFuncExpr;
+            IEnumerable<Factory> decorators = _decorators.TryGet(serviceType);
+            var openGenericDecoratorIndex = decorators == null ? 0 : ((Factory[])decorators).Length;
+            if (request.OpenGenericServiceType != null)
+            {
+                var openGenericDecorators = _decorators.TryGet(request.OpenGenericServiceType);
+                if (openGenericDecorators != null)
+                    decorators = decorators == null ? openGenericDecorators : decorators.Concat(openGenericDecorators);
+            }
+
+            if (decorators != null)
+            {
+                var decoratorRequest = request.MakeDecorated();
+                var decoratorIndex = 0;
+                var enumerator = decorators.GetEnumerator();
+                while (enumerator.MoveNext())
+                {
+                    var decorator = enumerator.Current.ThrowIfNull();
+                    if (((FactorySetup.Decorator)decorator.Setup).IsApplicable(request))
+                    {
+                        // Cache closed generic registration produced by open-generic decorator.
+                        if (decoratorIndex++ >= openGenericDecoratorIndex) 
+                            decorator = Register(decorator.TryProduceSpecificFactory(request, this), serviceType, null);
+
+                        var setup = ((FactorySetup.Decorator)decorator.Setup);
+                        var func = setup.CachedDecoratorFunc;
+                        if (func == null)
+                        {
+                            IList<Type> unusedFuncParams;
+                            func = decorator.TryGetFuncWithArgsExpression(decoratorFuncType, decoratorRequest, this, out unusedFuncParams);
+                            setup.CachedDecoratorFunc = func; // TODO Save Func in cacheExpression instead of Setup.
+                            setup.IsDecoratedServiceIgnored = unusedFuncParams != null;
+                        }
+
+                        result = result == null ? func
+                            : Expression.Lambda(Expression.Invoke(func, result.Body), result.Parameters[0]);
+
+                        // Once ignored, decorated service should stay ignored.
+                        isDecoratedServiceIgnored = !isDecoratedServiceIgnored && setup.IsDecoratedServiceIgnored;
+                    }
+                }
+            }
+
+            return result;
         }
 
         IEnumerable<object> IRegistry.GetKeys(Type serviceType, Func<Factory, bool> condition)
@@ -377,25 +371,23 @@ namespace DryIoc
 
         #region IRegistrator
 
-        public void Register(Factory factory, Type serviceType, object serviceKey)
+        public Factory Register(Factory factory, Type serviceType, object serviceKey)
         {
             ThrowIfNotImplemented(serviceType.ThrowIfNull(), factory.ThrowIfNull().ImplementationType);
             lock (_syncRoot)
             {
-                var entry = _registry.GetOrAdd(serviceType, _ => new RegistryEntry());
-
                 if (factory.Setup.Type == FactoryType.Decorator)
                 {
-                    entry.Decorators = entry.Decorators ?? new List<Factory>();
-                    entry.Decorators.Add(factory);
-                    return;
+                    _decorators = _decorators.AddOrUpdate(serviceType, new[] { factory });
+                    return factory;
                 }
 
+                var entry = _registry.GetOrAdd(serviceType, _ => new RegistryEntry());
                 if (serviceKey == null)
                 {
                     if (entry.LastDefault != null)
                     {
-                        entry.Indexed = entry.Indexed ?? HashTree<Factory>.Empty.AddOrUpdate(entry.MaxIndex++, entry.LastDefault);
+                        entry.Indexed = entry.Indexed ?? IntTree<Factory>.Empty.AddOrUpdate(entry.MaxIndex++, entry.LastDefault);
                         entry.Indexed = entry.Indexed.AddOrUpdate(entry.MaxIndex++, factory);
                     }
                     entry.LastDefault = factory;
@@ -403,7 +395,7 @@ namespace DryIoc
                 else if (serviceKey is int)
                 {
                     var index = (int)serviceKey;
-                    entry.Indexed = (entry.Indexed ?? HashTree<Factory>.Empty).AddOrUpdate(index, factory);
+                    entry.Indexed = (entry.Indexed ?? IntTree<Factory>.Empty).AddOrUpdate(index, factory);
                     entry.MaxIndex = Math.Max(entry.MaxIndex, index) + 1;
                 }
                 else if (serviceKey is string)
@@ -422,6 +414,8 @@ namespace DryIoc
                     }
                 }
             }
+
+            return factory;
         }
 
         public bool IsRegistered(Type serviceType, string serviceName)
@@ -484,7 +478,7 @@ namespace DryIoc
         {
             public static readonly KeyedResolutionCacheEntry Empty = new KeyedResolutionCacheEntry();
 
-            private HashTree<CompiledFactory> _indexed = HashTree<CompiledFactory>.Empty;
+            private IntTree<CompiledFactory> _indexed = IntTree<CompiledFactory>.Empty;
             private HashTree<string, CompiledFactory> _named = HashTree<string, CompiledFactory>.Empty;
 
             public CompiledFactory TryGet(object key)
@@ -659,13 +653,23 @@ namespace DryIoc
         private readonly Dictionary<Type, RegistryEntry> _registry;
         private HashTree<Type, Factory[]> _decorators;
 
+        private static V[] ConcatArrays<V>(V[] existing, V[] added)
+        {
+            var result = new V[existing.Length + added.Length];
+            Array.Copy(existing, 0, result, 0, existing.Length);
+            if (added.Length == 1)
+                result[existing.Length] = added[0];
+            else
+                Array.Copy(added, 0, result, existing.Length, added.Length);
+            return result;
+        }
+
         private sealed class RegistryEntry
         {
             public Factory LastDefault;
-            public HashTree<Factory> Indexed;
+            public IntTree<Factory> Indexed;
             public int MaxIndex;
             public Dictionary<string, Factory> Named;
-            public List<Factory> Decorators;
 
             public bool TryGetFactory(out Factory result, Type serviceType, object serviceKey = null)
             {
@@ -705,7 +709,7 @@ namespace DryIoc
         public FuncGenericWrapper()
             : base(setup: FactorySetup.AsGenericWrapper(types => types[types.Length - 1])) { }
 
-        public override Factory TryProvideSpecificFactory(Request request, IRegistry registry)
+        public override Factory TryProduceSpecificFactory(Request request, IRegistry registry)
         {
             return new DelegateFactory(CreateFunc, DryIoc.Reuse.Singleton, Setup);
         }
@@ -1199,7 +1203,7 @@ namespace DryIoc
             public override bool SkipCache { get { return true; } }
 
             public readonly Func<Request, bool> IsApplicable;
-            public LambdaExpression CachedDecoratorFuncExpr;
+            public LambdaExpression CachedDecoratorFunc;
             public bool IsDecoratedServiceIgnored;
 
             public Decorator(Func<Request, bool> isApplicable = null)
@@ -1231,7 +1235,7 @@ namespace DryIoc
             Setup = setup ?? FactorySetup.Service.Default;
         }
 
-        public abstract Factory TryProvideSpecificFactory(Request request, IRegistry registry);
+        public abstract Factory TryProduceSpecificFactory(Request request, IRegistry registry);
 
         public Expression GetExpression(Request request, IRegistry registry)
         {
@@ -1309,7 +1313,7 @@ namespace DryIoc
             _withConstructor = withConstructor;
         }
 
-        public override Factory TryProvideSpecificFactory(Request request, IRegistry _)
+        public override Factory TryProduceSpecificFactory(Request request, IRegistry _)
         {
             if (!_implementationType.IsGenericTypeDefinition) return null;
             var closedImplType = _implementationType.MakeGenericType(request.ServiceType.GetGenericArguments());
@@ -1445,7 +1449,7 @@ namespace DryIoc
             _getExpression = getExpression.ThrowIfNull();
         }
 
-        public override Factory TryProvideSpecificFactory(Request request, IRegistry registry)
+        public override Factory TryProduceSpecificFactory(Request request, IRegistry registry)
         {
             return null;
         }
@@ -1472,7 +1476,7 @@ namespace DryIoc
             _tryGetFactory = tryGetFactory.ThrowIfNull();
         }
 
-        public override Factory TryProvideSpecificFactory(Request request, IRegistry registry)
+        public override Factory TryProduceSpecificFactory(Request request, IRegistry registry)
         {
             return _tryGetFactory(request, registry);
         }
@@ -1494,7 +1498,7 @@ namespace DryIoc
         public readonly Request Parent; // can be null for resolution root
         public readonly Type ServiceType;
         public readonly object ServiceKey; // null for default, string for named or integer index for multiple defaults.
-        
+
         public readonly Type OpenGenericServiceType;
 
         public readonly FactoryType FactoryType;
@@ -1608,7 +1612,7 @@ namespace DryIoc
         #region Implementation
 
         private readonly object _syncRoot = new object();
-        private HashTree<object> _items = HashTree<object>.Empty;
+        private IntTree<object> _items = IntTree<object>.Empty;
         private volatile int _disposed;
 
         #endregion
@@ -1712,7 +1716,7 @@ namespace DryIoc
 
     public interface IRegistrator
     {
-        void Register(Factory factory, Type serviceType, object serviceKey);
+        Factory Register(Factory factory, Type serviceType, object serviceKey);
 
         bool IsRegistered(Type serviceType, string serviceName);
     }
@@ -1937,23 +1941,23 @@ namespace DryIoc
         }
     }
 
-    public sealed class HashTree<V> : IEnumerable<HashTree<V>>
+    public sealed class IntTree<V> : IEnumerable<IntTree<V>>
     {
-        public static readonly HashTree<V> Empty = new HashTree<V>();
+        public static readonly IntTree<V> Empty = new IntTree<V>();
         public bool IsEmpty { get { return Height == 0; } }
 
         public readonly int Key;
         public readonly V Value;
 
         public readonly int Height;
-        public readonly HashTree<V> Left, Right;
+        public readonly IntTree<V> Left, Right;
 
-        public delegate V UpdateValue(V old, V added);
+        public delegate V UpdateValue(V existing, V added);
 
-        public HashTree<V> AddOrUpdate(int key, V value, UpdateValue update = null)
+        public IntTree<V> AddOrUpdate(int key, V value, UpdateValue update = null)
         {
-            return Height == 0 ? new HashTree<V>(key, value, Empty, Empty)
-                : (key == Key ? new HashTree<V>(key, update == null ? value : update(Value, value), Left, Right)
+            return Height == 0 ? new IntTree<V>(key, value, Empty, Empty)
+                : (key == Key ? new IntTree<V>(key, update == null ? value : update(Value, value), Left, Right)
                 : (key < Key
                     ? With(Left.AddOrUpdate(key, value), Right)
                     : With(Left, Right.AddOrUpdate(key, value))).EnsureBalanced());
@@ -1969,9 +1973,9 @@ namespace DryIoc
 
         /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         /// The only difference is using fixed size array instead of stack for speed-up: 5/6 vs. stack.</summary>
-        public IEnumerator<HashTree<V>> GetEnumerator()
+        public IEnumerator<IntTree<V>> GetEnumerator()
         {
-            var parents = new HashTree<V>[Height];
+            var parents = new IntTree<V>[Height];
             var parentCount = -1;
             var node = this;
             while (node.Height != 0 || parentCount != -1)
@@ -1997,9 +2001,9 @@ namespace DryIoc
 
         #region Implementation
 
-        private HashTree() { }
+        private IntTree() { }
 
-        private HashTree(int key, V value, HashTree<V> left, HashTree<V> right)
+        private IntTree(int key, V value, IntTree<V> left, IntTree<V> right)
         {
             Key = key;
             Value = value;
@@ -2008,7 +2012,7 @@ namespace DryIoc
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private HashTree<V> EnsureBalanced()
+        private IntTree<V> EnsureBalanced()
         {
             var delta = Left.Height - Right.Height;
             return delta >= 2 ? With(Left.Right.Height - Left.Left.Height == 1 ? Left.RotateLeft() : Left, Right).RotateRight()
@@ -2016,31 +2020,36 @@ namespace DryIoc
                 : this);
         }
 
-        private HashTree<V> RotateRight()
+        private IntTree<V> RotateRight()
         {
             return Left.With(Left.Left, With(Left.Right, Right));
         }
 
-        private HashTree<V> RotateLeft()
+        private IntTree<V> RotateLeft()
         {
             return Right.With(With(Left, Right.Left), Right.Right);
         }
 
-        private HashTree<V> With(HashTree<V> left, HashTree<V> right)
+        private IntTree<V> With(IntTree<V> left, IntTree<V> right)
         {
-            return new HashTree<V>(Key, Value, left, right);
+            return new IntTree<V>(Key, Value, left, right);
         }
 
         #endregion
     }
 
-    public sealed class HashTree<K, V>
+    public sealed class HashTree<K, V> : IEnumerable<KV<K, V>>
     {
-        public static readonly HashTree<K, V> Empty = new HashTree<K, V>(HashTree<KV>.Empty);
+        public static readonly HashTree<K, V> Empty = new HashTree<K, V>(IntTree<KV<K, V>>.Empty, null);
+
+        public static HashTree<K, V> Using(Func<V, V, V> updateValue)
+        {
+            return new HashTree<K, V>(IntTree<KV<K, V>>.Empty, updateValue);
+        }
 
         public HashTree<K, V> AddOrUpdate(K key, V value)
         {
-            return new HashTree<K, V>(_tree.AddOrUpdate(key.GetHashCode(), new KV { Key = key, Value = value }, Update));
+            return new HashTree<K, V>(_tree.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateConflicts), _updateValue);
         }
 
         public V TryGet(K key)
@@ -2049,29 +2058,58 @@ namespace DryIoc
             return item != null && (ReferenceEquals(key, item.Key) || key.Equals(item.Key)) ? item.Value : TryGetConflicted(item, key);
         }
 
+        public IEnumerator<KV<K, V>> GetEnumerator()
+        {
+            foreach (var node in _tree)
+            {
+                yield return node.Value;
+                if (node.Value is KVWithConflicts)
+                {
+                    var conflicts = ((KVWithConflicts)node.Value).Conflicts;
+                    for (var i = 0; i < conflicts.Length; i++)
+                        yield return conflicts[i];
+                }
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
         #region Implementation
 
-        private readonly HashTree<KV> _tree;
-
-        private HashTree(HashTree<KV> tree)
+        private HashTree(IntTree<KV<K, V>> tree, Func<V, V, V> updateValue)
         {
             _tree = tree;
+            _updateValue = updateValue;
         }
 
-        private static KV Update(KV old, KV added)
+        private readonly IntTree<KV<K, V>> _tree;
+        private readonly Func<V, V, V> _updateValue;
+
+        private KV<K, V> UpdateConflicts(KV<K, V> existing, KV<K, V> added)
         {
-            var conflicts = old is KVWithConflicts ? ((KVWithConflicts)old).Conflicts : null;
+            var conflicts = existing is KVWithConflicts ? ((KVWithConflicts)existing).Conflicts : null;
+            if (ReferenceEquals(existing.Key, added.Key) || existing.Key.Equals(added.Key))
+                return conflicts == null ? UpdateValue(existing, added)
+                     : new KVWithConflicts(UpdateValue(existing, added), conflicts);
 
-            if (ReferenceEquals(old.Key, added.Key) || old.Key.Equals(added.Key))
-                return conflicts == null ? added
-                    : new KVWithConflicts { Key = added.Key, Value = added.Value, Conflicts = conflicts };
+            if (conflicts == null)
+                return new KVWithConflicts(existing, new[] { added });
 
-            var newConflicts = conflicts == null ? new[] { added }
-                : conflicts.AddOrUpdateCopy(added, Array.FindIndex(conflicts, x => Equals(x.Key, added.Key)));
-            return new KVWithConflicts { Key = old.Key, Value = old.Value, Conflicts = newConflicts };
+            var i = conflicts.Length - 1;
+            while (i >= 0 && !Equals(conflicts[i].Key, added.Key)) --i;
+            if (i != -1) added = UpdateValue(existing, added);
+            return new KVWithConflicts(existing, conflicts.AddOrUpdateCopy(added, i));
         }
 
-        private static V TryGetConflicted(KV item, K key)
+        private KV<K, V> UpdateValue(KV<K, V> existing, KV<K, V> added)
+        {
+            return _updateValue == null ? added : new KV<K, V>(existing.Key, _updateValue(existing.Value, added.Value));
+        }
+
+        private static V TryGetConflicted(KV<K, V> item, K key)
         {
             var conflicts = item is KVWithConflicts ? ((KVWithConflicts)item).Conflicts : null;
             if (conflicts != null)
@@ -2081,18 +2119,30 @@ namespace DryIoc
             return default(V);
         }
 
-        private class KV
+        private sealed class KVWithConflicts : KV<K, V>
         {
-            public K Key;
-            public V Value;
-        }
+            public readonly KV<K, V>[] Conflicts;
 
-        private sealed class KVWithConflicts : KV
-        {
-            public KV[] Conflicts;
+            public KVWithConflicts(KV<K, V> kv, KV<K, V>[] conflicts)
+                : base(kv.Key, kv.Value)
+            {
+                Conflicts = conflicts;
+            }
         }
 
         #endregion
+    }
+
+    public class KV<K, V>
+    {
+        public readonly K Key;
+        public readonly V Value;
+
+        public KV(K key, V value)
+        {
+            Key = key;
+            Value = value;
+        }
     }
 }
 

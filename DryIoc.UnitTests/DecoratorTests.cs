@@ -72,7 +72,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_resolve_closed_servise_with_open_generic_decorator()
+        public void Should_resolve_closed_service_with_open_generic_decorator()
         {
             var container = new Container();
             container.Register<IOperation<int>, SomeOperation<int>>();

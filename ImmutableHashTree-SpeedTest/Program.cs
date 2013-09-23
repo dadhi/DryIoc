@@ -110,7 +110,7 @@ namespace ImmutableHashTree_SpeedTest
             var keys = Enumerable.Range(0, itemCount).ToArray();
 
             var v2 = HashTreeV2<string>.Empty;
-            var v1 = HashTree<string>.Empty;
+            var v1 = IntTree<string>.Empty;
 
             var v2add = IntTreeV2Add(ref v2, keys, key, value);
             var v1add = IntTreeAdd(ref v1, keys, key, value);
@@ -138,7 +138,7 @@ namespace ImmutableHashTree_SpeedTest
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
             var v4 = HashTree<Type, string>.Empty;
-            var v1 = HashTree<Hashed<Type, string>>.Empty;
+            var v1 = IntTree<Hashed<Type, string>>.Empty;
 
 	        var v4AddTime = HashTree4Add(ref v4, keys, key, value);
 	        var v1AddTime = HashTreeAdd(ref v1, keys, key, value);
@@ -165,7 +165,7 @@ namespace ImmutableHashTree_SpeedTest
 
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
-            var typeTree = HashTreeX<Type, string>.Create();
+            var typeTree = HashTreeX<Type, string>.Using();
             var hashTree = HashTree<Type, string>.Empty;
 
             var typeTreeAddTime = HashTreeXAdd(ref typeTree, keys, key, value);
@@ -194,7 +194,7 @@ namespace ImmutableHashTree_SpeedTest
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
             var v2 = HashTree2<Type, string>.Empty;
-            var v1 = HashTree<Hashed<Type, string>>.Empty;
+            var v1 = IntTree<Hashed<Type, string>>.Empty;
 
             var v2AddTime = HashTree2Add(ref v2, keys, key, value);
             var v1AddTime = HashTreeAdd(ref v1, keys, key, value);
@@ -250,7 +250,7 @@ namespace ImmutableHashTree_SpeedTest
 			var keys = Enumerable.Range(0, itemCount).ToArray();
 
 			var dict = new Dictionary<int, string>();
-			var tree = HashTree<string>.Empty;
+			var tree = IntTree<string>.Empty;
 
 			var dictAddTime = DictAdd(dict, keys, key, value);
 			var treeAddTime = IntTreeAdd(ref tree, keys, key, value);
@@ -278,7 +278,7 @@ namespace ImmutableHashTree_SpeedTest
 			var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
 			var dict = new Dictionary<Type, string>();
-			var tree = HashTree<Hashed<Type, string>>.Empty;
+			var tree = IntTree<Hashed<Type, string>>.Empty;
 
 			var dictAddTime = DictAdd(dict, keys, key, value);
 			var treeAddTime = HashTreeAdd(ref tree, keys, key, value);
@@ -332,7 +332,7 @@ namespace ImmutableHashTree_SpeedTest
             return dictWatch.ElapsedMilliseconds;
 		}
 
-	    private static long IntTreeAdd<V>(ref HashTree<V> tree, int[] keys, int key, V value)
+	    private static long IntTreeAdd<V>(ref IntTree<V> tree, int[] keys, int key, V value)
 		{
 			var ignored = default(V);
 			var treeTime = Stopwatch.StartNew();
@@ -362,7 +362,7 @@ namespace ImmutableHashTree_SpeedTest
             return treeTime.ElapsedMilliseconds;
         }
 
-		private static long IntTreeGet<V>(HashTree<V> tree, int key, int times)
+		private static long IntTreeGet<V>(IntTree<V> tree, int key, int times)
 		{
 			V ignored = default(V);
 			var treeWatch = Stopwatch.StartNew();
@@ -447,7 +447,7 @@ namespace ImmutableHashTree_SpeedTest
             return treeTime.ElapsedMilliseconds;
         }
 
-		private static long HashTreeAdd<V>(ref HashTree<Hashed<Type, V>> tree, Type[] keys, Type key, V value)
+		private static long HashTreeAdd<V>(ref IntTree<Hashed<Type, V>> tree, Type[] keys, Type key, V value)
 		{
 			var ignored = default(V);
 			var treeTime = Stopwatch.StartNew();
@@ -517,7 +517,7 @@ namespace ImmutableHashTree_SpeedTest
             return treeWatch.ElapsedMilliseconds;
         }
 
-        private static long HashTreeGet<T>(HashTree<Hashed<Type, T>> tree, Type key, int times)
+        private static long HashTreeGet<T>(IntTree<Hashed<Type, T>> tree, Type key, int times)
 		{
 			T ignored = default(T);
 

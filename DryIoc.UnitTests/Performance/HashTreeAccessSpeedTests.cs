@@ -25,12 +25,12 @@ namespace DryIoc.UnitTests.Performance
 
     public static class Hashed
     {
-        public static HashTree<Hashed<K, V>> AddOrUpdate<K, V>(this HashTree<Hashed<K, V>> tree, K key, V value)
+        public static IntTree<Hashed<K, V>> AddOrUpdate<K, V>(this IntTree<Hashed<K, V>> tree, K key, V value)
         {
             return tree.AddOrUpdate(key.GetHashCode(), new Hashed<K, V>(key, value), Update);
         }
 
-        public static V TryGet<K, V>(this HashTree<Hashed<K, V>> tree, K key)
+        public static V TryGet<K, V>(this IntTree<Hashed<K, V>> tree, K key)
         {
             var item = tree.TryGet(key.GetHashCode());
             return item != null && Equals(item.Key, key) ? item.Value : TryGetConflicted(item, key);
@@ -67,7 +67,7 @@ namespace DryIoc.UnitTests.Performance
 
     public sealed class HashTree2<K, V> : IEnumerable<HashTree2<K, V>>
     {
-        public static readonly HashTree2<K, V> Empty = new HashTree2<K, V>(HashTree<KVStack>.Empty);
+        public static readonly HashTree2<K, V> Empty = new HashTree2<K, V>(IntTree<KVStack>.Empty);
 
         public HashTree2<K, V> AddOrUpdate(K key, V value)
         {
@@ -85,9 +85,9 @@ namespace DryIoc.UnitTests.Performance
             return _tree.Select(t => new HashTree2<K, V>(t)).GetEnumerator();
         }
 
-        private readonly HashTree<KVStack> _tree;
+        private readonly IntTree<KVStack> _tree;
 
-        private HashTree2(HashTree<KVStack> tree)
+        private HashTree2(IntTree<KVStack> tree)
         {
             _tree = tree;
         }
@@ -150,7 +150,7 @@ namespace DryIoc.UnitTests.Performance
 
     public sealed class HashTree3<K, V> : IEnumerable<HashTree3<K, V>>
     {
-        public static readonly HashTree3<K, V> Empty = new HashTree3<K, V>(HashTree<KV>.Empty);
+        public static readonly HashTree3<K, V> Empty = new HashTree3<K, V>(IntTree<KV>.Empty);
 
         public HashTree3<K, V> AddOrUpdate(K key, V value)
         {
@@ -171,9 +171,9 @@ namespace DryIoc.UnitTests.Performance
             return _tree.Select(t => new HashTree3<K, V>(t)).GetEnumerator();
         }
 
-        private readonly HashTree<KV> _tree;
+        private readonly IntTree<KV> _tree;
 
-        private HashTree3(HashTree<KV> tree)
+        private HashTree3(IntTree<KV> tree)
         {
             _tree = tree;
         }
