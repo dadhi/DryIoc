@@ -16,19 +16,16 @@
 // Features:
 // - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
 // - Add distinctive features: Export DelegateFactory<TService>.
-// - Make Request to return Empty for resolution root parent. So it will simplify ImplementationType checks. May be add IsResolutionRoot property as well.
-// - Make a single consistent approach to ResolveProperties and PropertyOrFieldResolutionRules.
-// - Move Container Setup related code to dedicated class/container-property Setup.
 // - Add parameter to Resolve to skip resolution cache, and probably all other caches.
 // - Rename ExportPublicTypes to AutoExport or something more concise.
 // ? Include properties Func with arguments support. What properties should be included: only marked for container resolution or all settable?
+// ! Make Request to return Empty for resolution root parent. So it will simplify ImplementationType checks. May be add IsResolutionRoot property as well.
 // + Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
 //
 // Internals:
 // - Move decorator cachedExpression from Setup to Factory itself. Make setup immutable again.
-// - Speed-up recursive dependency check as it happens on every Request resolution.
-// - Automatically propagate Setup on Factory.TryGetFactoryFor(Request ...).
-// ? Rename request to DependencyChain.
+// ! Rename request to DependencyChain.
+// + Speed-up recursive dependency check as it happens on every Request resolution.
 // + Remake Request ResolveTo to not mutate Request.
 // + Make Decorator caching work without SkipCache=true;
 // + Remove Container Singleton parameter from CompiledFactory.

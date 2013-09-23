@@ -1,12 +1,8 @@
 ﻿// TODO:
-// - Check and throw when Metadata is specified in multiple attributes, to provide determined behavior for the User.
 // - Add ExportAsDecorator(ForName, ForMetadata, ForImplementationType).
-// + Add IFactory<,, and more> support.
-// + Aggregate rules that using attributes into one and to GetCustomAttributes only once and improve speed.
-// + Split WithMetadata to Export and Import.
-// + Add ImportUsing(ImplType, Reuse, Name, Metadata, ConstructorSignature)
-// + Add ExportAll(Except=new Type[] { ... }).
-// + Add Import(ContractName=...) support on constructor parameters.
+// ? Add IFactory<,, and more> support.
+// ? Aggregate rules that using attributes into one and to GetCustomAttributes only once and improve speed.
+// + Check and throw when Metadata is specified in multiple attributes, to provide determined behavior for the User.
 
 //#define MEF_IS_AVAILABLE
 
