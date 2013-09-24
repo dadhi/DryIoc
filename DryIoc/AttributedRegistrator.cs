@@ -318,9 +318,9 @@ namespace DryIoc
 
         public override FactorySetup CreateSetup(object metadata)
         {
-            if (OfMetadata)
-                return DecoratorSetup.New(request => Equals(request.Metadata, metadata));
-            return DecoratorSetup.New(IsApplicable);
+            return OfMetadata 
+                ? DecoratorSetup.New(request => IsApplicable(request) && Equals(request.Metadata, metadata)) 
+                : DecoratorSetup.New(IsApplicable);
         }
 
         public override bool Equals(object obj)

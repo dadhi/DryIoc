@@ -31,6 +31,20 @@ namespace DryIoc.UnitTests.AttributedRegistration
             Assert.That(fast, Is.InstanceOf<RetryHandlerDecorator>());
             Assert.That(((RetryHandlerDecorator)fast).Handler, Is.InstanceOf<FastHandler>());
         }
+
+        [Test]
+        public void Decorator_can_be_applied_based_on_both_name_and_Metadata()
+        {
+            var container = new Container();
+            container.RegisterExported(typeof(TransactHandlerDecorator), typeof(FastHandler), typeof(SlowHandler), typeof(TransactHandler));
+
+            Assert.That(container.Resolve<IHandler>("slow"), Is.InstanceOf<SlowHandler>());
+            Assert.That(container.Resolve<IHandler>("fast"), Is.InstanceOf<FastHandler>());
+
+            var transact = container.Resolve<IHandler>("transact");
+            Assert.That(transact, Is.InstanceOf<TransactHandlerDecorator>());
+            Assert.That(((TransactHandlerDecorator)transact).Handler, Is.InstanceOf<TransactHandler>());
+        }
     }
 
     public interface IHandler { }
@@ -40,6 +54,9 @@ namespace DryIoc.UnitTests.AttributedRegistration
 
     [ExportAll(ContractName = "slow"), ExportWithMetadata(1)]
     class SlowHandler : IHandler { }
+
+    [ExportAll(ContractName = "transact"), ExportWithMetadata(1)]
+    class TransactHandler : IHandler { }
 
     [ExportAll, ExportAsDecorator(OfName = "slow")]
     class LoggingHandlerDecorator : IHandler
@@ -58,6 +75,18 @@ namespace DryIoc.UnitTests.AttributedRegistration
         public IHandler Handler { get; set; }
 
         public RetryHandlerDecorator(IHandler handler)
+        {
+            Handler = handler;
+        }
+    }
+
+
+    [ExportAll, ExportAsDecorator(OfName = "transact", OfMetadata = true), ExportWithMetadata(1)]
+    class TransactHandlerDecorator : IHandler
+    {
+        public IHandler Handler { get; set; }
+
+        public TransactHandlerDecorator(IHandler handler)
         {
             Handler = handler;
         }
