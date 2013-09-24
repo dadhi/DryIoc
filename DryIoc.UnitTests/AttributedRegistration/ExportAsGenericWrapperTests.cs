@@ -4,13 +4,13 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests.AttributedRegistration
 {
     [TestFixture]
-    public class ExportGenericWrapperTests
+    public class ExportAsGenericWrapperTests
     {
         [Test]
         public void Exporting_IFactory_as_generic_wrapper_should_work()
         {
             var container = new Container();
-            container.RegisterExportedTypes(typeof(FactoryConsumer), typeof(One), typeof(DryFactory<>));
+            container.RegisterExported(typeof(FactoryConsumer), typeof(One), typeof(DryFactory<>));
 
             var consumer = container.Resolve<FactoryConsumer>();
 
@@ -21,7 +21,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         public void Exporting_IFactory_with_arguments_as_generic_wrapper_should_work()
         {
             var container = new Container();
-            container.RegisterExportedTypes(typeof(FactoryWithArgsConsumer), typeof(Two), typeof(DryFactory<,>));
+            container.RegisterExported(typeof(FactoryWithArgsConsumer), typeof(Two), typeof(DryFactory<,>));
 
             var consumer = container.Resolve<Func<string, FactoryWithArgsConsumer>>();
 
@@ -52,7 +52,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         TService Create();
     }
 
-    [ExportPublicTypes, ExportAsGenericWrapper]
+    [ExportAll, ExportAsGenericWrapper]
     internal class DryFactory<TService> : IFactory<TService>
     {
         public DryFactory(Func<TService> create)
@@ -96,7 +96,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         TService Create(TArg0 arg0);
     }
 
-    [ExportPublicTypes, ExportAsGenericWrapper(1)]
+    [ExportAll, ExportAsGenericWrapper(1)]
     internal class DryFactory<TArg0, TService> : IFactory<TArg0, TService>
     {
         public DryFactory(Func<TArg0, TService> create)

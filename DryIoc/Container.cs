@@ -5,6 +5,7 @@
 // - Adjust ResolveProperties to be consistent with Import property or field.
 // - Fix code generation example.
 // - Evaluate Code Coverage.
+// - Add back static Array resolution.
 // + Convert SkipCache flag to enum.
 // + Review performance one again with fresh view.
 // + Add registration for lambda with IResolver parameter for something like RegisterDelegate(c => new Blah(c.Resolve(IDependency))).
@@ -18,12 +19,12 @@
 // - Add distinctive features: Export DelegateFactory<TService>.
 // - Add parameter to Resolve to skip resolution cache, and probably all other caches.
 // - Rename ExportPublicTypes to AutoExport or something more concise.
-// ? Include properties Func with arguments support. What properties should be included: only marked for container resolution or all settable?
+// ! Include properties Func with arguments support. What properties should be included: only marked for container resolution or all settable?
 // ! Make Request to return Empty for resolution root parent. So it will simplify ImplementationType checks. May be add IsResolutionRoot property as well.
 // + Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
 //
 // Internals:
-// - Move decorator cachedExpression from Setup to Factory itself. Make setup immutable again.
+// ! Move decorator cachedExpression from Setup to Factory itself. Make setup immutable again.
 // ! Rename request to DependencyChain.
 // + Speed-up recursive dependency check as it happens on every Request resolution.
 // + Remake Request ResolveTo to not mutate Request.
@@ -964,7 +965,7 @@ namespace DryIoc
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
-        public static void RegisterPublicTypes(this IRegistrator registrator,
+        public static void RegisterAll(this IRegistrator registrator,
             Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
@@ -982,11 +983,11 @@ namespace DryIoc
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
-        public static void RegisterPublicTypes<TImplementation>(this IRegistrator registrator,
+        public static void RegisterAll<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
-            registrator.RegisterPublicTypes(typeof(TImplementation), reuse, withConstructor, setup, named);
+            registrator.RegisterAll(typeof(TImplementation), reuse, withConstructor, setup, named);
         }
 
         /// <summary>

@@ -155,7 +155,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
 	        var container = new Container();
 
             Assert.Throws<ContainerException>(() => 
-                container.RegisterExportedTypes(typeof(OneWithManyMeta)));
+                container.RegisterExported(typeof(OneWithManyMeta)));
 	    }
 
 	    [Test]
@@ -173,7 +173,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
 		private void WhenIRegisterAllExportedTypes()
 		{
 			_container = new Container();
-			_container.RegisterExportedAssemblies(_assembly);
+			_container.RegisterExported(_assembly);
 		}
 
 		private void GivenAssemblyWithExportedTypes()

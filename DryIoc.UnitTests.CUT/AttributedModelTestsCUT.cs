@@ -213,7 +213,7 @@ namespace DryIoc.UnitTests.CUT
     {
     }
 
-    [ExportPublicTypes]
+    [ExportAll]
     internal class DbMan : ISomeDb, IAnotherDb
     {
     }
@@ -226,7 +226,7 @@ namespace DryIoc.UnitTests.CUT
     {
     }
 
-    [ExportPublicTypes(Except = new []{ typeof(IAnotherDb) })]
+    [ExportAll(Except = new []{ typeof(IAnotherDb) })]
     internal class DbMan<T> : ISomeDb<T>, IAnotherDb
     {
     }

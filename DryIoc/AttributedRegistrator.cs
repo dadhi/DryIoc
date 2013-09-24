@@ -1,5 +1,6 @@
 ﻿// TODO:
 // - Add ExportAsDecorator(ForName, ForMetadata, ForImplementationType).
+// + Rename ExportPublicTypes to something more concise. - ExportAll is fine for now.
 // ? Add IFactory<,, and more> support.
 // ? Aggregate rules that using attributes into one and to GetCustomAttributes only once and improve speed.
 // + Check and throw when Metadata is specified in multiple attributes, to provide determined behavior for the User.
@@ -20,14 +21,14 @@ namespace DryIoc
     {
         public static bool SingletonByDefault = true;
 
-        public static void RegisterExportedAssemblies(this IRegistrator registrator, params Assembly[] assemblies)
-        {
-            registrator.RegisterExported(ScanAssemblies(assemblies));
-        }
-
-        public static void RegisterExportedTypes(this IRegistrator registrator, params Type[] types)
+        public static void RegisterExported(this IRegistrator registrator, params Type[] types)
         {
             registrator.RegisterExported(ScanTypes(types));
+        }
+
+        public static void RegisterExported(this IRegistrator registrator, params Assembly[] assemblies)
+        {
+            registrator.RegisterExported(ScanAssemblies(assemblies));
         }
 
         public static void RegisterExported(this IRegistrator registrator, IEnumerable<RegistrationInfo> infos)
@@ -39,6 +40,10 @@ namespace DryIoc
                 {
                     var serviceTypeIndex = info.GenericWrapperServiceTypeIndex;
                     setup = GenericWrapperSetup.Of(types => types[serviceTypeIndex]);
+                }
+                else if (info.FactoryType == FactoryType.Decorator)
+                {
+                    setup = info.FactorySetupInfo.CreateSetup(info.ImplementationType);
                 }
                 else
                 {
@@ -72,6 +77,7 @@ namespace DryIoc
                 ExportInfo[] exports = null;
                 var isSingleton = SingletonByDefault; // default is singleton
                 var metadataAttributeIndex = -1;
+                FactorySetupInfo factorySetupInfo = null;
                 var factoryType = FactoryType.Service;
                 var genericWrapperServiceTypeArgIndex = 0;
 
@@ -96,11 +102,11 @@ namespace DryIoc
                             exports = exports.AddOrUpdateCopy(export);
                         }
                     }
-                    else if (attribute is ExportPublicTypesAttribute)
+                    else if (attribute is ExportAllAttribute)
                     {
-                        var autoExportAttribute = (ExportPublicTypesAttribute)attribute;
-                        var autoExports = autoExportAttribute.SelectServiceTypes(type)
-                            .Select(t => new ExportInfo { ServiceType = t })
+                        var exportAllAttribute = (ExportAllAttribute)attribute;
+                        var exportAllTypes = exportAllAttribute.SelectServiceTypes(type)
+                            .Select(t => new ExportInfo { ServiceType = t, ServiceName = exportAllAttribute.ContractName })
                             .ToArray();
 
                         if (exports != null)
@@ -108,12 +114,12 @@ namespace DryIoc
                             for (var index = 0; index < exports.Length; index++)
                             {
                                 var export = exports[index];
-                                if (!autoExports.Contains(export))
-                                    autoExports = autoExports.AddOrUpdateCopy(export);
+                                if (!exportAllTypes.Contains(export))
+                                    exportAllTypes = exportAllTypes.AddOrUpdateCopy(export);
                             }
                         }
 
-                        exports = autoExports;
+                        exports = exportAllTypes;
                     }
                     else if (attribute is PartCreationPolicyAttribute)
                     {
@@ -123,6 +129,12 @@ namespace DryIoc
                     {
                         factoryType = FactoryType.GenericWrapper;
                         genericWrapperServiceTypeArgIndex = ((ExportAsGenericWrapperAttribute)attribute).ServiceTypeArgIndex;
+                    }
+                    else if (attribute is ExportAsDecoratorAttribute)
+                    {
+                        var decoratorAttribute = ((ExportAsDecoratorAttribute)attribute);
+                        factoryType = FactoryType.Decorator;
+                        factorySetupInfo = new DecoratorSetupInfo { OfName = decoratorAttribute.OfName };
                     }
 
                     if (factoryType == FactoryType.Service && // Metadata is supported only for Service setup, so no need to check for other types.
@@ -137,8 +149,9 @@ namespace DryIoc
                 {
                     Exports = exports,
                     ImplementationType = type,
-                    IsSingleton = isSingleton,
+                    IsSingleton = isSingleton && factoryType != FactoryType.Decorator && factoryType != FactoryType.GenericWrapper,
                     MetadataAttributeIndex = metadataAttributeIndex,
+                    FactorySetupInfo = factorySetupInfo,
                     FactoryType = factoryType,
                     GenericWrapperServiceTypeIndex = genericWrapperServiceTypeArgIndex
                 };
@@ -151,7 +164,7 @@ namespace DryIoc
         {
             return type.IsClass && !type.IsAbstract &&
                 (Attribute.IsDefined(type, typeof(ExportAttribute), false) ||
-                Attribute.IsDefined(type, typeof(ExportPublicTypesAttribute), false));
+                Attribute.IsDefined(type, typeof(ExportAllAttribute), false));
         }
 
         public static ConstructorInfo FindSingleImportingConstructor(Type type)
@@ -267,6 +280,8 @@ namespace DryIoc
 
         public FactoryType FactoryType;
 
+        public FactorySetupInfo FactorySetupInfo;
+
         public int GenericWrapperServiceTypeIndex;
 
         public override bool Equals(object obj)
@@ -292,6 +307,58 @@ namespace DryIoc
             return true;
         }
     }
+
+    [Serializable]
+    public class FactorySetupInfo
+    {
+        public virtual FactorySetup CreateSetup(Type implementationType)
+        {
+            return ServiceSetup.Default;
+        }
+    }
+
+    [Serializable]
+    public class ServiceSetupInfo : FactorySetupInfo
+    {
+        public int MetadataAttributeIndex;
+
+        public override FactorySetup CreateSetup(Type implementationType)
+        {
+            var metadata = MetadataAttributeIndex == -1 ? null 
+                : AttributedRegistrator.FindMetadata(implementationType, MetadataAttributeIndex);
+            return ServiceSetup.WithMetadata(metadata);
+        }
+    }
+
+    [Serializable]
+    public class GenericWrapperSetupInfo : FactorySetupInfo
+    {
+        public int ServiceTypeIndex;
+
+        public override FactorySetup CreateSetup(Type implementationType)
+        {
+            return GenericWrapperSetup.Of(types => types[ServiceTypeIndex]);
+        }
+    }
+
+    [Serializable]
+    public class DecoratorSetupInfo : FactorySetupInfo
+    {
+        public string OfName;
+
+        public override FactorySetup CreateSetup(Type implementationType)
+        {
+            return DecoratorSetup.New(IsApplicable);
+        }
+
+        private bool IsApplicable(Request request)
+        {
+            if (OfName != null)
+                return Equals(OfName, request.ServiceKey);
+            return true;
+        }
+    }
+
 #pragma warning restore 659
 
 #if !MEF_IS_AVAILABLE
@@ -378,13 +445,12 @@ namespace DryIoc
         public readonly object Metadata;
     }
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
-    public class ExportPublicTypesAttribute : Attribute
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+    public class ExportAllAttribute : Attribute
     {
         public static Func<Type, bool> ExportedTypes = Container.PublicTypes;
 
         public Type[] Except { get; set; }
-
         public string ContractName { get; set; }
 
         public IEnumerable<Type> SelectServiceTypes(Type targetType)
@@ -403,6 +469,19 @@ namespace DryIoc
         {
             ServiceTypeArgIndex = serviceTypeArgumentIndex.ThrowIf(serviceTypeArgumentIndex < 0);
         }
+    }
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+    public class ExportAsDecoratorAttribute : Attribute
+    {
+        public string OfName { get; set; }
+        public string OfMetadata { get; set; }
+        public string OfImplementationType { get; set; }
+    }
+
+    public interface IDecoratorApplyCondition
+    {
+        bool Condition(Request request);
     }
 
     [MetadataAttribute]

@@ -92,7 +92,8 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
         {
             var model = TypeModel.Create();
 
-            var serializedTypes = new[] { typeof(ExportInfo), typeof(RegistrationInfo) };
+            var serializedTypes = new[] { typeof(ExportInfo), typeof(RegistrationInfo), 
+                typeof(FactorySetupInfo), typeof(DecoratorSetupInfo) };
 
             foreach (var type in serializedTypes)
                 model.Add(type, false).Add(type.GetFields().Select(x => x.Name).ToArray());

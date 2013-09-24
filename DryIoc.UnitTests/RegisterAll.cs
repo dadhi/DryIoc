@@ -3,14 +3,14 @@
 namespace DryIoc.UnitTests
 {
 	[TestFixture]
-	public class RegisterPublicTypesTests
+	public class RegisterAllTests
 	{
 		[Test]
 		public void Can_register_single_registrations_for_all_public_types_implemented()
 		{
 			// Arrange
 			var container = new Container();
-			container.RegisterPublicTypes<Someberry>();
+			container.RegisterAll<Someberry>();
 
 			Assert.That(container.IsRegistered<IBerry>(), Is.True);
 			Assert.That(container.IsRegistered<IProduct>(), Is.True);
@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
 		{
 			// Arrange
 			var container = new Container();
-            container.RegisterPublicTypes<Someberry>(Reuse.Singleton);
+            container.RegisterAll<Someberry>(Reuse.Singleton);
 
 			// Act
 			var product = container.Resolve<IProduct>();
