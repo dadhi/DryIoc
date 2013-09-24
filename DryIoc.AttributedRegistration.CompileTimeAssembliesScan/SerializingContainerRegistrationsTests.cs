@@ -92,7 +92,6 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
             model.Add<ExportInfo>();
             model.Add<RegistrationInfo>();
             model.Add<FactorySetupInfo>()
-                .AddSubType(101, model.Add<ServiceSetupInfo>().Type)
                 .AddSubType(102, model.Add<GenericWrapperSetupInfo>().Type)
                 .AddSubType(103, model.Add<DecoratorSetupInfo>().Type);
             return model;

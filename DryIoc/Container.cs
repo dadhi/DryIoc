@@ -176,7 +176,7 @@ namespace DryIoc
             }
 
             if (newFactory == null)
-                Throw.If(!shouldReturnNull, Error.UNABLE_TO_RESOLVE_SERVICE, request, request.PrintServiceInfo());
+                Throw.If(!shouldReturnNull, Error.UNABLE_TO_RESOLVE_SERVICE, request, request.PrintLatest());
             else
                 Register(newFactory, request.ServiceType, request.ServiceKey);
 
@@ -1520,22 +1520,28 @@ namespace DryIoc
         public readonly FactoryType FactoryType;
         public readonly int FactoryID;
         public readonly Type ImplementationType;
+        public readonly object Metadata;
 
         public int DecoratedFactoryID;
 
         public Request(Request parent, Type serviceType, object serviceKey, int decoratedFactoryID = 0, Factory factory = null)
         {
             Parent = parent;
-            ServiceType = serviceType.ThrowIfNull();
-            Throw.If(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
+
+            ServiceType = serviceType.ThrowIfNull()
+                .ThrowIf(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
             OpenGenericServiceType = serviceType.IsGenericType ? serviceType.GetGenericTypeDefinition() : null;
+            
             ServiceKey = serviceKey;
+
             DecoratedFactoryID = decoratedFactoryID;
+
             if (factory != null)
             {
                 FactoryType = factory.Setup.Type;
                 FactoryID = factory.ID;
                 ImplementationType = factory.ImplementationType;
+                Metadata = factory.Setup.Metadata;
             }
         }
 
@@ -1575,7 +1581,7 @@ namespace DryIoc
                 yield return x;
         }
 
-        public string PrintServiceInfo(bool showIndex = false)
+        public string PrintLatest(bool showIndex = false)
         {
             var key = ServiceKey is string ? "\"" + ServiceKey + "\""
                 : showIndex && ServiceKey is int ? "#" + ServiceKey
@@ -1590,9 +1596,9 @@ namespace DryIoc
 
         public override string ToString()
         {
-            var message = new StringBuilder().Append(PrintServiceInfo(true));
+            var message = new StringBuilder().Append(PrintLatest(true));
             return Parent == null ? message.ToString()
-                : Parent.Aggregate(message, (m, r) => m.AppendLine().Append(" in ").Append(r.PrintServiceInfo(true))).ToString();
+                : Parent.Aggregate(message, (m, r) => m.AppendLine().Append(" in ").Append(r.PrintLatest(true))).ToString();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -1840,6 +1846,12 @@ namespace DryIoc
         public static T ThrowIf<T>(this T arg, bool throwCondition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             if (!throwCondition) return arg;
+            throw GetException(message == null ? Format(ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
+        }
+
+        public static T ThrowIf<T>(this T arg, Func<T, bool> throwCondition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null)
+        {
+            if (!throwCondition(arg)) return arg;
             throw GetException(message == null ? Format(ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
         }
 
