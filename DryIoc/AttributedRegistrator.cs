@@ -35,21 +35,9 @@ namespace DryIoc
         {
             foreach (var info in infos)
             {
-                FactorySetup setup;
-                if (info.FactoryType == FactoryType.GenericWrapper)
-                {
-                    var serviceTypeIndex = info.GenericWrapperServiceTypeIndex;
-                    setup = GenericWrapperSetup.Of(types => types[serviceTypeIndex]);
-                }
-                else if (info.FactoryType == FactoryType.Decorator)
-                {
-                    setup = info.FactorySetupInfo.CreateSetup(info.ImplementationType);
-                }
-                else
-                {
-                    var metadata = info.MetadataAttributeIndex == -1 ? null : FindMetadata(info.ImplementationType, info.MetadataAttributeIndex);
-                    setup = ServiceSetup.WithMetadata(metadata);
-                }
+                var setup = info.FactorySetupInfo == null
+                    ? ServiceSetup.Default
+                    : info.FactorySetupInfo.CreateSetup(info.ImplementationType);
 
                 var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
                 var factory = new ReflectionFactory(info.ImplementationType, reuse, FindSingleImportingConstructor, setup);
@@ -77,9 +65,9 @@ namespace DryIoc
                 ExportInfo[] exports = null;
                 var isSingleton = SingletonByDefault; // default is singleton
                 var metadataAttributeIndex = -1;
-                FactorySetupInfo factorySetupInfo = null;
                 var factoryType = FactoryType.Service;
-                var genericWrapperServiceTypeArgIndex = 0;
+                FactorySetupInfo factorySetupInfo = null;
+                var multipleFactorySetupsFound = false;
 
                 for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
                 {
@@ -94,13 +82,9 @@ namespace DryIoc
                         };
 
                         if (exports == null)
-                        {
                             exports = new[] { export };
-                        }
                         else if (!exports.Contains(export))
-                        {
                             exports = exports.AddOrUpdateCopy(export);
-                        }
                     }
                     else if (attribute is ExportAllAttribute)
                     {
@@ -110,14 +94,12 @@ namespace DryIoc
                             .ToArray();
 
                         if (exports != null)
-                        {
                             for (var index = 0; index < exports.Length; index++)
                             {
                                 var export = exports[index];
                                 if (!exportAllTypes.Contains(export))
                                     exportAllTypes = exportAllTypes.AddOrUpdateCopy(export);
                             }
-                        }
 
                         exports = exportAllTypes;
                     }
@@ -127,33 +109,44 @@ namespace DryIoc
                     }
                     else if (attribute is ExportAsGenericWrapperAttribute)
                     {
+                        multipleFactorySetupsFound = factorySetupInfo != null;
+                        var wrapperAttribute = ((ExportAsGenericWrapperAttribute)attribute);
+                        factorySetupInfo = new GenericWrapperSetupInfo
+                        {
+                            ServiceTypeIndex = wrapperAttribute.ServiceTypeArgIndex
+                        };
                         factoryType = FactoryType.GenericWrapper;
-                        genericWrapperServiceTypeArgIndex = ((ExportAsGenericWrapperAttribute)attribute).ServiceTypeArgIndex;
                     }
                     else if (attribute is ExportAsDecoratorAttribute)
                     {
+                        multipleFactorySetupsFound = factorySetupInfo != null;
                         var decoratorAttribute = ((ExportAsDecoratorAttribute)attribute);
-                        factoryType = FactoryType.Decorator;
                         factorySetupInfo = new DecoratorSetupInfo { OfName = decoratorAttribute.OfName };
+                        factoryType = FactoryType.Decorator;
                     }
 
-                    if (factoryType == FactoryType.Service && // Metadata is supported only for Service setup, so no need to check for other types.
-                        Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), false))
+                    if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), false))
                     {
-                        Throw.If(metadataAttributeIndex != -1, Error.UNABLE_TO_SELECT_FROM_MULTIPLE_METADATA, type);
+                        Throw.If(metadataAttributeIndex != -1, Error.UNSUPPORTED_MULTIPLE_METADATA, type);
                         metadataAttributeIndex = attributeIndex;
                     }
+                }
+
+                Throw.If(multipleFactorySetupsFound, Error.UNSUPPORTED_MULTIPLE_SETUPS, type);
+
+                if (metadataAttributeIndex != -1)
+                {
+                    if (factoryType != FactoryType.Service)
+                        Throw.If(true, Error.UNSUPPORTED_METADATA_FOR_NON_SERVICE_SETUP, Enum.GetName(typeof(FactoryType), factoryType));
+                    factorySetupInfo = new ServiceSetupInfo { MetadataAttributeIndex = metadataAttributeIndex };
                 }
 
                 yield return new RegistrationInfo
                 {
                     Exports = exports,
                     ImplementationType = type,
-                    IsSingleton = isSingleton && factoryType != FactoryType.Decorator && factoryType != FactoryType.GenericWrapper,
-                    MetadataAttributeIndex = metadataAttributeIndex,
-                    FactorySetupInfo = factorySetupInfo,
-                    FactoryType = factoryType,
-                    GenericWrapperServiceTypeIndex = genericWrapperServiceTypeArgIndex
+                    IsSingleton = isSingleton && factoryType != FactoryType.Decorator,
+                    FactorySetupInfo = factorySetupInfo
                 };
             }
         }
@@ -245,19 +238,45 @@ namespace DryIoc
             "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}.";
 
         public static readonly string UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA =
-            "Unable to resolve dependency {0} with metadata [{1}]";
+            "Unable to resolve dependency {0} with metadata [{1}].";
 
-        public static readonly string UNABLE_TO_SELECT_FROM_MULTIPLE_METADATA =
-            "Unable to select from multiple metadata defined when Exporting {0}." + Environment.NewLine +
-            " Only single metadata is allowed per implementation type.";
+        public static readonly string UNSUPPORTED_MULTIPLE_METADATA =
+            "Multiple associated metadata found while exporting {0}. " +
+            "Only single metadata is supported per implementation type, please remove the rest.";
+
+        public static readonly string UNSUPPORTED_METADATA_FOR_NON_SERVICE_SETUP =
+            "Metadata is not supported for non-service {0} factory type.";
+
+        public static readonly string UNSUPPORTED_MULTIPLE_SETUPS =
+            "Multiple factory setups found while exporting {0}. " + 
+            "Only single ExportAs.. attribute is supported, please remove the rest.";
     }
 
 #pragma warning disable 659
+
+    [Serializable]
+    public sealed class RegistrationInfo
+    {
+        public Type ImplementationType;
+        public bool IsSingleton;
+        public ExportInfo[] Exports;
+        public FactorySetupInfo FactorySetupInfo;
+
+        public override bool Equals(object obj)
+        {
+            var other = obj as RegistrationInfo;
+            return other != null
+                && other.ImplementationType == ImplementationType
+                && other.IsSingleton == IsSingleton
+                && Equals(other.FactorySetupInfo, FactorySetupInfo)
+                && other.Exports.SequenceEqual(Exports);
+        }
+    }
+
     [Serializable]
     public sealed class ExportInfo
     {
         public Type ServiceType;
-
         public string ServiceName;
 
         public override bool Equals(object obj)
@@ -267,54 +286,9 @@ namespace DryIoc
         }
     }
 
-    [Serializable]
-    public sealed class RegistrationInfo
+    public abstract class FactorySetupInfo
     {
-        public ExportInfo[] Exports;
-
-        public Type ImplementationType;
-
-        public bool IsSingleton;
-
-        public int MetadataAttributeIndex;
-
-        public FactoryType FactoryType;
-
-        public FactorySetupInfo FactorySetupInfo;
-
-        public int GenericWrapperServiceTypeIndex;
-
-        public override bool Equals(object obj)
-        {
-            var other = obj as RegistrationInfo;
-            if (other == null)
-                return false;
-
-            if (FactoryType != other.FactoryType ||
-                ImplementationType != other.ImplementationType ||
-                IsSingleton != other.IsSingleton ||
-                MetadataAttributeIndex != other.MetadataAttributeIndex ||
-                GenericWrapperServiceTypeIndex != other.GenericWrapperServiceTypeIndex)
-                return false;
-
-            if (Exports.Length != other.Exports.Length)
-                return false;
-
-            for (var i = 0; i < Exports.Length; i++)
-                if (!Exports[i].Equals(other.Exports[i]))
-                    return false;
-
-            return true;
-        }
-    }
-
-    [Serializable]
-    public class FactorySetupInfo
-    {
-        public virtual FactorySetup CreateSetup(Type implementationType)
-        {
-            return ServiceSetup.Default;
-        }
+        public abstract FactorySetup CreateSetup(Type implementationType);
     }
 
     [Serializable]
@@ -324,9 +298,15 @@ namespace DryIoc
 
         public override FactorySetup CreateSetup(Type implementationType)
         {
-            var metadata = MetadataAttributeIndex == -1 ? null 
+            var metadata = MetadataAttributeIndex == -1 ? null
                 : AttributedRegistrator.FindMetadata(implementationType, MetadataAttributeIndex);
             return ServiceSetup.WithMetadata(metadata);
+        }
+
+        public override bool Equals(object obj)
+        {
+            var other = obj as ServiceSetupInfo;
+            return other != null && other.MetadataAttributeIndex == MetadataAttributeIndex;
         }
     }
 
@@ -339,6 +319,12 @@ namespace DryIoc
         {
             return GenericWrapperSetup.Of(types => types[ServiceTypeIndex]);
         }
+
+        public override bool Equals(object obj)
+        {
+            var other = obj as GenericWrapperSetupInfo;
+            return other != null && other.ServiceTypeIndex == ServiceTypeIndex;
+        }
     }
 
     [Serializable]
@@ -349,6 +335,12 @@ namespace DryIoc
         public override FactorySetup CreateSetup(Type implementationType)
         {
             return DecoratorSetup.New(IsApplicable);
+        }
+
+        public override bool Equals(object obj)
+        {
+            var other = obj as DecoratorSetupInfo;
+            return other != null && other.OfName == OfName;
         }
 
         private bool IsApplicable(Request request)

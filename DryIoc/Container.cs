@@ -15,6 +15,7 @@
 // + Add distinctive features:. ImportUsing.
 //
 // Features:
+// - Create separate property fro ReflectionFactory to allow Property injection.
 // - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
 // - Add distinctive features: Export DelegateFactory<TService>.
 // - Add parameter to Resolve to skip resolution cache, and probably all other caches.
@@ -24,6 +25,7 @@
 // + Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
 //
 // Internals:
+// - Speed: test MemberInit vs. Expression.Block in .net 4.0.
 // ! Move decorator cachedExpression from Setup to Factory itself. Make setup immutable again.
 // ! Rename request to DependencyChain.
 // + Speed-up recursive dependency check as it happens on every Request resolution.
@@ -84,7 +86,7 @@ namespace DryIoc
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
-        public readonly Setup Setup;
+        public readonly ContainerSetup Setup;
 
         public Container() : this(false) { }
 
@@ -96,7 +98,7 @@ namespace DryIoc
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
 
-            Setup = new Setup();
+            Setup = new ContainerSetup();
             CurrentScope = SingletonScope = new Scope();
 
             if (!coreOnly) // TODO: Default setup, May I just pass custom setup instead flag?
@@ -739,9 +741,9 @@ namespace DryIoc
         }
     }
 
-    public sealed class Setup
+    public sealed class ContainerSetup
     {
-        public Setup()
+        public ContainerSetup()
         {
             NonRegisteredServiceResolutionRules = new GetFactoryOrNull[0];
             ConstructorParamServiceKeyResolutionRules = new GetConstructorParamServiceKeyOrNull[0];
@@ -856,10 +858,10 @@ namespace DryIoc
         public static readonly string GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT =
             "Generic Wrapper expects single type argument by default, but found many: {0}.";
 
-        public static string SOME_FUNC_PARAMS_ARE_UNUSED =
+        public static readonly string SOME_FUNC_PARAMS_ARE_UNUSED =
             "Found some unused Func parameters ({0}) when resolving: {1}.";
 
-        public static string DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION = 
+        public static readonly string DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION = 
             "Decorator factory should support resolution as {0}, but it does not.";
     }
 
@@ -1829,40 +1831,51 @@ namespace DryIoc
     {
         public static Func<string, Exception> GetException = message => new ContainerException(message);
 
-        public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null) where T : class
+        public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
         {
             if (arg != null) return arg;
-            throw GetException(message == null ? Format(ARG_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2, arg3));
+            throw GetException(message == null ? Format(ARG_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2));
         }
 
-        public static T ThrowIf<T>(this T arg, bool throwCondition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
+        public static T ThrowIf<T>(this T arg, bool throwCondition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             if (!throwCondition) return arg;
-            throw GetException(message == null ? Format(ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2, arg3));
+            throw GetException(message == null ? Format(ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
         }
 
-        public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
+        public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             if (!throwCondition) return;
-            throw GetException(Format(message, arg0, arg1, arg2, arg3));
+            throw GetException(Format(message, arg0, arg1, arg2));
         }
 
         #region Implementation
 
-        private static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
+        private static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
-            return string.Format(message, Print(arg0), Print(arg1), Print(arg2), Print(arg3));
+            return string.Format(message, Print(arg0), Print(arg1), Print(arg2));
         }
 
-        private static string Print(object obj)
+        private static string Print(object arg)
         {
-            return obj == null ? null : obj is Type ? ((Type)obj).Print() : obj.ToString();
+            return arg == null ? null 
+                : arg is Type ? ((Type)arg).Print() 
+                : arg is Func<object> ? Print(((Func<object>)arg).Invoke())
+                : arg.ToString();
         }
 
         private static readonly string ARG_IS_NULL = "Argument of type {0} is null.";
         private static readonly string ARG_HAS_IMVALID_CONDITION = "Argument of type {0} has invalid condition.";
 
         #endregion
+    }
+
+    public static class Func
+    {
+        public static Func<object> Of(Func<object> func)
+        {
+            return func;
+        }
     }
 
     public static class Sugar

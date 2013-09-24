@@ -55,9 +55,7 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
             using (var file = File.OpenRead(DATA_FILE))
                 infos = (RegistrationInfo[])loadedModel.Deserialize(file, null, typeof(RegistrationInfo[]));
 
-            Assert.AreEqual(services.Length, infos.Length);
-            for (int i = 0; i < services.Length; i++)
-                Assert.AreEqual(services[i], infos[i]);
+            Assert.That(services, Is.EqualTo(infos));
         }
 
         [Test]
@@ -91,14 +89,22 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssembliesScan
         private static RuntimeTypeModel CreateModel()
         {
             var model = TypeModel.Create();
-
-            var serializedTypes = new[] { typeof(ExportInfo), typeof(RegistrationInfo), 
-                typeof(FactorySetupInfo), typeof(DecoratorSetupInfo) };
-
-            foreach (var type in serializedTypes)
-                model.Add(type, false).Add(type.GetFields().Select(x => x.Name).ToArray());
-
+            model.Add<ExportInfo>();
+            model.Add<RegistrationInfo>();
+            model.Add<FactorySetupInfo>()
+                .AddSubType(101, model.Add<ServiceSetupInfo>().Type)
+                .AddSubType(102, model.Add<GenericWrapperSetupInfo>().Type)
+                .AddSubType(103, model.Add<DecoratorSetupInfo>().Type);
             return model;
+        }
+    }
+
+    public static class RuntimeTypeModelExt
+    {
+        public static MetaType Add<T>(this RuntimeTypeModel model)
+        {
+            var publicFields = typeof(T).GetFields().Select(x => x.Name).ToArray();
+            return model.Add(typeof(T), false).Add(publicFields);
         }
     }
 }
