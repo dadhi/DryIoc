@@ -127,7 +127,8 @@ namespace DryIoc
                         setupInfo = new DecoratorSetupInfo
                         {
                             OfName = decoratorAttribute.OfName,
-                            OfMetadata = decoratorAttribute.OfMetadata
+                            OfMetadata = decoratorAttribute.OfMetadata,
+                            ConditionChecker = decoratorAttribute.ConditionChecker
                         };
                         factoryType = FactoryType.Decorator;
                     }
@@ -315,11 +316,18 @@ namespace DryIoc
     {
         public string OfName;
         public bool OfMetadata;
+        public Type ConditionChecker;
 
         public override FactorySetup CreateSetup(object metadata)
         {
-            return OfMetadata 
-                ? DecoratorSetup.New(request => IsApplicable(request) && Equals(request.Metadata, metadata)) 
+            if (ConditionChecker != null)
+            {
+                var checker = (IDecoratorConditionChecker)Activator.CreateInstance(ConditionChecker);
+                return DecoratorSetup.New(checker.Check);
+            }
+
+            return OfMetadata
+                ? DecoratorSetup.New(request => IsApplicable(request) && Equals(request.Metadata, metadata))
                 : DecoratorSetup.New(IsApplicable);
         }
 
@@ -415,12 +423,12 @@ namespace DryIoc
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
     public class ExportWithMetadataAttribute : Attribute
     {
+        public object Metadata { get; set; }
+
         public ExportWithMetadataAttribute(object metadata)
         {
             Metadata = metadata.ThrowIfNull();
         }
-
-        public readonly object Metadata;
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
@@ -453,13 +461,13 @@ namespace DryIoc
     public class ExportAsDecoratorAttribute : Attribute
     {
         public string OfName { get; set; }
-        public bool OfMetadata;
-        public Type OfImplementationType { get; set; }
+        public bool OfMetadata { get; set; }
+        public Type ConditionChecker { get; set; }
     }
 
-    public interface IDecoratorApplyCondition
+    public interface IDecoratorConditionChecker
     {
-        bool Condition(Request request);
+        bool Check(Request request);
     }
 
     [MetadataAttribute]

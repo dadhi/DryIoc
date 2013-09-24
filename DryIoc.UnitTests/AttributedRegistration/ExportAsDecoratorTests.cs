@@ -1,5 +1,4 @@
-﻿using System.Runtime.Remoting.Messaging;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
 namespace DryIoc.UnitTests.AttributedRegistration
 {
@@ -36,7 +35,8 @@ namespace DryIoc.UnitTests.AttributedRegistration
         public void Decorator_can_be_applied_based_on_both_name_and_Metadata()
         {
             var container = new Container();
-            container.RegisterExported(typeof(TransactHandlerDecorator), typeof(FastHandler), typeof(SlowHandler), typeof(TransactHandler));
+            container.RegisterExported(typeof(TransactHandlerDecorator), typeof(FastHandler), typeof(SlowHandler),
+                typeof(TransactHandler));
 
             Assert.That(container.Resolve<IHandler>("slow"), Is.InstanceOf<SlowHandler>());
             Assert.That(container.Resolve<IHandler>("fast"), Is.InstanceOf<FastHandler>());
@@ -45,21 +45,42 @@ namespace DryIoc.UnitTests.AttributedRegistration
             Assert.That(transact, Is.InstanceOf<TransactHandlerDecorator>());
             Assert.That(((TransactHandlerDecorator)transact).Handler, Is.InstanceOf<TransactHandler>());
         }
+
+        [Test]
+        public void Decorator_can_be_applied_based_on_custom_condition()
+        {
+            var container = new Container();
+            container.RegisterExported(typeof(CustomHandlerDecorator), typeof(FastHandler), typeof(SlowHandler));
+
+            Assert.That(container.Resolve<IHandler>("fast"), Is.InstanceOf<FastHandler>());
+
+            var fast = container.Resolve<IHandler>("slow");
+            Assert.That(fast, Is.InstanceOf<CustomHandlerDecorator>());
+            Assert.That(((CustomHandlerDecorator)fast).Handler, Is.InstanceOf<SlowHandler>());
+        }
     }
 
-    public interface IHandler { }
+    public interface IHandler
+    {
+    }
 
     [ExportAll(ContractName = "fast"), ExportWithMetadata(2)]
-    class FastHandler : IHandler { }
+    internal class FastHandler : IHandler
+    {
+    }
 
     [ExportAll(ContractName = "slow"), ExportWithMetadata(1)]
-    class SlowHandler : IHandler { }
+    internal class SlowHandler : IHandler
+    {
+    }
 
     [ExportAll(ContractName = "transact"), ExportWithMetadata(1)]
-    class TransactHandler : IHandler { }
+    internal class TransactHandler : IHandler
+    {
+    }
 
     [ExportAll, ExportAsDecorator(OfName = "slow")]
-    class LoggingHandlerDecorator : IHandler
+    internal class LoggingHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
 
@@ -70,7 +91,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
     }
 
     [ExportAll, ExportAsDecorator(OfMetadata = true), ExportWithMetadata(2)]
-    class RetryHandlerDecorator : IHandler
+    internal class RetryHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
 
@@ -80,9 +101,8 @@ namespace DryIoc.UnitTests.AttributedRegistration
         }
     }
 
-
     [ExportAll, ExportAsDecorator(OfName = "transact", OfMetadata = true), ExportWithMetadata(1)]
-    class TransactHandlerDecorator : IHandler
+    internal class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
 
@@ -91,4 +111,25 @@ namespace DryIoc.UnitTests.AttributedRegistration
             Handler = handler;
         }
     }
+
+    [ExportAll, ExportAsDecorator(ConditionChecker = typeof(ConditionChecker))]
+    internal class CustomHandlerDecorator : IHandler
+    {
+        public IHandler Handler { get; set; }
+
+        public CustomHandlerDecorator(IHandler handler)
+        {
+            Handler = handler;
+        }
+
+        class ConditionChecker : IDecoratorConditionChecker
+        {
+            public bool Check(Request request)
+            {
+                return request.ImplementationType == typeof(SlowHandler);
+            }
+        }
+    }
 }
+
+
