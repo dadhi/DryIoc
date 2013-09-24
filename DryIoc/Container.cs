@@ -200,7 +200,7 @@ namespace DryIoc
             var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
 
             LambdaExpression result = null;
-            var funcDecorators = _decorators.GetOrDefault(decoratorFuncType);
+            var funcDecorators = _decorators.GetValueOrDefault(decoratorFuncType);
             if (funcDecorators != null)
             {
                 var decoratorRequest = request.MakeDecorated();
@@ -221,11 +221,11 @@ namespace DryIoc
                 }
             }
 
-            IEnumerable<Factory> decorators = _decorators.GetOrDefault(serviceType);
+            IEnumerable<Factory> decorators = _decorators.GetValueOrDefault(serviceType);
             var openGenericDecoratorIndex = decorators == null ? 0 : ((Factory[])decorators).Length;
             if (request.OpenGenericServiceType != null)
             {
-                var openGenericDecorators = _decorators.GetOrDefault(request.OpenGenericServiceType);
+                var openGenericDecorators = _decorators.GetValueOrDefault(request.OpenGenericServiceType);
                 if (openGenericDecorators != null)
                     decorators = decorators == null ? openGenericDecorators : decorators.Concat(openGenericDecorators);
             }
@@ -435,13 +435,13 @@ namespace DryIoc
 
         public object ResolveDefault(Type serviceType, bool shouldReturnNull)
         {
-            return (_defaultResolutionCache.GetOrDefault(serviceType)
+            return (_defaultResolutionCache.GetValueOrDefault(serviceType)
                 ?? ResolveAndCacheFactory(serviceType, shouldReturnNull)).Invoke(CurrentScope, null/* resolutionRootScope */);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, bool shouldReturnNull)
         {
-            var entry = _keyedResolutionCache.GetOrDefault(serviceType);
+            var entry = _keyedResolutionCache.GetValueOrDefault(serviceType);
             var result = entry != null ? entry.GetCompiledFactoryOrNull(serviceKey.ThrowIfNull()) : null;
             if (result == null) // nothing in cache, try resolve and cache.
             {
@@ -482,7 +482,7 @@ namespace DryIoc
 
             public CompiledFactory GetCompiledFactoryOrNull(object key)
             {
-                return key is int ? _indexed.GetOrDefault((int)key) : _named.GetOrDefault((string)key);
+                return key is int ? _indexed.GetValueOrDefault((int)key) : _named.GetValueOrDefault((string)key);
             }
 
             public KeyedResolutionCacheEntry Add(object key, CompiledFactory factory)
@@ -692,7 +692,7 @@ namespace DryIoc
                         if (Indexed == null && index == 0)
                             result = LastDefault;
                         else if (Indexed != null)
-                            result = Indexed.GetOrDefault(index);
+                            result = Indexed.GetValueOrDefault(index);
                     }
                 }
 
@@ -1614,7 +1614,7 @@ namespace DryIoc
             Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
             lock (_syncRoot)
             {
-                var item = _items.GetOrDefault(id);
+                var item = _items.GetValueOrDefault(id);
                 if (item == null)
                     _items = _items.AddOrUpdate(id, item = factory());
                 return (T)item;
@@ -2003,7 +2003,7 @@ namespace DryIoc
                     : With(Left, Right.AddOrUpdate(key, value))).EnsureBalanced());
         }
 
-        public V GetOrDefault(int key, V defaultValue = default(V))
+        public V GetValueOrDefault(int key, V defaultValue = default(V))
         {
             var node = this;
             while (node.Height != 0 && key != node.Key)
@@ -2092,9 +2092,9 @@ namespace DryIoc
             return new HashTree<K, V>(_tree.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateConflicts), _updateValue);
         }
 
-        public V GetOrDefault(K key)
+        public V GetValueOrDefault(K key)
         {
-            var item = _tree.GetOrDefault(key.GetHashCode());
+            var item = _tree.GetValueOrDefault(key.GetHashCode());
             return item != null && (ReferenceEquals(key, item.Key) || key.Equals(item.Key)) ? item.Value : GetConflictedOrDefault(item, key);
         }
 

@@ -32,7 +32,7 @@ namespace DryIoc.UnitTests.Performance
 
         public static V TryGet<K, V>(this IntTree<Hashed<K, V>> tree, K key)
         {
-            var item = tree.GetOrDefault(key.GetHashCode());
+            var item = tree.GetValueOrDefault(key.GetHashCode());
             return item != null && Equals(item.Key, key) ? item.Value : TryGetConflicted(item, key);
         }
 
@@ -76,7 +76,7 @@ namespace DryIoc.UnitTests.Performance
 
         public V TryGet(K key, V defaultValue = default(V))
         {
-            var item = _tree.GetOrDefault(key.GetHashCode());
+            var item = _tree.GetValueOrDefault(key.GetHashCode());
             return item != null && Equals(item.Key, key) ? item.Value : TryGetStacked(item, key, defaultValue);
         }
 
@@ -161,7 +161,7 @@ namespace DryIoc.UnitTests.Performance
 
         public V TryGet(K key)
         {
-            var item = _tree.GetOrDefault(key.GetHashCode(), _defaultItem);
+            var item = _tree.GetValueOrDefault(key.GetHashCode(), _defaultItem);
             return key.Equals(item.Key) ? item.Value : TryGetConflicted(item, key);
             //return item != null && key.Equals(item.Key) ? item.Value : TryGetConflicted(item, key);
         }

@@ -16,9 +16,9 @@ namespace DryIoc.UnitTests
 				.AddOrUpdate(2, 22)
 				.AddOrUpdate(3, 33);
 
-			Assert.AreEqual(11, m.GetOrDefault(1));
-            Assert.AreEqual(22, m.GetOrDefault(2));
-            Assert.AreEqual(33, m.GetOrDefault(3));
+			Assert.AreEqual(11, m.GetValueOrDefault(1));
+            Assert.AreEqual(22, m.GetValueOrDefault(2));
+            Assert.AreEqual(33, m.GetValueOrDefault(3));
 		}
 
 		[Test]
@@ -96,7 +96,7 @@ namespace DryIoc.UnitTests
 			var tree = IntTree<int>.Empty;
 
             Assert.DoesNotThrow(
-                () => tree.GetOrDefault(0));
+                () => tree.GetValueOrDefault(0));
 		}
 
 		[Test]
@@ -129,7 +129,7 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate(2, "b")
                 .AddOrUpdate(3, "c");
 
-            var value = tree.GetOrDefault(2);
+            var value = tree.GetValueOrDefault(2);
 
             Assert.That(value, Is.EqualTo("b"));
         }
@@ -169,7 +169,7 @@ namespace DryIoc.UnitTests
 
             string result = null;
 
-            var items = tree.GetOrDefault(keyHash);
+            var items = tree.GetValueOrDefault(keyHash);
             if (items != null)
             {
                 var firstItem = items[0];
@@ -201,7 +201,7 @@ namespace DryIoc.UnitTests
 
             tree = tree.AddOrUpdate(key, value);
 
-            var result = tree.GetOrDefault(key);
+            var result = tree.GetValueOrDefault(key);
             Assert.That(result, Is.EqualTo("test"));
         }
 
@@ -216,7 +216,7 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate(key2, 2)
                 .AddOrUpdate(key3, 3);
 
-	        var value = tree.GetOrDefault(key3);
+	        var value = tree.GetValueOrDefault(key3);
 
             Assert.That(value, Is.EqualTo(3));
 	    }
