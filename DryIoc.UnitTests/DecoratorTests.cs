@@ -168,6 +168,21 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Should_support_decorator_of_decorator_without_decorated_service_argument_in_constructor()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, AnotherOperation>(setup: DecoratorSetup.New());
+            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.New());
+
+            var operation = container.Resolve<IOperation>();
+            var operationExpr = container.Resolve<Container.FactoryExpression<IOperation>>();
+
+            Assert.That(operation, Is.InstanceOf<RetryOperationDecorator>());
+            Assert.That(((RetryOperationDecorator)operation).Decorated, Is.InstanceOf<AnotherOperation>());
+        }
+
+        [Test]
         public void Should_support_decorating_of_Lazy_service()
         {
             var container = new Container();
