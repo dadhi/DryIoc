@@ -66,7 +66,7 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.DuringResolution);
 
             var consumer = container.Resolve<Consumer>();
-            //var consumerExpr = container.Resolve<Container.FactoryExpression<Consumer>>();
+            //var consumerExpr = container.Resolve<Container.DebugExpression<Consumer>>();
 
             Assert.That(consumer.Log, Is.Not.Null.And.SameAs(consumer.Account.Log));
         }

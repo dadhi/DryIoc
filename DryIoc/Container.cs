@@ -113,7 +113,7 @@ namespace DryIoc
 
                 this.Register(typeof(Meta<,>), new CustomFactoryProvider(GetMetaFactoryOrNull, GenericWrapperSetup.Of(t => t[0])));
 
-                this.Register(typeof(FactoryExpression<>), new CustomFactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
+                this.Register(typeof(DebugExpression<>), new CustomFactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
             }
         }
 
@@ -624,11 +624,11 @@ namespace DryIoc
         #region Diagnostics
 
         [DebuggerDisplay("Factory Expression: {Expression}")]
-        public sealed class FactoryExpression<TService>
+        public sealed class DebugExpression<TService>
         {
             public readonly Expression<CompiledFactory> Expression;
 
-            public FactoryExpression(Expression<CompiledFactory> expression)
+            public DebugExpression(Expression<CompiledFactory> expression)
             {
                 Expression = expression;
             }

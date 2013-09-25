@@ -162,7 +162,7 @@ namespace DryIoc.UnitTests
             container.Register<IOperation, AnotherOperation>(setup: DecoratorSetup.New());
 
             var operation = container.Resolve<IOperation>();
-            //var operationExpr = container.Resolve<Container.FactoryExpression<IOperation>>();
+            //var operationExpr = container.Resolve<Container.DebugExpression<IOperation>>();
 
             Assert.That(operation, Is.InstanceOf<AnotherOperation>());
         }
@@ -176,7 +176,7 @@ namespace DryIoc.UnitTests
             container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.New());
 
             var operation = container.Resolve<IOperation>();
-            var operationExpr = container.Resolve<Container.FactoryExpression<IOperation>>();
+            var operationExpr = container.Resolve<Container.DebugExpression<IOperation>>();
 
             Assert.That(operation, Is.InstanceOf<RetryOperationDecorator>());
             Assert.That(((RetryOperationDecorator)operation).Decorated, Is.InstanceOf<AnotherOperation>());
