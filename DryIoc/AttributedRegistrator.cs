@@ -327,8 +327,8 @@ namespace DryIoc
             }
 
             return OfMetadata
-                ? DecoratorSetup.New(request => IsApplicable(request) && Equals(request.Metadata, metadata))
-                : DecoratorSetup.New(IsApplicable);
+                ? DecoratorSetup.New(request => IsNameApplicable(request) && Equals(request.Metadata, metadata))
+                : DecoratorSetup.New(IsNameApplicable);
         }
 
         public override bool Equals(object obj)
@@ -337,11 +337,9 @@ namespace DryIoc
             return other != null && other.OfName == OfName && other.OfMetadata == OfMetadata;
         }
 
-        private bool IsApplicable(Request request)
+        private bool IsNameApplicable(Request request)
         {
-            if (OfName != null)
-                return Equals(OfName, request.ServiceKey);
-            return true;
+            return OfName == null || Equals(OfName, request.ServiceKey);
         }
     }
 
