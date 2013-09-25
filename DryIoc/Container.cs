@@ -254,10 +254,7 @@ namespace DryIoc
                                 .GetFuncWithArgsOrNull(decoratorFuncType, decoratorRequest, this, out unusedFunArgs)
                                 .ThrowIfNull(Error.DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION, decoratorFuncType);
 
-                            if (unusedFunArgs != null)
-                                setup.CachedExpression = funcExpr.Body;
-                            else
-                                setup.CachedExpression = funcExpr;
+                            setup.CachedExpression = unusedFunArgs != null ? funcExpr.Body : funcExpr;
                         }
 
                         if (resultDecorator == null || !(setup.CachedExpression is LambdaExpression))
@@ -744,13 +741,14 @@ namespace DryIoc
             if (funcTypeArgs.Length == 1)
                 return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
 
-            IList<Type> unusedFuncParams;
+            IList<Type> unusedFuncArgs;
             var funcExpr = serviceFactory
-                .GetFuncWithArgsOrNull(funcType, serviceRequest, registry, out unusedFuncParams)
+                .GetFuncWithArgsOrNull(funcType, serviceRequest, registry, out unusedFuncArgs)
                 .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
 
-            if (unusedFuncParams != null)
-                Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncParams.Print(), request);
+            if (unusedFuncArgs != null)
+                Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs.Print(), request);
+            
             return funcExpr;
         }
     }
