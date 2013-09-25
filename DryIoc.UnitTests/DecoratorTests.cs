@@ -246,21 +246,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Ignore]
-        public void Possible_to_register_decorator_as_delegate_of_decorated_service_wrapper()
-        {
-            var container = new Container();
-            container.Register<IOperation, SomeOperation>();
-            container.RegisterDelegate<Func<IOperation, IOperation>>(r => 
-                _ => new LazyDecorator(r.Resolve<Lazy<IOperation>>()), setup: DecoratorSetup.New());
-
-            var operation = container.Resolve<IOperation>();
-
-            Assert.That(operation, Is.InstanceOf<LazyDecorator>());
-            Assert.That(((LazyDecorator)operation).Decorated.Value, Is.InstanceOf<SomeOperation>());
-        }
-
-        [Test]
         public void Should_support_decorator_of_service_registered_with_delegate()
         {
             var container = new Container();
@@ -311,19 +296,6 @@ namespace DryIoc.UnitTests
             var operation = container.Resolve<Func<object, IOperation>>();
 
             Assert.That(operation("blah"), Is.InstanceOf<RetryOperationDecorator>());
-        }
-
-        [Test]
-        [Ignore]
-        public void Should_support_resolving_Func_with_parameters_of_Lazy_service()
-        {
-            var container = new Container();
-            container.Register<IOperation, ParameterizedOperation>();
-            container.Register<IOperation, FuncWithArgDecorator>(setup: DecoratorSetup.New());
-
-            var operation = container.Resolve<Func<object, IOperation>>();
-
-            Assert.That(operation("blah"), Is.InstanceOf<LazyDecorator>());
         }
 
         [Test]
