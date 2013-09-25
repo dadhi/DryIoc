@@ -58,6 +58,18 @@ namespace DryIoc.UnitTests.AttributedRegistration
             Assert.That(fast, Is.InstanceOf<CustomHandlerDecorator>());
             Assert.That(((CustomHandlerDecorator)fast).Handler, Is.InstanceOf<SlowHandler>());
         }
+
+        [Test]
+        public void Decorator_will_ignore_Import_attribute_on_decorated_service_constructor()
+        {
+            var container = new Container();
+            container.RegisterExported(typeof(FastHandler), typeof(SlowHandler), typeof(DecoratorWithFastHandlerImport));
+
+            var slow = container.Resolve<IHandler>("slow");
+
+            Assert.That(slow, Is.InstanceOf<DecoratorWithFastHandlerImport>());
+            Assert.That(((DecoratorWithFastHandlerImport) slow).Handler, Is.InstanceOf<SlowHandler>());
+        }
     }
 
     public interface IHandler
@@ -128,6 +140,17 @@ namespace DryIoc.UnitTests.AttributedRegistration
             {
                 return request.ImplementationType == typeof(SlowHandler);
             }
+        }
+    }
+
+    [ExportAll, ExportAsDecorator]
+    public class DecoratorWithFastHandlerImport : IHandler
+    {
+        public IHandler Handler { get; set; }
+
+        public DecoratorWithFastHandlerImport([Import("fast")]IHandler handler)
+        {
+            Handler = handler;
         }
     }
 }

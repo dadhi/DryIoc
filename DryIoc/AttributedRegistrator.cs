@@ -1,5 +1,5 @@
 ﻿// TODO:
-// - Add ExportAsDecorator(ForName, ForMetadata, ForImplementationType).
+// + Add ExportAsDecorator(ForName, ForMetadata, ForImplementationType).
 // + Rename ExportPublicTypes to something more concise. - ExportAll is fine for now.
 // ? Add IFactory<,, and more> support.
 // ? Aggregate rules that using attributes into one and to GetCustomAttributes only once and improve speed.
