@@ -126,9 +126,9 @@ namespace DryIoc
                         var decoratorAttribute = ((ExportAsDecoratorAttribute)attribute);
                         setupInfo = new DecoratorSetupInfo
                         {
-                            ServiceName = decoratorAttribute.DecoratedServiceName,
-                            MetadataCheck = decoratorAttribute.ShouldDecorateMetadata,
-                            ApplicabilityChecker = decoratorAttribute.DecoratedCondition
+                            ServiceName = decoratorAttribute.ContractName,
+                            CompareMetadata = decoratorAttribute.CompareMetadata,
+                            Condition = decoratorAttribute.Condition
                         };
                         factoryType = FactoryType.Decorator;
                     }
@@ -143,7 +143,7 @@ namespace DryIoc
                 Throw.If(multipleFactorySetupsFound, Error.UNSUPPORTED_MULTIPLE_SETUPS, type);
 
                 if (metadataAttributeIndex != -1 && setupInfo is DecoratorSetupInfo)
-                    ((DecoratorSetupInfo)setupInfo).ThrowIf(info => !info.MetadataCheck);
+                    ((DecoratorSetupInfo)setupInfo).ThrowIf(info => !info.CompareMetadata);
 
                 yield return new RegistrationInfo
                 {
@@ -315,31 +315,26 @@ namespace DryIoc
     public class DecoratorSetupInfo : FactorySetupInfo
     {
         public string ServiceName;
-        public bool MetadataCheck;
-        public Type ApplicabilityChecker;
+        public bool CompareMetadata;
+        public Type Condition;
 
         public override FactorySetup CreateSetup(object metadata)
         {
-            if (ApplicabilityChecker != null)
-            {
-                var checker = (IDecoratorCondition)Activator.CreateInstance(ApplicabilityChecker);
-                return DecoratorSetup.With(checker.Check);
-            }
+            if (Condition != null)
+                return DecoratorSetup.With(((IDecoratorCondition)Activator.CreateInstance(Condition)).Check);
 
-            return MetadataCheck
-                ? DecoratorSetup.With(request => IsNameApplicable(request) && Equals(request.Metadata, metadata))
-                : DecoratorSetup.With(IsNameApplicable);
+            if (CompareMetadata || ServiceName != null)
+                return DecoratorSetup.With(request =>
+                    (!CompareMetadata || Equals(metadata, request.Metadata)) &&
+                    (ServiceName == null || ServiceName.Equals(request.ServiceKey)));
+
+            return DecoratorSetup.Default;
         }
 
         public override bool Equals(object obj)
         {
             var other = obj as DecoratorSetupInfo;
-            return other != null && other.ServiceName == ServiceName && other.MetadataCheck == MetadataCheck;
-        }
-
-        private bool IsNameApplicable(Request request)
-        {
-            return ServiceName == null || Equals(ServiceName, request.ServiceKey);
+            return other != null && other.ServiceName == ServiceName && other.CompareMetadata == CompareMetadata;
         }
     }
 
@@ -458,9 +453,9 @@ namespace DryIoc
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
     public class ExportAsDecoratorAttribute : Attribute
     {
-        public string DecoratedServiceName { get; set; }
-        public bool ShouldDecorateMetadata { get; set; }
-        public Type DecoratedCondition { get; set; }
+        public string ContractName { get; set; }
+        public bool CompareMetadata { get; set; }
+        public Type Condition { get; set; }
     }
 
     public interface IDecoratorCondition
