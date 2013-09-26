@@ -91,7 +91,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
     {
     }
 
-    [ExportAll, ExportAsDecorator(OfName = "slow")]
+    [ExportAll, ExportAsDecorator(DecoratedServiceName = "slow")]
     internal class LoggingHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -102,7 +102,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         }
     }
 
-    [ExportAll, ExportAsDecorator(OfMetadata = true), ExportWithMetadata(2)]
+    [ExportAll, ExportAsDecorator(ShouldDecorateMetadata = true), ExportWithMetadata(2)]
     internal class RetryHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -113,7 +113,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         }
     }
 
-    [ExportAll, ExportAsDecorator(OfName = "transact", OfMetadata = true), ExportWithMetadata(1)]
+    [ExportAll, ExportAsDecorator(DecoratedServiceName = "transact", ShouldDecorateMetadata = true), ExportWithMetadata(1)]
     internal class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -124,7 +124,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         }
     }
 
-    [ExportAll, ExportAsDecorator(ConditionChecker = typeof(ConditionChecker))]
+    [ExportAll, ExportAsDecorator(DecoratedCondition = typeof(DecoratorCondition))]
     internal class CustomHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -134,7 +134,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
             Handler = handler;
         }
 
-        class ConditionChecker : IDecoratorConditionChecker
+        class DecoratorCondition : IDecoratorCondition
         {
             public bool Check(Request request)
             {

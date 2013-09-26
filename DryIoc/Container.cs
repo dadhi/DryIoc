@@ -94,7 +94,7 @@ namespace DryIoc
         {
             _syncRoot = new object();
             _registry = new Dictionary<Type, RegistryEntry>();
-            _decorators = HashTree<Type, Factory[]>.Using(Sugar.Concat);
+            _decorators = HashTree<Type, DecoratorEntry[]>.Using(Sugar.Concat);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
 
@@ -111,7 +111,7 @@ namespace DryIoc
 
                 this.Register(typeof(Lazy<>), Reuse.Transient, t => t.GetConstructor(new[] { typeof(Func<>) }), GenericWrapperSetup.Default);
 
-                this.Register(typeof(Meta<,>), new CustomFactoryProvider(GetMetaFactoryOrNull, GenericWrapperSetup.Of(t => t[0])));
+                this.Register(typeof(Meta<,>), new CustomFactoryProvider(GetMetaFactoryOrNull, GenericWrapperSetup.With(t => t[0])));
 
                 this.Register(typeof(DebugExpression<>), new CustomFactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
             }
@@ -204,7 +204,7 @@ namespace DryIoc
                 var decoratorRequest = request.MakeDecorated();
                 for (var i = 0; i < funcDecorators.Length; i++)
                 {
-                    var decorator = funcDecorators[i];
+                    var decorator = funcDecorators[i].Factory;
                     if (((DecoratorSetup)decorator.Setup).IsApplicable(request))
                     {
                         var newDecorator = decorator.GetExpression(decoratorRequest, this);
@@ -222,8 +222,8 @@ namespace DryIoc
                 }
             }
 
-            IEnumerable<Factory> decorators = _decorators.GetValueOrDefault(serviceType);
-            var openGenericDecoratorIndex = decorators == null ? 0 : ((Factory[])decorators).Length;
+            IEnumerable<DecoratorEntry> decorators = _decorators.GetValueOrDefault(serviceType);
+            var openGenericDecoratorIndex = decorators == null ? 0 : ((DecoratorEntry[])decorators).Length;
             if (request.OpenGenericServiceType != null)
             {
                 var openGenericDecorators = _decorators.GetValueOrDefault(request.OpenGenericServiceType);
@@ -240,33 +240,33 @@ namespace DryIoc
                 while (enumerator.MoveNext())
                 {
                     var decorator = enumerator.Current.ThrowIfNull();
-                    if (((DecoratorSetup)decorator.Setup).IsApplicable(request))
+                    var factory = decorator.Factory;
+                    if (((DecoratorSetup)factory.Setup).IsApplicable(request))
                     {
                         // Cache closed generic registration produced by open-generic decorator.
                         if (decoratorIndex++ >= openGenericDecoratorIndex)
-                            decorator = Register(decorator.GetRequestSpecificFactoryOrNull(request, this), serviceType, null);
+                            factory = Register(factory.GetRequestSpecificFactoryOrNull(request, this), serviceType, null);
 
-                        var setup = ((DecoratorSetup)decorator.Setup);
-                        if (setup.CachedExpression == null)
+                        if (decorator.CachedExpression == null)
                         {
                             IList<Type> unusedFunArgs;
-                            var funcExpr = decorator
+                            var funcExpr = factory
                                 .GetFuncWithArgsOrNull(decoratorFuncType, decoratorRequest, this, out unusedFunArgs)
                                 .ThrowIfNull(Error.DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION, decoratorFuncType);
 
-                            setup.CachedExpression = unusedFunArgs != null ? funcExpr.Body : funcExpr;
+                            decorator.CachedExpression = unusedFunArgs != null ? funcExpr.Body : funcExpr;
                         }
 
-                        if (resultDecorator == null || !(setup.CachedExpression is LambdaExpression))
-                            resultDecorator = setup.CachedExpression;
+                        if (resultDecorator == null || !(decorator.CachedExpression is LambdaExpression))
+                            resultDecorator = decorator.CachedExpression;
                         else
                         {
                             if (!(resultDecorator is LambdaExpression))
-                                resultDecorator = Expression.Invoke(setup.CachedExpression, resultDecorator);
+                                resultDecorator = Expression.Invoke(decorator.CachedExpression, resultDecorator);
                             else
                             {
                                 var prevDecorators = ((LambdaExpression) resultDecorator);
-                                var decorateDecorator = Expression.Invoke(setup.CachedExpression, prevDecorators.Body);
+                                var decorateDecorator = Expression.Invoke(decorator.CachedExpression, prevDecorators.Body);
                                 resultDecorator = Expression.Lambda(decorateDecorator, prevDecorators.Parameters[0]);
                             }
                         }
@@ -388,7 +388,7 @@ namespace DryIoc
             {
                 if (factory.Setup.Type == FactoryType.Decorator)
                 {
-                    _decorators = _decorators.AddOrUpdate(serviceType, new[] { factory });
+                    _decorators = _decorators.AddOrUpdate(serviceType, new[] { new DecoratorEntry(factory)  });
                     return factory;
                 }
 
@@ -661,7 +661,7 @@ namespace DryIoc
 
         private readonly object _syncRoot;
         private readonly Dictionary<Type, RegistryEntry> _registry;
-        private HashTree<Type, Factory[]> _decorators;
+        private HashTree<Type, DecoratorEntry[]> _decorators;
 
         private sealed class RegistryEntry
         {
@@ -700,13 +700,25 @@ namespace DryIoc
             }
         }
 
+        private sealed class DecoratorEntry
+        {
+            public readonly Factory Factory;
+            public Expression CachedExpression;
+
+            public DecoratorEntry(Factory factory, Expression cachedExpression = null)
+            {
+                Factory = factory;
+                CachedExpression = cachedExpression;
+            }
+        }
+
         #endregion
     }
 
     public class FuncGenericWrapper : Factory
     {
         public FuncGenericWrapper()
-            : base(setup: GenericWrapperSetup.Of(types => types[types.Length - 1])) { }
+            : base(setup: GenericWrapperSetup.With(types => types[types.Length - 1])) { }
 
         public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry)
         {
@@ -1179,11 +1191,11 @@ namespace DryIoc
 
     public class GenericWrapperSetup : FactorySetup
     {
-        public static readonly FactorySetup Default = new GenericWrapperSetup();
+        public static readonly GenericWrapperSetup Default = new GenericWrapperSetup();
 
-        public static FactorySetup Of(Func<Type[], Type> selectServiceType)
+        public static GenericWrapperSetup With(Func<Type[], Type> serviceTypeArgSelector)
         {
-            return selectServiceType == null ? Default : new GenericWrapperSetup(selectServiceType);
+            return serviceTypeArgSelector == null ? Default : new GenericWrapperSetup(serviceTypeArgSelector);
         }
 
         public override FactoryType Type { get { return FactoryType.GenericWrapper; } }
@@ -1208,16 +1220,16 @@ namespace DryIoc
 
     public class DecoratorSetup : FactorySetup
     {
-        public static FactorySetup New(Func<Request, bool> isApplicable = null)
+        public static readonly DecoratorSetup Default = new DecoratorSetup();
+
+        public static DecoratorSetup With(Func<Request, bool> applicabilityChecker = null)
         {
-            return new DecoratorSetup(isApplicable);
+            return applicabilityChecker == null ? Default : new DecoratorSetup(applicabilityChecker);
         }
 
         public override FactoryType Type { get { return FactoryType.Decorator; } }
         public override FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.DoNotCacheExpression; } }
         public readonly Func<Request, bool> IsApplicable;
-
-        public Expression CachedExpression;
 
         #region Implementation
 

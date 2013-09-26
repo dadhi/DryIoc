@@ -126,9 +126,9 @@ namespace DryIoc
                         var decoratorAttribute = ((ExportAsDecoratorAttribute)attribute);
                         setupInfo = new DecoratorSetupInfo
                         {
-                            OfName = decoratorAttribute.OfName,
-                            OfMetadata = decoratorAttribute.OfMetadata,
-                            ConditionChecker = decoratorAttribute.ConditionChecker
+                            ServiceName = decoratorAttribute.DecoratedServiceName,
+                            MetadataCheck = decoratorAttribute.ShouldDecorateMetadata,
+                            ApplicabilityChecker = decoratorAttribute.DecoratedCondition
                         };
                         factoryType = FactoryType.Decorator;
                     }
@@ -143,7 +143,7 @@ namespace DryIoc
                 Throw.If(multipleFactorySetupsFound, Error.UNSUPPORTED_MULTIPLE_SETUPS, type);
 
                 if (metadataAttributeIndex != -1 && setupInfo is DecoratorSetupInfo)
-                    ((DecoratorSetupInfo)setupInfo).ThrowIf(info => !info.OfMetadata);
+                    ((DecoratorSetupInfo)setupInfo).ThrowIf(info => !info.MetadataCheck);
 
                 yield return new RegistrationInfo
                 {
@@ -301,7 +301,7 @@ namespace DryIoc
 
         public override FactorySetup CreateSetup(object metadata)
         {
-            return GenericWrapperSetup.Of(types => types[ServiceTypeIndex]);
+            return GenericWrapperSetup.With(types => types[ServiceTypeIndex]);
         }
 
         public override bool Equals(object obj)
@@ -314,32 +314,32 @@ namespace DryIoc
     [Serializable]
     public class DecoratorSetupInfo : FactorySetupInfo
     {
-        public string OfName;
-        public bool OfMetadata;
-        public Type ConditionChecker;
+        public string ServiceName;
+        public bool MetadataCheck;
+        public Type ApplicabilityChecker;
 
         public override FactorySetup CreateSetup(object metadata)
         {
-            if (ConditionChecker != null)
+            if (ApplicabilityChecker != null)
             {
-                var checker = (IDecoratorConditionChecker)Activator.CreateInstance(ConditionChecker);
-                return DecoratorSetup.New(checker.Check);
+                var checker = (IDecoratorCondition)Activator.CreateInstance(ApplicabilityChecker);
+                return DecoratorSetup.With(checker.Check);
             }
 
-            return OfMetadata
-                ? DecoratorSetup.New(request => IsNameApplicable(request) && Equals(request.Metadata, metadata))
-                : DecoratorSetup.New(IsNameApplicable);
+            return MetadataCheck
+                ? DecoratorSetup.With(request => IsNameApplicable(request) && Equals(request.Metadata, metadata))
+                : DecoratorSetup.With(IsNameApplicable);
         }
 
         public override bool Equals(object obj)
         {
             var other = obj as DecoratorSetupInfo;
-            return other != null && other.OfName == OfName && other.OfMetadata == OfMetadata;
+            return other != null && other.ServiceName == ServiceName && other.MetadataCheck == MetadataCheck;
         }
 
         private bool IsNameApplicable(Request request)
         {
-            return OfName == null || Equals(OfName, request.ServiceKey);
+            return ServiceName == null || Equals(ServiceName, request.ServiceKey);
         }
     }
 
@@ -458,12 +458,12 @@ namespace DryIoc
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
     public class ExportAsDecoratorAttribute : Attribute
     {
-        public string OfName { get; set; }
-        public bool OfMetadata { get; set; }
-        public Type ConditionChecker { get; set; }
+        public string DecoratedServiceName { get; set; }
+        public bool ShouldDecorateMetadata { get; set; }
+        public Type DecoratedCondition { get; set; }
     }
 
-    public interface IDecoratorConditionChecker
+    public interface IDecoratorCondition
     {
         bool Check(Request request);
     }
