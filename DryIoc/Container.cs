@@ -94,7 +94,7 @@ namespace DryIoc
         {
             _syncRoot = new object();
             _registry = new Dictionary<Type, RegistryEntry>();
-            _decorators = HashTree<Type, Factory[]>.Using(ConcatArrays);
+            _decorators = HashTree<Type, Factory[]>.Using(Sugar.Concat);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
 
@@ -663,17 +663,6 @@ namespace DryIoc
         private readonly Dictionary<Type, RegistryEntry> _registry;
         private HashTree<Type, Factory[]> _decorators;
 
-        private static V[] ConcatArrays<V>(V[] existing, V[] added)
-        {
-            var result = new V[existing.Length + added.Length];
-            Array.Copy(existing, 0, result, 0, existing.Length);
-            if (added.Length == 1)
-                result[existing.Length] = added[0];
-            else
-                Array.Copy(added, 0, result, existing.Length, added.Length);
-            return result;
-        }
-
         private sealed class RegistryEntry
         {
             public Factory LastDefault;
@@ -775,7 +764,7 @@ namespace DryIoc
 
         public GetFactoryOrNull AddNonRegisteredServiceResolutionRule(GetFactoryOrNull rule)
         {
-            SetNonRegisteredServiceResolutionRules(NonRegisteredServiceResolutionRules.Concat(new[] { rule }));
+            SetNonRegisteredServiceResolutionRules(NonRegisteredServiceResolutionRules.Concat(rule));
             return rule;
         }
 
@@ -793,7 +782,7 @@ namespace DryIoc
 
         public GetConstructorParamServiceKeyOrNull AddConstructorParamServiceKeyResolutionRule(GetConstructorParamServiceKeyOrNull rule)
         {
-            SetConstructorParamServiceKeyResolutionRules(ConstructorParamServiceKeyResolutionRules.Concat(new[] { rule }));
+            SetConstructorParamServiceKeyResolutionRules(ConstructorParamServiceKeyResolutionRules.Concat(rule));
             return rule;
         }
 
@@ -811,7 +800,7 @@ namespace DryIoc
 
         public TryGetPropertyOrFieldServiceKey AddPropertyOrFieldResolutionRule(TryGetPropertyOrFieldServiceKey rule)
         {
-            SetPropertyOrFieldResolutionRules(PropertyOrFieldResolutionRules.Concat(new[] { rule }));
+            SetPropertyOrFieldResolutionRules(PropertyOrFieldResolutionRules.Concat(rule));
             return rule;
         }
 
@@ -1979,6 +1968,17 @@ namespace DryIoc
             Array.Copy(source, target, sourceLength);
             target[index] = value;
             return target;
+        }
+
+        public static V[] Concat<V>(this V[] source, params V[] added)
+        {
+            var result = new V[source.Length + added.Length];
+            Array.Copy(source, 0, result, 0, source.Length);
+            if (added.Length == 1)
+                result[source.Length] = added[0];
+            else
+                Array.Copy(added, 0, result, source.Length, added.Length);
+            return result;
         }
     }
 
