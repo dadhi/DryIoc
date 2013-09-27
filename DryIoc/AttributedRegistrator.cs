@@ -1,9 +1,5 @@
 ﻿// TODO:
-// + Add ExportAsDecorator(ForName, ForMetadata, ForImplementationType).
-// + Rename ExportPublicTypes to something more concise. - ExportAll is fine for now.
-// ? Add IFactory<,, and more> support.
-// ? Aggregate rules that using attributes into one and to GetCustomAttributes only once and improve speed.
-// + Check and throw when Metadata is specified in multiple attributes, to provide determined behavior for the User.
+// - Recognize export of Factory implementation.
 
 //#define MEF_IS_AVAILABLE
 

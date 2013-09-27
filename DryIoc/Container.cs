@@ -156,18 +156,18 @@ namespace DryIoc
                 Factory factory;
                 if (_registry.TryGetValue(request.ServiceType, out entry) &&
                     entry.TryGetFactory(out factory, request.ServiceType, request.ServiceKey))
-                    return factory.GetRequestSpecificFactoryOrNull(request, this) ?? factory;
+                    return factory.GetFactoryPerRequestOrNull(request, this) ?? factory;
 
                 if (request.OpenGenericServiceType != null &&
                     _registry.TryGetValue(request.OpenGenericServiceType, out entry))
                 {
                     Factory genericFactory;
                     if (entry.TryGetFactory(out genericFactory, request.ServiceType, request.ServiceKey) ||
-                        request.ServiceKey != null &&
-                        entry.TryGetFactory(out genericFactory, request.ServiceType) && // OR try find generic-wrapper by ignoring service key.
+                        request.ServiceKey != null && // OR try find generic-wrapper by ignoring service key.
+                        entry.TryGetFactory(out genericFactory, request.ServiceType) &&
                         genericFactory.Setup.Type == FactoryType.GenericWrapper)
                     {
-                        newFactory = genericFactory.GetRequestSpecificFactoryOrNull(request, this);
+                        newFactory = genericFactory.GetFactoryPerRequestOrNull(request, this);
                     }
                 }
             }
@@ -175,7 +175,7 @@ namespace DryIoc
             if (newFactory == null)
             {
                 var rules = ResolutionRules.ForUnregisteredService;
-                if (rules.Length != 0)
+                if (rules != null)
                     for (var i = 0; i < rules.Length && newFactory == null; i++)
                         newFactory = rules[i].Invoke(request, this);
             }
@@ -250,7 +250,7 @@ namespace DryIoc
                     {
                         // Cache closed generic registration produced by open-generic decorator.
                         if (decoratorIndex++ >= openGenericDecoratorIndex)
-                            factory = Register(factory.GetRequestSpecificFactoryOrNull(request, this), serviceType, null);
+                            factory = Register(factory.GetFactoryPerRequestOrNull(request, this), serviceType, null);
 
                         if (decorator.CachedExpression == null)
                         {
@@ -355,13 +355,19 @@ namespace DryIoc
 
         bool IRegistry.ShouldResolvePropertyOrField
         {
-            get { return ResolutionRules.ForPropertyOrFieldServiceKey.Length != 0; }
+            get
+            {
+                var rules = ResolutionRules.ForPropertyOrFieldServiceKey;
+                return rules != null && rules.Length != 0;
+            }
         }
 
         bool IRegistry.TryGetPropertyOrFieldKey(out object resultKey, MemberInfo propertyOrField, Request parent)
         {
-            var rules = ResolutionRules.ForPropertyOrFieldServiceKey;
             resultKey = null;
+            var rules = ResolutionRules.ForPropertyOrFieldServiceKey;
+            if (rules == null)
+                return false;
             var gotIt = false;
             for (var i = 0; i < rules.Length && !gotIt; i++)
                 gotIt = rules[i].Invoke(out resultKey, propertyOrField, parent, this);
@@ -520,11 +526,11 @@ namespace DryIoc
         public class FuncGenericWrapper : Factory
         {
             public FuncGenericWrapper()
-                : base(setup: GenericWrapperSetup.With(typeArgs => typeArgs[typeArgs.Length - 1])) { }
+                : base(DryIoc.Reuse.Singleton, GenericWrapperSetup.With(t => t[t.Length - 1])) { }
 
-            public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry)
+            public override Factory GetFactoryPerRequestOrNull(Request request, IRegistry registry)
             {
-                return new DelegateFactory(CreateExpression, DryIoc.Reuse.Singleton, Setup);
+                return new DelegateFactory(CreateExpression, Reuse, Setup);
             }
 
             protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -749,7 +755,6 @@ namespace DryIoc
 
         #endregion
     }
-
 
     public sealed class ResolutionRules
     {
@@ -1134,9 +1139,9 @@ namespace DryIoc
     {
         public static readonly GenericWrapperSetup Default = new GenericWrapperSetup();
 
-        public static GenericWrapperSetup With(Func<Type[], Type> serviceTypeArgSelector)
+        public static GenericWrapperSetup With(Func<Type[], Type> selectServiceTypeArg)
         {
-            return serviceTypeArgSelector == null ? Default : new GenericWrapperSetup(serviceTypeArgSelector);
+            return selectServiceTypeArg == null ? Default : new GenericWrapperSetup(selectServiceTypeArg);
         }
 
         public override FactoryType Type { get { return FactoryType.GenericWrapper; } }
@@ -1163,9 +1168,9 @@ namespace DryIoc
     {
         public static readonly DecoratorSetup Default = new DecoratorSetup();
 
-        public static DecoratorSetup With(Func<Request, bool> applicabilityChecker = null)
+        public static DecoratorSetup With(Func<Request, bool> condition = null)
         {
-            return applicabilityChecker == null ? Default : new DecoratorSetup(applicabilityChecker);
+            return condition == null ? Default : new DecoratorSetup(condition);
         }
 
         public override FactoryType Type { get { return FactoryType.Decorator; } }
@@ -1174,14 +1179,9 @@ namespace DryIoc
 
         #region Implementation
 
-        private DecoratorSetup(Func<Request, bool> isApplicable = null)
+        private DecoratorSetup(Func<Request, bool> condition = null)
         {
-            IsApplicable = isApplicable ?? IsApplicableByDefault;
-        }
-
-        private static bool IsApplicableByDefault(Request _)
-        {
-            return true;
+            IsApplicable = condition ?? (_ => true);
         }
 
         #endregion
@@ -1204,7 +1204,7 @@ namespace DryIoc
             Setup = setup ?? ServiceSetup.Default;
         }
 
-        public abstract Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry);
+        public abstract Factory GetFactoryPerRequestOrNull(Request request, IRegistry registry);
 
         public Expression GetExpression(Request request, IRegistry registry)
         {
@@ -1280,7 +1280,7 @@ namespace DryIoc
             _withConstructor = withConstructor;
         }
 
-        public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry _)
+        public override Factory GetFactoryPerRequestOrNull(Request request, IRegistry _)
         {
             if (!_implementationType.IsGenericTypeDefinition) return null;
             var closedImplType = _implementationType.MakeGenericType(request.ServiceType.GetGenericArguments());
@@ -1416,7 +1416,7 @@ namespace DryIoc
             _getExpression = getExpression.ThrowIfNull();
         }
 
-        public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry)
+        public override Factory GetFactoryPerRequestOrNull(Request request, IRegistry registry)
         {
             return null;
         }
@@ -1441,7 +1441,7 @@ namespace DryIoc
             _getFactoryOrNull = getFactoryOrNull.ThrowIfNull();
         }
 
-        public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry)
+        public override Factory GetFactoryPerRequestOrNull(Request request, IRegistry registry)
         {
             return _getFactoryOrNull(request, registry);
         }
@@ -1901,6 +1901,14 @@ namespace DryIoc
             }
 
             return results;
+        }
+
+        public static Type GetBasestType(this Type type)
+        {
+            Type baseType = null;
+            for (var bt = type.BaseType; bt != null; bt = bt.BaseType)
+                baseType = bt;
+            return baseType;
         }
 
         public static V GetOrAdd<K, V>(this IDictionary<K, V> source, K key, Func<K, V> valueFactory)

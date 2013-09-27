@@ -306,22 +306,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, ParameterizedOperation>();
-            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.Default);
 
             var operation = container.Resolve<Func<object, IOperation>>();
 
             Assert.That(operation("blah"), Is.InstanceOf<RetryOperationDecorator>());
-        }
-
-        [Test]
-        public void Should_NOT_support_decorator_of_Func_with_parameters_of_service__CAUSE_TOO_COMPLICATED()
-        {
-            var container = new Container();
-            container.Register<IOperation, ParameterizedOperation>();
-            container.Register<IOperation, FuncWithArgDecorator>(setup: DecoratorSetup.With());
-
-            Assert.Throws<ContainerException>(
-                () => container.Resolve<Func<object, IOperation>>());
         }
 
         [Test]
@@ -356,6 +345,17 @@ namespace DryIoc.UnitTests
             Assert.That(operation, Is.InstanceOf<RetryOperationDecorator<int>>());
             Assert.That(((RetryOperationDecorator<int>)operation).Decorated, Is.InstanceOf<SomeOperation<int>>());
         }
+
+        [Test]
+        public void Should_NOT_support_decorator_of_Func_with_parameters_of_service__CAUSE_TOO_COMPLICATED()
+        {
+            var container = new Container();
+            container.Register<IOperation, ParameterizedOperation>();
+            container.Register<IOperation, FuncWithArgDecorator>(setup: DecoratorSetup.With());
+
+            Assert.Throws<ContainerException>(
+                () => container.Resolve<Func<object, IOperation>>());
+        }
     }
 
     #region CUT
@@ -368,7 +368,7 @@ namespace DryIoc.UnitTests
     public class LogUserOps<T> : IOperationUser<T>
     {
         public readonly IOperationUser<T> Decorated;
-        public Meta<Func<IOperation<T>>, string> GetOperation { get { return Decorated.GetOperation; }}
+        public Meta<Func<IOperation<T>>, string> GetOperation { get { return Decorated.GetOperation; } }
 
         public LogUserOps(IOperationUser<T> decorated)
         {
@@ -419,7 +419,7 @@ namespace DryIoc.UnitTests
 
         public static IOperation MeasureWith(IOperation operation, IMeasurer measurer)
         {
-            return new MeasureExecutionTimeOperationDecorator(operation) {Measurer = measurer};
+            return new MeasureExecutionTimeOperationDecorator(operation) { Measurer = measurer };
         }
 
         public IMeasurer Measurer { get; set; }
@@ -483,11 +483,11 @@ namespace DryIoc.UnitTests
 
     public class FuncWithArgDecorator : IOperation
     {
-        public Func<object, IOperation> DecoratedFunc;
+        public IOperation Decorated;
 
         public FuncWithArgDecorator(Func<object, IOperation> decoratedFunc)
         {
-            DecoratedFunc = decoratedFunc;
+            Decorated = decoratedFunc(new object());
         }
     }
 
