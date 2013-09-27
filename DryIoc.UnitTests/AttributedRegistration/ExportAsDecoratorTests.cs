@@ -102,7 +102,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         }
     }
 
-    [ExportAll, ExportAsDecorator(ShouldCompareMetadata = true), ExportWithMetadata(2)]
+    [ExportAll, ExportAsDecorator(CompareMetadata = true), ExportWithMetadata(2)]
     internal class RetryHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -113,7 +113,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         }
     }
 
-    [ExportAll, ExportAsDecorator(ContractName = "transact", ShouldCompareMetadata = true), ExportWithMetadata(1)]
+    [ExportAll, ExportAsDecorator(ContractName = "transact", CompareMetadata = true), ExportWithMetadata(1)]
     internal class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
