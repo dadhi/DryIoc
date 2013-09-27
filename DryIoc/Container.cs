@@ -601,7 +601,7 @@ namespace DryIoc
             return metadata != null && metadataType.IsInstanceOfType(metadata) ? metadata : null;
         }
 
-        public static Factory ResolveDynamicEnumerable(Request req, IRegistry _)
+        public static Factory ResolveDynamicEnumerable(Request req, IRegistry ignored)
         {
             if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
