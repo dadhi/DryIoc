@@ -114,7 +114,7 @@ namespace DryIoc
 
             registrator.Register(typeof(Meta<,>), new FactoryProvider(ResolveMeta, GenericWrapperSetup.With(t => t[0])));
 
-            registrator.Register(typeof(DebugExpression<>), new FactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
+            registrator.Register(typeof(DebugExpression<>), new FactoryProvider(ResolveDebugExpression, GenericWrapperSetup.Default));
         }
 
         public static void MinimalSetup(ResolutionRules resolutionRules, IRegistrator registrator) { }
@@ -636,7 +636,7 @@ namespace DryIoc
             }
         }
 
-        public static Factory TryResolveFactoryExpression(Request request, IRegistry registry)
+        public static Factory ResolveDebugExpression(Request request, IRegistry registry)
         {
             var factoryCtor = request.ServiceType.GetConstructors()[0];
             var serviceType = request.ServiceType.GetGenericArguments()[0];
