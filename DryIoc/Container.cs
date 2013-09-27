@@ -80,12 +80,14 @@ namespace DryIoc
     /// Additional features:
     /// <list type="bullet">
     /// <item>Bare-bone mode with all default rules switched off via Container constructor parameter.</item>
-    /// <item>Control of service resolution via <see cref="ResolutionRulesFor"/>.</item>
+    /// <item>Control of service resolution via <see cref="ResolutionRules"/>.</item>
     /// </list>
     /// </para>
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
+        public readonly ResolutionRules ResolutionRules;
+
         public Container(Action<ResolutionRules, IRegistrator> setup = null)
         {
             _syncRoot = new object();
@@ -93,16 +95,16 @@ namespace DryIoc
             _decorators = HashTree<Type, DecoratorEntry[]>.Using(Sugar.Append);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
-            ResolutionRulesFor = new ResolutionRules();
+            ResolutionRules = new ResolutionRules();
 
             CurrentScope = SingletonScope = new Scope();
 
-            (setup ?? DefaultSetup).Invoke(ResolutionRulesFor, this);
+            (setup ?? DefaultSetup).Invoke(ResolutionRules, this);
         }
 
         public static void DefaultSetup(ResolutionRules resolutionRules, IRegistrator registrator)
         {
-            resolutionRules.UnregisteredService = resolutionRules.UnregisteredService.Append(GetEnumerableFactoryOrNull);
+            resolutionRules.ForUnregisteredService = resolutionRules.ForUnregisteredService.Append(GetEnumerableFactoryOrNull);
 
             var funcFactory = new FuncGenericWrapper();
             foreach (var funcType in FuncTypes)
@@ -117,29 +119,27 @@ namespace DryIoc
 
         public static void MinimalSetup(ResolutionRules resolutionRules, IRegistrator registrator) { }
 
-        public readonly ResolutionRules ResolutionRulesFor;
+        public static CompiledFactory CompileExpression(Expression expression)
+        {
+            return Expression.Lambda<CompiledFactory>(expression, Reuse.Parameters).Compile();
+        }
 
         public Container OpenScope()
         {
             return new Container(this);
         }
 
-        public ResolutionRules.ResolveUnregisteredService UseRegistrationsFrom(IRegistry anotherRegistry)
+        public ResolutionRules.ResolveUnregisteredService UseRegistrationsFrom(IRegistry registry)
         {
             ResolutionRules.ResolveUnregisteredService
-                fromAnotherRegistry = (request, _) => anotherRegistry.GetOrAddFactory(request, true);
-            ResolutionRulesFor.UnregisteredService = ResolutionRulesFor.UnregisteredService.Append(fromAnotherRegistry);
-            return fromAnotherRegistry;
+                useRegistryRule = (request, _) => registry.GetOrAddFactory(request, true);
+            ResolutionRules.ForUnregisteredService = ResolutionRules.ForUnregisteredService.Append(useRegistryRule);
+            return useRegistryRule;
         }
 
         public void Dispose()
         {
             CurrentScope.Dispose();
-        }
-
-        public static CompiledFactory CompileExpression(Expression expression)
-        {
-            return Expression.Lambda<CompiledFactory>(expression, Reuse.Parameters).Compile();
         }
 
         #region IRegistry
@@ -174,7 +174,7 @@ namespace DryIoc
 
             if (newFactory == null)
             {
-                var rules = ResolutionRulesFor.UnregisteredService;
+                var rules = ResolutionRules.ForUnregisteredService;
                 if (rules.Length != 0)
                     for (var i = 0; i < rules.Length && newFactory == null; i++)
                         newFactory = rules[i].Invoke(request, this);
@@ -346,7 +346,7 @@ namespace DryIoc
                 return parent.ServiceKey; // propagate key from wrapper or decorator.
 
             object resultKey = null;
-            var rules = ResolutionRulesFor.ConstructorParameterServiceKey;
+            var rules = ResolutionRules.ForConstructorParameterServiceKey;
             if (rules != null)
                 for (var i = 0; i < rules.Length && resultKey == null; i++)
                     resultKey = rules[i].Invoke(parameter, parent, this);
@@ -355,12 +355,12 @@ namespace DryIoc
 
         bool IRegistry.ShouldResolvePropertyOrField
         {
-            get { return ResolutionRulesFor.PropertyOrFieldServiceKey.Length != 0; }
+            get { return ResolutionRules.ForPropertyOrFieldServiceKey.Length != 0; }
         }
 
         bool IRegistry.TryGetPropertyOrFieldKey(out object resultKey, MemberInfo propertyOrField, Request parent)
         {
-            var rules = ResolutionRulesFor.PropertyOrFieldServiceKey;
+            var rules = ResolutionRules.ForPropertyOrFieldServiceKey;
             resultKey = null;
             var gotIt = false;
             for (var i = 0; i < rules.Length && !gotIt; i++)
@@ -656,7 +656,7 @@ namespace DryIoc
         {
             CurrentScope = new Scope();
             SingletonScope = source.SingletonScope;
-            ResolutionRulesFor = source.ResolutionRulesFor;
+            ResolutionRules = source.ResolutionRules;
             _syncRoot = source._syncRoot;
             _registry = source._registry;
             _decorators = source._decorators;
@@ -757,13 +757,13 @@ namespace DryIoc
     public sealed class ResolutionRules
     {
         public delegate Factory ResolveUnregisteredService(Request request, IRegistry registry);
-        public ResolveUnregisteredService[] UnregisteredService = new ResolveUnregisteredService[0];
+        public ResolveUnregisteredService[] ForUnregisteredService = new ResolveUnregisteredService[0];
 
         public delegate object ResolveConstructorParameterServiceKey(ParameterInfo parameter, Request parent, IRegistry registry);
-        public ResolveConstructorParameterServiceKey[] ConstructorParameterServiceKey = new ResolveConstructorParameterServiceKey[0];
+        public ResolveConstructorParameterServiceKey[] ForConstructorParameterServiceKey = new ResolveConstructorParameterServiceKey[0];
 
         public delegate bool ResolvePropertyOrFieldServiceKey(out object resultKey, MemberInfo propertyOrField, Request parent, IRegistry registry);
-        public ResolvePropertyOrFieldServiceKey[] PropertyOrFieldServiceKey = new ResolvePropertyOrFieldServiceKey[0];
+        public ResolvePropertyOrFieldServiceKey[] ForPropertyOrFieldServiceKey = new ResolvePropertyOrFieldServiceKey[0];
     }
 
     public static partial class Error
