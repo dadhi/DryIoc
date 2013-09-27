@@ -517,6 +517,40 @@ namespace DryIoc
 
         public static Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
 
+        public class FuncGenericWrapper : Factory
+        {
+            public FuncGenericWrapper()
+                : base(setup: GenericWrapperSetup.With(typeArgs => typeArgs[typeArgs.Length - 1])) { }
+
+            public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry)
+            {
+                return new DelegateFactory(CreateExpression, DryIoc.Reuse.Singleton, Setup);
+            }
+
+            protected override Expression CreateExpression(Request request, IRegistry registry)
+            {
+                var funcType = request.ServiceType;
+                var funcTypeArgs = funcType.GetGenericArguments();
+                var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
+
+                var serviceRequest = request.PushWithParentKey(serviceType);
+                var serviceFactory = registry.GetOrAddFactory(serviceRequest, false);
+
+                if (funcTypeArgs.Length == 1)
+                    return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
+
+                IList<Type> unusedFuncArgs;
+                var funcExpr = serviceFactory
+                    .GetFuncWithArgsOrNull(funcType, serviceRequest, registry, out unusedFuncArgs)
+                    .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
+
+                if (unusedFuncArgs != null)
+                    Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs.Print(), request);
+
+                return funcExpr;
+            }
+        }
+
         public static Factory ResolveMeta(Request request, IRegistry registry)
         {
             var genericArgs = request.ServiceType.GetGenericArguments();
@@ -621,11 +655,7 @@ namespace DryIoc
             private readonly Type _itemType;
         }
 
-        #endregion
-
-        #region Diagnostics
-
-        [DebuggerDisplay("Factory Expression: {Expression}")]
+        [DebuggerDisplay("{Expression}")]
         public sealed class DebugExpression<TService>
         {
             public readonly Expression<CompiledFactory> Expression;
@@ -720,39 +750,6 @@ namespace DryIoc
         #endregion
     }
 
-    public class FuncGenericWrapper : Factory
-    {
-        public FuncGenericWrapper()
-            : base(setup: GenericWrapperSetup.With(types => types[types.Length - 1])) { }
-
-        public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry)
-        {
-            return new DelegateFactory(CreateExpression, DryIoc.Reuse.Singleton, Setup);
-        }
-
-        protected override Expression CreateExpression(Request request, IRegistry registry)
-        {
-            var funcType = request.ServiceType;
-            var funcTypeArgs = funcType.GetGenericArguments();
-            var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
-
-            var serviceRequest = request.PushWithParentKey(serviceType);
-            var serviceFactory = registry.GetOrAddFactory(serviceRequest, false);
-
-            if (funcTypeArgs.Length == 1)
-                return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
-
-            IList<Type> unusedFuncArgs;
-            var funcExpr = serviceFactory
-                .GetFuncWithArgsOrNull(funcType, serviceRequest, registry, out unusedFuncArgs)
-                .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
-
-            if (unusedFuncArgs != null)
-                Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs.Print(), request);
-
-            return funcExpr;
-        }
-    }
 
     public sealed class ResolutionRules
     {
