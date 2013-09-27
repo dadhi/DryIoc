@@ -725,15 +725,10 @@ namespace DryIoc
 
         public override Factory GetRequestSpecificFactoryOrNull(Request request, IRegistry registry)
         {
-            return new DelegateFactory(CreateFunc, DryIoc.Reuse.Singleton, Setup);
+            return new DelegateFactory(CreateExpression, DryIoc.Reuse.Singleton, Setup);
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
-        {
-            throw new NotSupportedException();
-        }
-
-        private static Expression CreateFunc(Request request, IRegistry registry)
         {
             var funcType = request.ServiceType;
             var funcTypeArgs = funcType.GetGenericArguments();
