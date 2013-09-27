@@ -104,7 +104,7 @@ namespace DryIoc
 
         public static void DefaultSetup(ResolutionRules resolutionRules, IRegistrator registrator)
         {
-            resolutionRules.ForUnregisteredService = resolutionRules.ForUnregisteredService.Append(GetEnumerableFactoryOrNull);
+            resolutionRules.ForUnregisteredService = resolutionRules.ForUnregisteredService.Append(ResolveDynamicEnumerable);
 
             var funcFactory = new FuncGenericWrapper();
             foreach (var funcType in FuncTypes)
@@ -112,7 +112,7 @@ namespace DryIoc
 
             registrator.Register(typeof(Lazy<>), Reuse.Transient, t => t.GetConstructor(new[] { typeof(Func<>) }), GenericWrapperSetup.Default);
 
-            registrator.Register(typeof(Meta<,>), new FactoryProvider(GetMetaFactoryOrNull, GenericWrapperSetup.With(t => t[0])));
+            registrator.Register(typeof(Meta<,>), new FactoryProvider(ResolveMeta, GenericWrapperSetup.With(t => t[0])));
 
             registrator.Register(typeof(DebugExpression<>), new FactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
         }
@@ -517,7 +517,7 @@ namespace DryIoc
 
         public static Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
 
-        public static Factory GetMetaFactoryOrNull(Request request, IRegistry registry)
+        public static Factory ResolveMeta(Request request, IRegistry registry)
         {
             var genericArgs = request.ServiceType.GetGenericArguments();
             var serviceType = genericArgs[0];
@@ -561,7 +561,7 @@ namespace DryIoc
             return metadata != null && metadataType.IsInstanceOfType(metadata) ? metadata : null;
         }
 
-        public static Factory GetEnumerableFactoryOrNull(Request req, IRegistry _)
+        public static Factory ResolveDynamicEnumerable(Request req, IRegistry _)
         {
             if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
@@ -573,21 +573,21 @@ namespace DryIoc
                     var itemType = collectionIsArray ? collectionType.GetElementType() : collectionType.GetGenericArguments()[0];
                     var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
 
-                    var resolver = Expression.Constant(new EnumerableResolver(registry, itemType, wrappedItemType));
+                    var resolver = Expression.Constant(new DynamicEnumerableResolver(registry, itemType, wrappedItemType));
                     var resolveMethod = (collectionIsArray
-                        ? EnumerableResolver.ResolveArrayMethod
-                        : EnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
+                        ? DynamicEnumerableResolver.ResolveArrayMethod
+                        : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
                     return Expression.Call(resolver, resolveMethod, Expression.Constant(request));
                 },
                 setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
         }
 
-        internal sealed class EnumerableResolver
+        internal sealed class DynamicEnumerableResolver
         {
-            public static readonly MethodInfo ResolveEnumerableMethod = typeof(EnumerableResolver).GetMethod("ResolveEnumerable");
-            public static readonly MethodInfo ResolveArrayMethod = typeof(EnumerableResolver).GetMethod("ResolveArray");
+            public static readonly MethodInfo ResolveEnumerableMethod = typeof(DynamicEnumerableResolver).GetMethod("ResolveEnumerable");
+            public static readonly MethodInfo ResolveArrayMethod = typeof(DynamicEnumerableResolver).GetMethod("ResolveArray");
 
-            public EnumerableResolver(IRegistry registry, Type itemType, Type unwrappedItemType)
+            public DynamicEnumerableResolver(IRegistry registry, Type itemType, Type unwrappedItemType)
             {
                 _registry = new WeakReference(registry);
                 _unwrappedItemType = unwrappedItemType;
