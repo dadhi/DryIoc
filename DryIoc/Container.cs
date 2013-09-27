@@ -1,7 +1,7 @@
 ﻿// TODO:
 // For version 1.0.0
 // - Add condition to Decorator.
-// - Consolidate code related to rules in Setup class.
+// - Consolidate code related to rules in Rules class.
 // - Adjust ResolveProperties to be consistent with Import property or field.
 // - Fix code generation example.
 // - Evaluate Code Coverage.
@@ -80,13 +80,13 @@ namespace DryIoc
     /// Additional features:
     /// <list type="bullet">
     /// <item>Bare-bone mode with all default rules switched off via Container constructor parameter.</item>
-    /// <item>Control of service resolution via <see cref="Setup"/>.</item>
+    /// <item>Control of service resolution via <see cref="ResolutionRulesFor"/>.</item>
     /// </list>
     /// </para>
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
-        public readonly ContainerSetup Setup;
+        public readonly ResolutionRules ResolutionRulesFor;
 
         public Container() : this(false) { }
 
@@ -94,16 +94,16 @@ namespace DryIoc
         {
             _syncRoot = new object();
             _registry = new Dictionary<Type, RegistryEntry>();
-            _decorators = HashTree<Type, DecoratorEntry[]>.Using(Sugar.Concat);
+            _decorators = HashTree<Type, DecoratorEntry[]>.Using(Sugar.Append);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
 
-            Setup = new ContainerSetup();
+            ResolutionRulesFor = new ResolutionRules();
             CurrentScope = SingletonScope = new Scope();
 
             if (!coreOnly) // TODO: Default setup, May I just pass custom setup instead flag?
             {
-                Setup.AddNonRegisteredServiceResolutionRule(GetEnumerableFactoryOrNull);
+                ResolutionRulesFor.UnregisteredService = ResolutionRulesFor.UnregisteredService.Append(GetEnumerableFactoryOrNull);
 
                 var funcFactory = new FuncGenericWrapper();
                 foreach (var funcType in FuncTypes)
@@ -111,9 +111,9 @@ namespace DryIoc
 
                 this.Register(typeof(Lazy<>), Reuse.Transient, t => t.GetConstructor(new[] { typeof(Func<>) }), GenericWrapperSetup.Default);
 
-                this.Register(typeof(Meta<,>), new CustomFactoryProvider(GetMetaFactoryOrNull, GenericWrapperSetup.With(t => t[0])));
+                this.Register(typeof(Meta<,>), new FactoryProvider(GetMetaFactoryOrNull, GenericWrapperSetup.With(t => t[0])));
 
-                this.Register(typeof(DebugExpression<>), new CustomFactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
+                this.Register(typeof(DebugExpression<>), new FactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
             }
         }
 
@@ -122,9 +122,12 @@ namespace DryIoc
             return new Container(this);
         }
 
-        public GetFactoryOrNull UseRegistrationsFrom(IRegistry anotherRegistry)
+        public ResolutionRules.ResolveUnregisteredService UseRegistrationsFrom(IRegistry anotherRegistry)
         {
-            return Setup.AddNonRegisteredServiceResolutionRule((request, _) => anotherRegistry.GetOrAddFactory(request, true));
+            ResolutionRules.ResolveUnregisteredService 
+                fromAnotherRegistry = (request, _) => anotherRegistry.GetOrAddFactory(request, true);
+            ResolutionRulesFor.UnregisteredService = ResolutionRulesFor.UnregisteredService.Append(fromAnotherRegistry);
+            return fromAnotherRegistry;
         }
 
         public void Dispose()
@@ -169,7 +172,7 @@ namespace DryIoc
 
             if (newFactory == null)
             {
-                var rules = Setup.NonRegisteredServiceResolutionRules;
+                var rules = ResolutionRulesFor.UnregisteredService;
                 if (rules.Length != 0)
                     for (var i = 0; i < rules.Length && newFactory == null; i++)
                         newFactory = rules[i].Invoke(request, this);
@@ -265,7 +268,7 @@ namespace DryIoc
                                 resultDecorator = Expression.Invoke(decorator.CachedExpression, resultDecorator);
                             else
                             {
-                                var prevDecorators = ((LambdaExpression) resultDecorator);
+                                var prevDecorators = ((LambdaExpression)resultDecorator);
                                 var decorateDecorator = Expression.Invoke(decorator.CachedExpression, prevDecorators.Body);
                                 resultDecorator = Expression.Lambda(decorateDecorator, prevDecorators.Parameters[0]);
                             }
@@ -341,7 +344,7 @@ namespace DryIoc
                 return parent.ServiceKey; // propagate key from wrapper or decorator.
 
             object resultKey = null;
-            var rules = Setup.ConstructorParamServiceKeyResolutionRules;
+            var rules = ResolutionRulesFor.ConstructorParameterServiceKey;
             if (rules != null)
                 for (var i = 0; i < rules.Length && resultKey == null; i++)
                     resultKey = rules[i].Invoke(parameter, parent, this);
@@ -350,12 +353,12 @@ namespace DryIoc
 
         bool IRegistry.ShouldResolvePropertyOrField
         {
-            get { return Setup.PropertyOrFieldResolutionRules.Length != 0; }
+            get { return ResolutionRulesFor.PropertyOrFieldServiceKey.Length != 0; }
         }
 
         bool IRegistry.TryGetPropertyOrFieldKey(out object resultKey, MemberInfo propertyOrField, Request parent)
         {
-            var rules = Setup.PropertyOrFieldResolutionRules;
+            var rules = ResolutionRulesFor.PropertyOrFieldServiceKey;
             resultKey = null;
             var gotIt = false;
             for (var i = 0; i < rules.Length && !gotIt; i++)
@@ -388,7 +391,7 @@ namespace DryIoc
             {
                 if (factory.Setup.Type == FactoryType.Decorator)
                 {
-                    _decorators = _decorators.AddOrUpdate(serviceType, new[] { new DecoratorEntry(factory)  });
+                    _decorators = _decorators.AddOrUpdate(serviceType, new[] { new DecoratorEntry(factory) });
                     return factory;
                 }
 
@@ -651,7 +654,7 @@ namespace DryIoc
         {
             CurrentScope = new Scope();
             SingletonScope = source.SingletonScope;
-            Setup = source.Setup;
+            ResolutionRulesFor = source.ResolutionRulesFor;
             _syncRoot = source._syncRoot;
             _registry = source._registry;
             _decorators = source._decorators;
@@ -749,84 +752,28 @@ namespace DryIoc
 
             if (unusedFuncArgs != null)
                 Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs.Print(), request);
-            
+
             return funcExpr;
         }
     }
 
-    public sealed class ContainerSetup
+    public sealed class ResolutionRules
     {
-        public ContainerSetup()
-        {
-            NonRegisteredServiceResolutionRules = new GetFactoryOrNull[0];
-            ConstructorParamServiceKeyResolutionRules = new GetConstructorParamServiceKeyOrNull[0];
-            PropertyOrFieldResolutionRules = new TryGetPropertyOrFieldServiceKey[0];
-        }
+        public delegate Factory ResolveUnregisteredService(Request request, IRegistry registry);
+        public ResolveUnregisteredService[] UnregisteredService = new ResolveUnregisteredService[0];
 
-        public delegate object GetConstructorParamServiceKeyOrNull(ParameterInfo parameter, Request parent, IRegistry registry);
+        public delegate object ResolveConstructorParameterServiceKey(ParameterInfo parameter, Request parent, IRegistry registry);
+        public ResolveConstructorParameterServiceKey[] ConstructorParameterServiceKey = new ResolveConstructorParameterServiceKey[0];
 
-        public delegate bool TryGetPropertyOrFieldServiceKey(out object resultKey, MemberInfo propertyOrField, Request parent, IRegistry registry);
-
-        public GetFactoryOrNull[] NonRegisteredServiceResolutionRules { get; private set; }
-
-        public void SetNonRegisteredServiceResolutionRules(IEnumerable<GetFactoryOrNull> newRules)
-        {
-            NonRegisteredServiceResolutionRules = newRules.ThrowIfNull().ToArray();
-        }
-
-        public GetFactoryOrNull AddNonRegisteredServiceResolutionRule(GetFactoryOrNull rule)
-        {
-            SetNonRegisteredServiceResolutionRules(NonRegisteredServiceResolutionRules.Concat(rule));
-            return rule;
-        }
-
-        public void RemoveNonRegisteredServiceResolutionRule(GetFactoryOrNull rule)
-        {
-            SetNonRegisteredServiceResolutionRules(NonRegisteredServiceResolutionRules.Except(new[] { rule }));
-        }
-
-        public GetConstructorParamServiceKeyOrNull[] ConstructorParamServiceKeyResolutionRules { get; private set; }
-
-        public void SetConstructorParamServiceKeyResolutionRules(IEnumerable<GetConstructorParamServiceKeyOrNull> newRules)
-        {
-            ConstructorParamServiceKeyResolutionRules = newRules.ThrowIfNull().ToArray();
-        }
-
-        public GetConstructorParamServiceKeyOrNull AddConstructorParamServiceKeyResolutionRule(GetConstructorParamServiceKeyOrNull rule)
-        {
-            SetConstructorParamServiceKeyResolutionRules(ConstructorParamServiceKeyResolutionRules.Concat(rule));
-            return rule;
-        }
-
-        public void RemoveConstructorParamServiceKeyResolutionRule(GetConstructorParamServiceKeyOrNull rule)
-        {
-            SetConstructorParamServiceKeyResolutionRules(ConstructorParamServiceKeyResolutionRules.Except(new[] { rule }));
-        }
-
-        public TryGetPropertyOrFieldServiceKey[] PropertyOrFieldResolutionRules { get; private set; }
-
-        public void SetPropertyOrFieldResolutionRules(IEnumerable<TryGetPropertyOrFieldServiceKey> newRules)
-        {
-            PropertyOrFieldResolutionRules = newRules.ThrowIfNull().ToArray();
-        }
-
-        public TryGetPropertyOrFieldServiceKey AddPropertyOrFieldResolutionRule(TryGetPropertyOrFieldServiceKey rule)
-        {
-            SetPropertyOrFieldResolutionRules(PropertyOrFieldResolutionRules.Concat(rule));
-            return rule;
-        }
-
-        public void RemovePropertyOrFieldResolutionRule(TryGetPropertyOrFieldServiceKey rule)
-        {
-            SetPropertyOrFieldResolutionRules(PropertyOrFieldResolutionRules.Except(new[] { rule }));
-        }
+        public delegate bool ResolvePropertyOrFieldServiceKey(out object resultKey, MemberInfo propertyOrField, Request parent, IRegistry registry);
+        public ResolvePropertyOrFieldServiceKey[] PropertyOrFieldServiceKey = new ResolvePropertyOrFieldServiceKey[0];
     }
 
     public static partial class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
             "Unable to resolve service {0}." + Environment.NewLine +
-            "Please register service {1} Or adjust Container Setup.";
+            "Please register service {1} Or adjust Container Rules.";
 
         public static readonly string UNSUPPORTED_FUNC_WITH_ARGS =
             "Unsupported resolution as {0}.";
@@ -1492,11 +1439,9 @@ namespace DryIoc
         #endregion
     }
 
-    public delegate Factory GetFactoryOrNull(Request request, IRegistry registry);
-
-    public class CustomFactoryProvider : Factory
+    public class FactoryProvider : Factory
     {
-        public CustomFactoryProvider(GetFactoryOrNull getFactoryOrNull, FactorySetup setup = null)
+        public FactoryProvider(Func<Request, IRegistry, Factory> getFactoryOrNull, FactorySetup setup = null)
             : base(setup: setup)
         {
             _getFactoryOrNull = getFactoryOrNull.ThrowIfNull();
@@ -1514,7 +1459,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private readonly GetFactoryOrNull _getFactoryOrNull;
+        private readonly Func<Request, IRegistry, Factory> _getFactoryOrNull;
 
         #endregion
     }
@@ -1972,25 +1917,37 @@ namespace DryIoc
             return value;
         }
 
-        public static T[] AddOrUpdateCopy<T>(this T[] source, T value, int index = -1)
+        public static T[] Append<T>(this T[] source, params T[] added)
         {
-            var sourceLength = source.Length;
-            index = index < 0 ? sourceLength : index;
-            var target = new T[index < sourceLength ? sourceLength : sourceLength + 1];
-            Array.Copy(source, target, sourceLength);
-            target[index] = value;
-            return target;
-        }
-
-        public static V[] Concat<V>(this V[] source, params V[] added)
-        {
-            var result = new V[source.Length + added.Length];
+            var result = new T[source.Length + added.Length];
             Array.Copy(source, 0, result, 0, source.Length);
             if (added.Length == 1)
                 result[source.Length] = added[0];
             else
                 Array.Copy(added, 0, result, source.Length, added.Length);
             return result;
+        }
+
+        public static T[] AppendOrUpdate<T>(this T[] source, T value, int index = -1)
+        {
+            var sourceLength = source.Length;
+            index = index < 0 ? sourceLength : index;
+            var result = new T[index < sourceLength ? sourceLength : sourceLength + 1];
+            Array.Copy(source, result, sourceLength);
+            result[index] = value;
+            return result;
+        }
+
+        public static T[] Remove<T>(this T[] source, T value)
+        {
+            if (source == null || source.Length == 0)
+                return source;
+
+            var valueIndex = Array.IndexOf(source, value);
+            if (valueIndex == -1)
+                return source;
+
+            return source.Except(new[] { value }).ToArray();
         }
     }
 
@@ -2154,7 +2111,7 @@ namespace DryIoc
             var i = conflicts.Length - 1;
             while (i >= 0 && !Equals(conflicts[i].Key, added.Key)) --i;
             if (i != -1) added = UpdateValue(existing, added);
-            return new KVWithConflicts(existing, conflicts.AddOrUpdateCopy(added, i));
+            return new KVWithConflicts(existing, conflicts.AppendOrUpdate(added, i));
         }
 
         private KV<K, V> UpdateValue(KV<K, V> existing, KV<K, V> added)

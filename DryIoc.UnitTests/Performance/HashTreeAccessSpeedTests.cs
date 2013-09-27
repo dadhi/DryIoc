@@ -45,7 +45,7 @@ namespace DryIoc.UnitTests.Performance
 
             var newConflict = new KeyValuePair<K, V>(newItem.Key, newItem.Value);
             var newConflicts = item.Conflicts == null ? new[] { newConflict }
-                : item.Conflicts.AddOrUpdateCopy(newConflict, Array.FindIndex(item.Conflicts, x => Equals(x.Key, newItem.Key)));
+                : item.Conflicts.AppendOrUpdate(newConflict, Array.FindIndex(item.Conflicts, x => Equals(x.Key, newItem.Key)));
 
             return new Hashed<K, V>(item.Key, item.Value, newConflicts);
         }

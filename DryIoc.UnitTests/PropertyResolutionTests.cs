@@ -59,7 +59,7 @@ namespace DryIoc.UnitTests
 
             Assert.IsNull(holder.BarWoutSet);
         }
-        
+
         [Test]
         public void Can_resolve_property_marked_with_Import()
         {
@@ -68,11 +68,13 @@ namespace DryIoc.UnitTests
             container.Register<Guts>();
             container.Register<Brain>();
 
-            container.Setup.AddPropertyOrFieldResolutionRule((out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
-            {
-                resultKey = null;
-                return propertyOrField.GetCustomAttributes(typeof(ImportAttribute), false).Length != 0;
-            });
+            container.ResolutionRulesFor.PropertyOrFieldServiceKey =
+                container.ResolutionRulesFor.PropertyOrFieldServiceKey.Append(
+                    (out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
+                    {
+                        resultKey = null;
+                        return propertyOrField.GetCustomAttributes(typeof(ImportAttribute), false).Length != 0;
+                    });
 
             var chicken = container.Resolve<FunnyChicken>();
 
@@ -87,7 +89,8 @@ namespace DryIoc.UnitTests
             container.Register<Guts>();
             container.Register<Brain>();
 
-            container.Setup.AddPropertyOrFieldResolutionRule(AttributedRegistrator.ImportPropertyOrField);
+            container.ResolutionRulesFor.PropertyOrFieldServiceKey =
+                container.ResolutionRulesFor.PropertyOrFieldServiceKey.Append(AttributedRegistrator.ImportPropertyOrField);
 
             var chicken = container.Resolve<FunnyChicken>();
 
@@ -100,7 +103,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<FunnyDuckling>();
 
-            container.Setup.AddPropertyOrFieldResolutionRule(AttributedRegistrator.ImportPropertyOrField);
+            container.ResolutionRulesFor.PropertyOrFieldServiceKey =
+                container.ResolutionRulesFor.PropertyOrFieldServiceKey.Append(AttributedRegistrator.ImportPropertyOrField);
 
             Assert.DoesNotThrow(() =>
                 container.Resolve<FunnyDuckling>());
@@ -113,7 +117,8 @@ namespace DryIoc.UnitTests
             container.Register<FunkyChicken>();
             container.Register<Guts>();
 
-            container.Setup.AddPropertyOrFieldResolutionRule(AttributedRegistrator.ImportPropertyOrField);
+            container.ResolutionRulesFor.PropertyOrFieldServiceKey =
+                container.ResolutionRulesFor.PropertyOrFieldServiceKey.Append(AttributedRegistrator.ImportPropertyOrField);
 
             var chicken = container.Resolve<FunkyChicken>();
 
@@ -127,13 +132,16 @@ namespace DryIoc.UnitTests
             container.Register<LazyChicken>();
             container.Register<Guts>(named: "lazy-me");
 
-            container.Setup.AddPropertyOrFieldResolutionRule(AttributedRegistrator.ImportPropertyOrField);
+            container.ResolutionRulesFor.PropertyOrFieldServiceKey =
+                container.ResolutionRulesFor.PropertyOrFieldServiceKey.Append(AttributedRegistrator.ImportPropertyOrField);
 
             var chicken = container.Resolve<LazyChicken>();
 
             Assert.That(chicken.SomeGuts, Is.Not.Null);
         }
     }
+
+    #region CUT
 
     public class PropertyHolder
     {
@@ -152,20 +160,17 @@ namespace DryIoc.UnitTests
         [Import]
         public Guts SomeGuts { get; set; }
 
-        [Import]
-        public Brain SomeBrain;
+        [Import] public Brain SomeBrain;
     }
 
     public class FunnyDuckling
     {
-        [Import]
-        public readonly Brain Brains;
+        [Import] public readonly Brain Brains;
     }
 
     public class FunkyChicken
     {
-        [Import]
-        public Func<Guts> SomeGuts;
+        [Import] public Func<Guts> SomeGuts;
     }
 
     public class LazyChicken
@@ -181,4 +186,6 @@ namespace DryIoc.UnitTests
     public class Brain
     {
     }
+
+    #endregion
 }

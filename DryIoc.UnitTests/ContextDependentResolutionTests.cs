@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(Client));
 
             var factories = new Dictionary<Type, Factory>();
-            container.Register<ILogger>(new CustomFactoryProvider((request, _) =>
+            container.Register<ILogger>(new FactoryProvider((request, _) =>
             {
                 var parent = request.GetNonWrapperParentOrNull();
                 parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(ClientOfClient));
 
             var factories = new Dictionary<Type, Factory>();
-            container.Register<ILogger>(new CustomFactoryProvider((request, _) =>
+            container.Register<ILogger>(new FactoryProvider((request, _) =>
             {
                 var parent = request.GetNonWrapperParentOrNull();
                 parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
@@ -59,7 +59,7 @@ namespace DryIoc.UnitTests
 
             var factories = new Dictionary<Type, Factory>();
             container.Register<ILogger>(
-                new CustomFactoryProvider((request, _) =>
+                new FactoryProvider((request, _) =>
                 {
                     var implType = typeof(PlainLogger);
                     var parent = request.GetNonWrapperParentOrNull();

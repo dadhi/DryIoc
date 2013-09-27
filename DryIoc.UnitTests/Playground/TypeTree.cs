@@ -48,7 +48,7 @@ namespace DryIoc.UnitTests.Playground
                     : new KVWithConflicts { Key = added.Key, Value = added.Value, Conflicts = conflicts };
 
             var newConflicts = conflicts == null ? new[] { added }
-                : conflicts.AddOrUpdateCopy(added, Array.FindIndex(conflicts, x => x.Key == added.Key));
+                : conflicts.AppendOrUpdate(added, Array.FindIndex(conflicts, x => x.Key == added.Key));
 
             return new KVWithConflicts { Key = old.Key, Value = old.Value, Conflicts = newConflicts };
         }

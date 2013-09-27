@@ -109,7 +109,7 @@ namespace DryIoc.UnitTests.Playground
             var i = conflicts.Length - 1;
             while (i >= 0 && !Equals(conflicts[i].Key, added.Key)) --i;
             if (i != -1) added = UpdateValue(existing, added);
-            return new KVWithConflicts(existing, conflicts.AddOrUpdateCopy(added, i));
+            return new KVWithConflicts(existing, conflicts.AppendOrUpdate(added, i));
         }
 
         private KV<K, V> UpdateValue(KV<K, V> existing, KV<K, V> added)

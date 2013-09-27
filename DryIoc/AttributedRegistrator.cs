@@ -88,7 +88,7 @@ namespace DryIoc
                         if (exports == null)
                             exports = new[] { export };
                         else if (!exports.Contains(export))
-                            exports = exports.AddOrUpdateCopy(export);
+                            exports = exports.AppendOrUpdate(export);
                     }
                     else if (attribute is ExportAllAttribute)
                     {
@@ -102,7 +102,7 @@ namespace DryIoc
                             {
                                 var export = exports[index];
                                 if (!exportAllInfos.Contains(export))
-                                    exportAllInfos = exportAllInfos.AddOrUpdateCopy(export);
+                                    exportAllInfos = exportAllInfos.AppendOrUpdate(export);
                             }
 
                         exports = exportAllInfos;
