@@ -86,36 +86,38 @@ namespace DryIoc
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
-        public readonly ResolutionRules ResolutionRulesFor;
-
-        public Container() : this(false) { }
-
-        public Container(bool coreOnly)
+        public Container(Action<ResolutionRules, IRegistrator> setup = null)
         {
             _syncRoot = new object();
             _registry = new Dictionary<Type, RegistryEntry>();
             _decorators = HashTree<Type, DecoratorEntry[]>.Using(Sugar.Append);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
-
             ResolutionRulesFor = new ResolutionRules();
+
             CurrentScope = SingletonScope = new Scope();
 
-            if (!coreOnly) // TODO: Default setup, May I just pass custom setup instead flag?
-            {
-                ResolutionRulesFor.UnregisteredService = ResolutionRulesFor.UnregisteredService.Append(GetEnumerableFactoryOrNull);
-
-                var funcFactory = new FuncGenericWrapper();
-                foreach (var funcType in FuncTypes)
-                    this.Register(funcType, funcFactory);
-
-                this.Register(typeof(Lazy<>), Reuse.Transient, t => t.GetConstructor(new[] { typeof(Func<>) }), GenericWrapperSetup.Default);
-
-                this.Register(typeof(Meta<,>), new FactoryProvider(GetMetaFactoryOrNull, GenericWrapperSetup.With(t => t[0])));
-
-                this.Register(typeof(DebugExpression<>), new FactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
-            }
+            (setup ?? DefaultSetup).Invoke(ResolutionRulesFor, this);
         }
+
+        public static void DefaultSetup(ResolutionRules resolutionRules, IRegistrator registrator)
+        {
+            resolutionRules.UnregisteredService = resolutionRules.UnregisteredService.Append(GetEnumerableFactoryOrNull);
+
+            var funcFactory = new FuncGenericWrapper();
+            foreach (var funcType in FuncTypes)
+                registrator.Register(funcType, funcFactory);
+
+            registrator.Register(typeof(Lazy<>), Reuse.Transient, t => t.GetConstructor(new[] { typeof(Func<>) }), GenericWrapperSetup.Default);
+
+            registrator.Register(typeof(Meta<,>), new FactoryProvider(GetMetaFactoryOrNull, GenericWrapperSetup.With(t => t[0])));
+
+            registrator.Register(typeof(DebugExpression<>), new FactoryProvider(TryResolveFactoryExpression, GenericWrapperSetup.Default));
+        }
+
+        public static void MinimalSetup(ResolutionRules resolutionRules, IRegistrator registrator) { }
+
+        public readonly ResolutionRules ResolutionRulesFor;
 
         public Container OpenScope()
         {
@@ -124,7 +126,7 @@ namespace DryIoc
 
         public ResolutionRules.ResolveUnregisteredService UseRegistrationsFrom(IRegistry anotherRegistry)
         {
-            ResolutionRules.ResolveUnregisteredService 
+            ResolutionRules.ResolveUnregisteredService
                 fromAnotherRegistry = (request, _) => anotherRegistry.GetOrAddFactory(request, true);
             ResolutionRulesFor.UnregisteredService = ResolutionRulesFor.UnregisteredService.Append(fromAnotherRegistry);
             return fromAnotherRegistry;

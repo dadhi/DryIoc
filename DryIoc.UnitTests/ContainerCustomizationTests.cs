@@ -38,7 +38,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_barebone_container_I_should_be_able_to_resolve_service()
         {
-            var container = new Container(true);
+            var container = new Container((rules, registrator) => { });
             container.Register(typeof(Service));
 
             var service = container.Resolve<Service>();
@@ -49,7 +49,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_barebone_container_I_should_be_able_to_resolve_service_with_dependencies()
         {
-            var container = new Container(true);
+            var container = new Container(Container.MinimalSetup);
             container.Register(typeof(IDependency), typeof(Dependency));
             container.Register(typeof(ServiceWithDependency));
 
@@ -59,9 +59,9 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_core_only_container_I_can_NOT_resolve_func_of_service()
+        public void Given_minimal_container_setup_I_can_NOT_resolve_func_of_service()
         {
-            var container = new Container(true);
+            var container = new Container(Container.MinimalSetup);
             container.Register(typeof(Service));
 
             Assert.Throws<ContainerException>(() =>
@@ -71,7 +71,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_barebone_container_I_should_be_able_to_resolve_open_generic_service()
         {
-            var container = new Container(true);
+            var container = new Container(Container.MinimalSetup);
             container.Register(typeof(TransientOpenGenericService<>));
 
             var service = container.Resolve<TransientOpenGenericService<int>>();
