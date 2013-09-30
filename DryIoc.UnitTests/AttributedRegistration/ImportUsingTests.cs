@@ -11,8 +11,8 @@ namespace DryIoc.UnitTests.AttributedRegistration
         {
             var container = new Container();
             container.Register<NativeUser>();
-            container.ResolutionRules.ForConstructorParameterServiceKey =
-                container.ResolutionRules.ForConstructorParameterServiceKey.Append(
+            container.RulesToResolve.ConstructorParameters =
+                container.RulesToResolve.ConstructorParameters.Append(
                     AttributedRegistrator.GetNameFromImportUsingAttributeOrNull);
 
             var user = container.Resolve<NativeUser>();
@@ -25,8 +25,8 @@ namespace DryIoc.UnitTests.AttributedRegistration
         {
             var container = new Container();
             container.Register<HomeUser>();
-            container.ResolutionRules.ForConstructorParameterServiceKey =
-                container.ResolutionRules.ForConstructorParameterServiceKey.Append(
+            container.RulesToResolve.ConstructorParameters =
+                container.RulesToResolve.ConstructorParameters.Append(
                     AttributedRegistrator.GetNameFromImportUsingAttributeOrNull);
 
             var user = container.Resolve<HomeUser>();
@@ -38,8 +38,8 @@ namespace DryIoc.UnitTests.AttributedRegistration
         public void I_can_specify_metadata()
         {
             var container = new Container();
-            container.ResolutionRules.ForConstructorParameterServiceKey =
-                container.ResolutionRules.ForConstructorParameterServiceKey.Append(
+            container.RulesToResolve.ConstructorParameters =
+                container.RulesToResolve.ConstructorParameters.Append(
                     AttributedRegistrator.GetNameFromImportUsingAttributeOrNull);
             
             container.Register<MineCode>();

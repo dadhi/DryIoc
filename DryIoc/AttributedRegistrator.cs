@@ -1,4 +1,5 @@
 ﻿// TODO:
+// - Add ImportProperties.
 // - Recognize export of Factory implementation.
 
 //#define MEF_IS_AVAILABLE
@@ -220,14 +221,12 @@ namespace DryIoc
             return serviceName;
         }
 
-        public static bool ImportPropertyOrField(out object key, MemberInfo propertyOrField, Request parent, IRegistry _)
+        public static bool ImportPropertyOrField(out object key, MemberInfo member, Request parent, IRegistry _)
         {
-            key = null;
-            var imports = propertyOrField.GetCustomAttributes(typeof(ImportAttribute), false);
-            if (imports.Length == 0)
-                return false;
-            key = ((ImportAttribute)imports[0]).ContractName;
-            return true;
+            var imports = member.GetCustomAttributes(typeof(ImportAttribute), false);
+            var hasImports = imports.Length != 0;
+            key = !hasImports ? null : ((ImportAttribute)imports[0]).ContractName;
+            return hasImports;
         }
 
         #endregion

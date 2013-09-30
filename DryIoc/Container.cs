@@ -80,13 +80,13 @@ namespace DryIoc
     /// Additional features:
     /// <list type="bullet">
     /// <item>Bare-bone mode with all default rules switched off via Container constructor parameter.</item>
-    /// <item>Control of service resolution via <see cref="ResolutionRules"/>.</item>
+    /// <item>Control of service resolution via <see cref="RulesToResolve"/>.</item>
     /// </list>
     /// </para>
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
-        public readonly ResolutionRules ResolutionRules;
+        public readonly ResolutionRules RulesToResolve;
 
         public Container(Action<ResolutionRules, IRegistrator> setup = null)
         {
@@ -95,16 +95,16 @@ namespace DryIoc
             _decorators = HashTree<Type, DecoratorEntry[]>.Using(Sugar.Append);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
-            ResolutionRules = new ResolutionRules();
+            RulesToResolve = new ResolutionRules();
 
             CurrentScope = SingletonScope = new Scope();
 
-            (setup ?? DefaultSetup).Invoke(ResolutionRules, this);
+            (setup ?? DefaultSetup).Invoke(RulesToResolve, this);
         }
 
-        public static void DefaultSetup(ResolutionRules resolutionRules, IRegistrator registrator)
+        public static void DefaultSetup(ResolutionRules rules, IRegistrator registrator)
         {
-            resolutionRules.ForUnregisteredService = resolutionRules.ForUnregisteredService.Append(ResolveDynamicEnumerable);
+            rules.UnregisteredServices = rules.UnregisteredServices.Append(ResolveDynamicEnumerable);
 
             var funcFactory = new FuncGenericWrapper();
             foreach (var funcType in FuncTypes)
@@ -117,7 +117,7 @@ namespace DryIoc
             registrator.Register(typeof(DebugExpression<>), new FactoryProvider(ResolveDebugExpression, GenericWrapperSetup.Default));
         }
 
-        public static void MinimalSetup(ResolutionRules resolutionRules, IRegistrator registrator) { }
+        public static void MinimalSetup(ResolutionRules rules, IRegistrator registrator) { }
 
         public static CompiledFactory CompileExpression(Expression expression)
         {
@@ -133,7 +133,7 @@ namespace DryIoc
         {
             ResolutionRules.ResolveUnregisteredService
                 useRegistryRule = (request, _) => registry.GetOrAddFactory(request, true);
-            ResolutionRules.ForUnregisteredService = ResolutionRules.ForUnregisteredService.Append(useRegistryRule);
+            RulesToResolve.UnregisteredServices = RulesToResolve.UnregisteredServices.Append(useRegistryRule);
             return useRegistryRule;
         }
 
@@ -174,7 +174,7 @@ namespace DryIoc
 
             if (newFactory == null)
             {
-                var rules = ResolutionRules.ForUnregisteredService;
+                var rules = RulesToResolve.UnregisteredServices;
                 if (rules != null)
                     for (var i = 0; i < rules.Length && newFactory == null; i++)
                         newFactory = rules[i].Invoke(request, this);
@@ -339,37 +339,37 @@ namespace DryIoc
                 : ((IRegistry)this).GetWrappedServiceTypeOrSelf(wrappedType); // unwrap recursively.
         }
 
-        object IRegistry.GetConstructorParamKeyOrNull(ParameterInfo parameter, Request parent)
+        object IRegistry.GetConstructorParameterKeyOrNull(ParameterInfo parameter, Request parent)
         {
             if (parent.FactoryType == FactoryType.GenericWrapper ||
                 parent.FactoryType == FactoryType.Decorator)
                 return parent.ServiceKey; // propagate key from wrapper or decorator.
 
             object resultKey = null;
-            var rules = ResolutionRules.ForConstructorParameterServiceKey;
+            var rules = RulesToResolve.ConstructorParameters;
             if (rules != null)
                 for (var i = 0; i < rules.Length && resultKey == null; i++)
                     resultKey = rules[i].Invoke(parameter, parent, this);
             return resultKey;
         }
 
-        bool IRegistry.ShouldResolvePropertyOrField
+        bool IRegistry.ShouldResolvePropertiesOrFields
         {
             get
             {
-                var rules = ResolutionRules.ForPropertyOrFieldServiceKey;
+                var rules = RulesToResolve.PropertiesAndFields;
                 return rules != null && rules.Length != 0;
             }
         }
 
-        bool IRegistry.TryGetPropertyOrFieldKey(out object resultKey, MemberInfo propertyOrField, Request parent)
+        bool IRegistry.TryGetPropertyOrFieldKey(out object resultKey, MemberInfo member, Request parent)
         {
-            resultKey = null;
-            var rules = ResolutionRules.ForPropertyOrFieldServiceKey;
+            var rules = RulesToResolve.PropertiesAndFields;
             if (rules != null)
                 for (var i = 0; i < rules.Length; i++)
-                    if (rules[i].Invoke(out resultKey, propertyOrField, parent, this))
+                    if (rules[i].Invoke(out resultKey, member, parent, this))
                         return true;
+            resultKey = null;
             return false;
         }
 
@@ -621,7 +621,7 @@ namespace DryIoc
                 setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
         }
 
-        private sealed class DynamicEnumerableResolver
+        internal sealed class DynamicEnumerableResolver
         {
             public static readonly MethodInfo ResolveEnumerableMethod = typeof(DynamicEnumerableResolver).GetMethod("ResolveEnumerable");
             public static readonly MethodInfo ResolveArrayMethod = typeof(DynamicEnumerableResolver).GetMethod("ResolveArray");
@@ -691,7 +691,7 @@ namespace DryIoc
         {
             CurrentScope = new Scope();
             SingletonScope = source.SingletonScope;
-            ResolutionRules = source.ResolutionRules;
+            RulesToResolve = source.RulesToResolve;
             _syncRoot = source._syncRoot;
             _registry = source._registry;
             _decorators = source._decorators;
@@ -758,13 +758,13 @@ namespace DryIoc
     public sealed class ResolutionRules
     {
         public delegate Factory ResolveUnregisteredService(Request request, IRegistry registry);
-        public ResolveUnregisteredService[] ForUnregisteredService = new ResolveUnregisteredService[0];
+        public ResolveUnregisteredService[] UnregisteredServices = new ResolveUnregisteredService[0];
 
         public delegate object ResolveConstructorParameterServiceKey(ParameterInfo parameter, Request parent, IRegistry registry);
-        public ResolveConstructorParameterServiceKey[] ForConstructorParameterServiceKey = new ResolveConstructorParameterServiceKey[0];
+        public ResolveConstructorParameterServiceKey[] ConstructorParameters = new ResolveConstructorParameterServiceKey[0];
 
-        public delegate bool ResolvePropertyOrFieldServiceKey(out object resultKey, MemberInfo propertyOrField, Request parent, IRegistry registry);
-        public ResolvePropertyOrFieldServiceKey[] ForPropertyOrFieldServiceKey = new ResolvePropertyOrFieldServiceKey[0];
+        public delegate bool ResolvePropertyOrFieldServiceKey(out object resultKey, MemberInfo member, Request parent, IRegistry registry);
+        public ResolvePropertyOrFieldServiceKey[] PropertiesAndFields = new ResolvePropertyOrFieldServiceKey[0];
     }
 
     public static partial class Error
@@ -1295,13 +1295,13 @@ namespace DryIoc
                 for (var i = 0; i < ctorParams.Length; i++)
                 {
                     var ctorParam = ctorParams[i];
-                    var paramKey = registry.GetConstructorParamKeyOrNull(ctorParam, request);
+                    var paramKey = registry.GetConstructorParameterKeyOrNull(ctorParam, request);
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
                     paramExprs[i] = registry.GetOrAddFactory(paramRequest, false).GetExpression(paramRequest, registry);
                 }
             }
 
-            return AddInitializerIfRequired(Expression.New(ctor, paramExprs), request, registry);
+            return InitMembersIfRequired(Expression.New(ctor, paramExprs), request, registry);
         }
 
         protected override LambdaExpression CreateFuncWithArgsOrNull(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncArgs)
@@ -1330,7 +1330,7 @@ namespace DryIoc
 
                 if (ctorParamExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
-                    var paramKey = registry.GetConstructorParamKeyOrNull(ctorParam, request);
+                    var paramKey = registry.GetConstructorParameterKeyOrNull(ctorParam, request);
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
                     ctorParamExprs[cp] = registry.GetOrAddFactory(paramRequest, false).GetExpression(paramRequest, registry);
                 }
@@ -1351,7 +1351,7 @@ namespace DryIoc
             }
 
             var newExpr = Expression.New(ctor, ctorParamExprs);
-            return Expression.Lambda(funcType, AddInitializerIfRequired(newExpr, request, registry), funcInputParamExprs);
+            return Expression.Lambda(funcType, InitMembersIfRequired(newExpr, request, registry), funcInputParamExprs);
         }
 
         #region Implementation
@@ -1371,9 +1371,9 @@ namespace DryIoc
             return _withConstructor(_implementationType);
         }
 
-        private Expression AddInitializerIfRequired(NewExpression newService, Request request, IRegistry registry)
+        private Expression InitMembersIfRequired(NewExpression newService, Request request, IRegistry registry)
         {
-            if (!registry.ShouldResolvePropertyOrField)
+            if (!registry.ShouldResolvePropertiesOrFields)
                 return newService;
 
             var properties = ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -1387,16 +1387,12 @@ namespace DryIoc
             var bindings = new List<MemberBinding>();
             foreach (var member in properties.Concat(fields))
             {
-                object propOrFieldKey;
-                if (registry.TryGetPropertyOrFieldKey(out propOrFieldKey, member, request))
+                object memberKey;
+                if (registry.TryGetPropertyOrFieldKey(out memberKey, member, request))
                 {
-                    var propOrFieldType = member.MemberType == MemberTypes.Field
-                        ? ((FieldInfo)member).FieldType
-                        : ((PropertyInfo)member).PropertyType;
-
-                    var propOrFieldRequest = request.Push(propOrFieldType, propOrFieldKey);
-                    var propOrFieldExpr = registry.GetOrAddFactory(propOrFieldRequest, false).GetExpression(propOrFieldRequest, registry);
-                    bindings.Add(Expression.Bind(member, propOrFieldExpr));
+                    var memberRequest = request.Push(member.GetMemberType(), memberKey);
+                    var memberExpr = registry.GetOrAddFactory(memberRequest, false).GetExpression(memberRequest, registry);
+                    bindings.Add(Expression.Bind(member, memberExpr));
                 }
             }
 
@@ -1705,9 +1701,9 @@ namespace DryIoc
 
         Type GetWrappedServiceTypeOrSelf(Type serviceType);
 
-        object GetConstructorParamKeyOrNull(ParameterInfo parameter, Request parent);
+        object GetConstructorParameterKeyOrNull(ParameterInfo parameter, Request parent);
 
-        bool ShouldResolvePropertyOrField { get; }
+        bool ShouldResolvePropertiesOrFields { get; }
 
         bool TryGetPropertyOrFieldKey(out object resultKey, MemberInfo propertyOrField, Request parent);
     }
@@ -1907,6 +1903,13 @@ namespace DryIoc
             for (var bt = type.BaseType; bt != null; bt = bt.BaseType)
                 baseType = bt;
             return baseType;
+        }
+
+        public static Type GetMemberType(this MemberInfo member)
+        {
+            var mt = member.MemberType;
+            mt.ThrowIf(mt != MemberTypes.Field && mt != MemberTypes.Property);
+            return mt == MemberTypes.Field ? ((FieldInfo)member).FieldType : ((PropertyInfo)member).PropertyType;
         }
 
         public static V GetOrAdd<K, V>(this IDictionary<K, V> source, K key, Func<K, V> valueFactory)
