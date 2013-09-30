@@ -366,12 +366,11 @@ namespace DryIoc
         {
             resultKey = null;
             var rules = ResolutionRules.ForPropertyOrFieldServiceKey;
-            if (rules == null)
-                return false;
-            var gotIt = false;
-            for (var i = 0; i < rules.Length && !gotIt; i++)
-                gotIt = rules[i].Invoke(out resultKey, propertyOrField, parent, this);
-            return gotIt;
+            if (rules != null)
+                for (var i = 0; i < rules.Length; i++)
+                    if (rules[i].Invoke(out resultKey, propertyOrField, parent, this))
+                        return true;
+            return false;
         }
 
         private bool TryFindEntry(out RegistryEntry entry, Type serviceType)
@@ -622,7 +621,7 @@ namespace DryIoc
                 setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
         }
 
-        internal sealed class DynamicEnumerableResolver
+        private sealed class DynamicEnumerableResolver
         {
             public static readonly MethodInfo ResolveEnumerableMethod = typeof(DynamicEnumerableResolver).GetMethod("ResolveEnumerable");
             public static readonly MethodInfo ResolveArrayMethod = typeof(DynamicEnumerableResolver).GetMethod("ResolveArray");
@@ -1073,9 +1072,7 @@ namespace DryIoc
         /// <param name="getServiceName">Optional function to find service name, otherwise service name will be null.</param>
         public static void ResolveProperties(this IResolver resolver, object instance, Func<PropertyInfo, string> getServiceName = null)
         {
-            instance.ThrowIfNull();
-
-            var properties = instance.GetType()
+            var properties = instance.ThrowIfNull().GetType()
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.GetSetMethod() != null); // with public setter
 
@@ -1382,23 +1379,24 @@ namespace DryIoc
             var properties = ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.GetSetMethod() != null)
                 .Cast<MemberInfo>();
+
             var fields = ImplementationType.GetFields(BindingFlags.Public | BindingFlags.Instance)
                 .Where(f => !f.IsInitOnly)
                 .Cast<MemberInfo>();
 
             var bindings = new List<MemberBinding>();
-            foreach (var propOrField in properties.Concat(fields))
+            foreach (var member in properties.Concat(fields))
             {
                 object propOrFieldKey;
-                if (registry.TryGetPropertyOrFieldKey(out propOrFieldKey, propOrField, request))
+                if (registry.TryGetPropertyOrFieldKey(out propOrFieldKey, member, request))
                 {
-                    var propOrFieldType = propOrField.MemberType == MemberTypes.Field
-                        ? ((FieldInfo)propOrField).FieldType
-                        : ((PropertyInfo)propOrField).PropertyType;
+                    var propOrFieldType = member.MemberType == MemberTypes.Field
+                        ? ((FieldInfo)member).FieldType
+                        : ((PropertyInfo)member).PropertyType;
 
                     var propOrFieldRequest = request.Push(propOrFieldType, propOrFieldKey);
                     var propOrFieldExpr = registry.GetOrAddFactory(propOrFieldRequest, false).GetExpression(propOrFieldRequest, registry);
-                    bindings.Add(Expression.Bind(propOrField, propOrFieldExpr));
+                    bindings.Add(Expression.Bind(member, propOrFieldExpr));
                 }
             }
 
