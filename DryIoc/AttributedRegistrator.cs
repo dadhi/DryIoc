@@ -183,64 +183,75 @@ namespace DryIoc
 
         public static void UseImportAttributes(this ResolutionRules rules)
         {
-            rules.ConstructorParameters = rules.ConstructorParameters.Append(ResolveConstructorParameterKey);
-            rules.PropertiesAndFields = rules.PropertiesAndFields.Append(ResolvePropertyOrFieldKey);
+            rules.ConstructorParameters = rules.ConstructorParameters.Append(GetConstructorParameterServiceKeyOrNull);
+            rules.PropertiesAndFields = rules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
         }
 
-        private static object ResolveConstructorParameterKey(ParameterInfo parameter, Request parent, IRegistry registry)
+        public static object GetConstructorParameterServiceKeyOrNull(ParameterInfo parameter, Request parent, IRegistry registry)
         {
             var attributes = parameter.GetCustomAttributes(false);
             if (attributes.Length == 0)
                 return null;
 
-            return GetKeyFromImportAttributeOrNull(attributes)
-                ?? GetKeyFromMetadataAttributeOrNull(parameter, registry, attributes)
-                ?? GetKeyFromImportUsingAttributeOrNull(parameter, registry, attributes);
+            object key;
+            if (TryGetServiceKeyFromImportAttribute(out key, attributes) ||
+                TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, registry, attributes) ||
+                TryGetServiceKeyFromImportUsingAttribute(out key, parameter.ParameterType, registry, attributes))
+                return key;
+            return null;
         }
 
-        public static object GetKeyFromImportAttributeOrNull(object[] attributes)
+        public static bool TryGetPropertyOrFieldServiceKey(out object key, MemberInfo member, Request _, IRegistry registry)
+        {
+            key = null;
+            var attributes = member.GetCustomAttributes(false);
+            if (attributes.Length == 0)
+                return false;
+
+            return TryGetServiceKeyFromImportAttribute(out key, attributes)
+                || TryGetServiceKeyFromImportUsingAttribute(out key, member.GetMemberType(), registry, attributes);
+        }
+
+        public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
         {
             var import = attributes.GetSingleAttributeOrNull<ImportAttribute>();
-            return import == null ? null : import.ContractName;
+            key = import == null ? null : import.ContractName;
+            return import != null;
         }
 
-        public static object GetKeyFromMetadataAttributeOrNull(ParameterInfo parameter, IRegistry registry, object[] attributes)
+        public static bool TryGetServiceKeyWithMetadataAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
-            var attribute = attributes.GetSingleAttributeOrNull<ImportWithMetadataAttribute>();
-            if (attribute == null)
-                return null;
+            key = null;
+            var import = attributes.GetSingleAttributeOrNull<ImportWithMetadataAttribute>();
+            if (import == null)
+                return false;
 
-            var serviceType = registry.GetWrappedServiceTypeOrSelf(parameter.ParameterType);
-            var serviceKey = registry.GetKeys(serviceType, f => attribute.Metadata.Equals(f.Setup.Metadata)).FirstOrDefault();
-            return serviceKey.ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, attribute.Metadata);
+            var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
+            var metadata = import.Metadata;
+            key = registry.GetKeys(serviceType, factory => metadata.Equals(factory.Setup.Metadata)).FirstOrDefault()
+                .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, metadata);
+            return true;
         }
 
-        public static object GetKeyFromImportUsingAttributeOrNull(ParameterInfo parameter, IRegistry registry, object[] attributes)
+        public static bool TryGetServiceKeyFromImportUsingAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
+            key = null;
             var import = attributes.GetSingleAttributeOrNull<ImportUsingAttribute>();
             if (import == null)
-                return null;
+                return false;
 
-            var serviceType = registry.GetWrappedServiceTypeOrSelf(parameter.ParameterType);
+            var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
             var serviceName = import.ContractName;
             if (registry.IsRegistered(serviceType, serviceName))
-                return null;
+                return false;
 
             var implementationType = import.ImplementationType ?? serviceType;
             var reuse = import.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
             SelectConstructor withConstructor = t => t.GetConstructor(import.ConstructorSignature);
             var setup = ServiceSetup.WithMetadata(import.Metadata);
-
             registry.Register(serviceType, implementationType, reuse, withConstructor, setup, serviceName);
-            return serviceName;
-        }
-
-        public static bool ResolvePropertyOrFieldKey(out object key, MemberInfo member, Request parent, IRegistry _)
-        {
-            var imports = member.GetCustomAttributes(typeof(ImportAttribute), false);
-            var hasImports = imports.Length != 0;
-            key = !hasImports ? null : ((ImportAttribute)imports[0]).ContractName;
-            return hasImports;
+            key = serviceName;
+            return true;
         }
 
         private static TAttribute GetSingleAttributeOrNull<TAttribute>(this object[] attributes) where TAttribute : Attribute

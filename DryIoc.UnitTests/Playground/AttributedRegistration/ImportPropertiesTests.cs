@@ -3,7 +3,7 @@ using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.AttributedRegistration
+namespace DryIoc.UnitTests.Playground.AttributedRegistration
 {
     [TestFixture]
     public class ImportPropertiesTests

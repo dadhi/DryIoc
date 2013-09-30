@@ -38,7 +38,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AttributedRegistration\ImportPropertiesTests.cs" />
+    <Compile Include="Playground\AttributedRegistration\ImportPropertiesTests.cs" />
     <Compile Include="AttributedRegistration\ExportAsDecoratorTests.cs" />
     <Compile Include="AttributedRegistration\ImportUsingTests.cs">
       <SubType>Code</SubType>
@@ -95,6 +95,7 @@
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

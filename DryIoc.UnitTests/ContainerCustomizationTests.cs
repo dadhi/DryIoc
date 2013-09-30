@@ -100,7 +100,11 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.ResolutionRules.ConstructorParameters =
                 container.ResolutionRules.ConstructorParameters.Append((parameter, _, __) =>
-                    AttributedRegistrator.GetKeyFromImportAttributeOrNull(parameter.GetCustomAttributes(false)));
+                {
+                    object key;
+                    return AttributedRegistrator.TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false))
+                        ? key : null;
+                });
 
             container.Register(typeof(INamedService), typeof(NamedService));
             container.Register(typeof(INamedService), typeof(AnotherNamedService), named: "blah");
@@ -116,8 +120,13 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.ResolutionRules.ConstructorParameters =
-                container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) => 
-                    AttributedRegistrator.GetKeyFromMetadataAttributeOrNull(parameter, registry, parameter.GetCustomAttributes(false)));
+                container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) =>
+                {
+                    object key;
+                    var attributes = parameter.GetCustomAttributes(false);
+                    return AttributedRegistrator.TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, registry, attributes)
+                        ? key : null;
+                });
 
             container.Register(typeof(IFooService), typeof(FooHey), setup: ServiceSetup.WithMetadata(FooMetadata.Hey));
             container.Register(typeof(IFooService), typeof(FooBlah), setup: ServiceSetup.WithMetadata(FooMetadata.Blah));

@@ -86,7 +86,7 @@ namespace DryIoc
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
-        public readonly ResolutionRules ResolutionRules;
+        public ResolutionRules ResolutionRules { get; private set; }
 
         public Container(Action<ResolutionRules, IRegistrator> setup = null)
         {
@@ -763,15 +763,15 @@ namespace DryIoc
         public delegate object ResolveConstructorParameterServiceKey(ParameterInfo parameter, Request parent, IRegistry registry);
         public ResolveConstructorParameterServiceKey[] ConstructorParameters = new ResolveConstructorParameterServiceKey[0];
 
-        public delegate bool ResolvePropertyOrFieldServiceKey(out object resultKey, MemberInfo member, Request parent, IRegistry registry);
-        public ResolvePropertyOrFieldServiceKey[] PropertiesAndFields = new ResolvePropertyOrFieldServiceKey[0];
+        public delegate bool ResolveMemberServiceKey(out object key, MemberInfo member, Request parent, IRegistry registry);
+        public ResolveMemberServiceKey[] PropertiesAndFields = new ResolveMemberServiceKey[0];
     }
 
     public static partial class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
             "Unable to resolve service {0}." + Environment.NewLine +
-            "Please register service {1} Or adjust Container Rules.";
+            "Please register service {1} OR adjust resolution rules.";
 
         public static readonly string UNSUPPORTED_FUNC_WITH_ARGS =
             "Unsupported resolution as {0}.";
@@ -1688,7 +1688,10 @@ namespace DryIoc
 
     public interface IRegistry : IResolver, IRegistrator
     {
+        ResolutionRules ResolutionRules { get; }
+        
         Scope SingletonScope { get; }
+        
         Scope CurrentScope { get; }
 
         Factory GetOrAddFactory(Request request, bool returnNullOnError);

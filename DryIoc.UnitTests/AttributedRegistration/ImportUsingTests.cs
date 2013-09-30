@@ -1,4 +1,5 @@
 ﻿using System;
+using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests.AttributedRegistration
@@ -12,8 +13,13 @@ namespace DryIoc.UnitTests.AttributedRegistration
             var container = new Container();
             container.Register<NativeUser>();
             container.ResolutionRules.ConstructorParameters =
-                container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) => 
-                    AttributedRegistrator.GetKeyFromImportUsingAttributeOrNull(parameter, registry, parameter.GetCustomAttributes(false)));
+                container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) =>
+                {
+                    object key;
+                    var attributes = parameter.GetCustomAttributes(false);
+                    return AttributedRegistrator.TryGetServiceKeyFromImportUsingAttribute(out key, parameter.ParameterType, registry, attributes)
+                        ? key : null;
+                });
 
             var user = container.Resolve<NativeUser>();
 
@@ -27,7 +33,12 @@ namespace DryIoc.UnitTests.AttributedRegistration
             container.Register<HomeUser>();
             container.ResolutionRules.ConstructorParameters =
                 container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) =>
-                    AttributedRegistrator.GetKeyFromImportUsingAttributeOrNull(parameter, registry, parameter.GetCustomAttributes(false)));
+                {
+                    object key;
+                    var attributes = parameter.GetCustomAttributes(false);
+                    return AttributedRegistrator.TryGetServiceKeyFromImportUsingAttribute(out key, parameter.ParameterType, registry, attributes)
+                        ? key : null;
+                });
 
             var user = container.Resolve<HomeUser>();
 
@@ -39,39 +50,72 @@ namespace DryIoc.UnitTests.AttributedRegistration
         {
             var container = new Container();
             container.ResolutionRules.ConstructorParameters =
-                container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) => 
-                    AttributedRegistrator.GetKeyFromImportUsingAttributeOrNull(parameter, registry, parameter.GetCustomAttributes(false)));
+                container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) =>
+                {
+                    object key;
+                    var attributes = parameter.GetCustomAttributes(false);
+                    return AttributedRegistrator.TryGetServiceKeyFromImportUsingAttribute(out key, parameter.ParameterType, registry, attributes)
+                        ? key : null;
+                });
             
-            container.Register<MineCode>();
+            container.Register<MyCode>();
 
-            var code = container.Resolve<MineCode>();
+            var code = container.Resolve<MyCode>();
 
             Assert.That(code.Tool, Is.Not.Null);
             Assert.That(code.ToolMeta, Is.EqualTo(MineMeta.Green));
         }
+
+        [Test]
+        public void Import_using_should_work_for_field_and_properties()
+        {
+            var container = new Container();
+            container.ResolutionRules.UseImportAttributes();
+            container.RegisterExported(typeof(ServiceWithFieldAndProperty));
+
+            var service = container.Resolve<ServiceWithFieldAndProperty>();
+
+            Assert.That(service.Field, Is.InstanceOf<AnotherService>());
+            Assert.That(service.Property, Is.InstanceOf<AnotherService>());
+        }
     }
+
+    [ExportAll]
+    public class ServiceWithFieldAndProperty
+    {
+        [ImportUsing(ImplementationType = typeof(AnotherService), ContractName = "blah")]
+        public IService Field;
+
+        [ImportUsing(ImplementationType = typeof(AnotherService), ContractName = "blah")]
+        public IService Property { get; set; }
+    }
+
+    #region CUT
 
     public class NativeUser
     {
         public IForeignTool Tool { get; set; }
 
         public NativeUser(
-            [ImportUsing(ImplementationType=typeof(ForeignTool), CreationPolicy=CreationPolicy.NonShared)]
-            IForeignTool tool)
+            [ImportUsing(ImplementationType = typeof (ForeignTool), CreationPolicy = CreationPolicy.NonShared)] IForeignTool tool)
         {
             Tool = tool;
         }
     }
 
-    public interface IForeignTool { }
+    public interface IForeignTool
+    {
+    }
 
-    public class ForeignTool : IForeignTool { }
+    public class ForeignTool : IForeignTool
+    {
+    }
 
     public class HomeUser
     {
         public ExternalTool Tool { get; set; }
 
-        public HomeUser([ImportUsing(ConstructorSignature = new[] { typeof(string) })] Func<string, ExternalTool> getTool)
+        public HomeUser([ImportUsing(ConstructorSignature = new[] {typeof (string)})] Func<string, ExternalTool> getTool)
         {
             Tool = getTool("blah");
         }
@@ -81,7 +125,9 @@ namespace DryIoc.UnitTests.AttributedRegistration
     {
         public string Message { get; set; }
 
-        public ExternalTool() { }
+        public ExternalTool()
+        {
+        }
 
         public ExternalTool(string message)
         {
@@ -89,17 +135,24 @@ namespace DryIoc.UnitTests.AttributedRegistration
         }
     }
 
-    public enum MineMeta { Red, Green };
+    public enum MineMeta
+    {
+        Red,
+        Green
+    };
 
-    public class MineCode
+    public class MyCode
     {
         public ExternalTool Tool { get; set; }
         public MineMeta ToolMeta { get; set; }
 
-        public MineCode([ImportUsing(Metadata = MineMeta.Green, ConstructorSignature = new Type[0])] Meta<Lazy<ExternalTool>, MineMeta> tool)
+        public MyCode(
+            [ImportUsing(Metadata = MineMeta.Green, ConstructorSignature = new Type[0])] Meta<Lazy<ExternalTool>, MineMeta> tool)
         {
             Tool = tool.Value.Value;
             ToolMeta = tool.Metadata;
         }
     }
+
+    #endregion
 }
