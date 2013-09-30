@@ -80,13 +80,13 @@ namespace DryIoc
     /// Additional features:
     /// <list type="bullet">
     /// <item>Bare-bone mode with all default rules switched off via Container constructor parameter.</item>
-    /// <item>Control of service resolution via <see cref="RulesToResolve"/>.</item>
+    /// <item>Control of service resolution via <see cref="ResolutionRules"/>.</item>
     /// </list>
     /// </para>
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
-        public readonly ResolutionRules RulesToResolve;
+        public readonly ResolutionRules ResolutionRules;
 
         public Container(Action<ResolutionRules, IRegistrator> setup = null)
         {
@@ -95,11 +95,11 @@ namespace DryIoc
             _decorators = HashTree<Type, DecoratorEntry[]>.Using(Sugar.Append);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
-            RulesToResolve = new ResolutionRules();
+            ResolutionRules = new ResolutionRules();
 
             CurrentScope = SingletonScope = new Scope();
 
-            (setup ?? DefaultSetup).Invoke(RulesToResolve, this);
+            (setup ?? DefaultSetup).Invoke(ResolutionRules, this);
         }
 
         public static void DefaultSetup(ResolutionRules rules, IRegistrator registrator)
@@ -133,7 +133,7 @@ namespace DryIoc
         {
             ResolutionRules.ResolveUnregisteredService
                 useRegistryRule = (request, _) => registry.GetOrAddFactory(request, true);
-            RulesToResolve.UnregisteredServices = RulesToResolve.UnregisteredServices.Append(useRegistryRule);
+            ResolutionRules.UnregisteredServices = ResolutionRules.UnregisteredServices.Append(useRegistryRule);
             return useRegistryRule;
         }
 
@@ -174,7 +174,7 @@ namespace DryIoc
 
             if (newFactory == null)
             {
-                var rules = RulesToResolve.UnregisteredServices;
+                var rules = ResolutionRules.UnregisteredServices;
                 if (rules != null)
                     for (var i = 0; i < rules.Length && newFactory == null; i++)
                         newFactory = rules[i].Invoke(request, this);
@@ -346,25 +346,25 @@ namespace DryIoc
                 return parent.ServiceKey; // propagate key from wrapper or decorator.
 
             object resultKey = null;
-            var rules = RulesToResolve.ConstructorParameters;
+            var rules = ResolutionRules.ConstructorParameters;
             if (rules != null)
                 for (var i = 0; i < rules.Length && resultKey == null; i++)
                     resultKey = rules[i].Invoke(parameter, parent, this);
             return resultKey;
         }
 
-        bool IRegistry.ShouldResolvePropertiesOrFields
+        bool IRegistry.ShouldResolvePropertiesAndFields
         {
             get
             {
-                var rules = RulesToResolve.PropertiesAndFields;
+                var rules = ResolutionRules.PropertiesAndFields;
                 return rules != null && rules.Length != 0;
             }
         }
 
         bool IRegistry.TryGetPropertyOrFieldKey(out object resultKey, MemberInfo member, Request parent)
         {
-            var rules = RulesToResolve.PropertiesAndFields;
+            var rules = ResolutionRules.PropertiesAndFields;
             if (rules != null)
                 for (var i = 0; i < rules.Length; i++)
                     if (rules[i].Invoke(out resultKey, member, parent, this))
@@ -691,7 +691,7 @@ namespace DryIoc
         {
             CurrentScope = new Scope();
             SingletonScope = source.SingletonScope;
-            RulesToResolve = source.RulesToResolve;
+            ResolutionRules = source.ResolutionRules;
             _syncRoot = source._syncRoot;
             _registry = source._registry;
             _decorators = source._decorators;
@@ -1373,7 +1373,7 @@ namespace DryIoc
 
         private Expression InitMembersIfRequired(NewExpression newService, Request request, IRegistry registry)
         {
-            if (!registry.ShouldResolvePropertiesOrFields)
+            if (!registry.ShouldResolvePropertiesAndFields)
                 return newService;
 
             var properties = ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -1703,7 +1703,7 @@ namespace DryIoc
 
         object GetConstructorParameterKeyOrNull(ParameterInfo parameter, Request parent);
 
-        bool ShouldResolvePropertiesOrFields { get; }
+        bool ShouldResolvePropertiesAndFields { get; }
 
         bool TryGetPropertyOrFieldKey(out object resultKey, MemberInfo propertyOrField, Request parent);
     }

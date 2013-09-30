@@ -15,8 +15,8 @@ namespace DryIoc.UnitTests.AttributedRegistration
             container.RegisterExported(typeof(ServiceWithProperties));
             container.Register<IService, Service>();
 
-            container.RulesToResolve.PropertiesAndFields =
-                container.RulesToResolve.PropertiesAndFields.Append(ImportAll);
+            container.ResolutionRules.PropertiesAndFields =
+                container.ResolutionRules.PropertiesAndFields.Append(ImportAll);
 
             var service = container.Resolve<ServiceWithProperties>();
 
@@ -29,8 +29,8 @@ namespace DryIoc.UnitTests.AttributedRegistration
             var container = new Container();
             container.RegisterExported(typeof(ServiceWithUnregistredMembers));
 
-            container.RulesToResolve.PropertiesAndFields =
-                container.RulesToResolve.PropertiesAndFields.Append(ImportAll);
+            container.ResolutionRules.PropertiesAndFields =
+                container.ResolutionRules.PropertiesAndFields.Append(ImportAll);
 
             var service = container.Resolve<ServiceWithUnregistredMembers>();
 

@@ -181,33 +181,47 @@ namespace DryIoc
 
         #region Rules
 
-        public static object GetKeyFromImportAttributeOrNull(ParameterInfo parameter, Request _, IRegistry __)
+        public static void UseImportAttributes(this ResolutionRules rules)
         {
-            var imports = parameter.GetCustomAttributes(typeof(ImportAttribute), false);
-            return imports.Length == 1 ? ((ImportAttribute)imports[0]).ContractName : null;
+            rules.ConstructorParameters = rules.ConstructorParameters.Append(ResolveConstructorParameterKey);
+            rules.PropertiesAndFields = rules.PropertiesAndFields.Append(ResolvePropertyOrFieldKey);
         }
 
-        public static object GetKeyFromMetadataAttributeOrNull(ParameterInfo parameter, Request parent, IRegistry registry)
+        private static object ResolveConstructorParameterKey(ParameterInfo parameter, Request parent, IRegistry registry)
         {
-            var attributes = parameter.GetCustomAttributes(typeof(ImportWithMetadataAttribute), false);
+            var attributes = parameter.GetCustomAttributes(false);
             if (attributes.Length == 0)
                 return null;
 
-            var attribute = (ImportWithMetadataAttribute)attributes[0];
+            return GetKeyFromImportAttributeOrNull(attributes)
+                ?? GetKeyFromMetadataAttributeOrNull(parameter, registry, attributes)
+                ?? GetKeyFromImportUsingAttributeOrNull(parameter, registry, attributes);
+        }
+
+        public static object GetKeyFromImportAttributeOrNull(object[] attributes)
+        {
+            var import = attributes.GetSingleAttributeOrNull<ImportAttribute>();
+            return import == null ? null : import.ContractName;
+        }
+
+        public static object GetKeyFromMetadataAttributeOrNull(ParameterInfo parameter, IRegistry registry, object[] attributes)
+        {
+            var attribute = attributes.GetSingleAttributeOrNull<ImportWithMetadataAttribute>();
+            if (attribute == null)
+                return null;
+
             var serviceType = registry.GetWrappedServiceTypeOrSelf(parameter.ParameterType);
             var serviceKey = registry.GetKeys(serviceType, f => attribute.Metadata.Equals(f.Setup.Metadata)).FirstOrDefault();
-
             return serviceKey.ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, attribute.Metadata);
         }
 
-        public static object GetNameFromImportUsingAttributeOrNull(ParameterInfo param, Request parent, IRegistry registry)
+        public static object GetKeyFromImportUsingAttributeOrNull(ParameterInfo parameter, IRegistry registry, object[] attributes)
         {
-            var imports = param.GetCustomAttributes(typeof(ImportUsing), false);
-            if (imports.Length == 0)
+            var import = attributes.GetSingleAttributeOrNull<ImportUsingAttribute>();
+            if (import == null)
                 return null;
 
-            var import = (ImportUsing)imports[0];
-            var serviceType = registry.GetWrappedServiceTypeOrSelf(param.ParameterType);
+            var serviceType = registry.GetWrappedServiceTypeOrSelf(parameter.ParameterType);
             var serviceName = import.ContractName;
             if (registry.IsRegistered(serviceType, serviceName))
                 return null;
@@ -221,12 +235,20 @@ namespace DryIoc
             return serviceName;
         }
 
-        public static bool ImportPropertyOrField(out object key, MemberInfo member, Request parent, IRegistry _)
+        public static bool ResolvePropertyOrFieldKey(out object key, MemberInfo member, Request parent, IRegistry _)
         {
             var imports = member.GetCustomAttributes(typeof(ImportAttribute), false);
             var hasImports = imports.Length != 0;
             key = !hasImports ? null : ((ImportAttribute)imports[0]).ContractName;
             return hasImports;
+        }
+
+        private static TAttribute GetSingleAttributeOrNull<TAttribute>(this object[] attributes) where TAttribute : Attribute
+        {
+            TAttribute attr = null;
+            for (var i = 0; i < attributes.Length && attr == null; i++)
+                attr = attributes[i] as TAttribute;
+            return attr;
         }
 
         #endregion
@@ -471,7 +493,7 @@ namespace DryIoc
     }
 
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    public class ImportUsing : Attribute
+    public class ImportUsingAttribute : Attribute
     {
         public string ContractName { get; set; }
 

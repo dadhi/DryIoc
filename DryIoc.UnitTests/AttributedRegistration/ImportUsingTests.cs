@@ -11,9 +11,9 @@ namespace DryIoc.UnitTests.AttributedRegistration
         {
             var container = new Container();
             container.Register<NativeUser>();
-            container.RulesToResolve.ConstructorParameters =
-                container.RulesToResolve.ConstructorParameters.Append(
-                    AttributedRegistrator.GetNameFromImportUsingAttributeOrNull);
+            container.ResolutionRules.ConstructorParameters =
+                container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) => 
+                    AttributedRegistrator.GetKeyFromImportUsingAttributeOrNull(parameter, registry, parameter.GetCustomAttributes(false)));
 
             var user = container.Resolve<NativeUser>();
 
@@ -25,9 +25,9 @@ namespace DryIoc.UnitTests.AttributedRegistration
         {
             var container = new Container();
             container.Register<HomeUser>();
-            container.RulesToResolve.ConstructorParameters =
-                container.RulesToResolve.ConstructorParameters.Append(
-                    AttributedRegistrator.GetNameFromImportUsingAttributeOrNull);
+            container.ResolutionRules.ConstructorParameters =
+                container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) =>
+                    AttributedRegistrator.GetKeyFromImportUsingAttributeOrNull(parameter, registry, parameter.GetCustomAttributes(false)));
 
             var user = container.Resolve<HomeUser>();
 
@@ -38,9 +38,9 @@ namespace DryIoc.UnitTests.AttributedRegistration
         public void I_can_specify_metadata()
         {
             var container = new Container();
-            container.RulesToResolve.ConstructorParameters =
-                container.RulesToResolve.ConstructorParameters.Append(
-                    AttributedRegistrator.GetNameFromImportUsingAttributeOrNull);
+            container.ResolutionRules.ConstructorParameters =
+                container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) => 
+                    AttributedRegistrator.GetKeyFromImportUsingAttributeOrNull(parameter, registry, parameter.GetCustomAttributes(false)));
             
             container.Register<MineCode>();
 
