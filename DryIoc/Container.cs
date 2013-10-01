@@ -1356,7 +1356,6 @@ namespace DryIoc
         #region Implementation
 
         private readonly Type _implementationType;
-
         private readonly SelectConstructor _withConstructor;
 
         private ConstructorInfo SelectConstructor()
