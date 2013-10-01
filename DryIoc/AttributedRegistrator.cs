@@ -456,7 +456,7 @@ namespace DryIoc
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
     public class ExportAllAttribute : Attribute
     {
-        public static Func<Type, bool> ExportedTypes = Container.PublicTypes;
+        public static Func<Type, bool> ExportedTypes = Registrator.PublicTypes;
 
         public Type[] Except { get; set; }
         public string ContractName { get; set; }

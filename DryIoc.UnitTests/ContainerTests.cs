@@ -234,7 +234,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_multiple_defaults_registered_Resolving_one_should_throw()
         {
-            var container = new Container(Container.MinimalSetup);
+            var container = new Container(ContainerSetup.Minimal);
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));
