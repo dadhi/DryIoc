@@ -183,11 +183,11 @@ namespace DryIoc
 
         public static void UseImportAttributes(this ResolutionRules rules)
         {
-            rules.ConstructorParameters = rules.ConstructorParameters.Append(GetConstructorParameterServiceKeyOrNull);
+            rules.ConstructorParameters = rules.ConstructorParameters.Append(GetConstructorParameterServiceKeyOrDefault);
             rules.PropertiesAndFields = rules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
         }
 
-        public static object GetConstructorParameterServiceKeyOrNull(ParameterInfo parameter, Request parent, IRegistry registry)
+        public static object GetConstructorParameterServiceKeyOrDefault(ParameterInfo parameter, Request parent, IRegistry registry)
         {
             var attributes = parameter.GetCustomAttributes(false);
             if (attributes.Length == 0)
