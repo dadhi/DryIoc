@@ -40,7 +40,7 @@
   <ItemGroup>
     <Compile Include="Playground\AttributedRegistration\ImportPropertiesTests.cs" />
     <Compile Include="AttributedRegistration\ExportAsDecoratorTests.cs" />
-    <Compile Include="AttributedRegistration\ImportUsingTests.cs">
+    <Compile Include="AttributedRegistration\ExportOnImportTests.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="AttributedRegistration\ExportAllTests.cs" />

@@ -1,5 +1,5 @@
 ﻿// TODO:
-// - Add ImportProperties.
+// - Add ExportFactory.
 // - Recognize export of Factory implementation.
 
 //#define MEF_IS_AVAILABLE
@@ -196,7 +196,7 @@ namespace DryIoc
             object key;
             if (TryGetServiceKeyFromImportAttribute(out key, attributes) ||
                 TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, registry, attributes) ||
-                TryGetServiceKeyFromImportUsingAttribute(out key, parameter.ParameterType, registry, attributes))
+                TryGetServiceKeyFromExportOnImportAttribute(out key, parameter.ParameterType, registry, attributes))
                 return key;
             return null;
         }
@@ -209,12 +209,12 @@ namespace DryIoc
                 return false;
 
             return TryGetServiceKeyFromImportAttribute(out key, attributes)
-                || TryGetServiceKeyFromImportUsingAttribute(out key, member.GetMemberType(), registry, attributes);
+                || TryGetServiceKeyFromExportOnImportAttribute(out key, member.GetMemberType(), registry, attributes);
         }
 
         public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
         {
-            var import = attributes.GetSingleAttributeOrNull<ImportAttribute>();
+            var import = GetSingleAttributeOrNull<ImportAttribute>(attributes);
             key = import == null ? null : import.ContractName;
             return import != null;
         }
@@ -222,7 +222,7 @@ namespace DryIoc
         public static bool TryGetServiceKeyWithMetadataAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
             key = null;
-            var import = attributes.GetSingleAttributeOrNull<ImportWithMetadataAttribute>();
+            var import = GetSingleAttributeOrNull<ImportWithMetadataAttribute>(attributes);
             if (import == null)
                 return false;
 
@@ -233,28 +233,29 @@ namespace DryIoc
             return true;
         }
 
-        public static bool TryGetServiceKeyFromImportUsingAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
+        public static bool TryGetServiceKeyFromExportOnImportAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
             key = null;
-            var import = attributes.GetSingleAttributeOrNull<ImportUsingAttribute>();
+            var import = GetSingleAttributeOrNull<ExportOnImport>(attributes);
             if (import == null)
                 return false;
 
             var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
             var serviceName = import.ContractName;
-            if (registry.IsRegistered(serviceType, serviceName))
-                return false;
+            if (!registry.IsRegistered(serviceType, serviceName))
+            {
+                var implementationType = import.ImplementationType ?? serviceType;
+                var reuse = import.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
+                SelectConstructor withConstructor = t => t.GetConstructor(import.ConstructorSignature);
+                var setup = ServiceSetup.WithMetadata(import.Metadata);
+                registry.Register(serviceType, implementationType, reuse, withConstructor, setup, serviceName);
+            }
 
-            var implementationType = import.ImplementationType ?? serviceType;
-            var reuse = import.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
-            SelectConstructor withConstructor = t => t.GetConstructor(import.ConstructorSignature);
-            var setup = ServiceSetup.WithMetadata(import.Metadata);
-            registry.Register(serviceType, implementationType, reuse, withConstructor, setup, serviceName);
             key = serviceName;
             return true;
         }
 
-        private static TAttribute GetSingleAttributeOrNull<TAttribute>(this object[] attributes) where TAttribute : Attribute
+        private static TAttribute GetSingleAttributeOrNull<TAttribute>(object[] attributes) where TAttribute : Attribute
         {
             TAttribute attr = null;
             for (var i = 0; i < attributes.Length && attr == null; i++)
@@ -504,7 +505,7 @@ namespace DryIoc
     }
 
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    public class ImportUsingAttribute : Attribute
+    public class ExportOnImport : Attribute
     {
         public string ContractName { get; set; }
 

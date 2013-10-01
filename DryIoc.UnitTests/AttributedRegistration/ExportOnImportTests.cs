@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests.AttributedRegistration
 {
     [TestFixture]
-    public class ImportUsingTests
+    public class ExportOnImportTests
     {
         [Test]
         public void I_can_export_ctor_param_service_on_resolve()
@@ -17,7 +17,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
                 {
                     object key;
                     var attributes = parameter.GetCustomAttributes(false);
-                    return AttributedRegistrator.TryGetServiceKeyFromImportUsingAttribute(out key, parameter.ParameterType, registry, attributes)
+                    return AttributedRegistrator.TryGetServiceKeyFromExportOnImportAttribute(out key, parameter.ParameterType, registry, attributes)
                         ? key : null;
                 });
 
@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
                 {
                     object key;
                     var attributes = parameter.GetCustomAttributes(false);
-                    return AttributedRegistrator.TryGetServiceKeyFromImportUsingAttribute(out key, parameter.ParameterType, registry, attributes)
+                    return AttributedRegistrator.TryGetServiceKeyFromExportOnImportAttribute(out key, parameter.ParameterType, registry, attributes)
                         ? key : null;
                 });
 
@@ -54,7 +54,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
                 {
                     object key;
                     var attributes = parameter.GetCustomAttributes(false);
-                    return AttributedRegistrator.TryGetServiceKeyFromImportUsingAttribute(out key, parameter.ParameterType, registry, attributes)
+                    return AttributedRegistrator.TryGetServiceKeyFromExportOnImportAttribute(out key, parameter.ParameterType, registry, attributes)
                         ? key : null;
                 });
             
@@ -83,10 +83,10 @@ namespace DryIoc.UnitTests.AttributedRegistration
     [ExportAll]
     public class ServiceWithFieldAndProperty
     {
-        [ImportUsing(ImplementationType = typeof(AnotherService), ContractName = "blah")]
+        [ExportOnImport(ImplementationType = typeof(AnotherService), ContractName = "blah")]
         public IService Field;
 
-        [ImportUsing(ImplementationType = typeof(AnotherService), ContractName = "blah")]
+        [ExportOnImport(ImplementationType = typeof(AnotherService), ContractName = "blah")]
         public IService Property { get; set; }
     }
 
@@ -97,7 +97,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         public IForeignTool Tool { get; set; }
 
         public NativeUser(
-            [ImportUsing(ImplementationType = typeof (ForeignTool), CreationPolicy = CreationPolicy.NonShared)] IForeignTool tool)
+            [ExportOnImport(ImplementationType = typeof (ForeignTool), CreationPolicy = CreationPolicy.NonShared)] IForeignTool tool)
         {
             Tool = tool;
         }
@@ -115,7 +115,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
     {
         public ExternalTool Tool { get; set; }
 
-        public HomeUser([ImportUsing(ConstructorSignature = new[] {typeof (string)})] Func<string, ExternalTool> getTool)
+        public HomeUser([ExportOnImport(ConstructorSignature = new[] {typeof (string)})] Func<string, ExternalTool> getTool)
         {
             Tool = getTool("blah");
         }
@@ -147,7 +147,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         public MineMeta ToolMeta { get; set; }
 
         public MyCode(
-            [ImportUsing(Metadata = MineMeta.Green, ConstructorSignature = new Type[0])] Meta<Lazy<ExternalTool>, MineMeta> tool)
+            [ExportOnImport(Metadata = MineMeta.Green, ConstructorSignature = new Type[0])] Meta<Lazy<ExternalTool>, MineMeta> tool)
         {
             Tool = tool.Value.Value;
             ToolMeta = tool.Metadata;
