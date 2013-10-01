@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
             container.Register<Service>();
 
             container.ResolutionRules.UnregisteredServices =
-                container.ResolutionRules.UnregisteredServices.Remove(ContainerSetup.ResolveDynamicEnumerable);
+                container.ResolutionRules.UnregisteredServices.Remove(ContainerSetup.GetEnumerableDynamicallyOrNull);
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service[]>());

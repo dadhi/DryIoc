@@ -526,81 +526,90 @@ namespace DryIoc
     public static class ContainerSetup
     {
         public static Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
-        
+
         public static void Minimal(IRegistry registry) { }
 
         public static void Default(IRegistry registry)
         {
-            registry.ResolutionRules.UnregisteredServices = 
-                registry.ResolutionRules.UnregisteredServices.Append(ResolveDynamicEnumerable);
+            registry.ResolutionRules.UnregisteredServices =
+                registry.ResolutionRules.UnregisteredServices.Append(GetEnumerableDynamicallyOrNull);
 
-            var funcFactory = new FuncGenericWrapper();
+            var funcFactory = new FactoryProvider(
+                (_, __) => new DelegateFactory(GetFuncExpression, Reuse.Singleton),
+                GenericWrapperSetup.With(t => t[t.Length - 1]));
             foreach (var funcType in FuncTypes)
                 registry.Register(funcType, funcFactory);
 
-            registry.Register(typeof(Lazy<>), Reuse.Transient, t => t.GetConstructor(new[] { typeof(Func<>) }), GenericWrapperSetup.Default);
+            var lazyFactory = new ReflectionFactory(typeof(Lazy<>),
+                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>) }),
+                setup: GenericWrapperSetup.Default);
+            registry.Register(typeof(Lazy<>), lazyFactory);
 
-            registry.Register(typeof(Meta<,>), new FactoryProvider(ResolveMeta, GenericWrapperSetup.With(t => t[0])));
+            var metaFactory = new FactoryProvider(GetMetaFactoryOrNull, GenericWrapperSetup.With(t => t[0]));
+            registry.Register(typeof(Meta<,>), metaFactory);
 
-            registry.Register(typeof(DebugExpression<>), new FactoryProvider(ResolveDebugExpression, GenericWrapperSetup.Default));
+            var debugExprFactory = new FactoryProvider(
+                (_, __) => new DelegateFactory(GetDebugExpression),
+                GenericWrapperSetup.Default);
+            registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
-        public static Factory ResolveDynamicEnumerable(Request req, IRegistry ignored)
+        internal static Factory GetEnumerableDynamicallyOrNull(Request request, IRegistry registry)
         {
-            if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
+            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
 
-            return new DelegateFactory((request, registry) =>
+            return new DelegateFactory((req, reg) =>
             {
-                var collectionType = request.ServiceType;
+                var collectionType = req.ServiceType;
                 var collectionIsArray = collectionType.IsArray;
                 var itemType = collectionIsArray ? collectionType.GetElementType() : collectionType.GetGenericArguments()[0];
-                var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
+                var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
 
-                var resolver = Expression.Constant(new DynamicEnumerableResolver(registry, itemType, wrappedItemType));
+                var resolver = Expression.Constant(new DynamicEnumerableResolver(reg, itemType, wrappedItemType));
                 var resolveMethod = (collectionIsArray
                     ? DynamicEnumerableResolver.ResolveArrayMethod
                     : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
-                return Expression.Call(resolver, resolveMethod, Expression.Constant(request));
+                return Expression.Call(resolver, resolveMethod, Expression.Constant(req));
             },
-                setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
+            setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
         }
 
-        public class FuncGenericWrapper : Factory
+        internal static Expression GetFuncExpression(Request request, IRegistry registry)
         {
-            public FuncGenericWrapper()
-                : base(DryIoc.Reuse.Singleton, GenericWrapperSetup.With(t => t[t.Length - 1])) { }
+            var funcType = request.ServiceType;
+            var funcTypeArgs = funcType.GetGenericArguments();
+            var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
 
-            public override Factory GetFactoryPerRequestOrNull(Request request, IRegistry registry)
-            {
-                return new DelegateFactory(CreateExpression, Reuse, Setup);
-            }
+            var serviceRequest = request.PushWithParentKey(serviceType);
+            var serviceFactory = registry.GetOrAddFactory(serviceRequest, false);
 
-            protected override Expression CreateExpression(Request request, IRegistry registry)
-            {
-                var funcType = request.ServiceType;
-                var funcTypeArgs = funcType.GetGenericArguments();
-                var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
+            if (funcTypeArgs.Length == 1)
+                return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
 
-                var serviceRequest = request.PushWithParentKey(serviceType);
-                var serviceFactory = registry.GetOrAddFactory(serviceRequest, false);
+            IList<Type> unusedFuncArgs;
+            var funcExpr = serviceFactory
+                .GetFuncWithArgsOrNull(funcType, serviceRequest, registry, out unusedFuncArgs)
+                .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
 
-                if (funcTypeArgs.Length == 1)
-                    return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
+            if (unusedFuncArgs != null)
+                Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs.Print(), request);
 
-                IList<Type> unusedFuncArgs;
-                var funcExpr = serviceFactory
-                    .GetFuncWithArgsOrNull(funcType, serviceRequest, registry, out unusedFuncArgs)
-                    .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
-
-                if (unusedFuncArgs != null)
-                    Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs.Print(), request);
-
-                return funcExpr;
-            }
+            return funcExpr;
         }
 
-        public static Factory ResolveMeta(Request request, IRegistry registry)
+        internal static Expression GetDebugExpression(Request request, IRegistry registry)
+        {
+            var factoryCtor = request.ServiceType.GetConstructors()[0];
+            var serviceType = request.ServiceType.GetGenericArguments()[0];
+
+            var serviceRequest = request.PushWithParentKey(serviceType);
+            var serviceExpr = registry.GetOrAddFactory(serviceRequest, false).GetExpression(serviceRequest, registry);
+            var expression = Expression.New(factoryCtor, Expression.Lambda<Container.CompiledFactory>(serviceExpr, Reuse.Parameters));
+            return expression;
+        }
+
+        internal static Factory GetMetaFactoryOrNull(Request request, IRegistry registry)
         {
             var genericArgs = request.ServiceType.GetGenericArguments();
             var serviceType = genericArgs[0];
@@ -638,18 +647,6 @@ namespace DryIoc
             });
         }
 
-        public static Factory ResolveDebugExpression(Request request, IRegistry registry)
-        {
-            var factoryCtor = request.ServiceType.GetConstructors()[0];
-            var serviceType = request.ServiceType.GetGenericArguments()[0];
-
-            var serviceRequest = request.PushWithParentKey(serviceType);
-            var serviceExpr = registry.GetOrAddFactory(serviceRequest, false).GetExpression(serviceRequest, registry);
-            var newFactory = Expression.New(factoryCtor, Expression.Lambda<Container.CompiledFactory>(serviceExpr, Reuse.Parameters));
-
-            return new DelegateFactory((_, __) => newFactory);
-        }
-
         #region Implementation
 
         private static object GetTypedMetadataOrNull(Factory factory, Type metadataType)
@@ -661,10 +658,10 @@ namespace DryIoc
         internal sealed class DynamicEnumerableResolver
         {
             public static readonly MethodInfo ResolveEnumerableMethod =
-                typeof (DynamicEnumerableResolver).GetMethod("ResolveEnumerable");
+                typeof(DynamicEnumerableResolver).GetMethod("ResolveEnumerable");
 
             public static readonly MethodInfo ResolveArrayMethod =
-                typeof (DynamicEnumerableResolver).GetMethod("ResolveArray");
+                typeof(DynamicEnumerableResolver).GetMethod("ResolveArray");
 
             public DynamicEnumerableResolver(IRegistry registry, Type itemType, Type unwrappedItemType)
             {
@@ -678,7 +675,7 @@ namespace DryIoc
                 var registry = (_registry.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
 
                 var parent = request.GetNonWrapperParentOrNull();
-                    // Composite pattern support: filter out composite root from available keys.
+                // Composite pattern support: filter out composite root from available keys.
                 var keys = parent != null && parent.ServiceType == _unwrappedItemType
                     ? registry.GetKeys(_unwrappedItemType, factory => factory.ID != parent.FactoryID)
                     : registry.GetKeys(_unwrappedItemType, null);
@@ -687,7 +684,7 @@ namespace DryIoc
                 {
                     var service = registry.ResolveKeyed(_itemType, key, shouldReturnNull: true);
                     if (service != null) // skip unresolved items
-                        yield return (T) service;
+                        yield return (T)service;
                 }
             }
 
@@ -702,7 +699,6 @@ namespace DryIoc
         }
 
         #endregion
-
     }
 
     public sealed class ResolutionRules
@@ -1182,11 +1178,17 @@ namespace DryIoc
 
     public abstract class Factory
     {
+        public static readonly FactorySetup DefaultSetup = ServiceSetup.Default;
         public static volatile int IDSeedAndCount;
 
         public readonly int ID;
         public readonly IReuse Reuse;
-        public readonly FactorySetup Setup;
+
+        public FactorySetup Setup
+        {
+            get { return _setup; }
+            protected internal set { _setup = value ?? DefaultSetup; }
+        }
 
         public virtual Type ImplementationType { get { return null; } }
 
@@ -1194,7 +1196,7 @@ namespace DryIoc
         {
             ID = Interlocked.Increment(ref IDSeedAndCount);
             Reuse = reuse;
-            Setup = setup ?? ServiceSetup.Default;
+            Setup = setup;
         }
 
         public abstract Factory GetFactoryPerRequestOrNull(Request request, IRegistry registry);
@@ -1254,6 +1256,7 @@ namespace DryIoc
 
         #region Implementation
 
+        private FactorySetup _setup;
         private volatile Expression _cachedExpression;
 
         #endregion
@@ -1434,7 +1437,10 @@ namespace DryIoc
 
         public override Factory GetFactoryPerRequestOrNull(Request request, IRegistry registry)
         {
-            return _getFactoryOrNull(request, registry);
+            var factory = _getFactoryOrNull(request, registry);
+            if (factory != null && factory.Setup == DefaultSetup)
+                factory.Setup = Setup; // propagate provider setup if it is not specified by client.
+            return factory;
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
