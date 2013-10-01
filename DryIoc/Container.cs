@@ -541,7 +541,7 @@ namespace DryIoc
                 registry.Register(funcType, funcFactory);
 
             var lazyFactory = new ReflectionFactory(typeof(Lazy<>),
-                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>) }),
+                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }),
                 setup: GenericWrapperSetup.Default);
             registry.Register(typeof(Lazy<>), lazyFactory);
 
@@ -554,7 +554,7 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
-        internal static Factory GetEnumerableDynamicallyOrNull(Request request, IRegistry registry)
+        public static Factory GetEnumerableDynamicallyOrNull(Request request, IRegistry registry)
         {
             if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
@@ -575,7 +575,7 @@ namespace DryIoc
             setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
         }
 
-        internal static Expression GetFuncExpression(Request request, IRegistry registry)
+        public static Expression GetFuncExpression(Request request, IRegistry registry)
         {
             var funcType = request.ServiceType;
             var funcTypeArgs = funcType.GetGenericArguments();
@@ -598,7 +598,7 @@ namespace DryIoc
             return funcExpr;
         }
 
-        internal static Expression GetDebugExpression(Request request, IRegistry registry)
+        public static Expression GetDebugExpression(Request request, IRegistry registry)
         {
             var factoryCtor = request.ServiceType.GetConstructors()[0];
             var serviceType = request.ServiceType.GetGenericArguments()[0];
@@ -609,7 +609,7 @@ namespace DryIoc
             return expression;
         }
 
-        internal static Factory GetMetaFactoryOrNull(Request request, IRegistry registry)
+        public static Factory GetMetaFactoryOrNull(Request request, IRegistry registry)
         {
             var genericArgs = request.ServiceType.GetGenericArguments();
             var serviceType = genericArgs[0];
