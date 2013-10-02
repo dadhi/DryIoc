@@ -5,10 +5,10 @@ using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 using ProtoBuf.Meta;
 
-namespace DryIoc.CompileTimeRegistrationTests
+namespace DryIoc.CompileTimeOperationTests
 {
     [TestFixture]
-    public class SerializingRegistrationInfoTests
+    public class CompileTimeRegistrationInfoSerializationTests
     {
         private const string DATA_FILE = "DryExports.bin";
 

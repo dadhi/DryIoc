@@ -1,11 +1,11 @@
-﻿namespace DryIoc.CompileTimeRegistrationTests
+﻿namespace DryIoc.CompileTimeOperationTests
 {
     using DryIoc;
     using AR = AttributedRegistrator;
 
-    public static class GeneratedRegistrator
+    public static class CompileTimeGeneratedRegistrator
     {
-        public static void Register(this IRegistrator registrator)
+        public static void RegisterIn(IRegistrator registrator)
         {
             registrator.RegisterExported(new[]
             {

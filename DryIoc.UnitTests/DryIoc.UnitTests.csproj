@@ -70,6 +70,7 @@
     <Compile Include="AttributedRegistration\ExportAsGenericWrapperTests.cs" />
     <Compile Include="Playground\OptionsPlayTests.cs" />
     <Compile Include="Playground\ThrowPlayTests.cs" />
+    <Compile Include="Playground\TreeBuilderTests.cs" />
     <Compile Include="Playground\TypeTree.cs" />
     <Compile Include="Playground\HashTreeWithMonoidUpdate.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

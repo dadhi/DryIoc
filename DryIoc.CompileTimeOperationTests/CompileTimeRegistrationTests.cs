@@ -1,7 +1,7 @@
 ﻿using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.CompileTimeRegistrationTests
+namespace DryIoc.CompileTimeOperationTests
 {
     [TestFixture]
     public class CompileTimeRegistrationTests
@@ -70,6 +70,12 @@ namespace DryIoc.CompileTimeRegistrationTests
             var wrapped = container.Resolve<Wrap<IService>>("some");
 
             Assert.That(wrapped.Value, Is.InstanceOf<AnotherService>());
+        }
+
+        [Test]
+        public void Can_use_generated_registrator()
+        {
+            var container = new Container(AttributedRegistrator.DefaultSetup);
         }
     }
 
