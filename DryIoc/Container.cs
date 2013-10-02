@@ -93,7 +93,7 @@ namespace DryIoc
 
             CurrentScope = SingletonScope = new Scope();
 
-            (setup ?? DefaultSetup).Invoke(this);
+            (setup ?? DefaultSetup)(this);
         }
 
         public static Action<IRegistry> DefaultSetup = ContainerSetup.Default;

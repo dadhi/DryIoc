@@ -70,7 +70,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         public void Import_using_should_work_for_field_and_properties()
         {
             var container = new Container();
-            container.ResolutionRules.UseImportAttributes();
+            container.ResolutionRules.UseImportExportAttributes();
             container.RegisterExported(typeof(ServiceWithFieldAndProperty));
 
             var service = container.Resolve<ServiceWithFieldAndProperty>();

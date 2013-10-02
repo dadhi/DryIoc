@@ -172,8 +172,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
 
 		private void WhenIRegisterAllExportedTypes()
 		{
-			_container = new Container();
-            _container.ResolutionRules.UseImportAttributes();
+			_container = new Container(AttributedRegistrator.DefaultSetup);
 			_container.RegisterExported(_assembly);
 		}
 

@@ -1,5 +1,6 @@
 ﻿// TODO:
 // - Add ExportFactory.
+// - Move tests to separate CUT.dll to test Import attributes.
 // - Recognize export of Factory implementation.
 
 //#define MEF_IS_AVAILABLE
@@ -16,7 +17,19 @@ namespace DryIoc
 
     public static class AttributedRegistrator
     {
-        public static bool SingletonByDefault = true;
+        public static void DefaultSetup(IRegistry source)
+        {
+            Container.DefaultSetup(source);
+            source.ResolutionRules.UseImportExportAttributes();
+        }
+
+        public static void UseImportExportAttributes(this ResolutionRules rules)
+        {
+            rules.ConstructorParameters = rules.ConstructorParameters.Append(GetConstructorParameterServiceKeyOrDefault);
+            rules.PropertiesAndFields = rules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
+        }
+        
+        public static bool ExportedServiceIsSingletonByDefault = true;
 
         public static void RegisterExported(this IRegistrator registrator, params Type[] types)
         {
@@ -64,7 +77,7 @@ namespace DryIoc
                 var attributes = type.GetCustomAttributes(false);
 
                 ExportInfo[] exports = null;
-                var isSingleton = SingletonByDefault; // default is singleton
+                var isSingleton = ExportedServiceIsSingletonByDefault; // default is singleton
                 var metadataAttributeIndex = -1;
                 var factoryType = FactoryType.Service;
                 FactorySetupInfo setupInfo = null;
@@ -181,11 +194,7 @@ namespace DryIoc
 
         #region Rules
 
-        public static void UseImportAttributes(this ResolutionRules rules)
-        {
-            rules.ConstructorParameters = rules.ConstructorParameters.Append(GetConstructorParameterServiceKeyOrDefault);
-            rules.PropertiesAndFields = rules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
-        }
+
 
         public static object GetConstructorParameterServiceKeyOrDefault(ParameterInfo parameter, Request parent, IRegistry registry)
         {
