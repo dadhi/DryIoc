@@ -5,11 +5,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{427EE71C-A3FD-4304-BFA3-7D872CC38E98}</ProjectGuid>
+    <ProjectGuid>{4BF5054E-4A96-4C1B-9965-FBAA9A6CAC1C}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.AttributedRegistration.CompileTimeAssembliesScan</RootNamespace>
-    <AssemblyName>DryIoc.AttributedRegistration.CompileTimeAssembliesScan</AssemblyName>
+    <RootNamespace>DryIoc.CompileTimeRegistrationTests</RootNamespace>
+    <AssemblyName>DryIoc.CompileTimeRegistrationTests</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -37,22 +37,22 @@
     <Reference Include="protobuf-net">
       <HintPath>..\lib\protobuf-net.dll</HintPath>
     </Reference>
+    <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="GeneratedRegistrator.cs">
+    <Compile Include="CompileTimeRegistrationTests.cs" />
+    <Compile Include="GeneratedRegistrator.cs">
       <DependentUpon>GeneratedRegistrator.tt</DependentUpon>
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
-    </Content>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SerializingContainerRegistrationsTests.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="GeneratedRegistrator.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>GeneratedRegistrator.cs</LastGenOutput>
-    </None>
+    <Compile Include="SerializingRegistrationInfoTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.UnitTests.CUT\DryIoc.UnitTests.CUT.csproj">
@@ -65,6 +65,12 @@
       <Name>DryIoc</Name>
       <Private>False</Private>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="GeneratedRegistrator.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>GeneratedRegistrator.cs</LastGenOutput>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />

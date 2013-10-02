@@ -1,0 +1,59 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ output extension=".cs" #>
+<#@ assembly Name="System.Core" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Debug\DryIoc.dll" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Debug\DryIoc.UnitTests.CUT.dll" #>
+<#@ import Namespace="DryIoc" #>
+<#@ import Namespace="DryIoc.UnitTests.CUT" #>
+<#@ import Namespace="System.Diagnostics" #>
+<#@ import Namespace="System.Text" #>
+<#@ import Namespace="System.IO" #>
+<#@ import Namespace="System.Linq" #>
+<#@ import Namespace="System.Collections.Generic" #>
+namespace DryIoc.CompileTimeRegistrationTests
+{
+    using DryIoc;
+    using AR = AttributedRegistrator;
+
+    public static class GeneratedRegistrator
+    {
+        public static void Register(this IRegistrator registrator)
+        {
+            registrator.RegisterExported(new[]
+            {
+<#
+            Func<string, string> getQuoted = s => s == null ? "null" : ("\"" + s + "\"");
+            Func<FactorySetupInfo, string> getFactorySetupInfo = info => 
+                info is DecoratorSetupInfo ? string.Format("new DecoratorSetupInfo()") : 
+                info is GenericWrapperSetupInfo ? string.Format("new GenericWrapperSetupInfo()") : 
+                "null";
+
+            var assembly = typeof(TransientService).Assembly;
+            var infos = AttributedRegistrator.ScanAssemblies(new [] { assembly });
+
+            foreach (var info in infos)
+            {
+#>
+                new RegistrationInfo {
+                    ImplementationType = typeof(<#= info.ImplementationType.Print() #>),
+                    IsSingleton = <#= info.IsSingleton ? "true" : "false" #>,
+                    MetadataAttributeIndex = <#= info.MetadataAttributeIndex #>,
+                    FactorySetupInfo = <#= getFactorySetupInfo(info.FactorySetupInfo) #>,
+                    Exports = new[] {
+<#
+                foreach (var x in info.Exports) 
+                {
+#>
+                        new ExportInfo { ServiceType = typeof(<#= x.ServiceType.Print() #>), ServiceName = <#= getQuoted(x.ServiceName) #> },
+<#
+                }
+#>
+                    }
+                },
+<#
+            }
+#>
+            });
+        }
+    }
+}

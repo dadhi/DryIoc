@@ -214,7 +214,7 @@ namespace DryIoc.UnitTests.CUT
     }
 
     [ExportAll]
-    internal class DbMan : ISomeDb, IAnotherDb
+    public class DbMan : ISomeDb, IAnotherDb
     {
     }
 

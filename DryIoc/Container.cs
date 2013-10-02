@@ -2,6 +2,7 @@
 // For version 1.0.0
 // - Fix code generation example.
 // - Evaluate Code Coverage.
+// - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
 // + Adjust ResolveProperties to be consistent with Import property or field.
 // + Move Wrappers related code to Separate Setup class.
 // + Add condition to Decorator.
@@ -16,7 +17,6 @@
 // + Add distinctive features:. ExportOnImport.
 //
 // Features:
-// - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
 // - Add parameter to Resolve to skip resolution cache, and probably all other caches.
 // + Rename ExportPublicTypes to ExportAll or something more concise.
 // + Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
