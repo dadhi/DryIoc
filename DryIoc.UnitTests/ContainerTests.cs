@@ -264,5 +264,15 @@ namespace DryIoc.UnitTests
 
             Assert.That(service, Is.InstanceOf<Service>());
         }
+
+        [Test]
+        public void Possible_ask_to_return_null_if_service_is_unresolved_instead_of_throwing_an_error()
+        {
+            var container = new Container();
+
+            var service = container.Resolve<IService>(IfUnresolved.ReturnNull);
+
+            Assert.Null(service);
+        }
     }
 }
