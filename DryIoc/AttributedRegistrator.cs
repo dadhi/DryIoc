@@ -29,7 +29,7 @@ namespace DryIoc
             rules.PropertiesAndFields = rules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
         }
         
-        public static bool ExportedServiceIsSingletonByDefault = true;
+        public static readonly bool ExportedServiceIsSingletonByDefault = true;
 
         public static void RegisterExported(this IRegistrator registrator, params Type[] types)
         {
@@ -193,8 +193,6 @@ namespace DryIoc
         #endregion
 
         #region Rules
-
-
 
         public static object GetConstructorParameterServiceKeyOrDefault(ParameterInfo parameter, Request parent, IRegistry registry)
         {

@@ -1,10 +1,9 @@
 ﻿// TODO:
 // For version 1.0.0
-// - Adjust ResolveProperties to be consistent with Import property or field.
-// - Move Wrappers related code to Separate Setup class.
 // - Fix code generation example.
 // - Evaluate Code Coverage.
-// - Add back static Array resolution.
+// + Adjust ResolveProperties to be consistent with Import property or field.
+// + Move Wrappers related code to Separate Setup class.
 // + Add condition to Decorator.
 // + Consolidate code related to rules in Rules class.
 // + Convert SkipCache flag to enum.
@@ -1057,6 +1056,8 @@ namespace DryIoc
             return (TService)resolver.Resolve(typeof(TService), serviceName, ifUnresolved);
         }
 
+        public static readonly BindingFlags MembersToResolve = BindingFlags.Public | BindingFlags.Instance;
+
         /// <summary>
         /// For given instance resolves and sets non-initialized (null) properties from container.
         /// It does not throw if property is not resolved, so you might need to check property value afterwards.
@@ -1068,16 +1069,15 @@ namespace DryIoc
         {
             var implType = instance.ThrowIfNull().GetType();
             getServiceName = getServiceName ?? (_ => null);
-            const BindingFlags publicNonStatic = BindingFlags.Public | BindingFlags.Instance;
 
-            foreach (var property in implType.GetProperties(publicNonStatic).Where(p => p.GetSetMethod() != null))
+            foreach (var property in implType.GetProperties(MembersToResolve).Where(p => p.GetSetMethod() != null))
             {
                 var value = resolver.Resolve(property.PropertyType, getServiceName(property), IfUnresolved.ReturnNull);
                 if (value != null)
                     property.SetValue(instance, value, null);
             }
 
-            foreach (var field in implType.GetFields(publicNonStatic).Where(f => !f.IsInitOnly))
+            foreach (var field in implType.GetFields(MembersToResolve).Where(f => !f.IsInitOnly))
             {
                 var value = resolver.Resolve(field.FieldType, getServiceName(field), IfUnresolved.ReturnNull);
                 if (value != null)
@@ -1375,55 +1375,19 @@ namespace DryIoc
             return _withConstructor(_implementationType);
         }
 
-        private Expression InitMembersIfRequired2(NewExpression newService, Request request, IRegistry registry)
-        {
-            var rules = registry.ResolutionRules;
-            if (!rules.ShouldResolvePropertiesAndFields)
-                return newService;
-
-            var properties = ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.GetSetMethod() != null)
-                .Cast<MemberInfo>();
-
-            var fields = ImplementationType.GetFields(BindingFlags.Public | BindingFlags.Instance)
-                .Where(f => !f.IsInitOnly)
-                .Cast<MemberInfo>();
-
-            var bindings = new List<MemberBinding>();
-            foreach (var member in properties.Concat(fields))
-            {
-                object key;
-                if (rules.TryGetPropertyOrFieldServiceKey(out key, member, request, registry))
-                {
-                    var memberRequest = request.Push(member.GetMemberType(), key);
-                    var memberExpr = registry.GetOrAddFactory(memberRequest, IfUnresolved.Throw).GetExpression(memberRequest, registry);
-                    bindings.Add(Expression.Bind(member, memberExpr));
-                }
-            }
-
-            return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
-        }
-
-
         private Expression InitMembersIfRequired(NewExpression newService, Request request, IRegistry registry)
         {
-            var rules = registry.ResolutionRules;
-            if (!rules.ShouldResolvePropertiesAndFields)
+            if (!registry.ResolutionRules.ShouldResolvePropertiesAndFields)
                 return newService;
 
-            var properties = ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.GetSetMethod() != null)
-                .Cast<MemberInfo>();
-
-            var fields = ImplementationType.GetFields(BindingFlags.Public | BindingFlags.Instance)
-                .Where(f => !f.IsInitOnly)
-                .Cast<MemberInfo>();
+            var properties = ImplementationType.GetProperties(Resolver.MembersToResolve).Where(p => p.GetSetMethod() != null);
+            var fields = ImplementationType.GetFields(Resolver.MembersToResolve).Where(f => !f.IsInitOnly);
 
             var bindings = new List<MemberBinding>();
-            foreach (var member in properties.Concat(fields))
+            foreach (var member in properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>()))
             {
                 object key;
-                if (rules.TryGetPropertyOrFieldServiceKey(out key, member, request, registry))
+                if (registry.ResolutionRules.TryGetPropertyOrFieldServiceKey(out key, member, request, registry))
                 {
                     var memberRequest = request.Push(member.GetMemberType(), key);
                     var memberExpr = registry.GetOrAddFactory(memberRequest, IfUnresolved.Throw).GetExpression(memberRequest, registry);
