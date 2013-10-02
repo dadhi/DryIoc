@@ -93,7 +93,7 @@ namespace DryIoc
 
             CurrentScope = SingletonScope = new Scope();
 
-            (setup ?? DefaultSetup)(this);
+            (setup ?? DefaultSetup).Invoke(this);
         }
 
         public static Action<IRegistry> DefaultSetup = ContainerSetup.Default;
@@ -111,7 +111,7 @@ namespace DryIoc
         public ResolutionRules.ResolveUnregisteredService UseRegistrationsFrom(IRegistry registry)
         {
             ResolutionRules.ResolveUnregisteredService
-                useRegistryRule = (request, _) => registry.GetOrAddFactory(request, true);
+                useRegistryRule = (request, _) => registry.GetOrAddFactory(request, IfUnresolved.ReturnNull);
             ResolutionRules.UnregisteredServices = ResolutionRules.UnregisteredServices.Append(useRegistryRule);
             return useRegistryRule;
         }
@@ -186,20 +186,20 @@ namespace DryIoc
 
         #region IResolver
 
-        public object ResolveDefault(Type serviceType, bool shouldReturnNull)
+        public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            return (_defaultResolutionCache.GetValueOrDefault(serviceType) ?? ResolveAndCacheFactory(serviceType, shouldReturnNull))
+            return (_defaultResolutionCache.GetValueOrDefault(serviceType) ?? ResolveAndCacheFactory(serviceType, ifUnresolved))
                 .Invoke(CurrentScope, null/* resolutionRootScope */);
         }
 
-        public object ResolveKeyed(Type serviceType, object serviceKey, bool shouldReturnNull)
+        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
         {
             var entry = _keyedResolutionCache.GetValueOrDefault(serviceType);
             var result = entry != null ? entry.GetCompiledFactoryOrNull(serviceKey.ThrowIfNull()) : null;
             if (result == null) // nothing in cache now, try to resolve and cache.
             {
                 var request = new Request(null, serviceType, serviceKey);
-                var factory = ((IRegistry)this).GetOrAddFactory(request, shouldReturnNull);
+                var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
                 if (factory == null) return null;
                 result = CompileExpression(factory.GetExpression(request, this));
                 _keyedResolutionCache = _keyedResolutionCache.AddOrUpdate(serviceType,
@@ -214,10 +214,10 @@ namespace DryIoc
         private HashTree<Type, CompiledFactory> _defaultResolutionCache;
         private HashTree<Type, KeyedResolutionCacheEntry> _keyedResolutionCache;
 
-        private CompiledFactory ResolveAndCacheFactory(Type serviceType, bool shouldReturnNull)
+        private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
         {
             var request = new Request(null, serviceType, null);
-            var factory = ((IRegistry)this).GetOrAddFactory(request, shouldReturnNull);
+            var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null) return EmptyCompiledFactory;
             var result = CompileExpression(factory.GetExpression(request, this));
             _defaultResolutionCache = _defaultResolutionCache.AddOrUpdate(serviceType, result);
@@ -255,7 +255,7 @@ namespace DryIoc
         public Scope SingletonScope { get; private set; }
         public Scope CurrentScope { get; private set; }
 
-        Factory IRegistry.GetOrAddFactory(Request request, bool shouldReturnNull)
+        Factory IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
             Factory newFactory = null;
             lock (_syncRoot)
@@ -284,7 +284,7 @@ namespace DryIoc
                 newFactory = ResolutionRules.GetUnregisteredServiceFactoryOrNull(request, this);
 
             if (newFactory == null)
-                Throw.If(!shouldReturnNull, Error.UNABLE_TO_RESOLVE_SERVICE, request, request.PrintLatest());
+                Throw.If(ifUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request, request.PrintLatest());
             else
                 Register(newFactory, request.ServiceType, request.ServiceKey);
 
@@ -582,7 +582,7 @@ namespace DryIoc
             var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
 
             var serviceRequest = request.PushWithParentKey(serviceType);
-            var serviceFactory = registry.GetOrAddFactory(serviceRequest, false);
+            var serviceFactory = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw);
 
             if (funcTypeArgs.Length == 1)
                 return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
@@ -604,7 +604,7 @@ namespace DryIoc
             var serviceType = request.ServiceType.GetGenericArguments()[0];
 
             var serviceRequest = request.PushWithParentKey(serviceType);
-            var serviceExpr = registry.GetOrAddFactory(serviceRequest, false).GetExpression(serviceRequest, registry);
+            var serviceExpr = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw).GetExpression(serviceRequest, registry);
             var expression = Expression.New(factoryCtor, Expression.Lambda<Container.CompiledFactory>(serviceExpr, Reuse.Parameters));
             return expression;
         }
@@ -638,7 +638,7 @@ namespace DryIoc
             return new DelegateFactory((_, __) =>
             {
                 var serviceRequest = request.Push(serviceType, serviceKey);
-                var serviceFactory = registry.GetOrAddFactory(serviceRequest, false);
+                var serviceFactory = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw);
 
                 var metaCtor = request.ServiceType.GetConstructors()[0];
                 var serviceExpr = serviceFactory.GetExpression(serviceRequest, registry);
@@ -682,7 +682,7 @@ namespace DryIoc
 
                 foreach (var key in keys)
                 {
-                    var service = registry.ResolveKeyed(_itemType, key, shouldReturnNull: true);
+                    var service = registry.ResolveKeyed(_itemType, key, IfUnresolved.ReturnNull);
                     if (service != null) // skip unresolved items
                         yield return (T)service;
                 }
@@ -1010,10 +1010,11 @@ namespace DryIoc
         /// </summary>
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
+        /// <param name="ifUnresolved">Optional, say to how to handle unresolved service case.</param>
         /// <returns>The requested service instance.</returns>
-        public static object Resolve(this IResolver resolver, Type serviceType)
+        public static object Resolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return resolver.ResolveDefault(serviceType, false);
+            return resolver.ResolveDefault(serviceType, ifUnresolved);
         }
 
         /// <summary>
@@ -1021,10 +1022,11 @@ namespace DryIoc
         /// </summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
+        /// <param name="ifUnresolved">Optional, say to how to handle unresolved service case.</param>
         /// <returns>The requested service instance.</returns>
-        public static TService Resolve<TService>(this IResolver resolver)
+        public static TService Resolve<TService>(this IResolver resolver, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveDefault(typeof(TService), false);
+            return (TService)resolver.ResolveDefault(typeof(TService), ifUnresolved);
         }
 
         /// <summary>
@@ -1033,12 +1035,13 @@ namespace DryIoc
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceName">Service name.</param>
+        /// <param name="ifUnresolved">Optional, say to how to handle unresolved service case.</param>
         /// <returns>The requested service instance.</returns>
-        public static object Resolve(this IResolver resolver, Type serviceType, string serviceName)
+        public static object Resolve(this IResolver resolver, Type serviceType, string serviceName, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
             return serviceName == null
-                ? resolver.ResolveDefault(serviceType, false)
-                : resolver.ResolveKeyed(serviceType, serviceName, false);
+                ? resolver.ResolveDefault(serviceType, ifUnresolved)
+                : resolver.ResolveKeyed(serviceType, serviceName, ifUnresolved);
         }
 
         /// <summary>
@@ -1047,12 +1050,11 @@ namespace DryIoc
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceName">Service name.</param>
+        /// <param name="ifUnresolved">Optional, say to how to handle unresolved service case.</param>
         /// <returns>The requested service instance.</returns>
-        public static TService Resolve<TService>(this IResolver resolver, string serviceName)
+        public static TService Resolve<TService>(this IResolver resolver, string serviceName, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)(serviceName == null
-                ? resolver.ResolveDefault(typeof(TService), false)
-                : resolver.ResolveKeyed(typeof(TService), serviceName, false));
+            return (TService)resolver.Resolve(typeof(TService), serviceName, ifUnresolved);
         }
 
         /// <summary>
@@ -1062,20 +1064,24 @@ namespace DryIoc
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="getServiceName">Optional function to find service name, otherwise service name will be null.</param>
-        public static void ResolveProperties(this IResolver resolver, object instance, Func<PropertyInfo, string> getServiceName = null)
+        public static void ResolvePropertiesAndFields(this IResolver resolver, object instance, Func<MemberInfo, string> getServiceName = null)
         {
-            var properties = instance.ThrowIfNull().GetType()
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.GetSetMethod() != null); // with public setter
+            var implType = instance.ThrowIfNull().GetType();
+            getServiceName = getServiceName ?? (_ => null);
+            const BindingFlags publicNonStatic = BindingFlags.Public | BindingFlags.Instance;
 
-            foreach (var property in properties)
+            foreach (var property in implType.GetProperties(publicNonStatic).Where(p => p.GetSetMethod() != null))
             {
-                var serviceKey = getServiceName != null ? getServiceName(property) : null;
-                var resolvedValue = serviceKey == null
-                    ? resolver.ResolveDefault(property.PropertyType, true)
-                    : resolver.ResolveKeyed(property.PropertyType, serviceKey, true);
-                if (resolvedValue != null)
-                    property.SetValue(instance, resolvedValue, null);
+                var value = resolver.Resolve(property.PropertyType, getServiceName(property), IfUnresolved.ReturnNull);
+                if (value != null)
+                    property.SetValue(instance, value, null);
+            }
+
+            foreach (var field in implType.GetFields(publicNonStatic).Where(f => !f.IsInitOnly))
+            {
+                var value = resolver.Resolve(field.FieldType, getServiceName(field), IfUnresolved.ReturnNull);
+                if (value != null)
+                    field.SetValue(instance, value);
             }
         }
     }
@@ -1296,7 +1302,7 @@ namespace DryIoc
                     var ctorParam = ctorParams[i];
                     var paramKey = registry.ResolutionRules.GetConstructorParameterKeyOrDefault(ctorParam, request, registry);
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
-                    paramExprs[i] = registry.GetOrAddFactory(paramRequest, false).GetExpression(paramRequest, registry);
+                    paramExprs[i] = registry.GetOrAddFactory(paramRequest, IfUnresolved.Throw).GetExpression(paramRequest, registry);
                 }
             }
 
@@ -1331,7 +1337,7 @@ namespace DryIoc
                 {
                     var paramKey = registry.ResolutionRules.GetConstructorParameterKeyOrDefault(ctorParam, request, registry);
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
-                    ctorParamExprs[cp] = registry.GetOrAddFactory(paramRequest, false).GetExpression(paramRequest, registry);
+                    ctorParamExprs[cp] = registry.GetOrAddFactory(paramRequest, IfUnresolved.Throw).GetExpression(paramRequest, registry);
                 }
             }
 
@@ -1369,6 +1375,36 @@ namespace DryIoc
             return _withConstructor(_implementationType);
         }
 
+        private Expression InitMembersIfRequired2(NewExpression newService, Request request, IRegistry registry)
+        {
+            var rules = registry.ResolutionRules;
+            if (!rules.ShouldResolvePropertiesAndFields)
+                return newService;
+
+            var properties = ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(p => p.GetSetMethod() != null)
+                .Cast<MemberInfo>();
+
+            var fields = ImplementationType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                .Where(f => !f.IsInitOnly)
+                .Cast<MemberInfo>();
+
+            var bindings = new List<MemberBinding>();
+            foreach (var member in properties.Concat(fields))
+            {
+                object key;
+                if (rules.TryGetPropertyOrFieldServiceKey(out key, member, request, registry))
+                {
+                    var memberRequest = request.Push(member.GetMemberType(), key);
+                    var memberExpr = registry.GetOrAddFactory(memberRequest, IfUnresolved.Throw).GetExpression(memberRequest, registry);
+                    bindings.Add(Expression.Bind(member, memberExpr));
+                }
+            }
+
+            return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
+        }
+
+
         private Expression InitMembersIfRequired(NewExpression newService, Request request, IRegistry registry)
         {
             var rules = registry.ResolutionRules;
@@ -1390,7 +1426,7 @@ namespace DryIoc
                 if (rules.TryGetPropertyOrFieldServiceKey(out key, member, request, registry))
                 {
                     var memberRequest = request.Push(member.GetMemberType(), key);
-                    var memberExpr = registry.GetOrAddFactory(memberRequest, false).GetExpression(memberRequest, registry);
+                    var memberExpr = registry.GetOrAddFactory(memberRequest, IfUnresolved.Throw).GetExpression(memberRequest, registry);
                     bindings.Add(Expression.Bind(member, memberExpr));
                 }
             }
@@ -1673,11 +1709,13 @@ namespace DryIoc
         #endregion
     }
 
+    public enum IfUnresolved { Throw, ReturnNull }
+
     public interface IResolver
     {
-        object ResolveDefault(Type serviceType, bool shouldReturnNull);
+        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved);
 
-        object ResolveKeyed(Type serviceType, object serviceKey, bool shouldReturnNull);
+        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved);
     }
 
     public interface IRegistrator
@@ -1695,7 +1733,7 @@ namespace DryIoc
 
         Scope CurrentScope { get; }
 
-        Factory GetOrAddFactory(Request request, bool returnNullOnError);
+        Factory GetOrAddFactory(Request request, IfUnresolved ifUnresolved);
 
         Factory GetFactoryOrNull(Type serviceType, object serviceKey);
 

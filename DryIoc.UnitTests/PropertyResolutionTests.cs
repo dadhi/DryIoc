@@ -10,15 +10,16 @@ namespace DryIoc.UnitTests
     public class PropertyResolutionTests
     {
         [Test]
-        public void Resolving_non_registered_property_from_container_should_NOT_succeed()
+        public void Resolving_unregistered_property_should_NOT_throw_and_should_preserve_original_property_value()
         {
             var container = new Container();
             container.Register(typeof(PropertyHolder));
-
             var holder = container.Resolve<PropertyHolder>();
+            var dependency = holder.Dependency = new Dependency();
+
             container.ResolveProperties(holder);
 
-            Assert.IsNull(holder.Dependency);
+            Assert.That(holder.Dependency, Is.EqualTo(dependency));
         }
 
         [Test]
@@ -27,37 +28,64 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register(typeof(PropertyHolder));
             container.Register(typeof(IDependency), typeof(Dependency));
-
             var holder = container.Resolve<PropertyHolder>();
+
             container.ResolveProperties(holder);
 
             Assert.IsInstanceOf<Dependency>(holder.Dependency);
         }
 
         [Test]
-        public void Resolving_property_with_nonpublic_set_from_container_should_NOT_succeed()
+        public void Resolving_field_registered_in_container_should_succeed()
+        {
+            var container = new Container();
+            container.Register<FieldHolder>();
+            container.Register<IDependency, Dependency>();
+            var holder = container.Resolve<FieldHolder>();
+
+            container.ResolveProperties(holder);
+
+            Assert.IsInstanceOf<Dependency>(holder.Dependency);
+        }
+
+        [Test]
+        public void Resolving_property_with_nonpublic_set_should_NOT_throw_and_should_preserve_original_property_value()
         {
             var container = new Container();
             container.Register(typeof(PropertyHolder));
             container.Register(typeof(IBar), typeof(Bar));
-
             var holder = container.Resolve<PropertyHolder>();
+
             container.ResolveProperties(holder);
 
             Assert.IsNull(holder.Bar);
         }
 
         [Test]
-        public void Resolving_property_without_set_from_container_should_NOT_succeed()
+        public void Resolving_property_without_set_should_NOT_throw_and_should_preserve_original_property_value()
         {
             var container = new Container();
             container.Register(typeof(PropertyHolder));
             container.Register(typeof(IBar), typeof(Bar));
-
             var holder = container.Resolve<PropertyHolder>();
+
             container.ResolveProperties(holder);
 
-            Assert.IsNull(holder.BarWoutSet);
+            Assert.IsNull(holder.BarWithoutSet);
+        }
+
+        [Test]
+        public void Resolving_readonly_field_should_NOT_throw_and_should_preserve_field_original_value()
+        {
+            var container = new Container();
+            container.Register(typeof(FieldHolder));
+            container.Register(typeof(IBar), typeof(Bar), Reuse.Singleton);
+            var holder = container.Resolve<FieldHolder>();
+            var bar = container.Resolve<IBar>();
+
+            container.ResolveProperties(holder);
+
+            Assert.That(holder.Bar, Is.Not.EqualTo(bar));
         }
 
         [Test]
@@ -149,10 +177,17 @@ namespace DryIoc.UnitTests
 
         public IBar Bar { get; private set; }
 
-        public IBar BarWoutSet
+        public IBar BarWithoutSet
         {
             get { return null; }
         }
+    }
+
+    public class FieldHolder
+    {
+        public IDependency Dependency;
+
+        public readonly IBar Bar = new Bar();
     }
 
     public class FunnyChicken
