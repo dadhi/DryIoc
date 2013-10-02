@@ -1,4 +1,5 @@
-﻿using DryIoc.UnitTests.CUT;
+﻿using System;
+using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.CompileTimeOperationTests
@@ -73,9 +74,13 @@ namespace DryIoc.CompileTimeOperationTests
         }
 
         [Test]
-        public void Can_use_generated_registrator()
+        public void Can_use_compile_time_generated_registrations()
         {
             var container = new Container(AttributedRegistrator.DefaultSetup);
+            container.RegisterExported(CompileTimeGeneratedRegistrator.Registrations);
+
+            Assert.DoesNotThrow(() =>
+                container.Resolve<Meta<Func<IServiceWithMetadata>, IViewMetadata>[]>());
         }
     }
 
