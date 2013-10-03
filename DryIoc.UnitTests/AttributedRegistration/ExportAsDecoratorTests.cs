@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using DryIoc.UnitTests.CUT;
+using NUnit.Framework;
 
 namespace DryIoc.UnitTests.AttributedRegistration
 {
@@ -69,88 +70,6 @@ namespace DryIoc.UnitTests.AttributedRegistration
 
             Assert.That(slow, Is.InstanceOf<DecoratorWithFastHandlerImport>());
             Assert.That(((DecoratorWithFastHandlerImport) slow).Handler, Is.InstanceOf<SlowHandler>());
-        }
-    }
-
-    public interface IHandler
-    {
-    }
-
-    [ExportAll(ContractName = "fast"), ExportWithMetadata(2)]
-    internal class FastHandler : IHandler
-    {
-    }
-
-    [ExportAll(ContractName = "slow"), ExportWithMetadata(1)]
-    internal class SlowHandler : IHandler
-    {
-    }
-
-    [ExportAll(ContractName = "transact"), ExportWithMetadata(1)]
-    internal class TransactHandler : IHandler
-    {
-    }
-
-    [ExportAll, ExportAsDecorator(ContractName = "slow")]
-    internal class LoggingHandlerDecorator : IHandler
-    {
-        public IHandler Handler { get; set; }
-
-        public LoggingHandlerDecorator(IHandler handler)
-        {
-            Handler = handler;
-        }
-    }
-
-    [ExportAll, ExportAsDecorator(CompareMetadata = true), ExportWithMetadata(2)]
-    internal class RetryHandlerDecorator : IHandler
-    {
-        public IHandler Handler { get; set; }
-
-        public RetryHandlerDecorator(IHandler handler)
-        {
-            Handler = handler;
-        }
-    }
-
-    [ExportAll, ExportAsDecorator(ContractName = "transact", CompareMetadata = true), ExportWithMetadata(1)]
-    internal class TransactHandlerDecorator : IHandler
-    {
-        public IHandler Handler { get; set; }
-
-        public TransactHandlerDecorator(IHandler handler)
-        {
-            Handler = handler;
-        }
-    }
-
-    [ExportAll, ExportAsDecorator(Condition = typeof(Condition))]
-    internal class CustomHandlerDecorator : IHandler
-    {
-        public IHandler Handler { get; set; }
-
-        public CustomHandlerDecorator(IHandler handler)
-        {
-            Handler = handler;
-        }
-
-        class Condition : IDecoratorCondition
-        {
-            public bool Check(Request request)
-            {
-                return request.ImplementationType == typeof(SlowHandler);
-            }
-        }
-    }
-
-    [ExportAll, ExportAsDecorator]
-    public class DecoratorWithFastHandlerImport : IHandler
-    {
-        public IHandler Handler { get; set; }
-
-        public DecoratorWithFastHandlerImport([Import("fast")]IHandler handler)
-        {
-            Handler = handler;
         }
     }
 }

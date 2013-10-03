@@ -91,7 +91,7 @@
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.AnotherServiceWithMetadata),
                 IsSingleton = false,
-                MetadataAttributeIndex = 1,
+                MetadataAttributeIndex = 0,
                 FactorySetupInfo = null,
                 Exports = new[] {
                     new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IServiceWithMetadata), ServiceName = null },
@@ -166,6 +166,7 @@
                 MetadataAttributeIndex = -1,
                 FactorySetupInfo = null,
                 Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.DbMan), ServiceName = null },
                     new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.ISomeDb), ServiceName = null },
                     new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IAnotherDb), ServiceName = null },
                 }
@@ -177,6 +178,79 @@
                 FactorySetupInfo = null,
                 Exports = new[] {
                     new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.ISomeDb<>), ServiceName = null },
+                }
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.FastHandler),
+                IsSingleton = true,
+                MetadataAttributeIndex = 1,
+                FactorySetupInfo = null,
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IHandler), ServiceName = "fast" },
+                }
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.SlowHandler),
+                IsSingleton = true,
+                MetadataAttributeIndex = 1,
+                FactorySetupInfo = null,
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IHandler), ServiceName = "slow" },
+                }
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.TransactHandler),
+                IsSingleton = true,
+                MetadataAttributeIndex = 0,
+                FactorySetupInfo = null,
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IHandler), ServiceName = "transact" },
+                }
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.LoggingHandlerDecorator),
+                IsSingleton = false,
+                MetadataAttributeIndex = -1,
+                FactorySetupInfo = new DecoratorSetupInfo(),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IHandler), ServiceName = null },
+                }
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.RetryHandlerDecorator),
+                IsSingleton = false,
+                MetadataAttributeIndex = 1,
+                FactorySetupInfo = new DecoratorSetupInfo(),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IHandler), ServiceName = null },
+                }
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.TransactHandlerDecorator),
+                IsSingleton = false,
+                MetadataAttributeIndex = 1,
+                FactorySetupInfo = new DecoratorSetupInfo(),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IHandler), ServiceName = null },
+                }
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.CustomHandlerDecorator),
+                IsSingleton = false,
+                MetadataAttributeIndex = -1,
+                FactorySetupInfo = new DecoratorSetupInfo(),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IHandler), ServiceName = null },
+                }
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.DecoratorWithFastHandlerImport),
+                IsSingleton = false,
+                MetadataAttributeIndex = -1,
+                FactorySetupInfo = new DecoratorSetupInfo(),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.DecoratorWithFastHandlerImport), ServiceName = null },
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IHandler), ServiceName = null },
                 }
             },
         };

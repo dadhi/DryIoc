@@ -31,9 +31,11 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ExportAsDecoratorTestsCUT.cs" />
     <Compile Include="AttributedModelTestsCUT.cs" />
     <Compile Include="ContainerTestsCUT.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
