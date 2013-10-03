@@ -20,33 +20,36 @@ namespace DryIoc.CompileTimeOperationTests
         public static RegistrationInfo[] Registrations =
         {
 <#
-        Func<string, string> getQuoted = s => s == null ? "null" : ("\"" + s + "\"");
-        Func<FactorySetupInfo, string> getFactorySetupInfo = info => 
-            info is DecoratorSetupInfo ? string.Format("new DecoratorSetupInfo()") : 
-            info is GenericWrapperSetupInfo ? string.Format("new GenericWrapperSetupInfo()") : 
-            "null";
-
         var assembly = typeof(TransientService).Assembly;
         var infos = AttributedRegistrator.ScanAssemblies(new [] { assembly });
+
+        Func<bool, string> asBool = x => x ? "true" : "false";
+        Func<string, string> asString = x => x == null ? "null" : "\"" + x + "\"";
+        Func<Type, string> asTypeof = x => x == null ? "null" : "typeof(" + x.Print() + ")";
+        Func<Type, object, string> asEnum = (t, x) => t.Print() + "." +  Enum.GetName(t, x);
 
         foreach (var info in infos)
         {
 #>
             new RegistrationInfo {
-                ImplementationType = typeof(<#= info.ImplementationType.Print() #>),
-                IsSingleton = <#= info.IsSingleton ? "true" : "false" #>,
-                MetadataAttributeIndex = <#= info.MetadataAttributeIndex #>,
-                FactorySetupInfo = <#= getFactorySetupInfo(info.FactorySetupInfo) #>,
+                ImplementationType = <#= asTypeof(info.ImplementationType) #>,
                 Exports = new[] {
 <#
             foreach (var x in info.Exports) 
             {
 #>
-                    new ExportInfo { ServiceType = typeof(<#= x.ServiceType.Print() #>), ServiceName = <#= getQuoted(x.ServiceName) #> },
+                    new ExportInfo { ServiceType = <#= asTypeof(x.ServiceType) #>, ServiceName = <#= asString(x.ServiceName) #> },
 <#
             }
 #>
-                }
+                },
+                IsSingleton = <#= asBool(info.IsSingleton) #>,
+                MetadataAttributeIndex = <#= info.MetadataAttributeIndex #>,
+                FactoryType = <#= asEnum(typeof(FactoryType), info.FactoryType) #>,
+                GenericWrapperServiceTypeIndex = <#= info.GenericWrapperServiceTypeIndex #>,
+                DecoratorServiceName = <#= asString(info.DecoratorServiceName) #>, 
+                DecoratorShouldCompareMetadata = <#= asBool(info.DecoratorShouldCompareMetadata) #>, 
+                DecoratorConditionType = <#= asTypeof(info.DecoratorConditionType) #>
             },
 <#
         }

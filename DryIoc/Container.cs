@@ -1826,6 +1826,7 @@ namespace DryIoc
     {
         public static string Print(this Type type, Func<Type, string> output = null /* prints Type.FullName by default */)
         {
+            if (type == null) return null;
             var name = output == null ? type.FullName : output(type);
             if (type.IsGenericType) // for generic types
             {

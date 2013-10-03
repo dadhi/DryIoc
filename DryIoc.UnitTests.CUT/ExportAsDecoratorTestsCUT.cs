@@ -67,7 +67,7 @@ namespace DryIoc.UnitTests.CUT
             Handler = handler;
         }
 
-        class Condition : IDecoratorCondition
+        internal class Condition : IDecoratorCondition
         {
             public bool Check(Request request)
             {
