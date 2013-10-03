@@ -1,8 +1,9 @@
 ﻿// TODO:
-// For version 1.0.0
-// - Fix code generation example.
-// - Evaluate Code Coverage.
+// Goals - Version 1.0.0:
 // - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
+// - Evaluate Code Coverage.
+// - Finalize Public API.
+// + Fix code generation example.
 // + Adjust ResolveProperties to be consistent with Import property or field.
 // + Move Wrappers related code to Separate Setup class.
 // + Add condition to Decorator.
@@ -10,11 +11,10 @@
 // + Convert SkipCache flag to enum.
 // + Review performance one again with fresh view.
 // + Add registration for lambda with IResolver parameter for something like RegisterDelegate(c => new Blah(c.Resolve(IDependency))).
-
-// Goals:
-// - Finalize Public API.
-// - Add distinctive features: ExportFactory with FactoryMethod.
 // + Add distinctive features:. ExportOnImport.
+//
+// Goals - Version 2.0.0:
+// - Add distinctive feature: ExportFactory with FactoryMethod.
 //
 // Features:
 // - Add parameter to Resolve to skip resolution cache, and probably all other caches.
