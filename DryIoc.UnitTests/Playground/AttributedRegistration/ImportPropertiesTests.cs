@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace DryIoc.UnitTests.Playground.AttributedRegistration
 {
-    [TestFixture]
+    [TestFixture][Ignore]
     public class ImportPropertiesTests
     {
         [Test]

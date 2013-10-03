@@ -3,13 +3,12 @@ using System.Diagnostics;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.AttributedRegistration
+namespace DryIoc.UnitTests.Performance.AttributedRegistration
 {
-	[TestFixture]
+	[TestFixture][Ignore]
 	public class PerformanceTests
 	{
 		[Test]
-		[Ignore]
 		public void RegistrationPerformanceTest()
 		{
 			var currentAssembly = typeof(FooConsumer).Assembly;
@@ -30,7 +29,6 @@ namespace DryIoc.UnitTests.AttributedRegistration
 		}
 
 		[Test]
-		[Ignore]
 		public void AttributeIsDefinedVsGetCustomAttributes()
 		{
 			const int times = 100000;

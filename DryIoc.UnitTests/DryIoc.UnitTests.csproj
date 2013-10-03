@@ -44,7 +44,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="AttributedRegistration\ExportAllTests.cs" />
-    <Compile Include="AttributedRegistration\PerformanceTests.cs" />
+    <Compile Include="Performance\AttributedRegistration\PerformanceTests.cs" />
     <Compile Include="AttributedRegistration\AttributedRegistratorTests.cs" />
     <Compile Include="CompositePatternTests.cs" />
     <Compile Include="ContainerCustomizationTests.cs" />
