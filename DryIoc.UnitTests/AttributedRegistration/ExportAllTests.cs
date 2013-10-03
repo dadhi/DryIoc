@@ -42,11 +42,30 @@ namespace DryIoc.UnitTests.AttributedRegistration
             Assert.That(named, Is.Not.Null);
             Assert.That(one, Is.Not.Null);
         }
+
+        [Test]
+        public void Individual_Export_should_override_ExportAll_settings()
+        {
+            var container = new Container(AttributedRegistrator.DefaultSetup);
+            container.RegisterExported(typeof(BothExportAllAndExport));
+
+            var named = container.Resolve<INamed>("named");
+            Assert.That(named, Is.Not.Null);
+
+            var namedDefault = container.Resolve<INamed>(IfUnresolved.ReturnNull);
+            Assert.That(namedDefault, Is.Null);
+        }
     }
 
     public interface IOne {}
+
     public interface INamed {}
 
     [ExportAll(ContractName = "blah")]
     public class NamedOne : INamed, IOne {}
+
+    [ExportAll, Export("named", typeof(INamed))]
+    public class BothExportAllAndExport : INamed, IOne
+    {
+    }
 }

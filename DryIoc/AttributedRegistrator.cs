@@ -103,8 +103,8 @@ namespace DryIoc
                             for (var index = 0; index < info.Exports.Length; index++)
                             {
                                 var export = info.Exports[index];
-                                if (!exportAllInfos.Contains(export))
-                                    exportAllInfos = exportAllInfos.AppendOrUpdate(export);
+                                var overrideExportIndex = Array.FindIndex(exportAllInfos, x => x.ServiceType == export.ServiceType);
+                                exportAllInfos = exportAllInfos.AppendOrUpdate(export, overrideExportIndex);
                             }
 
                         info.Exports = exportAllInfos;
