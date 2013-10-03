@@ -36,8 +36,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ExportAsDecoratorTestsCUT.cs" />
-    <Compile Include="AttributedModelTestsCUT.cs" />
+    <Compile Include="AttributedRegistrationTestsCUT.cs" />
     <Compile Include="ContainerTestsCUT.cs" />
+    <Compile Include="ExportAsGenericWrapperTestsCUT.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -198,3 +198,4 @@ namespace DryIoc.UnitTests.AttributedRegistration
 
     #endregion
 }
+

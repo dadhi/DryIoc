@@ -47,7 +47,7 @@ namespace DryIoc.CompileTimeOperationTests
                 MetadataAttributeIndex = <#= info.MetadataAttributeIndex #>,
                 FactoryType = <#= asEnum(typeof(FactoryType), info.FactoryType) #>,
                 GenericWrapper = <#= info.GenericWrapper == null ? "null" : 
-                    string.Format("new GenericWrapper {{ ServiceTypeIndex = {0} }}", info.GenericWrapper.ServiceTypeIndex) #>,
+                    string.Format("new GenericWrapperInfo {{ ServiceTypeIndex = {0} }}", info.GenericWrapper.ServiceTypeIndex) #>,
                 Decorator = <#= info.Decorator == null ? "null" : 
                     string.Format("new DecoratorInfo {{ ServiceName = {0}, ShouldCompareMetadata = {1}, ConditionType = {2} }}", 
                         asString(info.Decorator.ServiceName), asBool(info.Decorator.ShouldCompareMetadata), asTypeof(info.Decorator.ConditionType)) #>

@@ -35,7 +35,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IHandler), ServiceName = "transact" },
                 },
                 IsSingleton = true,
-                MetadataAttributeIndex = 0,
+                MetadataAttributeIndex = 1,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
                 Decorator = null
@@ -57,7 +57,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IHandler), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 1,
+                MetadataAttributeIndex = 2,
                 FactoryType = DryIoc.FactoryType.Decorator,
                 GenericWrapper = null,
                 Decorator = new DecoratorInfo { ServiceName = null, ShouldCompareMetadata = true, ConditionType = null }
@@ -168,7 +168,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IServiceWithMultipleImplentations), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 0,
+                MetadataAttributeIndex = 1,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
                 Decorator = null
@@ -201,7 +201,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IServiceWithMetadata), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 1,
+                MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
                 Decorator = null
@@ -212,7 +212,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IServiceWithMetadata), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 0,
+                MetadataAttributeIndex = 2,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
                 Decorator = null
@@ -305,6 +305,73 @@
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
+                Decorator = null
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.FactoryConsumer),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.FactoryConsumer), ServiceName = null },
+                },
+                IsSingleton = true,
+                MetadataAttributeIndex = -1,
+                FactoryType = DryIoc.FactoryType.Service,
+                GenericWrapper = null,
+                Decorator = null
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.One),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.One), ServiceName = "one" },
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.One), ServiceName = "two" },
+                },
+                IsSingleton = true,
+                MetadataAttributeIndex = -1,
+                FactoryType = DryIoc.FactoryType.Service,
+                GenericWrapper = null,
+                Decorator = null
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.DryFactory<>),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IFactory<>), ServiceName = null },
+                },
+                IsSingleton = true,
+                MetadataAttributeIndex = -1,
+                FactoryType = DryIoc.FactoryType.GenericWrapper,
+                GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = 0 },
+                Decorator = null
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.FactoryWithArgsConsumer),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.FactoryWithArgsConsumer), ServiceName = null },
+                },
+                IsSingleton = true,
+                MetadataAttributeIndex = -1,
+                FactoryType = DryIoc.FactoryType.Service,
+                GenericWrapper = null,
+                Decorator = null
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.Two),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.Two), ServiceName = null },
+                },
+                IsSingleton = true,
+                MetadataAttributeIndex = -1,
+                FactoryType = DryIoc.FactoryType.Service,
+                GenericWrapper = null,
+                Decorator = null
+            },
+            new RegistrationInfo {
+                ImplementationType = typeof(DryIoc.UnitTests.CUT.DryFactory<,>),
+                Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.UnitTests.CUT.IFactory<,>), ServiceName = null },
+                },
+                IsSingleton = true,
+                MetadataAttributeIndex = -1,
+                FactoryType = DryIoc.FactoryType.GenericWrapper,
+                GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = 1 },
                 Decorator = null
             },
         };

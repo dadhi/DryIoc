@@ -31,7 +31,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         }
 
         [Test]
-        public void ExportAll_should_respect_ContactName()
+        public void ExportAll_should_respect_ContractName()
         {
             var container = new Container();
             container.RegisterExported(typeof(NamedOne));
