@@ -1101,7 +1101,7 @@ namespace DryIoc
     {
         public static readonly ServiceSetup Default = new ServiceSetup();
 
-        public static ServiceSetup With(FactoryCachePolicy cachePolicy, object metadata = null)
+        public static ServiceSetup With(FactoryCachePolicy cachePolicy = FactoryCachePolicy.CacheExpression, object metadata = null)
         {
             return cachePolicy == FactoryCachePolicy.CacheExpression && metadata == null ? Default : new ServiceSetup(cachePolicy, metadata);
         }
