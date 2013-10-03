@@ -57,7 +57,7 @@ namespace DryIoc.UnitTests.CUT
         }
     }
 
-    [ExportAll, ExportAsDecorator(ConditionType = typeof(Condition))]
+    [Export(typeof(IHandler)), ExportAsDecorator(ConditionType = typeof(Condition))]
     internal class CustomHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }

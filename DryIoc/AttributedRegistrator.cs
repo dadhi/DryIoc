@@ -117,16 +117,20 @@ namespace DryIoc
                     {
                         Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
                         info.FactoryType = FactoryType.GenericWrapper;
-                        info.GenericWrapperServiceTypeIndex = ((ExportAsGenericWrapperAttribute)attribute).ServiceTypeArgIndex;
+                        var genericWrapperAttribute = ((ExportAsGenericWrapperAttribute)attribute);
+                        info.GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = genericWrapperAttribute.ServiceTypeArgIndex };
                     }
                     else if (attribute is ExportAsDecoratorAttribute)
                     {
                         Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
                         var decorator = ((ExportAsDecoratorAttribute)attribute);
                         info.FactoryType = FactoryType.Decorator;
-                        info.DecoratorServiceName = decorator.ContractName;
-                        info.DecoratorShouldCompareMetadata = decorator.ShouldCompareMetadata;
-                        info.DecoratorConditionType = decorator.ConditionType;
+                        info.Decorator = new DecoratorInfo
+                        {
+                            ServiceName = decorator.ContractName,
+                            ShouldCompareMetadata = decorator.ShouldCompareMetadata,
+                            ConditionType = decorator.ConditionType
+                        };
                     }
 
                     if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), false))
@@ -138,7 +142,7 @@ namespace DryIoc
 
                 if (info.FactoryType == FactoryType.Decorator)
                 {
-                    Throw.If(info.DecoratorShouldCompareMetadata && info.MetadataAttributeIndex == -1, Error.METADATA_FOR_DECORATOR_IS_NOT_FOUND, type);
+                    Throw.If(info.Decorator.ShouldCompareMetadata && info.MetadataAttributeIndex == -1, Error.METADATA_FOR_DECORATOR_IS_NOT_FOUND, type);
                     info.IsSingleton = false; // Decorator could not be reused based on the definition, so we are ignoring reuse setting.
                 }
 
@@ -270,7 +274,7 @@ namespace DryIoc
             "Found multiple factory types associated with exported {0}. " +
             "Only single ExportAs.. attribute is supported, please remove the rest.";
 
-        public static readonly string METADATA_FOR_DECORATOR_IS_NOT_FOUND = 
+        public static readonly string METADATA_FOR_DECORATOR_IS_NOT_FOUND =
             "Exported Decorator should compare metadata BUT metadata is not found for {0}.";
 
         public static readonly string EXPORT_IS_REQUIRED =
@@ -288,28 +292,16 @@ namespace DryIoc
         public int MetadataAttributeIndex = -1;
 
         public FactoryType FactoryType;
-        public int GenericWrapperServiceTypeIndex;
-        public string DecoratorServiceName;
-        public bool DecoratorShouldCompareMetadata;
-        public Type DecoratorConditionType;
+        public GenericWrapperInfo GenericWrapper;
+        public DecoratorInfo Decorator;
 
         public FactorySetup CreateSetup(object metadata)
         {
             if (FactoryType == FactoryType.GenericWrapper)
-                return GenericWrapperSetup.With(t => t[GenericWrapperServiceTypeIndex]);
+                return GenericWrapper == null ? GenericWrapperSetup.Default : GenericWrapper.CreateSetup();
 
             if (FactoryType == FactoryType.Decorator)
-            {
-                if (DecoratorConditionType != null)
-                    return DecoratorSetup.With(((IDecoratorCondition)Activator.CreateInstance(DecoratorConditionType)).Check);
-
-                if (DecoratorShouldCompareMetadata || DecoratorServiceName != null)
-                    return DecoratorSetup.With(request =>
-                        (!DecoratorShouldCompareMetadata || Equals(metadata, request.Metadata)) &&
-                        (DecoratorServiceName == null || DecoratorServiceName.Equals(request.ServiceKey)));
-
-                return DecoratorSetup.Default;
-            }
+                return Decorator == null ? DecoratorSetup.Default : Decorator.CreateSetup(metadata);
 
             return ServiceSetup.WithMetadata(metadata);
         }
@@ -321,10 +313,8 @@ namespace DryIoc
                 && other.ImplementationType == ImplementationType
                 && other.IsSingleton == IsSingleton
                 && other.FactoryType == FactoryType
-                && other.GenericWrapperServiceTypeIndex == GenericWrapperServiceTypeIndex
-                && other.DecoratorServiceName == DecoratorServiceName
-                && other.DecoratorShouldCompareMetadata == DecoratorShouldCompareMetadata
-                && other.DecoratorConditionType == DecoratorConditionType
+                && Equals(other.GenericWrapper, GenericWrapper)
+                && Equals(other.Decorator, Decorator)
                 && other.Exports.SequenceEqual(Exports);
         }
     }
@@ -341,6 +331,59 @@ namespace DryIoc
             return other != null && other.ServiceType == ServiceType && other.ServiceName == ServiceName;
         }
     }
+
+    [Serializable]
+    public sealed class GenericWrapperInfo
+    {
+        public int ServiceTypeIndex;
+
+        public GenericWrapperSetup CreateSetup()
+        {
+            return GenericWrapperSetup.With(SelectServiceType);
+        }
+
+        public override bool Equals(object obj)
+        {
+            var other = obj as GenericWrapperInfo;
+            return other != null && other.ServiceTypeIndex == ServiceTypeIndex;
+        }
+
+        private Type SelectServiceType(Type[] typeArgs)
+        {
+            return typeArgs[ServiceTypeIndex];
+        }
+    }
+
+    [Serializable]
+    public sealed class DecoratorInfo
+    {
+        public string ServiceName;
+        public bool ShouldCompareMetadata;
+        public Type ConditionType;
+
+        public DecoratorSetup CreateSetup(object metadata)
+        {
+            if (ConditionType != null)
+                return DecoratorSetup.With(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).Check);
+
+            if (ShouldCompareMetadata || ServiceName != null)
+                return DecoratorSetup.With(request =>
+                    (!ShouldCompareMetadata || Equals(metadata, request.Metadata)) &&
+                    (ServiceName == null || ServiceName.Equals(request.ServiceKey)));
+
+            return DecoratorSetup.Default;
+        }
+
+        public override bool Equals(object obj)
+        {
+            var other = obj as DecoratorInfo;
+            return other != null
+                && other.ServiceName == ServiceName
+                && other.ShouldCompareMetadata == ShouldCompareMetadata
+                && other.ConditionType == ConditionType;
+        }
+    }
+
 #pragma warning restore 659
 
 #if !MEF_IS_AVAILABLE

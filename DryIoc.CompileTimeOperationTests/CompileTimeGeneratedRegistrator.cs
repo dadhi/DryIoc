@@ -15,10 +15,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.SlowHandler),
@@ -28,10 +26,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.TransactHandler),
@@ -41,10 +37,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.LoggingHandlerDecorator),
@@ -54,10 +48,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Decorator,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = "slow", 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = new DecoratorInfo { ServiceName = "slow", ShouldCompareMetadata = false, ConditionType = null }
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.RetryHandlerDecorator),
@@ -67,10 +59,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = 1,
                 FactoryType = DryIoc.FactoryType.Decorator,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = true, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = new DecoratorInfo { ServiceName = null, ShouldCompareMetadata = true, ConditionType = null }
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.TransactHandlerDecorator),
@@ -80,10 +70,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = 2,
                 FactoryType = DryIoc.FactoryType.Decorator,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = "transact", 
-                DecoratorShouldCompareMetadata = true, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = new DecoratorInfo { ServiceName = "transact", ShouldCompareMetadata = true, ConditionType = null }
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.CustomHandlerDecorator),
@@ -93,10 +81,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Decorator,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = typeof(DryIoc.UnitTests.CUT.CustomHandlerDecorator.Condition)
+                GenericWrapper = null,
+                Decorator = new DecoratorInfo { ServiceName = null, ShouldCompareMetadata = false, ConditionType = typeof(DryIoc.UnitTests.CUT.CustomHandlerDecorator.Condition) }
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.DecoratorWithFastHandlerImport),
@@ -107,10 +93,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Decorator,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = new DecoratorInfo { ServiceName = null, ShouldCompareMetadata = false, ConditionType = null }
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.TransientService),
@@ -120,10 +104,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.SingletonService),
@@ -133,10 +115,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.SingletonOpenGenericService<>),
@@ -146,10 +126,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.TransientOpenGenericService<>),
@@ -159,10 +137,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.OpenGenericServiceWithTwoParameters<,>),
@@ -172,10 +148,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.DependentService),
@@ -185,10 +159,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.OneTransientService),
@@ -198,10 +170,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.AnotherTransientService),
@@ -211,10 +181,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.OneServiceWithMetadata),
@@ -224,10 +192,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.AnotherServiceWithMetadata),
@@ -237,10 +203,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = 1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.YetAnotherServiceWithMetadata),
@@ -250,10 +214,8 @@
                 IsSingleton = false,
                 MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.ServiceWithMultipleCostructors),
@@ -263,10 +225,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.ServiceWithMultipleCostructorsAndOneImporting),
@@ -276,10 +236,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.SingleServiceWithMetadata),
@@ -289,10 +247,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = 1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.ServiceWithImportedCtorParameter),
@@ -302,10 +258,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.NamedService),
@@ -315,10 +269,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.AnotherNamedService),
@@ -328,10 +280,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.DbMan),
@@ -343,10 +293,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.UnitTests.CUT.DbMan<>),
@@ -356,10 +304,8 @@
                 IsSingleton = true,
                 MetadataAttributeIndex = -1,
                 FactoryType = DryIoc.FactoryType.Service,
-                GenericWrapperServiceTypeIndex = 0,
-                DecoratorServiceName = null, 
-                DecoratorShouldCompareMetadata = false, 
-                DecoratorConditionType = null
+                GenericWrapper = null,
+                Decorator = null
             },
         };
     }

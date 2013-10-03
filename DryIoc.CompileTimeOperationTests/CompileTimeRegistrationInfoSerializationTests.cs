@@ -91,6 +91,8 @@ namespace DryIoc.CompileTimeOperationTests
             var model = TypeModel.Create();
             model.Add<ExportInfo>();
             model.Add<RegistrationInfo>();
+            model.Add<GenericWrapperInfo>();
+            model.Add<DecoratorInfo>();
             return model;
         }
     }
