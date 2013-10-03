@@ -1,8 +1,8 @@
 ﻿// TODO:
 // Goals - Version 1.0.0:
-// - Add service Target (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
 // - Evaluate Code Coverage.
 // - Finalize Public API.
+// + Add Dependency info (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
 // + Fix code generation example.
 // + Adjust ResolveProperties to be consistent with Import property or field.
 // + Move Wrappers related code to Separate Setup class.
@@ -599,12 +599,12 @@ namespace DryIoc
 
         public static Expression GetDebugExpression(Request request, IRegistry registry)
         {
-            var factoryCtor = request.ServiceType.GetConstructors()[0];
+            var ctor = request.ServiceType.GetConstructors()[0];
             var serviceType = request.ServiceType.GetGenericArguments()[0];
 
             var serviceRequest = request.PushWithParentKey(serviceType);
             var serviceExpr = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw).GetExpression(serviceRequest, registry);
-            var expression = Expression.New(factoryCtor, Expression.Lambda<Container.CompiledFactory>(serviceExpr, Reuse.Parameters));
+            var expression = Expression.New(ctor, Expression.Lambda<Container.CompiledFactory>(serviceExpr, Reuse.Parameters));
             return expression;
         }
 
@@ -1301,7 +1301,8 @@ namespace DryIoc
                 {
                     var ctorParam = ctorParams[i];
                     var paramKey = registry.ResolutionRules.GetConstructorParameterKeyOrDefault(ctorParam, request, registry);
-                    var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
+                    var paramRequest = request.Push(ctorParam.ParameterType, paramKey,
+                        new DependencyInfo(DependencyKind.CtorParam, ctorParam.Name));
                     paramExprs[i] = registry.GetOrAddFactory(paramRequest, IfUnresolved.Throw).GetExpression(paramRequest, registry);
                 }
             }
@@ -1336,7 +1337,8 @@ namespace DryIoc
                 if (ctorParamExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
                     var paramKey = registry.ResolutionRules.GetConstructorParameterKeyOrDefault(ctorParam, request, registry);
-                    var paramRequest = request.Push(ctorParam.ParameterType, paramKey);
+                    var paramRequest = request.Push(ctorParam.ParameterType, paramKey,
+                        new DependencyInfo(DependencyKind.CtorParam, ctorParam.Name));
                     ctorParamExprs[cp] = registry.GetOrAddFactory(paramRequest, IfUnresolved.Throw).GetExpression(paramRequest, registry);
                 }
             }
@@ -1389,7 +1391,8 @@ namespace DryIoc
                 object key;
                 if (registry.ResolutionRules.TryGetPropertyOrFieldServiceKey(out key, member, request, registry))
                 {
-                    var memberRequest = request.Push(member.GetMemberType(), key);
+                    var memberRequest = request.Push(member.GetMemberType(), key,
+                        new DependencyInfo(member is PropertyInfo ? DependencyKind.Property : DependencyKind.Field, member.Name));
                     var memberExpr = registry.GetOrAddFactory(memberRequest, IfUnresolved.Throw).GetExpression(memberRequest, registry);
                     bindings.Add(Expression.Bind(member, memberExpr));
                 }
@@ -1399,6 +1402,110 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    public sealed class Request : IEnumerable<Request>
+    {
+        public readonly Request Parent; // can be null for resolution root
+        public readonly Type ServiceType;
+        public readonly object ServiceKey; // null for default, string for named or integer index for multiple defaults.
+        public readonly Type OpenGenericServiceType;
+        public readonly DependencyInfo Dependency;
+
+        public readonly int DecoratedFactoryID;
+
+        public readonly int FactoryID;
+        public readonly FactoryType FactoryType;
+        public readonly Type ImplementationType;
+        public readonly object Metadata;
+
+        public Request(Request parent, Type serviceType, object serviceKey, DependencyInfo dependency = null,
+            int decoratedFactoryID = 0, Factory factory = null)
+        {
+            Parent = parent;
+            ServiceKey = serviceKey;
+            Dependency = dependency;
+
+            ServiceType = serviceType.ThrowIfNull()
+                .ThrowIf(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
+
+            OpenGenericServiceType = serviceType.IsGenericType ? serviceType.GetGenericTypeDefinition() : null;
+
+            DecoratedFactoryID = decoratedFactoryID;
+            if (factory != null)
+            {
+                FactoryType = factory.Setup.Type;
+                FactoryID = factory.ID;
+                ImplementationType = factory.ImplementationType;
+                Metadata = factory.Setup.Metadata;
+            }
+        }
+
+        public Request GetNonWrapperParentOrNull()
+        {
+            var p = Parent;
+            while (p != null && p.FactoryType == FactoryType.GenericWrapper)
+                p = p.Parent;
+            return p;
+        }
+
+        public Request Push(Type serviceType, object serviceKey, DependencyInfo dependency = null)
+        {
+            return new Request(this, serviceType, serviceKey, dependency);
+        }
+
+        public Request PushWithParentKey(Type serviceType, DependencyInfo dependency = null)
+        {
+            return new Request(this, serviceType, ServiceKey, dependency);
+        }
+
+        public Request ResolveTo(Factory factory)
+        {
+            for (var p = Parent; p != null; p = p.Parent)
+                Throw.If(p.FactoryID == factory.ID, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
+            return new Request(Parent, ServiceType, ServiceKey, Dependency, DecoratedFactoryID, factory);
+        }
+
+        public Request MakeDecorated()
+        {
+            return new Request(Parent, ServiceType, ServiceKey, Dependency, FactoryID);
+        }
+
+        public IEnumerator<Request> GetEnumerator()
+        {
+            for (var x = this; x != null; x = x.Parent)
+                yield return x;
+        }
+
+        public enum PrintOptions { HideIndex, ShowIndex }
+
+        public string PrintLatest(PrintOptions options = PrintOptions.HideIndex)
+        {
+            var key = ServiceKey is string ? "\"" + ServiceKey + "\""
+                : options == PrintOptions.ShowIndex && ServiceKey is int ? "#" + ServiceKey
+                : "unnamed";
+
+            var types = ImplementationType != null && ImplementationType != ServiceType
+                ? ImplementationType.Print() + " : " + ServiceType.Print()
+                : ServiceType.Print();
+
+            var dep = Dependency == null ? string.Empty : " (" + Dependency + ")";
+
+            return key + " " + types + dep;
+        }
+
+        public override string ToString()
+        {
+            var message = new StringBuilder().Append(PrintLatest(PrintOptions.ShowIndex));
+            return Parent == null ? message.ToString()
+                : Parent.Aggregate(message, (m, r) => m.AppendLine().Append(" in ")
+                    .Append(r.PrintLatest(PrintOptions.ShowIndex))).ToString();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 
     public class DelegateFactory : Factory
@@ -1454,101 +1561,22 @@ namespace DryIoc
         #endregion
     }
 
-    public sealed class Request : IEnumerable<Request>
+    public enum DependencyKind { CtorParam, Property, Field }
+
+    public sealed class DependencyInfo
     {
-        public readonly Request Parent; // can be null for resolution root
-        public readonly Type ServiceType;
-        public readonly object ServiceKey; // null for default, string for named or integer index for multiple defaults.
+        public readonly DependencyKind Kind;
+        public readonly string Name;
 
-        public readonly Type OpenGenericServiceType;
-
-        public readonly FactoryType FactoryType;
-        public readonly int FactoryID;
-        public readonly Type ImplementationType;
-        public readonly object Metadata;
-
-        public int DecoratedFactoryID;
-
-        public Request(Request parent, Type serviceType, object serviceKey, int decoratedFactoryID = 0, Factory factory = null)
+        public DependencyInfo(DependencyKind kind, string name)
         {
-            Parent = parent;
-
-            ServiceType = serviceType.ThrowIfNull()
-                .ThrowIf(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
-            OpenGenericServiceType = serviceType.IsGenericType ? serviceType.GetGenericTypeDefinition() : null;
-
-            ServiceKey = serviceKey;
-
-            DecoratedFactoryID = decoratedFactoryID;
-
-            if (factory != null)
-            {
-                FactoryType = factory.Setup.Type;
-                FactoryID = factory.ID;
-                ImplementationType = factory.ImplementationType;
-                Metadata = factory.Setup.Metadata;
-            }
-        }
-
-        public Request GetNonWrapperParentOrNull()
-        {
-            var p = Parent;
-            while (p != null && p.FactoryType == FactoryType.GenericWrapper)
-                p = p.Parent;
-            return p;
-        }
-
-        public Request Push(Type serviceType, object serviceKey)
-        {
-            return new Request(this, serviceType, serviceKey);
-        }
-
-        public Request PushWithParentKey(Type serviceType)
-        {
-            return new Request(this, serviceType, ServiceKey);
-        }
-
-        public Request ResolveTo(Factory factory)
-        {
-            for (var p = Parent; p != null; p = p.Parent)
-                Throw.If(p.FactoryID == factory.ID, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
-            return new Request(Parent, ServiceType, ServiceKey, DecoratedFactoryID, factory);
-        }
-
-        public Request MakeDecorated()
-        {
-            return new Request(Parent, ServiceType, ServiceKey, FactoryID);
-        }
-
-        public IEnumerator<Request> GetEnumerator()
-        {
-            for (var x = this; x != null; x = x.Parent)
-                yield return x;
-        }
-
-        public string PrintLatest(bool showIndex = false)
-        {
-            var key = ServiceKey is string ? "\"" + ServiceKey + "\""
-                : showIndex && ServiceKey is int ? "#" + ServiceKey
-                : "unnamed";
-
-            var types = ImplementationType != null && ImplementationType != ServiceType
-                ? ImplementationType.Print() + " : " + ServiceType.Print()
-                : ServiceType.Print();
-
-            return key + " " + types;
+            Kind = kind;
+            Name = name;
         }
 
         public override string ToString()
         {
-            var message = new StringBuilder().Append(PrintLatest(true));
-            return Parent == null ? message.ToString()
-                : Parent.Aggregate(message, (m, r) => m.AppendLine().Append(" in ").Append(r.PrintLatest(true))).ToString();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
+            return Kind + " " + Name;
         }
     }
 
