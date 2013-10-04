@@ -1,9 +1,8 @@
 ﻿using System;
-using DryIoc.AttributedRegistration;
-using DryIoc.UnitTests.CUT;
+using DryIoc.AttributedRegistration.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.AttributedRegistration
+namespace DryIoc.AttributedRegistration.UnitTests
 {
     [TestFixture]
     public class ExportOnImportTests

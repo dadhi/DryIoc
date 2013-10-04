@@ -38,18 +38,11 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Playground\AttributedRegistration\ImportPropertiesTests.cs" />
-    <Compile Include="AttributedRegistration\ExportAsDecoratorTests.cs" />
-    <Compile Include="AttributedRegistration\ExportOnImportTests.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="AttributedRegistration\ExportAllTests.cs" />
-    <Compile Include="Performance\AttributedRegistration\PerformanceTests.cs" />
-    <Compile Include="AttributedRegistration\AttributedRegistratorTests.cs" />
     <Compile Include="CompositePatternTests.cs" />
     <Compile Include="ContainerCustomizationTests.cs" />
     <Compile Include="ContainerTests.cs" />
     <Compile Include="ContextDependentResolutionTests.cs" />
+    <Compile Include="CUT\ContainerTestsCUT.cs" />
     <Compile Include="DiagnosticsTests.cs" />
     <Compile Include="DecoratorTests.cs" />
     <Compile Include="DynamicFactoryTests.cs" />
@@ -67,7 +60,6 @@
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
     <Compile Include="DecoratorConditionTests.cs" />
     <Compile Include="Playground\Experiments.cs" />
-    <Compile Include="AttributedRegistration\ExportAsGenericWrapperTests.cs" />
     <Compile Include="Playground\OptionsPlayTests.cs" />
     <Compile Include="Playground\ThrowPlayTests.cs" />
     <Compile Include="Playground\TreeBuilderTests.cs" />
@@ -85,11 +77,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.UnitTests.CUT\DryIoc.UnitTests.CUT.csproj">
-      <Project>{D704FFFE-4359-4401-B8D6-7ACCB3FA39C4}</Project>
-      <Name>DryIoc.UnitTests.CUT</Name>
-      <Private>False</Private>
-    </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
       <Name>DryIoc</Name>

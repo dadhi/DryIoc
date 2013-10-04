@@ -2,7 +2,7 @@
 using System.IO;
 using System.Linq;
 using DryIoc.AttributedRegistration;
-using DryIoc.UnitTests.CUT;
+using DryIoc.AttributedRegistration.UnitTests.CUT;
 using NUnit.Framework;
 using ProtoBuf.Meta;
 

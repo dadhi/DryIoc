@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
-using DryIoc.UnitTests.CUT;
+using DryIoc.AttributedRegistration.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests

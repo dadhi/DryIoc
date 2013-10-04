@@ -1,6 +1,6 @@
 using System;
 using System.Diagnostics;
-using DryIoc.UnitTests.CUT;
+using DryIoc.AttributedRegistration.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests.Performance

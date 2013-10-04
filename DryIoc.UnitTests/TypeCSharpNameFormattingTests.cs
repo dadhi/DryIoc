@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -22,10 +21,20 @@ namespace DryIoc.UnitTests
 			var name = typeof(OpenGenericServiceWithTwoParameters<Lazy<IEnumerable<bool>>, Func<bool, TypeCSharpNameFormattingTests, string>>).Print();
 
             Assert.That(name, Is.EqualTo(
-                "DryIoc.UnitTests.CUT.OpenGenericServiceWithTwoParameters<" + 
+                "DryIoc.UnitTests.OpenGenericServiceWithTwoParameters<" + 
                     "DryIoc.Lazy<System.Collections.Generic.IEnumerable<System.Boolean>>, " + 
                     "System.Func<System.Boolean, DryIoc.UnitTests.TypeCSharpNameFormattingTests, System.String>" + 
                     ">"));
 		}
 	}
+
+    #region CUT
+
+    public class OpenGenericServiceWithTwoParameters<T1, T2>
+    {
+        public T1 Value1 { get; set; }
+        public T2 Value2 { get; set; }
+    }
+
+    #endregion
 }

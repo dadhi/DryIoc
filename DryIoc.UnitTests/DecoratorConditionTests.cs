@@ -1,5 +1,4 @@
-﻿using DryIoc.UnitTests.CUT;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
@@ -17,6 +16,28 @@ namespace DryIoc.UnitTests
 
             Assert.That(container.Resolve<IHandler>("fast"), Is.InstanceOf<FastHandler>());
             Assert.That(container.Resolve<IHandler>("slow"), Is.InstanceOf<LoggingHandlerDecorator>());
+        }
+    }
+
+    public interface IHandler
+    {
+    }
+
+    internal class FastHandler : IHandler
+    {
+    }
+
+    internal class SlowHandler : IHandler
+    {
+    }
+
+    internal class LoggingHandlerDecorator : IHandler
+    {
+        public IHandler Handler { get; set; }
+
+        public LoggingHandlerDecorator(IHandler handler)
+        {
+            Handler = handler;
         }
     }
 }

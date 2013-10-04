@@ -233,6 +233,10 @@ namespace DryIoc.UnitTests
 
     enum FooMetadata { Hey, Blah }
 
+    public interface IFooService
+    {
+    }
+
     public class FooHey : IFooService
     {
     }
@@ -271,6 +275,33 @@ namespace DryIoc.UnitTests
 
     public interface IJuice
     {
+    }
+
+    public class TransientOpenGenericService<T>
+    {
+        public T Value { get; set; }
+    }
+
+    public interface INamedService
+    {
+    }
+
+    public class NamedService : INamedService
+    {
+    }
+
+    public class AnotherNamedService : INamedService
+    {
+    }
+
+    public class ServiceWithImportedCtorParameter
+    {
+        public INamedService NamedDependency { get; set; }
+
+        public ServiceWithImportedCtorParameter([Import("blah")]INamedService namedDependency)
+        {
+            NamedDependency = namedDependency;
+        }
     }
 
     #endregion

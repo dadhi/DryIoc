@@ -35,6 +35,7 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\lib\nunit.framework.dll</HintPath>
     </Reference>
+    <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
@@ -43,12 +44,14 @@
     <Compile Include="ExportAsDecoratorTests.cs" />
     <Compile Include="ExportAsGenericWrapperTests.cs" />
     <Compile Include="ExportOnImportTests.cs" />
+    <Compile Include="Performance\PerformanceTests.cs" />
+    <Compile Include="Playground\ImportPropertiesTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.UnitTests.CUT\DryIoc.UnitTests.CUT.csproj">
-      <Project>{D704FFFE-4359-4401-B8D6-7ACCB3FA39C4}</Project>
-      <Name>DryIoc.UnitTests.CUT</Name>
+    <ProjectReference Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\DryIoc.AttributedRegistration.UnitTests.CUT.csproj">
+      <Project>{9E67B15C-D721-4525-9DD7-6A6ED6137748}</Project>
+      <Name>DryIoc.AttributedRegistration.UnitTests.CUT</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
