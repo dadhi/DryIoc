@@ -99,13 +99,10 @@ namespace DryIoc
                             .Select(t => new ExportInfo { ServiceType = t, ServiceName = exportAllAttribute.ContractName })
                             .ToArray();
 
-                        if (info.Exports != null)
+                        if (info.Exports != null) // eliminating identical exports
                             for (var index = 0; index < info.Exports.Length; index++)
-                            {
-                                var export = info.Exports[index];
-                                var overrideExportIndex = Array.FindIndex(exportAllInfos, x => x.ServiceType == export.ServiceType);
-                                exportAllInfos = exportAllInfos.AppendOrUpdate(export, overrideExportIndex);
-                            }
+                                if (!exportAllInfos.Contains(info.Exports[index]))
+                                    exportAllInfos = exportAllInfos.AppendOrUpdate(info.Exports[index]);
 
                         info.Exports = exportAllInfos;
                     }

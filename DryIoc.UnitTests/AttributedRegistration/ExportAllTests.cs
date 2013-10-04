@@ -44,7 +44,7 @@ namespace DryIoc.UnitTests.AttributedRegistration
         }
 
         [Test]
-        public void Individual_Export_should_override_ExportAll_settings()
+        public void Individual_Export_is_simply_added_to_ExportAll_settings()
         {
             var container = new Container(AttributedRegistrator.DefaultSetup);
             container.RegisterExported(typeof(BothExportAllAndExport));
@@ -52,8 +52,8 @@ namespace DryIoc.UnitTests.AttributedRegistration
             var named = container.Resolve<INamed>("named");
             Assert.That(named, Is.Not.Null);
 
-            var namedDefault = container.Resolve<INamed>(IfUnresolved.ReturnNull);
-            Assert.That(namedDefault, Is.Null);
+            var namedDefault = container.Resolve<INamed>();
+            Assert.That(namedDefault, Is.Not.Null);
         }
     }
 
