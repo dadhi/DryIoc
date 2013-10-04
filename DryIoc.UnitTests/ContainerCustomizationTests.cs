@@ -121,11 +121,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.ResolutionRules.ConstructorParameters =
-                container.ResolutionRules.ConstructorParameters.Append((parameter, _, registry) =>
+                container.ResolutionRules.ConstructorParameters.Append((parameter, parent, registry) =>
                 {
                     object key;
                     var attributes = parameter.GetCustomAttributes(false);
-                    return AttributedRegistrator.TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, registry, attributes)
+                    return AttributedRegistrator.TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes)
                         ? key : null;
                 });
 

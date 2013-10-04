@@ -185,8 +185,8 @@ namespace DryIoc.AttributedRegistration
 
             object key;
             if (TryGetServiceKeyFromImportAttribute(out key, attributes) ||
-                TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, registry, attributes) ||
-                TryGetServiceKeyFromExportOnImportAttribute(out key, parameter.ParameterType, registry, attributes))
+                TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes) ||
+                TryGetServiceKeyFromImportOrExportAttribute(out key, parameter.ParameterType, registry, attributes))
                 return key;
             return null;
         }
@@ -199,7 +199,7 @@ namespace DryIoc.AttributedRegistration
                 return false;
 
             return TryGetServiceKeyFromImportAttribute(out key, attributes)
-                || TryGetServiceKeyFromExportOnImportAttribute(out key, member.GetMemberType(), registry, attributes);
+                || TryGetServiceKeyFromImportOrExportAttribute(out key, member.GetMemberType(), registry, attributes);
         }
 
         public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
@@ -209,7 +209,7 @@ namespace DryIoc.AttributedRegistration
             return import != null;
         }
 
-        public static bool TryGetServiceKeyWithMetadataAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
+        public static bool TryGetServiceKeyWithMetadataAttribute(out object key, Type contractType, Request parent, IRegistry registry, object[] attributes)
         {
             key = null;
             var import = GetSingleAttributeOrNull<ImportWithMetadataAttribute>(attributes);
@@ -219,14 +219,14 @@ namespace DryIoc.AttributedRegistration
             var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
             var metadata = import.Metadata;
             key = registry.GetKeys(serviceType, factory => metadata.Equals(factory.Setup.Metadata)).FirstOrDefault()
-                .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, metadata);
+                .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, metadata, parent);
             return true;
         }
 
-        public static bool TryGetServiceKeyFromExportOnImportAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
+        public static bool TryGetServiceKeyFromImportOrExportAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
             key = null;
-            var import = GetSingleAttributeOrNull<ExportOnImport>(attributes);
+            var import = GetSingleAttributeOrNull<ImportOrExportAttribute>(attributes);
             if (import == null)
                 return false;
 
@@ -262,7 +262,7 @@ namespace DryIoc.AttributedRegistration
             "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}.";
 
         public static readonly string UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA =
-            "Unable to resolve dependency {0} with metadata [{1}].";
+            "Unable to resolve dependency {0} with metadata [{1}] in {2}";
 
         public static readonly string UNSUPPORTED_MULTIPLE_METADATA =
             "Multiple associated metadata found while exporting {0}. " +
@@ -520,7 +520,7 @@ namespace DryIoc.AttributedRegistration
     }
 
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    public class ExportOnImport : Attribute
+    public class ImportOrExportAttribute : Attribute
     {
         public string ContractName { get; set; }
 

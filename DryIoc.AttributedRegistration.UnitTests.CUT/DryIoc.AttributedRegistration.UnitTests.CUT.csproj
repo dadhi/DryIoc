@@ -33,15 +33,13 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AttributedRegistrationTestsCUT.cs" />
-    <Compile Include="ExportAsDecoratorTestsCUT.cs" />
-    <Compile Include="ExportAsGenericWrapperTestsCUT.cs" />
+    <Compile Include="AttributedRegistrationTests.CUT.cs" />
+    <Compile Include="ExportAsDecoratorTests.CUT.cs" />
+    <Compile Include="ExportAsGenericWrapperTests.CUT.cs" />
+    <Compile Include="ImportOrExportTests.CUT.cs" />
+    <Compile Include="ImportWithMetadataTests.CUT.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
