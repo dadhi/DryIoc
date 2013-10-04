@@ -1,10 +1,9 @@
 using System;
 using System.Diagnostics;
-using DryIoc.AttributedRegistration;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.Performance.AttributedRegistration
+namespace DryIoc.AttributedRegistration.UnitTests.Performance
 {
 	[TestFixture][Ignore]
 	public class PerformanceTests
@@ -12,7 +11,7 @@ namespace DryIoc.UnitTests.Performance.AttributedRegistration
 		[Test]
 		public void RegistrationPerformanceTest()
 		{
-			var currentAssembly = typeof(FooConsumer).Assembly;
+			var currentAssembly = typeof(TransientService).Assembly;
 
 			const int times = 1000;
 
@@ -26,7 +25,7 @@ namespace DryIoc.UnitTests.Performance.AttributedRegistration
 
 			stopwatch.Stop();
 
-            Assert.That(stopwatch.ElapsedMilliseconds, Is.LessThanOrEqualTo(1000));
+            Assert.That(stopwatch.ElapsedMilliseconds, Is.LessThanOrEqualTo(3000));
 		}
 
 		[Test]
