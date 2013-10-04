@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Reflection;
-using DryIoc.AttributedRegistration;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.Playground.AttributedRegistration
+namespace DryIoc.AttributedRegistration.UnitTests.Playground
 {
     [TestFixture][Ignore]
     public class ImportPropertiesTests
