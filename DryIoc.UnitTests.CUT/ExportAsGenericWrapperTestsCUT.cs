@@ -1,4 +1,5 @@
 ﻿using System;
+using DryIoc.AttributedRegistration;
 
 namespace DryIoc.UnitTests.CUT
 {

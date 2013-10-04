@@ -1,4 +1,6 @@
-﻿namespace DryIoc.CompileTimeOperationTests
+﻿using DryIoc.AttributedRegistration;
+
+namespace DryIoc.CompileTimeOperationTests
 {
     using DryIoc;
     using AR = AttributedRegistrator;

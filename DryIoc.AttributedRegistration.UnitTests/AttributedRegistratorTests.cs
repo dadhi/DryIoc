@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
-using DryIoc.AttributedRegistration;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.AttributedRegistration
+namespace DryIoc.AttributedRegistration.UnitTests
 {
 	[TestFixture]
 	public class AttributedRegistratorTests

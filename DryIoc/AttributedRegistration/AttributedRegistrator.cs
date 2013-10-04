@@ -5,12 +5,13 @@
 
 //#define MEF_IS_AVAILABLE
 
-namespace DryIoc
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+
+namespace DryIoc.AttributedRegistration
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Reflection;
 #if MEF_IS_AVAILABLE
 	using System.ComponentModel.Composition;
 #endif
@@ -255,7 +256,7 @@ namespace DryIoc
         #endregion
     }
 
-    public static partial class Error
+    public static class Error
     {
         public static readonly string UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE =
             "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}.";

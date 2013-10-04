@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using DryIoc.AttributedRegistration;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 using ProtoBuf.Meta;

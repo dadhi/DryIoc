@@ -5,11 +5,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</ProjectGuid>
+    <ProjectGuid>{E608BA59-1EA1-4598-B69E-310ADE638F0E}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc</RootNamespace>
-    <AssemblyName>DryIoc</AssemblyName>
+    <RootNamespace>DryIoc.AttributedRegistration.UnitTests</RootNamespace>
+    <AssemblyName>DryIoc.AttributedRegistration.UnitTests</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -31,12 +31,31 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="nunit.framework, Version=2.6.2.12296, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\nunit.framework.dll</HintPath>
+    </Reference>
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AttributedRegistration\AttributedRegistrator.cs" />
-    <Compile Include="Container.cs" />
+    <Compile Include="AttributedRegistratorTests.cs" />
+    <Compile Include="ExportAllTests.cs" />
+    <Compile Include="ExportAsDecoratorTests.cs" />
+    <Compile Include="ExportAsGenericWrapperTests.cs" />
+    <Compile Include="ExportOnImportTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DryIoc.UnitTests.CUT\DryIoc.UnitTests.CUT.csproj">
+      <Project>{D704FFFE-4359-4401-B8D6-7ACCB3FA39C4}</Project>
+      <Name>DryIoc.UnitTests.CUT</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
+      <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
+      <Name>DryIoc</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

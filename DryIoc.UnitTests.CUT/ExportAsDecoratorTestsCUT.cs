@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using DryIoc.AttributedRegistration;
 
 namespace DryIoc.UnitTests.CUT
 {

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Reflection;
+using DryIoc.AttributedRegistration;
 using DryIoc.UnitTests.CUT;
 using DryIoc.UnitTests.Playground;
 using NUnit.Framework;

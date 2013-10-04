@@ -755,7 +755,7 @@ namespace DryIoc
         }
     }
 
-    public static partial class Error
+    public static class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
             "Unable to resolve service {0}." + Environment.NewLine +

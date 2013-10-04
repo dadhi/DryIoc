@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.UnitTests.CUT", "Dry
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.CompileTimeOperationTests", "DryIoc.CompileTimeOperationTests\DryIoc.CompileTimeOperationTests.csproj", "{55F5A1DE-DFF6-4BF2-A07F-A64E0A81B26C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AttributedRegistration.UnitTests", "DryIoc.AttributedRegistration.UnitTests\DryIoc.AttributedRegistration.UnitTests.csproj", "{E608BA59-1EA1-4598-B69E-310ADE638F0E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,6 +73,16 @@ Global
 		{55F5A1DE-DFF6-4BF2-A07F-A64E0A81B26C}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{55F5A1DE-DFF6-4BF2-A07F-A64E0A81B26C}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{55F5A1DE-DFF6-4BF2-A07F-A64E0A81B26C}.Release|x86.ActiveCfg = Release|Any CPU
+		{E608BA59-1EA1-4598-B69E-310ADE638F0E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E608BA59-1EA1-4598-B69E-310ADE638F0E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E608BA59-1EA1-4598-B69E-310ADE638F0E}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{E608BA59-1EA1-4598-B69E-310ADE638F0E}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{E608BA59-1EA1-4598-B69E-310ADE638F0E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E608BA59-1EA1-4598-B69E-310ADE638F0E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E608BA59-1EA1-4598-B69E-310ADE638F0E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E608BA59-1EA1-4598-B69E-310ADE638F0E}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{E608BA59-1EA1-4598-B69E-310ADE638F0E}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{E608BA59-1EA1-4598-B69E-310ADE638F0E}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
