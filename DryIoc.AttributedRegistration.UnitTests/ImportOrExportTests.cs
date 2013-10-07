@@ -1,4 +1,5 @@
-﻿using DryIoc.AttributedRegistration.UnitTests.CUT;
+﻿using System;
+using DryIoc.AttributedRegistration.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests
@@ -52,5 +53,30 @@ namespace DryIoc.AttributedRegistration.UnitTests
             Assert.That(service.Field, Is.InstanceOf<AnotherService>());
             Assert.That(service.Property, Is.InstanceOf<AnotherService>());
         }
+
+        [Test]
+        public void When_something_else_than_Import_specified_It_should_throw()
+        {
+            var container = new Container(AttributedRegistrator.DefaultSetup);
+            container.RegisterExported(typeof(WithUnregisteredExternalEdependency));
+
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<WithUnregisteredExternalEdependency>());
+        }
+    }
+
+    [ExportAll]
+    public class WithUnregisteredExternalEdependency
+    {
+        public ExternalTool Tool { get; set; }
+
+        public WithUnregisteredExternalEdependency([SomeOther]ExternalTool tool)
+        {
+            Tool = tool;
+        }
+    }
+
+    public class SomeOtherAttribute : Attribute
+    {
     }
 }

@@ -55,7 +55,20 @@ namespace DryIoc.AttributedRegistration.UnitTests
             var namedDefault = container.Resolve<INamed>();
             Assert.That(namedDefault, Is.Not.Null);
         }
+
+        [Test]
+        public void If_both_export_and_export_all_specifying_the_same_setup_Then_only_single_will_be_registered()
+        {
+            var container = new Container(AttributedRegistrator.DefaultSetup);
+            container.RegisterExported(typeof(WithBothTheSameExports));
+
+            Assert.DoesNotThrow(() =>
+                container.Resolve<WithBothTheSameExports>());
+        }
     }
+
+    [ExportAll, Export]
+    public class WithBothTheSameExports {}
 
     public interface IOne {}
 
@@ -64,7 +77,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
     [ExportAll(ContractName = "blah")]
     public class NamedOne : INamed, IOne {}
 
-    [ExportAll, Export("named", typeof(INamed))]
+    [Export("named", typeof(INamed)), ExportAll]
     public class BothExportAllAndExport : INamed, IOne
     {
     }

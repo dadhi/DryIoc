@@ -18,7 +18,9 @@ namespace DryIoc.AttributedRegistration
 
     public static class AttributedRegistrator
     {
-        public static void DefaultSetup(IRegistry source)
+        public static Action<IRegistry> DefaultSetup = SetupContainerToUseImportAttributes;
+
+        public static void SetupContainerToUseImportAttributes(IRegistry source)
         {
             Container.DefaultSetup(source);
             source.ResolutionRules.UseImportExportAttributes();
