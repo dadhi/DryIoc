@@ -1367,6 +1367,21 @@ namespace DryIoc
             return _withConstructor(_implementationType);
         }
 
+        //private ConstructorInfo SelectConstructor2()
+        //{
+        //    var constructors = _implementationType.GetConstructors();
+        //    Throw.If(constructors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, _implementationType);
+
+        //    if (_withConstructor != null)
+        //        return _withConstructor(_implementationType);
+
+        //    if (constructors.Length == 1)
+        //        return constructors[0];
+
+        //    _withConstructor.
+        //    Throw.If(Error.UNABLE_TO_SELECT_CONSTRUCTOR, constructors.Length, _implementationType);;
+        //}
+
         private Expression InitMembersIfRequired(NewExpression newService, Request request, IRegistry registry)
         {
             if (!registry.ResolutionRules.ShouldResolvePropertiesAndFields)
@@ -1819,12 +1834,6 @@ namespace DryIoc
             throw GetException(message == null ? Format(ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
         }
 
-        public static T ThrowIf<T>(this T arg, Func<T, bool> throwCondition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null)
-        {
-            if (!throwCondition(arg)) return arg;
-            throw GetException(message == null ? Format(ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
-        }
-
         public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             if (!throwCondition) return;
@@ -1916,14 +1925,6 @@ namespace DryIoc
             }
 
             return results;
-        }
-
-        public static Type GetBasestType(this Type type)
-        {
-            Type baseType = null;
-            for (var bt = type.BaseType; bt != null; bt = bt.BaseType)
-                baseType = bt;
-            return baseType;
         }
 
         public static Type GetMemberType(this MemberInfo member)
