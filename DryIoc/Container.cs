@@ -14,7 +14,7 @@
 // + Add distinctive features:. ExportOnImport.
 //
 // Goals - Version 2.0.0:
-// - Add distinctive feature: ExportFactory with FactoryMethod.
+// - Add distinctive feature: IFactory to register with ExportFactory.
 //
 // Features:
 // - Add parameter to Resolve to skip resolution cache, and probably all other caches.
@@ -124,7 +124,11 @@ namespace DryIoc
 
         public Factory Register(Factory factory, Type serviceType, object serviceKey)
         {
-            ThrowIfNotImplemented(serviceType.ThrowIfNull(), factory.ThrowIfNull().ImplementationType);
+            var implementationType = factory.ThrowIfNull().ImplementationType;
+            if (implementationType != null && serviceType.ThrowIfNull() != typeof(object))
+                Throw.If(!implementationType.GetSelfAndImplemented().Contains(serviceType),
+                    Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
+            
             lock (_syncRoot)
             {
                 if (factory.Setup.Type == FactoryType.Decorator)
@@ -172,13 +176,6 @@ namespace DryIoc
         public bool IsRegistered(Type serviceType, string serviceName)
         {
             return ((IRegistry)this).GetFactoryOrNull(serviceType.ThrowIfNull(), serviceName) != null;
-        }
-
-        private static void ThrowIfNotImplemented(Type serviceType, Type implementationType)
-        {
-            if (implementationType != null && serviceType != typeof(object))
-                Throw.If(!implementationType.GetSelfAndImplemented().Contains(serviceType),
-                    Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
         }
 
         #endregion
