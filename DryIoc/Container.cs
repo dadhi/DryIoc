@@ -155,18 +155,11 @@ namespace DryIoc
                 }
                 else if (serviceKey is string)
                 {
-                    var name = serviceKey.ToString();
-                    entry.Named = entry.Named ?? new Dictionary<string, Factory>();
-                    try
-                    {
-                        entry.Named.Add(name, factory);
-                    }
-                    catch (ArgumentException)
-                    {
-                        var implType = entry.Named[name].ImplementationType;
-                        Throw.If(true, Error.DUPLICATE_SERVICE_NAME_REGISTRATION,
-                            serviceType, serviceKey, implType != null ? implType.Print() : "<custom>");
-                    }
+                    var name = (string)serviceKey;
+                    var named = entry.Named = entry.Named ?? new Dictionary<string, Factory>();
+                    if (named.ContainsKey(name))
+                        Throw.If(true, Error.DUPLICATE_SERVICE_NAME, serviceType, name, named[name].ImplementationType);
+                    named.Add(name, factory);
                 }
             }
 
@@ -795,7 +788,7 @@ namespace DryIoc
         public static readonly string CONTAINER_IS_GARBAGE_COLLECTED =
             "Container is no longer available (has been garbage-collected already).";
 
-        public static readonly string DUPLICATE_SERVICE_NAME_REGISTRATION =
+        public static readonly string DUPLICATE_SERVICE_NAME =
             "Service {0} with duplicate name '{1}' is already registered with implementation {2}.";
 
         public static readonly string GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT =
