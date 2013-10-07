@@ -1,4 +1,5 @@
-﻿using DryIoc.UnitTests.CUT;
+﻿using System;
+using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -108,5 +109,38 @@ namespace DryIoc.UnitTests
             Assert.Throws<ContainerException>(
                 () => container.Resolve<GenericOne<string>>());
         }
+
+        [Test]
+        public void Possible_to_select_constructor_for_open_generic_imlementation()
+        {
+            var container = new Container();
+            container.Register(typeof (LazyOne<>),
+                withConstructor: t => t.GetConstructor(new[] {typeof (Func<>).MakeGenericType(t.GetGenericArguments())}));
+            container.Register<Service>();
+
+            var service = container.Resolve<LazyOne<Service>>();
+
+            Assert.That(service.LazyValue, Is.InstanceOf<Func<Service>>());
+        }
     }
+
+    #region CUT
+
+    public class LazyOne<T>
+    {
+        public Func<T> LazyValue { get; set; }
+        public T Value { get; set; }
+
+        public LazyOne(T initValue)
+        {
+            Value = initValue;
+        }
+
+        public LazyOne(Func<T> lazyValue)
+        {
+            LazyValue = lazyValue;
+        }
+    }
+
+    #endregion
 }
