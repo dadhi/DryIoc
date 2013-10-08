@@ -68,7 +68,7 @@ namespace DryIoc.UnitTests.Playground
 
         public IEnumerator<KV<K, V>> GetEnumerator()
         {
-            foreach (var node in _tree)
+            foreach (var node in _tree.TraverseInOrder())
             {
                 yield return node.Value;
                 if (node.Value is KVWithConflicts)

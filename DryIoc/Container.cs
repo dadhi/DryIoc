@@ -383,7 +383,7 @@ namespace DryIoc
                 {
                     if (entry.Indexed != null)
                     {
-                        foreach (var item in entry.Indexed)
+                        foreach (var item in entry.Indexed.TraverseInOrder())
                             if (condition == null || condition(item.Value))
                                 yield return item.Key;
                     }
@@ -470,10 +470,10 @@ namespace DryIoc
                 {
                     if (Indexed != null)
                     {
-                        var factories = Indexed.Select(x => x.Value).ToArray();
+                        var factories = Indexed.TraverseInOrder().Select(x => x.Value).ToArray();
                         var implTypes = factories.Select(x => x.ImplementationType).Print(separator: ";" + Environment.NewLine);
                         Throw.If(true, Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, factories.Length, implTypes);
-                    }
+                    } // TODO: Cover
                     result = LastDefault;
                 }
                 else
@@ -1587,9 +1587,9 @@ namespace DryIoc
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
-                return;
+                return; // TODO: Cover
 
-            foreach (var item in _items.Select(x => x.Value).OfType<IDisposable>())
+            foreach (var item in _items.TraverseInOrder().Select(x => x.Value).OfType<IDisposable>())
                 item.Dispose();
             _items = null;
         }
@@ -1961,7 +1961,7 @@ namespace DryIoc
         }
     }
 
-    public sealed class IntTree<V> : IEnumerable<IntTree<V>>
+    public sealed class IntTree<V>
     {
         public static readonly IntTree<V> Empty = new IntTree<V>();
         public bool IsEmpty { get { return Height == 0; } }
@@ -1993,14 +1993,14 @@ namespace DryIoc
 
         /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         /// The only difference is using fixed size array instead of stack for speed-up: 5/6 vs. stack.</summary>
-        public IEnumerator<IntTree<V>> GetEnumerator()
+        public IEnumerable<IntTree<V>> TraverseInOrder()
         {
             var parents = new IntTree<V>[Height];
             var parentCount = -1;
             var node = this;
-            while (node.Height != 0 || parentCount != -1)
+            while (!node.IsEmpty || parentCount != -1)
             {
-                if (node.Height != 0)
+                if (!node.IsEmpty)
                 {
                     parents[++parentCount] = node;
                     node = node.Left;
@@ -2012,11 +2012,6 @@ namespace DryIoc
                     node = node.Right;
                 }
             }
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
         }
 
         #region Implementation
@@ -2058,7 +2053,7 @@ namespace DryIoc
         #endregion
     }
 
-    public sealed class HashTree<K, V> : IEnumerable<KV<K, V>>
+    public sealed class HashTree<K, V>
     {
         public static readonly HashTree<K, V> Empty = new HashTree<K, V>(IntTree<KV<K, V>>.Empty, null);
 
@@ -2076,25 +2071,6 @@ namespace DryIoc
         {
             var item = _tree.GetValueOrDefault(key.GetHashCode());
             return item != null && (ReferenceEquals(key, item.Key) || key.Equals(item.Key)) ? item.Value : GetConflictedOrDefault(item, key);
-        }
-
-        public IEnumerator<KV<K, V>> GetEnumerator()
-        {
-            foreach (var node in _tree)
-            {
-                yield return node.Value;
-                if (node.Value is KVWithConflicts)
-                {
-                    var conflicts = ((KVWithConflicts)node.Value).Conflicts;
-                    for (var i = 0; i < conflicts.Length; i++)
-                        yield return conflicts[i];
-                }
-            }
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
         }
 
         #region Implementation

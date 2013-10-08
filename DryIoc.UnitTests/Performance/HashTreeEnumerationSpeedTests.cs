@@ -43,7 +43,7 @@ namespace DryIoc.UnitTests.Performance
             timer = Stopwatch.StartNew();
             for (int t = 0; t < times; t++)
             {
-                foreach (var i in tree)
+                foreach (var i in tree.TraverseInOrder())
                 {
                     result = i.Value;
                 }

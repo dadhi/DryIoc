@@ -116,7 +116,7 @@ namespace DryIoc.UnitTests
 	        var items = Enumerable.Range(0, 10).ToArray();
 	        var tree = items.Aggregate(IntTree<int>.Empty, (t, i) => t.AddOrUpdate(i, i));
 
-	        var enumerated = tree.Select(t => t.Value).ToArray();
+	        var enumerated = tree.TraverseInOrder().Select(t => t.Value).ToArray();
 
             CollectionAssert.AreEqual(items, enumerated);
 	    }
