@@ -128,7 +128,7 @@ namespace DryIoc
             if (implementationType != null && serviceType.ThrowIfNull() != typeof(object))
                 Throw.If(!implementationType.GetSelfAndImplemented().Contains(serviceType),
                     Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
-            
+
             lock (_syncRoot)
             {
                 if (factory.Setup.Type == FactoryType.Decorator)
@@ -469,11 +469,8 @@ namespace DryIoc
                 if (serviceKey == null)
                 {
                     if (Indexed != null)
-                    {
-                        var factories = Indexed.TraverseInOrder().Select(x => x.Value).ToArray();
-                        var implTypes = factories.Select(x => x.ImplementationType).Print(separator: ";" + Environment.NewLine);
-                        Throw.If(true, Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, factories.Length, implTypes);
-                    } // TODO: Cover
+                        Throw.If(true, Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, 
+                            Indexed.TraverseInOrder().Select(x => x.Value.ImplementationType).Print(";" + Environment.NewLine));
                     result = LastDefault;
                 }
                 else
@@ -758,7 +755,7 @@ namespace DryIoc
             "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
 
         public static readonly string EXPECTED_SINGLE_DEFAULT_FACTORY =
-            "Expecting single default registration of {0} but found {1} registrations: {2}";
+            "Expecting single default registration of {0} but found many registrations: {1}";
 
         public static readonly string EXPECTED_NON_ABSTRACT_IMPL_TYPE =
             "Expecting not abstract and not interface implementation type, but found {0}.";
@@ -1851,7 +1848,7 @@ namespace DryIoc
             return name.Replace('+', '.'); // for nested classes
         }
 
-        public static string Print<T>(this IEnumerable<T> items, Func<T, string> output = null, string separator = ", ")
+        public static string Print<T>(this IEnumerable<T> items, string separator = ", ", Func<T, string> output = null)
         {
             if (items == null) return null;
             output = output ?? DefaultOutput;
