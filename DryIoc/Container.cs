@@ -755,7 +755,7 @@ namespace DryIoc
             "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
 
         public static readonly string EXPECTED_SINGLE_DEFAULT_FACTORY =
-            "Expecting single default registration of {0} but found many registrations: {1}";
+            "Expecting single default registration of {0} but found many: {1}";
 
         public static readonly string EXPECTED_NON_ABSTRACT_IMPL_TYPE =
             "Expecting not abstract and not interface implementation type, but found {0}.";

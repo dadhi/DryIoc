@@ -2,9 +2,10 @@
 <#@ output extension=".cs" #>
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(ProjectDir)..\bin\Debug\DryIoc.dll" #>
-<#@ assembly Name="$(ProjectDir)..\bin\Debug\DryIoc.UnitTests.CUT.dll" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Debug\DryIoc.AttributedRegistration.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc" #>
-<#@ import Namespace="DryIoc.UnitTests.CUT" #>
+<#@ import Namespace="DryIoc.AttributedRegistration" #>
+<#@ import Namespace="DryIoc.AttributedRegistration.UnitTests.CUT" #>
 <#@ import Namespace="System.Diagnostics" #>
 <#@ import Namespace="System.Text" #>
 <#@ import Namespace="System.IO" #>
@@ -12,8 +13,7 @@
 <#@ import Namespace="System.Collections.Generic" #>
 namespace DryIoc.CompileTimeOperationTests
 {
-    using DryIoc;
-    using AR = AttributedRegistrator;
+    using DryIoc.AttributedRegistration;
 
     public static class CompileTimeGeneratedRegistrator
     {
