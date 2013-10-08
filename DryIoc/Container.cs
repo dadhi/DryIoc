@@ -540,26 +540,28 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
-        public static Factory GetEnumerableDynamicallyOrNull(Request request, IRegistry registry)
+        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = (request, registry) =>
         {
-            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
+            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof (IEnumerable<>))
                 return null;
 
             return new DelegateFactory((req, reg) =>
-            {
-                var collectionType = req.ServiceType;
-                var collectionIsArray = collectionType.IsArray;
-                var itemType = collectionIsArray ? collectionType.GetElementType() : collectionType.GetGenericArguments()[0];
-                var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
+                {
+                    var collectionType = req.ServiceType;
+                    var collectionIsArray = collectionType.IsArray;
+                    var itemType = collectionIsArray
+                        ? collectionType.GetElementType()
+                        : collectionType.GetGenericArguments()[0];
+                    var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
 
-                var resolver = Expression.Constant(new DynamicEnumerableResolver(reg, itemType, wrappedItemType));
-                var resolveMethod = (collectionIsArray
-                    ? DynamicEnumerableResolver.ResolveArrayMethod
-                    : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
-                return Expression.Call(resolver, resolveMethod, Expression.Constant(req));
-            },
-            setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
-        }
+                    var resolver = Expression.Constant(new DynamicEnumerableResolver(reg, itemType, wrappedItemType));
+                    var resolveMethod = (collectionIsArray
+                        ? DynamicEnumerableResolver.ResolveArrayMethod
+                        : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
+                    return Expression.Call(resolver, resolveMethod, Expression.Constant(req));
+                },
+                setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
+        };
 
         public static Expression GetFuncExpression(Request request, IRegistry registry)
         {
@@ -1943,18 +1945,6 @@ namespace DryIoc
             Array.Copy(source, result, sourceLength);
             result[index] = value;
             return result;
-        }
-
-        public static T[] Remove<T>(this T[] source, T value)
-        {
-            if (source == null || source.Length == 0)
-                return source;
-
-            var valueIndex = Array.IndexOf(source, value);
-            if (valueIndex == -1)
-                return source;
-
-            return source.Except(new[] { value }).ToArray();
         }
     }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using DryIoc.AttributedRegistration;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -14,8 +15,10 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Service>();
 
-            container.ResolutionRules.UnregisteredServices =
-                container.ResolutionRules.UnregisteredServices.Remove(ContainerSetup.GetEnumerableDynamicallyOrNull);
+            var rules = container.ResolutionRules;
+            //rules.UnregisteredServices = rules.UnregisteredServices.Remove(ContainerSetup.GetEnumerableDynamicallyOrNull);
+            rules.UnregisteredServices = rules.UnregisteredServices
+                .Except(new[] { ContainerSetup.GetEnumerableDynamicallyOrNull }).ToArray();
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service[]>());
@@ -206,6 +209,21 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<ServiceWithTwoSameGenericDependencies>();
 
             Assert.That(service.Service1, Is.SameAs(service.Service2));
+        }
+
+        [Test]
+        public void Could_add_couple_of_rules_at_once()
+        {
+            var container = new Container(ContainerSetup.Minimal);
+
+            var count = 0;
+            container.ResolutionRules.UnregisteredServices = container.ResolutionRules.UnregisteredServices.Append(
+                (request, registry) => { ++count; return null; },
+                (request, registry) => { ++count; return null; });
+
+            container.Resolve<IService>(IfUnresolved.ReturnNull);
+
+            Assert.That(count, Is.EqualTo(2));
         }
     }
 
