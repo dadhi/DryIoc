@@ -1,8 +1,7 @@
-﻿using DryIoc.AttributedRegistration;
-using DryIoc.AttributedRegistration.UnitTests.CUT;
+﻿using DryIoc.AttributedRegistration.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.CompileTimeOperationTests
+namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
 {
     [TestFixture]
     public class CompileTimeRegistrationTests

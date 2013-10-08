@@ -5,11 +5,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{55F5A1DE-DFF6-4BF2-A07F-A64E0A81B26C}</ProjectGuid>
+    <ProjectGuid>{EE366065-BF63-44D1-BD65-75A214C1EE8E}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.CompileTimeOperationTests</RootNamespace>
-    <AssemblyName>DryIoc.CompileTimeOperationTests</AssemblyName>
+    <RootNamespace>DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests</RootNamespace>
+    <AssemblyName>DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>..\bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -25,13 +25,14 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>..\bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="nunit.framework">
+    <Reference Include="nunit.framework, Version=2.6.2.12296, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\lib\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="protobuf-net">
@@ -40,14 +41,20 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CompileTimeRegistrationTests.cs" />
-    <Compile Include="CompileTimeGeneratedRegistrator.cs">
+    <Content Include="CompileTimeGeneratedRegistrator.cs">
       <DependentUpon>CompileTimeGeneratedRegistrator.tt</DependentUpon>
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
-    </Compile>
-    <Compile Include="Properties\AssemblyInfo.cs" />
+    </Content>
     <Compile Include="CompileTimeRegistrationInfoSerializationTests.cs" />
+    <Compile Include="CompileTimeRegistrationTests.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="CompileTimeGeneratedRegistrator.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>CompileTimeGeneratedRegistrator.cs</LastGenOutput>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\DryIoc.AttributedRegistration.UnitTests.CUT.csproj">
@@ -60,12 +67,6 @@
       <Name>DryIoc</Name>
       <Private>False</Private>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="CompileTimeGeneratedRegistrator.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>CompileTimeGeneratedRegistrator.cs</LastGenOutput>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />

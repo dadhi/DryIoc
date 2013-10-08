@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("DryIoc.CompileTimeOperationTests")]
+[assembly: AssemblyTitle("DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("EPAM Systems")]
-[assembly: AssemblyProduct("DryIoc.CompileTimeOperationTests")]
-[assembly: AssemblyCopyright("Copyright © EPAM Systems 2013")]
+[assembly: AssemblyCompany("")]
+[assembly: AssemblyProduct("DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests")]
+[assembly: AssemblyCopyright("")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -20,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("55beadb2-fb4b-4ce2-8577-ab541a18826e")]
+[assembly: Guid("7cc14938-408c-448d-a5c2-da55a3c635ca")]
 
 // Version information for an assembly consists of the following four values:
 //

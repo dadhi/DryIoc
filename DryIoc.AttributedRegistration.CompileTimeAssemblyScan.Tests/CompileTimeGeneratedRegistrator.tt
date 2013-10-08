@@ -11,10 +11,8 @@
 <#@ import Namespace="System.IO" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Collections.Generic" #>
-namespace DryIoc.CompileTimeOperationTests
+namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
 {
-    using DryIoc.AttributedRegistration;
-
     public static class CompileTimeGeneratedRegistrator
     {
         public static RegistrationInfo[] Registrations =

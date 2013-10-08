@@ -1,7 +1,5 @@
-﻿namespace DryIoc.CompileTimeOperationTests
+﻿namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
 {
-    using DryIoc.AttributedRegistration;
-
     public static class CompileTimeGeneratedRegistrator
     {
         public static RegistrationInfo[] Registrations =
