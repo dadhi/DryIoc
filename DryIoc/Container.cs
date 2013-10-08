@@ -530,7 +530,7 @@ namespace DryIoc
                 registry.Register(funcType, funcFactory);
 
             var lazyFactory = new ReflectionFactory(typeof(Lazy<>),
-                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }),
+                getConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }),
                 setup: GenericWrapperSetup.Default);
             registry.Register(typeof(Lazy<>), lazyFactory);
 
@@ -834,14 +834,14 @@ namespace DryIoc
         /// <param name="serviceType">The service type to register.</param>
         /// <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
+        /// <param name="getConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register(this IRegistrator registrator, Type serviceType,
-            Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null,
             string named = null)
         {
-            registrator.Register(new ReflectionFactory(implementationType, reuse, withConstructor, setup), serviceType, named);
+            registrator.Register(new ReflectionFactory(implementationType, reuse, getConstructor, setup), serviceType, named);
         }
 
         /// <summary>
@@ -854,7 +854,7 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
             registrator.Register(new ReflectionFactory(implementationType, reuse, withConstructor, setup), implementationType, named);
@@ -871,7 +871,7 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
             where TImplementation : TService
         {
@@ -888,7 +888,7 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void Register<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
             registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup), typeof(TImplementation), named);
@@ -907,7 +907,7 @@ namespace DryIoc
         /// <param name="named">Optional registration name.</param>
         /// <param name="types">Optional condition to include selected types only. Default value is <see cref="PublicTypes"/></param>
         public static void RegisterAll(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
             string named = null, Func<Type, bool> types = null)
         {
             var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
@@ -925,7 +925,7 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
         public static void RegisterAll<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
             string named = null)
         {
             registrator.RegisterAll(typeof(TImplementation), reuse, withConstructor, setup, named);
@@ -1258,30 +1258,30 @@ namespace DryIoc
         #endregion
     }
 
-    public delegate ConstructorInfo SelectConstructor(Type implementationType);
+    public delegate ConstructorInfo GetConstructor(Type implementationType);
 
     public sealed class ReflectionFactory : Factory
     {
         public override Type ImplementationType { get { return _implementationType; } }
 
-        public ReflectionFactory(Type implementationType, IReuse reuse = null, SelectConstructor withConstructor = null, FactorySetup setup = null)
+        public ReflectionFactory(Type implementationType, IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
             _implementationType = implementationType.ThrowIfNull()
                 .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
-            _withConstructor = withConstructor;
+            _getConstructor = getConstructor;
         }
 
         public override Factory GetFactoryPerRequestOrNull(Request request, IRegistry _)
         {
             if (!_implementationType.IsGenericTypeDefinition) return null;
             var closedImplType = _implementationType.MakeGenericType(request.ServiceType.GetGenericArguments());
-            return new ReflectionFactory(closedImplType, Reuse, _withConstructor, Setup);
+            return new ReflectionFactory(closedImplType, Reuse, _getConstructor, Setup);
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
         {
-            var ctor = SelectConstructor();
+            var ctor = GetConstructor(ImplementationType);
             var ctorParams = ctor.GetParameters();
             Expression[] paramExprs = null;
             if (ctorParams.Length != 0)
@@ -1305,7 +1305,7 @@ namespace DryIoc
             var funcParamTypes = funcType.GetGenericArguments();
             funcParamTypes.ThrowIf(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
 
-            var ctor = SelectConstructor();
+            var ctor = GetConstructor(ImplementationType);
             var ctorParams = ctor.GetParameters();
             var ctorParamExprs = new Expression[ctorParams.Length];
             var funcInputParamExprs = new ParameterExpression[funcParamTypes.Length - 1]; // (minus Func return parameter).
@@ -1354,33 +1354,18 @@ namespace DryIoc
         #region Implementation
 
         private readonly Type _implementationType;
-        private readonly SelectConstructor _withConstructor;
+        private readonly GetConstructor _getConstructor;
 
-        private ConstructorInfo SelectConstructor()
+        public ConstructorInfo GetConstructor(Type type)
         {
-            var constructors = _implementationType.GetConstructors();
-            if (constructors.Length == 1)
-                return constructors[0];
+            if (_getConstructor != null)
+                return _getConstructor(type);
 
-            Throw.If(constructors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, _implementationType);
-            _withConstructor.ThrowIfNull(Error.UNABLE_TO_SELECT_CONSTRUCTOR, constructors.Length, _implementationType);
-            return _withConstructor(_implementationType);
+            var constructors = type.GetConstructors();
+            Throw.If(constructors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, type);
+            Throw.If(constructors.Length > 1, Error.UNABLE_TO_SELECT_CONSTRUCTOR, constructors.Length, type);
+            return constructors[0];
         }
-
-        //private ConstructorInfo SelectConstructor2()
-        //{
-        //    var constructors = _implementationType.GetConstructors();
-        //    Throw.If(constructors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, _implementationType);
-
-        //    if (_withConstructor != null)
-        //        return _withConstructor(_implementationType);
-
-        //    if (constructors.Length == 1)
-        //        return constructors[0];
-
-        //    _withConstructor.
-        //    Throw.If(Error.UNABLE_TO_SELECT_CONSTRUCTOR, constructors.Length, _implementationType);;
-        //}
 
         private Expression InitMembersIfRequired(NewExpression newService, Request request, IRegistry registry)
         {

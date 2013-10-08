@@ -162,9 +162,10 @@ namespace DryIoc.AttributedRegistration
 
         public static ConstructorInfo FindSingleImportingConstructor(Type type)
         {
-            return type.GetConstructors()
-                .SingleOrDefault(x => Attribute.IsDefined(x, typeof(ImportingConstructorAttribute)))
-                .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, type);
+            var constructors = type.GetConstructors();
+            return constructors.Length == 1 ? constructors[0]
+                : constructors.SingleOrDefault(x => Attribute.IsDefined(x, typeof (ImportingConstructorAttribute)))
+                    .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, type);
         }
 
         public static object FindMetadata(Type type, int metadataAttributeIndex)
@@ -238,9 +239,10 @@ namespace DryIoc.AttributedRegistration
             {
                 var implementationType = import.ImplementationType ?? serviceType;
                 var reuse = import.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
-                SelectConstructor withConstructor = t => t.GetConstructor(import.ConstructorSignature);
+                var getConstructor = import.ConstructorSignature != null 
+                    ? new GetConstructor(t => t.GetConstructor(import.ConstructorSignature)) : null;
                 var setup = ServiceSetup.WithMetadata(import.Metadata);
-                registry.Register(serviceType, implementationType, reuse, withConstructor, setup, serviceName);
+                registry.Register(serviceType, implementationType, reuse, getConstructor, setup, serviceName);
             }
 
             key = serviceName;

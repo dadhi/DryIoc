@@ -42,7 +42,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
         }
 
         [Test]
-        public void Import_using_should_work_for_field_and_properties()
+        public void I_can_import_or_export_fields_and_properties_as_well()
         {
             var container = new Container();
             container.ResolutionRules.UseImportExportAttributes();
