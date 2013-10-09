@@ -1532,17 +1532,14 @@ namespace DryIoc
                 factory.Setup = Setup; // propagate provider setup if it is not specified by client.
             return factory;
         }
-
-        protected override Expression CreateExpression(Request request, IRegistry registry) // TODO Cover
+        //ncrunch: no coverage start
+        protected override Expression CreateExpression(Request request, IRegistry registry)
         {
             throw new NotSupportedException();
         }
-
-        #region Implementation
+        //ncrunch: no coverage end
 
         private readonly Func<Request, IRegistry, Factory> _getFactoryOrNull;
-
-        #endregion
     }
 
     public enum DependencyKind { CtorParam, Property, Field }
