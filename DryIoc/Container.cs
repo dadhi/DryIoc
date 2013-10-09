@@ -469,7 +469,7 @@ namespace DryIoc
                 if (serviceKey == null)
                 {
                     if (Indexed != null)
-                        Throw.If(true, Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, 
+                        Throw.If(true, Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType,
                             Indexed.TraverseInOrder().Select(x => x.Value.ImplementationType).Print(";" + Environment.NewLine));
                     result = LastDefault;
                 }
@@ -542,7 +542,7 @@ namespace DryIoc
 
         public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = (request, registry) =>
         {
-            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof (IEnumerable<>))
+            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
 
             return new DelegateFactory((req, reg) =>
@@ -791,7 +791,8 @@ namespace DryIoc
             "Service {0} with duplicate name '{1}' is already registered with implementation {2}.";
 
         public static readonly string GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT =
-            "Generic Wrapper expects single type argument by default, but found many: {0}.";
+            "Generic Wrapper is working with single service type only, but found many: {0}. " +
+            "Please specify service type selector in Generic Wrapper setup upon registration.";
 
         public static readonly string SOME_FUNC_PARAMS_ARE_UNUSED =
             "Found some unused Func parameters ({0}) when resolving: {1}.";
@@ -1232,7 +1233,7 @@ namespace DryIoc
 
             var decorator = registry.GetDecoratorExpressionOrNull(request);
             if (decorator != null && !(decorator is LambdaExpression))
-                return Expression.Lambda(funcType, decorator, func.Parameters);
+                return Expression.Lambda(funcType, decorator, func.Parameters); // TODO Cover
 
             if (Reuse != null)
                 func = Expression.Lambda(funcType, Reuse.Of(request, registry, ID, func.Body), func.Parameters);
@@ -1245,7 +1246,7 @@ namespace DryIoc
 
         protected virtual LambdaExpression CreateFuncWithArgsOrNull(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncArgs)
         {
-            unusedFuncArgs = null;
+            unusedFuncArgs = null; // TODO Cover
             return null;
         }
 
@@ -1491,7 +1492,7 @@ namespace DryIoc
                     .Append(r.PrintLatest(PrintOptions.ShowIndex))).ToString();
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
+        IEnumerator IEnumerable.GetEnumerator() // TODO COver
         {
             return GetEnumerator();
         }
@@ -1538,7 +1539,7 @@ namespace DryIoc
             return factory;
         }
 
-        protected override Expression CreateExpression(Request request, IRegistry registry)
+        protected override Expression CreateExpression(Request request, IRegistry registry) // TODO Cover
         {
             throw new NotSupportedException();
         }

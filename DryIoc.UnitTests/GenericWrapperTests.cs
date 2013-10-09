@@ -74,5 +74,43 @@ namespace DryIoc.UnitTests
             GC.KeepAlive(services);
             Assert.That(containerWeakRef.IsAlive, Is.False);
         }
+
+        [Test]
+        public void Wrapper_is_only_working_if_used_in_enumerable_or_other_wrapper_It_means_that_directly_resolving_multiple_wrapper_would_NOT_throw()
+        {
+            var container = new Container();
+            container.Register(typeof(WrapperWithTwoArgs<,>), setup: GenericWrapperSetup.Default);
+            container.Register<Service>();
+            container.Register<AnotherService>();
+
+            var wrapper = container.Resolve<WrapperWithTwoArgs<Service, AnotherService>>();
+
+            Assert.That(wrapper.Arg0, Is.InstanceOf<Service>());
+            Assert.That(wrapper.Arg1, Is.InstanceOf<AnotherService>());
+        }
+
+        [Test]
+        public void Wrapper_is_only_working_if_used_in_enumerable_or_other_wrapper_It_means_that_resolving_array_of_multiple_wrapper_should_throw()
+        {
+            var container = new Container();
+            container.Register(typeof(WrapperWithTwoArgs<,>), setup: GenericWrapperSetup.Default);
+            container.Register<Service>();
+            container.Register<AnotherService>();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<WrapperWithTwoArgs<Service, AnotherService>[]>());
+        }
+    }
+
+    public class WrapperWithTwoArgs<T0, T1>
+    {
+        public T0 Arg0 { get; set; }
+        public T1 Arg1 { get; set; }
+
+        public WrapperWithTwoArgs(T0 arg0, T1 arg1)
+        {
+            Arg0 = arg0;
+            Arg1 = arg1;
+        }
     }
 }
