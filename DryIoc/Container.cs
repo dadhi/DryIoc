@@ -31,7 +31,6 @@
 #define SYSTEM_LAZY_IS_NOT_AVAILABLE
 #pragma warning disable 420 // a reference to a volatile field will not be treated as volatile
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -1480,6 +1479,7 @@ namespace DryIoc
 
             var dep = Dependency == null ? string.Empty : " (" + Dependency + ")";
 
+            // example: "unnamed DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
             return key + " " + types + dep;
         }
 
