@@ -576,9 +576,8 @@ namespace DryIoc
                 return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
 
             IList<Type> unusedFuncArgs;
-            var funcExpr = serviceFactory
-                .GetFuncWithArgsOrNull(funcType, serviceRequest, registry, out unusedFuncArgs)
-                .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType);
+            var funcExpr = serviceFactory.GetFuncWithArgsOrNull(funcType, serviceRequest, registry, out unusedFuncArgs)
+                .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType, serviceRequest);
 
             if (unusedFuncArgs != null)
                 Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs.Print(), request);
@@ -751,7 +750,7 @@ namespace DryIoc
             "Please register service {1} OR adjust resolution rules.";
 
         public static readonly string UNSUPPORTED_FUNC_WITH_ARGS =
-            "Unsupported resolution as {0}.";
+            "Unsupported resolution as {0} of {1}.";
 
         public static readonly string EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE =
             "Expecting implementation type {0} to be assignable to service type {1} but it is not.";

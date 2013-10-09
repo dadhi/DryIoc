@@ -319,6 +319,16 @@ namespace DryIoc.UnitTests
             Assert.Throws<ContainerException>(() => 
                 container.Resolve<Func<string, ServiceWithDependency>>());
         }
+
+        [Test]
+        public void Resolving_Func_of_delegate_factory_should_Throw()
+        {
+            var container = new Container();
+            container.RegisterDelegate(resolver => new Service());
+
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<Func<int, Service>>());
+        }
     }
 
     #region CUT
