@@ -16,6 +16,7 @@ namespace DryIoc.UnitTests
             var lazy = container.Resolve<Lazy<IService>>();
 
             Assert.That(lazy, Is.InstanceOf<Lazy<IService>>());
+            Assert.That(lazy.IsValueCreated, Is.False);
         }
 
         [Test]
