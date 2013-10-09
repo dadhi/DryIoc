@@ -1232,7 +1232,7 @@ namespace DryIoc
 
             var decorator = registry.GetDecoratorExpressionOrNull(request);
             if (decorator != null && !(decorator is LambdaExpression))
-                return Expression.Lambda(funcType, decorator, func.Parameters); // TODO Cover
+                return Expression.Lambda(funcType, decorator, func.Parameters);
 
             if (Reuse != null)
                 func = Expression.Lambda(funcType, Reuse.Of(request, registry, ID, func.Body), func.Parameters);
@@ -1245,7 +1245,7 @@ namespace DryIoc
 
         protected virtual LambdaExpression CreateFuncWithArgsOrNull(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncArgs)
         {
-            unusedFuncArgs = null; // TODO Cover
+            unusedFuncArgs = null;
             return null;
         }
 

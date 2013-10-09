@@ -314,6 +314,18 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Should_support_resolving_Func_with_parameters_without_decorated_service_argument_in_constructor()
+        {
+            var container = new Container();
+            container.Register<IOperation, ParameterizedOperation>();
+            container.Register<IOperation, AnotherOperation>(setup: DecoratorSetup.Default);
+
+            var operation = container.Resolve<Func<object, IOperation>>();
+
+            Assert.That(operation("blah"), Is.InstanceOf<AnotherOperation>());
+        }
+
+        [Test]
         public void Should_allow_Register_and_Resolve_of_two_decorators_of_the_same_type()
         {
             var container = new Container();
