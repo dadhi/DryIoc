@@ -1,35 +1,9 @@
-﻿// TODO:
-// Goals - Version 1.0.0:
-// - Evaluate Code Coverage.
-// - Finalize Public API.
-// + Add Dependency info (ctor parameter or fieldProperty) to request to show them in error: "Unable to resolve constructor parameter/field/property service".
-// + Fix code generation example.
-// + Adjust ResolveProperties to be consistent with Import property or field.
-// + Move Wrappers related code to Separate Setup class.
-// + Add condition to Decorator.
-// + Consolidate code related to rules in Rules class.
-// + Convert SkipCache flag to enum.
-// + Review performance one again with fresh view.
-// + Add registration for lambda with IResolver parameter for something like RegisterDelegate(c => new Blah(c.Resolve(IDependency))).
-// + Add distinctive features:. ExportOnImport.
-//
-// Goals - Version 2.0.0:
-// - Add distinctive feature: IFactory to register with ExportFactory.
-//
-// Features:
-// - Add parameter to Resolve to skip resolution cache, and probably all other caches.
-// + Rename ExportPublicTypes to ExportAll or something more concise.
-// + Decorator support for Func<..> service, may be supported if implement Decorator the same way as Reuse or Init - as Expression Decorator.
-//
-// Internals:
-// + Move decorator cachedExpression from Setup to Factory itself. Make setup immutable again.
-// + Speed-up recursive dependency check as it happens on every Request resolution.
-// + Remake Request ResolveTo to not mutate Request.
-// + Make Decorator caching work without SkipCache=true;
-// + Remove Container Singleton parameter from CompiledFactory.
+﻿// TODO: Version 2.0.0
+// Goals:
+// # Add distinctive feature: IFactory to register with ExportFactory.
 
 #define SYSTEM_LAZY_IS_NOT_AVAILABLE
-#pragma warning disable 420 // a reference to a volatile field will not be treated as volatile
+//#pragma warning disable 420 // Disable warning for using volatile fields in Interlocked.Exchange ("a reference to a volatile field will not be treated as volatile").
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -199,8 +173,8 @@ namespace DryIoc
 
         public delegate object CompiledFactory(Scope openScope, Scope resolutionRootScope);
 
-        private volatile HashTree<Type, CompiledFactory> _defaultResolutionCache;
-        private volatile HashTree<Type, KeyedResolutionCacheEntry> _keyedResolutionCache;
+        private HashTree<Type, CompiledFactory> _defaultResolutionCache;
+        private HashTree<Type, KeyedResolutionCacheEntry> _keyedResolutionCache;
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
         {
@@ -1173,7 +1147,6 @@ namespace DryIoc
     public abstract class Factory
     {
         public static readonly FactorySetup DefaultSetup = ServiceSetup.Default;
-        public static volatile int IDSeedAndCount;
 
         public readonly int ID;
         public readonly IReuse Reuse;
@@ -1188,7 +1161,7 @@ namespace DryIoc
 
         protected Factory(IReuse reuse = null, FactorySetup setup = null)
         {
-            ID = Interlocked.Increment(ref IDSeedAndCount);
+            ID = Interlocked.Increment(ref _idSeedAndCount);
             Reuse = reuse;
             Setup = setup;
         }
@@ -1250,8 +1223,9 @@ namespace DryIoc
 
         #region Implementation
 
+        private static int _idSeedAndCount;
         private FactorySetup _setup;
-        private volatile Expression _cachedExpression;
+        private Expression _cachedExpression;
 
         #endregion
     }
@@ -1589,7 +1563,7 @@ namespace DryIoc
 
         private readonly object _syncRoot = new object();
         private IntTree<object> _items = IntTree<object>.Empty;
-        private volatile int _disposed;
+        private int _disposed;
 
         #endregion
     }
@@ -1750,14 +1724,11 @@ namespace DryIoc
             _valueFactory = valueFactory.ThrowIfNull();
         }
 
-        public bool IsValueCreated
-        {
-            get { return _isValueCreated; }
-        }
+        public bool IsValueCreated { get; private set; }
 
         public T Value
         {
-            get { return _isValueCreated ? _value : Create(); }
+            get { return IsValueCreated ? _value : Create(); }
         }
 
         #region Implementation
@@ -1765,18 +1736,17 @@ namespace DryIoc
         private Func<T> _valueFactory;
         private T _value;
         private readonly object _valueCreationLock = new object();
-        private volatile bool _isValueCreated;
 
         private T Create()
         {
             lock (_valueCreationLock)
             {
-                if (!_isValueCreated)
+                if (!IsValueCreated)
                 {
                     var factory = _valueFactory.ThrowIfNull("Recursive creation of Lazy value is detected.");
                     _valueFactory = null;
                     _value = factory();
-                    _isValueCreated = true;
+                    IsValueCreated = true;
                 }
             }
 
