@@ -1393,7 +1393,7 @@ namespace DryIoc
         #endregion
     }
 
-    public sealed class Request : IEnumerable<Request>
+    public sealed class Request
     {
         public readonly Request Parent; // can be null for resolution root
         public readonly Type ServiceType;
@@ -1460,7 +1460,7 @@ namespace DryIoc
             return new Request(Parent, ServiceType, ServiceKey, Dependency, FactoryID);
         }
 
-        public IEnumerator<Request> GetEnumerator()
+        public IEnumerable<Request> Enumerate()
         {
             for (var x = this; x != null; x = x.Parent)
                 yield return x;
@@ -1487,13 +1487,8 @@ namespace DryIoc
         {
             var message = new StringBuilder().Append(PrintLatest(PrintOptions.ShowIndex));
             return Parent == null ? message.ToString()
-                : Parent.Aggregate(message, (m, r) => m.AppendLine().Append(" in ")
+                : Parent.Enumerate().Aggregate(message, (m, r) => m.AppendLine().Append(" in ")
                     .Append(r.PrintLatest(PrintOptions.ShowIndex))).ToString();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() // TODO COver
-        {
-            return GetEnumerator();
         }
     }
 
@@ -1654,12 +1649,11 @@ namespace DryIoc
             {
                 var singletonScope = registry.SingletonScope;
 
-                // Create lazy scoped singleton if we have Func somewhere in dependency chain.
+                // Create lazy singleton if we have Func somewhere in dependency chain.
                 var parent = request.Parent;
-                if (parent != null)
-                    parent = parent.FirstOrDefault(p =>
-                      p.OpenGenericServiceType != null && ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType));
-                if (parent != null)
+                if (parent != null &&
+                    parent.Enumerate().Any(p => p.OpenGenericServiceType != null && 
+                        ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType)))
                     return GetScopedServiceExpression(Expression.Constant(singletonScope), factoryID, factoryExpr);
 
                 // Otherwise we can create singleton instance right here, and put it into Scope for later disposal.
