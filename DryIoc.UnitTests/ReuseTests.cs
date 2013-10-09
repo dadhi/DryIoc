@@ -134,6 +134,20 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Scope_can_be_safely_disposed_multiple_times_It_does_NOT_throw()
+        {
+            var container = new Container();
+            container.Register<Log>(Reuse.InCurrentScope);
+
+            var containerWithNewScope = container.OpenScope();
+            containerWithNewScope.Resolve<Log>();
+            containerWithNewScope.Dispose();
+
+            Assert.DoesNotThrow(
+                containerWithNewScope.Dispose);
+        }
+
+        [Test]
         public void Nested_scope_disposition_wont_affect_outer_scope_factories()
         {
             var container = new Container();

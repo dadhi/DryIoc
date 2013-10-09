@@ -1578,7 +1578,7 @@ namespace DryIoc
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
-                return; // TODO: Cover
+                return;
 
             foreach (var item in _items.TraverseInOrder().Select(x => x.Value).OfType<IDisposable>())
                 item.Dispose();
