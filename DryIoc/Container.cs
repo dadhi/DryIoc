@@ -190,8 +190,8 @@ namespace DryIoc
                 var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
                 if (factory == null) return null;
                 result = CompileExpression(factory.GetExpression(request, this));
-                _keyedResolutionCache = _keyedResolutionCache.AddOrUpdate(serviceType,
-                    (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, result));
+                Interlocked.Exchange(ref _keyedResolutionCache, _keyedResolutionCache.AddOrUpdate(serviceType,
+                    (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, result)));
             }
 
             return result(CurrentScope, null /* resolutionRootScope */);
@@ -199,8 +199,8 @@ namespace DryIoc
 
         public delegate object CompiledFactory(Scope openScope, Scope resolutionRootScope);
 
-        private HashTree<Type, CompiledFactory> _defaultResolutionCache;
-        private HashTree<Type, KeyedResolutionCacheEntry> _keyedResolutionCache;
+        private volatile HashTree<Type, CompiledFactory> _defaultResolutionCache;
+        private volatile HashTree<Type, KeyedResolutionCacheEntry> _keyedResolutionCache;
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
         {
@@ -208,7 +208,7 @@ namespace DryIoc
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null) return EmptyCompiledFactory;
             var result = CompileExpression(factory.GetExpression(request, this));
-            _defaultResolutionCache = _defaultResolutionCache.AddOrUpdate(serviceType, result);
+            Interlocked.Exchange(ref _defaultResolutionCache, _defaultResolutionCache.AddOrUpdate(serviceType, result));
             return result;
         }
 
@@ -1649,7 +1649,7 @@ namespace DryIoc
                 // Create lazy singleton if we have Func somewhere in dependency chain.
                 var parent = request.Parent;
                 if (parent != null &&
-                    parent.Enumerate().Any(p => p.OpenGenericServiceType != null && 
+                    parent.Enumerate().Any(p => p.OpenGenericServiceType != null &&
                         ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType)))
                     return GetScopedServiceExpression(Expression.Constant(singletonScope), factoryID, factoryExpr);
 
