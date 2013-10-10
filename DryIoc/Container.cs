@@ -1447,14 +1447,18 @@ namespace DryIoc
                 : options == PrintOptions.ShowIndex && ServiceKey is int ? "#" + ServiceKey
                 : "unnamed";
 
-            var types = ImplementationType != null && ImplementationType != ServiceType
+            var kind = FactoryType == FactoryType.Decorator ? " decorator"
+                : FactoryType == FactoryType.GenericWrapper ? " generic wrapper"
+                : string.Empty;
+
+            var type = ImplementationType != null && ImplementationType != ServiceType
                 ? ImplementationType.Print() + " : " + ServiceType.Print()
                 : ServiceType.Print();
 
             var dep = Dependency == null ? string.Empty : " (" + Dependency + ")";
 
-            // example: "unnamed DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
-            return key + " " + types + dep;
+            // example: "unnamed generic wrapper DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
+            return key + kind + " " + type + dep;
         }
 
         public override string ToString()
