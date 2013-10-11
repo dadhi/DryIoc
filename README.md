@@ -1,2 +1,8 @@
 IoC for fun and profit.
-Work is in progress..
+Version 1.0.0
+
+Diagnostics:
+
+Thread Safety:
+
+Features:
