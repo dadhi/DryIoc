@@ -54,6 +54,7 @@
     <Compile Include="LambdaRegistrationTests.cs" />
     <Compile Include="LazyTests.cs" />
     <Compile Include="MetadataTests.cs" />
+    <Compile Include="Performance\CompareTryGetVsGetOrNull.cs" />
     <Compile Include="Performance\HashTreeAccessSpeedTests.cs" />
     <Compile Include="Performance\HashTreeEnumerationSpeedTests.cs" />
     <Compile Include="Performance\MethodArgumentsPassingSpeedComparison.cs" />

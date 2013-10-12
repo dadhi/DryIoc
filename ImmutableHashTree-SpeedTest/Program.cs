@@ -15,12 +15,20 @@ namespace ImmutableHashTree_SpeedTest
 		static void Main()
 		{
 			Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            CompareHashTreeGet();
+            //CompareHashTreeGet();
+		    DoCompareTryGetVsGetOrNull();
 		    //CompareHashTreeEnumeration();
 		    //CompareMethodArgumentPassing();
 		    //CompareTypesForEquality(typeof(string));
 			Console.ReadKey();
 		}
+
+        private static void DoCompareTryGetVsGetOrNull()
+        {
+            CompareTryGetVsGetOrNull.Compare();
+            Console.WriteLine();
+            CompareTryGetVsGetOrNull.Compare();
+        }
 
 	    private static void CompareMethodArgumentPassing()
 	    {
