@@ -1,9 +1,9 @@
 ﻿// TODO: Version 2.0.0
 // Goals:
-// # Add distinctive feature: IFactory to register with ExportFactory.
+// - Add distinctive feature: IFactory to register with ExportFactory.
+// - Array resolution using array initializer expression.
 
 #define SYSTEM_LAZY_IS_NOT_AVAILABLE
-//#pragma warning disable 420 // Disable warning for using volatile fields in Interlocked.Exchange ("a reference to a volatile field will not be treated as volatile").
 using System;
 using System.Collections;
 using System.Collections.Generic;
