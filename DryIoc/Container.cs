@@ -1,10 +1,11 @@
 ﻿// TODO: Version 2.0.0
 // Goals:
-// # Add distinctive feature: IFactory to register with ExportFactory.
+// - Add distinctive feature: IFactory to register with ExportFactory.
+// - Array resolution using array initializer expression.
 
 #define SYSTEM_LAZY_IS_NOT_AVAILABLE
-//#pragma warning disable 420 // Disable warning for using volatile fields in Interlocked.Exchange ("a reference to a volatile field will not be treated as volatile").
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -553,7 +554,7 @@ namespace DryIoc
                 .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType, serviceRequest);
 
             if (unusedFuncArgs != null)
-                Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs.Print(), request);
+                Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs/*.Print()*/, request);
 
             return funcExpr;
         }
@@ -1769,7 +1770,7 @@ namespace DryIoc
     public static class Throw
     {
         public static Func<string, Exception> GetException = message => new ContainerException(message);
-        public static Func<object, string> ArgOutput = Sugar.DefaultOutput;
+        public static Func<object, string> ArgOutput = Sugar.DefaultOutput2;
 
         public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
         {
@@ -1823,9 +1824,34 @@ namespace DryIoc
                 (s, x) => (s.Length != 0 ? s.Append(separator) : s).Append(output(x))).ToString();
         }
 
+        public static string Print2(this IEnumerable items, string separator = ", ", Func<object, string> output = null)
+        {
+            if (items == null) return null;
+            output = output ?? DefaultOutput2;
+            var builder = new StringBuilder();
+            foreach (var item in items)
+            {
+                if (builder.Length != 0) builder.Append(separator);
+                builder.Append(output(item));
+            }
+
+            return builder.ToString();
+        }
+
+        public static string DefaultOutput2(object x)
+        {
+            return x is string ? (string)x
+                : ReferenceEquals(x, null) ? null
+                : x is IEnumerable ? Print2((IEnumerable)x)
+                : x is Type ? (x as Type).Print()
+                : x.ToString();
+        }
+
         public static string DefaultOutput<T>(T x)
         {
-            return ReferenceEquals(x, null) ? null : x is Type ? (x as Type).Print() : x.ToString();
+            return ReferenceEquals(x, null) ? null
+                : x is Type ? (x as Type).Print()
+                : x.ToString();
         }
 
         public static Type[] GetSelfAndImplemented(this Type type)

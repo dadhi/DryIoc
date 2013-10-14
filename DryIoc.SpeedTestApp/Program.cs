@@ -3,24 +3,31 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using DryIoc;
 using DryIoc.UnitTests;
 using DryIoc.UnitTests.Performance;
 using DryIoc.UnitTests.Playground;
 
-namespace ImmutableHashTree_SpeedTest
+namespace DryIoc.SpeedTestApp
 {
 	class Program
 	{
 		static void Main()
 		{
 			Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            CompareHashTreeGet();
+            //CompareHashTreeGet();
+		    DoCompareTryGetVsGetOrNull();
 		    //CompareHashTreeEnumeration();
 		    //CompareMethodArgumentPassing();
 		    //CompareTypesForEquality(typeof(string));
 			Console.ReadKey();
 		}
+
+        private static void DoCompareTryGetVsGetOrNull()
+        {
+            CompareTryGetVsGetOrNull.Compare();
+            Console.WriteLine();
+            CompareTryGetVsGetOrNull.Compare();
+        }
 
 	    private static void CompareMethodArgumentPassing()
 	    {
