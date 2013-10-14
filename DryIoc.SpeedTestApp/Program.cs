@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using DryIoc;
 using DryIoc.UnitTests;
 using DryIoc.UnitTests.Performance;
 using DryIoc.UnitTests.Playground;
 
-namespace ImmutableHashTree_SpeedTest
+namespace DryIoc.SpeedTestApp
 {
 	class Program
 	{

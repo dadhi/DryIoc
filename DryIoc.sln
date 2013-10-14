@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImmutableHashTree-SpeedTest", "ImmutableHashTree-SpeedTest\ImmutableHashTree-SpeedTest.csproj", "{A9C4E2CC-3CA9-4F04-8544-A2837B045643}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SpeedTestApp", "DryIoc.SpeedTestApp\DryIoc.SpeedTestApp.csproj", "{A9C4E2CC-3CA9-4F04-8544-A2837B045643}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc", "DryIoc\DryIoc.csproj", "{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}"
 EndProject

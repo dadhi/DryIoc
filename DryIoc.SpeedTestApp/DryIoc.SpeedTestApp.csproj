@@ -8,8 +8,8 @@
     <ProjectGuid>{A9C4E2CC-3CA9-4F04-8544-A2837B045643}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ImmutableHashTree_SpeedTest</RootNamespace>
-    <AssemblyName>ImmutableHashTree-SpeedTest</AssemblyName>
+    <RootNamespace>DryIoc.SpeedTestApp</RootNamespace>
+    <AssemblyName>DryIoc.SpeedTestApp</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
