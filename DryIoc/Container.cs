@@ -1952,13 +1952,13 @@ namespace DryIoc
 
         public delegate V UpdateValue(V existing, V added);
 
-        public IntTree<V> AddOrUpdate(int key, V value, UpdateValue update = null)
+        public IntTree<V> AddOrUpdate(int key, V value, UpdateValue updateValue = null)
         {
             return Height == 0 ? new IntTree<V>(key, value, Empty, Empty)
-                : (key == Key ? new IntTree<V>(key, update == null ? value : update(Value, value), Left, Right)
+                : (key == Key ? new IntTree<V>(key, updateValue == null ? value : updateValue(Value, value), Left, Right)
                 : (key < Key
-                    ? With(Left.AddOrUpdate(key, value), Right)
-                    : With(Left, Right.AddOrUpdate(key, value))).EnsureBalanced());
+                    ? With(Left.AddOrUpdate(key, value, updateValue), Right)
+                    : With(Left, Right.AddOrUpdate(key, value, updateValue))).EnsureBalanced());
         }
 
         public V GetValueOrDefault(int key, V defaultValue = default(V))

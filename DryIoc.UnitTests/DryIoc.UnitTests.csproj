@@ -60,6 +60,7 @@
     <Compile Include="Performance\MethodArgumentsPassingSpeedComparison.cs" />
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
     <Compile Include="DecoratorConditionTests.cs" />
+    <Compile Include="Playground\IntNTree.cs" />
     <Compile Include="Playground\Experiments.cs" />
     <Compile Include="Playground\OptionsPlayTests.cs" />
     <Compile Include="Playground\ThrowPlayTests.cs" />
