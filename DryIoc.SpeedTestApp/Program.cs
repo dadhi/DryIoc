@@ -139,7 +139,7 @@ namespace DryIoc.SpeedTestApp
 
 	    public static void GetHashTree4vs1ofType(int itemCount)
         {
-            var key = typeof(HashTreeTests.DictVsMap);
+            var key = typeof(IntTreeTests.DictVsMap);
             var value = "hey";
 
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
@@ -167,7 +167,7 @@ namespace DryIoc.SpeedTestApp
 
         public static void GetHashTreeXVsHashTree(int itemCount)
         {
-            var key = typeof(HashTreeTests.DictVsMap);
+            var key = typeof(IntTreeTests.DictVsMap);
             var value = "hey";
 
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
@@ -195,7 +195,7 @@ namespace DryIoc.SpeedTestApp
 
         public static void GetHashTree2vs1ofType(int itemCount)
         {
-            var key = typeof(HashTreeTests.DictVsMap);
+            var key = typeof(IntTreeTests.DictVsMap);
             var value = "hey";
 
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
@@ -223,7 +223,7 @@ namespace DryIoc.SpeedTestApp
 
         public static void GetDictVsHashTree2OfType(int itemCount)
         {
-            var key = typeof(HashTreeTests.DictVsMap);
+            var key = typeof(IntTreeTests.DictVsMap);
             var value = "hey";
 
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
@@ -279,7 +279,7 @@ namespace DryIoc.SpeedTestApp
 
 		public static void GetDictVsHashTreeOfType(int itemCount)
 		{
-			var key = typeof(HashTreeTests.DictVsMap);
+			var key = typeof(IntTreeTests.DictVsMap);
 			var value = "hey";
 
 			var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();

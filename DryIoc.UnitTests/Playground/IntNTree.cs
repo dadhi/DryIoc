@@ -4,7 +4,7 @@ namespace DryIoc.UnitTests.Playground
 {
     public sealed class IntNTree<V>
     {
-        public const int N = 5;
+        public static int N = 5;
 
         public static readonly IntNTree<V> Empty = new IntNTree<V>();
 
@@ -17,9 +17,9 @@ namespace DryIoc.UnitTests.Playground
         {
             var node = this;
             while (node.Height != 0)
-                if (key < _leftKey)
+                if (key < node.LeftKey)
                     node = node.Left;
-                else if (key > _rightKey)
+                else if (key > node.RightKey)
                     node = node.Right;
                 else
                     return node.GetItemValueOrDefault(key, defaultValue);
@@ -28,21 +28,20 @@ namespace DryIoc.UnitTests.Playground
 
         public IntNTree<V> AddOrUpdate(int key, V value, UpdateValue updateValue = null)
         {
-            var newItem = new KV<int, V>(key, value);
-            return Height == 0 ? new IntNTree<V>(new[] { newItem }, Empty, Empty) : AddOrUpdate(newItem, updateValue);
+            return AddOrUpdate(new KV<int, V>(key, value), updateValue);
         }
 
-        private readonly KV<int, V>[] _items;
-        private readonly int _leftKey;
-        private readonly int _rightKey;
+        internal readonly KV<int, V>[] Items;
+        internal readonly int LeftKey;
+        internal readonly int RightKey;
 
         private IntNTree() { }
 
         private IntNTree(KV<int, V>[] items, IntNTree<V> left, IntNTree<V> right)
         {
-            _items = items;
-            _leftKey = _items[0].Key;
-            _rightKey = _items[_items.Length - 1].Key;
+            Items = items;
+            LeftKey = Items[0].Key;
+            RightKey = Items[Items.Length - 1].Key;
 
             Left = left;
             Right = right;
@@ -51,7 +50,7 @@ namespace DryIoc.UnitTests.Playground
 
         internal V GetItemValueOrDefault(int key, V defaultValue = default(V))
         {
-            var items = _items;
+            var items = Items;
             for (var i = 0; i < items.Length; i++)
                 if (key == items[i].Key)
                     return items[i].Value;
@@ -60,26 +59,29 @@ namespace DryIoc.UnitTests.Playground
 
         private IntNTree<V> AddOrUpdate(KV<int, V> item, UpdateValue updateValue)
         {
-            if (item.Key < _leftKey)
+            if (Height == 0)
+                return new IntNTree<V>(new[] { item }, Empty, Empty);
+
+            if (item.Key < LeftKey)
             {
-                if (_items.Length < N)
+                if (Items.Length < N)
                 {
-                    var newItems = new KV<int, V>[_items.Length + 1];
+                    var newItems = new KV<int, V>[Items.Length + 1];
                     newItems[0] = item;
-                    Array.Copy(_items, 0, newItems, 1, _items.Length);
+                    Array.Copy(Items, 0, newItems, 1, Items.Length);
                     return new IntNTree<V>(newItems, Left, Right);
                 }
 
                 return With(Left.AddOrUpdate(item, updateValue), Right).EnsureBalanced();
             }
 
-            if (item.Key > _rightKey)
+            if (item.Key > RightKey)
             {
-                if (_items.Length < N)
+                if (Items.Length < N)
                 {
-                    var newItems = new KV<int, V>[_items.Length + 1];
-                    Array.Copy(_items, 0, newItems, 0, _items.Length);
-                    newItems[_items.Length] = item;
+                    var newItems = new KV<int, V>[Items.Length + 1];
+                    Array.Copy(Items, 0, newItems, 0, Items.Length);
+                    newItems[Items.Length] = item;
                     return new IntNTree<V>(newItems, Left, Right);
                 }
 
@@ -87,52 +89,52 @@ namespace DryIoc.UnitTests.Playground
             }
 
             var i = 0;
-            while (item.Key > _items[i].Key) i++;
+            while (item.Key > Items[i].Key) i++;
 
-            if (item.Key == _items[i].Key) // Update value
+            if (item.Key == Items[i].Key) // Update value
             {
-                var newItems = new KV<int, V>[_items.Length];
-                Array.Copy(_items, 0, newItems, 0, _items.Length);
-                newItems[i] = updateValue == null ? item : new KV<int, V>(item.Key, updateValue(_items[i].Value, item.Value));
+                var newItems = new KV<int, V>[Items.Length];
+                Array.Copy(Items, 0, newItems, 0, Items.Length);
+                newItems[i] = updateValue == null ? item : new KV<int, V>(item.Key, updateValue(Items[i].Value, item.Value));
                 return new IntNTree<V>(newItems, Left, Right);
             }
 
-            if (_items.Length < N) // Insert value into current node
+            if (Items.Length < N) // Insert value into current node
             {
-                var newItems = new KV<int, V>[_items.Length + 1];
-                Array.Copy(_items, 0, newItems, 0, i);
+                var newItems = new KV<int, V>[Items.Length + 1];
+                Array.Copy(Items, 0, newItems, 0, i);
                 newItems[i] = item;
-                Array.Copy(_items, i, newItems, i + 1, _items.Length - i);
+                Array.Copy(Items, i, newItems, i + 1, Items.Length - i);
                 return new IntNTree<V>(newItems, Left, Right);
             }
 
-            var items = new KV<int, V>[_items.Length];
+            var items = new KV<int, V>[Items.Length];
 
             // Drop left item to the left node if it has room for insert, otherwise drop right item to right node.
-            if (Left._items.Length < N)
+            if (Left.Height == 0 || Left.Items.Length < N)
             {
                 // values: drop 1, 2, insert 3, 4, 6, 9
                 // indexes:     0, 1, insert 1, 2, 3, 4 
                 // i == 2
-                Array.Copy(_items, 1, items, 0, i - 1);
+                Array.Copy(Items, 1, items, 0, i - 1);
                 items[i - 1] = item;
-                Array.Copy(_items, i, items, i, _items.Length - i);
-                return new IntNTree<V>(items, Left.AddOrUpdate(_items[0], updateValue), Right);
+                Array.Copy(Items, i, items, i, Items.Length - i);
+                return new IntNTree<V>(items, Left.AddOrUpdate(Items[0], updateValue), Right);
             }
 
             // values:  copy 1, 2, insert 3, copy 4, 6, drop 9
             // indexes: copy 0, 1, insert 1, copy 2, 3, drop 4 
             // i == 2
-            Array.Copy(_items, 0, items, 0, i);
+            Array.Copy(Items, 0, items, 0, i);
             items[i] = item;
-            Array.Copy(_items, i, items, i + 1, _items.Length - i - 1);
-            return new IntNTree<V>(items, Left, Right.AddOrUpdate(_items[0], updateValue))
+            Array.Copy(Items, i, items, i + 1, Items.Length - i - 1);
+            return new IntNTree<V>(items, Left, Right.AddOrUpdate(Items[Items.Length - 1], updateValue))
                 .EnsureBalanced(); // Ensure that is balanced cause we are not checking for Right room
         }
 
         private IntNTree<V> With(IntNTree<V> left, IntNTree<V> right)
         {
-            return new IntNTree<V>(_items, left, right);
+            return new IntNTree<V>(Items, left, right);
         }
 
         private IntNTree<V> EnsureBalanced()

@@ -50,7 +50,7 @@
     <Compile Include="FuncTests.cs" />
     <Compile Include="OpenGenericsTests.cs" />
     <Compile Include="GenericWrapperTests.cs" />
-    <Compile Include="HashTreeTests.cs" />
+    <Compile Include="IntTreeTests.cs" />
     <Compile Include="LambdaRegistrationTests.cs" />
     <Compile Include="LazyTests.cs" />
     <Compile Include="MetadataTests.cs" />
@@ -62,6 +62,7 @@
     <Compile Include="DecoratorConditionTests.cs" />
     <Compile Include="Playground\IntNTree.cs" />
     <Compile Include="Playground\Experiments.cs" />
+    <Compile Include="Playground\IntNTreeTests.cs" />
     <Compile Include="Playground\OptionsPlayTests.cs" />
     <Compile Include="Playground\ThrowPlayTests.cs" />
     <Compile Include="Playground\TreeBuilderTests.cs" />
