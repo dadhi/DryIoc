@@ -22,7 +22,21 @@ namespace DryIoc.UnitTests.Playground
                 else if (key > node.RightKey)
                     node = node.Right;
                 else
-                    return node.GetItemValueOrDefault(key, defaultValue);
+                {
+                    var items = node.Items;
+                    if (key == node.LeftKey)
+                        return items[0].Value;
+                    
+                    if (key == node.RightKey)
+                        return items[items.Length - 1].Value;
+                    
+                    if (items.Length > 2)
+                        for (var i = 1; i < items.Length - 1; i++)
+                            if (key == items[i].Key)
+                                return items[i].Value;
+                    break;
+                }
+           
             return defaultValue;
         }
 
@@ -46,15 +60,6 @@ namespace DryIoc.UnitTests.Playground
             Left = left;
             Right = right;
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
-        }
-
-        internal V GetItemValueOrDefault(int key, V defaultValue = default(V))
-        {
-            var items = Items;
-            for (var i = 0; i < items.Length; i++)
-                if (key == items[i].Key)
-                    return items[i].Value;
-            return defaultValue;
         }
 
         private IntNTree<V> AddOrUpdate(KV<int, V> item, UpdateValue updateValue)
@@ -119,7 +124,7 @@ namespace DryIoc.UnitTests.Playground
                 Array.Copy(Items, 1, items, 0, i - 1);
                 items[i - 1] = item;
                 Array.Copy(Items, i, items, i, Items.Length - i);
-                return new IntNTree<V>(items, Left.AddOrUpdate(Items[0], updateValue), Right);
+                return new IntNTree<V>(items, Left.AddOrUpdate(Items[0], updateValue), Right).EnsureBalanced();
             }
 
             // values:  copy 1, 2, insert 3, copy 4, 6, drop 9
@@ -128,8 +133,7 @@ namespace DryIoc.UnitTests.Playground
             Array.Copy(Items, 0, items, 0, i);
             items[i] = item;
             Array.Copy(Items, i, items, i + 1, Items.Length - i - 1);
-            return new IntNTree<V>(items, Left, Right.AddOrUpdate(Items[Items.Length - 1], updateValue))
-                .EnsureBalanced(); // Ensure that is balanced cause we are not checking for Right room
+            return new IntNTree<V>(items, Left, Right.AddOrUpdate(Items[Items.Length - 1], updateValue)).EnsureBalanced();
         }
 
         private IntNTree<V> With(IntNTree<V> left, IntNTree<V> right)

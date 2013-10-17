@@ -154,8 +154,8 @@ namespace DryIoc.UnitTests.Playground
                 .AddOrUpdate(1, "x")
                 .AddOrUpdate(1, "y");
 
-            Assert.AreEqual("a", tree.GetItemValueOrDefault(0));
-            Assert.AreEqual("y", tree.GetItemValueOrDefault(1));
+            Assert.AreEqual("a", tree.GetValueOrDefault(0));
+            Assert.AreEqual("y", tree.GetValueOrDefault(1));
         }
     }
 
@@ -189,8 +189,8 @@ namespace DryIoc.UnitTests.Playground
             Assert.AreEqual(0, t.LeftKey);
             Assert.AreEqual(5, t.RightKey);
             Assert.AreEqual(1, t.Height);
-            Assert.AreEqual(2, t.GetItemValueOrDefault(2));
-            Assert.AreEqual(3, t.GetItemValueOrDefault(3));
+            Assert.AreEqual(2, t.GetValueOrDefault(2));
+            Assert.AreEqual(3, t.GetValueOrDefault(3));
         }
     }
 }

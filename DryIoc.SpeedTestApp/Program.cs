@@ -14,8 +14,8 @@ namespace DryIoc.SpeedTestApp
 		static void Main()
 		{
 			Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            //CompareHashTreeGet();
-		    DoCompareTryGetVsGetOrNull();
+            CompareTreeGet();
+            //DoCompareTryGetVsGetOrNull();
 		    //CompareHashTreeEnumeration();
 		    //CompareMethodArgumentPassing();
 		    //CompareTypesForEquality(typeof(string));
@@ -43,11 +43,11 @@ namespace DryIoc.SpeedTestApp
 	        HashTreeEnumerationSpeedTests.CompareListVsHashTree();
 	    }
 
-	    private static void CompareHashTreeGet()
+	    private static void CompareTreeGet()
 	    {
-            GetHashTreeXVsHashTree(itemCount: 2000);
+            GetIntTreeVsIntNTree(itemCount: 20);
             Console.WriteLine();
-            GetHashTreeXVsHashTree(itemCount: 2000);
+            GetIntTreeVsIntNTree(itemCount: 20);
 	    }
 
 	    private static void CompareTypesForEquality(Type actual)
@@ -249,6 +249,34 @@ namespace DryIoc.SpeedTestApp
             Console.WriteLine("Tree - " + treeGetTime);
         }
 
+        public static void GetIntTreeVsIntNTree(int itemCount)
+        {
+            var key = itemCount - 2;
+            var value = "hey";
+
+            var keys = Enumerable.Range(0, itemCount).ToArray();
+
+            var tree = IntTree<string>.Empty;
+            var ntree = IntNTree<string>.Empty;
+
+            var treeAddTime = IntTreeAdd(ref tree, keys, key, value);
+            var ntreeAddTime = IntNTreeAdd(ref ntree, keys, key, value);
+
+            Console.WriteLine("Adding {0} items (ms):", itemCount);
+            Console.WriteLine("Tree - " + treeAddTime);
+            Console.WriteLine("NTree - " + ntreeAddTime);
+            Console.WriteLine();
+
+            var getTimes = 1 * 1000 * 1000;
+
+            var treeGetTime = IntTreeGet(tree, key, getTimes);
+            var ntreeGetTime = IntNTreeGet(ntree, key, getTimes);
+
+            Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
+            Console.WriteLine("Tree - " + treeGetTime);
+            Console.WriteLine("NTree - " + ntreeGetTime);
+        }
+
 		public static void GetDictVsHashTreeOfInt(int itemCount)
 		{
 			var key = itemCount;
@@ -339,6 +367,21 @@ namespace DryIoc.SpeedTestApp
             return dictWatch.ElapsedMilliseconds;
 		}
 
+        private static long IntNTreeAdd<V>(ref IntNTree<V> tree, int[] keys, int key, V value)
+        {
+            var ignored = default(V);
+            var treeTime = Stopwatch.StartNew();
+
+            for (var i = 0; i < keys.Length; i++)
+                Interlocked.Exchange(ref tree, tree.AddOrUpdate(keys[i], ignored));
+
+            Interlocked.Exchange(ref tree, tree.AddOrUpdate(key, value));
+
+            treeTime.Stop();
+            GC.Collect();
+            return treeTime.ElapsedMilliseconds;
+        }
+
 	    private static long IntTreeAdd<V>(ref IntTree<V> tree, int[] keys, int key, V value)
 		{
 			var ignored = default(V);
@@ -367,6 +410,20 @@ namespace DryIoc.SpeedTestApp
             treeTime.Stop();
             GC.Collect();
             return treeTime.ElapsedMilliseconds;
+        }
+
+        private static long IntNTreeGet<V>(IntNTree<V> tree, int key, int times)
+        {
+            V ignored = default(V);
+            var treeWatch = Stopwatch.StartNew();
+
+            for (int i = 0; i < times; i++)
+                ignored = tree.GetValueOrDefault(key);
+
+            treeWatch.Stop();
+            GC.KeepAlive(ignored);
+            GC.Collect();
+            return treeWatch.ElapsedMilliseconds;
         }
 
 		private static long IntTreeGet<V>(IntTree<V> tree, int key, int times)
