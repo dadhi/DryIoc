@@ -444,7 +444,7 @@ namespace DryIoc
                 {
                     if (Indexed != null)
                         Throw.If(true, Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType,
-                            Indexed.TraverseInOrder().Select(x => x.Value.ImplementationType).Print(";" + Environment.NewLine));
+                            Indexed.TraverseInOrder().Select(x => x.Value.ImplementationType));
                     result = LastDefault;
                 }
                 else
@@ -551,11 +551,8 @@ namespace DryIoc
 
             IList<Type> unusedFuncArgs;
             var funcExpr = serviceFactory.GetFuncWithArgsOrNull(funcType, serviceRequest, registry, out unusedFuncArgs)
-                .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType, serviceRequest);
-
-            if (unusedFuncArgs != null)
-                Throw.If(true, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs/*.Print()*/, request);
-
+                .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType, serviceRequest)
+                .ThrowIf(unusedFuncArgs != null, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs, request);
             return funcExpr;
         }
 
@@ -720,8 +717,8 @@ namespace DryIoc
     public static class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
-            "Unable to resolve service {0}. " + Environment.NewLine +
-            "Please register service OR adjust resolution rules.";
+@"Unable to resolve service {0}. 
+Please register service OR adjust resolution rules.";
 
         public static readonly string UNSUPPORTED_FUNC_WITH_ARGS =
             "Unsupported resolution as {0} of {1}.";
@@ -742,8 +739,8 @@ namespace DryIoc
             "Constructor [{0}] of {1} misses some arguments required for {2} dependency.";
 
         public static readonly string UNABLE_TO_SELECT_CONSTRUCTOR =
-            "Unable to select single constructor from {0} available in {1}. " + Environment.NewLine +
-            "Please provide constructor selector when registering service.";
+@"Unable to select single constructor from {0} available in {1}.
+Please provide constructor selector when registering service.";
 
         public static readonly string EXPECTED_FUNC_WITH_MULTIPLE_ARGS =
             "Expecting Func with one or more arguments but found {0}.";
@@ -764,11 +761,14 @@ namespace DryIoc
             "Service {0} with duplicate name '{1}' is already registered with implementation {2}.";
 
         public static readonly string GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT =
-            "Generic Wrapper is working with single service type only, but found many: {0}. " +
-            "Please specify service type selector in Generic Wrapper setup upon registration.";
+@"Generic Wrapper is working with single service type only, but found many: 
+{0}.
+Please specify service type selector in Generic Wrapper setup upon registration.";
 
         public static readonly string SOME_FUNC_PARAMS_ARE_UNUSED =
-            "Found some unused Func parameters ({0}) when resolving: {1}.";
+@"Found some unused Func parameters: 
+{0} 
+when resolving {1}.";
 
         public static readonly string DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION =
             "Decorator factory should support resolution as {0}, but it does not.";
@@ -1114,8 +1114,7 @@ namespace DryIoc
 
         private static Type SelectSingleByDefault(Type[] typeArgs)
         {
-            if (typeArgs.Length != 1)
-                Throw.If(true, Error.GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT, typeArgs.Print());
+            Throw.If(typeArgs.Length != 1, Error.GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT, typeArgs);
             return typeArgs[0];
         }
 
@@ -1443,7 +1442,7 @@ namespace DryIoc
         public override string ToString()
         {
             var message = new StringBuilder().Append(Print());
-            return Parent == null ? message.ToString() 
+            return Parent == null ? message.ToString()
                  : Parent.Enumerate().Aggregate(message,
                     (m, r) => m.AppendLine().Append(" in ").Append(r.Print())).ToString();
         }
@@ -1768,6 +1767,7 @@ namespace DryIoc
     public static class Throw
     {
         public static Func<string, Exception> GetException = message => new ContainerException(message);
+
         public static Func<object, string> PrintArg = Sugar.Print;
 
         public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
@@ -1802,9 +1802,10 @@ namespace DryIoc
         public static string Print(object x)
         {
             return x is string ? (string)x
-                : x is Type ? ((Type)x).Print()
-                    : x is IEnumerable ? ((IEnumerable)x).Print()
-                        : (string.Empty + x);
+                : (x is Type ? ((Type)x).Print()
+                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine)
+                : (x is IEnumerable ? ((IEnumerable)x).Print()
+                : (string.Empty + x))));
         }
 
         public static string Print(this IEnumerable items, string separator = ", ", Func<object, string> printItem = null)
@@ -1948,7 +1949,7 @@ namespace DryIoc
         }
 
         /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up: 5/6 vs. stack.</summary>
+        /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).</summary>
         public IEnumerable<IntTree<V>> TraverseInOrder()
         {
             var parents = new IntTree<V>[Height];
