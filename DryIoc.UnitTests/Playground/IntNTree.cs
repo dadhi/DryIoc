@@ -4,7 +4,7 @@ namespace DryIoc.UnitTests.Playground
 {
     public sealed class IntNTree<V>
     {
-        public static int N = 5;
+        public static int N = 3;
 
         public static readonly IntNTree<V> Empty = new IntNTree<V>();
 
