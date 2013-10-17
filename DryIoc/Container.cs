@@ -247,7 +247,7 @@ namespace DryIoc
                 newFactory = ResolutionRules.GetUnregisteredServiceFactoryOrNull(request, this);
 
             if (newFactory == null)
-                Throw.If(ifUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request, request.PrintLatest());
+                Throw.If(ifUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
             else
                 Register(newFactory, request.ServiceType, request.ServiceKey);
 
@@ -720,8 +720,8 @@ namespace DryIoc
     public static class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
-            "Unable to resolve service {0}." + Environment.NewLine +
-            "Please register service {1} OR adjust resolution rules.";
+            "Unable to resolve service {0}. " + Environment.NewLine +
+            "Please register service OR adjust resolution rules.";
 
         public static readonly string UNSUPPORTED_FUNC_WITH_ARGS =
             "Unsupported resolution as {0} of {1}.";
@@ -1440,17 +1440,23 @@ namespace DryIoc
                 yield return x;
         }
 
-        public enum PrintOptions { HideIndex, ShowIndex }
+        public override string ToString()
+        {
+            var message = new StringBuilder().Append(Print());
+            return Parent == null ? message.ToString() 
+                 : Parent.Enumerate().Aggregate(message,
+                    (m, r) => m.AppendLine().Append(" in ").Append(r.Print())).ToString();
+        }
 
-        public string PrintLatest(PrintOptions options = PrintOptions.HideIndex)
+        private string Print()
         {
             var key = ServiceKey is string ? "\"" + ServiceKey + "\""
-                : options == PrintOptions.ShowIndex && ServiceKey is int ? "#" + ServiceKey
-                : "unnamed";
+                : ServiceKey is int ? "#" + ServiceKey
+                    : "unnamed";
 
             var kind = FactoryType == FactoryType.Decorator ? " decorator"
                 : FactoryType == FactoryType.GenericWrapper ? " generic wrapper"
-                : string.Empty;
+                    : string.Empty;
 
             var type = ImplementationType != null && ImplementationType != ServiceType
                 ? ImplementationType.Print() + " : " + ServiceType.Print()
@@ -1460,14 +1466,6 @@ namespace DryIoc
 
             // example: "unnamed generic wrapper DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
             return key + kind + " " + type + dep;
-        }
-
-        public override string ToString()
-        {
-            var message = new StringBuilder().Append(PrintLatest(PrintOptions.ShowIndex));
-            return Parent == null ? message.ToString()
-                : Parent.Enumerate().Aggregate(message, (m, r) => m.AppendLine().Append(" in ")
-                    .Append(r.PrintLatest(PrintOptions.ShowIndex))).ToString();
         }
     }
 
@@ -1770,7 +1768,7 @@ namespace DryIoc
     public static class Throw
     {
         public static Func<string, Exception> GetException = message => new ContainerException(message);
-        public static Func<object, string> ArgOutput = Sugar.DefaultOutput2;
+        public static Func<object, string> PrintArg = Sugar.Print;
 
         public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
         {
@@ -1792,7 +1790,7 @@ namespace DryIoc
 
         private static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
-            return string.Format(message, ArgOutput(arg0), ArgOutput(arg1), ArgOutput(arg2));
+            return string.Format(message, PrintArg(arg0), PrintArg(arg1), PrintArg(arg2));
         }
 
         private static readonly string ARG_IS_NULL = "Argument of type {0} is null.";
@@ -1801,57 +1799,37 @@ namespace DryIoc
 
     public static class Sugar
     {
-        public static string Print(this Type type, Func<Type, string> output = null /* prints Type.FullName by default */)
+        public static string Print(object x)
+        {
+            return x is string ? (string)x
+                : x is Type ? ((Type)x).Print()
+                    : x is IEnumerable ? ((IEnumerable)x).Print()
+                        : (string.Empty + x);
+        }
+
+        public static string Print(this IEnumerable items, string separator = ", ", Func<object, string> printItem = null)
+        {
+            if (items == null) return null;
+            printItem = printItem ?? Print;
+            var builder = new StringBuilder();
+            foreach (var item in items)
+                (builder.Length == 0 ? builder : builder.Append(separator)).Append(printItem(item));
+            return builder.ToString();
+        }
+
+        public static string Print(this Type type, Func<Type, string> print = null /* prints Type.FullName by default */)
         {
             if (type == null) return null;
-            var name = output == null ? type.FullName : output(type);
+            var name = print == null ? type.FullName : print(type);
             if (type.IsGenericType) // for generic types
             {
                 var genericArgs = type.GetGenericArguments();
                 var genericArgsString = type.IsGenericTypeDefinition
                     ? new string(',', genericArgs.Length - 1)
-                    : String.Join(", ", genericArgs.Select(x => x.Print(output)).ToArray());
+                    : string.Join(", ", genericArgs.Select(x => x.Print(print)).ToArray());
                 name = name.Substring(0, name.IndexOf('`')) + "<" + genericArgsString + ">";
             }
             return name.Replace('+', '.'); // for nested classes
-        }
-
-        public static string Print<T>(this IEnumerable<T> items, string separator = ", ", Func<T, string> output = null)
-        {
-            if (items == null) return null;
-            output = output ?? DefaultOutput;
-            return items.Aggregate(new StringBuilder(),
-                (s, x) => (s.Length != 0 ? s.Append(separator) : s).Append(output(x))).ToString();
-        }
-
-        public static string Print2(this IEnumerable items, string separator = ", ", Func<object, string> output = null)
-        {
-            if (items == null) return null;
-            output = output ?? DefaultOutput2;
-            var builder = new StringBuilder();
-            foreach (var item in items)
-            {
-                if (builder.Length != 0) builder.Append(separator);
-                builder.Append(output(item));
-            }
-
-            return builder.ToString();
-        }
-
-        public static string DefaultOutput2(object x)
-        {
-            return x is string ? (string)x
-                : ReferenceEquals(x, null) ? null
-                : x is IEnumerable ? Print2((IEnumerable)x)
-                : x is Type ? (x as Type).Print()
-                : x.ToString();
-        }
-
-        public static string DefaultOutput<T>(T x)
-        {
-            return ReferenceEquals(x, null) ? null
-                : x is Type ? (x as Type).Print()
-                : x.ToString();
         }
 
         public static Type[] GetSelfAndImplemented(this Type type)
