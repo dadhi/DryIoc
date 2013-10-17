@@ -29,9 +29,12 @@ namespace DryIoc.UnitTests.Playground
                     
                     if (key == node.RightKey)
                         return items[items.Length - 1].Value;
-                    
-                    if (items.Length > 2)
-                        for (var i = 1; i < items.Length - 1; i++)
+
+                    if (items.Length > 2 && key == items[1].Key)
+                        return items[1].Value;
+
+                    if (items.Length > 3)
+                        for (var i = 2; i < items.Length - 1; i++)
                             if (key == items[i].Key)
                                 return items[i].Value;
                     break;

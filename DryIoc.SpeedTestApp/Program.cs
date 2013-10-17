@@ -45,9 +45,9 @@ namespace DryIoc.SpeedTestApp
 
 	    private static void CompareTreeGet()
 	    {
-            GetIntTreeVsIntNTree(itemCount: 20);
+            GetIntTreeVsIntNTree(itemCount: 21);
             Console.WriteLine();
-            GetIntTreeVsIntNTree(itemCount: 20);
+            GetIntTreeVsIntNTree(itemCount: 21);
 	    }
 
 	    private static void CompareTypesForEquality(Type actual)
@@ -251,7 +251,7 @@ namespace DryIoc.SpeedTestApp
 
         public static void GetIntTreeVsIntNTree(int itemCount)
         {
-            var key = itemCount - 2;
+            var key = itemCount - 1;
             var value = "hey";
 
             var keys = Enumerable.Range(0, itemCount).ToArray();
