@@ -1,7 +1,5 @@
-﻿// TODO:
-// - Add ExportFactory.
-// - Move tests to separate CUT.dll to test Import attributes.
-// - Recognize export of Factory implementation.
+﻿// TODO: vNext
+// - Add distinctive feature: IFactory to register with ExportFactory.
 
 //#define MEF_IS_AVAILABLE
 
@@ -72,7 +70,7 @@ namespace DryIoc.AttributedRegistration
 
         public static IEnumerable<RegistrationInfo> ScanTypes(IEnumerable<Type> types)
         {
-            foreach (var type in types.Where(TypeCouldBeExported))
+            foreach (var type in types.Where(IsTypeToExport))
             {
                 var attributes = type.GetCustomAttributes(false);
 
@@ -153,7 +151,7 @@ namespace DryIoc.AttributedRegistration
 
         #region Tools
 
-        public static bool TypeCouldBeExported(Type type)
+        public static bool IsTypeToExport(Type type)
         {
             return type.IsClass && !type.IsAbstract &&
                 (Attribute.IsDefined(type, typeof(ExportAttribute), false) ||
