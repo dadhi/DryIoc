@@ -269,8 +269,8 @@ namespace DryIoc.AttributedRegistration
             "Unable to resolve dependency {0} with metadata [{1}] in {2}";
 
         public static readonly string UNSUPPORTED_MULTIPLE_METADATA =
-            "Multiple associated metadata found while exporting {0}. " +
-            "Only single metadata is supported per implementation type, please remove the rest.";
+@"Multiple associated metadata found while exporting {0}. 
+Only single metadata is supported per implementation type, please remove the rest.";
 
         public static readonly string UNSUPPORTED_MULTIPLE_FACTORY_TYPES =
             "Found multiple factory types associated with exported {0}. " +
