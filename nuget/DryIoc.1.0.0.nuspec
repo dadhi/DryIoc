@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <metadata>
+        <id>DryIoc</id>
+        <version>1.0.0</version>
+        <authors>Maksim Volkau</authors>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>Fast, Featureful, Small IoC container to embed into your app or framework.</description>
+        <summary>IoC container for fun and profit.</summary>
+    </metadata>
+    <files>
+        <file src="DryIoc\AttributedRegistration\AttributedRegistrator.cs" target="DryIoc\AttributedRegistration\AttributedRegistrator.cs" />
+        <file src="DryIoc\Container.cs" target="DryIoc\Container.cs" />
+    </files>
+</package>
