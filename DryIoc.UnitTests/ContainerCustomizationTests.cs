@@ -16,7 +16,6 @@ namespace DryIoc.UnitTests
             container.Register<Service>();
 
             var rules = container.ResolutionRules;
-            //rules.UnregisteredServices = rules.UnregisteredServices.Remove(ContainerSetup.GetEnumerableDynamicallyOrNull);
             rules.UnregisteredServices = rules.UnregisteredServices
                 .Except(new[] { ContainerSetup.GetEnumerableDynamicallyOrNull }).ToArray();
 
@@ -212,7 +211,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Could_add_couple_of_rules_at_once()
+        public void Possible_to_add_couple_of_rules_at_once()
         {
             var container = new Container(ContainerSetup.Minimal);
 
@@ -224,6 +223,19 @@ namespace DryIoc.UnitTests
             container.Resolve<IService>(IfUnresolved.ReturnNull);
 
             Assert.That(count, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void You_can_customize_resolving_single_implementation_from_multiple_registrations()
+        {
+            var container = new Container(
+                _ => _.ResolutionRules.GetSingleRegisteredFactory = factories => factories.Last());
+
+            container.Register(typeof(IService), typeof(Service));
+            container.Register(typeof(IService), typeof(AnotherService));
+            var service = container.Resolve(typeof(IService));
+
+            Assert.That(service, Is.InstanceOf<AnotherService>());
         }
     }
 

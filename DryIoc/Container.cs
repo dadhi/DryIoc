@@ -1,5 +1,6 @@
 ﻿// TODO: vNext
-// - Array resolution using array initializer expression.
+// - add: Array resolution using array initializer expression. Why: Should be faster then current lazy IEnumerable implementation.
+// - fix: Rules are not thread-safe regarding replacing the rule in place, cause the rules are provided as arrays.
 
 #define SYSTEM_LAZY_IS_NOT_AVAILABLE
 using System;
@@ -98,7 +99,7 @@ namespace DryIoc
         {
             var implementationType = factory.ThrowIfNull().ImplementationType;
             if (implementationType != null && serviceType.ThrowIfNull() != typeof(object))
-                Throw.If(!implementationType.GetSelfAndImplemented().Contains(serviceType),
+                Throw.If(!implementationType.EnumerateSelfAndImplementedTypes().Contains(serviceType),
                     Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
 
             lock (_syncRoot)
@@ -111,24 +112,23 @@ namespace DryIoc
 
                 var entry = _factories.GetOrAdd(serviceType, _ => new FactoriesEntry());
                 if (serviceKey == null)
-                {
-                    if (entry.LastDefault != null)
-                    {
-                        entry.Indexed = entry.Indexed ?? IntTree<Factory>.Empty.AddOrUpdate(entry.MaxIndex++, entry.LastDefault);
-                        entry.Indexed = entry.Indexed.AddOrUpdate(entry.MaxIndex++, factory);
-                    }
-                    entry.LastDefault = factory;
+                {   // default factories will contain all the factories and LastDefault will just point to the latest.
+                    if (entry.LastDefaultFactory != null) 
+                        entry.DefaultFactories = (entry.DefaultFactories
+                            ?? IntTree<Factory>.Empty.AddOrUpdate(entry.MaxDefaultIndex++, entry.LastDefaultFactory))
+                            .AddOrUpdate(entry.MaxDefaultIndex++, factory);
+                    entry.LastDefaultFactory = factory;
                 }
                 else if (serviceKey is int)
                 {
                     var index = (int)serviceKey;
-                    entry.Indexed = (entry.Indexed ?? IntTree<Factory>.Empty).AddOrUpdate(index, factory);
-                    entry.MaxIndex = Math.Max(entry.MaxIndex, index) + 1;
+                    entry.DefaultFactories = (entry.DefaultFactories ?? IntTree<Factory>.Empty).AddOrUpdate(index, factory);
+                    entry.MaxDefaultIndex = Math.Max(entry.MaxDefaultIndex, index) + 1;
                 }
                 else if (serviceKey is string)
                 {
                     var name = (string)serviceKey;
-                    var named = entry.Named = entry.Named ?? new Dictionary<string, Factory>();
+                    var named = entry.NamedFactories = entry.NamedFactories ?? new Dictionary<string, Factory>();
                     if (named.ContainsKey(name))
                         Throw.If(true, Error.DUPLICATE_SERVICE_NAME, serviceType, name, named[name].ImplementationType);
                     named.Add(name, factory);
@@ -224,16 +224,16 @@ namespace DryIoc
                 FactoriesEntry entry;
                 Factory factory;
                 if (_factories.TryGetValue(request.ServiceType, out entry) &&
-                    entry.TryGet(out factory, request.ServiceType, request.ServiceKey))
+                    entry.TryGet(out factory, request.ServiceType, request.ServiceKey, ResolutionRules.GetSingleRegisteredFactory))
                     return factory.GetFactoryPerRequestOrNull(request, this) ?? factory;
 
                 if (request.OpenGenericServiceType != null &&
                     _factories.TryGetValue(request.OpenGenericServiceType, out entry))
                 {
                     Factory genericFactory;
-                    if (entry.TryGet(out genericFactory, request.ServiceType, request.ServiceKey) ||
+                    if (entry.TryGet(out genericFactory, request.ServiceType, request.ServiceKey, ResolutionRules.GetSingleRegisteredFactory) ||
                         request.ServiceKey != null && // OR try find generic-wrapper by ignoring service key.
-                        entry.TryGet(out genericFactory, request.ServiceType) &&
+                        entry.TryGet(out genericFactory, request.ServiceType, null, ResolutionRules.GetSingleRegisteredFactory) &&
                         genericFactory.Setup.Type == FactoryType.GenericWrapper)
                     {
                         newFactory = genericFactory.GetFactoryPerRequestOrNull(request, this);
@@ -353,21 +353,21 @@ namespace DryIoc
                 FactoriesEntry entry;
                 if (TryFindEntry(out entry, serviceType))
                 {
-                    if (entry.Indexed != null)
+                    if (entry.DefaultFactories != null)
                     {
-                        foreach (var item in entry.Indexed.TraverseInOrder())
+                        foreach (var item in entry.DefaultFactories.TraverseInOrder())
                             if (condition == null || condition(item.Value))
                                 yield return item.Key;
                     }
-                    else if (entry.LastDefault != null)
+                    else if (entry.LastDefaultFactory != null)
                     {
-                        if (condition == null || condition(entry.LastDefault))
+                        if (condition == null || condition(entry.LastDefaultFactory))
                             yield return 0;
                     }
 
-                    if (entry.Named != null)
+                    if (entry.NamedFactories != null)
                     {
-                        foreach (var pair in entry.Named)
+                        foreach (var pair in entry.NamedFactories)
                             if (condition == null || condition(pair.Value))
                                 yield return pair.Key;
                     }
@@ -381,7 +381,8 @@ namespace DryIoc
             {
                 FactoriesEntry entry;
                 Factory factory;
-                if (TryFindEntry(out entry, serviceType) && entry.TryGet(out factory, serviceType, serviceKey))
+                if (TryFindEntry(out entry, serviceType) &&
+                    entry.TryGet(out factory, serviceType, serviceKey, ResolutionRules.GetSingleRegisteredFactory))
                     return factory;
                 return null;
             }
@@ -430,35 +431,41 @@ namespace DryIoc
 
         private sealed class FactoriesEntry
         {
-            public Factory LastDefault;
-            public IntTree<Factory> Indexed;
-            public int MaxIndex;
-            public Dictionary<string, Factory> Named;
+            public Factory LastDefaultFactory;
+            public IntTree<Factory> DefaultFactories;
+            public int MaxDefaultIndex;
+            public Dictionary<string, Factory> NamedFactories;
 
-            public bool TryGet(out Factory result, Type serviceType, object serviceKey = null)
+            public bool TryGet(out Factory result, Type serviceType, object serviceKey, 
+                Func<IEnumerable<Factory>, Factory> getSingleFactory = null)
             {
                 result = null;
                 if (serviceKey == null)
                 {
-                    if (Indexed != null)
-                        Throw.If(true, Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType,
-                            Indexed.TraverseInOrder().Select(x => x.Value.ImplementationType));
-                    result = LastDefault;
+                    if (DefaultFactories == null)
+                        result = LastDefaultFactory;
+                    else
+                    {
+                        var factories = DefaultFactories.TraverseInOrder().Select(_ => _.Value);
+                        result = getSingleFactory
+                            .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, factories.Select(_ => _.ImplementationType))
+                            .Invoke(factories);
+                    }
                 }
                 else
                 {
                     if (serviceKey is string)
                     {
-                        if (Named != null)
-                            Named.TryGetValue((string)serviceKey, out result);
+                        if (NamedFactories != null)
+                            NamedFactories.TryGetValue((string)serviceKey, out result);
                     }
                     else if (serviceKey is int)
                     {
                         var index = (int)serviceKey;
-                        if (Indexed == null && index == 0)
-                            result = LastDefault;
-                        else if (Indexed != null)
-                            result = Indexed.GetValueOrDefault(index);
+                        if (DefaultFactories == null && index == 0)
+                            result = LastDefaultFactory;
+                        else if (DefaultFactories != null)
+                            result = DefaultFactories.GetValueOrDefault(index);
                     }
                 }
 
@@ -512,28 +519,29 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
-        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = (request, registry) =>
-        {
-            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
-                return null;
+        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = 
+            (request, registry) =>
+            {
+                if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
+                    return null;
 
-            return new DelegateFactory((req, reg) =>
-                {
-                    var collectionType = req.ServiceType;
-                    var collectionIsArray = collectionType.IsArray;
-                    var itemType = collectionIsArray
-                        ? collectionType.GetElementType()
-                        : collectionType.GetGenericArguments()[0];
-                    var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
+                return new DelegateFactory((req, reg) =>
+                    {
+                        var collectionType = req.ServiceType;
+                        var collectionIsArray = collectionType.IsArray;
+                        var itemType = collectionIsArray
+                            ? collectionType.GetElementType()
+                            : collectionType.GetGenericArguments()[0];
+                        var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
 
-                    var resolver = Expression.Constant(new DynamicEnumerableResolver(reg, itemType, wrappedItemType));
-                    var resolveMethod = (collectionIsArray
-                        ? DynamicEnumerableResolver.ResolveArrayMethod
-                        : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
-                    return Expression.Call(resolver, resolveMethod, Expression.Constant(req));
-                },
-                setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
-        };
+                        var resolver = Expression.Constant(new DynamicEnumerableResolver(reg, itemType, wrappedItemType));
+                        var resolveMethod = (collectionIsArray
+                            ? DynamicEnumerableResolver.ResolveArrayMethod
+                            : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
+                        return Expression.Call(resolver, resolveMethod, Expression.Constant(req));
+                    },
+                    setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
+            };
 
         public static Expression GetFuncExpression(Request request, IRegistry registry)
         {
@@ -659,6 +667,8 @@ namespace DryIoc
 
     public sealed class ResolutionRules
     {
+        public Func<IEnumerable<Factory>, Factory> GetSingleRegisteredFactory;
+
         public delegate Factory ResolveUnregisteredService(Request request, IRegistry registry);
         public ResolveUnregisteredService[] UnregisteredServices = new ResolveUnregisteredService[0];
 
@@ -725,7 +735,8 @@ Please register service OR adjust resolution rules.";
             "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
 
         public static readonly string EXPECTED_SINGLE_DEFAULT_FACTORY =
-            "Expecting single default registration of {0} but found many: {1}";
+@"Expecting single default registration of {0} but found many:
+{1}.";
 
         public static readonly string EXPECTED_NON_ABSTRACT_IMPL_TYPE =
             "Expecting not abstract and not interface implementation type, but found {0}.";
@@ -882,7 +893,7 @@ when resolving {1}.";
             string named = null, Func<Type, bool> types = null)
         {
             var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
-            foreach (var serviceType in implementationType.GetSelfAndImplemented().Where(types ?? PublicTypes))
+            foreach (var serviceType in implementationType.EnumerateSelfAndImplementedTypes().Where(types ?? PublicTypes))
                 registrator.Register(registration, serviceType, named);
         }
 
@@ -1831,7 +1842,7 @@ when resolving {1}.";
             return name.Replace('+', '.'); // for nested classes
         }
 
-        public static Type[] GetSelfAndImplemented(this Type type)
+        public static Type[] EnumerateSelfAndImplementedTypes(this Type type)
         {
             Type[] results;
 

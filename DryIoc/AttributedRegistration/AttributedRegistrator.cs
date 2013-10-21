@@ -480,7 +480,7 @@ Only single metadata is supported per implementation type, please remove the res
 
         public IEnumerable<Type> SelectServiceTypes(Type targetType)
         {
-            var serviceTypes = targetType.GetSelfAndImplemented().Where(ExportedTypes);
+            var serviceTypes = targetType.EnumerateSelfAndImplementedTypes().Where(ExportedTypes);
             return Except == null || Except.Length == 0 ? serviceTypes : serviceTypes.Except(Except);
         }
     }

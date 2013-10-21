@@ -9,7 +9,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void GetSelfAndAllInheritedTypes_should_work_for_open_generic_types()
         {
-            var types = typeof(Fuzz<>).GetSelfAndImplemented().ToArray();
+            var types = typeof(Fuzz<>).EnumerateSelfAndImplementedTypes().ToArray();
 
             CollectionAssert.AreEqual(new[] { typeof(Fuzz<>), typeof(IBuzz), typeof(IFuzz<>), typeof(IFuzz), typeof(Buzz) }, types);
         }
@@ -17,7 +17,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void GetSelfAndAllInheritedTypes_should_work_for_class_nested_in_open_generic_types()
         {
-            var types = typeof(Fuzz<>.NestedClazz).GetSelfAndImplemented().ToArray();
+            var types = typeof(Fuzz<>.NestedClazz).EnumerateSelfAndImplementedTypes().ToArray();
 
             CollectionAssert.AreEqual(new[] { typeof(Fuzz<>.NestedClazz), typeof(IFuzz<>), typeof(IFuzz) }, types);
         }
@@ -25,7 +25,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_return_A_implementors()
         {
-            var types = typeof(A).GetSelfAndImplemented();
+            var types = typeof(A).EnumerateSelfAndImplementedTypes();
 
             Assert.That(types, Is.EqualTo(new[] { typeof(A), typeof(IB), typeof(IA), typeof(B), typeof(C) }));
         }
@@ -33,7 +33,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_return_B_implementors()
         {
-            var types = typeof(B).GetSelfAndImplemented();
+            var types = typeof(B).EnumerateSelfAndImplementedTypes();
 
             Assert.That(types, Is.EqualTo(new[] { typeof(B), typeof(IB), typeof(C) }));
         }
