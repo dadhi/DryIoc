@@ -11,7 +11,7 @@
         <summary>IoC container for fun and profit.</summary>
     </metadata>
     <files>
-        <file src="DryIoc\Container.cs" target="content\DryIoc\Container.cs" />
-        <file src="DryIoc\AttributedRegistration\AttributedRegistrator.cs" target="content\DryIoc\AttributedRegistration\AttributedRegistrator.cs" />
+        <file src="..\DryIoc\Container.cs" target="content\DryIoc\Container.cs" />
+        <file src="..\DryIoc\AttributedRegistration\AttributedRegistrator.cs" target="content\DryIoc\AttributedRegistration\AttributedRegistrator.cs" />
     </files>
 </package>
