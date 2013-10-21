@@ -13,3 +13,4 @@ syntax: glob
 *.ncrunch*
 *.crunch*
 *.dtp.*
+*.nupkg
