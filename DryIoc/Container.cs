@@ -39,7 +39,7 @@ namespace DryIoc
     /// <para>
     /// Additional features:
     /// <list type="bullet">
-    /// <item>Bare-bone mode with all default rules switched off via Container constructor parameter.</item>
+    /// <item>Minimal mode with all default rules switched off via Container constructor parameter.</item>
     /// <item>Control of service resolution via <see cref="ResolutionRules"/>.</item>
     /// </list>
     /// </para>
@@ -47,7 +47,6 @@ namespace DryIoc
     /// TODO: vNext
     /// <list type="bullet">
     /// <item>add: Array resolution using array initializer expression. Why: Should be faster then current lazy IEnumerable</item>
-    /// <item>add: Nuget option to switch SYSTEM_LAZY_IS_NOT_AVAILABLE depending on target framework.</item>
     /// <item>upd: Remove most of Container doc-comments.</item>
     /// <item>fix: Rules are not thread-safe regarding replacing the rule in place, cause the rules are provided as arrays.</item>
     /// </list>
@@ -2065,5 +2064,3 @@ when resolving {1}.";
         }
     }
 }
-
-#pragma warning restore 420
