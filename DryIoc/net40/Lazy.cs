@@ -1,15 +1,11 @@
-﻿using System;
-using System.Diagnostics;
-
-namespace DryIoc
+﻿namespace System
 {
-    [DebuggerStepThrough]
-    [DebuggerDisplay("{Value}")]
     public sealed class Lazy<T>
     {
         public Lazy(Func<T> valueFactory)
         {
-            _valueFactory = valueFactory.ThrowIfNull();
+            if (valueFactory == null) throw new ArgumentNullException("valueFactory");
+            _valueFactory = valueFactory;
         }
 
         public bool IsValueCreated { get; private set; }
@@ -31,7 +27,8 @@ namespace DryIoc
             {
                 if (!IsValueCreated)
                 {
-                    var factory = _valueFactory.ThrowIfNull("Recursive creation of Lazy value is detected.");
+                    if (_valueFactory == null) throw new InvalidOperationException("The initialization function tries to access Value on this instance.");
+                    var factory = _valueFactory;
                     _valueFactory = null;
                     _value = factory();
                     IsValueCreated = true;

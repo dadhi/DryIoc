@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
 
             Assert.That(name, Is.EqualTo(
                 "DryIoc.UnitTests.OpenGenericServiceWithTwoParameters<" + 
-                    "DryIoc.Lazy<System.Collections.Generic.IEnumerable<System.Boolean>>, " + 
+                    "System.Lazy<System.Collections.Generic.IEnumerable<System.Boolean>>, " + 
                     "System.Func<System.Boolean, DryIoc.UnitTests.TypeCSharpNameFormattingTests, System.String>" + 
                     ">"));
 		}

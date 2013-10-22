@@ -54,7 +54,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IHandler), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 1,
+                MetadataAttributeIndex = 2,
                 FactoryType = DryIoc.FactoryType.Decorator,
                 GenericWrapper = null,
                 Decorator = new DecoratorInfo { ServiceName = null, ShouldCompareMetadata = true, ConditionType = null }
@@ -65,7 +65,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IHandler), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 0,
+                MetadataAttributeIndex = 2,
                 FactoryType = DryIoc.FactoryType.Decorator,
                 GenericWrapper = null,
                 Decorator = new DecoratorInfo { ServiceName = "transact", ShouldCompareMetadata = true, ConditionType = null }
@@ -233,7 +233,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IServiceWithMultipleImplentations), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 0,
+                MetadataAttributeIndex = 1,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
                 Decorator = null
@@ -277,7 +277,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IServiceWithMetadata), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 0,
+                MetadataAttributeIndex = 1,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
                 Decorator = null
@@ -446,7 +446,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IFooService), ServiceName = null },
                 },
                 IsSingleton = true,
-                MetadataAttributeIndex = 0,
+                MetadataAttributeIndex = 1,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
                 Decorator = null

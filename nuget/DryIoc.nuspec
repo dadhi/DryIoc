@@ -2,16 +2,16 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc</id>
-        <version>1.0.1</version>
+        <version>1.0.2</version>
         <authors>Maksim Volkau</authors>
         <owners>Maksim Volkau</owners>
         <copyright>Maksim Volkau</copyright>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>Fast, Featureful, Small IoC container to embed into your app or framework.</description>
+        <description>Fast, comprehensive, small IoC container to embed into your application or framework.</description>
         <summary>IoC container for fun and profit.</summary>
     </metadata>
     <files>
-        <file src="..\DryIoc\Container.cs" target="content\DryIoc\Container.cs" />
-        <file src="..\DryIoc\AttributedRegistration\AttributedRegistrator.cs" target="content\DryIoc\AttributedRegistration\AttributedRegistrator.cs" />
+        <file src="..\DryIoc\**\*.cs" target="content\net35" exclude="..\DryIoc\Properties\*.*" />
+        <file src="..\DryIoc\**\*.cs" target="content\net40" exclude="..\DryIoc\Properties\*.*;..\DryIoc\**\net40\*.*" />
     </files>
 </package>

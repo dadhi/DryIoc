@@ -1,4 +1,6 @@
-﻿namespace DryIoc.AttributedRegistration.UnitTests.CUT
+﻿using System;
+
+namespace DryIoc.AttributedRegistration.UnitTests.CUT
 {
     enum FooMetadata { Hey, Blah, NotFound }
 
