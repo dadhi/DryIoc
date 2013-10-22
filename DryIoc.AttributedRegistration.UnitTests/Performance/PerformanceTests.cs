@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.Composition;
 using System.Diagnostics;
 using DryIoc.AttributedRegistration.UnitTests.CUT;
 using NUnit.Framework;

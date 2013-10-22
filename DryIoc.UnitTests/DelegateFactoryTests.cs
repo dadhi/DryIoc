@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class LambdaRegistrationTests
+    public class DelegateFactoryTests
     {
         [Test]
         public void Given_Lambda_registration_Resolving_service_should_be_of_Lambda_provided_implementation()

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Composition;
 using System.Linq;
 using System.Reflection;
 
@@ -15,9 +16,9 @@ namespace DryIoc.AttributedRegistration
     /// </summary>
     public static class AttributedRegistrator
     {
-        public static Action<IRegistry> DefaultSetup = SetupContainerToUseImportAttributes;
+        public static Action<IRegistry> DefaultSetup = UseImportExportAttributes;
 
-        public static void SetupContainerToUseImportAttributes(IRegistry source)
+        public static void UseImportExportAttributes(IRegistry source)
         {
             Container.DefaultSetup(source);
             source.ResolutionRules.UseImportExportAttributes();

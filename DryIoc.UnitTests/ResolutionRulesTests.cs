@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.Composition;
 using System.Linq;
 using DryIoc.AttributedRegistration;
 using DryIoc.UnitTests.CUT;
@@ -7,7 +8,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ContainerCustomizationTests
+    public class ResolutionRulesTests
     {
         [Test]
         public void I_should_be_able_to_turn_off_Enumerable_support_for_container_instance()
@@ -39,7 +40,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_barebone_container_I_should_be_able_to_resolve_service()
+        public void Given_minimal_container_I_should_be_able_to_resolve_service()
         {
             var container = new Container(_ => { });
             container.Register(typeof(Service));
@@ -50,7 +51,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_barebone_container_I_should_be_able_to_resolve_service_with_dependencies()
+        public void Given_minimal_container_I_should_be_able_to_resolve_service_with_dependencies()
         {
             var container = new Container(ContainerSetup.Minimal);
             container.Register(typeof(IDependency), typeof(Dependency));
@@ -72,7 +73,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_barebone_container_I_should_be_able_to_resolve_open_generic_service()
+        public void Given_minimal_container_I_should_be_able_to_resolve_open_generic_service()
         {
             var container = new Container(ContainerSetup.Minimal);
             container.Register(typeof(TransientOpenGenericService<>));

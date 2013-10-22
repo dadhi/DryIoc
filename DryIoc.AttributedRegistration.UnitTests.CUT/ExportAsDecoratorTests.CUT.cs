@@ -1,4 +1,6 @@
-﻿namespace DryIoc.AttributedRegistration.UnitTests.CUT
+﻿using System.ComponentModel.Composition;
+
+namespace DryIoc.AttributedRegistration.UnitTests.CUT
 {
     public interface IHandler
     {

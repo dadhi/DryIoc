@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace DryIoc.AttributedRegistration
+﻿namespace System.ComponentModel.Composition
 {
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
     public class ExportAttribute : Attribute

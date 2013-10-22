@@ -1,4 +1,5 @@
-﻿using DryIoc.AttributedRegistration.UnitTests.CUT;
+﻿using System.ComponentModel.Composition;
+using DryIoc.AttributedRegistration.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests

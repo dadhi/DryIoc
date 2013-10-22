@@ -35,9 +35,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AttributedRegistration\AttributedRegistrator.cs" />
-    <Compile Include="AttributedRegistration\ExportImportAttributes.net4.cs" />
+    <Compile Include="AttributedRegistration\ExportImportAttributes.net40.cs" />
     <Compile Include="Container.cs" />
-    <Compile Include="Lazy.net4.cs" />
+    <Compile Include="Lazy.net40.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

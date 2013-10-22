@@ -39,7 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CompositePatternTests.cs" />
-    <Compile Include="ContainerCustomizationTests.cs" />
+    <Compile Include="ResolutionRulesTests.cs" />
     <Compile Include="ContainerTests.cs" />
     <Compile Include="ContextDependentResolutionTests.cs" />
     <Compile Include="CUT\ContainerTests.CUT.cs" />
@@ -51,7 +51,7 @@
     <Compile Include="OpenGenericsTests.cs" />
     <Compile Include="GenericWrapperTests.cs" />
     <Compile Include="IntTreeTests.cs" />
-    <Compile Include="LambdaRegistrationTests.cs" />
+    <Compile Include="DelegateFactoryTests.cs" />
     <Compile Include="LazyTests.cs" />
     <Compile Include="MetadataTests.cs" />
     <Compile Include="Performance\CompareTryGetVsGetOrNull.cs" />
