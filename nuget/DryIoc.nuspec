@@ -11,7 +11,7 @@
         <summary>IoC container for fun and profit.</summary>
     </metadata>
     <files>
-        <file src="..\DryIoc\**\*.cs" target="content\net35" exclude="..\DryIoc\Properties\*.*" />
-        <file src="..\DryIoc\**\*.cs" target="content\net40" exclude="..\DryIoc\Properties\*.*;..\DryIoc\**\net40\*.*" />
+        <file src="..\DryIoc\**\*.cs" target="content\net35\DryIoc" exclude="..\DryIoc\Properties\*.*" />
+        <file src="..\DryIoc\**\*.cs" target="content\net40\DryIoc" exclude="..\DryIoc\Properties\*.*;..\DryIoc\**\net40\*.*" />
     </files>
 </package>
