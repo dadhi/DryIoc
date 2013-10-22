@@ -1,19 +1,18 @@
-﻿// TODO: vNext
-// - Add distinctive feature: IFactory to register with ExportFactory.
-
-//#define MEF_IS_AVAILABLE
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
 namespace DryIoc.AttributedRegistration
 {
-#if MEF_IS_AVAILABLE
-	using System.ComponentModel.Composition;
-#endif
-
+    /// <summary>
+    /// <para>
+    /// TODO: vNext
+    /// <list type="bullet">
+    /// <item>add: Missing feature to register attributed DelegateFactory. IFactory to register with ExportFactory.</item>
+    /// </list>
+    /// </para>
+    /// </summary>
     public static class AttributedRegistrator
     {
         public static Action<IRegistry> DefaultSetup = SetupContainerToUseImportAttributes;
@@ -281,7 +280,8 @@ Only single metadata is supported per implementation type, please remove the res
             "At least one Export attributed should be defined for {0}.";
     }
 
-#pragma warning disable 659
+    #region Registration Info DTOs
+    #pragma warning disable 659
 
     [Serializable]
     public sealed class RegistrationInfo
@@ -310,12 +310,12 @@ Only single metadata is supported per implementation type, please remove the res
         {
             var other = obj as RegistrationInfo;
             return other != null
-                && other.ImplementationType == ImplementationType
-                && other.IsSingleton == IsSingleton
-                && other.FactoryType == FactoryType
-                && Equals(other.GenericWrapper, GenericWrapper)
-                && Equals(other.Decorator, Decorator)
-                && other.Exports.SequenceEqual(Exports);
+                   && other.ImplementationType == ImplementationType
+                   && other.IsSingleton == IsSingleton
+                   && other.FactoryType == FactoryType
+                   && Equals(other.GenericWrapper, GenericWrapper)
+                   && Equals(other.Decorator, Decorator)
+                   && other.Exports.SequenceEqual(Exports);
         }
     }
 
@@ -364,7 +364,7 @@ Only single metadata is supported per implementation type, please remove the res
         public DecoratorSetup CreateSetup(object metadata)
         {
             if (ConditionType != null)
-                return DecoratorSetup.With(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).Check);
+                return DecoratorSetup.With(((IDecoratorCondition) Activator.CreateInstance(ConditionType)).Check);
 
             if (ShouldCompareMetadata || ServiceName != null)
                 return DecoratorSetup.With(request =>
@@ -378,85 +378,16 @@ Only single metadata is supported per implementation type, please remove the res
         {
             var other = obj as DecoratorInfo;
             return other != null
-                && other.ServiceName == ServiceName
-                && other.ShouldCompareMetadata == ShouldCompareMetadata
-                && other.ConditionType == ConditionType;
+                   && other.ServiceName == ServiceName
+                   && other.ShouldCompareMetadata == ShouldCompareMetadata
+                   && other.ConditionType == ConditionType;
         }
     }
 
-#pragma warning restore 659
-
-#if !MEF_IS_AVAILABLE
-    #region Defining MEF attributes
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
-    public class ExportAttribute : Attribute
-    {
-        public string ContractName { get; set; }
-
-        public Type ContractType { get; set; }
-
-        public ExportAttribute()
-        {
-        }
-
-        public ExportAttribute(Type contractType)
-            : this(null, contractType)
-        {
-        }
-
-        public ExportAttribute(string contractName)
-            : this(contractName, null)
-        {
-        }
-
-        public ExportAttribute(string contractName, Type contractType)
-        {
-            ContractType = contractType;
-            ContractName = contractName;
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Constructor, AllowMultiple = false, Inherited = false)]
-    public class ImportingConstructorAttribute : Attribute
-    {
-    }
-
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    public class ImportAttribute : Attribute
-    {
-        public ImportAttribute() { }
-
-        public ImportAttribute(string contractName)
-        {
-            ContractName = contractName;
-        }
-
-        public string ContractName { get; set; }
-    }
-
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
-    public class PartCreationPolicyAttribute : Attribute
-    {
-        public CreationPolicy CreationPolicy { get; set; }
-
-        public PartCreationPolicyAttribute(CreationPolicy policy)
-        {
-            CreationPolicy = policy;
-        }
-    }
-
-    public enum CreationPolicy
-    {
-        Shared,
-        NonShared
-    }
-
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
-    public class MetadataAttributeAttribute : Attribute
-    {
-    }
+    #pragma warning restore 659
     #endregion
-#endif
+
+    #region Additional Export/Import attributes
 
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
@@ -521,7 +452,8 @@ Only single metadata is supported per implementation type, please remove the res
         public readonly object Metadata;
     }
 
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter,
+        AllowMultiple = false, Inherited = false)]
     public class ImportOrExportAttribute : Attribute
     {
         public string ContractName { get; set; }
@@ -534,4 +466,6 @@ Only single metadata is supported per implementation type, please remove the res
 
         public Type[] ConstructorSignature { get; set; }
     }
+
+    #endregion
 }
