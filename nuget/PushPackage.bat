@@ -1,1 +1,1 @@
-nuget push ..\bin\nuget\DryIoc.1.0.2.nupkg -Source https://staging.nuget.org -ApiKey 0b5079aa-246c-4aa2-a64c-3509e38663b1
+nuget push ..\bin\nuget\DryIoc.%1.nupkg -Source https://staging.nuget.org -ApiKey 0b5079aa-246c-4aa2-a64c-3509e38663b1
