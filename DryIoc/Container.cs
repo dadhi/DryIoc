@@ -46,7 +46,6 @@ namespace DryIoc
     /// <para>
     /// TODO: vNext
     /// <list type="bullet">
-    /// <item>add: Array resolution using array initializer expression. Why: Should be faster then current lazy IEnumerable</item>
     /// <item>upd: Remove most of Container doc-comments.</item>
     /// <item>fix: Rules are not thread-safe regarding replacing the rule in place, cause the rules are provided as arrays.</item>
     /// </list>

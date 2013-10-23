@@ -114,13 +114,25 @@ namespace DryIoc.UnitTests
         public void Possible_to_select_constructor_for_open_generic_imlementation()
         {
             var container = new Container();
-            container.Register(typeof (LazyOne<>),
-                withConstructor: t => t.GetConstructor(new[] {typeof (Func<>).MakeGenericType(t.GetGenericArguments())}));
+            container.Register(typeof(LazyOne<>),
+                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }));
             container.Register<Service>();
 
             var service = container.Resolve<LazyOne<Service>>();
 
             Assert.That(service.LazyValue, Is.InstanceOf<Func<Service>>());
+        }
+
+        [Test]
+        public void Possible_to_resolve_open_generic_with_constraints()
+        {
+            var container = new Container();
+            container.Register(typeof(GenericWithConstraint<>));
+            container.Register<Service>();
+
+            var service = container.Resolve<GenericWithConstraint<Service>>();
+
+            Assert.That(service.Service, Is.InstanceOf<Service>());
         }
     }
 
@@ -139,6 +151,16 @@ namespace DryIoc.UnitTests
         public LazyOne(Func<T> lazyValue)
         {
             LazyValue = lazyValue;
+        }
+    }
+
+    public class GenericWithConstraint<T> where T : IService, new()
+    {
+        public T Service { get; set; }
+
+        public GenericWithConstraint(T service)
+        {
+            Service = service;
         }
     }
 
