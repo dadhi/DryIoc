@@ -45,9 +45,9 @@ namespace DryIoc.SpeedTestApp
 
 	    private static void CompareTreeGet()
 	    {
-            GetIntTreeVsIntNTree(itemCount: 21);
+            GetAvlTreeVsHashTree(itemCount: 18);
             Console.WriteLine();
-            GetIntTreeVsIntNTree(itemCount: 21);
+            GetAvlTreeVsHashTree(itemCount: 18);
 	    }
 
 	    private static void CompareTypesForEquality(Type actual)
@@ -108,6 +108,35 @@ namespace DryIoc.SpeedTestApp
             //GC.Collect();
             GC.KeepAlive(result);
 	    }
+
+        public static void GetAvlTreeVsHashTree(int itemCount)
+        {
+            var key = typeof(IntTreeTests.DictVsMap);
+            var value = "hey";
+
+            var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
+
+            var avlTree = AvlTree<Type, string>.Empty;
+            var hashTree = HashTree<Type, string>.Empty;
+
+            var avlTreeAddTime = AvlTreeAdd(ref avlTree, keys, key, value);
+            var hashTreeAddTime = HashTree4Add(ref hashTree, keys, key, value);
+
+            Console.WriteLine("Adding {0} items (ms):", itemCount);
+            Console.WriteLine("AvlTree - " + avlTreeAddTime);
+            Console.WriteLine("HashTree - " + hashTreeAddTime);
+            Console.WriteLine();
+
+            var getTimes = 1 * 1000 * 1000;
+
+            var avlTreeGetTime = AvlTreeGet(avlTree, key, getTimes);
+            var hashTreeGetTime = HashTree4Get(hashTree, key, getTimes);
+
+            Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
+            Console.WriteLine("AvlTree - " + avlTreeGetTime);
+            Console.WriteLine("HashTree - " + hashTreeGetTime);
+        }
+
 
         public static void GetHashTree2vs1OfInt(int itemCount)
         {
@@ -473,6 +502,25 @@ namespace DryIoc.SpeedTestApp
             return treeTime.ElapsedMilliseconds;
         }
 
+        private static long AvlTreeAdd<V>(ref AvlTree<Type, V> tree, Type[] keys, Type key, V value)
+        {
+            var ignored = default(V);
+            var treeTime = Stopwatch.StartNew();
+
+            for (var i = 0; i < keys.Length; i++)
+            {
+                var k = keys[i];
+                Interlocked.Exchange(ref tree, tree.AddOrUpdate(k, ignored));
+            }
+
+            Interlocked.Exchange(ref tree, tree.AddOrUpdate(key, value));
+
+            treeTime.Stop();
+            GC.KeepAlive(ignored);
+            GC.Collect();
+            return treeTime.ElapsedMilliseconds;
+        }
+
         private static long HashTreeXAdd<V>(ref HashTreeX<Type, V> tree, Type[] keys, Type key, V value)
         {
             var ignored = default(V);
@@ -531,6 +579,23 @@ namespace DryIoc.SpeedTestApp
 		}
 
         private static long HashTree4Get<T>(HashTree<Type, T> tree, Type key, int times)
+        {
+            T ignored = default(T);
+
+            var treeWatch = Stopwatch.StartNew();
+
+            for (int i = 0; i < times; i++)
+            {
+                ignored = tree.GetValueOrDefault(key);
+            }
+
+            treeWatch.Stop();
+            GC.KeepAlive(ignored);
+            GC.Collect();
+            return treeWatch.ElapsedMilliseconds;
+        }
+
+        private static long AvlTreeGet<T>(AvlTree<Type, T> tree, Type key, int times)
         {
             T ignored = default(T);
 

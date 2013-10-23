@@ -15,7 +15,7 @@ namespace DryIoc.UnitTests.Playground
         public readonly int Height;
         public readonly AvlTree<K, V> Left, Right;
 
-        public delegate V UpdateValue(V existing, V added);
+        public delegate V UpdateValue(V current, V added);
 
         public AvlTree<K, V> AddOrUpdate(K key, V value, UpdateValue updateValue = null)
         {
@@ -25,18 +25,9 @@ namespace DryIoc.UnitTests.Playground
         public V GetValueOrDefault(K key, V defaultValue = default(V))
         {
             var hash = key.GetHashCode();
-            for (var node = this; node.Height != 0; node = hash < node.Hash ? node.Left : node.Right)
-                if (hash == node.Hash)
-                    return ReferenceEquals(key, node.Key) || key.Equals(node.Key) ? node.Value : node.GetConflictedOrDefault(key, defaultValue);
-            return defaultValue;
-        }
-
-        private V GetConflictedOrDefault(K key, V defaultValue)
-        {
-            if (Conflicts != null)
-                for (var i = 0; i < Conflicts.Length; i++)
-                    if (Equals(Conflicts[i].Key, key))
-                        return Conflicts[i].Value;
+            for (var t = this; t.Height != 0; t = hash < t.Hash ? t.Left : t.Right)
+                if (hash == t.Hash)
+                    return ReferenceEquals(key, t.Key) || key.Equals(t.Key) ? t.Value : t.GetConflictedOrDefault(key, defaultValue);
             return defaultValue;
         }
 
@@ -46,22 +37,22 @@ namespace DryIoc.UnitTests.Playground
         {
             var parents = new AvlTree<K, V>[Height];
             var parentCount = -1;
-            var node = this;
-            while (!node.IsEmpty || parentCount != -1)
+            var t = this;
+            while (!t.IsEmpty || parentCount != -1)
             {
-                if (!node.IsEmpty)
+                if (!t.IsEmpty)
                 {
-                    parents[++parentCount] = node;
-                    node = node.Left;
+                    parents[++parentCount] = t;
+                    t = t.Left;
                 }
                 else
                 {
-                    node = parents[parentCount--];
-                    yield return new KV<K, V>(node.Key, node.Value);
-                    if (node.Conflicts != null)
-                        for (var i = 0; i < node.Conflicts.Length; i++)
-                            yield return node.Conflicts[i];
-                    node = node.Right;
+                    t = parents[parentCount--];
+                    yield return new KV<K, V>(t.Key, t.Value);
+                    if (t.Conflicts != null)
+                        for (var i = 0; i < t.Conflicts.Length; i++)
+                            yield return t.Conflicts[i];
+                    t = t.Right;
                 }
             }
         }
@@ -70,7 +61,7 @@ namespace DryIoc.UnitTests.Playground
 
         private AvlTree() { }
 
-        private AvlTree(int hash, K key, V value, KV<K,V>[] conficts, AvlTree<K, V> left, AvlTree<K, V> right)
+        private AvlTree(int hash, K key, V value, KV<K, V>[] conficts, AvlTree<K, V> left, AvlTree<K, V> right)
         {
             Hash = hash;
             Key = key;
@@ -94,6 +85,15 @@ namespace DryIoc.UnitTests.Playground
                     ? With(Left.AddOrUpdate(hash, key, value, updateValue), Right)
                     : With(Left, Right.AddOrUpdate(hash, key, value, updateValue)))
                         .EnsureBalanced());
+        }
+
+        private V GetConflictedOrDefault(K key, V defaultValue)
+        {
+            if (Conflicts != null)
+                for (var i = 0; i < Conflicts.Length; i++)
+                    if (Equals(Conflicts[i].Key, key))
+                        return Conflicts[i].Value;
+            return defaultValue;
         }
 
         private AvlTree<K, V> ResolveConflicts(K key, V value, UpdateValue updateValue)

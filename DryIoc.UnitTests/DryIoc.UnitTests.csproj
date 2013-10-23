@@ -39,6 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CompositePatternTests.cs" />
+    <Compile Include="Playground\AvlTree.cs" />
     <Compile Include="ResolutionRulesTests.cs" />
     <Compile Include="ContainerTests.cs" />
     <Compile Include="ContextDependentResolutionTests.cs" />
