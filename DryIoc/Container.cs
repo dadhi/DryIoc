@@ -112,7 +112,7 @@ namespace DryIoc
                 var entry = _factories.GetOrAdd(serviceType, _ => new FactoriesEntry());
                 if (serviceKey == null)
                 {   // default factories will contain all the factories and LastDefault will just point to the latest.
-                    if (entry.LastDefaultFactory != null) 
+                    if (entry.LastDefaultFactory != null)
                         entry.DefaultFactories = (entry.DefaultFactories
                             ?? IntTree<Factory>.Empty.AddOrUpdate(entry.MaxDefaultIndex++, entry.LastDefaultFactory))
                             .AddOrUpdate(entry.MaxDefaultIndex++, factory);
@@ -435,7 +435,7 @@ namespace DryIoc
             public int MaxDefaultIndex;
             public Dictionary<string, Factory> NamedFactories;
 
-            public bool TryGet(out Factory result, Type serviceType, object serviceKey, 
+            public bool TryGet(out Factory result, Type serviceType, object serviceKey,
                 Func<IEnumerable<Factory>, Factory> getSingleFactory = null)
             {
                 result = null;
@@ -518,29 +518,28 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
-        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = 
-            (request, registry) =>
+        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = (request, registry) =>
+        {
+            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
+                return null;
+
+            return new DelegateFactory((req, reg) =>
             {
-                if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
-                    return null;
+                var collectionType = req.ServiceType;
+                var collectionIsArray = collectionType.IsArray;
+                var itemType = collectionIsArray
+                    ? collectionType.GetElementType()
+                    : collectionType.GetGenericArguments()[0];
+                var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
 
-                return new DelegateFactory((req, reg) =>
-                    {
-                        var collectionType = req.ServiceType;
-                        var collectionIsArray = collectionType.IsArray;
-                        var itemType = collectionIsArray
-                            ? collectionType.GetElementType()
-                            : collectionType.GetGenericArguments()[0];
-                        var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
-
-                        var resolver = Expression.Constant(new DynamicEnumerableResolver(reg, itemType, wrappedItemType));
-                        var resolveMethod = (collectionIsArray
-                            ? DynamicEnumerableResolver.ResolveArrayMethod
-                            : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
-                        return Expression.Call(resolver, resolveMethod, Expression.Constant(req));
-                    },
-                    setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
-            };
+                var resolver = Expression.Constant(new DynamicEnumerableResolver(reg, itemType, wrappedItemType));
+                var resolveMethod = (collectionIsArray
+                    ? DynamicEnumerableResolver.ResolveArrayMethod
+                    : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
+                return Expression.Call(resolver, resolveMethod, Expression.Constant(req));
+            },
+            setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
+        };
 
         public static Expression GetFuncExpression(Request request, IRegistry registry)
         {
@@ -1516,6 +1515,7 @@ when resolving {1}.";
                 factory.Setup = Setup; // propagate provider setup if it is not specified by client.
             return factory;
         }
+
         //ncrunch: no coverage start
         protected override Expression CreateExpression(Request request, IRegistry registry)
         {
@@ -1588,7 +1588,7 @@ when resolving {1}.";
         public static readonly IReuse Transient = null; // no reuse.
         public static readonly IReuse Singleton, InCurrentScope, DuringResolution;
 
-        public static readonly ParameterExpression[] Parameters;
+        internal static readonly ParameterExpression[] Parameters;
 
         static Reuse()
         {

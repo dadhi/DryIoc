@@ -6,14 +6,15 @@ namespace DryIoc.UnitTests.Playground
     public sealed class AvlTree<K, V>
     {
         public static readonly AvlTree<K, V> Empty = new AvlTree<K, V>();
-        public bool IsEmpty { get { return Height == 0; } }
 
         public readonly int Hash;
         public readonly K Key;
         public readonly V Value;
         public readonly KV<K, V>[] Conflicts;
-        public readonly int Height;
         public readonly AvlTree<K, V> Left, Right;
+        public readonly int Height;
+
+        public bool IsEmpty { get { return Height == 0; } }
 
         public delegate V UpdateValue(V current, V added);
 
@@ -27,7 +28,7 @@ namespace DryIoc.UnitTests.Playground
             var hash = key.GetHashCode();
             for (var t = this; t.Height != 0; t = hash < t.Hash ? t.Left : t.Right)
                 if (hash == t.Hash)
-                    return ReferenceEquals(key, t.Key) || key.Equals(t.Key) ? t.Value : t.GetConflictedOrDefault(key, defaultValue);
+                    return ReferenceEquals(key, t.Key) || key.Equals(t.Key) ? t.Value : t.GetConflictedValueOrDefault(key, defaultValue);
             return defaultValue;
         }
 
@@ -87,15 +88,6 @@ namespace DryIoc.UnitTests.Playground
                         .EnsureBalanced());
         }
 
-        private V GetConflictedOrDefault(K key, V defaultValue)
-        {
-            if (Conflicts != null)
-                for (var i = 0; i < Conflicts.Length; i++)
-                    if (Equals(Conflicts[i].Key, key))
-                        return Conflicts[i].Value;
-            return defaultValue;
-        }
-
         private AvlTree<K, V> ResolveConflicts(K key, V value, UpdateValue updateValue)
         {
             if (ReferenceEquals(Key, key) || Key.Equals(key))
@@ -110,6 +102,15 @@ namespace DryIoc.UnitTests.Playground
             Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
             conflicts[i != -1 ? i : Conflicts.Length] = new KV<K, V>(key, i != -1 ? updateValue(Conflicts[i].Value, value) : value);
             return new AvlTree<K, V>(Hash, Key, Value, conflicts, Left, Right);
+        }
+
+        private V GetConflictedValueOrDefault(K key, V defaultValue)
+        {
+            if (Conflicts != null)
+                for (var i = 0; i < Conflicts.Length; i++)
+                    if (Equals(Conflicts[i].Key, key))
+                        return Conflicts[i].Value;
+            return defaultValue;
         }
 
         private AvlTree<K, V> EnsureBalanced()
