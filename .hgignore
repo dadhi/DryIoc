@@ -1,6 +1,8 @@
 syntax:glob
-bin/*
+.hg.*
 obj/*
+Debug/*
+Release/*
 ClientBin/*
 out/*
 .svn/*
@@ -8,8 +10,6 @@ out/*
 *.suo
 *.xap
 *.user
-syntax: glob
-.hg.*
 *.ncrunch*
 *.crunch*
 *.dtp.*
