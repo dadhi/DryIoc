@@ -10,6 +10,7 @@ namespace DryIoc.AttributedRegistration
     /// <para>
     /// TODO: vNext
     /// <list type="bullet">
+    /// <item>add: Missing support of InheritedExport.</item>
     /// <item>add: Missing feature to register attributed DelegateFactory. IFactory to register with ExportFactory.</item>
     /// </list>
     /// </para>
@@ -131,7 +132,7 @@ namespace DryIoc.AttributedRegistration
                         };
                     }
 
-                    if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), false))
+                    if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), true))
                     {
                         Throw.If(info.MetadataAttributeIndex != -1, Error.UNSUPPORTED_MULTIPLE_METADATA, type);
                         info.MetadataAttributeIndex = attributeIndex;
@@ -391,7 +392,7 @@ Only single metadata is supported per implementation type, please remove the res
     #region Additional Export/Import attributes
 
     [MetadataAttribute]
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportWithMetadataAttribute : Attribute
     {
         public object Metadata { get; set; }
@@ -402,7 +403,7 @@ Only single metadata is supported per implementation type, please remove the res
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportAllAttribute : Attribute
     {
         public static Func<Type, bool> ExportedTypes = Registrator.PublicTypes;
@@ -417,7 +418,7 @@ Only single metadata is supported per implementation type, please remove the res
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportAsGenericWrapperAttribute : Attribute
     {
         public int ServiceTypeArgIndex { get; set; }
@@ -428,7 +429,7 @@ Only single metadata is supported per implementation type, please remove the res
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportAsDecoratorAttribute : Attribute
     {
         public string ContractName { get; set; }
@@ -442,7 +443,7 @@ Only single metadata is supported per implementation type, please remove the res
     }
 
     [MetadataAttribute]
-    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = true)]
+    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
     public class ImportWithMetadataAttribute : Attribute
     {
         public ImportWithMetadataAttribute(object metadata)
@@ -453,8 +454,7 @@ Only single metadata is supported per implementation type, please remove the res
         public readonly object Metadata;
     }
 
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter,
-        AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
     public class ImportOrExportAttribute : Attribute
     {
         public string ContractName { get; set; }
