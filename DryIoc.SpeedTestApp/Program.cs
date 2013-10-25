@@ -14,7 +14,8 @@ namespace DryIoc.SpeedTestApp
 		static void Main()
 		{
 			Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            CompareTreeGet();
+            //CompareTreeGet();
+		    CompareClosureFieldAccess();
             //DoCompareTryGetVsGetOrNull();
 		    //CompareHashTreeEnumeration();
 		    //CompareMethodArgumentPassing();
@@ -43,11 +44,18 @@ namespace DryIoc.SpeedTestApp
 	        HashTreeEnumerationSpeedTests.CompareListVsHashTree();
 	    }
 
+        private static void CompareClosureFieldAccess()
+        {
+            ClosureFieldsAccessSpeed.Test();
+            Console.WriteLine();
+            ClosureFieldsAccessSpeed.Test();
+        }
+
 	    private static void CompareTreeGet()
 	    {
-            GetAvlTreeVsHashTree(itemCount: 18);
+            GetAvlTreeVsHashTree(itemCount: 9);
             Console.WriteLine();
-            GetAvlTreeVsHashTree(itemCount: 18);
+            GetAvlTreeVsHashTree(itemCount: 9);
 	    }
 
 	    private static void CompareTypesForEquality(Type actual)

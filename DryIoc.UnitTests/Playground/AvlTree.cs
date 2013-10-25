@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 namespace DryIoc.UnitTests.Playground
 {
+    /// <summary>
+    /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree, where actual node key is <typeparamref name="K"/> hash code.
+    /// </summary>
     public sealed class AvlTree<K, V>
     {
         public static readonly AvlTree<K, V> Empty = new AvlTree<K, V>();

@@ -59,7 +59,7 @@ namespace DryIoc
             _factories = new Dictionary<Type, FactoriesEntry>();
             _decorators = HashTree<Type, DecoratorsEntry[]>.Using(Sugar.Append);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
-            _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
+            _defaultResolutionCache = IntTree<KV<Type, CompiledFactory>>.Empty;
             ResolutionRules = new ResolutionRules();
 
             CurrentScope = SingletonScope = new Scope();
@@ -148,8 +148,9 @@ namespace DryIoc
 
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            return (_defaultResolutionCache.GetValueOrDefault(serviceType) ?? ResolveAndCacheFactory(serviceType, ifUnresolved))
-                .Invoke(CurrentScope, null/* resolutionRootScope */);
+            var factory = _defaultResolutionCache.GetValueOrDefault(serviceType.GetHashCode());
+            return (factory != null && serviceType == factory.Key ? factory.Value : ResolveAndCacheFactory(serviceType, ifUnresolved))
+                (CurrentScope, null/* resolutionRootScope */);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -171,7 +172,7 @@ namespace DryIoc
 
         public delegate object CompiledFactory(Scope openScope, Scope resolutionRootScope);
 
-        private HashTree<Type, CompiledFactory> _defaultResolutionCache;
+        private IntTree<KV<Type, CompiledFactory>> _defaultResolutionCache;
         private HashTree<Type, KeyedResolutionCacheEntry> _keyedResolutionCache;
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
@@ -180,7 +181,8 @@ namespace DryIoc
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null) return EmptyCompiledFactory;
             var result = CompileExpression(factory.GetExpression(request, this));
-            Interlocked.Exchange(ref _defaultResolutionCache, _defaultResolutionCache.AddOrUpdate(serviceType, result));
+            Interlocked.Exchange(ref _defaultResolutionCache,
+                _defaultResolutionCache.AddOrUpdate(serviceType.GetHashCode(), new KV<Type, CompiledFactory>(serviceType, result)));
             return result;
         }
 
@@ -1883,6 +1885,9 @@ when resolving {1}.";
         }
     }
 
+    /// <summary>
+    /// Immutable AVL-tree (http://en.wikipedia.org/wiki/AVL_tree) with node key of type int.
+    /// </summary>
     public sealed class IntTree<V>
     {
         public static readonly IntTree<V> Empty = new IntTree<V>();
@@ -1907,10 +1912,10 @@ when resolving {1}.";
 
         public V GetValueOrDefault(int key, V defaultValue = default(V))
         {
-            var node = this;
-            while (node.Height != 0 && key != node.Key)
-                node = key < node.Key ? node.Left : node.Right;
-            return node.Height != 0 ? node.Value : defaultValue;
+            for (var node = this; node.Height != 0; node = key < node.Key ? node.Left : node.Right)
+                if (node.Key == key)
+                    return node.Value;
+            return defaultValue;
         }
 
         /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
