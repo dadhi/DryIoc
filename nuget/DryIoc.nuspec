@@ -2,13 +2,14 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc</id>
-        <version>1.0.3</version>
+        <version>1.0.4</version>
         <authors>Maksim Volkau</authors>
         <owners>Maksim Volkau</owners>
         <copyright>Maksim Volkau</copyright>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Fast, comprehensive, small IoC container to embed into your application or framework.</description>
-        <summary>IoC container for fun and profit.</summary>
+        <summary>IoC Container for fun and profit.</summary>
+        <tags>IoC Container InversionOfControl DI DependencyInjection DRY</tags>
     </metadata>
     <files>
         <file src="..\DryIoc\**\*.cs" target="content\net35\DryIoc" exclude="..\DryIoc\Properties\*.*" />
