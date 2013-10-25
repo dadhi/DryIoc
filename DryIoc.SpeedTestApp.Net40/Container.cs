@@ -69,20 +69,23 @@ namespace DryIoc
 
         public static Action<IRegistry> DefaultSetup = ContainerSetup.Default;
 
-        public static CompiledFactory CompileExpression(Expression expression, Request request)
+        public static CompiledFactory CompileExpression(Expression expression, Request request = null)
         {
-            var varAssignments = request.VarAssignments;
-            if (varAssignments.Count == 1)
+            if (request != null)
             {
-                expression = varAssignments.Values.First().Value;
-            }
-            else if (varAssignments.Count > 1)
-            {
-                var vars = varAssignments.Values;
-                expression = Expression.Block(
-                    vars.Select(x => x.Key),
-                    vars.Select(x => Expression.Assign(x.Key, x.Value)).Concat(
-                        new[] { expression }));
+                var varAssignments = request.VarAssignments;
+                if (varAssignments.Count == 1)
+                {
+                    expression = varAssignments.Values.First().Value;
+                }
+                else if (varAssignments.Count > 1)
+                {
+                    var vars = varAssignments.Values;
+                    expression = Expression.Block(
+                        vars.Select(x => x.Key),
+                        vars.Select(x => Expression.Assign(x.Key, x.Value)).Concat(
+                            new[] { expression }));
+                }
             }
 
             return Expression.Lambda<CompiledFactory>(expression, Reuse.Parameters).Compile();
@@ -1503,8 +1506,6 @@ when resolving {1}.";
         public readonly Dictionary<int, KV<ParameterExpression, Expression>> VarAssignments;
     }
 
-
-
     public class DelegateFactory : Factory
     {
         public DelegateFactory(Func<Request, IRegistry, Expression> getExpression, IReuse reuse = null, FactorySetup setup = null)
@@ -1672,8 +1673,7 @@ when resolving {1}.";
                 // Otherwise we can create singleton instance right here, and put it into Scope for later disposal.
                 var currentScope = registry.CurrentScope; // same as for singletonScope
 
-                var singleton = singletonScope.GetOrAdd(factoryID,
-                    () => Container.CompileExpression(factoryExpr, request)(currentScope, null));
+                var singleton = singletonScope.GetOrAdd(factoryID, () => Container.CompileExpression(factoryExpr)(currentScope, null));
                 var singletonType = factoryExpr.Type;
                 var singletonConstExpr = Expression.Constant(singleton, singletonType);
 
