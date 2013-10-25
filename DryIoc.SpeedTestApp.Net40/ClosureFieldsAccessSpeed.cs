@@ -64,9 +64,9 @@ namespace DryIoc.SpeedTestApp.Net40
             var b = new B();
             var c = new C();
 
-            var aExpr = Expression.Variable(typeof(A), "a");
-            var bExpr = Expression.Variable(typeof(B), "b");
-            var cExpr = Expression.Variable(typeof(C), "c");
+            var aExpr = Expression.Variable(typeof(A));
+            var bExpr = Expression.Variable(typeof(B));
+            var cExpr = Expression.Variable(typeof(C));
 
             var block = Expression.Block(
                 new[] {aExpr, bExpr, cExpr},
