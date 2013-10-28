@@ -17,24 +17,26 @@ namespace DryIoc.SpeedTestApp.Net40
         }
 
         [Test]
-        public void When_resolving_singleton_consumer_Then_used_expression_should_contain_singleton_variable()
+        public void When_singleton_appears_only_once_in_expression_Then_expression_should_be_used_as_is()
         {
             var container = new Container();
-            container.Register<SingletonService>();
+            container.Register<SingletonService>(Reuse.Singleton);
             container.Register<DirectSingletonConsumer>();
 
             var consumer = container.Resolve<DirectSingletonConsumer>();
         }
 
         [Test]
-        public void When_singleton_is_appears_multiple_times_in_factory_expression_Then_it_should_be_assigned_to_local_var_and_reused()
+        public void When_singleton_is_appears_multiple_times_in_expression_Then_it_should_be_assigned_to_local_var_and_reused()
         {
             var container = new Container();
-            container.Register<SingletonService>();
+            container.Register<SingletonService>(Reuse.Singleton);
             container.Register<DirectSingletonConsumer>();
             container.Register<SingletonConsumer>();
 
             var consumer = container.Resolve<SingletonConsumer>();
+
+
         }
     }
 
