@@ -69,9 +69,9 @@ namespace DryIoc
 
         public static Action<IRegistry> DefaultSetup = ContainerSetup.Default;
 
-        public static Expression ReplaceDuplicateConstantsWithVars(Expression original)
+        public static Expression ReplaceDuplicateConstantsWithVariables(Expression original)
         {
-            var visitor = new ReplaceDuplicateConstantsWithVarsVisitor();
+            var visitor = new ReplaceDuplicateConstantsWithVariablesVisitor();
             var result = visitor.Visit(original);
             if (visitor.Vars == null || visitor.Vars.Count == 0 ||
                 // If number of duplicate references to constants are small, then optimization does not worth it.
@@ -85,7 +85,7 @@ namespace DryIoc
             return resultBlock;
         }
 
-        private sealed class ReplaceDuplicateConstantsWithVarsVisitor : ExpressionVisitor
+        private sealed class ReplaceDuplicateConstantsWithVariablesVisitor : ExpressionVisitor
         {
             public Dictionary<ConstantExpression, KV<int, ParameterExpression>> Vars;
 
@@ -197,7 +197,7 @@ namespace DryIoc
                 var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
                 if (factory == null) return null;
                 var expression = factory.GetExpression(request, this);
-                result = CompileExpression(ReplaceDuplicateConstantsWithVars(expression));
+                result = CompileExpression(ReplaceDuplicateConstantsWithVariables(expression));
                 Interlocked.Exchange(ref _keyedResolutionCache, _keyedResolutionCache.AddOrUpdate(serviceType,
                     (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, result)));
             }
@@ -216,7 +216,7 @@ namespace DryIoc
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null) return EmptyCompiledFactory;
             var expression = factory.GetExpression(request, this);
-            var result = CompileExpression(ReplaceDuplicateConstantsWithVars(expression));
+            var result = CompileExpression(ReplaceDuplicateConstantsWithVariables(expression));
             Interlocked.Exchange(ref _defaultResolutionCache,
                 _defaultResolutionCache.AddOrUpdate(serviceType.GetHashCode(), new KV<Type, CompiledFactory>(serviceType, result)));
             return result;

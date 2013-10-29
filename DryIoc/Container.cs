@@ -1475,11 +1475,6 @@ when resolving {1}.";
             // example: "unnamed generic wrapper DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
             return key + kind + " " + type + dep;
         }
-
-        public void AddVarAssignment(int id, BinaryExpression assignement)
-        {
-            throw new NotImplementedException();
-        }
     }
 
     public class DelegateFactory : Factory
@@ -1998,10 +1993,11 @@ when resolving {1}.";
             return new HashTree<K, V>(_tree.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateConflicts), _updateValue);
         }
 
-        public V GetValueOrDefault(K key)
+        public V GetValueOrDefault(K key, V defaultValue = default(V))
         {
             var item = _tree.GetValueOrDefault(key.GetHashCode());
-            return item != null && (ReferenceEquals(key, item.Key) || key.Equals(item.Key)) ? item.Value : GetConflictedOrDefault(item, key);
+            return item != null && (ReferenceEquals(key, item.Key) || key.Equals(item.Key)) 
+                ? item.Value : GetConflictedValueOrDefault(item, key, defaultValue);
         }
 
         #region Implementation
@@ -2036,14 +2032,14 @@ when resolving {1}.";
             return _updateValue == null ? added : new KV<K, V>(existing.Key, _updateValue(existing.Value, added.Value));
         }
 
-        private static V GetConflictedOrDefault(KV<K, V> item, K key)
+        private static V GetConflictedValueOrDefault(KV<K, V> item, K key, V defaultValue)
         {
             var conflicts = item is KVWithConflicts ? ((KVWithConflicts)item).Conflicts : null;
             if (conflicts != null)
                 for (var i = 0; i < conflicts.Length; i++)
                     if (Equals(conflicts[i].Key, key))
                         return conflicts[i].Value;
-            return default(V);
+            return defaultValue;
         }
 
         private sealed class KVWithConflicts : KV<K, V>

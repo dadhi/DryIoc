@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
+using System.Reflection.Emit;
 using NUnit.Framework;
 
 namespace DryIoc.SpeedTestApp.Net40
@@ -12,9 +14,19 @@ namespace DryIoc.SpeedTestApp.Net40
     {
         public static void TestExpr()
         {
+            var consts = new object[]
+            {
+                new A(),
+                new B(),
+                new C()
+            };
+
             var one = Expression.Lambda<Func<X>>(CreateOne(), null).Compile();
             var two = CreateTwo();
             var twoFromOne = Expression.Lambda<Func<X>>(CreateTwoFromOne(), null).Compile();
+            var fromArray = CreateFromArray();
+            var fromArrayCompiledToMethod = CreateFromArrayCompiledToMethod();
+            var fromArrayTwo = CreateFromArrayTwo();
 
             var times = 1 * 1000 * 1000;
             Console.WriteLine("Testing {0:n0} times in for cycle: ", times);
@@ -47,6 +59,33 @@ namespace DryIoc.SpeedTestApp.Net40
             }
             timer.Stop();
             Console.WriteLine("TwoFromOne took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
+
+            GC.Collect();
+            timer = Stopwatch.StartNew();
+            for (var t = 0; t < times; t++)
+            {
+                x = fromArray(consts);
+            }
+            timer.Stop();
+            Console.WriteLine("FromArray took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
+
+            GC.Collect();
+            timer = Stopwatch.StartNew();
+            for (var t = 0; t < times; t++)
+            {
+                x = fromArrayTwo(consts);
+            }
+            timer.Stop();
+            Console.WriteLine("FromArrayTwo took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
+
+            GC.Collect();
+            timer = Stopwatch.StartNew();
+            for (var t = 0; t < times; t++)
+            {
+                x = fromArrayCompiledToMethod(consts);
+            }
+            timer.Stop();
+            Console.WriteLine("FromArrayCompiledToMethod took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
 
             GC.KeepAlive(x);
         }
@@ -116,6 +155,132 @@ namespace DryIoc.SpeedTestApp.Net40
             return block;
         }
 
+        [Test]
+        public static Func<object[], X> CreateFromArray()
+        {
+            var arrayExpr = Expression.Parameter(typeof(object[]));
+
+            var aExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(0)), typeof(A));
+            var bExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(1)), typeof(B));
+            var cExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(2)), typeof(C));
+
+            var newExpr =
+                Expression.New(typeof(X).GetConstructors()[0],
+                    aExpr, bExpr, cExpr,
+                    Expression.New(typeof(A1).GetConstructors()[0], aExpr),
+                    Expression.New(typeof(B1).GetConstructors()[0], bExpr),
+                    Expression.New(typeof(C1).GetConstructors()[0], cExpr));
+
+            var funcExpr = Expression.Lambda<Func<object[], X>>(newExpr, arrayExpr);
+            var func = funcExpr.Compile();
+            return func;
+        }
+
+        [Test]
+        public static Func<object[], X> CreateFromArrayCompiledToMethod()
+        {
+            var arrayExpr = Expression.Parameter(typeof(object[]));
+
+            var aExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(0)), typeof(A));
+            var bExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(1)), typeof(B));
+            var cExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(2)), typeof(C));
+
+            var newExpr =
+                Expression.New(typeof(X).GetConstructors()[0],
+                    aExpr, bExpr, cExpr,
+                    Expression.New(typeof(A1).GetConstructors()[0], aExpr),
+                    Expression.New(typeof(B1).GetConstructors()[0], bExpr),
+                    Expression.New(typeof(C1).GetConstructors()[0], cExpr));
+
+            var funcExpr = Expression.Lambda<Func<object[], X>>(newExpr, arrayExpr);
+
+            var ab = AppDomain.CurrentDomain.DefineDynamicAssembly(new AssemblyName("assembly"), AssemblyBuilderAccess.Run);
+            var mod = ab.DefineDynamicModule("module");
+            var tb = mod.DefineType("type", TypeAttributes.Public);
+            var mb = tb.DefineMethod("test3", MethodAttributes.Public | MethodAttributes.Static, typeof(X), new[] { typeof(object[]) });
+            funcExpr.CompileToMethod(mb);
+            var t = tb.CreateType();
+            var func = (Func<object[], X>)Delegate.CreateDelegate(typeof(Func<object[], X>), t.GetMethod("test3"));
+            return func;
+        }
+
+        [Test]
+        public static Func<object[], X> CreateFromArrayCompiledToMethod2()
+        {
+            var arrayExpr = Expression.Parameter(typeof(object[]));
+
+            var aExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(0)), typeof(A));
+            var bExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(1)), typeof(B));
+            var cExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(2)), typeof(C));
+
+            var newExpr =
+                Expression.New(typeof(X).GetConstructors()[0],
+                    aExpr, bExpr, cExpr,
+                    Expression.New(typeof(A1).GetConstructors()[0], aExpr),
+                    Expression.New(typeof(B1).GetConstructors()[0], bExpr),
+                    Expression.New(typeof(C1).GetConstructors()[0], cExpr));
+
+            var funcExpr = Expression.Lambda<Func<object[], X>>(newExpr, arrayExpr);
+
+            var ab = AppDomain.CurrentDomain.DefineDynamicAssembly(new AssemblyName("assembly"), AssemblyBuilderAccess.Run);
+            var mod = ab.DefineDynamicModule("module");
+
+            var tb1 = mod.DefineType("type1", TypeAttributes.Public);
+            var mb = tb1.DefineMethod("test", MethodAttributes.Public | MethodAttributes.Static, typeof(X), new[] { typeof(object[]) });
+            funcExpr.CompileToMethod(mb);
+            var t = tb1.CreateType();
+            var func = (Func<object[], X>)Delegate.CreateDelegate(typeof(Func<object[], X>), t.GetMethod("test"));
+
+            var tb2 = mod.DefineType("type2", TypeAttributes.Public);
+            var mb2 = tb2.DefineMethod("test", MethodAttributes.Public | MethodAttributes.Static, typeof(X), new[] { typeof(object[]) });
+            funcExpr.CompileToMethod(mb2);
+            var t2 = tb2.CreateType();
+            var func2 = (Func<object[], X>)Delegate.CreateDelegate(typeof(Func<object[], X>), t2.GetMethod("test"));
+
+            return func2;
+        }
+
+
+        private static DynamicMethod CreateDynamicMethod()
+        {
+            var dynamicMethod = new DynamicMethod(
+                "DynamicMethod", typeof(object), new[] { typeof(object[]) }, typeof(ClosureFieldsAccessSpeed).Module, true);
+
+            return dynamicMethod;
+        }
+
+        [Test]
+        public static Func<object[], X> CreateFromArrayTwo()
+        {
+            var arrayExpr = Expression.Parameter(typeof(object[]));
+
+            var aExpr = Expression.Variable(typeof(A));
+            var bExpr = Expression.Variable(typeof(B));
+            var cExpr = Expression.Variable(typeof(C));
+
+            var aValExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(0)), typeof(A));
+            var bValExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(1)), typeof(B));
+            var cValExpr = Expression.Convert(Expression.ArrayIndex(arrayExpr, Expression.Constant(2)), typeof(C));
+
+            var newExpr =
+                Expression.Block(
+                    new[] { aExpr, bExpr, cExpr },
+
+                    Expression.Assign(aExpr, aValExpr),
+                    Expression.Assign(bExpr, bValExpr),
+                    Expression.Assign(cExpr, cValExpr),
+
+                    Expression.New(typeof(X).GetConstructors()[0],
+                        aExpr, bExpr, cExpr,
+                        Expression.New(typeof(A1).GetConstructors()[0], aExpr),
+                        Expression.New(typeof(B1).GetConstructors()[0], bExpr),
+                        Expression.New(typeof(C1).GetConstructors()[0], cExpr)));
+
+            var funcExpr = Expression.Lambda<Func<object[], X>>(newExpr, arrayExpr);
+            var func = funcExpr.Compile();
+            return func;
+        }
+
     }
 
     class MoveConstantsToVariableVisitor : ExpressionVisitor
@@ -132,7 +297,7 @@ namespace DryIoc.SpeedTestApp.Net40
         }
     }
 
-    class X
+    public class X
     {
         public A A { get; set; }
         public B B { get; set; }
@@ -154,11 +319,13 @@ namespace DryIoc.SpeedTestApp.Net40
         }
     }
 
-    class A { }
-    class B { }
-    class C { }
+    public class A { }
 
-    class A1
+    public class B { }
+
+    public class C { }
+
+    public class A1
     {
         public A A { get; set; }
 
@@ -168,7 +335,7 @@ namespace DryIoc.SpeedTestApp.Net40
         }
     }
 
-    class B1
+    public class B1
     {
         public B B { get; set; }
 
@@ -178,7 +345,7 @@ namespace DryIoc.SpeedTestApp.Net40
         }
     }
 
-    class C1
+    public class C1
     {
         public C C { get; set; }
 
