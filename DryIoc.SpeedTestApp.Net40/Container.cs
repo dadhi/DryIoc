@@ -61,8 +61,7 @@ namespace DryIoc
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = IntTree<KV<Type, CompiledFactory>>.Empty;
             ResolutionRules = new ResolutionRules();
-
-            CurrentScope = SingletonScope = new Scope();
+            SingletonScope = _currentScope = new Scope();
 
             (setup ?? DefaultSetup).Invoke(this);
         }
@@ -98,14 +97,15 @@ namespace DryIoc
                 Vars[constExpr] = Vars.TryGetValue(constExpr, out varItem)
                     ? (varItem = new KV<int, ParameterExpression>(varItem.Key + 1, varItem.Value)) // here track number of duplicate constants
                     : (varItem = new KV<int, ParameterExpression>(0, Expression.Variable(constExpr.Type)));
-                
+
                 return varItem.Value;
             }
         }
 
-        public static CompiledFactory CompileExpression(Expression expression)
+        public static Expression<CompiledFactory> GetFactoryExpression(Expression expression)
         {
-            return Expression.Lambda<CompiledFactory>(expression, Reuse.Parameters).Compile();
+            return Expression.Lambda<CompiledFactory>(expression,
+                ConstantsParameter, Reuse.CurrentScopeParameter, Reuse.ResolutionScopeParameter);
         }
 
         public Container OpenScope()
@@ -184,7 +184,7 @@ namespace DryIoc
         {
             var factory = _defaultResolutionCache.GetValueOrDefault(serviceType.GetHashCode());
             return (factory != null && serviceType == factory.Key ? factory.Value : ResolveAndCacheFactory(serviceType, ifUnresolved))
-                (CurrentScope, null/* resolutionRootScope */);
+                (_constants, CurrentScope, null/* resolutionRootScope */);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -197,15 +197,13 @@ namespace DryIoc
                 var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
                 if (factory == null) return null;
                 var expression = factory.GetExpression(request, this);
-                result = CompileExpression(ReplaceDuplicateConstantsWithVariables(expression));
+                result = GetFactoryExpression(expression).Compile();
                 Interlocked.Exchange(ref _keyedResolutionCache, _keyedResolutionCache.AddOrUpdate(serviceType,
                     (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, result)));
             }
 
-            return result(CurrentScope, null /* resolutionRootScope */);
+            return result(_constants, _currentScope, null /* resolutionRootScope */);
         }
-
-        public delegate object CompiledFactory(Scope openScope, Scope resolutionRootScope);
 
         private IntTree<KV<Type, CompiledFactory>> _defaultResolutionCache;
         private HashTree<Type, KeyedResolutionCacheEntry> _keyedResolutionCache;
@@ -216,13 +214,13 @@ namespace DryIoc
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null) return EmptyCompiledFactory;
             var expression = factory.GetExpression(request, this);
-            var result = CompileExpression(ReplaceDuplicateConstantsWithVariables(expression));
+            var result = GetFactoryExpression(expression).Compile();
             Interlocked.Exchange(ref _defaultResolutionCache,
                 _defaultResolutionCache.AddOrUpdate(serviceType.GetHashCode(), new KV<Type, CompiledFactory>(serviceType, result)));
             return result;
         }
 
-        private static object EmptyCompiledFactory(Scope openScope, Scope resolutionRootsScope) { return null; }
+        private static object EmptyCompiledFactory(object[] costants, Scope currentScope, Scope resolutionScope) { return null; }
 
         private sealed class KeyedResolutionCacheEntry
         {
@@ -250,8 +248,36 @@ namespace DryIoc
 
         public ResolutionRules ResolutionRules { get; private set; }
 
+        public readonly static ParameterExpression ConstantsParameter = Expression.Parameter(typeof(object[]), "constants");
+        public object[] Constants { get { return _constants; } }
+
         public Scope SingletonScope { get; private set; }
-        public Scope CurrentScope { get; private set; }
+        public Scope CurrentScope { get { return _currentScope; } }
+
+        public Expression GetConstantExpression(object constant, Type constantType)
+        {
+            int constantIndex;
+            lock (_syncRoot)
+            {
+                if (_constants == null)
+                {
+                    _constants = new[] { constant };
+                    constantIndex = 0;
+                }
+                else
+                {
+                    constantIndex = Array.IndexOf(_constants, constant);
+                    if (constantIndex == -1)
+                    {
+                        _constants = _constants.AppendOrUpdate(constant);
+                        constantIndex = _constants.Length - 1;
+                    }
+                }
+            }
+
+            var result = Expression.ArrayIndex(ConstantsParameter, Expression.Constant(constantIndex));
+            return Expression.Convert(result, constantType);
+        }
 
         Factory IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
@@ -452,7 +478,8 @@ namespace DryIoc
 
         private Container(Container source)
         {
-            CurrentScope = new Scope();
+            _currentScope = new Scope();
+
             SingletonScope = source.SingletonScope;
             ResolutionRules = source.ResolutionRules;
             _syncRoot = source._syncRoot;
@@ -465,6 +492,8 @@ namespace DryIoc
         private readonly object _syncRoot;
         private readonly Dictionary<Type, FactoriesEntry> _factories;
         private HashTree<Type, DecoratorsEntry[]> _decorators;
+        private readonly Scope _currentScope;
+        private object[] _constants;
 
         private sealed class FactoriesEntry
         {
@@ -524,6 +553,8 @@ namespace DryIoc
 
         #endregion
     }
+
+    public delegate object CompiledFactory(object[] constants, Scope openScope, Scope resolutionRootScope);
 
     public static class ContainerSetup
     {
@@ -605,7 +636,7 @@ namespace DryIoc
 
             var serviceRequest = request.PushWithParentKey(serviceType);
             var serviceExpr = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw).GetExpression(serviceRequest, registry);
-            var expression = Expression.New(ctor, Expression.Lambda<Container.CompiledFactory>(serviceExpr, Reuse.Parameters));
+            var expression = Expression.New(ctor, Container.GetFactoryExpression(serviceExpr));
             return expression;
         }
 
@@ -1631,20 +1662,18 @@ when resolving {1}.";
         public static readonly IReuse Transient = null; // no reuse.
         public static readonly IReuse Singleton, InCurrentScope, DuringResolution;
 
-        internal static readonly ParameterExpression[] Parameters;
+        public static ParameterExpression CurrentScopeParameter, ResolutionScopeParameter;
 
         static Reuse()
         {
             Singleton = new SingletonReuse();
 
-            var currentScope = Expression.Parameter(typeof(Scope), "currentScope");
-            InCurrentScope = new InScopeReuse(currentScope);
+            CurrentScopeParameter = Expression.Parameter(typeof(Scope), "currentScope");
+            InCurrentScope = new InScopeReuse(CurrentScopeParameter);
 
-            var resolutionScope = Expression.Parameter(typeof(Scope), "resolutionScope");
+            ResolutionScopeParameter = Expression.Parameter(typeof(Scope), "resolutionScope");
             var createScopeOnceMethod = typeof(Reuse).GetMethod("CreateScopeOnce", BindingFlags.NonPublic | BindingFlags.Static);
-            DuringResolution = new InScopeReuse(Expression.Call(null, createScopeOnceMethod, (Expression)resolutionScope));
-
-            Parameters = new[] { currentScope, resolutionScope };
+            DuringResolution = new InScopeReuse(Expression.Call(null, createScopeOnceMethod, (Expression)ResolutionScopeParameter));
         }
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
@@ -1672,20 +1701,21 @@ when resolving {1}.";
             public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
             {
                 // save scope into separate var to prevent closure on registry.
-                var singletonScope = registry.SingletonScope; 
+                var singletonScope = registry.SingletonScope;
 
                 // Create lazy singleton if we have Func somewhere in dependency chain.
                 var parent = request.Parent;
-                if (parent != null &&
-                    parent.Enumerate().Any(p =>
-                        p.OpenGenericServiceType != null &&
-                        ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType)))
+                if (parent != null && parent.Enumerate().Any(p =>
+                    p.OpenGenericServiceType != null && ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType)))
                     return GetScopedServiceExpression(Expression.Constant(singletonScope), factoryID, factoryExpr);
 
                 // Otherwise we can create singleton instance right here, and put it into Scope for later disposal.
                 var currentScope = registry.CurrentScope; // same as for singletonScope
-                var singleton = singletonScope.GetOrAdd(factoryID, () => Container.CompileExpression(factoryExpr)(currentScope, null));
-                return Expression.Constant(singleton, factoryExpr.Type);
+                var constants = registry.Constants;
+
+                var singleton = singletonScope.GetOrAdd(factoryID,
+                    () => Container.GetFactoryExpression(factoryExpr).Compile()(constants, currentScope, null));
+                return registry.GetConstantExpression(singleton, factoryExpr.Type);
             }
         }
 
@@ -1731,6 +1761,10 @@ when resolving {1}.";
 
         Scope CurrentScope { get; }
 
+        object[] Constants { get; }
+
+        Expression GetConstantExpression(object constant, Type constantType);
+
         Factory GetOrAddFactory(Request request, IfUnresolved ifUnresolved);
 
         Factory GetFactoryOrNull(Type serviceType, object serviceKey);
@@ -1758,9 +1792,9 @@ when resolving {1}.";
     [DebuggerDisplay("{Expression}")]
     public sealed class DebugExpression<TService>
     {
-        public readonly Expression<Container.CompiledFactory> Expression;
+        public readonly Expression<CompiledFactory> Expression;
 
-        public DebugExpression(Expression<Container.CompiledFactory> expression)
+        public DebugExpression(Expression<CompiledFactory> expression)
         {
             Expression = expression;
         }
