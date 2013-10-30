@@ -60,9 +60,10 @@ namespace DryIoc
             _decorators = HashTree<Type, DecoratorsEntry[]>.Using(Sugar.Append);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = IntTree<KV<Type, CompiledFactory>>.Empty;
+            _currentScope = _singletonScope = new Scope();
+            _constants = null;
+            
             ResolutionRules = new ResolutionRules();
-            SingletonScope = _currentScope = new Scope();
-
             (setup ?? DefaultSetup).Invoke(this);
         }
 
@@ -89,7 +90,7 @@ namespace DryIoc
 
         public void Dispose()
         {
-            CurrentScope.Dispose();
+            _currentScope.Dispose();
         }
 
         #region IRegistrator
@@ -150,7 +151,7 @@ namespace DryIoc
         {
             var factory = _defaultResolutionCache.GetValueOrDefault(serviceType.GetHashCode());
             return (factory != null && serviceType == factory.Key ? factory.Value : ResolveAndCacheFactory(serviceType, ifUnresolved))
-                (_constants, CurrentScope, null/* resolutionRootScope */);
+                (_constants, _currentScope, null/* resolutionRootScope */);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -217,7 +218,7 @@ namespace DryIoc
         public readonly static ParameterExpression ConstantsParameter = Expression.Parameter(typeof(object[]), "constants");
         public object[] Constants { get { return _constants; } }
 
-        public Scope SingletonScope { get; private set; }
+        public Scope SingletonScope { get { return _singletonScope; }}
         public Scope CurrentScope { get { return _currentScope; } }
 
         public Expression GetConstantExpression(object constant, Type constantType)
@@ -445,20 +446,21 @@ namespace DryIoc
         private Container(Container source)
         {
             _currentScope = new Scope();
-            SingletonScope = source.SingletonScope;
-            ResolutionRules = source.ResolutionRules;
+            _singletonScope = source._singletonScope;
             _constants = source._constants;
             _syncRoot = source._syncRoot;
             _factories = source._factories;
             _decorators = source._decorators;
             _keyedResolutionCache = source._keyedResolutionCache;
             _defaultResolutionCache = source._defaultResolutionCache;
+            ResolutionRules = source.ResolutionRules;
         }
 
         private readonly object _syncRoot;
         private readonly Dictionary<Type, FactoriesEntry> _factories;
         private HashTree<Type, DecoratorsEntry[]> _decorators;
         private readonly Scope _currentScope;
+        private readonly Scope _singletonScope;
         private object[] _constants;
 
         private sealed class FactoriesEntry
