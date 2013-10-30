@@ -1632,11 +1632,11 @@ when resolving {1}.";
             Singleton = new SingletonReuse();
 
             CurrentScopeParameter = Expression.Parameter(typeof(Scope), "currentScope");
-            InCurrentScope = new InScopeReuse(CurrentScopeParameter);
+            InCurrentScope = new ScopedReuse(CurrentScopeParameter);
 
             ResolutionScopeParameter = Expression.Parameter(typeof(Scope), "resolutionScope");
-            var createScopeOnceMethod = typeof(Reuse).GetMethod("CreateScopeOnce", BindingFlags.NonPublic | BindingFlags.Static);
-            DuringResolution = new InScopeReuse(Expression.Call(null, createScopeOnceMethod, (Expression)ResolutionScopeParameter));
+            DuringResolution = new ScopedReuse(
+                Expression.Call(typeof(Reuse), "CreateScopeOnce", null, (Expression)ResolutionScopeParameter));
         }
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
@@ -1659,6 +1659,21 @@ when resolving {1}.";
         }
         // ReSharper restore UnusedMember.Local
 
+        private sealed class ScopedReuse : IReuse
+        {
+            public ScopedReuse(Expression scope)
+            {
+                _scope = scope;
+            }
+
+            public Expression Of(Request _, IRegistry __, int factoryID, Expression factoryExpr)
+            {
+                return GetScopedServiceExpression(_scope, factoryID, factoryExpr);
+            }
+
+            private readonly Expression _scope;
+        }
+
         private sealed class SingletonReuse : IReuse
         {
             public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
@@ -1680,21 +1695,6 @@ when resolving {1}.";
                     () => Container.GetFactoryExpression(factoryExpr).Compile()(constants, currentScope, null));
                 return registry.GetConstantExpression(singleton, factoryExpr.Type);
             }
-        }
-
-        private sealed class InScopeReuse : IReuse
-        {
-            public InScopeReuse(Expression scope)
-            {
-                _scope = scope;
-            }
-
-            public Expression Of(Request _, IRegistry __, int factoryID, Expression factoryExpr)
-            {
-                return GetScopedServiceExpression(_scope, factoryID, factoryExpr);
-            }
-
-            private readonly Expression _scope;
         }
 
         #endregion
