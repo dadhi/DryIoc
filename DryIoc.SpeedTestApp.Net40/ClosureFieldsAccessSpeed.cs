@@ -222,24 +222,25 @@ namespace DryIoc.SpeedTestApp.Net40
 
             var funcExpr = Expression.Lambda<Func<object[], X>>(newExpr, arrayExpr);
 
-            var ab = AppDomain.CurrentDomain.DefineDynamicAssembly(new AssemblyName("assembly"), AssemblyBuilderAccess.Run);
-            var mod = ab.DefineDynamicModule("module");
+            var assemblyBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(new AssemblyName("assembly"), AssemblyBuilderAccess.RunAndCollect);
+            var moduleBuilder = assemblyBuilder.DefineDynamicModule("module");
 
-            var tb1 = mod.DefineType("type1", TypeAttributes.Public);
-            var mb = tb1.DefineMethod("test", MethodAttributes.Public | MethodAttributes.Static, typeof(X), new[] { typeof(object[]) });
-            funcExpr.CompileToMethod(mb);
-            var t = tb1.CreateType();
-            var func = (Func<object[], X>)Delegate.CreateDelegate(typeof(Func<object[], X>), t.GetMethod("test"));
+            var typeBuilder = moduleBuilder.DefineType("type1", TypeAttributes.Public);
+            var methodBuilder = typeBuilder.DefineMethod("test", MethodAttributes.Public | MethodAttributes.Static, 
+                typeof(X), new[] { typeof(object[]) });
+            funcExpr.CompileToMethod(methodBuilder);
+            var createdType = typeBuilder.CreateType();
+            var func = (Func<object[], X>)Delegate.CreateDelegate(typeof(Func<object[], X>), createdType.GetMethod("test"));
 
-            var tb2 = mod.DefineType("type2", TypeAttributes.Public);
-            var mb2 = tb2.DefineMethod("test", MethodAttributes.Public | MethodAttributes.Static, typeof(X), new[] { typeof(object[]) });
-            funcExpr.CompileToMethod(mb2);
-            var t2 = tb2.CreateType();
+            var typeBuilder2 = moduleBuilder.DefineType("type2", TypeAttributes.Public);
+            var methodBuilder2 = typeBuilder2.DefineMethod("test", MethodAttributes.Public | MethodAttributes.Static, 
+                typeof(X), new[] { typeof(object[]) });
+            funcExpr.CompileToMethod(methodBuilder2);
+            var t2 = typeBuilder2.CreateType();
             var func2 = (Func<object[], X>)Delegate.CreateDelegate(typeof(Func<object[], X>), t2.GetMethod("test"));
 
-            return func2;
+            return func + func2;
         }
-
 
         private static DynamicMethod CreateDynamicMethod()
         {

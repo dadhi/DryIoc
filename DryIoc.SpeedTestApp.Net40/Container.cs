@@ -14,12 +14,12 @@ namespace DryIoc
     /// <para>
     /// Supports registration of:
     /// <list type="bullet">
-    ///	<item>Transient or Singleton instance reuse (Transient means - not reuse, so it just a null). 
+    /// <item>Transient or Singleton instance reuse (Transient means - not reuse, so it just a null). 
     /// Custom reuse policy is possible via specifying your own <see cref="IReuse"/> implementation.</item>
     /// <item>Arbitrary lambda factory to return service.</item>
-    ///	<item>Optional service name.</item>
-    ///	<item>Open generics are registered the same way as concrete types.</item>
-    ///	<item>User-defined service metadata.</item>
+    /// <item>Optional service name.</item>
+    /// <item>Open generics are registered the same way as concrete types.</item>
+    /// <item>User-defined service metadata.</item>
     /// <item>Check if service is registered via <see cref="Registrator.IsRegistered"/>.</item>
     /// </list>
     /// </para>
@@ -29,8 +29,8 @@ namespace DryIoc
     /// <item>Service instance.</item>
     /// <item>Automatic constructor parameters injection.</item>
     /// <item>User-defined service constructor selection, Throws if not defined.</item>
-    ///	<item>Func&lt;TService&gt; - will create Transient TService each time when invoked but Singleton only once on first invoke.</item>
-    ///	<item>Lazy&lt;TService&gt; - will create instance only once on first access to Value property.</item>
+    /// <item>Func&lt;TService&gt; - will create Transient TService each time when invoked but Singleton only once on first invoke.</item>
+    /// <item>Lazy&lt;TService&gt; - will create instance only once on first access to Value property.</item>
     /// <item>Func&lt;..., TService&gt; - Func with parameters. Parameters identified by Type, not by name. Order of parameters does not matter.</item>
     /// <item>Meta&lt;TService, TMetadata&gt; - service wrapped in Meta with registered TMetadata. TService could be a registered type or Func, Lazy variations.</item>
     /// <item>IEnumerable&lt;TService&gt; and TService[] - TService could be a registered type or Func, Lazy, Meta variations.</item>
@@ -1541,11 +1541,6 @@ when resolving {1}.";
 
             // example: "unnamed generic wrapper DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
             return key + kind + " " + type + dep;
-        }
-
-        public void AddVarAssignment(int id, BinaryExpression assignement)
-        {
-            throw new NotImplementedException();
         }
     }
 
