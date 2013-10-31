@@ -1678,20 +1678,21 @@ when resolving {1}.";
         {
             public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
             {
-                // save scope into separate var to prevent closure on registry.
                 var singletonScope = registry.SingletonScope;
 
                 // Create lazy singleton if we have Func somewhere in dependency chain.
                 var parent = request.Parent;
                 if (parent != null && parent.Enumerate().Any(p =>
                     p.OpenGenericServiceType != null && ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType)))
-                    return GetScopedServiceExpression(Expression.Constant(singletonScope), factoryID, factoryExpr);
+                {
+                    var singletonScopeExpr = registry.GetConstantExpression(singletonScope, singletonScope.GetType());
+                    return GetScopedServiceExpression(singletonScopeExpr, factoryID, factoryExpr);
+                }
 
-                // Otherwise we can create singleton instance right here, and put it into Scope for later disposal.
-                var currentScope = registry.CurrentScope; // same as for singletonScope
+                // Create singleton now and put into constants.
                 var constants = registry.Constants;
-
-                var singleton = singletonScope.GetOrAdd(factoryID,
+                var currentScope = registry.CurrentScope;
+                var singleton = singletonScope.GetOrAdd(factoryID, 
                     () => Container.GetFactoryExpression(factoryExpr).Compile()(constants, currentScope, null));
                 return registry.GetConstantExpression(singleton, factoryExpr.Type);
             }
@@ -1726,8 +1727,6 @@ when resolving {1}.";
 
         object[] Constants { get; }
 
-        Expression GetConstantExpression(object constant, Type constantType);
-
         Factory GetOrAddFactory(Request request, IfUnresolved ifUnresolved);
 
         Factory GetFactoryOrNull(Type serviceType, object serviceKey);
@@ -1737,6 +1736,8 @@ when resolving {1}.";
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
         Type GetWrappedServiceTypeOrSelf(Type serviceType);
+
+        Expression GetConstantExpression(object constant, Type constantType);
     }
 
     public sealed class Meta<TService, TMetadata>
