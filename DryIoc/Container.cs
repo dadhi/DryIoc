@@ -46,7 +46,6 @@ namespace DryIoc
     /// <para>
     /// TODO: vNext
     /// <list type="bullet">
-    /// <item>fix: Review use of resolver in delegate factory in light of constants usage approach.</item>
     /// <item>upd: Remove most of Container doc-comments.</item>
     /// <item>fix: Rules are not thread-safe regarding replacing the rule in place, cause the rules are provided as arrays.</item>
     /// </list>
@@ -231,6 +230,7 @@ namespace DryIoc
         public object[] Constants { get { return _constants; } }
 
         public Scope SingletonScope { get { return _singletonScope; } }
+        
         public Scope CurrentScope { get { return _currentScope; } }
 
         public Expression GetConstantExpression(object constant, Type constantType)
@@ -968,7 +968,11 @@ when resolving {1}.";
             string named = null)
         {
             var factory = new DelegateFactory(
-                (_, __) => Expression.Invoke(Expression.Constant(lambda), Container.RegistryExpression),
+                (_, registry) =>
+                {
+                    var lambdaExpr = registry.GetConstantExpression(lambda, typeof (Func<IResolver, TService>));
+                    return Expression.Invoke(lambdaExpr, Container.RegistryExpression);
+                },
                 reuse, setup);
             registrator.Register(factory, typeof(TService), named);
         }

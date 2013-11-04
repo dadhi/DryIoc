@@ -99,7 +99,7 @@ namespace DryIoc.SpeedTestApp.Net40
             var constants = registry.Constants;
 
             var singleton = singletonScope.GetOrAdd(factoryID, 
-                () => Container.GetFactoryExpression(factoryExpr).Compile()(constants, currentScope, null));
+                () => Container.CreateFactoryExpression(factoryExpr).Compile()(constants, currentScope, null));
             return registry.GetConstantExpression(singleton, factoryExpr.Type);
         }
     }

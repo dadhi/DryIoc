@@ -46,6 +46,7 @@ namespace DryIoc
     /// <para>
     /// TODO: vNext
     /// <list type="bullet">
+    /// <item>fix: Review use of resolver in delegate factory in light of constants usage approach.</item>
     /// <item>upd: Remove most of Container doc-comments.</item>
     /// <item>fix: Rules are not thread-safe regarding replacing the rule in place, cause the rules are provided as arrays.</item>
     /// </list>
@@ -60,49 +61,19 @@ namespace DryIoc
             _decorators = HashTree<Type, DecoratorsEntry[]>.Using(Sugar.Append);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = IntTree<KV<Type, CompiledFactory>>.Empty;
-            ResolutionRules = new ResolutionRules();
-            SingletonScope = _currentScope = new Scope();
 
+            _currentScope = _singletonScope = new Scope();
+
+            // put itself into constants, to support container access inside expression. It is common for dynamic scenarios. 
+            _constants = new object[] { new WeakReference(this) }; 
+
+            ResolutionRules = new ResolutionRules();
             (setup ?? DefaultSetup).Invoke(this);
         }
 
         public static Action<IRegistry> DefaultSetup = ContainerSetup.Default;
 
-        public static Expression ReplaceDuplicateConstantsWithVariables(Expression original)
-        {
-            var visitor = new ReplaceDuplicateConstantsWithVariablesVisitor();
-            var result = visitor.Visit(original);
-            if (visitor.Vars == null || visitor.Vars.Count == 0 ||
-                // If number of duplicate references to constants are small, then optimization does not worth it.
-                visitor.Vars.Sum(_ => _.Value.Key) < visitor.Vars.Count)
-                return original;
-
-            var resultBlock = Expression.Block(
-                visitor.Vars.Select(_ => _.Value.Value),
-                visitor.Vars.Select(_ => Expression.Assign(_.Value.Value, _.Key)).Concat(
-                new[] { result }));
-            return resultBlock;
-        }
-
-        private sealed class ReplaceDuplicateConstantsWithVariablesVisitor : ExpressionVisitor
-        {
-            public Dictionary<ConstantExpression, KV<int, ParameterExpression>> Vars;
-
-            protected override Expression VisitConstant(ConstantExpression constExpr)
-            {
-                if (Vars == null)
-                    Vars = new Dictionary<ConstantExpression, KV<int, ParameterExpression>>();
-
-                KV<int, ParameterExpression> varItem;
-                Vars[constExpr] = Vars.TryGetValue(constExpr, out varItem)
-                    ? (varItem = new KV<int, ParameterExpression>(varItem.Key + 1, varItem.Value)) // here track number of duplicate constants
-                    : (varItem = new KV<int, ParameterExpression>(0, Expression.Variable(constExpr.Type)));
-
-                return varItem.Value;
-            }
-        }
-
-        public static Expression<CompiledFactory> GetFactoryExpression(Expression expression)
+        public static Expression<CompiledFactory> CreateFactoryExpression(Expression expression)
         {
             return Expression.Lambda<CompiledFactory>(expression,
                 ConstantsParameter, Reuse.CurrentScopeParameter, Reuse.ResolutionScopeParameter);
@@ -123,7 +94,7 @@ namespace DryIoc
 
         public void Dispose()
         {
-            CurrentScope.Dispose();
+            _currentScope.Dispose();
         }
 
         #region IRegistrator
@@ -184,7 +155,7 @@ namespace DryIoc
         {
             var factory = _defaultResolutionCache.GetValueOrDefault(serviceType.GetHashCode());
             return (factory != null && serviceType == factory.Key ? factory.Value : ResolveAndCacheFactory(serviceType, ifUnresolved))
-                (_constants, CurrentScope, null/* resolutionRootScope */);
+                (_constants, _currentScope, null/* resolutionRootScope */);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -197,7 +168,7 @@ namespace DryIoc
                 var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
                 if (factory == null) return null;
                 var expression = factory.GetExpression(request, this);
-                result = GetFactoryExpression(expression).Compile();
+                result = CreateFactoryExpression(expression).Compile();
                 Interlocked.Exchange(ref _keyedResolutionCache, _keyedResolutionCache.AddOrUpdate(serviceType,
                     (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, result)));
             }
@@ -214,7 +185,7 @@ namespace DryIoc
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null) return EmptyCompiledFactory;
             var expression = factory.GetExpression(request, this);
-            var result = GetFactoryExpression(expression).Compile();
+            var result = CreateFactoryExpression(expression).Compile();
             Interlocked.Exchange(ref _defaultResolutionCache,
                 _defaultResolutionCache.AddOrUpdate(serviceType.GetHashCode(), new KV<Type, CompiledFactory>(serviceType, result)));
             return result;
@@ -248,10 +219,18 @@ namespace DryIoc
 
         public ResolutionRules ResolutionRules { get; private set; }
 
-        public readonly static ParameterExpression ConstantsParameter = Expression.Parameter(typeof(object[]), "constants");
+        public readonly static ParameterExpression ConstantsParameter = 
+            Expression.Parameter(typeof(object[]), "constants");
+
+        public static readonly Expression RegistryWeakRefExpression = 
+            Expression.Convert(Expression.ArrayIndex(ConstantsParameter, Expression.Constant(0)), typeof(WeakReference));
+
+        public readonly static Expression RegistryExpression = 
+            Expression.Convert(Expression.Property(RegistryWeakRefExpression, "Target"), typeof(IRegistry));
+
         public object[] Constants { get { return _constants; } }
 
-        public Scope SingletonScope { get; private set; }
+        public Scope SingletonScope { get { return _singletonScope; } }
         public Scope CurrentScope { get { return _currentScope; } }
 
         public Expression GetConstantExpression(object constant, Type constantType)
@@ -259,24 +238,17 @@ namespace DryIoc
             int constantIndex;
             lock (_syncRoot)
             {
-                if (_constants == null)
+                constantIndex = Array.IndexOf(_constants, constant);
+                if (constantIndex == -1)
                 {
-                    _constants = new[] { constant };
-                    constantIndex = 0;
-                }
-                else
-                {
-                    constantIndex = Array.IndexOf(_constants, constant);
-                    if (constantIndex == -1)
-                    {
-                        _constants = _constants.AppendOrUpdate(constant);
-                        constantIndex = _constants.Length - 1;
-                    }
+                    _constants = _constants.AppendOrUpdate(constant);
+                    constantIndex = _constants.Length - 1;
                 }
             }
 
-            var result = Expression.ArrayIndex(ConstantsParameter, Expression.Constant(constantIndex));
-            return Expression.Convert(result, constantType);
+            var constantIndexExpr = Expression.Constant(constantIndex, typeof(int));
+            var constantsAccesssExpr = Expression.ArrayIndex(ConstantsParameter, constantIndexExpr);
+            return Expression.Convert(constantsAccesssExpr, constantType);
         }
 
         Factory IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
@@ -476,23 +448,31 @@ namespace DryIoc
 
         #region Implementation
 
-        private Container(Container source)
+        // Creates child container with singleton scope, constants and cache shared with parent. BUT with new CurrentScope.
+        private Container(Container parent)
         {
+            ResolutionRules = parent.ResolutionRules;
+            _singletonScope = parent._singletonScope;
             _currentScope = new Scope();
 
-            SingletonScope = source.SingletonScope;
-            ResolutionRules = source.ResolutionRules;
-            _syncRoot = source._syncRoot;
-            _factories = source._factories;
-            _decorators = source._decorators;
-            _keyedResolutionCache = source._keyedResolutionCache;
-            _defaultResolutionCache = source._defaultResolutionCache;
+            var parentConstants = parent._constants;
+            _constants = new object[parentConstants.Length];
+            Array.Copy(parentConstants, 0, _constants, 0, parentConstants.Length);
+            _constants[0] = new WeakReference(this);
+
+            _syncRoot = parent._syncRoot;
+            _factories = parent._factories;
+            _decorators = parent._decorators;
+
+            _defaultResolutionCache = IntTree<KV<Type, CompiledFactory>>.Empty;
+            _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
         }
 
         private readonly object _syncRoot;
         private readonly Dictionary<Type, FactoriesEntry> _factories;
         private HashTree<Type, DecoratorsEntry[]> _decorators;
         private readonly Scope _currentScope;
+        private readonly Scope _singletonScope;
         private object[] _constants;
 
         private sealed class FactoriesEntry
@@ -587,27 +567,33 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
-        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = (request, registry) =>
+        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = (req, _) =>
         {
-            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
+            if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
 
-            return new DelegateFactory((req, reg) =>
+            return new DelegateFactory((request, registry) =>
             {
-                var collectionType = req.ServiceType;
-                var collectionIsArray = collectionType.IsArray;
-                var itemType = collectionIsArray
+                var collectionType = request.ServiceType;
+
+                var itemType = collectionType.IsArray
                     ? collectionType.GetElementType()
                     : collectionType.GetGenericArguments()[0];
-                var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
 
-                var resolver = Expression.Constant(new DynamicEnumerableResolver(reg, itemType, wrappedItemType));
-                var resolveMethod = (collectionIsArray
-                    ? DynamicEnumerableResolver.ResolveArrayMethod
-                    : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
-                return Expression.Call(resolver, resolveMethod, Expression.Constant(req));
+                var unwrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
+
+                // Composite pattern support: filter out composite root from available keys.
+                var parentFactoryID = -1;
+                var parent = request.GetNonWrapperParentOrNull();
+                if (parent != null && parent.ServiceType == unwrappedItemType)
+                    parentFactoryID = parent.FactoryID;
+
+                var resolveMethodGeneric = collectionType.IsArray ? _resolveArrayMethod : _resolveEnumerableMethod;
+                var resolveMethod = resolveMethodGeneric.MakeGenericMethod(itemType, unwrappedItemType);
+
+                return Expression.Call(resolveMethod, Container.RegistryWeakRefExpression, Expression.Constant(parentFactoryID));
             },
-            setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
+            setup: ServiceSetup.With(FactoryCachePolicy.NotCacheExpression));
         };
 
         public static Expression GetFuncExpression(Request request, IRegistry registry)
@@ -636,7 +622,7 @@ namespace DryIoc
 
             var serviceRequest = request.PushWithParentKey(serviceType);
             var serviceExpr = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw).GetExpression(serviceRequest, registry);
-            var expression = Expression.New(ctor, Container.GetFactoryExpression(serviceExpr));
+            var expression = Expression.New(ctor, Container.CreateFactoryExpression(serviceExpr));
             return expression;
         }
 
@@ -673,7 +659,7 @@ namespace DryIoc
 
                 var metaCtor = request.ServiceType.GetConstructors()[0];
                 var serviceExpr = serviceFactory.GetExpression(serviceRequest, registry);
-                var metadataExpr = Expression.Constant(resultMetadata, metadataType);
+                var metadataExpr = registry.GetConstantExpression(resultMetadata, metadataType);
                 return Expression.New(metaCtor, serviceExpr, metadataExpr);
             });
         }
@@ -686,47 +672,33 @@ namespace DryIoc
             return metadata != null && metadataType.IsInstanceOfType(metadata) ? metadata : null;
         }
 
-        internal sealed class DynamicEnumerableResolver
+        private static readonly MethodInfo _resolveEnumerableMethod =
+            typeof(ContainerSetup).GetMethod("ResolveEnumerable", BindingFlags.Static | BindingFlags.NonPublic);
+        internal static IEnumerable<TItem> ResolveEnumerable<TItem, TUnwrappedItem>(WeakReference registryRef, int parentFactoryID)
         {
-            public static readonly MethodInfo ResolveEnumerableMethod =
-                typeof(DynamicEnumerableResolver).GetMethod("ResolveEnumerable");
+            var itemType = typeof(TItem);
+            var unwrappedItemType = typeof(TUnwrappedItem);
 
-            public static readonly MethodInfo ResolveArrayMethod =
-                typeof(DynamicEnumerableResolver).GetMethod("ResolveArray");
+            Func<Factory, bool> condition = null;
+            if (parentFactoryID != -1)
+                condition = factory => factory.ID != parentFactoryID;
 
-            public DynamicEnumerableResolver(IRegistry registry, Type itemType, Type unwrappedItemType)
+            var registry = (registryRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
+            var keys = registry.GetKeys(unwrappedItemType, condition);
+
+            foreach (var key in keys)
             {
-                _registry = new WeakReference(registry);
-                _unwrappedItemType = unwrappedItemType;
-                _itemType = itemType;
+                var service = registry.ResolveKeyed(itemType, key, IfUnresolved.ReturnNull);
+                if (service != null) // skip unresolved items
+                    yield return (TItem)service;
             }
+        }
 
-            public IEnumerable<T> ResolveEnumerable<T>(Request request)
-            {
-                var registry = (_registry.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
-
-                var parent = request.GetNonWrapperParentOrNull();
-                // Composite pattern support: filter out composite root from available keys.
-                var keys = parent != null && parent.ServiceType == _unwrappedItemType
-                    ? registry.GetKeys(_unwrappedItemType, factory => factory.ID != parent.FactoryID)
-                    : registry.GetKeys(_unwrappedItemType, null);
-
-                foreach (var key in keys)
-                {
-                    var service = registry.ResolveKeyed(_itemType, key, IfUnresolved.ReturnNull);
-                    if (service != null) // skip unresolved items
-                        yield return (T)service;
-                }
-            }
-
-            public T[] ResolveArray<T>(Request request)
-            {
-                return ResolveEnumerable<T>(request).ToArray();
-            }
-
-            private readonly WeakReference _registry;
-            private readonly Type _unwrappedItemType;
-            private readonly Type _itemType;
+        private static readonly MethodInfo _resolveArrayMethod =
+            typeof(ContainerSetup).GetMethod("ResolveArray", BindingFlags.Static | BindingFlags.NonPublic);
+        internal static TItem[] ResolveArray<TItem, TUnwrappedItem>(WeakReference registryRef, int parentFactoryID)
+        {
+            return ResolveEnumerable<TItem, TUnwrappedItem>(registryRef, parentFactoryID).ToArray();
         }
 
         #endregion
@@ -996,7 +968,7 @@ when resolving {1}.";
             string named = null)
         {
             var factory = new DelegateFactory(
-                (_, resolver) => Expression.Invoke(Expression.Constant(lambda), Expression.Constant(resolver, typeof(IResolver))),
+                (_, __) => Expression.Invoke(Expression.Constant(lambda), Container.RegistryExpression),
                 reuse, setup);
             registrator.Register(factory, typeof(TService), named);
         }
@@ -1127,7 +1099,7 @@ when resolving {1}.";
 
     public enum FactoryType { Service, Decorator, GenericWrapper };
 
-    public enum FactoryCachePolicy { CacheExpression, DoNotCacheExpression };
+    public enum FactoryCachePolicy { CacheExpression, NotCacheExpression };
 
     public abstract class FactorySetup
     {
@@ -1207,7 +1179,7 @@ when resolving {1}.";
         }
 
         public override FactoryType Type { get { return FactoryType.Decorator; } }
-        public override FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.DoNotCacheExpression; } }
+        public override FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.NotCacheExpression; } }
         public readonly Func<Request, bool> IsApplicable;
 
         #region Implementation
@@ -1664,11 +1636,11 @@ when resolving {1}.";
             Singleton = new SingletonReuse();
 
             CurrentScopeParameter = Expression.Parameter(typeof(Scope), "currentScope");
-            InCurrentScope = new InScopeReuse(CurrentScopeParameter);
+            InCurrentScope = new ScopedReuse(CurrentScopeParameter);
 
             ResolutionScopeParameter = Expression.Parameter(typeof(Scope), "resolutionScope");
-            var createScopeOnceMethod = typeof(Reuse).GetMethod("CreateScopeOnce", BindingFlags.NonPublic | BindingFlags.Static);
-            DuringResolution = new InScopeReuse(Expression.Call(null, createScopeOnceMethod, (Expression)ResolutionScopeParameter));
+            DuringResolution = new ScopedReuse(
+                Expression.Call(typeof(Reuse), "CreateScopeOnce", null, (Expression)ResolutionScopeParameter));
         }
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
@@ -1691,32 +1663,9 @@ when resolving {1}.";
         }
         // ReSharper restore UnusedMember.Local
 
-        private sealed class SingletonReuse : IReuse
+        private sealed class ScopedReuse : IReuse
         {
-            public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
-            {
-                // save scope into separate var to prevent closure on registry.
-                var singletonScope = registry.SingletonScope;
-
-                // Create lazy singleton if we have Func somewhere in dependency chain.
-                var parent = request.Parent;
-                if (parent != null && parent.Enumerate().Any(p =>
-                    p.OpenGenericServiceType != null && ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType)))
-                    return GetScopedServiceExpression(Expression.Constant(singletonScope), factoryID, factoryExpr);
-
-                // Otherwise we can create singleton instance right here, and put it into Scope for later disposal.
-                var currentScope = registry.CurrentScope; // same as for singletonScope
-                var constants = registry.Constants;
-
-                var singleton = singletonScope.GetOrAdd(factoryID,
-                    () => Container.GetFactoryExpression(factoryExpr).Compile()(constants, currentScope, null));
-                return registry.GetConstantExpression(singleton, factoryExpr.Type);
-            }
-        }
-
-        private sealed class InScopeReuse : IReuse
-        {
-            public InScopeReuse(Expression scope)
+            public ScopedReuse(Expression scope)
             {
                 _scope = scope;
             }
@@ -1727,6 +1676,30 @@ when resolving {1}.";
             }
 
             private readonly Expression _scope;
+        }
+
+        private sealed class SingletonReuse : IReuse
+        {
+            public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+            {
+                var singletonScope = registry.SingletonScope;
+
+                // Create lazy singleton if we have Func somewhere in dependency chain.
+                var parent = request.Parent;
+                if (parent != null && parent.Enumerate().Any(p =>
+                    p.OpenGenericServiceType != null && ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType)))
+                {
+                    var singletonScopeExpr = registry.GetConstantExpression(singletonScope, singletonScope.GetType());
+                    return GetScopedServiceExpression(singletonScopeExpr, factoryID, factoryExpr);
+                }
+
+                // Create singleton now and put into constants.
+                var constants = registry.Constants;
+                var currentScope = registry.CurrentScope;
+                var singleton = singletonScope.GetOrAdd(factoryID,
+                    () => Container.CreateFactoryExpression(factoryExpr).Compile()(constants, currentScope, null));
+                return registry.GetConstantExpression(singleton, factoryExpr.Type);
+            }
         }
 
         #endregion
@@ -1758,8 +1731,6 @@ when resolving {1}.";
 
         object[] Constants { get; }
 
-        Expression GetConstantExpression(object constant, Type constantType);
-
         Factory GetOrAddFactory(Request request, IfUnresolved ifUnresolved);
 
         Factory GetFactoryOrNull(Type serviceType, object serviceKey);
@@ -1769,6 +1740,8 @@ when resolving {1}.";
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
         Type GetWrappedServiceTypeOrSelf(Type serviceType);
+
+        Expression GetConstantExpression(object constant, Type constantType);
     }
 
     public sealed class Meta<TService, TMetadata>
