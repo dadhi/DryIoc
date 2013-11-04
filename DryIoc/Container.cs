@@ -559,29 +559,6 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
-        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull_old = (request, registry) =>
-        {
-            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
-                return null;
-
-            return new DelegateFactory((req, reg) =>
-            {
-                var collectionType = req.ServiceType;
-                var collectionIsArray = collectionType.IsArray;
-                var itemType = collectionIsArray
-                    ? collectionType.GetElementType()
-                    : collectionType.GetGenericArguments()[0];
-                var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
-
-                var resolver = Expression.Constant(new DynamicEnumerableResolver(reg, itemType, wrappedItemType));
-                var resolveMethod = (collectionIsArray
-                    ? DynamicEnumerableResolver.ResolveArrayMethod
-                    : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
-                return Expression.Call(resolver, resolveMethod, Expression.Constant(req));
-            },
-            setup: ServiceSetup.With(FactoryCachePolicy.NotCacheExpression));
-        };
-
         public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = (req, _) =>
         {
             if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
@@ -606,41 +583,6 @@ namespace DryIoc
             },
             setup: ServiceSetup.With(FactoryCachePolicy.NotCacheExpression));
         };
-
-        private static readonly MethodInfo _resolveEnumerableMethod =
-            typeof(ContainerSetup).GetMethod("ResolveEnumerable", BindingFlags.Static | BindingFlags.NonPublic);
-        internal static IEnumerable<TItem> ResolveEnumerable<TItem, TUnwrappedItem>(Request request, WeakReference registryRef)
-        {
-            var itemType = typeof(TItem);
-            var unwrappedItemType = typeof(TUnwrappedItem);
-
-            var parent = request.GetNonWrapperParentOrNull();
-
-            // Composite pattern support: filter out composite root from available keys.
-            Func<Factory, bool> condition = null;
-            if (parent != null && parent.ServiceType == unwrappedItemType)
-            {
-                var parentFactoryID = parent.FactoryID;
-                condition = factory => factory.ID != parentFactoryID;
-            }
-
-            var registry = (registryRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
-            var keys = registry.GetKeys(unwrappedItemType, condition);
-
-            foreach (var key in keys)
-            {
-                var service = registry.ResolveKeyed(itemType, key, IfUnresolved.ReturnNull);
-                if (service != null) // skip unresolved items
-                    yield return (TItem)service;
-            }
-        }
-
-        private static readonly MethodInfo _resolveArrayMethod =
-            typeof(ContainerSetup).GetMethod("ResolveArray", BindingFlags.Static | BindingFlags.NonPublic);
-        internal static TItem[] ResolveArray<TItem, TUnwrappedItem>(Request request, WeakReference registryRef)
-        {
-            return ResolveEnumerable<TItem, TUnwrappedItem>(request, registryRef).ToArray();
-        }
 
         public static Expression GetFuncExpression(Request request, IRegistry registry)
         {
@@ -705,7 +647,7 @@ namespace DryIoc
 
                 var metaCtor = request.ServiceType.GetConstructors()[0];
                 var serviceExpr = serviceFactory.GetExpression(serviceRequest, registry);
-                var metadataExpr = Expression.Constant(resultMetadata, metadataType);
+                var metadataExpr = registry.GetConstantExpression(resultMetadata, metadataType);
                 return Expression.New(metaCtor, serviceExpr, metadataExpr);
             });
         }
@@ -718,47 +660,39 @@ namespace DryIoc
             return metadata != null && metadataType.IsInstanceOfType(metadata) ? metadata : null;
         }
 
-        internal sealed class DynamicEnumerableResolver
+        private static readonly MethodInfo _resolveEnumerableMethod =
+            typeof(ContainerSetup).GetMethod("ResolveEnumerable", BindingFlags.Static | BindingFlags.NonPublic);
+        internal static IEnumerable<TItem> ResolveEnumerable<TItem, TUnwrappedItem>(Request request, WeakReference registryRef)
         {
-            public static readonly MethodInfo ResolveEnumerableMethod =
-                typeof(DynamicEnumerableResolver).GetMethod("ResolveEnumerable");
+            var itemType = typeof(TItem);
+            var unwrappedItemType = typeof(TUnwrappedItem);
 
-            public static readonly MethodInfo ResolveArrayMethod =
-                typeof(DynamicEnumerableResolver).GetMethod("ResolveArray");
+            var parent = request.GetNonWrapperParentOrNull();
 
-            public DynamicEnumerableResolver(IRegistry registry, Type itemType, Type unwrappedItemType)
+            // Composite pattern support: filter out composite root from available keys.
+            Func<Factory, bool> condition = null;
+            if (parent != null && parent.ServiceType == unwrappedItemType)
             {
-                _registry = new WeakReference(registry);
-                _unwrappedItemType = unwrappedItemType;
-                _itemType = itemType;
+                var parentFactoryID = parent.FactoryID;
+                condition = factory => factory.ID != parentFactoryID;
             }
 
-            public IEnumerable<T> ResolveEnumerable<T>(Request request)
+            var registry = (registryRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
+            var keys = registry.GetKeys(unwrappedItemType, condition);
+
+            foreach (var key in keys)
             {
-                var registry = (_registry.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
-
-                var parent = request.GetNonWrapperParentOrNull();
-                // Composite pattern support: filter out composite root from available keys.
-                var keys = parent != null && parent.ServiceType == _unwrappedItemType
-                    ? registry.GetKeys(_unwrappedItemType, factory => factory.ID != parent.FactoryID)
-                    : registry.GetKeys(_unwrappedItemType, null);
-
-                foreach (var key in keys)
-                {
-                    var service = registry.ResolveKeyed(_itemType, key, IfUnresolved.ReturnNull);
-                    if (service != null) // skip unresolved items
-                        yield return (T)service;
-                }
+                var service = registry.ResolveKeyed(itemType, key, IfUnresolved.ReturnNull);
+                if (service != null) // skip unresolved items
+                    yield return (TItem)service;
             }
+        }
 
-            public T[] ResolveArray<T>(Request request)
-            {
-                return ResolveEnumerable<T>(request).ToArray();
-            }
-
-            private readonly WeakReference _registry;
-            private readonly Type _unwrappedItemType;
-            private readonly Type _itemType;
+        private static readonly MethodInfo _resolveArrayMethod =
+            typeof(ContainerSetup).GetMethod("ResolveArray", BindingFlags.Static | BindingFlags.NonPublic);
+        internal static TItem[] ResolveArray<TItem, TUnwrappedItem>(Request request, WeakReference registryRef)
+        {
+            return ResolveEnumerable<TItem, TUnwrappedItem>(request, registryRef).ToArray();
         }
 
         #endregion
@@ -1028,7 +962,9 @@ when resolving {1}.";
             string named = null)
         {
             var factory = new DelegateFactory(
-                (_, resolver) => Expression.Invoke(Expression.Constant(lambda), Expression.Constant(resolver, typeof(IResolver))),
+                (_, registry) => Expression.Invoke(
+                    Expression.Constant(lambda), 
+                    registry.GetConstantExpression(registry, typeof(IResolver))),
                 reuse, setup);
             registrator.Register(factory, typeof(TService), named);
         }
