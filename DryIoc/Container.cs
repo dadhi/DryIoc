@@ -46,6 +46,7 @@ namespace DryIoc
     /// <para>
     /// TODO: vNext
     /// <list type="bullet">
+    /// <item>fix: Review use of resolver in delegate factory in light of constants usage approach.</item>
     /// <item>upd: Remove most of Container doc-comments.</item>
     /// <item>fix: Rules are not thread-safe regarding replacing the rule in place, cause the rules are provided as arrays.</item>
     /// </list>
@@ -60,9 +61,12 @@ namespace DryIoc
             _decorators = HashTree<Type, DecoratorsEntry[]>.Using(Sugar.Append);
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
             _defaultResolutionCache = IntTree<KV<Type, CompiledFactory>>.Empty;
+
             _currentScope = _singletonScope = new Scope();
-            _constants = null;
-            
+
+            // put itself into constants, to support container access inside expression. It is common for dynamic scenarios. 
+            _constants = new object[] { new WeakReference(this) }; 
+
             ResolutionRules = new ResolutionRules();
             (setup ?? DefaultSetup).Invoke(this);
         }
@@ -218,7 +222,7 @@ namespace DryIoc
         public readonly static ParameterExpression ConstantsParameter = Expression.Parameter(typeof(object[]), "constants");
         public object[] Constants { get { return _constants; } }
 
-        public Scope SingletonScope { get { return _singletonScope; }}
+        public Scope SingletonScope { get { return _singletonScope; } }
         public Scope CurrentScope { get { return _currentScope; } }
 
         public Expression GetConstantExpression(object constant, Type constantType)
@@ -226,24 +230,17 @@ namespace DryIoc
             int constantIndex;
             lock (_syncRoot)
             {
-                if (_constants == null)
+                constantIndex = Array.IndexOf(_constants, constant);
+                if (constantIndex == -1)
                 {
-                    _constants = new[] { constant };
-                    constantIndex = 0;
-                }
-                else
-                {
-                    constantIndex = Array.IndexOf(_constants, constant);
-                    if (constantIndex == -1)
-                    {
-                        _constants = _constants.AppendOrUpdate(constant);
-                        constantIndex = _constants.Length - 1;
-                    }
+                    _constants = _constants.AppendOrUpdate(constant);
+                    constantIndex = _constants.Length - 1;
                 }
             }
 
-            var result = Expression.ArrayIndex(ConstantsParameter, Expression.Constant(constantIndex));
-            return Expression.Convert(result, constantType);
+            var constantIndexExpr = Expression.Constant(constantIndex, typeof(int));
+            var constantsAccesssExpr = Expression.ArrayIndex(ConstantsParameter, constantIndexExpr);
+            return Expression.Convert(constantsAccesssExpr, constantType);
         }
 
         Factory IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
@@ -443,17 +440,24 @@ namespace DryIoc
 
         #region Implementation
 
-        private Container(Container source)
+        // Creates child container with singleton scope, constants and cache shared with parent. BUT with new CurrentScope.
+        private Container(Container parent)
         {
+            ResolutionRules = parent.ResolutionRules;
+            _singletonScope = parent._singletonScope;
             _currentScope = new Scope();
-            _singletonScope = source._singletonScope;
-            _constants = source._constants;
-            _syncRoot = source._syncRoot;
-            _factories = source._factories;
-            _decorators = source._decorators;
-            _keyedResolutionCache = source._keyedResolutionCache;
-            _defaultResolutionCache = source._defaultResolutionCache;
-            ResolutionRules = source.ResolutionRules;
+
+            var parentConstants = parent._constants;
+            _constants = new object[parentConstants.Length];
+            Array.Copy(parentConstants, 0, _constants, 0, parentConstants.Length);
+            _constants[0] = new WeakReference(this);
+
+            _syncRoot = parent._syncRoot;
+            _factories = parent._factories;
+            _decorators = parent._decorators;
+
+            _defaultResolutionCache = IntTree<KV<Type, CompiledFactory>>.Empty;
+            _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
         }
 
         private readonly object _syncRoot;
@@ -555,7 +559,7 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
-        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = (request, registry) =>
+        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull_old = (request, registry) =>
         {
             if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
@@ -575,8 +579,68 @@ namespace DryIoc
                     : DynamicEnumerableResolver.ResolveEnumerableMethod).MakeGenericMethod(itemType);
                 return Expression.Call(resolver, resolveMethod, Expression.Constant(req));
             },
-            setup: ServiceSetup.With(FactoryCachePolicy.DoNotCacheExpression));
+            setup: ServiceSetup.With(FactoryCachePolicy.NotCacheExpression));
         };
+
+        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = (req, _) =>
+        {
+            if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
+                return null;
+
+            return new DelegateFactory((request, registry) =>
+            {
+                var collectionType = request.ServiceType;
+
+                var itemType = collectionType.IsArray
+                    ? collectionType.GetElementType()
+                    : collectionType.GetGenericArguments()[0];
+
+                var unwrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
+
+                var resolveMethodGeneric = collectionType.IsArray ? _resolveArrayMethod : _resolveEnumerableMethod;
+                var resolveMethod = resolveMethodGeneric.MakeGenericMethod(itemType, unwrappedItemType);
+
+                var registryRefExpr = registry.GetConstantExpression(new WeakReference(registry), typeof(WeakReference));
+                var resolveCallExpr = Expression.Call(resolveMethod, Expression.Constant(request), registryRefExpr);
+                return resolveCallExpr;
+            },
+            setup: ServiceSetup.With(FactoryCachePolicy.NotCacheExpression));
+        };
+
+        private static readonly MethodInfo _resolveEnumerableMethod =
+            typeof(ContainerSetup).GetMethod("ResolveEnumerable", BindingFlags.Static | BindingFlags.NonPublic);
+        internal static IEnumerable<TItem> ResolveEnumerable<TItem, TUnwrappedItem>(Request request, WeakReference registryRef)
+        {
+            var itemType = typeof(TItem);
+            var unwrappedItemType = typeof(TUnwrappedItem);
+
+            var parent = request.GetNonWrapperParentOrNull();
+
+            // Composite pattern support: filter out composite root from available keys.
+            Func<Factory, bool> condition = null;
+            if (parent != null && parent.ServiceType == unwrappedItemType)
+            {
+                var parentFactoryID = parent.FactoryID;
+                condition = factory => factory.ID != parentFactoryID;
+            }
+
+            var registry = (registryRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
+            var keys = registry.GetKeys(unwrappedItemType, condition);
+
+            foreach (var key in keys)
+            {
+                var service = registry.ResolveKeyed(itemType, key, IfUnresolved.ReturnNull);
+                if (service != null) // skip unresolved items
+                    yield return (TItem)service;
+            }
+        }
+
+        private static readonly MethodInfo _resolveArrayMethod =
+            typeof(ContainerSetup).GetMethod("ResolveArray", BindingFlags.Static | BindingFlags.NonPublic);
+        internal static TItem[] ResolveArray<TItem, TUnwrappedItem>(Request request, WeakReference registryRef)
+        {
+            return ResolveEnumerable<TItem, TUnwrappedItem>(request, registryRef).ToArray();
+        }
 
         public static Expression GetFuncExpression(Request request, IRegistry registry)
         {
@@ -1095,7 +1159,7 @@ when resolving {1}.";
 
     public enum FactoryType { Service, Decorator, GenericWrapper };
 
-    public enum FactoryCachePolicy { CacheExpression, DoNotCacheExpression };
+    public enum FactoryCachePolicy { CacheExpression, NotCacheExpression };
 
     public abstract class FactorySetup
     {
@@ -1175,7 +1239,7 @@ when resolving {1}.";
         }
 
         public override FactoryType Type { get { return FactoryType.Decorator; } }
-        public override FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.DoNotCacheExpression; } }
+        public override FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.NotCacheExpression; } }
         public readonly Func<Request, bool> IsApplicable;
 
         #region Implementation
@@ -1692,7 +1756,7 @@ when resolving {1}.";
                 // Create singleton now and put into constants.
                 var constants = registry.Constants;
                 var currentScope = registry.CurrentScope;
-                var singleton = singletonScope.GetOrAdd(factoryID, 
+                var singleton = singletonScope.GetOrAdd(factoryID,
                     () => Container.GetFactoryExpression(factoryExpr).Compile()(constants, currentScope, null));
                 return registry.GetConstantExpression(singleton, factoryExpr.Type);
             }

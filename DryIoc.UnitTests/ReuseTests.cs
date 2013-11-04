@@ -148,7 +148,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Nested_scope_disposition_wont_affect_outer_scope_factories()
+        public void Nested_scope_disposition_should_not_affect_outer_scope_factories()
         {
             var container = new Container();
             container.Register<Log>(Reuse.InCurrentScope);
@@ -157,6 +157,21 @@ namespace DryIoc.UnitTests
             using (container.OpenScope()) { }
 
             Assert.DoesNotThrow(() => getLog());
+        }
+
+        [Test]
+        public void Nested_scope_disposition_should_not_affect_singleton_resolution_for_parent_container()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(Reuse.Singleton);
+
+            IService serviceInNestedScope;
+            using (container.OpenScope())
+                serviceInNestedScope = container.Resolve<IService>();
+
+            var serviceInOuterScope = container.Resolve<IService>();
+
+            Assert.That(serviceInNestedScope, Is.SameAs(serviceInOuterScope));
         }
 
         [Test]
