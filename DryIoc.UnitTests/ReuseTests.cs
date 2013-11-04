@@ -271,8 +271,7 @@ namespace DryIoc.UnitTests
 
         static ThreadReuse()
         {
-            var getScopeMethod = typeof(ThreadReuse).GetMethod("GetScope", BindingFlags.Static | BindingFlags.NonPublic);
-            _scopeExpr = Expression.Call(getScopeMethod, null);
+            _scopeExpr = Expression.Call(typeof(ThreadReuse).GetMethod("GetScope", BindingFlags.Static | BindingFlags.NonPublic));
         }
     }
 

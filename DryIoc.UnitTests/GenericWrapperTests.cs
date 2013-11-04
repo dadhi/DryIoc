@@ -35,7 +35,8 @@ namespace DryIoc.UnitTests
         public void Given_the_same_type_service_and_wrapper_registered_When_resolved_Then_service_will_preferred_over_wrapper()
         {
             var container = new Container();
-            container.Register<Lazy<IService>>();
+            container.Register<Lazy<IService>>(
+                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }));
             container.Register<IService, Service>();
 
             var service = container.Resolve<Lazy<IService>>();

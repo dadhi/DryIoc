@@ -1,7 +1,5 @@
 using System;
-using System.ComponentModel.Composition;
 using System.Linq;
-using DryIoc.AttributedRegistration;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -106,8 +104,7 @@ namespace DryIoc.UnitTests
                 container.ResolutionRules.ConstructorParameters.Append((parameter, _, __) =>
                 {
                     object key;
-                    return AttributedRegistrator.TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false))
-                        ? key : null;
+                    return TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false)) ? key : null;
                 });
 
             container.Register(typeof(INamedService), typeof(NamedService));
@@ -128,7 +125,7 @@ namespace DryIoc.UnitTests
                 {
                     object key;
                     var attributes = parameter.GetCustomAttributes(false);
-                    return AttributedRegistrator.TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes)
+                    return TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes)
                         ? key : null;
                 });
 
@@ -238,6 +235,35 @@ namespace DryIoc.UnitTests
 
             Assert.That(service, Is.InstanceOf<AnotherService>());
         }
+
+        public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
+        {
+            var import = GetSingleAttributeOrNull<ImportAttribute>(attributes);
+            key = import == null ? null : import.ContractName;
+            return import != null;
+        }
+
+        public static bool TryGetServiceKeyWithMetadataAttribute(out object key, Type contractType, Request parent, IRegistry registry, object[] attributes)
+        {
+            key = null;
+            var import = GetSingleAttributeOrNull<ImportWithMetadataAttribute>(attributes);
+            if (import == null)
+                return false;
+
+            var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
+            var metadata = import.Metadata;
+            key = registry.GetKeys(serviceType, factory => metadata.Equals(factory.Setup.Metadata)).FirstOrDefault()
+                .ThrowIfNull("Unable to resolve", serviceType, metadata, parent);
+            return true;
+        }
+
+        private static TAttribute GetSingleAttributeOrNull<TAttribute>(object[] attributes) where TAttribute : Attribute
+        {
+            TAttribute attr = null;
+            for (var i = 0; i < attributes.Length && attr == null; i++)
+                attr = attributes[i] as TAttribute;
+            return attr;
+        }
     }
 
     #region CUT
@@ -274,6 +300,18 @@ namespace DryIoc.UnitTests
 
     public class FooBlah : IFooService
     {
+    }
+
+
+    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+    public class ImportWithMetadataAttribute : Attribute
+    {
+        public ImportWithMetadataAttribute(object metadata)
+        {
+            Metadata = metadata.ThrowIfNull();
+        }
+
+        public readonly object Metadata;
     }
 
     public class FooConsumer

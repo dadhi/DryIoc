@@ -1,7 +1,5 @@
 ﻿using System;
-using System.ComponentModel.Composition;
 using System.Reflection;
-using DryIoc.AttributedRegistration;
 using DryIoc.UnitTests.CUT;
 using DryIoc.UnitTests.Playground;
 using NUnit.Framework;
@@ -120,7 +118,7 @@ namespace DryIoc.UnitTests
             container.Register<Brain>();
 
             container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(AttributedRegistrator.TryGetPropertyOrFieldServiceKey);
+                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
 
             var chicken = container.Resolve<FunnyChicken>();
 
@@ -134,7 +132,7 @@ namespace DryIoc.UnitTests
             container.Register<FunnyDuckling>();
 
             container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(AttributedRegistrator.TryGetPropertyOrFieldServiceKey);
+                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
 
             Assert.DoesNotThrow(() =>
                 container.Resolve<FunnyDuckling>());
@@ -148,7 +146,7 @@ namespace DryIoc.UnitTests
             container.Register<Guts>();
 
             container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(AttributedRegistrator.TryGetPropertyOrFieldServiceKey);
+                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
 
             var chicken = container.Resolve<FunkyChicken>();
 
@@ -163,15 +161,48 @@ namespace DryIoc.UnitTests
             container.Register<Guts>(named: "lazy-me");
 
             container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(AttributedRegistrator.TryGetPropertyOrFieldServiceKey);
+                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
 
             var chicken = container.Resolve<LazyChicken>();
 
             Assert.That(chicken.SomeGuts, Is.Not.Null);
         }
+
+        public static bool TryGetPropertyOrFieldServiceKey(out object key, MemberInfo member, Request _, IRegistry registry)
+        {
+            key = null;
+            var attributes = member.GetCustomAttributes(false);
+            if (attributes.Length == 0)
+                return false;
+
+            var import = GetSingleAttributeOrNull<ImportAttribute>(attributes);
+            key = import == null ? null : import.ContractName;
+            return import != null;
+        }
+
+        private static TAttribute GetSingleAttributeOrNull<TAttribute>(object[] attributes) where TAttribute : Attribute
+        {
+            TAttribute attr = null;
+            for (var i = 0; i < attributes.Length && attr == null; i++)
+                attr = attributes[i] as TAttribute;
+            return attr;
+        }
     }
 
     #region CUT
+
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+    public class ImportAttribute : Attribute
+    {
+        public ImportAttribute() { }
+
+        public ImportAttribute(string contractName)
+        {
+            ContractName = contractName;
+        }
+
+        public string ContractName { get; set; }
+    }
 
     public class PropertyHolder
     {

@@ -41,12 +41,109 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\DryIoc.UnitTests\CompositePatternTests.cs">
+      <Link>UnitTests\CompositePatternTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\ContainerTests.cs">
+      <Link>UnitTests\ContainerTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\ContextDependentResolutionTests.cs">
+      <Link>UnitTests\ContextDependentResolutionTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\CUT\ContainerTests.CUT.cs">
+      <Link>UnitTests\CUT\ContainerTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\DecoratorConditionTests.cs">
+      <Link>UnitTests\DecoratorConditionTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\DecoratorTests.cs">
+      <Link>UnitTests\DecoratorTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\DelegateFactoryTests.cs">
+      <Link>UnitTests\DelegateFactoryTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\DiagnosticsTests.cs">
+      <Link>UnitTests\DiagnosticsTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\DynamicFactoryTests.cs">
+      <Link>UnitTests\DynamicFactoryTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\EnumerableAndArrayTests.cs">
+      <Link>UnitTests\EnumerableAndArrayTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\FuncTests.cs">
+      <Link>UnitTests\FuncTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\GenericWrapperTests.cs">
+      <Link>UnitTests\GenericWrapperTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\IntTreeTests.cs">
+      <Link>UnitTests\IntTreeTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\LazyTests.cs">
+      <Link>UnitTests\LazyTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\MetadataTests.cs">
+      <Link>UnitTests\MetadataTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\OpenGenericsTests.cs">
+      <Link>UnitTests\OpenGenericsTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\Playground\AvlTree.cs">
+      <Link>UnitTests\Playground\AvlTree.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\Playground\Experiments.cs">
+      <Link>UnitTests\Playground\Experiments.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\Playground\HashTreeWithMonoidUpdate.cs">
+      <Link>UnitTests\Playground\HashTreeWithMonoidUpdate.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\Playground\IntNTree.cs">
+      <Link>UnitTests\Playground\IntNTree.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\Playground\IntNTreeTests.cs">
+      <Link>UnitTests\Playground\IntNTreeTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\Playground\OptionsPlayTests.cs">
+      <Link>UnitTests\Playground\OptionsPlayTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\Playground\ThrowPlayTests.cs">
+      <Link>UnitTests\Playground\ThrowPlayTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\Playground\TreeBuilderTests.cs">
+      <Link>UnitTests\Playground\TreeBuilderTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\Playground\TypeTree.cs">
+      <Link>UnitTests\Playground\TypeTree.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\PropertyResolutionTests.cs">
+      <Link>UnitTests\PropertyResolutionTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\RegisterAll.cs">
+      <Link>UnitTests\RegisterAll.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\ResolutionRulesTests.cs">
+      <Link>UnitTests\ResolutionRulesTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\ReuseTests.cs">
+      <Link>UnitTests\ReuseTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\SugarTests.cs">
+      <Link>UnitTests\SugarTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\ThrowTests.cs">
+      <Link>UnitTests\ThrowTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.UnitTests\TypeCSharpNameFormattingTests.cs">
+      <Link>UnitTests\TypeCSharpNameFormattingTests.cs</Link>
+    </Compile>
     <Compile Include="ClosureFieldsAccessSpeed.cs" />
     <Compile Include="Container.cs" />
     <Compile Include="FastSingletonTests.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
