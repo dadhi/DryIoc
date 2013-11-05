@@ -87,25 +87,6 @@ namespace DryIoc.UnitTests
             Assert.Throws<ContainerException>(() => 
                 container.Resolve<ServiceWithDependency>());
         }
-
-        [Test]
-        public void Registration_with_resolver_as_param_should_NOT_hold_reference_to_container_when_it_is_GCed()
-        {
-            var container = new Container();
-            var containerWeakRef = new WeakReference(container);
-
-            container.Register<IDependency, Dependency>();
-            container.RegisterDelegate(r => new ServiceWithDependency(r.Resolve<IDependency>()));
-            container.Resolve<ServiceWithDependency>();
-            container.Dispose();
-// ReSharper disable RedundantAssignment
-            container = null;
-// ReSharper restore RedundantAssignment
-            
-            GC.Collect();
-
-            Assert.That(containerWeakRef.IsAlive, Is.False);
-        }
     }
 }
 

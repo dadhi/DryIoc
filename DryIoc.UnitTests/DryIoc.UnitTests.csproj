@@ -39,6 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CompositePatternTests.cs" />
+    <Compile Include="Memory\NoLeakingMemoryTests.cs" />
     <Compile Include="Performance\ClosureFieldsAccessSpeed.cs" />
     <Compile Include="Playground\AvlTree.cs" />
     <Compile Include="ResolutionRulesTests.cs" />

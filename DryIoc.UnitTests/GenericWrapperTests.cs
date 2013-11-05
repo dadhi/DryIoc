@@ -58,25 +58,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolved_wrapper_should_NOT_hold_reference_to_container()
-        {
-            var container = new Container();
-
-            container.Register(typeof(IService), typeof(Service), setup: ServiceSetup.WithMetadata("007"));
-            var services = container.Resolve<IEnumerable<Meta<Lazy<IService>, string>>>();
-
-            var containerWeakRef = new WeakReference(container);
-            // ReSharper disable RedundantAssignment
-            container = null;
-            // ReSharper restore RedundantAssignment
-            GC.Collect(Int32.MaxValue);
-            GC.WaitForFullGCComplete();
-            GC.Collect(Int32.MaxValue);
-            GC.KeepAlive(services);
-            Assert.That(containerWeakRef.IsAlive, Is.False);
-        }
-
-        [Test]
         public void Wrapper_is_only_working_if_used_in_enumerable_or_other_wrapper_It_means_that_directly_resolving_multiple_wrapper_would_NOT_throw()
         {
             var container = new Container();

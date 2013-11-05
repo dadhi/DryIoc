@@ -399,4 +399,23 @@ namespace DryIoc.UnitTests.CUT
             Transient = transient;
         }
     }
+
+    public interface IBar { }
+
+    class Bar : IBar { }
+
+    internal interface IFuh
+    {
+        IBar Bar { get; set; }
+    }
+
+    class Fuh : IFuh
+    {
+        public IBar Bar { get; set; }
+
+        public Fuh(IBar bar)
+        {
+            Bar = bar;
+        }
+    }
 }

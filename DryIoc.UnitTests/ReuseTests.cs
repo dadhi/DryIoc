@@ -167,9 +167,9 @@ namespace DryIoc.UnitTests
 
             IService serviceInNestedScope;
             using (container.OpenScope())
-                serviceInNestedScope = container.Resolve<IService>();
+                serviceInNestedScope = container.Resolve<Func<IService>>()();
 
-            var serviceInOuterScope = container.Resolve<IService>();
+            var serviceInOuterScope = container.Resolve<Func<IService>>()();
 
             Assert.That(serviceInNestedScope, Is.SameAs(serviceInOuterScope));
         }

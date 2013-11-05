@@ -83,38 +83,14 @@
     <Compile Include="..\DryIoc.UnitTests\LazyTests.cs">
       <Link>UnitTests\LazyTests.cs</Link>
     </Compile>
+    <Compile Include="..\DryIoc.UnitTests\Memory\NoLeakingMemoryTests.cs">
+      <Link>UnitTests\Memory\NoLeakingMemoryTests.cs</Link>
+    </Compile>
     <Compile Include="..\DryIoc.UnitTests\MetadataTests.cs">
       <Link>UnitTests\MetadataTests.cs</Link>
     </Compile>
     <Compile Include="..\DryIoc.UnitTests\OpenGenericsTests.cs">
       <Link>UnitTests\OpenGenericsTests.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIoc.UnitTests\Playground\AvlTree.cs">
-      <Link>UnitTests\Playground\AvlTree.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIoc.UnitTests\Playground\Experiments.cs">
-      <Link>UnitTests\Playground\Experiments.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIoc.UnitTests\Playground\HashTreeWithMonoidUpdate.cs">
-      <Link>UnitTests\Playground\HashTreeWithMonoidUpdate.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIoc.UnitTests\Playground\IntNTree.cs">
-      <Link>UnitTests\Playground\IntNTree.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIoc.UnitTests\Playground\IntNTreeTests.cs">
-      <Link>UnitTests\Playground\IntNTreeTests.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIoc.UnitTests\Playground\OptionsPlayTests.cs">
-      <Link>UnitTests\Playground\OptionsPlayTests.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIoc.UnitTests\Playground\ThrowPlayTests.cs">
-      <Link>UnitTests\Playground\ThrowPlayTests.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIoc.UnitTests\Playground\TreeBuilderTests.cs">
-      <Link>UnitTests\Playground\TreeBuilderTests.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIoc.UnitTests\Playground\TypeTree.cs">
-      <Link>UnitTests\Playground\TypeTree.cs</Link>
     </Compile>
     <Compile Include="..\DryIoc.UnitTests\PropertyResolutionTests.cs">
       <Link>UnitTests\PropertyResolutionTests.cs</Link>
