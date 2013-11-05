@@ -64,7 +64,7 @@ namespace DryIoc
             _currentScope = _singletonScope = new Scope();
 
             // put itself into constants, to support container access inside expression. It is common for dynamic scenarios. 
-            _constants = new object[] { new WeakReference(this) }; 
+            _constants = new object[] { new WeakReference(this) };
 
             ResolutionRules = new ResolutionRules();
             (setup ?? DefaultSetup).Invoke(this);
@@ -218,19 +218,19 @@ namespace DryIoc
 
         public ResolutionRules ResolutionRules { get; private set; }
 
-        public readonly static ParameterExpression ConstantsParameter = 
+        public readonly static ParameterExpression ConstantsParameter =
             Expression.Parameter(typeof(object[]), "constants");
 
-        public static readonly Expression RegistryWeakRefExpression = 
+        public static readonly Expression RegistryWeakRefExpression =
             Expression.Convert(Expression.ArrayIndex(ConstantsParameter, Expression.Constant(0)), typeof(WeakReference));
 
-        public readonly static Expression RegistryExpression = 
+        public readonly static Expression RegistryExpression =
             Expression.Convert(Expression.Property(RegistryWeakRefExpression, "Target"), typeof(IRegistry));
 
         public object[] Constants { get { return _constants; } }
 
         public Scope SingletonScope { get { return _singletonScope; } }
-        
+
         public Scope CurrentScope { get { return _currentScope; } }
 
         public Expression GetConstantExpression(object constant, Type constantType)
@@ -621,9 +621,11 @@ namespace DryIoc
             var serviceType = request.ServiceType.GetGenericArguments()[0];
 
             var serviceRequest = request.PushWithParentKey(serviceType);
-            var serviceExpr = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw).GetExpression(serviceRequest, registry);
-            var expression = Expression.New(ctor, Container.CreateFactoryExpression(serviceExpr));
-            return expression;
+            var serviceExpr = registry
+                .GetOrAddFactory(serviceRequest, IfUnresolved.Throw)
+                .GetExpression(serviceRequest, registry);
+
+            return Expression.New(ctor, Container.CreateFactoryExpression(serviceExpr));
         }
 
         public static Factory GetMetaFactoryOrNull(Request request, IRegistry registry)
@@ -970,7 +972,7 @@ when resolving {1}.";
             var factory = new DelegateFactory(
                 (_, registry) =>
                 {
-                    var lambdaExpr = registry.GetConstantExpression(lambda, typeof (Func<IResolver, TService>));
+                    var lambdaExpr = registry.GetConstantExpression(lambda, typeof(Func<IResolver, TService>));
                     return Expression.Invoke(lambdaExpr, Container.RegistryExpression);
                 },
                 reuse, setup);

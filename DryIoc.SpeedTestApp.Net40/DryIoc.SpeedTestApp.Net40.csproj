@@ -113,8 +113,10 @@
     <Compile Include="..\DryIoc.UnitTests\TypeCSharpNameFormattingTests.cs">
       <Link>UnitTests\TypeCSharpNameFormattingTests.cs</Link>
     </Compile>
+    <Compile Include="..\DryIoc\Container.cs">
+      <Link>Container.cs</Link>
+    </Compile>
     <Compile Include="ClosureFieldsAccessSpeed.cs" />
-    <Compile Include="Container.cs" />
     <Compile Include="FastSingletonTests.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
