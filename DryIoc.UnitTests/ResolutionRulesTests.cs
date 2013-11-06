@@ -268,11 +268,11 @@ namespace DryIoc.UnitTests
 
     #region CUT
 
-    internal class SomeService
+    public class SomeService
     {
     }
 
-    internal class Bla<T>
+    public class Bla<T>
     {
         public string Message { get; set; }
         public Func<T> Factory { get; set; }
@@ -338,7 +338,7 @@ namespace DryIoc.UnitTests
     {
     }
 
-    class Orange : IFruit
+    public class Orange : IFruit
     {
     }
 

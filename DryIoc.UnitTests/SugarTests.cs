@@ -49,22 +49,22 @@ namespace DryIoc.UnitTests
 
     public class A : B, IA { }
 
-    class Fuzz<T> : Buzz, IFuzz<T>
+    public class Fuzz<T> : Buzz, IFuzz<T>
     {
         public class NestedClazz : IFuzz<T>
         {
         }
     }
 
-    internal class Buzz : IBuzz
+    public class Buzz : IBuzz
     {
     }
 
-    interface IFuzz<T> : IFuzz
+    public interface IFuzz<T> : IFuzz
     {
     }
 
-    interface IFuzz { }
+    public interface IFuzz { }
 
-    interface IBuzz { }
+    public interface IBuzz { }
 }

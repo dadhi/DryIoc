@@ -81,7 +81,7 @@ namespace DryIoc.UnitTests
         string Log(string message);
     }
 
-    class Logger<T> : ILogger
+    public class Logger<T> : ILogger
     {
         public string Log(string message)
         {

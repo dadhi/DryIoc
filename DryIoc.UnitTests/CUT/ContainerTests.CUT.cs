@@ -402,14 +402,14 @@ namespace DryIoc.UnitTests.CUT
 
     public interface IBar { }
 
-    class Bar : IBar { }
+    public class Bar : IBar { }
 
-    internal interface IFuh
+    public interface IFuh
     {
         IBar Bar { get; set; }
     }
 
-    class Fuh : IFuh
+    public class Fuh : IFuh
     {
         public IBar Bar { get; set; }
 

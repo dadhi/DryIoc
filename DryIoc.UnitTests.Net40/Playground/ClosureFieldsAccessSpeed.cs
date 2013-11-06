@@ -10,6 +10,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests.Net40.Playground
 {
     [TestFixture]
+    [Ignore]
     public class ClosureFieldsAccessSpeed
     {
         public static void TestExpr()

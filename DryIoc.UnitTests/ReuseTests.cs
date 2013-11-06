@@ -257,14 +257,15 @@ namespace DryIoc.UnitTests
             return Reuse.GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
         }
 
+        public static Scope GetScope()
+        {
+            return _scope = _scope ?? new Scope();
+        }
+
         [ThreadStatic]
         private static Scope _scope;
 
         private static readonly Expression _scopeExpr = Expression.Call(typeof(ThreadReuse), "GetScope", null);
-        internal static Scope GetScope()
-        {
-            return _scope = _scope ?? new Scope();
-        }
     }
 
     #region CUT

@@ -23,15 +23,15 @@ namespace DryIoc.UnitTests
     {
     }
 
-    internal class FastHandler : IHandler
+    public class FastHandler : IHandler
     {
     }
 
-    internal class SlowHandler : IHandler
+    public class SlowHandler : IHandler
     {
     }
 
-    internal class LoggingHandlerDecorator : IHandler
+    public class LoggingHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
 

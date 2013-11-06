@@ -441,7 +441,7 @@ namespace DryIoc.UnitTests
     {
     }
 
-    internal class Measurer : IMeasurer
+    public class Measurer : IMeasurer
     {
     }
 

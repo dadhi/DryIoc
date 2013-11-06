@@ -12,9 +12,9 @@ namespace DryIoc.UnitTests
 			var container = new Container();
 			container.RegisterAll<Someberry>();
 
-			Assert.That(container.IsRegistered<IBerry>(), Is.True);
+			Assert.That(container.IsRegistered<IBerry>(), Is.False);
 			Assert.That(container.IsRegistered<IProduct>(), Is.True);
-			Assert.That(container.IsRegistered<Someberry>(), Is.False);
+			Assert.That(container.IsRegistered<Someberry>(), Is.True);
 		}
 
 		[Test]
@@ -26,12 +26,12 @@ namespace DryIoc.UnitTests
 
 			// Act
 			var product = container.Resolve<IProduct>();
-			var berry = container.Resolve<IBerry>();
+            var berry = container.Resolve<Someberry>();
 
 			Assert.That(product, Is.SameAs(berry));
 		}
 
-	    internal class Someberry : IBerry, IProduct
+	    public class Someberry : IBerry, IProduct
 		{
 		}
 
@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
 		{
 		}
 
-		public interface IBerry
+	    internal interface IBerry
 		{
 		}
 	}

@@ -64,7 +64,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
             Handler = handler;
         }
 
-        internal class Condition : IDecoratorCondition
+        public class Condition : IDecoratorCondition
         {
             public bool Check(Request request)
             {
