@@ -1680,6 +1680,7 @@ when resolving {1}.";
                 Expression.Lambda(factoryExpr, null));
         }
 
+        // Used by reflection only (inside factory expression).
         public static Scope InitScope(ref Scope scope)
         {
             return scope = scope ?? new Scope();
