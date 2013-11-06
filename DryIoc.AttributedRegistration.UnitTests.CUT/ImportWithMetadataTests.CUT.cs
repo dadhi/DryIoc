@@ -2,7 +2,7 @@
 
 namespace DryIoc.AttributedRegistration.UnitTests.CUT
 {
-    enum FooMetadata { Hey, Blah, NotFound }
+    public enum FooMetadata { Hey, Blah, NotFound }
 
     [ExportAll, ExportWithMetadata(FooMetadata.Hey)]
     public class FooHey : IFooService

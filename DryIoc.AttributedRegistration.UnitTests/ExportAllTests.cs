@@ -20,18 +20,6 @@ namespace DryIoc.AttributedRegistration.UnitTests
         }
 
         [Test]
-        public void When_generic_class_all_public_types_exported_Then_resolving_internal_type_should_throw()
-        {
-            var container = new Container();
-            container.RegisterExported(typeof(ISomeDb).Assembly);
-
-            container.Resolve<ISomeDb<int>>();
-
-            Assert.Throws<ContainerException>(
-                () => container.Resolve<DbMan<int>>());
-        }
-
-        [Test]
         public void ExportAll_should_respect_ContractName()
         {
             var container = new Container();

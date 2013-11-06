@@ -26,7 +26,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     }
 
     [ExportAll, ExportAsGenericWrapper]
-    internal class DryFactory<TService> : IFactory<TService>
+    public class DryFactory<TService> : IFactory<TService>
     {
         public DryFactory(Func<TService> create)
         {
@@ -69,7 +69,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     }
 
     [ExportAll, ExportAsGenericWrapper(1)]
-    internal class DryFactory<TArg0, TService> : IFactory<TArg0, TService>
+    public class DryFactory<TArg0, TService> : IFactory<TArg0, TService>
     {
         public DryFactory(Func<TArg0, TService> create)
         {

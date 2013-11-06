@@ -7,22 +7,22 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     }
 
     [ExportAll(ContractName = "fast"), ExportWithMetadata(2)]
-    internal class FastHandler : IHandler
+    public class FastHandler : IHandler
     {
     }
 
     [ExportAll(ContractName = "slow"), ExportWithMetadata(1)]
-    internal class SlowHandler : IHandler
+    public class SlowHandler : IHandler
     {
     }
 
     [ExportAll(ContractName = "transact"), ExportWithMetadata(1)]
-    internal class TransactHandler : IHandler
+    public class TransactHandler : IHandler
     {
     }
 
     [ExportAll, ExportAsDecorator(ContractName = "slow")]
-    internal class LoggingHandlerDecorator : IHandler
+    public class LoggingHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
 
@@ -33,7 +33,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     }
 
     [ExportAll, ExportAsDecorator(ShouldCompareMetadata = true), ExportWithMetadata(2)]
-    internal class RetryHandlerDecorator : IHandler
+    public class RetryHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
 
@@ -44,7 +44,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     }
 
     [ExportAll, ExportAsDecorator(ContractName = "transact", ShouldCompareMetadata = true), ExportWithMetadata(1)]
-    internal class TransactHandlerDecorator : IHandler
+    public class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
 
@@ -55,7 +55,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     }
 
     [Export(typeof(IHandler)), ExportAsDecorator(ConditionType = typeof(Condition))]
-    internal class CustomHandlerDecorator : IHandler
+    public class CustomHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
 
