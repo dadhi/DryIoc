@@ -1,4 +1,5 @@
 ﻿using System;
+using DryIoc.UnitTests.Net40.Playground;
 
 namespace DryIoc.SpeedTestApp.Net40
 {

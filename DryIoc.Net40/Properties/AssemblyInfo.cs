@@ -1,15 +1,14 @@
 ﻿using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("DryIoc.AttributedRegistration.UnitTests.CUT")]
+[assembly: AssemblyTitle("DryIoc.Net40")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("DryIoc.AttributedRegistration.UnitTests.CUT")]
+[assembly: AssemblyProduct("DryIoc.Net40")]
 [assembly: AssemblyCopyright("")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -20,7 +19,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("c88420bf-cb61-4c79-8436-cae94167d74a")]
+[assembly: Guid("7bb4edd9-a652-4186-ae43-e7c26eeb955a")]
 
 // Version information for an assembly consists of the following four values:
 //
@@ -34,5 +33,3 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
-
-[assembly: InternalsVisibleTo("DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests")]

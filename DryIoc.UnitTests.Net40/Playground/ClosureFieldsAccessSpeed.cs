@@ -7,7 +7,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using NUnit.Framework;
 
-namespace DryIoc.SpeedTestApp.Net40
+namespace DryIoc.UnitTests.Net40.Playground
 {
     [TestFixture]
     public class ClosureFieldsAccessSpeed

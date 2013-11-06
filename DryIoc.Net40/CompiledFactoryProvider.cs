@@ -4,17 +4,20 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using DryIoc;
 
-[assembly: InternalsVisibleTo("DryIoc.CompiledFactoryProvider.DynamicAssembly")]
+[assembly: InternalsVisibleTo(CompiledFactoryProvider.DYNAMIC_ASSEMBLY_NAME)]
 
 namespace DryIoc
 {
     public static partial class CompiledFactoryProvider
     {
+        public const string DYNAMIC_ASSEMBLY_NAME = "DryIoc.CompiledFactoryProvider.DynamicAssembly";
+
         static partial void CompileToDynamicMethod(Expression<CompiledFactory> factoryExpression, ref CompiledFactory resultFactory)
         {
             Interlocked.CompareExchange(ref _moduleBuilder, DefineDynamicModuleBuilder(), null);
-            var typeName = "type" + Interlocked.Increment(ref TypeId);
+            var typeName = "Factory" + Interlocked.Increment(ref TypeId);
             var typeBuilder = _moduleBuilder.DefineType(typeName, TypeAttributes.Public);
             var methodBuilder = typeBuilder.DefineMethod("GetService", MethodAttributes.Public | MethodAttributes.Static, 
                 typeof(object), new[] { typeof(object[]), typeof(Scope) });
@@ -24,16 +27,21 @@ namespace DryIoc
                 dynamicType.GetMethod("GetService"));
         }
 
-        private static int TypeId; 
+        #region Implementation
+
+        private static int TypeId;
 
         private static ModuleBuilder _moduleBuilder;
 
         private static ModuleBuilder DefineDynamicModuleBuilder()
         {
-            var assemblyName = new AssemblyName("DryIoc.CompiledFactoryProvider.DynamicAssembly");
-            var assemblyBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+            var assemblyName = new AssemblyName(DYNAMIC_ASSEMBLY_NAME);
+            var assemblyBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName,
+                AssemblyBuilderAccess.RunAndCollect);
             var moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name);
             return moduleBuilder;
         }
+
+        #endregion
     }
 }
