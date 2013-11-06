@@ -14,17 +14,22 @@ namespace DryIoc
     {
         public const string DYNAMIC_ASSEMBLY_NAME = "DryIoc.CompiledFactoryProvider.DynamicAssembly";
 
-        static partial void CompileToDynamicMethod(Expression<CompiledFactory> factoryExpression, ref CompiledFactory resultFactory)
+        static partial void CompileToMethod(Expression<CompiledFactory> factoryExpression, ref CompiledFactory resultFactory)
         {
+            resultFactory.ThrowIf(resultFactory != null);
+
             Interlocked.CompareExchange(ref _moduleBuilder, DefineDynamicModuleBuilder(), null);
+            
             var typeName = "Factory" + Interlocked.Increment(ref TypeId);
-            var typeBuilder = _moduleBuilder.DefineType(typeName, TypeAttributes.Public);
-            var methodBuilder = typeBuilder.DefineMethod("GetService", MethodAttributes.Public | MethodAttributes.Static, 
+            var typeBuilder = _moduleBuilder.DefineType(typeName, TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
+            
+            var methodBuilder = typeBuilder.DefineMethod("GetService", MethodAttributes.Public | MethodAttributes.Static,
                 typeof(object), new[] { typeof(object[]), typeof(Scope) });
+            
             factoryExpression.CompileToMethod(methodBuilder);
+            
             var dynamicType = typeBuilder.CreateType();
-            resultFactory = (CompiledFactory)Delegate.CreateDelegate(typeof(CompiledFactory), 
-                dynamicType.GetMethod("GetService"));
+            resultFactory = (CompiledFactory)Delegate.CreateDelegate(typeof(CompiledFactory), dynamicType.GetMethod("GetService"));
         }
 
         #region Implementation

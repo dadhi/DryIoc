@@ -557,11 +557,12 @@ namespace DryIoc
         public static CompiledFactory CompileFactory(this Expression<CompiledFactory> factoryExpression)
         {
             CompiledFactory factory = null;
-            CompileToDynamicMethod(factoryExpression, ref factory);
+            CompileToMethod(factoryExpression, ref factory);
             return factory ?? factoryExpression.Compile();
         }
 
-        static partial void CompileToDynamicMethod(Expression<CompiledFactory> factoryExpression, ref CompiledFactory resultFactory);
+        // Partial method definition to be implemented in .NET40 version of Container.
+        static partial void CompileToMethod(Expression<CompiledFactory> factoryExpression, ref CompiledFactory resultFactory);
     }
 
     public static class ContainerSetup
@@ -1679,12 +1680,12 @@ when resolving {1}.";
                 Expression.Lambda(factoryExpr, null));
         }
 
-        #region Implementation
-
-        internal static Scope InitScope(ref Scope scope)
+        public static Scope InitScope(ref Scope scope)
         {
             return scope = scope ?? new Scope();
         }
+
+        #region Implementation
 
         private static readonly MethodInfo _getOrAddToScopeMethod = typeof(Scope).GetMethod("GetOrAdd");
 
