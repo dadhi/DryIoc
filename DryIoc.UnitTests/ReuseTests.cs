@@ -259,18 +259,11 @@ namespace DryIoc.UnitTests
 
         [ThreadStatic]
         private static Scope _scope;
-        private static readonly Expression _scopeExpr;
 
-        // ReSharper disable UnusedMember.Local
-        private static Scope GetScope()
+        private static readonly Expression _scopeExpr = Expression.Call(typeof(ThreadReuse), "GetScope", null);
+        internal static Scope GetScope()
         {
-            return _scope ?? (_scope = new Scope());
-        }
-        // ReSharper restore UnusedMember.Local
-
-        static ThreadReuse()
-        {
-            _scopeExpr = Expression.Call(typeof(ThreadReuse), "GetScope", null);
+            return _scope = _scope ?? new Scope();
         }
     }
 

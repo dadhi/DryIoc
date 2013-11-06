@@ -1668,7 +1668,7 @@ when resolving {1}.";
         {
             Singleton = new SingletonReuse();
             InCurrentScope = new ScopedReuse(Container.CurrentScopeExpression);
-            InResolutionScope = new ScopedReuse(Expression.Call(typeof(Reuse), "CreateScopeOnce", null, Container.ResolutionScopeParameter));
+            InResolutionScope = new ScopedReuse(Expression.Call(typeof(Reuse), "InitScope", null, Container.ResolutionScopeParameter));
         }
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
@@ -1681,15 +1681,12 @@ when resolving {1}.";
 
         #region Implementation
 
-        private static readonly MethodInfo _getOrAddToScopeMethod = typeof(Scope).GetMethod("GetOrAdd");
-
-        // ReSharper disable UnusedMember.Local
-        // Used only by reflection
-        private static Scope CreateScopeOnce(ref Scope scope)
+        internal static Scope InitScope(ref Scope scope)
         {
-            return scope ?? (scope = new Scope());
+            return scope = scope ?? new Scope();
         }
-        // ReSharper restore UnusedMember.Local
+
+        private static readonly MethodInfo _getOrAddToScopeMethod = typeof(Scope).GetMethod("GetOrAdd");
 
         private sealed class ScopedReuse : IReuse
         {
