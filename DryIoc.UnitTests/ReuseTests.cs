@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq.Expressions;
-using System.Reflection;
 using System.Threading;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -192,7 +191,7 @@ namespace DryIoc.UnitTests
         public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same()
         {
             var container = new Container();
-            container.Register<Service>(CustomReuse.InThread);
+            container.Register<Service>(CustomReuse.InThreadScope);
 
             var one = container.Resolve<Service>();
             var another = container.Resolve<Service>();
@@ -205,7 +204,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ServiceWithDependency>();
-            container.Register<IDependency, Dependency>(CustomReuse.InThread);
+            container.Register<IDependency, Dependency>(CustomReuse.InThreadScope);
 
             var one = container.Resolve<ServiceWithDependency>();
             var another = container.Resolve<ServiceWithDependency>();
@@ -216,7 +215,7 @@ namespace DryIoc.UnitTests
         public void Given_Thread_reuse_Services_resolved_in_different_thread_should_be_the_different()
         {
             var container = new Container();
-            container.Register<Service>(CustomReuse.InThread);
+            container.Register<Service>(CustomReuse.InThreadScope);
 
             Service one = null;
             var threadOne = new Thread(() => one = container.Resolve<Service>()) { IsBackground = true };
@@ -233,7 +232,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ServiceWithDependency>();
-            container.Register<IDependency, Dependency>(CustomReuse.InThread);
+            container.Register<IDependency, Dependency>(CustomReuse.InThreadScope);
 
             ServiceWithDependency one = null;
             var threadOne = new Thread(() => one = container.Resolve<ServiceWithDependency>());
@@ -248,7 +247,7 @@ namespace DryIoc.UnitTests
 
     public static class CustomReuse
     {
-        public static ThreadReuse InThread = new ThreadReuse();
+        public static ThreadReuse InThreadScope = new ThreadReuse();
     }
 
     public class ThreadReuse : IReuse
@@ -271,7 +270,7 @@ namespace DryIoc.UnitTests
 
         static ThreadReuse()
         {
-            _scopeExpr = Expression.Call(typeof(ThreadReuse).GetMethod("GetScope", BindingFlags.Static | BindingFlags.NonPublic));
+            _scopeExpr = Expression.Call(typeof(ThreadReuse), "GetScope", null);
         }
     }
 

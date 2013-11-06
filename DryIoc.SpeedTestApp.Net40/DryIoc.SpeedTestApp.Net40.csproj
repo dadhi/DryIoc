@@ -117,6 +117,7 @@
       <Link>Container.cs</Link>
     </Compile>
     <Compile Include="ClosureFieldsAccessSpeed.cs" />
+    <Compile Include="CompiledFactoryProvider.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

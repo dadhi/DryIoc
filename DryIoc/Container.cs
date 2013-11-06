@@ -212,8 +212,7 @@ namespace DryIoc
             var request = new Request(null, serviceType, null);
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null) return EmptyCompiledFactory;
-            var expression = factory.GetExpression(request, this);
-            var result = CreateFactoryExpression(expression).Compile();
+            var result = factory.GetExpression(request, this).ToCompiledFactoryExpression().CompileFactory();
             Interlocked.Exchange(ref _defaultResolutionCache,
                 _defaultResolutionCache.AddOrUpdate(serviceType.GetHashCode(), new KV<Type, CompiledFactory>(serviceType, result)));
             return result;
@@ -548,6 +547,23 @@ namespace DryIoc
 
     public delegate object CompiledFactory(object[] constants, Scope resolutionScope);
 
+    public static partial class CompiledFactoryProvider
+    {
+        public static Expression<CompiledFactory> ToCompiledFactoryExpression(this Expression expression)
+        {
+            return Expression.Lambda<CompiledFactory>(expression, Container.ConstantsParameter, Container.ResolutionScopeParameter);
+        }
+
+        public static CompiledFactory CompileFactory(this Expression<CompiledFactory> factoryExpression)
+        {
+            CompiledFactory factory = null;
+            CompileToDynamicMethod(factoryExpression, ref factory);
+            return factory ?? factoryExpression.Compile();
+        }
+
+        static partial void CompileToDynamicMethod(Expression<CompiledFactory> factoryExpression, ref CompiledFactory resultFactory);
+    }
+
     public static class ContainerSetup
     {
         public static Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
@@ -631,13 +647,14 @@ namespace DryIoc
         {
             var ctor = request.ServiceType.GetConstructors()[0];
             var serviceType = request.ServiceType.GetGenericArguments()[0];
-
             var serviceRequest = request.PushWithParentKey(serviceType);
+
             var serviceExpr = registry
                 .GetOrAddFactory(serviceRequest, IfUnresolved.Throw)
                 .GetExpression(serviceRequest, registry);
 
-            return Expression.New(ctor, Container.CreateFactoryExpression(serviceExpr));
+            var expressionConstExpr = registry.GetConstantExpression(serviceExpr, typeof(Expression));
+            return Expression.New(ctor, expressionConstExpr);
         }
 
         public static Factory GetMetaFactoryOrNull(Request request, IRegistry registry)
@@ -1651,7 +1668,7 @@ when resolving {1}.";
         {
             Singleton = new SingletonReuse();
             InCurrentScope = new ScopedReuse(Container.CurrentScopeExpression);
-            InResolutionScope = new ScopedReuse(Expression.Call(typeof(Reuse), "CreateScopeOnce", null, (Expression)Container.ResolutionScopeParameter));
+            InResolutionScope = new ScopedReuse(Expression.Call(typeof(Reuse), "CreateScopeOnce", null, Container.ResolutionScopeParameter));
         }
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
@@ -1764,9 +1781,9 @@ when resolving {1}.";
     {
         public readonly Expression<CompiledFactory> Expression;
 
-        public DebugExpression(Expression<CompiledFactory> expression)
+        public DebugExpression(Expression expression)
         {
-            Expression = expression;
+            Expression = expression.ToCompiledFactoryExpression();
         }
     }
 
