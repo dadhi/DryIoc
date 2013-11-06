@@ -8,9 +8,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("RenameTest")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("EPAM Systems")]
+[assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("RenameTest")]
-[assembly: AssemblyCopyright("Copyright © EPAM Systems 2013")]
+[assembly: AssemblyCopyright("")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

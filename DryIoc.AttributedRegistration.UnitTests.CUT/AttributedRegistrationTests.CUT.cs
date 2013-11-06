@@ -82,7 +82,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
         string Message { get; }
     }
 
-    [ExportWithDisplayName(ContractType = typeof(IServiceWithMultipleImplentations), DisplayName = "One")]
+    [ExportWithDisplayName(typeof(IServiceWithMultipleImplentations), "One")]
     [PartCreationPolicy(CreationPolicy.NonShared)]
     public class OneTransientService : IServiceWithMultipleImplentations
     {
@@ -110,12 +110,12 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     {
     }
 
-    [ExportWithDisplayName(ContractType = typeof(IServiceWithMetadata), DisplayName = "Up")]
+    [ExportWithDisplayName(typeof(IServiceWithMetadata), "Up")]
     public class OneServiceWithMetadata : IServiceWithMetadata
     {
     }
 
-    [ExportWithDisplayName(ContractType = typeof(IServiceWithMetadata), DisplayName = "Down")]
+    [ExportWithDisplayName(typeof(IServiceWithMetadata), "Down")]
     [PartCreationPolicy(CreationPolicy.NonShared)]
     public class AnotherServiceWithMetadata : IServiceWithMetadata
     {
@@ -140,6 +140,16 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     [MetadataAttribute]
     public class ExportWithDisplayNameAttribute : ExportAttribute, IViewMetadata
     {
+        public ExportWithDisplayNameAttribute(string displayName)
+        {
+            DisplayName = displayName;
+        }
+
+        public ExportWithDisplayNameAttribute(Type contractType, string displayName) : base(contractType)
+        {
+            DisplayName = displayName;
+        }
+
         public string DisplayName { get; set; }
     }
 

@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SpeedTestApp.Net40",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RenameTost", "RenameTost\RenameTost.csproj", "{BA8826D3-CB76-4F4C-B799-74912FE3E213}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AttributedRegistration.UnitTests.CUT.Net40", "DryIoc.AttributedRegistration.UnitTests.CUT.Net40\DryIoc.AttributedRegistration.UnitTests.CUT.Net40.csproj", "{1A7C2E33-4076-492B-A82D-D3B875F18A2A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -107,6 +109,16 @@ Global
 		{BA8826D3-CB76-4F4C-B799-74912FE3E213}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{BA8826D3-CB76-4F4C-B799-74912FE3E213}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{BA8826D3-CB76-4F4C-B799-74912FE3E213}.Release|x86.ActiveCfg = Release|Any CPU
+		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

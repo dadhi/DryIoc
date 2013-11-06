@@ -190,7 +190,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
 
     #region CUT
 
-    [ExportWithDisplayName(DisplayName = "blah")]
+    [ExportWithDisplayName("blah")]
     [ExportWithMetadata("hey")]
     public class OneWithManyMeta
     {

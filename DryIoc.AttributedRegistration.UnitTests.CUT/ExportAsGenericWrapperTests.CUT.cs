@@ -8,7 +8,8 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     {
         public FactoryConsumer(IFactory<One>[] ones)
         {
-            One = ones.ThrowIf(ones.Length == 0)[0].Create();
+            if (ones.Length == 0) throw new InvalidOperationException("Empty factory list");
+            One = ones[0].Create();
         }
 
         public One One { get; set; }

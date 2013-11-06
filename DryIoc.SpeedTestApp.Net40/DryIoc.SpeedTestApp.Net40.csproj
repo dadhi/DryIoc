@@ -38,9 +38,16 @@
       <HintPath>../lib/nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\AttributedRegistratorTests.cs">
+      <Link>AttributedRegistration\UnitTests\AttributedRegistratorTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ImportWithMetadataTests.cs">
+      <Link>AttributedRegistration\UnitTests\ImportWithMetadataTests.cs</Link>
+    </Compile>
     <Compile Include="..\DryIoc.UnitTests\CompositePatternTests.cs">
       <Link>UnitTests\CompositePatternTests.cs</Link>
     </Compile>
@@ -113,6 +120,9 @@
     <Compile Include="..\DryIoc.UnitTests\TypeCSharpNameFormattingTests.cs">
       <Link>UnitTests\TypeCSharpNameFormattingTests.cs</Link>
     </Compile>
+    <Compile Include="..\DryIoc\AttributedRegistration\AttributedRegistrator.cs">
+      <Link>AttributedRegistration\AttributedRegistrator.cs</Link>
+    </Compile>
     <Compile Include="..\DryIoc\Container.cs">
       <Link>Container.cs</Link>
     </Compile>
@@ -121,7 +131,13 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="..\DryIoc.AttributedRegistration.UnitTests.CUT.Net40\DryIoc.AttributedRegistration.UnitTests.CUT.Net40.csproj">
+      <Project>{1A7C2E33-4076-492B-A82D-D3B875F18A2A}</Project>
+      <Name>DryIoc.AttributedRegistration.UnitTests.CUT.Net40</Name>
+      <Private>False</Private>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
