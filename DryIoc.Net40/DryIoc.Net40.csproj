@@ -42,7 +42,7 @@
     <Compile Include="..\DryIoc\Container.cs">
       <Link>Container.cs</Link>
     </Compile>
-    <Compile Include="CompiledFactoryProvider.cs" />
+    <Compile Include="FactoryCompiler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

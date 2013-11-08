@@ -181,8 +181,8 @@ namespace DryIoc
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
         {
-            var entry = _keyedResolutionCache.GetValueOrDefault(serviceType);
-            var compiledFactory = entry != null ? entry.GetCompiledFactoryOrNull(serviceKey) : null;
+            var cacheEntry = _keyedResolutionCache.GetValueOrDefault(serviceType);
+            var compiledFactory = cacheEntry != null ? cacheEntry.GetCompiledFactoryOrNull(serviceKey) : null;
             if (compiledFactory == null)
             {
                 var request = new Request(null, serviceType, serviceKey);
@@ -190,7 +190,7 @@ namespace DryIoc
                 if (factory == null) return null;
                 compiledFactory = factory.GetExpression(request, this).ToCompiledFactoryExpression().CompileFactory();
                 Interlocked.Exchange(ref _keyedResolutionCache, _keyedResolutionCache.AddOrUpdate(serviceType,
-                    (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, compiledFactory)));
+                    (cacheEntry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, compiledFactory)));
             }
 
             return compiledFactory(_constants, resolutionScope: null);
@@ -538,7 +538,7 @@ namespace DryIoc
 
     public delegate object CompiledFactory(object[] constants, Scope resolutionScope);
 
-    public static partial class CompiledFactoryProvider
+    public static partial class FactoryCompiler
     {
         public static Expression<CompiledFactory> ToCompiledFactoryExpression(this Expression expression)
         {
@@ -1132,6 +1132,8 @@ when resolving {1}.";
         public abstract FactoryType Type { get; }
         public virtual FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.CacheExpression; } }
         public virtual object Metadata { get { return null; } }
+
+        public Func<Expression<CompiledFactory>, CompiledFactory> CompileToFactory = FactoryCompiler.CompileFactory;
     }
 
     public class ServiceSetup : FactorySetup

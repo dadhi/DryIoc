@@ -6,11 +6,11 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using DryIoc;
 
-[assembly: InternalsVisibleTo(CompiledFactoryProvider.DYNAMIC_ASSEMBLY_NAME)]
+[assembly: InternalsVisibleTo(FactoryCompiler.DYNAMIC_ASSEMBLY_NAME)]
 
 namespace DryIoc
 {
-    public static partial class CompiledFactoryProvider
+    public static partial class FactoryCompiler
     {
         public const string DYNAMIC_ASSEMBLY_NAME = "DryIoc.CompiledFactoryProvider.DynamicAssembly";
 
