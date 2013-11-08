@@ -190,19 +190,19 @@ namespace DryIoc
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
         {
             var entry = _keyedResolutionCache.GetValueOrDefault(serviceType);
-            var result = entry != null ? entry.GetCompiledFactoryOrNull(serviceKey.ThrowIfNull()) : null;
-            if (result == null) // nothing in cache now, try to resolve and cache.
+            var compiledFactory = entry != null ? entry.GetCompiledFactoryOrNull(serviceKey) : null;
+            if (compiledFactory == null)
             {
                 var request = new Request(null, serviceType, serviceKey);
                 var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
                 if (factory == null) return null;
                 var expression = factory.GetExpression(request, this);
-                result = CreateFactoryExpression(expression).Compile();
+                compiledFactory = CreateFactoryExpression(expression).Compile();
                 Interlocked.Exchange(ref _keyedResolutionCache, _keyedResolutionCache.AddOrUpdate(serviceType,
-                    (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, result)));
+                    (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, compiledFactory)));
             }
 
-            return result(_constants, resolutionScope: null);
+            return compiledFactory(_constants, resolutionScope: null);
         }
 
         private HashTree<Type, CompiledFactory> _defaultResolutionCache;
