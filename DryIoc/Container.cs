@@ -46,7 +46,6 @@ namespace DryIoc
     /// <para>
     /// TODO:
     /// <list type="bullet">
-    /// <item>upd: _defaultResulutionCache as HashTree. No need to use IntTree directly, performance benefit is too small.</item>
     /// <item>upd: Use static EnumerableResolve.</item>
     /// <item>upd: Refactor CompileFactory stuff to allow customization on Factory level.</item>
     /// <item>upd: Remove most of Container doc-comments.</item>
@@ -61,8 +60,8 @@ namespace DryIoc
             _syncRoot = new object();
             _factories = new Dictionary<Type, FactoriesEntry>();
             _decorators = HashTree<Type, DecoratorsEntry[]>.Using(Sugar.Append);
+            _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
             _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
-            _defaultResolutionCache = IntTree<KV<Type, CompiledFactory>>.Empty;
 
             // put itself into constants, to support container access inside expression. It is common for dynamic scenarios. 
             _constants = new object[3];
@@ -184,9 +183,8 @@ namespace DryIoc
 
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var factory = _defaultResolutionCache.GetValueOrDefault(serviceType.GetHashCode());
-            return (factory != null && serviceType == factory.Key ? factory.Value : ResolveAndCacheFactory(serviceType, ifUnresolved))
-                (_constants, resolutionScope: null);
+            return (_defaultResolutionCache.GetValueOrDefault(serviceType) ?? ResolveAndCacheFactory(serviceType, ifUnresolved))
+                .Invoke(_constants, resolutionScope: null);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -207,7 +205,7 @@ namespace DryIoc
             return result(_constants, resolutionScope: null);
         }
 
-        private IntTree<KV<Type, CompiledFactory>> _defaultResolutionCache;
+        private HashTree<Type, CompiledFactory> _defaultResolutionCache;
         private HashTree<Type, KeyedResolutionCacheEntry> _keyedResolutionCache;
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
@@ -215,10 +213,9 @@ namespace DryIoc
             var request = new Request(null, serviceType, null);
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null) return EmptyCompiledFactory;
-            var result = factory.GetExpression(request, this).ToCompiledFactoryExpression().CompileFactory();
-            Interlocked.Exchange(ref _defaultResolutionCache,
-                _defaultResolutionCache.AddOrUpdate(serviceType.GetHashCode(), new KV<Type, CompiledFactory>(serviceType, result)));
-            return result;
+            var compiledFactory = factory.GetExpression(request, this).ToCompiledFactoryExpression().CompileFactory();
+            Interlocked.Exchange(ref _defaultResolutionCache, _defaultResolutionCache.AddOrUpdate(serviceType, compiledFactory));
+            return compiledFactory;
         }
 
         private static object EmptyCompiledFactory(object[] costants, Scope resolutionScope) { return null; }
