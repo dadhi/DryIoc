@@ -44,8 +44,11 @@ namespace DryIoc
     /// </list>
     /// </para>
     /// <para>
-    /// TODO: vNext
+    /// TODO:
     /// <list type="bullet">
+    /// <item>upd: _defaultResulutionCache as HashTree. No need to use IntTree directly, performance benefit is too small.</item>
+    /// <item>upd: Use static EnumerableResolve.</item>
+    /// <item>upd: Refactor CompileFactory stuff to allow customization on Factory level.</item>
     /// <item>upd: Remove most of Container doc-comments.</item>
     /// <item>fix: Rules are not thread-safe regarding replacing the rule in place, cause the rules are provided as arrays.</item>
     /// </list>

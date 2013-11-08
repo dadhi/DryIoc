@@ -8,7 +8,7 @@ namespace DryIoc.AttributedRegistration
 {
     /// <summary>
     /// <para>
-    /// TODO: vNext
+    /// TODO:
     /// <list type="bullet">
     /// <item>add: Missing support of InheritedExport.</item>
     /// <item>add: Missing feature to register attributed DelegateFactory. IFactory to register with ExportFactory.</item>
