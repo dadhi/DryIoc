@@ -16,7 +16,7 @@ namespace DryIoc.UnitTests
 
             var rules = container.ResolutionRules;
             rules.UnregisteredServices = rules.UnregisteredServices
-                .Except(new[] { ContainerSetup.GetEnumerableDynamicallyOrNull }).ToArray();
+                .Except(new[] { ContainerSetup.GetEnumerableOrArrayDynamicallyOrNull }).ToArray();
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service[]>());

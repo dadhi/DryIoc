@@ -574,7 +574,7 @@ namespace DryIoc
         public static void Default(IRegistry registry)
         {
             registry.ResolutionRules.UnregisteredServices =
-                registry.ResolutionRules.UnregisteredServices.Append(GetEnumerableDynamicallyOrNull);
+                registry.ResolutionRules.UnregisteredServices.Append(GetEnumerableOrArrayDynamicallyOrNull);
 
             var funcFactory = new FactoryProvider(
                 (_, __) => new DelegateFactory(GetFuncExpression, Reuse.Singleton),
@@ -596,7 +596,7 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
-        public static ResolutionRules.ResolveUnregisteredService GetEnumerableDynamicallyOrNull = (req, _) =>
+        public static ResolutionRules.ResolveUnregisteredService GetEnumerableOrArrayDynamicallyOrNull = (req, _) =>
         {
             if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
@@ -609,16 +609,16 @@ namespace DryIoc
                     ? collectionType.GetElementType()
                     : collectionType.GetGenericArguments()[0];
 
-                var unwrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
+                var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
 
                 // Composite pattern support: filter out composite root from available keys.
                 var parentFactoryID = -1;
                 var parent = request.GetNonWrapperParentOrNull();
-                if (parent != null && parent.ServiceType == unwrappedItemType)
+                if (parent != null && parent.ServiceType == wrappedItemType)
                     parentFactoryID = parent.FactoryID;
 
                 var resolveMethodGeneric = collectionType.IsArray ? _resolveArrayMethod : _resolveEnumerableMethod;
-                var resolveMethod = resolveMethodGeneric.MakeGenericMethod(itemType, unwrappedItemType);
+                var resolveMethod = resolveMethodGeneric.MakeGenericMethod(itemType, wrappedItemType);
 
                 return Expression.Call(resolveMethod, Container.RegistryWeakRefExpression, Expression.Constant(parentFactoryID));
             },
@@ -706,23 +706,21 @@ namespace DryIoc
 
         private static readonly MethodInfo _resolveEnumerableMethod =
             typeof(ContainerSetup).GetMethod("ResolveEnumerable", BindingFlags.Static | BindingFlags.NonPublic);
-        internal static IEnumerable<TItem> ResolveEnumerable<TItem, TUnwrappedItem>(WeakReference registryRef, int parentFactoryID)
+        internal static IEnumerable<TItem> ResolveEnumerable<TItem, TWrappedItem>(WeakReference registryRef, int parentFactoryID)
         {
             var itemType = typeof(TItem);
-            var unwrappedItemType = typeof(TUnwrappedItem);
-
-            Func<Factory, bool> condition = null;
-            if (parentFactoryID != -1)
-                condition = factory => factory.ID != parentFactoryID;
-
+            var wrappedItemType = typeof(TWrappedItem);
             var registry = (registryRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
-            var keys = registry.GetKeys(unwrappedItemType, condition);
+            
+            var itemKeys = parentFactoryID == -1 
+                ? registry.GetKeys(wrappedItemType, null)
+                : registry.GetKeys(wrappedItemType, factory => factory.ID != parentFactoryID);
 
-            foreach (var key in keys)
+            foreach (var itemKey in itemKeys)
             {
-                var service = registry.ResolveKeyed(itemType, key, IfUnresolved.ReturnNull);
-                if (service != null) // skip unresolved items
-                    yield return (TItem)service;
+                var item = registry.ResolveKeyed(itemType, itemKey, IfUnresolved.ReturnNull);
+                if (item != null) // skip unresolved items
+                    yield return (TItem)item;
             }
         }
 
