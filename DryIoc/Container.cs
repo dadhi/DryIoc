@@ -101,29 +101,21 @@ namespace DryIoc
         public static readonly int SINGLETON_SCOPE_CONST_INDEX = 1;
         public static readonly int CURRENT_SCOPE_CONST_INDEX = 2;
 
-        public static readonly Expression RegistryWeakRefExpression =
-            Expression.Convert(
-                Expression.ArrayIndex(ConstantsParameter, Expression.Constant(REGISTRY_WEAKREF_CONST_INDEX)),
-                typeof(WeakReference));
+        public static readonly Expression RegistryWeakRefExpression = Expression.Convert(
+            Expression.ArrayIndex(ConstantsParameter, Expression.Constant(REGISTRY_WEAKREF_CONST_INDEX)),
+            typeof(WeakReference));
 
-        public static readonly Expression RegistryExpression =
-            Expression.Convert(Expression.Property(RegistryWeakRefExpression, "Target"),
-                typeof(IRegistry));
+        public static readonly Expression RegistryExpression = Expression.Convert(
+            Expression.Property(RegistryWeakRefExpression, "Target"),
+            typeof(IRegistry));
 
-        public static readonly Expression SingletonScopeExpression =
-            Expression.Convert(
-                Expression.ArrayIndex(ConstantsParameter, Expression.Constant(SINGLETON_SCOPE_CONST_INDEX)),
-                typeof(Scope));
+        public static readonly Expression SingletonScopeExpression = Expression.Convert(
+            Expression.ArrayIndex(ConstantsParameter, Expression.Constant(SINGLETON_SCOPE_CONST_INDEX)),
+            typeof(Scope));
 
-        public static readonly Expression CurrentScopeExpression =
-            Expression.Convert(
-                Expression.ArrayIndex(ConstantsParameter, Expression.Constant(CURRENT_SCOPE_CONST_INDEX)),
-                typeof(Scope));
-
-        public static Expression<CompiledFactory> CreateFactoryExpression(Expression expression)
-        {
-            return Expression.Lambda<CompiledFactory>(expression, ConstantsParameter, ResolutionScopeParameter);
-        }
+        public static readonly Expression CurrentScopeExpression = Expression.Convert(
+            Expression.ArrayIndex(ConstantsParameter, Expression.Constant(CURRENT_SCOPE_CONST_INDEX)),
+            typeof(Scope));
 
         #endregion
 
@@ -183,8 +175,8 @@ namespace DryIoc
 
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            return (_defaultResolutionCache.GetValueOrDefault(serviceType) ?? ResolveAndCacheFactory(serviceType, ifUnresolved))
-                .Invoke(_constants, resolutionScope: null);
+            return (_defaultResolutionCache.GetValueOrDefault(serviceType) 
+                ?? ResolveAndCacheFactory(serviceType, ifUnresolved))(_constants, resolutionScope: null);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -196,8 +188,7 @@ namespace DryIoc
                 var request = new Request(null, serviceType, serviceKey);
                 var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
                 if (factory == null) return null;
-                var expression = factory.GetExpression(request, this);
-                compiledFactory = CreateFactoryExpression(expression).Compile();
+                compiledFactory = factory.GetExpression(request, this).ToCompiledFactoryExpression().CompileFactory();
                 Interlocked.Exchange(ref _keyedResolutionCache, _keyedResolutionCache.AddOrUpdate(serviceType,
                     (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, compiledFactory)));
             }
@@ -650,12 +641,13 @@ namespace DryIoc
             var serviceType = request.ServiceType.GetGenericArguments()[0];
             var serviceRequest = request.PushWithParentKey(serviceType);
 
-            var serviceExpr = registry
+            var factoryExpr = registry
                 .GetOrAddFactory(serviceRequest, IfUnresolved.Throw)
-                .GetExpression(serviceRequest, registry);
+                .GetExpression(serviceRequest, registry)
+                .ToCompiledFactoryExpression();
 
-            var expressionConstExpr = registry.GetConstantExpression(serviceExpr, typeof(Expression));
-            return Expression.New(ctor, expressionConstExpr);
+            var factoryConstExpr = registry.GetConstantExpression(factoryExpr, typeof(Expression<CompiledFactory>));
+            return Expression.New(ctor, factoryConstExpr);
         }
 
         public static Factory GetMetaFactoryOrNull(Request request, IRegistry registry)
@@ -1717,7 +1709,7 @@ when resolving {1}.";
                 var constants = registry.Constants;
                 var singletonScope = (Scope)constants[Container.SINGLETON_SCOPE_CONST_INDEX];
                 var singleton = singletonScope.GetOrAdd(factoryID,
-                    () => Container.CreateFactoryExpression(factoryExpr).Compile()(constants, null));
+                    () => factoryExpr.ToCompiledFactoryExpression().CompileFactory().Invoke(constants, null));
                 return registry.GetConstantExpression(singleton, factoryExpr.Type);
             }
         }
@@ -1778,9 +1770,9 @@ when resolving {1}.";
     {
         public readonly Expression<CompiledFactory> Expression;
 
-        public DebugExpression(Expression expression)
+        public DebugExpression(Expression<CompiledFactory> expression)
         {
-            Expression = expression.ToCompiledFactoryExpression();
+            Expression = expression;
         }
     }
 
