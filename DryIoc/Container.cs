@@ -175,14 +175,14 @@ namespace DryIoc
 
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            return (_defaultResolutionCache.GetValueOrDefault(serviceType) 
+            return (_defaultResolutionCache.GetValueOrDefault(serviceType)
                 ?? ResolveAndCacheFactory(serviceType, ifUnresolved))(_constants, resolutionScope: null);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
         {
-            var cacheEntry = _keyedResolutionCache.GetValueOrDefault(serviceType);
-            var compiledFactory = cacheEntry != null ? cacheEntry.GetCompiledFactoryOrNull(serviceKey) : null;
+            var entry = _keyedResolutionCache.GetValueOrDefault(serviceType);
+            var compiledFactory = entry != null ? entry.GetCompiledFactoryOrNull(serviceKey) : null;
             if (compiledFactory == null)
             {
                 var request = new Request(null, serviceType, serviceKey);
@@ -190,7 +190,7 @@ namespace DryIoc
                 if (factory == null) return null;
                 compiledFactory = factory.GetExpression(request, this).ToCompiledFactoryExpression().CompileFactory();
                 Interlocked.Exchange(ref _keyedResolutionCache, _keyedResolutionCache.AddOrUpdate(serviceType,
-                    (cacheEntry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, compiledFactory)));
+                    (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, compiledFactory)));
             }
 
             return compiledFactory(_constants, resolutionScope: null);
@@ -387,6 +387,32 @@ namespace DryIoc
             return resultDecorator;
         }
 
+        IEnumerable<object> IRegistry.GetKeys(Type serviceType)
+        {
+            lock (_syncRoot)
+            {
+                FactoriesEntry entry;
+                if (TryFindEntry(out entry, serviceType))
+                {
+                    if (entry.DefaultFactories != null)
+                    {
+                        foreach (var item in entry.DefaultFactories.TraverseInOrder())
+                            yield return item.Key;
+                    }
+                    else if (entry.LastDefaultFactory != null)
+                    {
+                        yield return 0;
+                    }
+
+                    if (entry.NamedFactories != null)
+                    {
+                        foreach (var pair in entry.NamedFactories)
+                            yield return pair.Key;
+                    }
+                }
+            }
+        }
+
         IEnumerable<object> IRegistry.GetKeys(Type serviceType, Func<Factory, bool> condition)
         {
             lock (_syncRoot)
@@ -397,19 +423,19 @@ namespace DryIoc
                     if (entry.DefaultFactories != null)
                     {
                         foreach (var item in entry.DefaultFactories.TraverseInOrder())
-                            if (condition == null || condition(item.Value))
+                            if (condition(item.Value))
                                 yield return item.Key;
                     }
                     else if (entry.LastDefaultFactory != null)
                     {
-                        if (condition == null || condition(entry.LastDefaultFactory))
+                        if (condition(entry.LastDefaultFactory))
                             yield return 0;
                     }
 
                     if (entry.NamedFactories != null)
                     {
                         foreach (var pair in entry.NamedFactories)
-                            if (condition == null || condition(pair.Value))
+                            if (condition(pair.Value))
                                 yield return pair.Key;
                     }
                 }
@@ -703,9 +729,9 @@ namespace DryIoc
             var itemType = typeof(TItem);
             var wrappedItemType = typeof(TWrappedItem);
             var registry = (registryRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
-            
-            var itemKeys = parentFactoryID == -1 
-                ? registry.GetKeys(wrappedItemType, null)
+
+            var itemKeys = parentFactoryID == -1
+                ? registry.GetKeys(wrappedItemType)
                 : registry.GetKeys(wrappedItemType, factory => factory.ID != parentFactoryID);
 
             foreach (var itemKey in itemKeys)
@@ -1746,6 +1772,8 @@ when resolving {1}.";
         Factory GetFactoryOrNull(Type serviceType, object serviceKey);
 
         Expression GetDecoratorExpressionOrNull(Request request);
+
+        IEnumerable<object> GetKeys(Type serviceType);
 
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
