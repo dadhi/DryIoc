@@ -46,7 +46,7 @@ namespace DryIoc.AttributedRegistration
 
         public static void RegisterExported(this IRegistrator registrator, params Type[] types)
         {
-            registrator.RegisterExported(ScanTypes(types));
+            registrator.RegisterExported(types.Where(IsTypeToExport).Select(GetRegistrationInfo));
         }
 
         public static void RegisterExported(this IRegistrator registrator, params Assembly[] assemblies)
@@ -77,88 +77,89 @@ namespace DryIoc.AttributedRegistration
 
         public static IEnumerable<RegistrationInfo> ScanAssemblies(IEnumerable<Assembly> assemblies)
         {
-            return ScanTypes(assemblies.SelectMany(a => a.GetTypes()));
+            return assemblies.SelectMany(a => a.GetTypes()).Where(IsTypeToExport).Select(GetRegistrationInfo);
         }
 
-        public static IEnumerable<RegistrationInfo> ScanTypes(IEnumerable<Type> types)
+        public static RegistrationInfo GetRegistrationInfo(Type type)
         {
-            foreach (var type in types.Where(IsTypeToExport))
+            var attributes = type.GetCustomAttributes(false);
+
+            var info = new RegistrationInfo {ImplementationType = type};
+
+            for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
             {
-                var attributes = type.GetCustomAttributes(false);
-
-                var info = new RegistrationInfo { ImplementationType = type };
-
-                for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
+                var attribute = attributes[attributeIndex];
+                if (attribute is ExportAttribute)
                 {
-                    var attribute = attributes[attributeIndex];
-                    if (attribute is ExportAttribute)
+                    var exportAttribute = (ExportAttribute) attribute;
+                    var export = new ExportInfo
                     {
-                        var exportAttribute = (ExportAttribute)attribute;
-                        var export = new ExportInfo
-                        {
-                            ServiceType = exportAttribute.ContractType ?? type,
-                            ServiceName = exportAttribute.ContractName
-                        };
+                        ServiceType = exportAttribute.ContractType ?? type,
+                        ServiceName = exportAttribute.ContractName
+                    };
 
-                        if (info.Exports == null)
-                            info.Exports = new[] { export };
-                        else if (!info.Exports.Contains(export))
-                            info.Exports = info.Exports.AppendOrUpdate(export);
-                    }
-                    else if (attribute is ExportAllAttribute)
-                    {
-                        var exportAllAttribute = (ExportAllAttribute)attribute;
-                        var exportAllInfos = exportAllAttribute.SelectServiceTypes(type)
-                            .Select(t => new ExportInfo { ServiceType = t, ServiceName = exportAllAttribute.ContractName })
-                            .ToArray();
+                    if (info.Exports == null)
+                        info.Exports = new[] {export};
+                    else if (!info.Exports.Contains(export))
+                        info.Exports = info.Exports.AppendOrUpdate(export);
+                }
+                else if (attribute is ExportAllAttribute)
+                {
+                    var exportAllAttribute = (ExportAllAttribute) attribute;
+                    var exportAllInfos = exportAllAttribute.SelectServiceTypes(type)
+                        .Select(t => new ExportInfo {ServiceType = t, ServiceName = exportAllAttribute.ContractName})
+                        .ToArray();
 
-                        if (info.Exports != null) // eliminating identical exports
-                            for (var index = 0; index < info.Exports.Length; index++)
-                                if (!exportAllInfos.Contains(info.Exports[index]))
-                                    exportAllInfos = exportAllInfos.AppendOrUpdate(info.Exports[index]);
+                    if (info.Exports != null) // eliminating identical exports
+                        for (var index = 0; index < info.Exports.Length; index++)
+                            if (!exportAllInfos.Contains(info.Exports[index]))
+                                exportAllInfos = exportAllInfos.AppendOrUpdate(info.Exports[index]);
 
-                        info.Exports = exportAllInfos;
-                    }
-                    else if (attribute is PartCreationPolicyAttribute)
+                    info.Exports = exportAllInfos;
+                }
+                else if (attribute is PartCreationPolicyAttribute)
+                {
+                    info.IsSingleton = ((PartCreationPolicyAttribute) attribute).CreationPolicy == CreationPolicy.Shared;
+                }
+                else if (attribute is ExportAsGenericWrapperAttribute)
+                {
+                    Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
+                    info.FactoryType = FactoryType.GenericWrapper;
+                    var genericWrapperAttribute = ((ExportAsGenericWrapperAttribute) attribute);
+                    info.GenericWrapper = new GenericWrapperInfo
                     {
-                        info.IsSingleton = ((PartCreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
-                    }
-                    else if (attribute is ExportAsGenericWrapperAttribute)
+                        ServiceTypeIndex = genericWrapperAttribute.ServiceTypeArgIndex
+                    };
+                }
+                else if (attribute is ExportAsDecoratorAttribute)
+                {
+                    Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
+                    var decorator = ((ExportAsDecoratorAttribute) attribute);
+                    info.FactoryType = FactoryType.Decorator;
+                    info.Decorator = new DecoratorInfo
                     {
-                        Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
-                        info.FactoryType = FactoryType.GenericWrapper;
-                        var genericWrapperAttribute = ((ExportAsGenericWrapperAttribute)attribute);
-                        info.GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = genericWrapperAttribute.ServiceTypeArgIndex };
-                    }
-                    else if (attribute is ExportAsDecoratorAttribute)
-                    {
-                        Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
-                        var decorator = ((ExportAsDecoratorAttribute)attribute);
-                        info.FactoryType = FactoryType.Decorator;
-                        info.Decorator = new DecoratorInfo
-                        {
-                            ServiceName = decorator.ContractName,
-                            ShouldCompareMetadata = decorator.ShouldCompareMetadata,
-                            ConditionType = decorator.ConditionType
-                        };
-                    }
-
-                    if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), true))
-                    {
-                        Throw.If(info.MetadataAttributeIndex != -1, Error.UNSUPPORTED_MULTIPLE_METADATA, type);
-                        info.MetadataAttributeIndex = attributeIndex;
-                    }
+                        ServiceName = decorator.ContractName,
+                        ShouldCompareMetadata = decorator.ShouldCompareMetadata,
+                        ConditionType = decorator.ConditionType
+                    };
                 }
 
-                if (info.FactoryType == FactoryType.Decorator)
+                if (Attribute.IsDefined(attribute.GetType(), typeof (MetadataAttributeAttribute), true))
                 {
-                    Throw.If(info.Decorator.ShouldCompareMetadata && info.MetadataAttributeIndex == -1, Error.METADATA_FOR_DECORATOR_IS_NOT_FOUND, type);
-                    info.IsSingleton = false; // Decorator could not be reused based on the definition, so we are ignoring reuse setting.
+                    Throw.If(info.MetadataAttributeIndex != -1, Error.UNSUPPORTED_MULTIPLE_METADATA, type);
+                    info.MetadataAttributeIndex = attributeIndex;
                 }
-
-                info.Exports.ThrowIfNull(Error.EXPORT_IS_REQUIRED, type);
-                yield return info;
             }
+
+            if (info.FactoryType == FactoryType.Decorator)
+            {
+                Throw.If(info.Decorator.ShouldCompareMetadata && info.MetadataAttributeIndex == -1,
+                    Error.METADATA_FOR_DECORATOR_IS_NOT_FOUND, type);
+                info.IsSingleton = false;
+            }
+
+            info.Exports.ThrowIfNull(Error.EXPORT_IS_REQUIRED, type);
+            return info;
         }
 
         #region Tools
