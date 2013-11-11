@@ -7,6 +7,16 @@ using System.Reflection;
 namespace DryIoc.AttributedRegistration
 {
     /// <summary>
+    /// Implements part of MEF Attributed Programming Model - http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx
+    /// Not supported: 
+    /// <list type="bullet">
+    /// <item>Export of entities than types, e.g. exporting of properties, fields, methods.</item>
+    /// <item>RequiredCreationPolicy attribute.</item>
+    /// <item>Dynamic resolution with IPartImportsSatisfiedNotification.</item>
+    /// <item>ExportFactory&lt;T&gt;. Use Func instead.</item>
+    /// <item>ExportMetadata attribute. Use <see cref="ExportWithMetadataAttribute"/> instead.</item>
+    /// <item>PartNotDiscoverable attribute.</item>
+    /// </list>
     /// <para>
     /// TODO:
     /// <list type="bullet">
