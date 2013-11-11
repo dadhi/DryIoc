@@ -11,9 +11,10 @@ namespace DryIoc.AttributedRegistration
     /// Not supported: 
     /// <list type="bullet">
     /// <item>Export of entities than types, e.g. exporting of properties, fields, methods.</item>
+    /// <item>ImportMany attribute. Use <see cref="IEnumerable{T}"/> or array instead.</item>
     /// <item>RequiredCreationPolicy attribute.</item>
     /// <item>Dynamic resolution with IPartImportsSatisfiedNotification.</item>
-    /// <item>ExportFactory&lt;T&gt;. Use Func instead.</item>
+    /// <item>ExportFactory&lt;T&gt;. Use <see cref="Func{TResult}"/> instead.</item>
     /// <item>ExportMetadata attribute. Use <see cref="ExportWithMetadataAttribute"/> instead.</item>
     /// <item>PartNotDiscoverable attribute.</item>
     /// </list>
@@ -164,7 +165,7 @@ namespace DryIoc.AttributedRegistration
 
         public static bool IsTypeToExport(Type type)
         {
-            return type.IsClass && !type.IsAbstract &&
+            return type.IsClass && !type.IsAbstract && 
                 (Attribute.IsDefined(type, typeof(ExportAttribute), false) ||
                 Attribute.IsDefined(type, typeof(ExportAllAttribute), false));
         }
