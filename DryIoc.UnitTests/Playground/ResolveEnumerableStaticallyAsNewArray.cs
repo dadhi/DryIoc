@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq.Expressions;
 
 namespace DryIoc.UnitTests.Playground
@@ -19,18 +18,14 @@ namespace DryIoc.UnitTests.Playground
                     ? collectionType.GetElementType()
                     : collectionType.GetGenericArguments()[0];
 
-                var unwrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
+                var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
 
                 // Composite pattern support: filter out composite root from available keys.
-                Func<Factory, bool> condition = null;
                 var parent = request.GetNonWrapperParentOrNull();
-                if (parent != null && parent.ServiceType == unwrappedItemType)
-                {
-                    var parentFactoryID = parent.FactoryID;
-                    condition = factory => factory.ID != parentFactoryID;
-                }
+                var itemKeys = parent != null && parent.ServiceType == wrappedItemType
+                    ? registry.GetKeys(wrappedItemType, factory => factory.ID != parent.FactoryID)
+                    : registry.GetKeys(wrappedItemType);
 
-                var itemKeys = registry.GetKeys(unwrappedItemType, condition);
                 //Throw.If(itemKeys.Length == 0, NO_REGISTERED_SERVICES_OF_ITEM_TYPE_FOUND, unwrappedItemType);
 
                 var itemExpressions = new List<Expression>();

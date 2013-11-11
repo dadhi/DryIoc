@@ -14,8 +14,8 @@ namespace DryIoc.SpeedTestApp
 		static void Main()
 		{
 			Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            //CompareTreeGet();
-		    CompareClosureFieldAccess();
+            CompareTreeGet();
+            //CompareClosureFieldAccess();
             //DoCompareTryGetVsGetOrNull();
 		    //CompareHashTreeEnumeration();
 		    //CompareMethodArgumentPassing();
