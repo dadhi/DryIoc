@@ -369,16 +369,16 @@ Only single metadata is supported per implementation type, please remove the res
         new ExportInfo { ServiceType = ").AppendType(Exports[i].ServiceType).Append(
                      @", ServiceName = ").AppendString(Exports[i].ServiceName).Append(@" },"); 
             code.Append(@"
-    }
+    },
     IsSingleton = ").AppendBool(IsSingleton).Append(@",
     MetadataAttributeIndex = ").Append(MetadataAttributeIndex).Append(@",
     FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType); 
             if (GenericWrapper != null) code.Append(@",
     GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = ").Append(GenericWrapper.ServiceTypeIndex).Append(@" }"); 
-            if (Decorator != null) code.Append(@"
+            if (Decorator != null) code.Append(@",
     Decorator = new DecoratorInfo { ServiceName = ").AppendString(Decorator.ServiceName).Append(
                                 @", ShouldCompareMetadata = ").AppendBool(Decorator.ShouldCompareMetadata).Append(
-                                @", Decorator.ConditionType = ").AppendType(Decorator.ConditionType).Append(
+                                @", ConditionType = ").AppendType(Decorator.ConditionType).Append(
                                 @"}"); code.Append(@"
 }");
 

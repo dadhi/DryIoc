@@ -40,6 +40,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AttributedRegistratorTests.cs" />
+    <Compile Include="CodeGenerationTests.cs" />
     <Compile Include="ExportAllTests.cs" />
     <Compile Include="ExportAsDecoratorTests.cs" />
     <Compile Include="ExportAsGenericWrapperTests.cs" />

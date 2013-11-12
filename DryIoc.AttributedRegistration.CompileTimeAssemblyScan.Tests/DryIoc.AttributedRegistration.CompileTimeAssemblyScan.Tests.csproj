@@ -41,11 +41,11 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="CompileTimeGeneratedRegistrator.cs">
+    <Compile Include="CompileTimeGeneratedRegistrator.cs">
       <DependentUpon>CompileTimeGeneratedRegistrator.tt</DependentUpon>
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
-    </Content>
+    </Compile>
     <Compile Include="CompileTimeRegistrationInfoSerializationTests.cs" />
     <Compile Include="CompileTimeRegistrationTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -1,55 +1,24 @@
 ﻿<#@ template debug="false" hostspecific="false" language="C#" #>
 <#@ output extension=".cs" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(ProjectDir)..\bin\Debug\DryIoc.dll" #>
-<#@ assembly Name="$(ProjectDir)..\bin\Debug\DryIoc.AttributedRegistration.UnitTests.CUT.dll" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.dll" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.AttributedRegistration.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.AttributedRegistration" #>
 <#@ import Namespace="DryIoc.AttributedRegistration.UnitTests.CUT" #>
-<#@ import Namespace="System.Diagnostics" #>
-<#@ import Namespace="System.Text" #>
-<#@ import Namespace="System.IO" #>
-<#@ import Namespace="System.Linq" #>
-<#@ import Namespace="System.Collections.Generic" #>
 namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
 {
     public static class CompileTimeGeneratedRegistrator
     {
-        public static RegistrationInfo[] Registrations =
+        public static readonly RegistrationInfo[] Registrations =
         {
 <#
         var assembly = typeof(TransientService).Assembly;
-        var infos = AttributedRegistrator.ScanAssemblies(new [] { assembly });
-
-        Func<bool, string> asBool = x => x ? "true" : "false";
-        Func<string, string> asString = x => x == null ? "null" : "\"" + x + "\"";
-        Func<Type, string> asTypeof = x => x == null ? "null" : "typeof(" + x.Print() + ")";
-        Func<Type, object, string> asEnum = (t, x) => t.Print() + "." +  Enum.GetName(t, x);
-
-        foreach (var info in infos)
+        var registrationInfos = AttributedRegistrator.ScanAssemblies(new [] { assembly });
+        foreach (var info in registrationInfos)
         {
 #>
-            new RegistrationInfo {
-                ImplementationType = <#= asTypeof(info.ImplementationType) #>,
-                Exports = new[] {
-<#
-            foreach (var x in info.Exports) 
-            {
-#>
-                    new ExportInfo { ServiceType = <#= asTypeof(x.ServiceType) #>, ServiceName = <#= asString(x.ServiceName) #> },
-<#
-            }
-#>
-                },
-                IsSingleton = <#= asBool(info.IsSingleton) #>,
-                MetadataAttributeIndex = <#= info.MetadataAttributeIndex #>,
-                FactoryType = <#= asEnum(typeof(FactoryType), info.FactoryType) #>,
-                GenericWrapper = <#= info.GenericWrapper == null ? "null" : 
-                    string.Format("new GenericWrapperInfo {{ ServiceTypeIndex = {0} }}", info.GenericWrapper.ServiceTypeIndex) #>,
-                Decorator = <#= info.Decorator == null ? "null" : 
-                    string.Format("new DecoratorInfo {{ ServiceName = {0}, ShouldCompareMetadata = {1}, ConditionType = {2} }}", 
-                        asString(info.Decorator.ServiceName), asBool(info.Decorator.ShouldCompareMetadata), asTypeof(info.Decorator.ConditionType)) #>
-            },
+<#= info.ToCode() #>, 
 <#
         }
 #>
