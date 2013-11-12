@@ -395,35 +395,6 @@ namespace DryIoc
             return resultDecorator;
         }
 
-        IEnumerable<string> GetNames(Type serviceType)
-        {
-            lock (_syncRoot)
-            {
-                FactoriesEntry entry;
-                if (TryFindEntry(out entry, serviceType) && entry.NamedFactories != null)
-                    return entry.NamedFactories.Keys;
-            }
-            return Enumerable.Empty<string>();
-        }
-
-        IEnumerable<int> GetIndexes(Type serviceType)
-        {
-            lock (_syncRoot)
-            {
-                FactoriesEntry entry;
-                if (TryFindEntry(out entry, serviceType))
-                {
-                    if (entry.DefaultFactories != null)
-                        return entry.DefaultFactories.TraverseInOrder().Select(tree => tree.Key);
-
-                    if (entry.LastDefaultFactory != null)
-                        return Enumerable.Repeat(0, 1);
-                }
-            }
-
-            return Enumerable.Empty<int>();
-        }
-
         IEnumerable<object> IRegistry.GetKeys(Type serviceType)
         {
             lock (_syncRoot)
@@ -432,34 +403,18 @@ namespace DryIoc
                 if (TryFindEntry(out entry, serviceType))
                 {
                     if (entry.DefaultFactories != null)
+                    {
                         foreach (var item in entry.DefaultFactories.TraverseInOrder())
                             yield return item.Key;
+                    }
                     else if (entry.LastDefaultFactory != null)
                         yield return 0;
 
                     if (entry.NamedFactories != null)
+                    {
                         foreach (var pair in entry.NamedFactories)
                             yield return pair.Key;
-                }
-            }
-        }
-
-        IEnumerable<KV<object, Factory>> IRegistry.GetAll(Type serviceType)
-        {
-            lock (_syncRoot)
-            {
-                FactoriesEntry entry;
-                if (TryFindEntry(out entry, serviceType))
-                {
-                    if (entry.DefaultFactories != null)
-                        foreach (var item in entry.DefaultFactories.TraverseInOrder())
-                            yield return new KV<object, Factory>(item.Key, item.Value);
-                    else if (entry.LastDefaultFactory != null)
-                        yield return new KV<object, Factory>(0, entry.LastDefaultFactory);
-
-                    if (entry.NamedFactories != null)
-                        foreach (var pair in entry.NamedFactories)
-                            yield return new KV<object, Factory>(pair.Key, pair.Value);
+                    }
                 }
             }
         }
@@ -477,11 +432,8 @@ namespace DryIoc
                             if (condition(item.Value))
                                 yield return item.Key;
                     }
-                    else if (entry.LastDefaultFactory != null)
-                    {
-                        if (condition(entry.LastDefaultFactory))
-                            yield return 0;
-                    }
+                    else if (entry.LastDefaultFactory != null && condition(entry.LastDefaultFactory))
+                        yield return 0;
 
                     if (entry.NamedFactories != null)
                     {
@@ -738,19 +690,10 @@ namespace DryIoc
             var serviceKey = request.ServiceKey;
             if (serviceKey == null)
             {
-                var result = registry.GetAll(wrappedServiceType)
-                    .Select(kv => new { kv.Key, Metadata = GetTypedMetadataOrDefault(kv.Value, metadataType) })
-                    .FirstOrDefault(_ => _.Metadata != null);
-                if (result != null)
-                {
-                    serviceKey = result.Key;
-                    resultMetadata = result.Metadata;
-                }
-
-                //var resultKey = registry.GetKeys(wrappedServiceType, factory =>
-                //    (resultMetadata = GetTypedMetadataOrDefault(factory, metadataType)) != null).FirstOrDefault();
-                //if (resultKey != null)
-                //    serviceKey = resultKey;
+                var resultKey = registry.GetKeys(wrappedServiceType, factory =>
+                    (resultMetadata = GetTypedMetadataOrDefault(factory, metadataType)) != null).FirstOrDefault();
+                if (resultKey != null)
+                    serviceKey = resultKey;
             }
             else
             {
@@ -1834,8 +1777,6 @@ when resolving {1}.";
         Expression GetDecoratorExpressionOrDefault(Request request);
 
         IEnumerable<object> GetKeys(Type serviceType);
-
-        IEnumerable<KV<object, Factory>> GetAll(Type serviceType);
 
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
