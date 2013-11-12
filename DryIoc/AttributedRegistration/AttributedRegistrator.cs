@@ -10,19 +10,17 @@ namespace DryIoc.AttributedRegistration
     /// Implements part of MEF Attributed Programming Model - http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx
     /// Not supported: 
     /// <list type="bullet">
-    /// <item>Export of entities than types, e.g. exporting of properties, fields, methods.</item>
+    /// <item>Export of entities other than classes, e.g. exporting of properties, fields, methods.</item>
     /// <item>ImportMany attribute. Use <see cref="IEnumerable{T}"/> or array instead.</item>
-    /// <item>RequiredCreationPolicy attribute.</item>
+    /// <item>RequiredCreationPolicy in Imports.</item>
     /// <item>Dynamic resolution with IPartImportsSatisfiedNotification.</item>
     /// <item>ExportFactory&lt;T&gt;. Use <see cref="Func{TResult}"/> instead.</item>
-    /// <item>ExportMetadata attribute. Use <see cref="ExportWithMetadataAttribute"/> instead.</item>
-    /// <item>PartNotDiscoverable attribute.</item>
+    /// <item>ExportMetadata attribute. Use <see cref="ExportWithMetadataAttribute"/> instead or attributes annotated with <see cref="MetadataAttributeAttribute"/>.</item>
     /// </list>
     /// <para>
     /// TODO:
     /// <list type="bullet">
-    /// <item>add: Missing support of InheritedExport.</item>
-    /// <item>add: Missing feature to register attributed DelegateFactory. IFactory to register with ExportFactory.</item>
+    /// <item>add: Missing feature to register attributed DelegateFactory.</item>
     /// </list>
     /// </para>
     /// </summary>
@@ -446,13 +444,13 @@ Only single metadata is supported per implementation type, please remove the res
     {
         public static Func<Type, bool> ExportedTypes = Registrator.PublicTypes;
 
-        public Type[] ExceptTypes { get; set; }
         public string ContractName { get; set; }
+        public Type[] ExcludeTypes { get; set; }
 
         public IEnumerable<Type> GetAllContractTypes(Type targetType)
         {
             var contractTypes = targetType.GetSelfAndImplementedTypes().Where(ExportedTypes);
-            return ExceptTypes == null || ExceptTypes.Length == 0 ? contractTypes : contractTypes.Except(ExceptTypes);
+            return ExcludeTypes == null || ExcludeTypes.Length == 0 ? contractTypes : contractTypes.Except(ExcludeTypes);
         }
     }
 
