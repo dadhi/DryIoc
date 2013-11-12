@@ -51,6 +51,9 @@
     <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ImportWithMetadataTests.CUT.cs">
       <Link>ImportWithMetadataTests.CUT.cs</Link>
     </Compile>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\InheritedExportTests.CUT.cs">
+      <Link>InheritedExportTests.CUT.cs</Link>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

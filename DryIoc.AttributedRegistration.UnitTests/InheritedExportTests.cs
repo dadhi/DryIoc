@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel.Composition;
 using System.Linq;
+using DryIoc.AttributedRegistration.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests
@@ -64,24 +65,4 @@ namespace DryIoc.AttributedRegistration.UnitTests
             Assert.IsTrue(Attribute.IsDefined(typeof(ForExportBaseImpl), typeof(InheritedExportAttribute), true));
         }
     }
-
-    [InheritedExport]
-    public interface IForExport { }
-
-    class ForExport : IForExport { }
-
-    [InheritedExport]
-    public abstract class ForExportBase {}
-
-    class ForExportBaseImpl : ForExportBase {}
-
-    [PartNotDiscoverable]
-    public class Undicoverable : IForExport {}
-
-    [InheritedExport("i"), InheritedExport("j")]
-    public interface IMultiExported {}
-
-    [Export("a"), Export("b")]
-    [ExportAll(ContractName = "c")]
-    public class MultiExported : IMultiExported {}
 }

@@ -81,7 +81,7 @@ namespace DryIoc.AttributedRegistration
 
         public static RegistrationInfo GetRegistrationInfoOrDefault(Type type)
         {
-            if (!type.IsClass && type.IsAbstract)
+            if (!type.IsClass || type.IsAbstract)
                 return null;
 
             var attributes = type.GetCustomAttributes(false);
