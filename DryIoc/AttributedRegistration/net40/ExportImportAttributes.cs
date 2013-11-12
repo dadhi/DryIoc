@@ -3,8 +3,8 @@
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
     public class ExportAttribute : Attribute
     {
-        public string ContractName { get; set; }
-        public Type ContractType { get; set; }
+        public string ContractName { get; private set; }
+        public Type ContractType { get; private set; }
 
         public ExportAttribute() { }
 
@@ -44,7 +44,7 @@
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class PartCreationPolicyAttribute : Attribute
     {
-        public CreationPolicy CreationPolicy { get; set; }
+        public CreationPolicy CreationPolicy { get; private set; }
 
         public PartCreationPolicyAttribute(CreationPolicy policy)
         {
@@ -58,14 +58,14 @@
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
     public class ImportAttribute : Attribute
     {
+        public string ContractName { get; private set; }
+
         public ImportAttribute() { }
 
         public ImportAttribute(string contractName)
         {
             ContractName = contractName;
         }
-
-        public string ContractName { get; set; }
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]

@@ -186,7 +186,8 @@ namespace DryIoc.AttributedRegistration
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = (InheritedExportAttribute) exports[i];
-                export.ContractType = export.ContractType ?? type;
+                if (export.ContractType == null)
+                    exports[i] = new InheritedExportAttribute(export.ContractName, type);
             }
             return exports;
         }

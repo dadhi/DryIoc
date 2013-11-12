@@ -49,7 +49,6 @@ namespace DryIoc
     /// <item>upd: Use static EnumerableResolve for arrays.</item>
     /// <item>upd: Refactor CompileFactory stuff to allow customization on Factory level.</item>
     /// <item>upd: Remove most of Container doc-comments.</item>
-    /// <item>fix: Rules are not thread-safe regarding replacing the rule in place, cause the rules are provided as arrays.</item>
     /// </list>
     /// </para>
     /// </summary>
@@ -433,20 +432,34 @@ namespace DryIoc
                 if (TryFindEntry(out entry, serviceType))
                 {
                     if (entry.DefaultFactories != null)
-                    {
                         foreach (var item in entry.DefaultFactories.TraverseInOrder())
                             yield return item.Key;
-                    }
                     else if (entry.LastDefaultFactory != null)
-                    {
                         yield return 0;
-                    }
 
                     if (entry.NamedFactories != null)
-                    {
                         foreach (var pair in entry.NamedFactories)
                             yield return pair.Key;
-                    }
+                }
+            }
+        }
+
+        IEnumerable<KV<object, Factory>> IRegistry.GetAll(Type serviceType)
+        {
+            lock (_syncRoot)
+            {
+                FactoriesEntry entry;
+                if (TryFindEntry(out entry, serviceType))
+                {
+                    if (entry.DefaultFactories != null)
+                        foreach (var item in entry.DefaultFactories.TraverseInOrder())
+                            yield return new KV<object, Factory>(item.Key, item.Value);
+                    else if (entry.LastDefaultFactory != null)
+                        yield return new KV<object, Factory>(0, entry.LastDefaultFactory);
+
+                    if (entry.NamedFactories != null)
+                        foreach (var pair in entry.NamedFactories)
+                            yield return new KV<object, Factory>(pair.Key, pair.Value);
                 }
             }
         }
@@ -725,10 +738,19 @@ namespace DryIoc
             var serviceKey = request.ServiceKey;
             if (serviceKey == null)
             {
-                var resultKey = registry.GetKeys(wrappedServiceType, factory =>
-                    (resultMetadata = GetTypedMetadataOrDefault(factory, metadataType)) != null).FirstOrDefault();
-                if (resultKey != null)
-                    serviceKey = resultKey;
+                var result = registry.GetAll(wrappedServiceType)
+                    .Select(kv => new { kv.Key, Metadata = GetTypedMetadataOrDefault(kv.Value, metadataType) })
+                    .FirstOrDefault(_ => _.Metadata != null);
+                if (result != null)
+                {
+                    serviceKey = result.Key;
+                    resultMetadata = result.Metadata;
+                }
+
+                //var resultKey = registry.GetKeys(wrappedServiceType, factory =>
+                //    (resultMetadata = GetTypedMetadataOrDefault(factory, metadataType)) != null).FirstOrDefault();
+                //if (resultKey != null)
+                //    serviceKey = resultKey;
             }
             else
             {
@@ -1812,6 +1834,8 @@ when resolving {1}.";
         Expression GetDecoratorExpressionOrDefault(Request request);
 
         IEnumerable<object> GetKeys(Type serviceType);
+
+        IEnumerable<KV<object, Factory>> GetAll(Type serviceType);
 
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
