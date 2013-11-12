@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 
 namespace DryIoc.AttributedRegistration
 {
@@ -20,6 +21,7 @@ namespace DryIoc.AttributedRegistration
     /// <para>
     /// TODO:
     /// <list type="bullet">
+    /// <item>add: Explicit registration code generator to use in compile-time exports discovery.</item>
     /// <item>add: Missing feature to register attributed DelegateFactory.</item>
     /// </list>
     /// </para>
@@ -355,6 +357,60 @@ Only single metadata is supported per implementation type, please remove the res
                    && Equals(other.GenericWrapper, GenericWrapper)
                    && Equals(other.Decorator, Decorator)
                    && other.Exports.SequenceEqual(Exports);
+        }
+
+        public string ToCode()
+        {
+            var code = new StringBuilder(
+@"new RegistrationInfo {
+    ImplementationType = ").AppendType(ImplementationType).Append(@",
+    Exports = new[] {");         
+            for (var i = 0; i < Exports.Length; i++) code.Append(@"
+        new ExportInfo { ServiceType = ").AppendType(Exports[i].ServiceType).Append(
+                     @", ServiceName = ").AppendString(Exports[i].ServiceName).Append(@" },"); 
+            code.Append(@"
+    }
+    IsSingleton = ").AppendBool(IsSingleton).Append(@",
+    MetadataAttributeIndex = ").Append(MetadataAttributeIndex).Append(@",
+    FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType); 
+            if (GenericWrapper != null) code.Append(@",
+    GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = ").Append(GenericWrapper.ServiceTypeIndex).Append(@" }"); 
+            if (Decorator != null) code.Append(@"
+    Decorator = new DecoratorInfo { ServiceName = ").AppendString(Decorator.ServiceName).Append(
+                                @", ShouldCompareMetadata = ").AppendBool(Decorator.ShouldCompareMetadata).Append(
+                                @", Decorator.ConditionType = ").AppendType(Decorator.ConditionType).Append(
+                                @"}"); code.Append(@"
+}");
+
+            return code.ToString();
+        }
+    }
+
+    public static class CodePrint
+    {
+        public static StringBuilder AppendIf(this StringBuilder builder, bool condition, string value)
+        {
+            return condition ? builder.Append(value) : builder;
+        }
+
+        public static StringBuilder AppendBool(this StringBuilder builder, bool x)
+        {
+            return builder.Append(x ? "true" : "false");
+        }
+
+        public static StringBuilder AppendString(this StringBuilder builder, string x)
+        {
+            return builder.Append(x == null ? "null" : ("\"" + x + "\""));
+        }
+
+        public static StringBuilder AppendType(this StringBuilder builder, Type x)
+        {
+            return builder.Append(x == null ? "null" : "typeof(" + x.Print() + ")");
+        }
+
+        public static StringBuilder AppendEnum(this StringBuilder builder, Type enumType, object enumValue)
+        {
+            return builder.Append(enumType.Print() + "." + Enum.GetName(enumType, enumValue));
         }
     }
 

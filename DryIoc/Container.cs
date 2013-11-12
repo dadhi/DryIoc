@@ -212,8 +212,11 @@ namespace DryIoc
             var expression = factory.GetExpression(request, this);
             if (expression.NodeType == ExpressionType.Convert) // no need to convert resolution root, as at will be converted after invoking CompliedFactory.
                 expression = ((UnaryExpression)expression).Operand;
+
             var compiledFactory = expression.ToCompiledFactoryExpression().CompileFactory();
-            Interlocked.Exchange(ref _defaultResolutionCache, _defaultResolutionCache.AddOrUpdate(serviceType, compiledFactory));
+
+            Interlocked.Exchange(ref _defaultResolutionCache, 
+                _defaultResolutionCache.AddOrUpdate(serviceType, compiledFactory));
             return compiledFactory;
         }
 
@@ -966,7 +969,8 @@ when resolving {1}.";
             registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup), typeof(TImplementation), named);
         }
 
-        public static Func<Type, bool> PublicTypes = t => (t.IsPublic || t.IsNestedPublic) && t != typeof(object);
+        public static Func<Type, bool> PublicTypes = 
+            type => (type.IsPublic || type.IsNestedPublic) && type != typeof(object);
 
         /// <summary>
         /// Registers single registration for all implemented public interfaces and base classes.
@@ -1162,7 +1166,8 @@ when resolving {1}.";
         public virtual FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.CacheExpression; } }
         public virtual object Metadata { get { return null; } }
 
-        public Func<Expression<CompiledFactory>, CompiledFactory> CompileToFactory = FactoryCompiler.CompileFactory;
+        // TODO: Review usage.
+        public Func<Expression<CompiledFactory>, CompiledFactory> CompileFactory = FactoryCompiler.CompileFactory;
     }
 
     public class ServiceSetup : FactorySetup

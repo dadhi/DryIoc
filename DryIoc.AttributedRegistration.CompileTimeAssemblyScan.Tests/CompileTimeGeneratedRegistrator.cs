@@ -7,6 +7,7 @@
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.FastHandler),
                 Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.FastHandler), ServiceName = "fast" },
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IHandler), ServiceName = "fast" },
                 },
                 IsSingleton = true,
@@ -18,6 +19,7 @@
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.SlowHandler),
                 Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.SlowHandler), ServiceName = "slow" },
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IHandler), ServiceName = "slow" },
                 },
                 IsSingleton = true,
@@ -29,6 +31,7 @@
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.TransactHandler),
                 Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.TransactHandler), ServiceName = "transact" },
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IHandler), ServiceName = "transact" },
                 },
                 IsSingleton = true,
@@ -40,6 +43,7 @@
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.LoggingHandlerDecorator),
                 Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.LoggingHandlerDecorator), ServiceName = null },
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IHandler), ServiceName = null },
                 },
                 IsSingleton = false,
@@ -51,10 +55,11 @@
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.RetryHandlerDecorator),
                 Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.RetryHandlerDecorator), ServiceName = null },
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IHandler), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 2,
+                MetadataAttributeIndex = 1,
                 FactoryType = DryIoc.FactoryType.Decorator,
                 GenericWrapper = null,
                 Decorator = new DecoratorInfo { ServiceName = null, ShouldCompareMetadata = true, ConditionType = null }
@@ -62,10 +67,11 @@
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.TransactHandlerDecorator),
                 Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.TransactHandlerDecorator), ServiceName = null },
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IHandler), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 2,
+                MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Decorator,
                 GenericWrapper = null,
                 Decorator = new DecoratorInfo { ServiceName = "transact", ShouldCompareMetadata = true, ConditionType = null }
@@ -233,7 +239,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IServiceWithMultipleImplentations), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 1,
+                MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
                 Decorator = null
@@ -277,7 +283,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IServiceWithMetadata), ServiceName = null },
                 },
                 IsSingleton = false,
-                MetadataAttributeIndex = 1,
+                MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
                 Decorator = null
@@ -364,6 +370,7 @@
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.DbMan<>),
                 Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.DbMan<>), ServiceName = null },
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.ISomeDb<>), ServiceName = null },
                 },
                 IsSingleton = true,
@@ -398,6 +405,7 @@
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.DryFactory<>),
                 Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.DryFactory<>), ServiceName = null },
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IFactory<>), ServiceName = null },
                 },
                 IsSingleton = true,
@@ -431,6 +439,7 @@
             new RegistrationInfo {
                 ImplementationType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.DryFactory<,>),
                 Exports = new[] {
+                    new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.DryFactory<,>), ServiceName = null },
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IFactory<,>), ServiceName = null },
                 },
                 IsSingleton = true,
@@ -446,7 +455,7 @@
                     new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.IFooService), ServiceName = null },
                 },
                 IsSingleton = true,
-                MetadataAttributeIndex = 1,
+                MetadataAttributeIndex = 0,
                 FactoryType = DryIoc.FactoryType.Service,
                 GenericWrapper = null,
                 Decorator = null
