@@ -16,7 +16,7 @@ namespace DryIoc.UnitTests
 
             var rules = container.ResolutionRules;
             rules.UnregisteredServices = rules.UnregisteredServices
-                .Except(new[] { ContainerSetup.GetEnumerableOrArrayDynamicallyOrNull }).ToArray();
+                .Except(new[] { ContainerSetup.GetEnumerableOrArrayDynamicallyOrDefault }).ToArray();
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service[]>());
@@ -238,7 +238,7 @@ namespace DryIoc.UnitTests
 
         public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
         {
-            var import = GetSingleAttributeOrNull<ImportAttribute>(attributes);
+            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
             key = import == null ? null : import.ContractName;
             return import != null;
         }
@@ -246,7 +246,7 @@ namespace DryIoc.UnitTests
         public static bool TryGetServiceKeyWithMetadataAttribute(out object key, Type contractType, Request parent, IRegistry registry, object[] attributes)
         {
             key = null;
-            var import = GetSingleAttributeOrNull<ImportWithMetadataAttribute>(attributes);
+            var import = GetSingleAttributeOrDefault<ImportWithMetadataAttribute>(attributes);
             if (import == null)
                 return false;
 
@@ -257,7 +257,7 @@ namespace DryIoc.UnitTests
             return true;
         }
 
-        private static TAttribute GetSingleAttributeOrNull<TAttribute>(object[] attributes) where TAttribute : Attribute
+        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
         {
             TAttribute attr = null;
             for (var i = 0; i < attributes.Length && attr == null; i++)

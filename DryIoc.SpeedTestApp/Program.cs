@@ -16,18 +16,18 @@ namespace DryIoc.SpeedTestApp
 			Thread.CurrentThread.Priority = ThreadPriority.Highest;
             CompareTreeGet();
             //CompareClosureFieldAccess();
-            //DoCompareTryGetVsGetOrNull();
+            //DoCompareTryGetVsGetOrDefault();
 		    //CompareHashTreeEnumeration();
 		    //CompareMethodArgumentPassing();
 		    //CompareTypesForEquality(typeof(string));
 			Console.ReadKey();
 		}
 
-        private static void DoCompareTryGetVsGetOrNull()
+        private static void DoCompareTryGetVsGetOrDefault()
         {
-            CompareTryGetVsGetOrNull.Compare();
+            CompareTryGetVsGetOrDefault.Compare();
             Console.WriteLine();
-            CompareTryGetVsGetOrNull.Compare();
+            CompareTryGetVsGetOrDefault.Compare();
         }
 
 	    private static void CompareMethodArgumentPassing()

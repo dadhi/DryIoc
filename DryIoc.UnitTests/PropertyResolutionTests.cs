@@ -174,12 +174,12 @@ namespace DryIoc.UnitTests
             if (attributes.Length == 0)
                 return false;
 
-            var import = GetSingleAttributeOrNull<ImportAttribute>(attributes);
+            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
             key = import == null ? null : import.ContractName;
             return import != null;
         }
 
-        private static TAttribute GetSingleAttributeOrNull<TAttribute>(object[] attributes) where TAttribute : Attribute
+        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
         {
             TAttribute attr = null;
             for (var i = 0; i < attributes.Length && attr == null; i++)

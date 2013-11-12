@@ -245,7 +245,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     {
     }
 
-    [ExportAll(Except = new []{ typeof(IAnotherDb) })]
+    [ExportAll(ExceptTypes = new []{ typeof(IAnotherDb) })]
     public class DbMan<T> : ISomeDb<T>, IAnotherDb
     {
     }

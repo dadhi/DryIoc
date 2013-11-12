@@ -36,6 +36,9 @@
             : base(contractName, contractType) { }
     }
 
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public sealed class PartNotDiscoverableAttribute : Attribute { }
+
     public enum CreationPolicy { Shared, NonShared }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]

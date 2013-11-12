@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace DryIoc.UnitTests.Performance
 {
-    public static class CompareTryGetVsGetOrNull
+    public static class CompareTryGetVsGetOrDefault
     {
         public static void Compare()
         {
@@ -30,10 +30,10 @@ namespace DryIoc.UnitTests.Performance
             timer = Stopwatch.StartNew();
             for (int t = 0; t < times; t++)
             {
-                result = holder.GetValueOrNull(type) ?? value;
+                result = holder.GetValueOrDefault(type) ?? value;
             }
             timer.Stop();
-            Console.WriteLine("GetValueOrNull took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
+            Console.WriteLine("GetValueOrDefault took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
             GC.Collect();
 
             GC.KeepAlive(result);
@@ -61,7 +61,7 @@ namespace DryIoc.UnitTests.Performance
             return false;
         }
 
-        public object GetValueOrNull(Type key)
+        public object GetValueOrDefault(Type key)
         {
             return key == typeof(object) ? _value : null;
         }

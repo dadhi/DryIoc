@@ -46,7 +46,7 @@ namespace DryIoc.AttributedRegistration
 
         public static void RegisterExported(this IRegistrator registrator, params Type[] types)
         {
-            registrator.RegisterExported(types.Where(IsTypeToExport).Select(GetRegistrationInfo));
+            registrator.RegisterExported(types.Select(GetRegistrationInfoOrDefault).Where(info => info != null));
         }
 
         public static void RegisterExported(this IRegistrator registrator, params Assembly[] assemblies)
@@ -77,21 +77,39 @@ namespace DryIoc.AttributedRegistration
 
         public static IEnumerable<RegistrationInfo> ScanAssemblies(IEnumerable<Assembly> assemblies)
         {
-            return assemblies.SelectMany(a => a.GetTypes()).Where(IsTypeToExport).Select(GetRegistrationInfo);
+            return assemblies.SelectMany(a => a.GetTypes())
+                .Select(GetRegistrationInfoOrDefault).Where(info => info != null);
         }
 
-        public static RegistrationInfo GetRegistrationInfo(Type type)
+        public static RegistrationInfo GetRegistrationInfoOrDefault(Type type)
         {
+            if (!type.IsClass && type.IsAbstract)
+                return null;
+
             var attributes = type.GetCustomAttributes(false);
 
-            var info = new RegistrationInfo {ImplementationType = type};
+            for (var baseType = type.BaseType;
+                baseType != typeof(object) && baseType != null;
+                baseType = baseType.BaseType)
+                attributes = attributes.Append(GetInheritedExportAttributes(baseType));
+
+            var interfaces = type.GetInterfaces();
+            for (var i = 0; i < interfaces.Length; i++)
+                attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
+
+            if (attributes.Length == 0 ||
+                !Array.Exists(attributes, a => a is ExportAttribute || a is ExportAllAttribute) ||
+                Array.Exists(attributes, a => a is PartNotDiscoverableAttribute))
+                return null;
+
+            var info = new RegistrationInfo { ImplementationType = type };
 
             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
             {
                 var attribute = attributes[attributeIndex];
                 if (attribute is ExportAttribute)
                 {
-                    var exportAttribute = (ExportAttribute) attribute;
+                    var exportAttribute = (ExportAttribute)attribute;
                     var export = new ExportInfo
                     {
                         ServiceType = exportAttribute.ContractType ?? type,
@@ -99,15 +117,15 @@ namespace DryIoc.AttributedRegistration
                     };
 
                     if (info.Exports == null)
-                        info.Exports = new[] {export};
+                        info.Exports = new[] { export };
                     else if (!info.Exports.Contains(export))
                         info.Exports = info.Exports.AppendOrUpdate(export);
                 }
                 else if (attribute is ExportAllAttribute)
                 {
-                    var exportAllAttribute = (ExportAllAttribute) attribute;
-                    var exportAllInfos = exportAllAttribute.SelectServiceTypes(type)
-                        .Select(t => new ExportInfo {ServiceType = t, ServiceName = exportAllAttribute.ContractName})
+                    var exportAllAttribute = (ExportAllAttribute)attribute;
+                    var exportAllInfos = exportAllAttribute.GetAllContractTypes(type)
+                        .Select(t => new ExportInfo { ServiceType = t, ServiceName = exportAllAttribute.ContractName })
                         .ToArray();
 
                     if (info.Exports != null) // eliminating identical exports
@@ -119,22 +137,22 @@ namespace DryIoc.AttributedRegistration
                 }
                 else if (attribute is PartCreationPolicyAttribute)
                 {
-                    info.IsSingleton = ((PartCreationPolicyAttribute) attribute).CreationPolicy == CreationPolicy.Shared;
+                    info.IsSingleton = ((PartCreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
                 }
                 else if (attribute is ExportAsGenericWrapperAttribute)
                 {
                     Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
                     info.FactoryType = FactoryType.GenericWrapper;
-                    var genericWrapperAttribute = ((ExportAsGenericWrapperAttribute) attribute);
+                    var genericWrapperAttribute = ((ExportAsGenericWrapperAttribute)attribute);
                     info.GenericWrapper = new GenericWrapperInfo
                     {
-                        ServiceTypeIndex = genericWrapperAttribute.ServiceTypeArgIndex
+                        ServiceTypeIndex = genericWrapperAttribute.ContractTypeArgIndex
                     };
                 }
                 else if (attribute is ExportAsDecoratorAttribute)
                 {
                     Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
-                    var decorator = ((ExportAsDecoratorAttribute) attribute);
+                    var decorator = ((ExportAsDecoratorAttribute)attribute);
                     info.FactoryType = FactoryType.Decorator;
                     info.Decorator = new DecoratorInfo
                     {
@@ -144,7 +162,7 @@ namespace DryIoc.AttributedRegistration
                     };
                 }
 
-                if (Attribute.IsDefined(attribute.GetType(), typeof (MetadataAttributeAttribute), true))
+                if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), true))
                 {
                     Throw.If(info.MetadataAttributeIndex != -1, Error.UNSUPPORTED_MULTIPLE_METADATA, type);
                     info.MetadataAttributeIndex = attributeIndex;
@@ -162,20 +180,28 @@ namespace DryIoc.AttributedRegistration
             return info;
         }
 
-        #region Tools
+        #region Implementation
 
-        public static bool IsTypeToExport(Type type)
+        private static object[] GetInheritedExportAttributes(Type type)
         {
-            return type.IsClass && !type.IsAbstract && 
-                (Attribute.IsDefined(type, typeof(ExportAttribute), false) ||
-                Attribute.IsDefined(type, typeof(ExportAllAttribute), false));
+            var exports = type.GetCustomAttributes(typeof (InheritedExportAttribute), false);
+            for (var i = 0; i < exports.Length; i++)
+            {
+                var export = (InheritedExportAttribute) exports[i];
+                export.ContractType = export.ContractType ?? type;
+            }
+            return exports;
         }
+
+        #endregion
+
+        #region Tools
 
         public static ConstructorInfo FindSingleImportingConstructor(Type type)
         {
             var constructors = type.GetConstructors();
             return constructors.Length == 1 ? constructors[0]
-                : constructors.SingleOrDefault(x => Attribute.IsDefined(x, typeof (ImportingConstructorAttribute)))
+                : constructors.SingleOrDefault(x => Attribute.IsDefined(x, typeof(ImportingConstructorAttribute)))
                     .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, type);
         }
 
@@ -218,7 +244,7 @@ namespace DryIoc.AttributedRegistration
 
         public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
         {
-            var import = GetSingleAttributeOrNull<ImportAttribute>(attributes);
+            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
             key = import == null ? null : import.ContractName;
             return import != null;
         }
@@ -226,7 +252,7 @@ namespace DryIoc.AttributedRegistration
         public static bool TryGetServiceKeyWithMetadataAttribute(out object key, Type contractType, Request parent, IRegistry registry, object[] attributes)
         {
             key = null;
-            var import = GetSingleAttributeOrNull<ImportWithMetadataAttribute>(attributes);
+            var import = GetSingleAttributeOrDefault<ImportWithMetadataAttribute>(attributes);
             if (import == null)
                 return false;
 
@@ -240,7 +266,7 @@ namespace DryIoc.AttributedRegistration
         public static bool TryGetServiceKeyFromImportOrExportAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
             key = null;
-            var import = GetSingleAttributeOrNull<ImportOrExportAttribute>(attributes);
+            var import = GetSingleAttributeOrDefault<ImportOrExportAttribute>(attributes);
             if (import == null)
                 return false;
 
@@ -250,7 +276,7 @@ namespace DryIoc.AttributedRegistration
             {
                 var implementationType = import.ImplementationType ?? serviceType;
                 var reuse = import.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
-                var getConstructor = import.ConstructorSignature != null 
+                var getConstructor = import.ConstructorSignature != null
                     ? new GetConstructor(t => t.GetConstructor(import.ConstructorSignature)) : null;
                 var setup = ServiceSetup.WithMetadata(import.Metadata);
                 registry.Register(serviceType, implementationType, reuse, getConstructor, setup, serviceName);
@@ -260,7 +286,7 @@ namespace DryIoc.AttributedRegistration
             return true;
         }
 
-        private static TAttribute GetSingleAttributeOrNull<TAttribute>(object[] attributes) where TAttribute : Attribute
+        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
         {
             TAttribute attr = null;
             for (var i = 0; i < attributes.Length && attr == null; i++)
@@ -295,7 +321,7 @@ Only single metadata is supported per implementation type, please remove the res
     }
 
     #region Registration Info DTOs
-    #pragma warning disable 659
+#pragma warning disable 659
 
     [Serializable]
     public sealed class RegistrationInfo
@@ -378,7 +404,7 @@ Only single metadata is supported per implementation type, please remove the res
         public DecoratorSetup CreateSetup(object metadata)
         {
             if (ConditionType != null)
-                return DecoratorSetup.With(((IDecoratorCondition) Activator.CreateInstance(ConditionType)).Check);
+                return DecoratorSetup.With(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).Check);
 
             if (ShouldCompareMetadata || ServiceName != null)
                 return DecoratorSetup.With(request =>
@@ -398,7 +424,7 @@ Only single metadata is supported per implementation type, please remove the res
         }
     }
 
-    #pragma warning restore 659
+#pragma warning restore 659
     #endregion
 
     #region Additional Export/Import attributes
@@ -420,24 +446,24 @@ Only single metadata is supported per implementation type, please remove the res
     {
         public static Func<Type, bool> ExportedTypes = Registrator.PublicTypes;
 
-        public Type[] Except { get; set; }
+        public Type[] ExceptTypes { get; set; }
         public string ContractName { get; set; }
 
-        public IEnumerable<Type> SelectServiceTypes(Type targetType)
+        public IEnumerable<Type> GetAllContractTypes(Type targetType)
         {
-            var serviceTypes = targetType.EnumerateSelfAndImplementedTypes().Where(ExportedTypes);
-            return Except == null || Except.Length == 0 ? serviceTypes : serviceTypes.Except(Except);
+            var contractTypes = targetType.GetSelfAndImplementedTypes().Where(ExportedTypes);
+            return ExceptTypes == null || ExceptTypes.Length == 0 ? contractTypes : contractTypes.Except(ExceptTypes);
         }
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportAsGenericWrapperAttribute : Attribute
     {
-        public int ServiceTypeArgIndex { get; set; }
+        public int ContractTypeArgIndex { get; set; }
 
-        public ExportAsGenericWrapperAttribute(int serviceTypeArgumentIndex = 0)
+        public ExportAsGenericWrapperAttribute(int contractTypeArgIndex = 0)
         {
-            ServiceTypeArgIndex = serviceTypeArgumentIndex.ThrowIf(serviceTypeArgumentIndex < 0);
+            ContractTypeArgIndex = contractTypeArgIndex.ThrowIf(contractTypeArgIndex < 0);
         }
     }
 

@@ -21,7 +21,7 @@ namespace DryIoc.UnitTests.Playground
                 var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
 
                 // Composite pattern support: filter out composite root from available keys.
-                var parent = request.GetNonWrapperParentOrNull();
+                var parent = request.GetNonWrapperParentOrDefault();
                 var itemKeys = parent != null && parent.ServiceType == wrappedItemType
                     ? registry.GetKeys(wrappedItemType, factory => factory.ID != parent.FactoryID)
                     : registry.GetKeys(wrappedItemType);

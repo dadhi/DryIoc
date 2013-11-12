@@ -16,7 +16,7 @@ namespace DryIoc.UnitTests
             var factories = new Dictionary<Type, Factory>();
             container.Register<ILogger>(new FactoryProvider((request, _) =>
             {
-                var parent = request.GetNonWrapperParentOrNull();
+                var parent = request.GetNonWrapperParentOrDefault();
                 parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
                 var typeArg = parent.ImplementationType ?? parent.ServiceType;
                 return factories.GetOrAdd(typeArg, t => new ReflectionFactory(typeof(Logger<>).MakeGenericType(t)));
@@ -38,7 +38,7 @@ namespace DryIoc.UnitTests
             var factories = new Dictionary<Type, Factory>();
             container.Register<ILogger>(new FactoryProvider((request, _) =>
             {
-                var parent = request.GetNonWrapperParentOrNull();
+                var parent = request.GetNonWrapperParentOrDefault();
                 parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
                 var genericArg = parent.ImplementationType ?? parent.ServiceType;
                 return factories.GetOrAdd(genericArg, t => new ReflectionFactory(typeof(Logger<>).MakeGenericType(t), Reuse.Singleton));
@@ -62,7 +62,7 @@ namespace DryIoc.UnitTests
                 new FactoryProvider((request, _) =>
                 {
                     var implType = typeof(PlainLogger);
-                    var parent = request.GetNonWrapperParentOrNull();
+                    var parent = request.GetNonWrapperParentOrDefault();
                     if (parent != null && parent.ImplementationType == typeof(User2))
                         implType = typeof(FastLogger);
                     return factories.GetOrAdd(implType, t => new ReflectionFactory(t));

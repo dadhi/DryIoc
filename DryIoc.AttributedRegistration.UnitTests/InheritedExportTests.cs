@@ -11,7 +11,12 @@ namespace DryIoc.AttributedRegistration.UnitTests
         [Test]
         public void It_is_possible_to_mark_interface_to_export_all_its_implementations()
         {
-            Assert.Fail();
+            var container = new Container();
+            container.RegisterExported(typeof(ForExport));
+
+            var forExport = container.Resolve<IForExport>();
+
+            Assert.That(forExport, Is.InstanceOf<ForExport>());
         }
 
         [Test]
