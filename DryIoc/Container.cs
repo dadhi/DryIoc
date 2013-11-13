@@ -46,7 +46,7 @@ namespace DryIoc
     /// <para>
     /// TODO:
     /// <list type="bullet">
-    /// <item>upd: Use static EnumerableResolve for arrays.</item>
+    /// <item>upd: Use ILazyEnumerable and IEnumerable.</item>
     /// <item>upd: Refactor CompileFactory stuff to allow customization on Factory level.</item>
     /// <item>upd: Remove most of Container doc-comments.</item>
     /// </list>
@@ -585,6 +585,7 @@ namespace DryIoc
         }
 
         // Partial method definition to be implemented in .NET40 version of Container.
+        // It is optional and fine to be not implemented.
         static partial void CompileToMethod(Expression<CompiledFactory> factoryExpression, ref CompiledFactory resultFactory);
     }
 
@@ -1165,9 +1166,6 @@ when resolving {1}.";
         public abstract FactoryType Type { get; }
         public virtual FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.CacheExpression; } }
         public virtual object Metadata { get { return null; } }
-
-        // TODO: Review usage.
-        public Func<Expression<CompiledFactory>, CompiledFactory> CompileFactory = FactoryCompiler.CompileFactory;
     }
 
     public class ServiceSetup : FactorySetup

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 
 namespace DryIoc.UnitTests.Playground
@@ -23,10 +24,10 @@ namespace DryIoc.UnitTests.Playground
                 // Composite pattern support: filter out composite root from available keys.
                 var parent = request.GetNonWrapperParentOrDefault();
                 var itemKeys = parent != null && parent.ServiceType == wrappedItemType
-                    ? registry.GetKeys(wrappedItemType, factory => factory.ID != parent.FactoryID)
-                    : registry.GetKeys(wrappedItemType);
+                    ? registry.GetKeys(wrappedItemType, factory => factory.ID != parent.FactoryID).ToArray()
+                    : registry.GetKeys(wrappedItemType).ToArray();
 
-                //Throw.If(itemKeys.Length == 0, NO_REGISTERED_SERVICES_OF_ITEM_TYPE_FOUND, unwrappedItemType);
+                Throw.If(itemKeys.Length == 0, NO_REGISTERED_SERVICES_OF_ITEM_TYPE_FOUND, wrappedItemType);
 
                 var itemExpressions = new List<Expression>();
                 foreach (var itemKey in itemKeys)
@@ -37,7 +38,7 @@ namespace DryIoc.UnitTests.Playground
                         itemExpressions.Add(itemFactory.GetExpression(itemRequest, registry));
                 }
 
-                //Throw.If(itemExpressions.Count == 0, UNABLE_TO_RESOLVE_ANY_SERVICE_OF_ITEM_TYPE, itemType);
+                Throw.If(itemExpressions.Count == 0, UNABLE_TO_RESOLVE_ANY_SERVICE_OF_ITEM_TYPE, itemType);
                 return Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
             },
             setup: ServiceSetup.With(FactoryCachePolicy.NotCacheExpression));
