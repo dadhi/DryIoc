@@ -64,15 +64,25 @@ namespace DryIoc.UnitTests.CUT
 		}
 	}
 
-	public class ServiceWithEnumerableDependency : IService
+	public class ServiceWithEnumerableDependencies : IService
 	{
 	    public IEnumerable<IDependency> Foos { get; private set; }
 
-	    public ServiceWithEnumerableDependency(IEnumerable<IDependency> foos)
+	    public ServiceWithEnumerableDependencies(IEnumerable<IDependency> foos)
 		{
 			Foos = foos;
 		}
 	}
+
+    public class ServiceWithManyDependencies : IService
+    {
+        public IEnumerable<IDependency> Foos { get; private set; }
+
+        public ServiceWithManyDependencies(Many<IDependency> foos)
+        {
+            Foos = foos.Items;
+        }
+    }
 
     public class ServiceWithLazyDependency : IService
 	{

@@ -215,7 +215,7 @@ namespace DryIoc
 
             var compiledFactory = expression.ToCompiledFactoryExpression().CompileFactory();
 
-            Interlocked.Exchange(ref _defaultResolutionCache, 
+            Interlocked.Exchange(ref _defaultResolutionCache,
                 _defaultResolutionCache.AddOrUpdate(serviceType, compiledFactory));
             return compiledFactory;
         }
@@ -435,7 +435,8 @@ namespace DryIoc
                             if (condition(item.Value))
                                 yield return item.Key;
                     }
-                    else if (entry.LastDefaultFactory != null && condition(entry.LastDefaultFactory))
+                    else if (entry.LastDefaultFactory != null &&
+                        condition(entry.LastDefaultFactory))
                         yield return 0;
 
                     if (entry.NamedFactories != null)
@@ -598,7 +599,9 @@ namespace DryIoc
         public static void Default(IRegistry registry)
         {
             registry.ResolutionRules.UnregisteredServices =
-                registry.ResolutionRules.UnregisteredServices.Append(GetEnumerableOrArrayDynamicallyOrDefault);
+                registry.ResolutionRules.UnregisteredServices.Append(
+                    ResolveEnumerableAsStaticArray,
+                    ResolveManyDynamically);
 
             var funcFactory = new FactoryProvider(
                 (_, __) => new DelegateFactory(GetFuncExpression, Reuse.Singleton),
@@ -620,7 +623,7 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
-        public static ResolutionRules.ResolveUnregisteredService GetEnumerableOrArrayDynamicallyOrDefault = (req, _) =>
+        public static ResolutionRules.ResolveUnregisteredService ResolveEnumerableAsStaticArray = (req, _) =>
         {
             if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
@@ -636,15 +639,50 @@ namespace DryIoc
                 var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
 
                 // Composite pattern support: filter out composite root from available keys.
+                var parent = request.GetNonWrapperParentOrDefault();
+                var itemKeys = parent != null && parent.ServiceType == wrappedItemType
+                    ? registry.GetKeys(wrappedItemType, factory => factory.ID != parent.FactoryID).ToArray()
+                    : registry.GetKeys(wrappedItemType).ToArray();
+
+                Throw.If(itemKeys.Length == 0, Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS, wrappedItemType, request);
+
+                var itemExpressions = new List<Expression>();
+                foreach (var itemKey in itemKeys)
+                {
+                    var itemRequest = request.Push(itemType, itemKey);
+                    var itemFactory = registry.GetOrAddFactory(itemRequest, IfUnresolved.ReturnNull);
+                    if (itemFactory != null)
+                        itemExpressions.Add(itemFactory.GetExpression(itemRequest, registry));
+                }
+
+                Throw.If(itemExpressions.Count == 0, Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS, itemType, request);
+                return Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
+            },
+            setup: ServiceSetup.With(FactoryCachePolicy.NotCacheExpression));
+        };
+
+        public static ResolutionRules.ResolveUnregisteredService ResolveManyDynamically = (req, _) =>
+        {
+            if (req.OpenGenericServiceType != typeof(Many<>))
+                return null;
+
+            return new DelegateFactory((request, registry) =>
+            {
+                var dynamicEnumerableType = request.ServiceType;
+                var itemType = dynamicEnumerableType.GetGenericArguments()[0];
+
+                var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
+
+                // Composite pattern support: filter out composite root from available keys.
                 var parentFactoryID = -1;
                 var parent = request.GetNonWrapperParentOrDefault();
                 if (parent != null && parent.ServiceType == wrappedItemType)
                     parentFactoryID = parent.FactoryID;
 
-                var resolveMethodGeneric = collectionType.IsArray ? _resolveArrayMethod : _resolveEnumerableMethod;
-                var resolveMethod = resolveMethodGeneric.MakeGenericMethod(itemType, wrappedItemType);
-
-                return Expression.Call(resolveMethod, Container.RegistryWeakRefExpression, Expression.Constant(parentFactoryID));
+                var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, wrappedItemType);
+                var resolveMethodCallExpr = Expression.Call(resolveMethod, 
+                    Container.RegistryWeakRefExpression, Expression.Constant(parentFactoryID));
+                return Expression.New(dynamicEnumerableType.GetConstructors()[0], resolveMethodCallExpr);
             },
             setup: ServiceSetup.With(FactoryCachePolicy.NotCacheExpression));
         };
@@ -729,9 +767,9 @@ namespace DryIoc
             return metadata != null && metadataType.IsInstanceOfType(metadata) ? metadata : null;
         }
 
-        private static readonly MethodInfo _resolveEnumerableMethod =
-            typeof(ContainerSetup).GetMethod("ResolveEnumerable", BindingFlags.Static | BindingFlags.NonPublic);
-        internal static IEnumerable<TItem> ResolveEnumerable<TItem, TWrappedItem>(WeakReference registryRef, int parentFactoryID)
+        private static readonly MethodInfo _resolveManyDynamicallyMethod =
+            typeof(ContainerSetup).GetMethod("DoResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
+        internal static IEnumerable<TItem> DoResolveManyDynamically<TItem, TWrappedItem>(WeakReference registryRef, int parentFactoryID)
         {
             var itemType = typeof(TItem);
             var wrappedItemType = typeof(TWrappedItem);
@@ -747,13 +785,6 @@ namespace DryIoc
                 if (item != null) // skip unresolved items
                     yield return (TItem)item;
             }
-        }
-
-        private static readonly MethodInfo _resolveArrayMethod =
-            typeof(ContainerSetup).GetMethod("ResolveArray", BindingFlags.Static | BindingFlags.NonPublic);
-        internal static TItem[] ResolveArray<TItem, TUnwrappedItem>(WeakReference registryRef, int parentFactoryID)
-        {
-            return ResolveEnumerable<TItem, TUnwrappedItem>(registryRef, parentFactoryID).ToArray();
         }
 
         #endregion
@@ -875,6 +906,12 @@ when resolving {1}.";
 
         public static readonly string DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION =
             "Decorator factory should support resolution as {0}, but it does not.";
+
+        public static readonly string UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS =
+            "Unable to find registered services of item type (unwrapped) {0} when resolving {1}.";
+
+        public static readonly string UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS =
+            "Unable to resolve any service of item type {0} when resolving {1}.";
     }
 
     public static class Registrator
@@ -970,7 +1007,7 @@ when resolving {1}.";
             registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup), typeof(TImplementation), named);
         }
 
-        public static Func<Type, bool> PublicTypes = 
+        public static Func<Type, bool> PublicTypes =
             type => (type.IsPublic || type.IsNestedPublic) && type != typeof(object);
 
         /// <summary>
@@ -1786,6 +1823,16 @@ when resolving {1}.";
         Type GetWrappedServiceTypeOrSelf(Type serviceType);
 
         Expression GetConstantExpression(object constant, Type constantType);
+    }
+
+    public sealed class Many<TService>
+    {
+        public readonly IEnumerable<TService> Items;
+
+        public Many(IEnumerable<TService> items)
+        {
+            Items = items;
+        }
     }
 
     public sealed class Meta<TService, TMetadata>

@@ -39,10 +39,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CompositePatternTests.cs" />
+    <Compile Include="ManyTests.cs" />
     <Compile Include="Memory\NoLeakingMemoryTests.cs" />
     <Compile Include="Performance\ClosureFieldsAccessSpeed.cs" />
     <Compile Include="Playground\AvlTree.cs" />
-    <Compile Include="Playground\ResolveEnumerableStaticallyAsNewArray.cs" />
     <Compile Include="ResolutionRulesTests.cs" />
     <Compile Include="ContainerTests.cs" />
     <Compile Include="ContextDependentResolutionTests.cs" />

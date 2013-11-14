@@ -79,21 +79,6 @@ namespace DryIoc.UnitTests
 		}
 
 		[Test]
-		public void ResolveEnumerableOfFunc_ServiceRegisteredWithFunc_ShouldReturnEnumerableOfFunc()
-		{
-			var container = new Container();
-			container.RegisterDelegate<IService<string>>(_ => new ClosedGenericClass());
-
-			var services = container.Resolve<IEnumerable<Func<IService<string>>>>();
-
-			var factory = services.Single();
-			var service = factory();
-			Assert.IsNotNull(service);
-			var anotherService = factory();
-			Assert.AreNotSame(service, anotherService);
-		}
-
-		[Test]
 		public void I_can_resolve_array_of_open_generics()
 		{
 			var container = new Container();
@@ -122,71 +107,64 @@ namespace DryIoc.UnitTests
 		}
 
 		[Test]
-		public void Resolve_ServiceWithIEnumerableDependency_ReturnsInstanceWithIEnumerableDependency()
+        public void I_can_inject_enumerable_as_dependency()
 		{
 			var container = new Container();
 			container.Register(typeof(IDependency), typeof(Dependency));
 			container.Register(typeof(IDependency), typeof(Dependency), named: "Foo2");
-			container.Register(typeof(IService), typeof(ServiceWithEnumerableDependency));
+			container.Register(typeof(IService), typeof(ServiceWithEnumerableDependencies));
 
-			var service = (ServiceWithEnumerableDependency)container.Resolve<IService>();
+			var service = (ServiceWithEnumerableDependencies)container.Resolve<IService>();
 
             Assert.That(service.Foos, Is.InstanceOf<IEnumerable<IDependency>>());
 		}
 
 		[Test]
-		public void Resolving_IEnumerable_should_for_not_registered_service_should_return_empty_collection()
+        public void Resolving_array_of_not_registered_services_should_throw()
 		{
 			var container = new Container();
 
-		    var count = container.Resolve<IEnumerable<IService>>().Count();
-
-            Assert.That(count, Is.EqualTo(0));
-		}
-
-		[Test]
-		public void ReResolving_Enumerable_after_registering_another_service_should_contain_that_service()
-		{
-			// Arrange
-			var container = new Container();
-            container.Register<ServiceWithEnumerableDependency>();
-            container.Register<IDependency, Foo1>();
-
-            var service = container.Resolve<ServiceWithEnumerableDependency>();
-			Assert.That(service.Foos.Count(), Is.EqualTo(1));
-
-			// Act
-            container.Register<IDependency, Foo2>();
-            var serviceAfter = container.Resolve<ServiceWithEnumerableDependency>();
-
-            Assert.That(serviceAfter.Foos.Count(), Is.EqualTo(2));
+            Assert.Throws<ContainerException>(() =>
+		        container.Resolve<IService[]>());
 		}
 
         [Test]
-        public void ReResolving_Enumerable_as_dependency_after_registering_another_service_should_contain_that_service()
+        public void When_enumerable_is_reresolved_after_registering_another_service_Then_enumerable_should_NOT_contain_that_service()
         {
-            // Arrange
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
-            var servicesBefore = container.Resolve<IEnumerable<IService>>().ToArray();
+            var servicesBefore = container.Resolve<IService[]>();
             Assert.That(servicesBefore.Length, Is.EqualTo(1));
 
-            // Act
             container.Register(typeof(IService), typeof(AnotherService), named: "another");
-            var servicesAfter = container.Resolve<IEnumerable<IService>>().ToArray();
 
-            Assert.That(servicesAfter.Length, Is.EqualTo(2));
+            var servicesAfter = container.Resolve<IService[]>();
+            Assert.That(servicesAfter.Length, Is.EqualTo(1));
         }
+
+		[Test]
+        public void When_enumerable_dependency_is_reresolved_after_registering_another_service_Then_enumerable_should_NOT_contain_that_service()
+		{
+			var container = new Container();
+            container.Register<ServiceWithEnumerableDependencies>();
+            container.Register<IDependency, Foo1>();
+
+            var service = container.Resolve<ServiceWithEnumerableDependencies>();
+			Assert.That(service.Foos.Count(), Is.EqualTo(1));
+
+            container.Register<IDependency, Foo2>();
+            var serviceAfter = container.Resolve<ServiceWithEnumerableDependencies>();
+
+            Assert.That(serviceAfter.Foos.Count(), Is.EqualTo(1));
+		}
 
 		[Test]
 		public void I_should_be_able_to_resolve_Lazy_of_Func_of_IEnumerable()
 		{
-			// Arrange
 			var container = new Container();
 			container.Register(typeof(IService), typeof(Service), named: "blah");
 			container.Register(typeof(IService), typeof(Service), named: "crew");
 
-			// Act
 			var result = container.Resolve<Lazy<Func<IEnumerable<IService>>>>();
 
             Assert.That(result, Is.InstanceOf<Lazy<Func<IEnumerable<IService>>>>());
