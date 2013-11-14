@@ -46,8 +46,6 @@ namespace DryIoc
     /// <para>
     /// TODO:
     /// <list type="bullet">
-    /// <item>upd: Use ILazyEnumerable and IEnumerable.</item>
-    /// <item>upd: Refactor CompileFactory stuff to allow customization on Factory level.</item>
     /// <item>upd: Remove most of Container doc-comments.</item>
     /// </list>
     /// </para>
@@ -192,7 +190,7 @@ namespace DryIoc
                 var expression = factory.GetExpression(request, this);
                 if (expression.NodeType == ExpressionType.Convert) // no need to convert resolution root, as at will be converted after invoking CompliedFactory.
                     expression = ((UnaryExpression)expression).Operand;
-                compiledFactory = expression.ToCompiledFactoryExpression().CompileFactory();
+                compiledFactory = expression.ToFactoryExpression().CompileFactory();
                 Interlocked.Exchange(ref _keyedResolutionCache, _keyedResolutionCache.AddOrUpdate(serviceType,
                     (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, compiledFactory)));
             }
@@ -213,7 +211,7 @@ namespace DryIoc
             if (expression.NodeType == ExpressionType.Convert) // no need to convert resolution root, as at will be converted after invoking CompliedFactory.
                 expression = ((UnaryExpression)expression).Operand;
 
-            var compiledFactory = expression.ToCompiledFactoryExpression().CompileFactory();
+            var compiledFactory = expression.ToFactoryExpression().CompileFactory();
 
             Interlocked.Exchange(ref _defaultResolutionCache,
                 _defaultResolutionCache.AddOrUpdate(serviceType, compiledFactory));
@@ -398,32 +396,9 @@ namespace DryIoc
             return resultDecorator;
         }
 
-        IEnumerable<object> IRegistry.GetKeys(Type serviceType)
-        {
-            lock (_syncRoot)
-            {
-                FactoriesEntry entry;
-                if (TryFindEntry(out entry, serviceType))
-                {
-                    if (entry.DefaultFactories != null)
-                    {
-                        foreach (var item in entry.DefaultFactories.TraverseInOrder())
-                            yield return item.Key;
-                    }
-                    else if (entry.LastDefaultFactory != null)
-                        yield return 0;
-
-                    if (entry.NamedFactories != null)
-                    {
-                        foreach (var pair in entry.NamedFactories)
-                            yield return pair.Key;
-                    }
-                }
-            }
-        }
-
         IEnumerable<object> IRegistry.GetKeys(Type serviceType, Func<Factory, bool> condition)
         {
+            condition = condition ?? AlwaysTrue;
             lock (_syncRoot)
             {
                 FactoriesEntry entry;
@@ -482,6 +457,8 @@ namespace DryIoc
             return _factories.TryGetValue(serviceType, out entry) || serviceType.IsGenericType &&
                    _factories.TryGetValue(serviceType.GetGenericTypeDefinition().ThrowIfNull(), out entry);
         }
+
+        private static bool AlwaysTrue(Factory _) { return true; }
 
         #endregion
 
@@ -573,7 +550,7 @@ namespace DryIoc
 
     public static partial class FactoryCompiler
     {
-        public static Expression<CompiledFactory> ToCompiledFactoryExpression(this Expression expression)
+        public static Expression<CompiledFactory> ToFactoryExpression(this Expression expression)
         {
             return Expression.Lambda<CompiledFactory>(expression, Container.ConstantsParameter, Container.ResolutionScopeParameter);
         }
@@ -640,9 +617,10 @@ namespace DryIoc
 
                 // Composite pattern support: filter out composite root from available keys.
                 var parent = request.GetNonWrapperParentOrDefault();
-                var itemKeys = parent != null && parent.ServiceType == wrappedItemType
-                    ? registry.GetKeys(wrappedItemType, factory => factory.ID != parent.FactoryID).ToArray()
-                    : registry.GetKeys(wrappedItemType).ToArray();
+                Func<Factory, bool> condition = null;
+                if (parent != null && parent.ServiceType == wrappedItemType)
+                    condition = factory => factory.ID != parent.FactoryID;
+                var itemKeys = registry.GetKeys(wrappedItemType, condition).ToArray();
 
                 Throw.If(itemKeys.Length == 0, Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS, wrappedItemType, request);
 
@@ -657,8 +635,7 @@ namespace DryIoc
 
                 Throw.If(itemExpressions.Count == 0, Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS, itemType, request);
                 return Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
-            },
-            setup: ServiceSetup.With(FactoryCachePolicy.NotCacheExpression));
+            });
         };
 
         public static ResolutionRules.ResolveUnregisteredService ResolveManyDynamically = (req, _) =>
@@ -716,7 +693,7 @@ namespace DryIoc
             var factoryExpr = registry
                 .GetOrAddFactory(serviceRequest, IfUnresolved.Throw)
                 .GetExpression(serviceRequest, registry)
-                .ToCompiledFactoryExpression();
+                .ToFactoryExpression();
 
             var factoryConstExpr = registry.GetConstantExpression(factoryExpr, typeof(Expression<CompiledFactory>));
             return Expression.New(ctor, factoryConstExpr);
@@ -776,10 +753,11 @@ namespace DryIoc
             var wrappedItemType = typeof(TWrappedItem);
             var registry = (registryRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
 
-            var itemKeys = parentFactoryID == -1
-                ? registry.GetKeys(wrappedItemType)
-                : registry.GetKeys(wrappedItemType, factory => factory.ID != parentFactoryID);
+            Func<Factory, bool> condition = null;
+            if (parentFactoryID != -1)
+                condition = factory => factory.ID != parentFactoryID;
 
+            var itemKeys = registry.GetKeys(wrappedItemType, condition);
             foreach (var itemKey in itemKeys)
             {
                 var item = registry.ResolveKeyed(itemType, itemKey, IfUnresolved.ReturnNull);
@@ -1781,7 +1759,7 @@ when resolving {1}.";
                 var constants = registry.Constants;
                 var singletonScope = (Scope)constants[Container.SINGLETON_SCOPE_CONST_INDEX];
                 var singleton = singletonScope.GetOrAdd(factoryID,
-                    () => factoryExpr.ToCompiledFactoryExpression().CompileFactory().Invoke(constants, null));
+                    () => factoryExpr.ToFactoryExpression().CompileFactory().Invoke(constants, null));
                 return registry.GetConstantExpression(singleton, factoryExpr.Type);
             }
         }
@@ -1816,8 +1794,6 @@ when resolving {1}.";
         Factory GetFactoryOrDefault(Type serviceType, object serviceKey);
 
         Expression GetDecoratorExpressionOrDefault(Request request);
-
-        IEnumerable<object> GetKeys(Type serviceType);
 
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
