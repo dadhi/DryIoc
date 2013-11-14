@@ -680,8 +680,9 @@ namespace DryIoc
                     parentFactoryID = parent.FactoryID;
 
                 var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, wrappedItemType);
-                var resolveMethodCallExpr = Expression.Call(resolveMethod, 
+                var resolveMethodCallExpr = Expression.Call(resolveMethod,
                     Container.RegistryWeakRefExpression, Expression.Constant(parentFactoryID));
+
                 return Expression.New(dynamicEnumerableType.GetConstructors()[0], resolveMethodCallExpr);
             },
             setup: ServiceSetup.With(FactoryCachePolicy.NotCacheExpression));

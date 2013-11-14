@@ -148,5 +148,18 @@ namespace DryIoc.UnitTests
             Assert.That(result, Is.InstanceOf<Lazy<Func<Many<IService>>>>());
             Assert.That(result.Value.Invoke().Items.Count(), Is.EqualTo(2));
 		}
+
+	    [Test]
+	    public void If_some_item_is_not_resolved_then_it_would_not_throw()
+	    {
+            var container = new Container();
+	        container.Register<Service>(setup: ServiceSetup.WithMetadata(1));
+
+	        var servicesWithBoolMeta = container.Resolve<Many<Meta<Service, bool>>>().Items;
+            Assert.That(servicesWithBoolMeta.Count(), Is.EqualTo(0));
+
+            var servicesWithIntMeta = container.Resolve<Many<Meta<Service, int>>>().Items;
+            Assert.That(servicesWithIntMeta.Count(), Is.EqualTo(1));
+	    }
 	}
 }
