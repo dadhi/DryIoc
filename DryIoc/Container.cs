@@ -58,7 +58,7 @@ namespace DryIoc
             _factories = new Dictionary<Type, FactoriesEntry>();
             _decorators = HashTree<Type, DecoratorsEntry[]>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
-            _keyedResolutionCache = HashTree<Type, KeyedResolutionCacheEntry>.Empty;
+            _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
 
             // put itself into constants, to support container access inside expression. It is common for dynamic scenarios. 
             _constants = new object[3];
@@ -173,71 +173,44 @@ namespace DryIoc
 
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var compiledFactory = _defaultResolutionCache.GetValueOrDefault(serviceType)
-                ?? ResolveAndCacheFactory(serviceType, ifUnresolved);
+            var compiledFactory =
+                _defaultResolutionCache.GetValueOrDefault(serviceType) ??
+                ResolveAndCacheFactory(serviceType, ifUnresolved);
             return compiledFactory(_constants, resolutionScope: null);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
         {
-            var entry = _keyedResolutionCache.GetValueOrDefault(serviceType);
-            var compiledFactory = entry != null ? entry.GetCompiledFactoryOrDefault(serviceKey) : null;
+            var entry = _keyedResolutionCache.GetValueOrDefault(serviceType) ?? HashTree<object, CompiledFactory>.Empty;
+            var compiledFactory = entry.GetValueOrDefault(serviceKey);
             if (compiledFactory == null)
             {
                 var request = new Request(null, serviceType, serviceKey);
                 var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
                 if (factory == null) return null;
-                var expression = factory.GetExpression(request, this);
-                if (expression.NodeType == ExpressionType.Convert) // no need to convert resolution root, as at will be converted after invoking CompliedFactory.
-                    expression = ((UnaryExpression)expression).Operand;
-                compiledFactory = expression.ToFactoryExpression().CompileFactory();
-                Interlocked.Exchange(ref _keyedResolutionCache, _keyedResolutionCache.AddOrUpdate(serviceType,
-                    (entry ?? KeyedResolutionCacheEntry.Empty).Add(serviceKey, compiledFactory)));
+                compiledFactory = factory.GetExpression(request, this).ToFactoryExpression().CompileFactory();
+                Interlocked.Exchange(ref _keyedResolutionCache,
+                    _keyedResolutionCache.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, compiledFactory)));
             }
 
             return compiledFactory(_constants, resolutionScope: null);
         }
 
         private HashTree<Type, CompiledFactory> _defaultResolutionCache;
-        private HashTree<Type, KeyedResolutionCacheEntry> _keyedResolutionCache;
+        private HashTree<Type, HashTree<object, CompiledFactory>> _keyedResolutionCache;
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
         {
             var request = new Request(null, serviceType, null);
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null) return EmptyCompiledFactory;
-            var expression = factory.GetExpression(request, this);
-            if (expression.NodeType == ExpressionType.Convert) // no need to convert resolution root, as at will be converted after invoking CompliedFactory.
-                expression = ((UnaryExpression)expression).Operand;
-
-            var compiledFactory = expression.ToFactoryExpression().CompileFactory();
-
+            var compiledFactory = factory.GetExpression(request, this).ToFactoryExpression().CompileFactory();
             Interlocked.Exchange(ref _defaultResolutionCache,
                 _defaultResolutionCache.AddOrUpdate(serviceType, compiledFactory));
             return compiledFactory;
         }
 
         private static object EmptyCompiledFactory(object[] costants, Scope resolutionScope) { return null; }
-
-        private sealed class KeyedResolutionCacheEntry
-        {
-            public static readonly KeyedResolutionCacheEntry Empty = new KeyedResolutionCacheEntry();
-
-            private HashTree<int, CompiledFactory> _indexed = HashTree<int, CompiledFactory>.Empty;
-            private HashTree<string, CompiledFactory> _named = HashTree<string, CompiledFactory>.Empty;
-
-            public CompiledFactory GetCompiledFactoryOrDefault(object key)
-            {
-                return key is int ? _indexed.GetValueOrDefault((int)key) : _named.GetValueOrDefault((string)key);
-            }
-
-            public KeyedResolutionCacheEntry Add(object key, CompiledFactory factory)
-            {
-                return key is int
-                    ? new KeyedResolutionCacheEntry { _indexed = _indexed.AddOrUpdate((int)key, factory), _named = _named }
-                    : new KeyedResolutionCacheEntry { _indexed = _indexed, _named = _named.AddOrUpdate((string)key, factory) };
-            }
-        }
 
         #endregion
 
@@ -551,6 +524,9 @@ namespace DryIoc
     {
         public static Expression<CompiledFactory> ToFactoryExpression(this Expression expression)
         {
+            // Removing Convert from expression root, as the result will be converted after invoking CompliedFactory.
+            if (expression.NodeType == ExpressionType.Convert)
+                expression = ((UnaryExpression)expression).Operand;
             return Expression.Lambda<CompiledFactory>(expression, Container.ConstantsParameter, Container.ResolutionScopeParameter);
         }
 
