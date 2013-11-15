@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace DryIoc.UnitTests.Performance
+namespace DryIoc.UnitTests.Playground
 {
     public class HashTreeEnumerationSpeedTests
     {

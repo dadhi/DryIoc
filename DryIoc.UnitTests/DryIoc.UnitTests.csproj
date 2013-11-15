@@ -43,6 +43,8 @@
     <Compile Include="Memory\NoLeakingMemoryTests.cs" />
     <Compile Include="Performance\ClosureFieldsAccessSpeed.cs" />
     <Compile Include="Playground\AvlTree.cs" />
+    <Compile Include="Playground\HashAndIntTrees.cs" />
+    <Compile Include="Playground\IntTreeTests.cs" />
     <Compile Include="ResolutionRulesTests.cs" />
     <Compile Include="ContainerTests.cs" />
     <Compile Include="ContextDependentResolutionTests.cs" />
@@ -54,13 +56,13 @@
     <Compile Include="FuncTests.cs" />
     <Compile Include="OpenGenericsTests.cs" />
     <Compile Include="GenericWrapperTests.cs" />
-    <Compile Include="IntTreeTests.cs" />
+    <Compile Include="HashTreeTests.cs" />
     <Compile Include="DelegateFactoryTests.cs" />
     <Compile Include="LazyTests.cs" />
     <Compile Include="MetadataTests.cs" />
     <Compile Include="Performance\CompareTryGetVsGetOrNull.cs" />
-    <Compile Include="Performance\HashTreeAccessSpeedTests.cs" />
-    <Compile Include="Performance\HashTreeEnumerationSpeedTests.cs" />
+    <Compile Include="Playground\HashTreeAccessSpeedTests.cs" />
+    <Compile Include="Playground\HashTreeEnumerationSpeedTests.cs" />
     <Compile Include="Performance\MethodArgumentsPassingSpeedComparison.cs" />
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
     <Compile Include="DecoratorConditionTests.cs" />

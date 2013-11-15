@@ -3,12 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace DryIoc.UnitTests.Performance
+namespace DryIoc.UnitTests.Playground
 {
-    public class HashTreeAccessSpeedTests
-    {
-    }
-
     public sealed class Hashed<K, V>
     {
         public readonly K Key;

@@ -124,8 +124,8 @@ namespace DryIoc.SpeedTestApp
 
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
-            var avlTree = AvlTree<Type, string>.Empty;
-            var hashTree = HashTree<Type, string>.Empty;
+            var avlTree = HashTree<Type, string>.Empty;
+            var hashTree = UnitTests.Playground.HashTree<Type, string>.Empty;
 
             var avlTreeAddTime = AvlTreeAdd(ref avlTree, keys, key, value);
             var hashTreeAddTime = HashTree4Add(ref hashTree, keys, key, value);
@@ -181,7 +181,7 @@ namespace DryIoc.SpeedTestApp
 
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
-            var v4 = HashTree<Type, string>.Empty;
+            var v4 = UnitTests.Playground.HashTree<Type, string>.Empty;
             var v1 = IntTree<Hashed<Type, string>>.Empty;
 
 	        var v4AddTime = HashTree4Add(ref v4, keys, key, value);
@@ -210,7 +210,7 @@ namespace DryIoc.SpeedTestApp
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
             var typeTree = HashTreeX<Type, string>.Using();
-            var hashTree = HashTree<Type, string>.Empty;
+            var hashTree = UnitTests.Playground.HashTree<Type, string>.Empty;
 
             var typeTreeAddTime = HashTreeXAdd(ref typeTree, keys, key, value);
             var hashTreeAddTime = HashTree4Add(ref hashTree, keys, key, value);
@@ -266,7 +266,7 @@ namespace DryIoc.SpeedTestApp
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
             var dict = new Dictionary<Type, string>();
-            var tree = HashTree<Type, string>.Empty;
+            var tree = UnitTests.Playground.HashTree<Type, string>.Empty;
 
             var dictAddTime = DictAdd(dict, keys, key, value);
             var treeAddTime = HashTree4Add(ref tree, keys, key, value);
@@ -491,7 +491,7 @@ namespace DryIoc.SpeedTestApp
             return treeWatch.ElapsedMilliseconds;
         }
 
-        private static long HashTree4Add<V>(ref HashTree<Type, V> tree, Type[] keys, Type key, V value)
+        private static long HashTree4Add<V>(ref UnitTests.Playground.HashTree<Type, V> tree, Type[] keys, Type key, V value)
         {
             var ignored = default(V);
             var treeTime = Stopwatch.StartNew();
@@ -510,7 +510,7 @@ namespace DryIoc.SpeedTestApp
             return treeTime.ElapsedMilliseconds;
         }
 
-        private static long AvlTreeAdd<V>(ref AvlTree<Type, V> tree, Type[] keys, Type key, V value)
+        private static long AvlTreeAdd<V>(ref HashTree<Type, V> tree, Type[] keys, Type key, V value)
         {
             var ignored = default(V);
             var treeTime = Stopwatch.StartNew();
@@ -586,7 +586,7 @@ namespace DryIoc.SpeedTestApp
 			return treeTime.ElapsedMilliseconds;
 		}
 
-        private static long HashTree4Get<T>(HashTree<Type, T> tree, Type key, int times)
+        private static long HashTree4Get<T>(UnitTests.Playground.HashTree<Type, T> tree, Type key, int times)
         {
             T ignored = default(T);
 
@@ -603,7 +603,7 @@ namespace DryIoc.SpeedTestApp
             return treeWatch.ElapsedMilliseconds;
         }
 
-        private static long AvlTreeGet<T>(AvlTree<Type, T> tree, Type key, int times)
+        private static long AvlTreeGet<T>(HashTree<Type, T> tree, Type key, int times)
         {
             T ignored = default(T);
 

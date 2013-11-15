@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace DryIoc.UnitTests.Playground
 {
     /// <summary>
-    /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree, where actual node key is <typeparamref name="K"/> hash code.
+    /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree, where actual node key is hash code of <typeparamref name="K"/>.
     /// </summary>
     public sealed class AvlTree<K, V>
     {
@@ -76,10 +76,7 @@ namespace DryIoc.UnitTests.Playground
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private static V ReplaceValue(V _, V added)
-        {
-            return added;
-        }
+        private static V ReplaceValue(V _, V added) { return added; }
 
         private AvlTree<K, V> AddOrUpdate(int hash, K key, V value, UpdateValue updateValue)
         {
