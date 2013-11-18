@@ -60,8 +60,9 @@ namespace DryIoc
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
             _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
 
-            // put itself into constants, to support container access inside expression. It is common for dynamic scenarios. 
             _constants = new object[3];
+            // Put container itself into constants, to support container access inside expression. 
+            // It is common for dynamic scenarios.
             _constants[REGISTRY_WEAKREF_CONST_INDEX] = new WeakReference(this);
             _constants[CURRENT_SCOPE_CONST_INDEX] = _constants[SINGLETON_SCOPE_CONST_INDEX] = new Scope();
 
@@ -478,7 +479,8 @@ namespace DryIoc
                     {
                         var factories = DefaultFactories.TraverseInOrder().Select(_ => _.Value);
                         result = getSingleFactory
-                            .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, factories.Select(_ => _.ImplementationType))
+                            .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType,
+                                factories.Select(_ => _.ImplementationType))
                             .Invoke(factories);
                     }
                 }
@@ -534,7 +536,9 @@ namespace DryIoc
         {
             CompiledFactory factory = null;
             CompileToMethod(factoryExpression, ref factory);
+            // ReSharper disable ConstantNullCoalescingCondition
             return factory ?? factoryExpression.Compile();
+            // ReSharper restore ConstantNullCoalescingCondition
         }
 
         // Partial method definition to be implemented in .NET40 version of Container.
@@ -1984,6 +1988,14 @@ when resolving {1}.";
             Key = key;
             Value = value;
         }
+
+#pragma warning disable 659
+        public override bool Equals(object obj)
+#pragma warning restore 659
+        {
+            var other = obj as KV<K, V>;
+            return other != null && Equals(other.Key, Key) && Equals(other.Value, Value);
+        }
     }
 
     /// <summary>
@@ -2011,11 +2023,12 @@ when resolving {1}.";
 
         public V GetValueOrDefault(K key, V defaultValue = default(V))
         {
+            var t = this;
             var hash = key.GetHashCode();
-            for (var t = this; t.Height != 0; t = hash < t.Hash ? t.Left : t.Right)
-                if (hash == t.Hash)
-                    return ReferenceEquals(key, t.Key) || key.Equals(t.Key) ? t.Value : t.GetConflictedValueOrDefault(key, defaultValue);
-            return defaultValue;
+            while (t.Height != 0 && t.Hash != hash)
+                t = hash < t.Hash ? t.Left : t.Right;
+            return t.Height != 0 && (ReferenceEquals(key, t.Key) || key.Equals(t.Key)) ? t.Value
+                : t.GetConflictedValueOrDefault(key, defaultValue);
         }
 
         /// <summary>

@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Tree_should_supported_hash_conflicting_keys()
+        public void When_adding_value_with_hash_conflicted_key_Then_I_should_be_able_to_get_it_back()
         {
             var key1 = new HashConflictingKey<string>("a");
             var key2 = new HashConflictingKey<string>("b");
@@ -35,6 +35,27 @@ namespace DryIoc.UnitTests
             var value = tree.GetValueOrDefault(key3);
 
             Assert.That(value, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void When_adding_couple_of_values_with_hash_conflicted_key_Then_I_should_be_able_to_get_them_back()
+        {
+            var key1 = new HashConflictingKey<string>("a");
+            var key2 = new HashConflictingKey<string>("b");
+            var key3 = new HashConflictingKey<string>("c");
+            var tree = HashTree<HashConflictingKey<string>, int>.Empty
+                .AddOrUpdate(key1, 1)
+                .AddOrUpdate(key2, 2)
+                .AddOrUpdate(key3, 3);
+
+            var values = tree.TraverseInOrder().ToArray();
+
+            Assert.That(values, Is.EqualTo(new[]
+            {
+                new KV<HashConflictingKey<string>, int>(key1, 1),
+                new KV<HashConflictingKey<string>, int>(key2, 2),
+                new KV<HashConflictingKey<string>, int>(key3, 3)
+            }));
         }
 
         [Test]
