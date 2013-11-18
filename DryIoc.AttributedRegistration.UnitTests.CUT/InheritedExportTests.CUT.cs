@@ -18,7 +18,8 @@ namespace DryIoc.AttributedRegistration.UnitTests.CUT
     [InheritedExport("i"), InheritedExport("j")]
     public interface IMultiExported { }
 
-    [Export("a"), Export("b")]
+    [Export("a")]
     [ExportAll(ContractName = "c")]
+    [Export("b")]
     public class MultiExported : IMultiExported { }
 }

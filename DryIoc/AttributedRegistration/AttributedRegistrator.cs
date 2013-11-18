@@ -128,9 +128,9 @@ namespace DryIoc.AttributedRegistration
                         .Select(t => new ExportInfo { ServiceType = t, ServiceName = exportAllAttribute.ContractName })
                         .ToArray();
 
-                    if (info.Exports != null) // eliminating identical exports
+                    if (info.Exports != null)
                         for (var index = 0; index < info.Exports.Length; index++)
-                            if (!exportAllInfos.Contains(info.Exports[index]))
+                            if (!exportAllInfos.Contains(info.Exports[index])) // filtering out identical exports
                                 exportAllInfos = exportAllInfos.AppendOrUpdate(info.Exports[index]);
 
                     info.Exports = exportAllInfos;
@@ -388,11 +388,6 @@ Only single metadata is supported per implementation type, please remove the res
 
     public static class CodePrint
     {
-        public static StringBuilder AppendIf(this StringBuilder builder, bool condition, string value)
-        {
-            return condition ? builder.Append(value) : builder;
-        }
-
         public static StringBuilder AppendBool(this StringBuilder builder, bool x)
         {
             return builder.Append(x ? "true" : "false");
