@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reflection;
 using DryIoc.AttributedRegistration.UnitTests.CUT;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests.Playground
@@ -12,7 +13,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.Playground
         public void I_want_to_resolve_service_properties_with_import_attribute()
         {
             var container = new Container();
-            container.RegisterExported(typeof(ServiceWithProperties));
+            container.RegisterExports(typeof(ServiceWithProperties));
             container.Register<IService, Service>();
 
             container.ResolutionRules.PropertiesAndFields =
@@ -27,7 +28,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.Playground
         public void It_should_NOT_throw_on_unresolved_members()
         {
             var container = new Container();
-            container.RegisterExported(typeof(ServiceWithUnregistredMembers));
+            container.RegisterExports(typeof(ServiceWithUnregistredMembers));
 
             container.ResolutionRules.PropertiesAndFields =
                 container.ResolutionRules.PropertiesAndFields.Append(ImportAll);

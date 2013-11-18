@@ -1,4 +1,5 @@
 ﻿using System;
+using DryIoc.MefAttributedModel;
 
 namespace DryIoc.AttributedRegistration.UnitTests.CUT
 {

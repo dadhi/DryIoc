@@ -1,4 +1,5 @@
 ﻿using DryIoc.AttributedRegistration.UnitTests.CUT;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
@@ -9,12 +10,12 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
         [Test]
         public void Can_register_service_with_constants_alone()
         {
-            var container = new Container(AttributedRegistrator.DefaultSetup);
-            container.RegisterExported(new[]
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(new[]
             {
-                new RegistrationInfo
+                new TypeExportInfo
                 {
-                    ImplementationType = typeof(AnotherService),
+                    Type = typeof(AnotherService),
                     Exports = new[] { 
                         new ExportInfo { ServiceType = typeof(IService), ServiceName = "another" }
                     },
@@ -31,21 +32,21 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
         [Test]
         public void Can_register_decorator_and_wrapper_with_constants_alone()
         {
-            var container = new Container(AttributedRegistrator.DefaultSetup);
-            container.RegisterExported(new[]
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(new[]
             {
-                new RegistrationInfo
+                new TypeExportInfo
                 {
-                    ImplementationType = typeof(Service),
+                    Type = typeof(Service),
                     Exports = new[] {
                         new ExportInfo { ServiceType = typeof(IService), ServiceName = "some" } },
                     IsSingleton = true,
                     MetadataAttributeIndex = -1
                 },
 
-                new RegistrationInfo
+                new TypeExportInfo
                 {
-                    ImplementationType = typeof(AnotherService),
+                    Type = typeof(AnotherService),
                     Exports = new[] {
                         new ExportInfo { ServiceType = typeof(IService), ServiceName = null } },
                     IsSingleton = false,
@@ -53,9 +54,9 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
                     FactoryType = FactoryType.Decorator,
                 },
 
-                new RegistrationInfo
+                new TypeExportInfo
                 {
-                    ImplementationType = typeof(Wrap<>),
+                    Type = typeof(Wrap<>),
                     Exports = new[] {
                         new ExportInfo { ServiceType = typeof(Wrap<>), ServiceName = null } }, IsSingleton = false,
                     MetadataAttributeIndex = -1,

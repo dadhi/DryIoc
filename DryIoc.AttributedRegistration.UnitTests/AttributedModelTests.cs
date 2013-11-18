@@ -2,12 +2,13 @@
 using System.Linq;
 using System.Reflection;
 using DryIoc.AttributedRegistration.UnitTests.CUT;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests
 {
 	[TestFixture]
-	public class AttributedRegistratorTests
+	public class AttributedModelTests
 	{
 		[Test]
 		public void I_can_resolve_service_with_dependencies()
@@ -155,7 +156,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
 	        var container = new Container();
 
             Assert.Throws<ContainerException>(() => 
-                container.RegisterExported(typeof(OneWithManyMeta)));
+                container.RegisterExports(typeof(OneWithManyMeta)));
 	    }
 
 	    [Test]
@@ -172,8 +173,8 @@ namespace DryIoc.AttributedRegistration.UnitTests
 
 		private void WhenIRegisterAllExportedTypes()
 		{
-			_container = new Container(AttributedRegistrator.DefaultSetup);
-			_container.RegisterExported(_assembly);
+			_container = new Container(AttributedModel.DefaultSetup);
+			_container.RegisterExports(_assembly);
 		}
 
 		private void GivenAssemblyWithExportedTypes()

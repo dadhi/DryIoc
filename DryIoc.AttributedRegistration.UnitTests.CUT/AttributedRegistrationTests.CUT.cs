@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel.Composition;
+using DryIoc.MefAttributedModel;
 
 namespace DryIoc.AttributedRegistration.UnitTests.CUT
 {

@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
 using DryIoc.AttributedRegistration.UnitTests.CUT;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests.Performance
@@ -21,7 +22,7 @@ namespace DryIoc.AttributedRegistration.UnitTests.Performance
 			for (int i = 0; i < times; i++)
 			{
 				var container = new Container();
-				container.RegisterExported(currentAssembly);
+				container.RegisterExports(currentAssembly);
 			}
 
 			stopwatch.Stop();

@@ -39,8 +39,8 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\AttributedRegistratorTests.cs">
-      <Link>AttributedRegistratorTests.cs</Link>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\AttributedModelTests.cs">
+      <Link>AttributedModelTests.cs</Link>
     </Compile>
     <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ExportAllTests.cs">
       <Link>ExportAllTests.cs</Link>

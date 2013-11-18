@@ -1,5 +1,6 @@
 ﻿using System;
 using DryIoc.AttributedRegistration.UnitTests.CUT;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests
@@ -11,7 +12,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
         public void Exporting_IFactory_as_generic_wrapper_should_work()
         {
             var container = new Container();
-            container.RegisterExported(typeof(FactoryConsumer), typeof(One), typeof(DryFactory<>));
+            container.RegisterExports(typeof(FactoryConsumer), typeof(One), typeof(DryFactory<>));
 
             var consumer = container.Resolve<FactoryConsumer>();
 
@@ -22,7 +23,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
         public void Exporting_IFactory_with_arguments_as_generic_wrapper_should_work()
         {
             var container = new Container();
-            container.RegisterExported(typeof(FactoryWithArgsConsumer), typeof(Two), typeof(DryFactory<,>));
+            container.RegisterExports(typeof(FactoryWithArgsConsumer), typeof(Two), typeof(DryFactory<,>));
 
             var consumer = container.Resolve<Func<string, FactoryWithArgsConsumer>>();
 

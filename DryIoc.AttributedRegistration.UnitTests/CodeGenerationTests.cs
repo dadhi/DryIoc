@@ -1,4 +1,5 @@
 ﻿using DryIoc.AttributedRegistration.UnitTests.CUT;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests
@@ -9,7 +10,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
         [Test]
         public void Should_properly_print_registration_info()
         {
-            var info = AttributedRegistrator.GetRegistrationInfoOrDefault(typeof(ForExportBaseImpl));
+            var info = AttributedModel.GetRegistrationInfoOrDefault(typeof(ForExportBaseImpl));
 
             var code = info.ToCode();
 

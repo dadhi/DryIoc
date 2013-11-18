@@ -1988,14 +1988,6 @@ when resolving {1}.";
             Key = key;
             Value = value;
         }
-
-#pragma warning disable 659
-        public override bool Equals(object obj)
-#pragma warning restore 659
-        {
-            var other = obj as KV<K, V>;
-            return other != null && Equals(other.Key, Key) && Equals(other.Value, Value);
-        }
     }
 
     /// <summary>

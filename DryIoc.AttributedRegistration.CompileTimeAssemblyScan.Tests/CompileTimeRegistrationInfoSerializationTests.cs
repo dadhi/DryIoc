@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using DryIoc.AttributedRegistration.UnitTests.CUT;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 using ProtoBuf.Meta;
 
@@ -39,7 +40,7 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
         {
             // Given
             var assembly = typeof(TransientService).Assembly;
-            var services = AttributedRegistrator.ScanAssemblies(new[] { assembly }).ToArray();
+            var services = AttributedModel.DiscoverExportsInAssemblies(new[] { assembly }).ToArray();
 
             // When
             if (File.Exists(DATA_FILE))
@@ -51,9 +52,9 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
 
             // Then
             var loadedModel = CreateModel();
-            RegistrationInfo[] infos;
+            TypeExportInfo[] infos;
             using (var file = File.OpenRead(DATA_FILE))
-                infos = (RegistrationInfo[])loadedModel.Deserialize(file, null, typeof(RegistrationInfo[]));
+                infos = (TypeExportInfo[])loadedModel.Deserialize(file, null, typeof(TypeExportInfo[]));
 
             Assert.That(services, Is.EqualTo(infos));
         }
@@ -63,7 +64,7 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
         {
             // Given
             var assembly = typeof(TransientService).Assembly;
-            var services = AttributedRegistrator.ScanAssemblies(new[] { assembly }).ToArray();
+            var services = AttributedModel.DiscoverExportsInAssemblies(new[] { assembly }).ToArray();
 
             if (File.Exists(DATA_FILE))
                 File.Delete(DATA_FILE);
@@ -73,13 +74,13 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
                 model.Serialize(file, services);
 
             var loadedModel = CreateModel();
-            RegistrationInfo[] infos;
+            TypeExportInfo[] infos;
             using (var file = File.OpenRead(DATA_FILE))
-                infos = (RegistrationInfo[])loadedModel.Deserialize(file, null, typeof(RegistrationInfo[]));
+                infos = (TypeExportInfo[])loadedModel.Deserialize(file, null, typeof(TypeExportInfo[]));
 
             // When
             var container = new Container();
-            container.RegisterExported(infos);
+            container.RegisterExports(infos);
 
             // Then
             var factories = container.Resolve<Meta<Func<IServiceWithMetadata>, IViewMetadata>[]>();
@@ -89,8 +90,8 @@ namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
         private static RuntimeTypeModel CreateModel()
         {
             var model = TypeModel.Create();
+            model.Add<TypeExportInfo>();
             model.Add<ExportInfo>();
-            model.Add<RegistrationInfo>();
             model.Add<GenericWrapperInfo>();
             model.Add<DecoratorInfo>();
             return model;

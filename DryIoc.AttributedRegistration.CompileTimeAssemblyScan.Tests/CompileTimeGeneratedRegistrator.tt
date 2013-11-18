@@ -4,18 +4,18 @@
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.dll" #>
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.AttributedRegistration.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc" #>
-<#@ import Namespace="DryIoc.AttributedRegistration" #>
+<#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ import Namespace="DryIoc.AttributedRegistration.UnitTests.CUT" #>
 namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
 {
     public static class CompileTimeGeneratedRegistrator
     {
-        public static readonly RegistrationInfo[] Registrations =
+        public static readonly TypeExportInfo[] Registrations =
         {
 <#
         var assembly = typeof(TransientService).Assembly;
-        var registrationInfos = AttributedRegistrator.ScanAssemblies(new [] { assembly });
-        foreach (var info in registrationInfos)
+        var infos = AttributedModel.DiscoverExportsInAssemblies(new [] { assembly });
+        foreach (var info in infos)
         {
 #>
 <#= info.ToCode() #>, 

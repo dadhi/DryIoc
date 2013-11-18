@@ -36,11 +36,11 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\DryIoc\AttributedRegistration\AttributedRegistrator.cs">
-      <Link>AttributedRegistration\AttributedRegistrator.cs</Link>
-    </Compile>
     <Compile Include="..\DryIoc\Container.cs">
       <Link>Container.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc\MefAttributedModel\AttributedModel.cs">
+      <Link>MefAttributedModel\AttributedModel.cs</Link>
     </Compile>
     <Compile Include="FactoryCompiler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

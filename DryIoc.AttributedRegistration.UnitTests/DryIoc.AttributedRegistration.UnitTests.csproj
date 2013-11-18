@@ -39,7 +39,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AttributedRegistratorTests.cs" />
+    <Compile Include="AttributedModelTests.cs" />
     <Compile Include="CodeGenerationTests.cs" />
     <Compile Include="ExportAllTests.cs" />
     <Compile Include="ExportAsDecoratorTests.cs" />

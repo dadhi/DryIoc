@@ -2,6 +2,7 @@
 using System.ComponentModel.Composition;
 using System.Linq;
 using DryIoc.AttributedRegistration.UnitTests.CUT;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests
@@ -13,7 +14,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
         public void It_is_possible_to_mark_interface_to_export_all_its_implementations()
         {
             var container = new Container();
-            container.RegisterExported(typeof(ForExport));
+            container.RegisterExports(typeof(ForExport));
 
             var forExport = container.Resolve<IForExport>();
 
@@ -24,7 +25,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
         public void It_is_possible_to_mark_abstract_class_to_export_all_its_implementations()
         {
             var container = new Container();
-            container.RegisterExported(typeof(ForExportBaseImpl));
+            container.RegisterExports(typeof(ForExportBaseImpl));
 
             var forExport = container.Resolve<ForExportBase>();
 
@@ -35,7 +36,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
         public void It_is_possible_to_mark_class_as_not_discoverable()
         {
             var container = new Container();
-            container.RegisterExported(typeof(Undicoverable));
+            container.RegisterExports(typeof(Undicoverable));
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IForExport>());
@@ -45,7 +46,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
         public void Can_handle_multiple_inherited_and_export_attributes()
         {
             var container = new Container();
-            container.RegisterExported(typeof(MultiExported));
+            container.RegisterExports(typeof(MultiExported));
 
             Assert.DoesNotThrow(() =>
             {

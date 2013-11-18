@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.Composition;
 using DryIoc.AttributedRegistration.UnitTests.CUT;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests
@@ -11,7 +12,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
         public void When_class_public_types_exported_as_singleton_Then_resolving_types_will_return_the_same_instance()
         {
             var container = new Container();
-            container.RegisterExported(typeof(ISomeDb).Assembly);
+            container.RegisterExports(typeof(ISomeDb).Assembly);
 
             var someDb = container.Resolve<ISomeDb>();
             var anotherDb = container.Resolve<IAnotherDb>();
@@ -23,7 +24,7 @@ namespace DryIoc.AttributedRegistration.UnitTests
         public void ExportAll_should_respect_ContractName()
         {
             var container = new Container();
-            container.RegisterExported(typeof(NamedOne));
+            container.RegisterExports(typeof(NamedOne));
 
             var named = container.Resolve<INamed>("blah");
             var one = container.Resolve<IOne>("blah");
@@ -35,8 +36,8 @@ namespace DryIoc.AttributedRegistration.UnitTests
         [Test]
         public void Individual_Export_is_simply_added_to_ExportAll_settings()
         {
-            var container = new Container(AttributedRegistrator.DefaultSetup);
-            container.RegisterExported(typeof(BothExportAllAndExport));
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(BothExportAllAndExport));
 
             var named = container.Resolve<INamed>("named");
             Assert.That(named, Is.Not.Null);
@@ -48,8 +49,8 @@ namespace DryIoc.AttributedRegistration.UnitTests
         [Test]
         public void If_both_export_and_export_all_specifying_the_same_setup_Then_only_single_will_be_registered()
         {
-            var container = new Container(AttributedRegistrator.DefaultSetup);
-            container.RegisterExported(typeof(WithBothTheSameExports));
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(WithBothTheSameExports));
 
             Assert.DoesNotThrow(() =>
                 container.Resolve<WithBothTheSameExports>());

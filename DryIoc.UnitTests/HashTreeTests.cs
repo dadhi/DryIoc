@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
@@ -48,13 +49,13 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate(key2, 2)
                 .AddOrUpdate(key3, 3);
 
-            var values = tree.TraverseInOrder().ToArray();
+            var values = tree.TraverseInOrder().ToDictionary(kv => kv.Key.Key, kv => kv.Value);
 
-            Assert.That(values, Is.EqualTo(new[]
+            Assert.That(values, Is.EqualTo(new Dictionary<string, int>
             {
-                new KV<HashConflictingKey<string>, int>(key1, 1),
-                new KV<HashConflictingKey<string>, int>(key2, 2),
-                new KV<HashConflictingKey<string>, int>(key3, 3)
+                { "a", 1 }, 
+                { "b", 2 }, 
+                { "c", 3 }, 
             }));
         }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using DryIoc.AttributedRegistration.UnitTests.CUT;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.AttributedRegistration.UnitTests
@@ -10,8 +11,8 @@ namespace DryIoc.AttributedRegistration.UnitTests
         [Test]
         public void I_can_export_ctor_param_service_on_resolve()
         {
-            var container = new Container(AttributedRegistrator.DefaultSetup);
-            container.RegisterExported(typeof(NativeUser));
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(NativeUser));
 
             var user = container.Resolve<NativeUser>();
 
@@ -21,8 +22,8 @@ namespace DryIoc.AttributedRegistration.UnitTests
         [Test]
         public void I_can_specify_constructor_while_exporting_once_a_ctor_param_service()
         {
-            var container = new Container(AttributedRegistrator.DefaultSetup);
-            container.RegisterExported(typeof(HomeUser));
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(HomeUser));
 
             var user = container.Resolve<HomeUser>();
 
@@ -32,8 +33,8 @@ namespace DryIoc.AttributedRegistration.UnitTests
         [Test]
         public void I_can_specify_metadata()
         {
-            var container = new Container(AttributedRegistrator.DefaultSetup);
-            container.RegisterExported(typeof(MyCode));
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(MyCode));
 
             var code = container.Resolve<MyCode>();
 
@@ -45,8 +46,8 @@ namespace DryIoc.AttributedRegistration.UnitTests
         public void I_can_import_or_export_fields_and_properties_as_well()
         {
             var container = new Container();
-            container.ResolutionRules.UseImportExportAttributes();
-            container.RegisterExported(typeof(ServiceWithFieldAndProperty));
+            container.ResolutionRules.UseImportsForResolution();
+            container.RegisterExports(typeof(ServiceWithFieldAndProperty));
 
             var service = container.Resolve<ServiceWithFieldAndProperty>();
 
@@ -57,8 +58,8 @@ namespace DryIoc.AttributedRegistration.UnitTests
         [Test]
         public void When_something_else_than_Import_specified_It_should_throw()
         {
-            var container = new Container(AttributedRegistrator.DefaultSetup);
-            container.RegisterExported(typeof(WithUnregisteredExternalEdependency));
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(WithUnregisteredExternalEdependency));
 
             Assert.Throws<ContainerException>(() => 
                 container.Resolve<WithUnregisteredExternalEdependency>());

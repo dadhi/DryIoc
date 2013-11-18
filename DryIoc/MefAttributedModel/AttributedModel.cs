@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 
-namespace DryIoc.AttributedRegistration
+namespace DryIoc.MefAttributedModel
 {
     /// <summary>
     /// Implements part of MEF Attributed Programming Model - http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx
@@ -26,62 +26,64 @@ namespace DryIoc.AttributedRegistration
     /// </list>
     /// </para>
     /// </summary>
-    public static class AttributedRegistrator
+    public static class AttributedModel
     {
-        public static Action<IRegistry> DefaultSetup = UseImportExportAttributes;
+        public static Action<IRegistry> DefaultSetup = UseImportsForResolution;
 
-        public static void UseImportExportAttributes(IRegistry source)
+        public static readonly CreationPolicy DefaultCreationPolicy = CreationPolicy.Shared;
+
+        public static void UseImportsForResolution(this IRegistry source)
         {
             Container.DefaultSetup(source);
-            source.ResolutionRules.UseImportExportAttributes();
+            source.ResolutionRules.UseImportsForResolution();
         }
 
-        public static void UseImportExportAttributes(this ResolutionRules rules)
+        public static void UseImportsForResolution(this ResolutionRules rules)
         {
             rules.ConstructorParameters = rules.ConstructorParameters.Append(GetConstructorParameterServiceKeyOrDefault);
             rules.PropertiesAndFields = rules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
         }
 
-        public static readonly bool ExportedServiceIsSingletonByDefault = true;
-
-        public static void RegisterExported(this IRegistrator registrator, params Type[] types)
+        public static void RegisterExports(this IRegistrator registrator, params Type[] types)
         {
-            registrator.RegisterExported(types.Select(GetRegistrationInfoOrDefault).Where(info => info != null));
+            registrator.RegisterExports(types.Select(GetRegistrationInfoOrDefault).Where(info => info != null));
         }
 
-        public static void RegisterExported(this IRegistrator registrator, params Assembly[] assemblies)
+        public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
         {
-            registrator.RegisterExported(ScanAssemblies(assemblies));
+            registrator.RegisterExports(DiscoverExportsInAssemblies(assemblies));
         }
 
-        public static void RegisterExported(this IRegistrator registrator, IEnumerable<RegistrationInfo> infos)
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<TypeExportInfo> infos)
         {
             foreach (var info in infos)
+                RegisterExport(registrator, info);
+        }
+
+        public static void RegisterExport(this IRegistrator registrator, TypeExportInfo info)
+        {
+            object metadata = null;
+            if (info.MetadataAttributeIndex != -1)
+                metadata = FindMetadata(info.Type, info.MetadataAttributeIndex);
+
+            var setup = info.CreateSetup(metadata);
+            var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
+            var factory = new ReflectionFactory(info.Type, reuse, FindSingleImportingConstructor, setup);
+
+            var exports = info.Exports;
+            for (var i = 0; i < exports.Length; i++)
             {
-                object metadata = null;
-                if (info.MetadataAttributeIndex != -1)
-                    metadata = FindMetadata(info.ImplementationType, info.MetadataAttributeIndex);
-
-                var setup = info.CreateSetup(metadata);
-                var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
-                var factory = new ReflectionFactory(info.ImplementationType, reuse, FindSingleImportingConstructor, setup);
-
-                var exports = info.Exports;
-                for (var i = 0; i < exports.Length; i++)
-                {
-                    var export = exports[i];
-                    registrator.Register(factory, export.ServiceType, export.ServiceName);
-                }
+                var export = exports[i];
+                registrator.Register(factory, export.ServiceType, export.ServiceName);
             }
         }
 
-        public static IEnumerable<RegistrationInfo> ScanAssemblies(IEnumerable<Assembly> assemblies)
+        public static IEnumerable<TypeExportInfo> DiscoverExportsInAssemblies(IEnumerable<Assembly> assemblies)
         {
-            return assemblies.SelectMany(a => a.GetTypes())
-                .Select(GetRegistrationInfoOrDefault).Where(info => info != null);
+            return assemblies.SelectMany(a => a.GetTypes()).Select(GetRegistrationInfoOrDefault).Where(info => info != null);
         }
 
-        public static RegistrationInfo GetRegistrationInfoOrDefault(Type type)
+        public static TypeExportInfo GetRegistrationInfoOrDefault(Type type)
         {
             if (!type.IsClass || type.IsAbstract)
                 return null;
@@ -102,7 +104,7 @@ namespace DryIoc.AttributedRegistration
                 Array.Exists(attributes, a => a is PartNotDiscoverableAttribute))
                 return null;
 
-            var info = new RegistrationInfo { ImplementationType = type };
+            var info = new TypeExportInfo { Type = type };
 
             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
             {
@@ -325,11 +327,11 @@ Only single metadata is supported per implementation type, please remove the res
 #pragma warning disable 659
 
     [Serializable]
-    public sealed class RegistrationInfo
+    public sealed class TypeExportInfo
     {
-        public Type ImplementationType;
+        public Type Type;
         public ExportInfo[] Exports;
-        public bool IsSingleton = AttributedRegistrator.ExportedServiceIsSingletonByDefault;
+        public bool IsSingleton = AttributedModel.DefaultCreationPolicy == CreationPolicy.Shared;
         public int MetadataAttributeIndex = -1;
 
         public FactoryType FactoryType;
@@ -349,21 +351,21 @@ Only single metadata is supported per implementation type, please remove the res
 
         public override bool Equals(object obj)
         {
-            var other = obj as RegistrationInfo;
+            var other = obj as TypeExportInfo;
             return other != null
-                   && other.ImplementationType == ImplementationType
-                   && other.IsSingleton == IsSingleton
-                   && other.FactoryType == FactoryType
-                   && Equals(other.GenericWrapper, GenericWrapper)
-                   && Equals(other.Decorator, Decorator)
-                   && other.Exports.SequenceEqual(Exports);
+                && other.Type == Type
+                && other.IsSingleton == IsSingleton
+                && other.FactoryType == FactoryType
+                && Equals(other.GenericWrapper, GenericWrapper)
+                && Equals(other.Decorator, Decorator)
+                && other.Exports.SequenceEqual(Exports);
         }
 
         public string ToCode()
         {
             var code = new StringBuilder(
 @"new RegistrationInfo {
-    ImplementationType = ").AppendType(ImplementationType).Append(@",
+    ImplementationType = ").AppendType(Type).Append(@",
     Exports = new[] {");         
             for (var i = 0; i < Exports.Length; i++) code.Append(@"
         new ExportInfo { ServiceType = ").AppendType(Exports[i].ServiceType).Append(
