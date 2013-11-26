@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SpeedTestApp", "DryIoc.SpeedTestApp\DryIoc.SpeedTestApp.csproj", "{A9C4E2CC-3CA9-4F04-8544-A2837B045643}"
@@ -15,7 +15,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AttributedRegistrati
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SpeedTestApp.Net40", "DryIoc.SpeedTestApp.Net40\DryIoc.SpeedTestApp.Net40.csproj", "{626B701A-8C0D-4DBF-934C-F00FBB331931}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RenameTost", "RenameTost\RenameTost.csproj", "{BA8826D3-CB76-4F4C-B799-74912FE3E213}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Potter", "Potter\Potter.csproj", "{BA8826D3-CB76-4F4C-B799-74912FE3E213}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AttributedRegistration.UnitTests.CUT.Net40", "DryIoc.AttributedRegistration.UnitTests.CUT.Net40\DryIoc.AttributedRegistration.UnitTests.CUT.Net40.csproj", "{1A7C2E33-4076-492B-A82D-D3B875F18A2A}"
 EndProject

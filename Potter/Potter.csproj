@@ -8,8 +8,8 @@
     <ProjectGuid>{BA8826D3-CB76-4F4C-B799-74912FE3E213}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>RenameTost</RootNamespace>
-    <AssemblyName>RenameTost</AssemblyName>
+    <RootNamespace>Potter</RootNamespace>
+    <AssemblyName>Potter</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
