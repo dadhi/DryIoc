@@ -186,7 +186,7 @@ namespace DryIoc
             var compiledFactory = entry.GetValueOrDefault(serviceKey);
             if (compiledFactory == null)
             {
-                var request = new Request(null, serviceType, serviceKey);
+                var request = Request.Create(serviceType, serviceKey);
                 var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
                 if (factory == null) return null;
                 compiledFactory = factory.GetExpression(request, this).ToFactoryExpression().CompileFactory();
@@ -202,7 +202,7 @@ namespace DryIoc
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var request = new Request(null, serviceType, null);
+            var request = Request.Create(serviceType);
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null) return EmptyCompiledFactory;
             var compiledFactory = factory.GetExpression(request, this).ToFactoryExpression().CompileFactory();
@@ -600,10 +600,9 @@ namespace DryIoc
                 if (parent != null && parent.ServiceType == wrappedItemType)
                     condition = factory => factory.ID != parent.FactoryID;
                 var itemKeys = registry.GetKeys(wrappedItemType, condition).ToArray();
-
                 Throw.If(itemKeys.Length == 0, Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS, wrappedItemType, request);
 
-                var itemExpressions = new List<Expression>();
+                var itemExpressions = new List<Expression>(itemKeys.Length);
                 foreach (var itemKey in itemKeys)
                 {
                     var itemRequest = request.Push(itemType, itemKey);
@@ -650,7 +649,7 @@ namespace DryIoc
             var funcTypeArgs = funcType.GetGenericArguments();
             var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
 
-            var serviceRequest = request.PushWithParentKey(serviceType);
+            var serviceRequest = request.PushPreservingParentKey(serviceType);
             var serviceFactory = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw);
 
             if (funcTypeArgs.Length == 1)
@@ -667,7 +666,7 @@ namespace DryIoc
         {
             var ctor = request.ServiceType.GetConstructors()[0];
             var serviceType = request.ServiceType.GetGenericArguments()[0];
-            var serviceRequest = request.PushWithParentKey(serviceType);
+            var serviceRequest = request.PushPreservingParentKey(serviceType);
 
             var factoryExpr = registry
                 .GetOrAddFactory(serviceRequest, IfUnresolved.Throw)
@@ -1484,7 +1483,59 @@ when resolving {1}.";
         public readonly Type ImplementationType;
         public readonly object Metadata;
 
-        public Request(Request parent, Type serviceType, object serviceKey, DependencyInfo dependency = null,
+        // Start from creating request, then Resolve it with factory and Push new sub-requests.
+        public static Request Create(Type serviceType, object serviceKey = null)
+        {
+            return new Request(null, serviceType, serviceKey);
+        }
+
+        public Request Push(Type serviceType, object serviceKey, DependencyInfo dependency = null)
+        {
+            return new Request(this, serviceType, serviceKey, dependency);
+        }
+
+        public Request PushPreservingParentKey(Type serviceType, DependencyInfo dependency = null)
+        {
+            return new Request(this, serviceType, ServiceKey, dependency);
+        }
+
+        public Request ResolveTo(Factory factory)
+        {
+            for (var p = Parent; p != null; p = p.Parent)
+                Throw.If(p.FactoryID == factory.ID, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
+            return new Request(Parent, ServiceType, ServiceKey, Dependency, DecoratedFactoryID, factory);
+        }
+
+        public Request MakeDecorated()
+        {
+            return new Request(Parent, ServiceType, ServiceKey, Dependency, FactoryID);
+        }
+
+        public Request GetNonWrapperParentOrDefault()
+        {
+            var p = Parent;
+            while (p != null && p.FactoryType == FactoryType.GenericWrapper)
+                p = p.Parent;
+            return p;
+        }
+
+        public IEnumerable<Request> Enumerate()
+        {
+            for (var x = this; x != null; x = x.Parent)
+                yield return x;
+        }
+
+        public override string ToString()
+        {
+            var message = new StringBuilder().Append(Print());
+            return Parent == null ? message.ToString()
+                 : Parent.Enumerate().Aggregate(message,
+                    (m, r) => m.AppendLine().Append(" in ").Append(r.Print())).ToString();
+        }
+
+        #region Implementation
+
+        private Request(Request parent, Type serviceType, object serviceKey, DependencyInfo dependency = null,
             int decoratedFactoryID = 0, Factory factory = null)
         {
             Parent = parent;
@@ -1506,58 +1557,18 @@ when resolving {1}.";
             }
         }
 
-        public Request GetNonWrapperParentOrDefault()
-        {
-            var p = Parent;
-            while (p != null && p.FactoryType == FactoryType.GenericWrapper)
-                p = p.Parent;
-            return p;
-        }
-
-        public Request Push(Type serviceType, object serviceKey, DependencyInfo dependency = null)
-        {
-            return new Request(this, serviceType, serviceKey, dependency);
-        }
-
-        public Request PushWithParentKey(Type serviceType, DependencyInfo dependency = null)
-        {
-            return new Request(this, serviceType, ServiceKey, dependency);
-        }
-
-        public Request ResolveTo(Factory factory)
-        {
-            for (var p = Parent; p != null; p = p.Parent)
-                Throw.If(p.FactoryID == factory.ID, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
-            return new Request(Parent, ServiceType, ServiceKey, Dependency, DecoratedFactoryID, factory);
-        }
-
-        public Request MakeDecorated()
-        {
-            return new Request(Parent, ServiceType, ServiceKey, Dependency, FactoryID);
-        }
-
-        public IEnumerable<Request> Enumerate()
-        {
-            for (var x = this; x != null; x = x.Parent)
-                yield return x;
-        }
-
-        public override string ToString()
-        {
-            var message = new StringBuilder().Append(Print());
-            return Parent == null ? message.ToString()
-                 : Parent.Enumerate().Aggregate(message,
-                    (m, r) => m.AppendLine().Append(" in ").Append(r.Print())).ToString();
-        }
-
         private string Print()
         {
-            var key = ServiceKey is string ? "\"" + ServiceKey + "\""
-                : ServiceKey is int ? "#" + ServiceKey
+            var key = ServiceKey is string
+                ? "\"" + ServiceKey + "\""
+                : ServiceKey is int
+                    ? "#" + ServiceKey
                     : "unnamed";
 
-            var kind = FactoryType == FactoryType.Decorator ? " decorator"
-                : FactoryType == FactoryType.GenericWrapper ? " generic wrapper"
+            var kind = FactoryType == FactoryType.Decorator
+                ? " decorator"
+                : FactoryType == FactoryType.GenericWrapper
+                    ? " generic wrapper"
                     : string.Empty;
 
             var type = ImplementationType != null && ImplementationType != ServiceType
@@ -1569,6 +1580,8 @@ when resolving {1}.";
             // example: "unnamed generic wrapper DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
             return key + kind + " " + type + dep;
         }
+
+        #endregion
     }
 
     public class DelegateFactory : Factory
