@@ -1,4 +1,5 @@
 ﻿using System;
+using DryIoc.SpeedTestApp.Net40.Tests;
 using DryIoc.UnitTests.Net40.Playground;
 
 namespace DryIoc.SpeedTestApp.Net40
@@ -7,8 +8,15 @@ namespace DryIoc.SpeedTestApp.Net40
     {
         static void Main()
         {
-            CompareClosureFieldAccess();
+            CompareArrayCreationSpeed();
             Console.ReadKey();
+        }
+
+        private static void CompareArrayCreationSpeed()
+        {
+            TestArrayCreationSpeed.Compare();
+            Console.WriteLine();
+            TestArrayCreationSpeed.Compare();
         }
 
         private static void CompareClosureFieldAccess()

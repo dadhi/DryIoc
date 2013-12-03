@@ -35,25 +35,21 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
-    <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Tests\TestArrayCreationSpeed.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.Net40\DryIoc.Net40.csproj">
-      <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
-      <Name>DryIoc.Net40</Name>
-      <Private>False</Private>
-    </ProjectReference>
     <ProjectReference Include="..\DryIoc.UnitTests.Net40\DryIoc.UnitTests.Net40.csproj">
       <Project>{C8A2BC7E-C806-4191-B525-C0D72679041A}</Project>
       <Name>DryIoc.UnitTests.Net40</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
