@@ -21,7 +21,6 @@ namespace DryIoc.MefAttributedModel
     /// <para>
     /// TODO:
     /// <list type="bullet">
-    /// <item>add: Explicit registration code generator to use in compile-time exports discovery.</item>
     /// <item>add: Missing feature to register attributed DelegateFactory.</item>
     /// </list>
     /// </para>

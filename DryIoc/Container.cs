@@ -725,17 +725,16 @@ namespace DryIoc
 
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
             typeof(ContainerSetup).GetMethod("DoResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
+        
         internal static IEnumerable<TItem> DoResolveManyDynamically<TItem, TWrappedItem>(WeakReference registryRef, int parentFactoryID)
         {
             var itemType = typeof(TItem);
             var wrappedItemType = typeof(TWrappedItem);
             var registry = (registryRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
 
-            Func<Factory, bool> condition = null;
-            if (parentFactoryID != -1)
-                condition = factory => factory.ID != parentFactoryID;
+            var itemKeys = registry.GetKeys(wrappedItemType,
+                parentFactoryID == -1 ? (Func<Factory, bool>)null : factory => factory.ID != parentFactoryID);
 
-            var itemKeys = registry.GetKeys(wrappedItemType, condition);
             foreach (var itemKey in itemKeys)
             {
                 var item = registry.ResolveKeyed(itemType, itemKey, IfUnresolved.ReturnNull);
@@ -1559,17 +1558,13 @@ when resolving {1}.";
 
         private string Print()
         {
-            var key = ServiceKey is string
-                ? "\"" + ServiceKey + "\""
-                : ServiceKey is int
-                    ? "#" + ServiceKey
-                    : "unnamed";
+            var key = ServiceKey is string ? "\"" + ServiceKey + "\"" 
+                : ServiceKey is int ? "#" + ServiceKey
+                : "unnamed";
 
             var kind = FactoryType == FactoryType.Decorator
-                ? " decorator"
-                : FactoryType == FactoryType.GenericWrapper
-                    ? " generic wrapper"
-                    : string.Empty;
+                ? " decorator" : FactoryType == FactoryType.GenericWrapper
+                ? " generic wrapper" : string.Empty;
 
             var type = ImplementationType != null && ImplementationType != ServiceType
                 ? ImplementationType.Print() + " : " + ServiceType.Print()
