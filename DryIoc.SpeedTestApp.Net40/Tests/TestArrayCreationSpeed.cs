@@ -128,28 +128,26 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
                 switch (_state)
                 {
                     case 0: 
-                        Current = new SomeItem();
-                        ++_state;
-                        return true;
+                        Current = new SomeItem(); ++_state;
+                        break;
                     case 1:
-                        Current = new AnotherItem();
-                        ++_state;
-                        return true;
+                        Current = new AnotherItem(); ++_state;
+                        break;
                     case 2:
-                        Current = new YetAnotherItem();
-                        ++_state;
-                        return true;
+                        Current = new YetAnotherItem(); ++_state;
+                        break;
                     case 3:
-                        Current = new YetAnotherItem();
-                        ++_state;
-                        return true;
+                        Current = new YetAnotherItem(); ++_state;
+                        break;
                     case 4:
-                        Current = new YetAnotherItem();
+                        Current = new YetAnotherItem(); ++_state;
+                        break;
+                    default:
                         ++_state;
-                        return true;
+                        break;
                 }
 
-                return false;
+                return _state != 6;
             }
 
             public void Reset()
