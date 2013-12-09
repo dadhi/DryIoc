@@ -14,9 +14,9 @@ namespace DryIoc.SpeedTestApp.Net40
 
         private static void CompareArrayCreationSpeed()
         {
-            TestArrayCreationSpeed.Compare();
+            TestEnumerableCreationSpeed.Compare();
             Console.WriteLine();
-            TestArrayCreationSpeed.Compare();
+            TestEnumerableCreationSpeed.Compare();
         }
 
         private static void CompareImmutableCollectionSpeed()

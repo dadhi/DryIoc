@@ -8,7 +8,7 @@ using NUnit.Framework;
 
 namespace DryIoc.SpeedTestApp.Net40.Tests
 {
-    public class TestArrayCreationSpeed
+    public class TestEnumerableCreationSpeed
     {
         [Test]
         public static void Compare()
@@ -65,7 +65,7 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
         }
     }
 
-    internal class ItemEnumerable : IEnumerable<IItem> 
+    internal sealed class ItemEnumerable : IEnumerable<IItem> 
     {
         public IEnumerator<IItem> GetEnumerator()
         {
@@ -77,37 +77,69 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
             return GetEnumerator();
         }
 
-        internal class ItemEnumenrator : IEnumerator<IItem>
+        internal sealed class ItemEnumenrator : IEnumerator<IItem>
         {
             private int _state;
-            
-            public IItem Current { get; private set; }
+            private IItem _current;
+
+            public IItem Current
+            {
+                get { return _current; }
+            }
+
+            //public bool MoveNext()
+            //{
+            //    _current = MoveNext(_state++);
+            //    return _current != null;
+            //}
 
             public bool MoveNext()
             {
                 switch (_state)
                 {
-                    case 0: 
-                        Current = new SomeItem(); ++_state;
+                    case 0:
+                        _current = new SomeItem();
                         break;
                     case 1:
-                        Current = new AnotherItem(); ++_state;
+                        _current = new AnotherItem();
                         break;
                     case 2:
-                        Current = new YetAnotherItem(); ++_state;
+                        _current = new YetAnotherItem();
                         break;
                     case 3:
-                        Current = new YetAnotherItem(); ++_state;
+                        _current = new YetAnotherItem();
                         break;
                     case 4:
-                        Current = new YetAnotherItem(); ++_state;
-                        break;
-                    default:
-                        ++_state;
+                        _current = new YetAnotherItem();
                         break;
                 }
 
-                return _state != 6;
+                return ++_state != 6;
+            }
+
+            private static IItem MoveNext(int state)
+            {
+                IItem current = null;
+                switch (state)
+                {
+                    case 0:
+                        current = new SomeItem();
+                        break;
+                    case 1:
+                        current = new AnotherItem();
+                        break;
+                    case 2:
+                        current = new YetAnotherItem();
+                        break;
+                    case 3:
+                        current = new YetAnotherItem();
+                        break;
+                    case 4:
+                        current = new YetAnotherItem();
+                        break;
+                }
+
+                return current;
             }
 
             public void Reset()
