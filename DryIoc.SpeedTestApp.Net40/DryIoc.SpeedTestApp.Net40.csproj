@@ -44,11 +44,17 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Tests\TestArrayCreationSpeed.cs" />
+    <Compile Include="Tests\TestImmutableCollectionSpeeds.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.UnitTests.Net40\DryIoc.UnitTests.Net40.csproj">
       <Project>{C8A2BC7E-C806-4191-B525-C0D72679041A}</Project>
       <Name>DryIoc.UnitTests.Net40</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
+      <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
+      <Name>DryIoc</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>

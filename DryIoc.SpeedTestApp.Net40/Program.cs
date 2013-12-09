@@ -19,6 +19,13 @@ namespace DryIoc.SpeedTestApp.Net40
             TestArrayCreationSpeed.Compare();
         }
 
+        private static void CompareImmutableCollectionSpeed()
+        {
+            TestImmutableCollectionSpeeds.TestAccess();
+            Console.WriteLine();
+            TestImmutableCollectionSpeeds.TestAccess();
+        }
+
         private static void CompareClosureFieldAccess()
         {
             ClosureFieldsAccessSpeed.TestExpr();
