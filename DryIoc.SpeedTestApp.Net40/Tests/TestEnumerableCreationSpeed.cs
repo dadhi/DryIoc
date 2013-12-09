@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using NUnit.Framework;
@@ -61,6 +62,24 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
             timer.Stop();
             Console.WriteLine("Generated ItemCollection took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
 
+            Lazy<IItem>[] lazyItems =
+            {
+                new Lazy<IItem>(() => new SomeItem()), 
+                new Lazy<IItem>(() =>new AnotherItem()), 
+                new Lazy<IItem>(() =>new YetAnotherItem()),
+                new Lazy<IItem>(() =>new YetAnotherItem()),
+                new Lazy<IItem>(() =>new YetAnotherItem())
+            };
+
+            GC.Collect();
+            timer = Stopwatch.StartNew();
+            for (int t = 0; t < times; t++)
+            {
+                result = new ItemsConsumer(new LazyReadOnlyCollection<IItem>(lazyItems));
+            }
+            timer.Stop();
+            Console.WriteLine("Generated ItemCollection took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
+
             GC.KeepAlive(result);
         }
 
@@ -96,6 +115,46 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
             }
 
             return current;
+        }
+    }
+
+    internal sealed class LazyReadOnlyCollection<T> : ICollection<T>
+    {
+        private readonly Lazy<T>[] _items;
+
+        public LazyReadOnlyCollection(Lazy<T>[] items)
+        {
+            _items = items;
+        }
+
+        public bool IsReadOnly { get { return true; } }
+
+        public void Add(T item) { throw new NotSupportedException(); }
+        public void Clear() { throw new NotSupportedException(); }
+        public bool Remove(T item) { throw new NotSupportedException(); }
+
+        public int Count { get { return _items.Length; } }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            for (var index = 0; index < _items.Length; index++)
+                yield return _items[index].Value;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public bool Contains(T item)
+        {
+            return this.Contains(item, null);
+        }
+
+        public void CopyTo(T[] array, int arrayIndex)
+        {
+            for (var index = 0; index < _items.Length; index++)
+                array[arrayIndex++] = _items[index].Value;
         }
     }
 
