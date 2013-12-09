@@ -52,6 +52,15 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
             timer.Stop();
             Console.WriteLine("Generated ItemEnumerable took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
 
+            GC.Collect();
+            timer = Stopwatch.StartNew();
+            for (int t = 0; t < times; t++)
+            {
+                result = new ItemsConsumer(new ItemCollection<IItem>(CreateItem, 5));
+            }
+            timer.Stop();
+            Console.WriteLine("Generated ItemCollection took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
+
             GC.KeepAlive(result);
         }
 
@@ -63,9 +72,123 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
             yield return new YetAnotherItem();
             yield return new YetAnotherItem();
         }
+
+        private static IItem CreateItem(int index)
+        {
+            IItem current = null;
+            switch (index)
+            {
+                case 0:
+                    current = new SomeItem();
+                    break;
+                case 1:
+                    current = new AnotherItem();
+                    break;
+                case 2:
+                    current = new YetAnotherItem();
+                    break;
+                case 3:
+                    current = new YetAnotherItem();
+                    break;
+                case 4:
+                    current = new YetAnotherItem();
+                    break;
+            }
+
+            return current;
+        }
     }
 
-    internal sealed class ItemEnumerable : IEnumerable<IItem> 
+    internal sealed class ItemCollection<T> : ICollection<T>
+    {
+        private readonly Func<int, T> _getItem;
+
+        public ItemCollection(Func<int, T> getItem, int count)
+        {
+            _getItem = getItem;
+            Count = count;
+        }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            return new InternalEnumerator(_getItem, Count);
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        internal sealed class InternalEnumerator : IEnumerator<T>
+        {
+            private readonly Func<int, T> _getItem;
+            private readonly int _count;
+            private int _index;
+
+            public InternalEnumerator(Func<int, T> getItem, int count)
+            {
+                _getItem = getItem;
+                _count = count;
+            }
+
+            public T Current { get; private set; }
+
+            public bool MoveNext()
+            {
+                if (_index < _count)
+                {
+                    Current = _getItem(_index);
+                    ++_index;
+                    return true;
+                }
+
+                return false;
+            }
+
+            public void Reset()
+            {
+                _index = -1;
+            }
+
+            public void Dispose() { }
+
+            object IEnumerator.Current
+            {
+                get { return Current; }
+            }
+        }
+
+        public void Add(T item)
+        {
+            throw new NotSupportedException();
+        }
+
+        public void Clear()
+        {
+            throw new NotSupportedException();
+        }
+
+        public bool Contains(T item)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CopyTo(T[] array, int arrayIndex)
+        {
+            throw new NotSupportedException();
+        }
+
+        public bool Remove(T item)
+        {
+            throw new NotSupportedException();
+        }
+
+        public int Count { get; private set; }
+
+        public bool IsReadOnly { get { return true; } }
+    }
+
+    internal sealed class ItemEnumerable : IEnumerable<IItem>
     {
         public IEnumerator<IItem> GetEnumerator()
         {
