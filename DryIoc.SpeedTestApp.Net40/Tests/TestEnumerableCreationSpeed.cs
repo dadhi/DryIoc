@@ -61,23 +61,22 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
             timer.Stop();
             Console.WriteLine("Generated ItemCollection took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
 
-            IItem[] items =
-            {
-                new SomeItem(), 
-                new AnotherItem(), 
-                new YetAnotherItem(),
-                new YetAnotherItem(),
-                new YetAnotherItem()
-            };
-
             GC.Collect();
             timer = Stopwatch.StartNew();
             for (int t = 0; t < times; t++)
             {
-                result = new ItemsConsumer(new ArrayCollection<IItem>(items));
+                result = new ItemsConsumer(new FixedSizeArrayEnumerable<IItem>(() => new IItem[]
+                {
+                    new SomeItem(), 
+                    new AnotherItem(), 
+                    new YetAnotherItem(),
+                    new YetAnotherItem(),
+                    new YetAnotherItem()
+                },
+                5));
             }
             timer.Stop();
-            Console.WriteLine("Generated ItemCollection took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
+            Console.WriteLine("ArrayEnumerable took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
 
             GC.KeepAlive(result);
         }
@@ -117,13 +116,14 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
         }
     }
 
-    internal sealed class ArrayCollection<T> : ICollection<T>
+    public sealed class FixedSizeArrayEnumerable<T> : ICollection<T>
     {
-        private readonly T[] _items;
+        private readonly Lazy<T[]> _items;
 
-        public ArrayCollection(T[] items)
+        public FixedSizeArrayEnumerable(Func<T[]> getItems, int size)
         {
-            _items = items;
+            _items = new Lazy<T[]>(getItems);
+            Count = size;
         }
 
         public bool IsReadOnly { get { return true; } }
@@ -132,11 +132,11 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
         public void Clear() { throw new NotSupportedException(); }
         public bool Remove(T item) { throw new NotSupportedException(); }
 
-        public int Count { get { return _items.Length; } }
+        public int Count { get; private set; }
 
         public IEnumerator<T> GetEnumerator()
         {
-            return ((IEnumerable<T>)_items).GetEnumerator();
+            return ((IEnumerable<T>)_items.Value).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -146,12 +146,12 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
 
         public bool Contains(T item)
         {
-            return _items.Contains(item);
+            return _items.Value.Contains(item);
         }
 
         public void CopyTo(T[] array, int arrayIndex)
         {
-            _items.CopyTo(array, arrayIndex);
+            _items.Value.CopyTo(array, arrayIndex);
         }
     }
 
