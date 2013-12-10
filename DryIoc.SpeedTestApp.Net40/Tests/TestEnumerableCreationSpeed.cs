@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using NUnit.Framework;
@@ -62,20 +61,20 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
             timer.Stop();
             Console.WriteLine("Generated ItemCollection took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
 
-            Lazy<IItem>[] lazyItems =
+            IItem[] items =
             {
-                new Lazy<IItem>(() => new SomeItem()), 
-                new Lazy<IItem>(() =>new AnotherItem()), 
-                new Lazy<IItem>(() =>new YetAnotherItem()),
-                new Lazy<IItem>(() =>new YetAnotherItem()),
-                new Lazy<IItem>(() =>new YetAnotherItem())
+                new SomeItem(), 
+                new AnotherItem(), 
+                new YetAnotherItem(),
+                new YetAnotherItem(),
+                new YetAnotherItem()
             };
 
             GC.Collect();
             timer = Stopwatch.StartNew();
             for (int t = 0; t < times; t++)
             {
-                result = new ItemsConsumer(new LazyReadOnlyCollection<IItem>(lazyItems));
+                result = new ItemsConsumer(new ArrayCollection<IItem>(items));
             }
             timer.Stop();
             Console.WriteLine("Generated ItemCollection took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
@@ -118,11 +117,11 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
         }
     }
 
-    internal sealed class LazyReadOnlyCollection<T> : ICollection<T>
+    internal sealed class ArrayCollection<T> : ICollection<T>
     {
-        private readonly Lazy<T>[] _items;
+        private readonly T[] _items;
 
-        public LazyReadOnlyCollection(Lazy<T>[] items)
+        public ArrayCollection(T[] items)
         {
             _items = items;
         }
@@ -137,8 +136,7 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
 
         public IEnumerator<T> GetEnumerator()
         {
-            for (var index = 0; index < _items.Length; index++)
-                yield return _items[index].Value;
+            return ((IEnumerable<T>)_items).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -148,13 +146,12 @@ namespace DryIoc.SpeedTestApp.Net40.Tests
 
         public bool Contains(T item)
         {
-            return this.Contains(item, null);
+            return _items.Contains(item);
         }
 
         public void CopyTo(T[] array, int arrayIndex)
         {
-            for (var index = 0; index < _items.Length; index++)
-                array[arrayIndex++] = _items[index].Value;
+            _items.CopyTo(array, arrayIndex);
         }
     }
 
