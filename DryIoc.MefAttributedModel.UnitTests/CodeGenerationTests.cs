@@ -15,9 +15,9 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.That(code, Is.EqualTo(
 @"new RegistrationInfo {
-    ImplementationType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.ForExportBaseImpl),
+    ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExportBaseImpl),
     Exports = new[] {
-        new ExportInfo { ServiceType = typeof(DryIoc.AttributedRegistration.UnitTests.CUT.ForExportBase), ServiceName = null },
+        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExportBase), ServiceName = null },
     },
     IsSingleton = true,
     MetadataAttributeIndex = -1,
