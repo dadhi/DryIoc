@@ -1,16 +1,16 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{9E67B15C-D721-4525-9DD7-6A6ED6137748}</ProjectGuid>
+    <ProjectGuid>{1A7C2E33-4076-492B-A82D-D3B875F18A2A}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.AttributedRegistration.UnitTests.CUT</RootNamespace>
-    <AssemblyName>DryIoc.AttributedRegistration.UnitTests.CUT</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <RootNamespace>DryIoc.MefAttributedModel.UnitTests.CUT.Net40</RootNamespace>
+    <AssemblyName>DryIoc.MefAttributedModel.UnitTests.CUT.Net40</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -32,21 +32,34 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AttributedRegistrationTests.CUT.cs" />
-    <Compile Include="ExportAsDecoratorTests.CUT.cs" />
-    <Compile Include="ExportAsGenericWrapperTests.CUT.cs" />
-    <Compile Include="ImportOrExportTests.CUT.cs" />
-    <Compile Include="ImportWithMetadataTests.CUT.cs" />
-    <Compile Include="InheritedExportTests.CUT.cs" />
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\AttributedRegistrationTests.CUT.cs">
+      <Link>AttributedRegistrationTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ExportAsDecoratorTests.CUT.cs">
+      <Link>ExportAsDecoratorTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ExportAsGenericWrapperTests.CUT.cs">
+      <Link>ExportAsGenericWrapperTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ImportOrExportTests.CUT.cs">
+      <Link>ImportOrExportTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ImportWithMetadataTests.CUT.cs">
+      <Link>ImportWithMetadataTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\InheritedExportTests.CUT.cs">
+      <Link>InheritedExportTests.CUT.cs</Link>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
-      <Name>DryIoc</Name>
+    <ProjectReference Include="..\DryIoc.Net40\DryIoc.Net40.csproj">
+      <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
+      <Name>DryIoc.Net40</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>

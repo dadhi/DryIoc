@@ -1,15 +1,15 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{1A7C2E33-4076-492B-A82D-D3B875F18A2A}</ProjectGuid>
+    <ProjectGuid>{BC652607-1F3B-451D-A619-C2652232DC8B}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.AttributedRegistration.UnitTests.CUT.Net40</RootNamespace>
-    <AssemblyName>DryIoc.AttributedRegistration.UnitTests.CUT.Net40</AssemblyName>
+    <RootNamespace>DryIoc.MefAttributedModel.UnitTests.Net40</RootNamespace>
+    <AssemblyName>DryIoc.MefAttributedModel.UnitTests.Net40</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -31,32 +31,43 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="nunit.framework, Version=2.6.2.12296, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
+      <HintPath>../lib/nunit.framework.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\AttributedRegistrationTests.CUT.cs">
-      <Link>AttributedRegistrationTests.CUT.cs</Link>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\AttributedModelTests.cs">
+      <Link>AttributedModelTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ExportAsDecoratorTests.CUT.cs">
-      <Link>ExportAsDecoratorTests.CUT.cs</Link>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ExportAllTests.cs">
+      <Link>ExportAllTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ExportAsGenericWrapperTests.CUT.cs">
-      <Link>ExportAsGenericWrapperTests.CUT.cs</Link>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ExportAsDecoratorTests.cs">
+      <Link>ExportAsDecoratorTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ImportOrExportTests.CUT.cs">
-      <Link>ImportOrExportTests.CUT.cs</Link>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ExportAsGenericWrapperTests.cs">
+      <Link>ExportAsGenericWrapperTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ImportWithMetadataTests.CUT.cs">
-      <Link>ImportWithMetadataTests.CUT.cs</Link>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ImportOrExportTests.cs">
+      <Link>ImportOrExportTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\InheritedExportTests.CUT.cs">
-      <Link>InheritedExportTests.CUT.cs</Link>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ImportWithMetadataTests.cs">
+      <Link>ImportWithMetadataTests.cs</Link>
+    </Compile>
+    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\InheritedExportTests.cs">
+      <Link>InheritedExportTests.cs</Link>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\DryIoc.AttributedRegistration.UnitTests.CUT.Net40\DryIoc.AttributedRegistration.UnitTests.CUT.Net40.csproj">
+      <Project>{1A7C2E33-4076-492B-A82D-D3B875F18A2A}</Project>
+      <Name>DryIoc.AttributedRegistration.UnitTests.CUT.Net40</Name>
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\DryIoc.Net40\DryIoc.Net40.csproj">
       <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
       <Name>DryIoc.Net40</Name>

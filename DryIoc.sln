@@ -17,13 +17,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SpeedTestApp.Net40",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Potter", "Potter\Potter.csproj", "{BA8826D3-CB76-4F4C-B799-74912FE3E213}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AttributedRegistration.UnitTests.CUT.Net40", "DryIoc.AttributedRegistration.UnitTests.CUT.Net40\DryIoc.AttributedRegistration.UnitTests.CUT.Net40.csproj", "{1A7C2E33-4076-492B-A82D-D3B875F18A2A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.UnitTests.CUT.Net40", "DryIoc.MefAttributedModel.UnitTests.CUT.Net40\DryIoc.MefAttributedModel.UnitTests.CUT.Net40.csproj", "{1A7C2E33-4076-492B-A82D-D3B875F18A2A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Net40", "DryIoc.Net40\DryIoc.Net40.csproj", "{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Net40", "Net40", "{84205448-1773-45D6-8D42-548A7997A7E1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AttributedRegistration.UnitTests.Net40", "DryIoc.AttributedRegistration.UnitTests.Net40\DryIoc.AttributedRegistration.UnitTests.Net40.csproj", "{BC652607-1F3B-451D-A619-C2652232DC8B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.UnitTests.Net40", "DryIoc.MefAttributedModel.UnitTests.Net40\DryIoc.MefAttributedModel.UnitTests.Net40.csproj", "{BC652607-1F3B-451D-A619-C2652232DC8B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.UnitTests.Net40", "DryIoc.UnitTests.Net40\DryIoc.UnitTests.Net40.csproj", "{C8A2BC7E-C806-4191-B525-C0D72679041A}"
 EndProject
