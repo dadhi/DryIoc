@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -39,33 +39,33 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\AttributedModelTests.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests\AttributedModelTests.cs">
       <Link>AttributedModelTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ExportAllTests.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests\ExportAllTests.cs">
       <Link>ExportAllTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ExportAsDecoratorTests.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests\ExportAsDecoratorTests.cs">
       <Link>ExportAsDecoratorTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ExportAsGenericWrapperTests.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests\ExportAsGenericWrapperTests.cs">
       <Link>ExportAsGenericWrapperTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ImportOrExportTests.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests\ImportOrExportTests.cs">
       <Link>ImportOrExportTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\ImportWithMetadataTests.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests\ImportWithMetadataTests.cs">
       <Link>ImportWithMetadataTests.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests\InheritedExportTests.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests\InheritedExportTests.cs">
       <Link>InheritedExportTests.cs</Link>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.AttributedRegistration.UnitTests.CUT.Net40\DryIoc.AttributedRegistration.UnitTests.CUT.Net40.csproj">
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT.Net40\DryIoc.MefAttributedModel.UnitTests.CUT.Net40.csproj">
       <Project>{1A7C2E33-4076-492B-A82D-D3B875F18A2A}</Project>
-      <Name>DryIoc.AttributedRegistration.UnitTests.CUT.Net40</Name>
+      <Name>DryIoc.MefAttributedModel.UnitTests.CUT.Net40</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc.Net40\DryIoc.Net40.csproj">

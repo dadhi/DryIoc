@@ -1,8 +1,7 @@
-﻿using DryIoc.AttributedRegistration.UnitTests.CUT;
-using DryIoc.MefAttributedModel;
+﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
+namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 {
     [TestFixture]
     public class CompileTimeRegistrationTests

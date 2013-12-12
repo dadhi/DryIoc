@@ -1,11 +1,10 @@
 ﻿using System;
 using System.ComponentModel.Composition;
 using System.Linq;
-using DryIoc.AttributedRegistration.UnitTests.CUT;
-using DryIoc.MefAttributedModel;
+using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.AttributedRegistration.UnitTests
+namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
     public class InheritedExportTests

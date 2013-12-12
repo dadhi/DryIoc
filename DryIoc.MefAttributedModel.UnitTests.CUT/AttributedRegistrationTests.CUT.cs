@@ -1,8 +1,7 @@
 ﻿using System;
 using System.ComponentModel.Composition;
-using DryIoc.MefAttributedModel;
 
-namespace DryIoc.AttributedRegistration.UnitTests.CUT
+namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
     public interface IService { }
 

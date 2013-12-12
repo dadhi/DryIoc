@@ -1,7 +1,6 @@
 ﻿using System;
-using DryIoc.MefAttributedModel;
 
-namespace DryIoc.AttributedRegistration.UnitTests.CUT
+namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
     public enum FooMetadata { Hey, Blah, NotFound }
 

@@ -36,22 +36,22 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\AttributedRegistrationTests.CUT.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\AttributedRegistrationTests.CUT.cs">
       <Link>AttributedRegistrationTests.CUT.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ExportAsDecoratorTests.CUT.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsDecoratorTests.CUT.cs">
       <Link>ExportAsDecoratorTests.CUT.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ExportAsGenericWrapperTests.CUT.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsGenericWrapperTests.CUT.cs">
       <Link>ExportAsGenericWrapperTests.CUT.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ImportOrExportTests.CUT.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportOrExportTests.CUT.cs">
       <Link>ImportOrExportTests.CUT.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\ImportWithMetadataTests.CUT.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportWithMetadataTests.CUT.cs">
       <Link>ImportWithMetadataTests.CUT.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\InheritedExportTests.CUT.cs">
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\InheritedExportTests.CUT.cs">
       <Link>InheritedExportTests.CUT.cs</Link>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />

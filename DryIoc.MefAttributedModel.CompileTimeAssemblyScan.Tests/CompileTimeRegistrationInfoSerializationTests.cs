@@ -1,12 +1,11 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using DryIoc.AttributedRegistration.UnitTests.CUT;
-using DryIoc.MefAttributedModel;
+using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 using ProtoBuf.Meta;
 
-namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
+namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 {
     [TestFixture]
     public class CompileTimeRegistrationInfoSerializationTests

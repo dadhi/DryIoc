@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -57,7 +57,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\DryIoc.AttributedRegistration.UnitTests.CUT.csproj">
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">
       <Project>{9E67B15C-D721-4525-9DD7-6A6ED6137748}</Project>
       <Name>DryIoc.AttributedRegistration.UnitTests.CUT</Name>
       <Private>False</Private>

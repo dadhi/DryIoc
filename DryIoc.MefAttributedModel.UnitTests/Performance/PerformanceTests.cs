@@ -1,11 +1,10 @@
 using System;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
-using DryIoc.AttributedRegistration.UnitTests.CUT;
-using DryIoc.MefAttributedModel;
+using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.AttributedRegistration.UnitTests.Performance
+namespace DryIoc.MefAttributedModel.UnitTests.Performance
 {
 	[TestFixture][Ignore]
 	public class PerformanceTests
