@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.U
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AttributedRegistration.UnitTests.CUT", "DryIoc.AttributedRegistration.UnitTests.CUT\DryIoc.AttributedRegistration.UnitTests.CUT.csproj", "{9E67B15C-D721-4525-9DD7-6A6ED6137748}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests", "DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests\DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests.csproj", "{EE366065-BF63-44D1-BD65-75A214C1EE8E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests", "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests.csproj", "{EE366065-BF63-44D1-BD65-75A214C1EE8E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SpeedTestApp.Net40", "DryIoc.SpeedTestApp.Net40\DryIoc.SpeedTestApp.Net40.csproj", "{626B701A-8C0D-4DBF-934C-F00FBB331931}"
 EndProject

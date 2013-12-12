@@ -1,15 +1,15 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{E608BA59-1EA1-4598-B69E-310ADE638F0E}</ProjectGuid>
+    <ProjectGuid>{EE366065-BF63-44D1-BD65-75A214C1EE8E}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.AttributedRegistration.UnitTests</RootNamespace>
-    <AssemblyName>DryIoc.AttributedRegistration.UnitTests</AssemblyName>
+    <RootNamespace>DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests</RootNamespace>
+    <AssemblyName>DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -35,21 +35,26 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\lib\nunit.framework.dll</HintPath>
     </Reference>
-    <Reference Include="System" />
+    <Reference Include="protobuf-net">
+      <HintPath>..\lib\protobuf-net.dll</HintPath>
+    </Reference>
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AttributedModelTests.cs" />
-    <Compile Include="CodeGenerationTests.cs" />
-    <Compile Include="ExportAllTests.cs" />
-    <Compile Include="ExportAsDecoratorTests.cs" />
-    <Compile Include="ExportAsGenericWrapperTests.cs" />
-    <Compile Include="ImportOrExportTests.cs" />
-    <Compile Include="ImportWithMetadataTests.cs" />
-    <Compile Include="InheritedExportTests.cs" />
-    <Compile Include="Performance\PerformanceTests.cs" />
-    <Compile Include="Playground\ImportPropertiesTests.cs" />
+    <Content Include="CompileTimeGeneratedRegistrator.cs">
+      <DependentUpon>CompileTimeGeneratedRegistrator.tt</DependentUpon>
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+    </Content>
+    <Compile Include="CompileTimeRegistrationInfoSerializationTests.cs" />
+    <Compile Include="CompileTimeRegistrationTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="CompileTimeGeneratedRegistrator.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>CompileTimeGeneratedRegistrator.cs</LastGenOutput>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.AttributedRegistration.UnitTests.CUT\DryIoc.AttributedRegistration.UnitTests.CUT.csproj">
@@ -62,6 +67,9 @@
       <Name>DryIoc</Name>
       <Private>False</Private>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
