@@ -614,13 +614,7 @@ namespace DryIoc
 
                 Throw.If(itemExpressions.Count == 0, Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS, itemType, request);
                 var newArrayExpr = Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
-                if (collectionType.IsArray)
-                    return newArrayExpr;
-                
-                var enumerableCtor = typeof(FixedSizeArrayEnumerable<>).MakeGenericType(itemType).GetConstructors()[0];
-                var sizeExpr = Expression.Constant(itemExpressions.Count, typeof(int));
-                var newEnumerableExpr = Expression.New(enumerableCtor, Expression.Lambda(newArrayExpr, null), sizeExpr);
-                return newEnumerableExpr;
+                return newArrayExpr;
             });
         };
 
@@ -733,7 +727,7 @@ namespace DryIoc
 
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
             typeof(ContainerSetup).GetMethod("DoResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
-        
+
         internal static IEnumerable<TItem> DoResolveManyDynamically<TItem, TWrappedItem>(WeakReference registryRef, int parentFactoryID)
         {
             var itemType = typeof(TItem);
@@ -1566,7 +1560,7 @@ when resolving {1}.";
 
         private string Print()
         {
-            var key = ServiceKey is string ? "\"" + ServiceKey + "\"" 
+            var key = ServiceKey is string ? "\"" + ServiceKey + "\""
                 : ServiceKey is int ? "#" + ServiceKey
                 : "unnamed";
 
@@ -1991,44 +1985,6 @@ when resolving {1}.";
             Array.Copy(source, result, sourceLength);
             result[index] = value;
             return result;
-        }
-    }
-
-    public sealed class FixedSizeArrayEnumerable<T> : ICollection<T>
-    {
-        private readonly Lazy<T[]> _items;
-
-        public FixedSizeArrayEnumerable(Func<T[]> getItems, int size)
-        {
-            _items = new Lazy<T[]>(getItems);
-            Count = size;
-        }
-
-        public int Count { get; private set; }
-
-        public bool IsReadOnly { get { return true; } }
-        public void Add(T item) { throw new NotSupportedException(); }
-        public void Clear() { throw new NotSupportedException(); }
-        public bool Remove(T item) { throw new NotSupportedException(); }
-
-        public IEnumerator<T> GetEnumerator()
-        {
-            return ((IEnumerable<T>)_items.Value).GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public bool Contains(T item)
-        {
-            return _items.Value.Contains(item);
-        }
-
-        public void CopyTo(T[] array, int arrayIndex)
-        {
-            _items.Value.CopyTo(array, arrayIndex);
         }
     }
 
