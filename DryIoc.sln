@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.UnitTests", "DryIoc.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.UnitTests", "DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.csproj", "{E608BA59-1EA1-4598-B69E-310ADE638F0E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AttributedRegistration.UnitTests.CUT", "DryIoc.AttributedRegistration.UnitTests.CUT\DryIoc.AttributedRegistration.UnitTests.CUT.csproj", "{9E67B15C-D721-4525-9DD7-6A6ED6137748}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.UnitTests.CUT", "DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj", "{9E67B15C-D721-4525-9DD7-6A6ED6137748}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests", "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests.csproj", "{EE366065-BF63-44D1-BD65-75A214C1EE8E}"
 EndProject
