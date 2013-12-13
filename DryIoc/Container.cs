@@ -197,7 +197,7 @@ namespace DryIoc
 
         #region IResolver
 
-        public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
+        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
             var compiledFactory =
                 _defaultResolutionCache.GetValueOrDefault(serviceType) ??
@@ -205,7 +205,7 @@ namespace DryIoc
             return compiledFactory(_constants, resolutionScope: null);
         }
 
-        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
         {
             var entry = _keyedResolutionCache.GetValueOrDefault(serviceType) ?? HashTree<object, CompiledFactory>.Empty;
             var compiledFactory = entry.GetValueOrDefault(serviceKey);
@@ -894,6 +894,9 @@ when resolving {1}.";
 
         public static readonly string UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS =
             "Unable to resolve any service of item type {0} when resolving {1}.";
+
+        public static readonly string DELEGATE_FACTORY_EXPRESSION_RETURNED_NULL = 
+            "Delegate factory expression returned NULL when resolving {0}.";
     }
 
     public static class Registrator
@@ -1620,7 +1623,7 @@ when resolving {1}.";
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
         {
-            return _getExpression(request, registry);
+            return _getExpression(request, registry).ThrowIfNull(Error.DELEGATE_FACTORY_EXPRESSION_RETURNED_NULL, request);
         }
 
         #region Implementation

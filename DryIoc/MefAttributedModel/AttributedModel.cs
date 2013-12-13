@@ -26,6 +26,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 
@@ -85,9 +86,7 @@ namespace DryIoc.MefAttributedModel
 
         public static void RegisterExport(this IRegistrator registrator, TypeExportInfo info)
         {
-            object metadata = null;
-            if (info.MetadataAttributeIndex != -1)
-                metadata = FindMetadata(info.Type, info.MetadataAttributeIndex);
+            var metadata = FindMetadata(info.Type, info.MetadataAttributeIndex);
 
             var setup = info.CreateSetup(metadata);
             var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
@@ -97,7 +96,20 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceName);
+                var serviceType = export.ServiceType;
+                var serviceName = export.ServiceName;
+
+                registrator.Register(factory, serviceType, serviceName);
+
+                if (serviceType.IsGenericType &&
+                    serviceType.GetGenericTypeDefinition() == typeof(IFactory<>))
+                {
+                    Func<Request, IRegistry, Expression> getExpression = (_, registry) =>
+                        Expression.Call(registry.GetConstantExpression(registry.Resolve(serviceType, serviceName), serviceType), "Create", null);
+
+                    var factoredServiceType = serviceType.GetGenericArguments()[0];
+                    registrator.Register(factoredServiceType, new DelegateFactory(getExpression, reuse, setup), serviceName); 
+                }
             }
         }
 
@@ -164,10 +176,6 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.IsSingleton = ((PartCreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
                 }
-                else if (attribute is ExportAsFactoryAttribute)
-                {
-                    
-                }
                 else if (attribute is ExportAsGenericWrapperAttribute)
                 {
                     Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
@@ -213,10 +221,10 @@ namespace DryIoc.MefAttributedModel
 
         private static object[] GetInheritedExportAttributes(Type type)
         {
-            var exports = type.GetCustomAttributes(typeof (InheritedExportAttribute), false);
+            var exports = type.GetCustomAttributes(typeof(InheritedExportAttribute), false);
             for (var i = 0; i < exports.Length; i++)
             {
-                var export = (InheritedExportAttribute) exports[i];
+                var export = (InheritedExportAttribute)exports[i];
                 if (export.ContractType == null)
                     exports[i] = new InheritedExportAttribute(export.ContractName, type);
             }
@@ -237,6 +245,7 @@ namespace DryIoc.MefAttributedModel
 
         public static object FindMetadata(Type type, int metadataAttributeIndex)
         {
+            if (metadataAttributeIndex < 0) return null;
             var attributes = type.GetCustomAttributes(false);
             var metadataAttribute = attributes[metadataAttributeIndex];
             var withMetadataAttribute = metadataAttribute as ExportWithMetadataAttribute;
@@ -393,17 +402,17 @@ Only single metadata is supported per implementation type, please remove the res
             var code = new StringBuilder(
 @"new RegistrationInfo {
     ImplementationType = ").AppendType(Type).Append(@",
-    Exports = new[] {");         
+    Exports = new[] {");
             for (var i = 0; i < Exports.Length; i++) code.Append(@"
         new ExportInfo { ServiceType = ").AppendType(Exports[i].ServiceType).Append(
-                     @", ServiceName = ").AppendString(Exports[i].ServiceName).Append(@" },"); 
+                     @", ServiceName = ").AppendString(Exports[i].ServiceName).Append(@" },");
             code.Append(@"
     },
     IsSingleton = ").AppendBool(IsSingleton).Append(@",
     MetadataAttributeIndex = ").Append(MetadataAttributeIndex).Append(@",
-    FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType); 
+    FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
             if (GenericWrapper != null) code.Append(@",
-    GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = ").Append(GenericWrapper.ServiceTypeIndex).Append(@" }"); 
+    GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = ").Append(GenericWrapper.ServiceTypeIndex).Append(@" }");
             if (Decorator != null) code.Append(@",
     Decorator = new DecoratorInfo { ServiceName = ").AppendString(Decorator.ServiceName).Append(
                                 @", ShouldCompareMetadata = ").AppendBool(Decorator.ShouldCompareMetadata).Append(
@@ -539,9 +548,6 @@ Only single metadata is supported per implementation type, please remove the res
     {
         T Create();
     }
-
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public class ExportAsFactoryAttribute : Attribute {}
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportAsGenericWrapperAttribute : Attribute
