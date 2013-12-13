@@ -87,9 +87,10 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterExport(this IRegistrator registrator, TypeExportInfo info)
         {
             var metadata = FindMetadata(info.Type, info.MetadataAttributeIndex);
-
             var setup = info.CreateSetup(metadata);
+
             var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
+            
             var factory = new ReflectionFactory(info.Type, reuse, FindSingleImportingConstructor, setup);
 
             var exports = info.Exports;

@@ -22,7 +22,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Could_use_factory2_interface_for_delegate_factory_registration()
+        public void Could_dynamically_register_IFactory_dot_Create_with_delegate_factory()
         {
             var container = new Container();
 
@@ -50,6 +50,68 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.NotNull(orange);
         }
+
+        [Test]
+        public void Could_register_multi_factory_automatically_when_exported()
+        {
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(FruitFactory));
+
+            var orange = container.Resolve<Orange>();
+            var apple = container.Resolve<Apple>();
+
+            Assert.NotNull(orange);
+            Assert.NotNull(apple);
+        }
+
+        [Test]
+        public void Could_register_multi_factory_with_separate_named_Exports()
+        {
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(NamedFruitFactory));
+
+            var orange = container.Resolve<Orange>("orange");
+            var apple = container.Resolve<Apple>("apple");
+
+            Assert.NotNull(orange);
+            Assert.NotNull(apple);
+        }
+
+        [Test]
+        public void Reuse_should_be_applied_for_factory_created_services()
+        {
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(OrangeFactory));
+
+            var one = container.Resolve<Orange>();
+            var another = container.Resolve<Orange>();
+
+            Assert.That(one, Is.SameAs(another));
+        }
+
+        [Test]
+        public void Specified_transient_reuse_should_be_applied_for_factory_created_services()
+        {
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(TransientOrangeFactory));
+
+            var one = container.Resolve<Orange>();
+            var another = container.Resolve<Orange>();
+
+            Assert.That(one, Is.Not.SameAs(another));
+        }
+
+        [Test]
+        public void Factory_should_be_always_exported_as_shared()
+        {
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(TransientOrangeFactory));
+
+            var oneFactory = container.Resolve<IFactory<Orange>>();
+            var anotherFactory = container.Resolve<IFactory<Orange>>();
+
+            Assert.That(oneFactory, Is.SameAs(anotherFactory));
+        }
     }
 
     [ExportAll]
@@ -61,5 +123,44 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
     }
 
+    [ExportAll]
+    class FruitFactory : IFactory<Orange>, IFactory<Apple>
+    {
+        Orange IFactory<Orange>.Create()
+        {
+            return new Orange();
+        }
+
+        Apple IFactory<Apple>.Create()
+        {
+            return new Apple();
+        }
+    }
+
+    [Export("orange", typeof(IFactory<Orange>))]
+    [Export("apple", typeof(IFactory<Apple>))]
+    class NamedFruitFactory : IFactory<Orange>, IFactory<Apple>
+    {
+        public Orange Create()
+        {
+            return new Orange();
+        }
+
+        Apple IFactory<Apple>.Create()
+        {
+            return new Apple();
+        }
+    }
+
+    [ExportAll, PartCreationPolicy(CreationPolicy.NonShared)]
+    class TransientOrangeFactory : IFactory<Orange>
+    {
+        public Orange Create()
+        {
+            return new Orange();
+        }
+    }
+
     class Orange {}
+    class Apple {}
 }
