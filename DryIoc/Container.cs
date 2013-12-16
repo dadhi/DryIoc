@@ -1179,7 +1179,7 @@ when resolving {1}.";
         }
     }
 
-    public enum FactoryType { Service, Decorator, GenericWrapper };
+    public enum FactoryType { Service = 0, Decorator, GenericWrapper };
 
     public enum FactoryCachePolicy { CacheExpression, NotCacheExpression };
 

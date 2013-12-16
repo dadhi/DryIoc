@@ -100,18 +100,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.That(one, Is.Not.SameAs(another));
         }
-
-        [Test]
-        public void Factory_should_be_always_exported_as_shared()
-        {
-            var container = new Container(AttributedModel.DefaultSetup);
-            container.RegisterExports(typeof(TransientOrangeFactory));
-
-            var oneFactory = container.Resolve<IFactory<Orange>>();
-            var anotherFactory = container.Resolve<IFactory<Orange>>();
-
-            Assert.That(oneFactory, Is.SameAs(anotherFactory));
-        }
     }
 
     [ExportAll]
@@ -152,9 +140,10 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
     }
 
-    [ExportAll, PartCreationPolicy(CreationPolicy.NonShared)]
+    [ExportAll]
     class TransientOrangeFactory : IFactory<Orange>
     {
+        [CreationPolicy(CreationPolicy.NonShared)]
         public Orange Create()
         {
             return new Orange();

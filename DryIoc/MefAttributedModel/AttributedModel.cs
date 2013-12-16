@@ -90,28 +90,32 @@ namespace DryIoc.MefAttributedModel
             var setup = info.CreateSetup(metadata);
 
             var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
-            
+
             var factory = new ReflectionFactory(info.Type, reuse, FindSingleImportingConstructor, setup);
 
             var exports = info.Exports;
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
-                var serviceType = export.ServiceType;
-                var serviceName = export.ServiceName;
+                registrator.Register(factory, export.ServiceType, export.ServiceName);
 
-                registrator.Register(factory, serviceType, serviceName);
-
-                if (serviceType.IsGenericType &&
-                    serviceType.GetGenericTypeDefinition() == typeof(IFactory<>))
-                {
-                    Func<Request, IRegistry, Expression> getExpression = (_, registry) =>
-                        Expression.Call(registry.GetConstantExpression(registry.Resolve(serviceType, serviceName), serviceType), "Create", null);
-
-                    var factoredServiceType = serviceType.GetGenericArguments()[0];
-                    registrator.Register(factoredServiceType, new DelegateFactory(getExpression, reuse, setup), serviceName); 
-                }
+                if (export.ServiceType.IsGenericType &&
+                    export.ServiceType.GetGenericTypeDefinition() == typeof(IFactory<>))
+                    RegisterFactory(registrator, export);
             }
+        }
+
+        private static void RegisterFactory(IRegistrator registrator, ExportInfo export)
+        {
+            Func<Request, IRegistry, Expression> getExpression = (_, registry) =>
+            {
+                var factoryObject = registry.Resolve(export.ServiceType, export.ServiceName);
+                var factoryExpr = registry.GetConstantExpression(factoryObject, export.ServiceType);
+                return Expression.Call(factoryExpr, "Create", null);
+            };
+
+            var factoredServiceType = export.ServiceType.GetGenericArguments()[0];
+            registrator.Register(factoredServiceType, new DelegateFactory(getExpression, null, null), export.ServiceName);
         }
 
         public static IEnumerable<TypeExportInfo> DiscoverExportsInAssemblies(IEnumerable<Assembly> assemblies)
@@ -176,6 +180,10 @@ namespace DryIoc.MefAttributedModel
                 else if (attribute is PartCreationPolicyAttribute)
                 {
                     info.IsSingleton = ((PartCreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
+                }
+                else if (attribute is CreationPolicyAttribute)
+                {
+                    info.IsSingleton = ((CreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
                 }
                 else if (attribute is ExportAsGenericWrapperAttribute)
                 {
@@ -306,7 +314,7 @@ namespace DryIoc.MefAttributedModel
         public static bool TryGetServiceKeyFromImportOrExportAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
             key = null;
-            var import = GetSingleAttributeOrDefault<ImportOrExportAttribute>(attributes);
+            var import = GetSingleAttributeOrDefault<ExportIfNeededAttribute>(attributes);
             if (import == null)
                 return false;
 
@@ -587,7 +595,7 @@ Only single metadata is supported per implementation type, please remove the res
     }
 
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    public class ImportOrExportAttribute : Attribute
+    public class ExportIfNeededAttribute : Attribute
     {
         public string ContractName { get; set; }
 
@@ -598,6 +606,21 @@ Only single metadata is supported per implementation type, please remove the res
         public object Metadata { get; set; }
 
         public Type[] ConstructorSignature { get; set; }
+    }
+
+    /// <summary>
+    /// You may use this attribute to specify CreationPolicy for <see cref="IFactory{T}"/> Create method.
+    /// Or in place of <see cref="PartCreationPolicyAttribute"/> for exported classes.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+    public class CreationPolicyAttribute : Attribute
+    {
+        public CreationPolicy CreationPolicy { get; private set; }
+
+        public CreationPolicyAttribute(CreationPolicy policy)
+        {
+            CreationPolicy = policy;
+        }
     }
 
     #endregion

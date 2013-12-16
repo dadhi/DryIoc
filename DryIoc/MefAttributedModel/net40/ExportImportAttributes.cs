@@ -1,6 +1,6 @@
 ﻿namespace System.ComponentModel.Composition
 {
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
     public class ExportAttribute : Attribute
     {
         public string ContractName { get; private set; }
@@ -42,7 +42,7 @@
     public enum CreationPolicy { Shared, NonShared }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public class PartCreationPolicyAttribute : Attribute
+    public sealed class PartCreationPolicyAttribute : Attribute
     {
         public CreationPolicy CreationPolicy { get; private set; }
 
