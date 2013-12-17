@@ -9,7 +9,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Should_properly_print_registration_info()
         {
-            var info = AttributedModel.GetRegistrationInfoOrDefault(typeof(ForExportBaseImpl));
+            var info = AttributedModel.GetExportInfoOrDefault(typeof(ForExportBaseImpl));
 
             var code = info.ToCode();
 

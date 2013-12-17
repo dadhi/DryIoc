@@ -70,7 +70,7 @@ namespace DryIoc.MefAttributedModel
 
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
         {
-            registrator.RegisterExports(types.Select(GetRegistrationInfoOrDefault).Where(info => info != null));
+            registrator.RegisterExports(types.Select(GetExportInfoOrDefault).Where(info => info != null));
         }
 
         public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
@@ -101,49 +101,32 @@ namespace DryIoc.MefAttributedModel
 
                 if (export.ServiceType.IsGenericType &&
                     export.ServiceType.GetGenericTypeDefinition() == typeof(IFactory<>))
-                    RegisterFactory(registrator, export);
+                    RegisterFactory(registrator, info.Type, export);
             }
-        }
-
-        private static void RegisterFactory(IRegistrator registrator, ExportInfo export)
-        {
-            Func<Request, IRegistry, Expression> getExpression = (_, registry) =>
-            {
-                var factoryObject = registry.Resolve(export.ServiceType, export.ServiceName);
-                var factoryExpr = registry.GetConstantExpression(factoryObject, export.ServiceType);
-                return Expression.Call(factoryExpr, "Create", null);
-            };
-
-            var factoredServiceType = export.ServiceType.GetGenericArguments()[0];
-            registrator.Register(factoredServiceType, new DelegateFactory(getExpression, null, null), export.ServiceName);
         }
 
         public static IEnumerable<TypeExportInfo> DiscoverExportsInAssemblies(IEnumerable<Assembly> assemblies)
         {
-            return assemblies.SelectMany(a => a.GetTypes()).Select(GetRegistrationInfoOrDefault).Where(info => info != null);
+            return assemblies.SelectMany(a => a.GetTypes())
+                .Select(GetExportInfoOrDefault).Where(info => info != null);
         }
 
-        public static TypeExportInfo GetRegistrationInfoOrDefault(Type type)
+        public static TypeExportInfo GetExportInfoOrDefault(Type type)
         {
             if (!type.IsClass || type.IsAbstract)
                 return null;
 
-            var attributes = type.GetCustomAttributes(false);
-
-            for (var baseType = type.BaseType;
-                baseType != typeof(object) && baseType != null;
-                baseType = baseType.BaseType)
-                attributes = attributes.Append(GetInheritedExportAttributes(baseType));
-
-            var interfaces = type.GetInterfaces();
-            for (var i = 0; i < interfaces.Length; i++)
-                attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
-
+            var attributes = GetAllExportRelatedAttributes(type);
             if (attributes.Length == 0 ||
                 !Array.Exists(attributes, a => a is ExportAttribute || a is ExportAllAttribute) ||
                 Array.Exists(attributes, a => a is PartNotDiscoverableAttribute))
                 return null;
 
+            return GetExportInfoOrDefault(type, attributes);
+        }
+
+        public static TypeExportInfo GetExportInfoOrDefault(Type type, object[] attributes)
+        {
             var info = new TypeExportInfo { Type = type };
 
             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
@@ -228,6 +211,25 @@ namespace DryIoc.MefAttributedModel
 
         #region Implementation
 
+        private static readonly MethodInfo _resolveMethod =
+            typeof(Resolver).GetMethod("Resolve", new[] { typeof(IResolver), typeof(string), typeof(IfUnresolved) });
+
+        private static object[] GetAllExportRelatedAttributes(Type type)
+        {
+            var attributes = type.GetCustomAttributes(false);
+
+            for (var baseType = type.BaseType;
+                baseType != typeof(object) && baseType != null;
+                baseType = baseType.BaseType)
+                attributes = attributes.Append(GetInheritedExportAttributes(baseType));
+
+            var interfaces = type.GetInterfaces();
+            for (var i = 0; i < interfaces.Length; i++)
+                attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
+
+            return attributes;
+        }
+
         private static object[] GetInheritedExportAttributes(Type type)
         {
             var exports = type.GetCustomAttributes(typeof(InheritedExportAttribute), false);
@@ -238,6 +240,33 @@ namespace DryIoc.MefAttributedModel
                     exports[i] = new InheritedExportAttribute(export.ContractName, type);
             }
             return exports;
+        }
+
+        private static void RegisterFactory(IRegistrator registrator, Type factoryImplementingType, ExportInfo export)
+        {
+            var factoryType = export.ServiceType;
+            var factoryName = export.ServiceName;
+
+            // Result expression is {container.Resolve<IFactory<TService>>(factoryName).Create()} 
+            Func<Request, IRegistry, Expression> getExpression = (_, __) =>
+                Expression.Call(
+                    Expression.Call(_resolveMethod.MakeGenericMethod(factoryType),
+                        Container.RegistryExpression,
+                        Expression.Constant(factoryName, typeof(string)),
+                        Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
+                    "Create", null);
+
+            var serviceType = factoryType.GetGenericArguments()[0];
+
+            var methods = factoryImplementingType.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            var createMethods = methods.Where(m => m.GetBaseDefinition().DeclaringType == factoryType).ToArray();
+            //var attributes = createMethod.GetCustomAttributes(false);
+
+            string serviceName = null;
+
+            var delegateFactory = new DelegateFactory(getExpression, null, null);
+
+            registrator.Register(serviceType, delegateFactory, serviceName);
         }
 
         #endregion
