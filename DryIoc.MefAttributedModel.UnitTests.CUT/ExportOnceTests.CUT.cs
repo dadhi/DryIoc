@@ -9,7 +9,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public IForeignTool Tool { get; set; }
 
         public NativeUser(
-            [ExportIfNeeded(ImplementationType = typeof(ForeignTool), CreationPolicy = CreationPolicy.NonShared)] 
+            [ExportOnce(ImplementationType = typeof(ForeignTool), CreationPolicy = CreationPolicy.NonShared)] 
             IForeignTool tool)
         {
             Tool = tool;
@@ -29,7 +29,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public ExternalTool Tool { get; set; }
 
-        public HomeUser([ExportIfNeeded(ConstructorSignature = new[] { typeof(string) })] Func<string, ExternalTool> getTool)
+        public HomeUser([ExportOnce(ConstructorSignature = new[] { typeof(string) })] Func<string, ExternalTool> getTool)
         {
             Tool = getTool("blah");
         }
@@ -62,7 +62,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public MineMeta ToolMeta { get; set; }
 
         public MyCode(
-            [ExportIfNeeded(Metadata = MineMeta.Green, ConstructorSignature = new Type[0])] 
+            [ExportOnce(Metadata = MineMeta.Green, ConstructorSignature = new Type[0])] 
             Meta<Lazy<ExternalTool>, MineMeta> tool)
         {
             Tool = tool.Value.Value;
@@ -73,10 +73,10 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [ExportAll]
     public class ServiceWithFieldAndProperty
     {
-        [ExportIfNeeded(ImplementationType = typeof(AnotherService), ContractName = "blah")]
+        [ExportOnce(ImplementationType = typeof(AnotherService), ContractName = "blah")]
         public IService Field;
 
-        [ExportIfNeeded(ImplementationType = typeof(AnotherService), ContractName = "blah")]
+        [ExportOnce(ImplementationType = typeof(AnotherService), ContractName = "blah")]
         public IService Property { get; set; }
     }
 }

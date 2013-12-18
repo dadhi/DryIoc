@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ExportIfNeededTests
+    public class ExportOnceTests
     {
         [Test]
         public void I_can_export_ctor_param_service_on_resolve()

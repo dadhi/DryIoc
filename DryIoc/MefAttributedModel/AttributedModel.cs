@@ -87,7 +87,8 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterExport(this IRegistrator registrator, TypeExportInfo info)
         {
             var metadata = FindMetadata(info.Type, info.MetadataAttributeIndex);
-            var setup = info.CreateSetup(metadata);
+
+            var setup = info.GetSetup(metadata);
 
             var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
 
@@ -242,7 +243,7 @@ namespace DryIoc.MefAttributedModel
             return exports;
         }
 
-        private static void RegisterFactory(IRegistrator registrator, Type factoryImplementingType, ExportInfo export)
+        private static void RegisterFactory(IRegistrator registrator, Type factoryImplementationType, ExportInfo export)
         {
             var factoryType = export.ServiceType;
             var factoryName = export.ServiceName;
@@ -256,11 +257,13 @@ namespace DryIoc.MefAttributedModel
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     "Create", null);
 
-            var serviceType = factoryType.GetGenericArguments()[0];
+            var factoryMethod = factoryImplementationType.GetInterfaceMap(factoryType).TargetMethods[0];
+            var attributes = factoryMethod.GetCustomAttributes(false);
+            if (Array.FindIndex(attributes, a => a is ExportAttribute || a is ExportAllAttribute) == -1)
+                attributes = attributes.Append(new ExportAttribute());
 
-            var methods = factoryImplementingType.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            var createMethods = methods.Where(m => m.GetBaseDefinition().DeclaringType == factoryType).ToArray();
-            //var attributes = createMethod.GetCustomAttributes(false);
+            var serviceType = factoryType.GetGenericArguments()[0];
+            var exportInfo = GetExportInfoOrDefault(serviceType, attributes);
 
             string serviceName = null;
 
@@ -343,7 +346,7 @@ namespace DryIoc.MefAttributedModel
         public static bool TryGetServiceKeyFromImportOrExportAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
             key = null;
-            var import = GetSingleAttributeOrDefault<ExportIfNeededAttribute>(attributes);
+            var import = GetSingleAttributeOrDefault<ExportOnceAttribute>(attributes);
             if (import == null)
                 return false;
 
@@ -412,7 +415,7 @@ Only single metadata is supported per implementation type, please remove the res
         public GenericWrapperInfo GenericWrapper;
         public DecoratorInfo Decorator;
 
-        public FactorySetup CreateSetup(object metadata)
+        public FactorySetup GetSetup(object metadata)
         {
             if (FactoryType == FactoryType.GenericWrapper)
                 return GenericWrapper == null ? GenericWrapperSetup.Default : GenericWrapper.CreateSetup();
@@ -624,7 +627,7 @@ Only single metadata is supported per implementation type, please remove the res
     }
 
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    public class ExportIfNeededAttribute : Attribute
+    public class ExportOnceAttribute : Attribute
     {
         public string ContractName { get; set; }
 
