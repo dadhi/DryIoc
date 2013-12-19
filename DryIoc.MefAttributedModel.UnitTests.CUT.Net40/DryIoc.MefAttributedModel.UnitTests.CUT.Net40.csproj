@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -45,8 +45,8 @@
     <Compile Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsGenericWrapperTests.CUT.cs">
       <Link>ExportAsGenericWrapperTests.CUT.cs</Link>
     </Compile>
-    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportOrExportTests.CUT.cs">
-      <Link>ImportOrExportTests.CUT.cs</Link>
+    <Compile Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportOnceTests.CUT.cs">
+      <Link>ExportOnceTests.CUT.cs</Link>
     </Compile>
     <Compile Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportWithMetadataTests.CUT.cs">
       <Link>ImportWithMetadataTests.CUT.cs</Link>

@@ -41,7 +41,7 @@
   <ItemGroup>
     <Compile Include="AttributedModelTests.cs" />
     <Compile Include="CodeGenerationTests.cs" />
-    <Compile Include="DelegateFactoryTests.cs" />
+    <Compile Include="ExportFactoryTests.cs" />
     <Compile Include="ExportAllTests.cs" />
     <Compile Include="ExportAsDecoratorTests.cs" />
     <Compile Include="ExportAsGenericWrapperTests.cs" />

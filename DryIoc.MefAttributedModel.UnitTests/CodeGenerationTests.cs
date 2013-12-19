@@ -14,8 +14,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var code = info.ToCode();
 
             Assert.That(code, Is.EqualTo(
-@"new RegistrationInfo {
-    ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExportBaseImpl),
+@"new TypeExportInfo {
+    Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExportBaseImpl),
     Exports = new[] {
         new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExportBase), ServiceName = null },
     },

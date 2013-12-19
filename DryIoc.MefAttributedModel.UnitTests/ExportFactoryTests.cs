@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class DelegateFactoryTests
+    public class ExportFactoryTests
     {
         [Test]
         public void Could_use_factory_interface_for_delegate_factory_registration()
@@ -22,7 +22,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Could_dynamically_register_IFactory_dot_Create_with_delegate_factory()
+        public void Could_dynamically_register_IFactory_method_with_delegate_factory()
         {
             var container = new Container();
 
@@ -103,7 +103,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
     }
 
     [ExportAll]
-    class OrangeFactory : IFactory<Orange>
+    public class OrangeFactory : IFactory<Orange>
     {
         public Orange Create()
         {
@@ -112,7 +112,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
     }
 
     [ExportAll]
-    class FruitFactory : IFactory<Orange>, IFactory<Apple>
+    public class FruitFactory : IFactory<Orange>, IFactory<Apple>
     {
         Orange IFactory<Orange>.Create()
         {
@@ -127,13 +127,15 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
     [Export("orange", typeof(IFactory<Orange>))]
     [Export("apple", typeof(IFactory<Apple>))]
-    class NamedFruitFactory : IFactory<Orange>, IFactory<Apple>
+    public class NamedFruitFactory : IFactory<Orange>, IFactory<Apple>
     {
+        [Export("orange")]
         public Orange Create()
         {
             return new Orange();
         }
 
+        [Export("apple")]
         Apple IFactory<Apple>.Create()
         {
             return new Apple();
@@ -141,7 +143,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
     }
 
     [ExportAll]
-    class TransientOrangeFactory : IFactory<Orange>
+    public class TransientOrangeFactory : IFactory<Orange>
     {
         [CreationPolicy(CreationPolicy.NonShared)]
         public Orange Create()
@@ -150,6 +152,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
     }
 
-    class Orange {}
-    class Apple {}
+    public class Orange {}
+    public class Apple {}
 }

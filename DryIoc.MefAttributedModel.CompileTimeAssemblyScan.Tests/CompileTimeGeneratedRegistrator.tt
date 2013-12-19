@@ -2,11 +2,11 @@
 <#@ output extension=".cs" #>
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.dll" #>
-<#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.AttributedRegistration.UnitTests.CUT.dll" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
-<#@ import Namespace="DryIoc.AttributedRegistration.UnitTests.CUT" #>
-namespace DryIoc.AttributedRegistration.CompileTimeAssemblyScan.Tests
+<#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
+namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 {
     public static class CompileTimeGeneratedRegistrator
     {

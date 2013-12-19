@@ -70,7 +70,8 @@ namespace DryIoc.MefAttributedModel
 
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
         {
-            registrator.RegisterExports(types.Select(GetExportInfoOrDefault).Where(info => info != null));
+            registrator.RegisterExports(types
+                .Select(GetExportInfoOrDefault).Where(info => info != null));
         }
 
         public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
@@ -86,13 +87,7 @@ namespace DryIoc.MefAttributedModel
 
         public static void RegisterExport(this IRegistrator registrator, TypeExportInfo info)
         {
-            var metadata = FindMetadata(info.Type, info.MetadataAttributeIndex);
-
-            var setup = info.GetSetup(metadata);
-
-            var reuse = info.IsSingleton ? Reuse.Singleton : Reuse.Transient;
-
-            var factory = new ReflectionFactory(info.Type, reuse, FindSingleImportingConstructor, setup);
+            var factory = new ReflectionFactory(info.Type, info.GetReuse(), FindSingleImportingConstructor, info.GetSetup());
 
             var exports = info.Exports;
             for (var i = 0; i < exports.Length; i++)
@@ -212,9 +207,6 @@ namespace DryIoc.MefAttributedModel
 
         #region Implementation
 
-        private static readonly MethodInfo _resolveMethod =
-            typeof(Resolver).GetMethod("Resolve", new[] { typeof(IResolver), typeof(string), typeof(IfUnresolved) });
-
         private static object[] GetAllExportRelatedAttributes(Type type)
         {
             var attributes = type.GetCustomAttributes(false);
@@ -243,33 +235,35 @@ namespace DryIoc.MefAttributedModel
             return exports;
         }
 
-        private static void RegisterFactory(IRegistrator registrator, Type factoryImplementationType, ExportInfo export)
-        {
-            var factoryType = export.ServiceType;
-            var factoryName = export.ServiceName;
+        private static readonly MethodInfo _resolveMethod =
+            typeof(Resolver).GetMethod("Resolve", new[] { typeof(IResolver), typeof(string), typeof(IfUnresolved) });
 
+        private static void RegisterFactory(IRegistrator registrator, Type factoryType, ExportInfo factoryExport)
+        {
             // Result expression is {container.Resolve<IFactory<TService>>(factoryName).Create()} 
-            Func<Request, IRegistry, Expression> getExpression = (_, __) =>
+            Func<Request, IRegistry, Expression> factoryCreateExpr = (_, __) =>
                 Expression.Call(
-                    Expression.Call(_resolveMethod.MakeGenericMethod(factoryType),
+                    Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
                         Container.RegistryExpression,
-                        Expression.Constant(factoryName, typeof(string)),
+                        Expression.Constant(factoryExport.ServiceName, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     "Create", null);
 
-            var factoryMethod = factoryImplementationType.GetInterfaceMap(factoryType).TargetMethods[0];
+            var factoryMethod = factoryType.GetInterfaceMap(factoryExport.ServiceType).TargetMethods[0];
             var attributes = factoryMethod.GetCustomAttributes(false);
-            if (Array.FindIndex(attributes, a => a is ExportAttribute || a is ExportAllAttribute) == -1)
+            if (attributes.Length == 0 ||
+                Array.FindIndex(attributes, a => a is ExportAttribute || a is ExportAllAttribute) == -1)
                 attributes = attributes.Append(new ExportAttribute());
 
-            var serviceType = factoryType.GetGenericArguments()[0];
-            var exportInfo = GetExportInfoOrDefault(serviceType, attributes);
+            var serviceType = factoryExport.ServiceType.GetGenericArguments()[0];
+            var exportInfo = GetExportInfoOrDefault(serviceType, attributes).ThrowIfNull();
 
-            string serviceName = null;
-
-            var delegateFactory = new DelegateFactory(getExpression, null, null);
-
-            registrator.Register(serviceType, delegateFactory, serviceName);
+            var factory = new DelegateFactory(factoryCreateExpr, exportInfo.GetReuse(), exportInfo.GetSetup(attributes));
+            for (var i = 0; i < exportInfo.Exports.Length; i++)
+            {
+                var export = exportInfo.Exports[i];
+                registrator.Register(factory, export.ServiceType, export.ServiceName);
+            }
         }
 
         #endregion
@@ -282,15 +276,6 @@ namespace DryIoc.MefAttributedModel
             return constructors.Length == 1 ? constructors[0]
                 : constructors.SingleOrDefault(x => Attribute.IsDefined(x, typeof(ImportingConstructorAttribute)))
                     .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, type);
-        }
-
-        public static object FindMetadata(Type type, int metadataAttributeIndex)
-        {
-            if (metadataAttributeIndex < 0) return null;
-            var attributes = type.GetCustomAttributes(false);
-            var metadataAttribute = attributes[metadataAttributeIndex];
-            var withMetadataAttribute = metadataAttribute as ExportWithMetadataAttribute;
-            return withMetadataAttribute != null ? withMetadataAttribute.Metadata : metadataAttribute;
         }
 
         #endregion
@@ -415,15 +400,30 @@ Only single metadata is supported per implementation type, please remove the res
         public GenericWrapperInfo GenericWrapper;
         public DecoratorInfo Decorator;
 
-        public FactorySetup GetSetup(object metadata)
+        public IReuse GetReuse()
+        {
+            return IsSingleton ? Reuse.Singleton : Reuse.Transient;
+        }
+
+        public object GetMetadata(object[] attributes = null)
+        {
+            attributes = attributes ?? Type.GetCustomAttributes(false);
+            var metadataAttribute = MetadataAttributeIndex == -1 ? null
+                : attributes.ThrowIf(attributes.Length == 0)[MetadataAttributeIndex];
+            var metadata = !(metadataAttribute is ExportWithMetadataAttribute) ? metadataAttribute
+                : ((ExportWithMetadataAttribute)metadataAttribute).Metadata;
+            return metadata;
+        }
+
+        public FactorySetup GetSetup(object[] attributes = null)
         {
             if (FactoryType == FactoryType.GenericWrapper)
                 return GenericWrapper == null ? GenericWrapperSetup.Default : GenericWrapper.CreateSetup();
 
             if (FactoryType == FactoryType.Decorator)
-                return Decorator == null ? DecoratorSetup.Default : Decorator.CreateSetup(metadata);
+                return Decorator == null ? DecoratorSetup.Default : Decorator.CreateSetup(GetMetadata(attributes));
 
-            return ServiceSetup.WithMetadata(metadata);
+            return ServiceSetup.WithMetadata(GetMetadata(attributes));
         }
 
         public override bool Equals(object obj)
@@ -441,8 +441,8 @@ Only single metadata is supported per implementation type, please remove the res
         public string ToCode()
         {
             var code = new StringBuilder(
-@"new RegistrationInfo {
-    ImplementationType = ").AppendType(Type).Append(@",
+@"new TypeExportInfo {
+    Type = ").AppendType(Type).Append(@",
     Exports = new[] {");
             for (var i = 0; i < Exports.Length; i++) code.Append(@"
         new ExportInfo { ServiceType = ").AppendType(Exports[i].ServiceType).Append(
