@@ -2,17 +2,16 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc</id>
-        <version>1.0.4</version>
+        <version>1.0.6</version>
         <authors>Maksim Volkau</authors>
-        <owners>Maksim Volkau</owners>
-        <copyright>Maksim Volkau</copyright>
-        <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>Fast, comprehensive, small IoC container to embed into your application or framework.</description>
-        <summary>IoC Container for fun and profit.</summary>
-        <tags>IoC Container InversionOfControl DI DependencyInjection DRY</tags>
+        <copyright>Copyright © Maksim Volkau 2013</copyright>
+        <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+        <requireLicenseAcceptance>true</requireLicenseAcceptance>
+        <description>Fast, rich, small IoC container for your application or framework.</description>
+        <tags>IoC Container InversionOfControl DI DependencyInjection DRY ServiceProvider Factory</tags>
     </metadata>
     <files>
         <file src="..\DryIoc\**\*.cs" target="content\net35\DryIoc" exclude="..\DryIoc\Properties\*.*" />
-        <file src="..\DryIoc\**\*.cs" target="content\net40\DryIoc" exclude="..\DryIoc\Properties\*.*;..\DryIoc\**\net40\*.*" />
+        <file src="..\DryIoc\**\*.cs;..\DryIoc.net40\*.cs" target="content\net40\DryIoc" exclude="..\DryIoc\Properties\*.*;..\DryIoc\**\net40\*.*" />
     </files>
 </package>
