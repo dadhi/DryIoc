@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests")]
-[assembly: AssemblyCopyright("Copyright © Maksim Volkau 2013")]
+[assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

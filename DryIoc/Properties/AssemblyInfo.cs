@@ -7,12 +7,12 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc")]
-[assembly: AssemblyCopyright("Copyright © Maksim Volkau 2013")]
+[assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
-[assembly: AssemblyVersion("1.0.6")]
-[assembly: AssemblyFileVersion("1.0.6")]
+[assembly: AssemblyVersion("1.0.7")]
+[assembly: AssemblyFileVersion("1.0.7")]
 
 [assembly: ComVisible(false)]
 [assembly: Guid("6f2bee9b-8e7f-4806-97b7-4b63f2f0cde0")]

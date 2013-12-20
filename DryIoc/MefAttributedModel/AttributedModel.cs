@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013 Maksim Volkau <max.volkov@gmail.com>
+Copyright (c) 2013 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -38,17 +38,11 @@ namespace DryIoc.MefAttributedModel
     /// <list type="bullet">
     /// <item>Export of entities other than classes, e.g. exporting of properties, fields, methods.</item>
     /// <item>ImportMany attribute. Use <see cref="IEnumerable{T}"/> or array instead.</item>
-    /// <item>RequiredCreationPolicy in Imports.</item>
+    /// <item>RequiredCreationPolicy.</item>
     /// <item>Dynamic resolution with IPartImportsSatisfiedNotification.</item>
     /// <item>ExportFactory&lt;T&gt;. Use <see cref="Func{TResult}"/> instead.</item>
     /// <item>ExportMetadata attribute. Use <see cref="ExportWithMetadataAttribute"/> instead or attributes annotated with <see cref="MetadataAttributeAttribute"/>.</item>
     /// </list>
-    /// <para>
-    /// TODO:
-    /// <list type="bullet">
-    /// <item>add: Missing feature to register attributed DelegateFactory.</item>
-    /// </list>
-    /// </para>
     /// </summary>
     public static class AttributedModel
     {

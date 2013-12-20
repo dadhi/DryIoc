@@ -2,11 +2,11 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc</id>
-        <version>1.0.6</version>
+        <version>1.0.7</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © Maksim Volkau 2013</copyright>
+        <copyright>Copyright © 2013 Maksim Volkau</copyright>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
-        <requireLicenseAcceptance>true</requireLicenseAcceptance>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Fast, rich, small IoC container for your application or framework.</description>
         <tags>IoC Container InversionOfControl DI DependencyInjection DRY ServiceProvider Factory</tags>
     </metadata>
