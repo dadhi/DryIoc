@@ -109,20 +109,17 @@ namespace DryIoc.MefAttributedModel
 
         public static TypeExportInfo GetExportInfoOrDefault(Type type)
         {
-            if (!type.IsClass || type.IsAbstract)
-                return null;
+            return !type.IsClass || type.IsAbstract ? null
+                : GetExportInfoOrDefault(type, GetAllExportRelatedAttributes(type));
+        }
 
-            var attributes = GetAllExportRelatedAttributes(type);
+        public static TypeExportInfo GetExportInfoOrDefault(Type type, object[] attributes)
+        {
             if (attributes.Length == 0 ||
                 !Array.Exists(attributes, a => a is ExportAttribute || a is ExportAllAttribute) ||
                 Array.Exists(attributes, a => a is PartNotDiscoverableAttribute))
                 return null;
 
-            return GetExportInfoOrDefault(type, attributes);
-        }
-
-        public static TypeExportInfo GetExportInfoOrDefault(Type type, object[] attributes)
-        {
             var info = new TypeExportInfo { Type = type };
 
             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
@@ -251,12 +248,11 @@ namespace DryIoc.MefAttributedModel
 
             var factoryMethod = factoryType.GetInterfaceMap(factoryExport.ServiceType).TargetMethods[0];
             var attributes = factoryMethod.GetCustomAttributes(false);
-            if (attributes.Length == 0 ||
-                Array.FindIndex(attributes, a => a is ExportAttribute || a is ExportAllAttribute) == -1)
-                attributes = attributes.Append(new ExportAttribute());
-
             var serviceType = factoryExport.ServiceType.GetGenericArguments()[0];
-            var exportInfo = GetExportInfoOrDefault(serviceType, attributes).ThrowIfNull();
+
+            var exportInfo = GetExportInfoOrDefault(serviceType, attributes);
+            if (exportInfo == null)
+                return;
 
             var factory = new DelegateFactory(factoryCreateExpr, exportInfo.GetReuse(), exportInfo.GetSetup(attributes));
             for (var i = 0; i < exportInfo.Exports.Length; i++)

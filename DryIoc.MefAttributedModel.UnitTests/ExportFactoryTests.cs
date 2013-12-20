@@ -105,6 +105,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
     [ExportAll]
     public class OrangeFactory : IFactory<Orange>
     {
+        [Export]
         public Orange Create()
         {
             return new Orange();
@@ -114,11 +115,13 @@ namespace DryIoc.MefAttributedModel.UnitTests
     [ExportAll]
     public class FruitFactory : IFactory<Orange>, IFactory<Apple>
     {
+        [Export]
         Orange IFactory<Orange>.Create()
         {
             return new Orange();
         }
 
+        [Export]
         Apple IFactory<Apple>.Create()
         {
             return new Apple();
@@ -145,7 +148,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
     [ExportAll]
     public class TransientOrangeFactory : IFactory<Orange>
     {
-        [CreationPolicy(CreationPolicy.NonShared)]
+        [Export, CreationPolicy(CreationPolicy.NonShared)]
         public Orange Create()
         {
             return new Orange();
