@@ -30,7 +30,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var factoryType = typeof(IFactory<Orange>);
 
-            Func<Request, IRegistry, Expression> getExpression = (_, registry) => 
+            Func<Request, IRegistry, Expression> getExpression = (_, registry) =>
                 Expression.Call(registry.GetConstantExpression(registry.Resolve(factoryType), factoryType), "Create", null);
 
             container.Register(typeof(Orange), new DelegateFactory(getExpression));
@@ -100,6 +100,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.That(one, Is.Not.SameAs(another));
         }
+
+        [Test]
+        public void Could_export_Func_with_parameters_as_Factory()
+        {
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(FuncFactory));
+
+            var factory = container.Resolve<Func<string, Orange>>();
+
+            Assert.NotNull(factory("hey"));
+        }
     }
 
     [ExportAll]
@@ -155,6 +166,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
     }
 
-    public class Orange {}
-    public class Apple {}
+    [ExportAll]
+    public class FuncFactory : IFactory<Func<string, Orange>>
+    {
+        [Export]
+        public Func<string, Orange> Create()
+        {
+            return s => new Orange();
+        }
+    }
+
+    public class Orange { }
+    public class Apple { }
 }
