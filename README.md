@@ -1,17 +1,17 @@
 DryIoc - fast, small and rich IoC Container.
 --------------------------------------------
-**+** Low ceremony, small to be embed as source, with [Autofac]+[MEF] level of functionality.
+**Container with [Autofac]+[MEF] level of functionality BUT much faster and small enough to embed as code.**
 
 [Autofac]: https://code.google.com/p/autofac/
 [MEF]: http://mef.codeplex.com/
 
 Implemented using [Expression Trees API](http://msdn.microsoft.com/en-us/library/bb397951.aspx).<br/>
-Designed to work with **.NET 3.5** and higher.<br/>
+Working with **.NET 3.5** and higher.<br/>
 Available via nuget: [TODO]<br/>
 
 ### Fast ###
-* On par with fastest containers listed in <https://github.com/danielpalme/IocPerformance>
-* Designed that general use-cases are specifically optimized for speed.
+* On par with fastest containers listed in [IoC Container Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
+* General use-cases optimized for max speed.
 * Memory footprint preserved as low as possible.
 * Call stack depth preserved as shallow as possible. 
 
