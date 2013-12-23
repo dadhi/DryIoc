@@ -1,4 +1,4 @@
-DryIoc - fast, small and rich IoC Container.
+DryIoc is fast, small and rich IoC Container.
 --------------------------------------------
 **Container with [Autofac]+[MEF] level of functionality BUT much faster and small enough to embed as code.**
 
@@ -28,18 +28,19 @@ DryIoc - fast, small and rich IoC Container.
 ### Supports ###
 * Constructor, property and field injection.
 * Delegate factory registration.
+* `IsRegistered` check.
 * Open-generics without special syntax.
 * Multiple unnamed/named services with single/many implementations.
 * Arbitrary metadata object accociated with service implementation.
 * Resolution of generic wrappers:
 	* `Lazy<T>`, `Func<T>`, `IEnumerable<T>`, `T[]`, `Meta<TMetadata, T>`.
-	* Func with free parameters for constructor arguments: `Func<A, T>`, `Func<A1, A2, T>`, etc.
+	* Func with free parameters to specify constructor arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
 	* `Many<T>` for dynamic resolution of available services.
 	* User-defined wrappers.
-	* Wrappers could be freely nested, e.g. `Meta<SomeMetadata, Func<SomeService>>[]`.
+	* Wrappers can be freely nested, e.g. `Meta<SomeMetadata, Func<SomeService>>[]`.
 * Instance lifetime control (*instance reuse* in DryIoc terms):
     * `Transient`, `Singleton`, `InCurrentScope`, `InResolutionScope`.
-    * Custom reuse by implementing `IReuse`. Check `ThreadReuse` in unit-tests.
+    * Custom reuse by implementing `IReuse`. Check `ThreadReuse` in unit-tests for example.
     * Nested disposable scopes of reuse.
     * Disposing of `Singleton` on Container dispose. 
 * [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern). 
