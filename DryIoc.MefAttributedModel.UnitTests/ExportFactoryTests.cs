@@ -111,6 +111,27 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.NotNull(factory("hey"));
         }
+
+        [Test]
+        public void You_should_attribute_Create_with_Export_to_register_Otherwise_only_factory_itself_will_be_registered()
+        {
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.RegisterExports(typeof(BareFactory));
+
+            container.Resolve<IFactory<Apple>>();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<Apple>());
+        }
+    }
+
+    [ExportAll]
+    public class BareFactory : IFactory<Apple>
+    {
+        public Apple Create()
+        {
+            return new Apple();
+        }
     }
 
     [ExportAll]

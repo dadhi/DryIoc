@@ -69,7 +69,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var slow = container.Resolve<IHandler>("slow");
 
             Assert.That(slow, Is.InstanceOf<DecoratorWithFastHandlerImport>());
-            Assert.That(((DecoratorWithFastHandlerImport) slow).Handler, Is.InstanceOf<SlowHandler>());
+            Assert.That(((DecoratorWithFastHandlerImport)slow).Handler, Is.InstanceOf<SlowHandler>());
         }
     }
 }

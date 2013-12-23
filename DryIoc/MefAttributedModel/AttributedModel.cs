@@ -98,7 +98,8 @@ namespace DryIoc.MefAttributedModel
         public static IEnumerable<TypeExportInfo> DiscoverExportsInAssemblies(IEnumerable<Assembly> assemblies)
         {
             return assemblies.SelectMany(a => a.GetTypes())
-                .Select(GetExportInfoOrDefault).Where(info => info != null);
+                .Select(GetExportInfoOrDefault)
+                .Where(info => info != null);
         }
 
         public static TypeExportInfo GetExportInfoOrDefault(Type type)
@@ -231,6 +232,14 @@ namespace DryIoc.MefAttributedModel
 
         private static void RegisterFactory(IRegistrator registrator, Type factoryType, ExportInfo factoryExport)
         {
+            var factoryMethod = factoryType.GetInterfaceMap(factoryExport.ServiceType).TargetMethods[0];
+            var attributes = factoryMethod.GetCustomAttributes(false);
+            var serviceType = factoryExport.ServiceType.GetGenericArguments()[0];
+
+            var exportInfo = GetExportInfoOrDefault(serviceType, attributes);
+            if (exportInfo == null)
+                return;
+
             // Result expression is {container.Resolve<IFactory<TService>>(factoryName).Create()} 
             Func<Request, IRegistry, Expression> factoryCreateExpr = (_, __) =>
                 Expression.Call(
@@ -239,14 +248,6 @@ namespace DryIoc.MefAttributedModel
                         Expression.Constant(factoryExport.ServiceName, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     "Create", null);
-
-            var factoryMethod = factoryType.GetInterfaceMap(factoryExport.ServiceType).TargetMethods[0];
-            var attributes = factoryMethod.GetCustomAttributes(false);
-            var serviceType = factoryExport.ServiceType.GetGenericArguments()[0];
-
-            var exportInfo = GetExportInfoOrDefault(serviceType, attributes);
-            if (exportInfo == null)
-                return;
 
             var factory = new DelegateFactory(factoryCreateExpr, exportInfo.GetReuse(), exportInfo.GetSetup(attributes));
             for (var i = 0; i < exportInfo.Exports.Length; i++)
