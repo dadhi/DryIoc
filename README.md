@@ -23,7 +23,7 @@ DryIoc - fast, small and rich IoC Container.
 * Unit-tested with 100% coverage.
 * Thread-safe: registrations and resolutions could be done in parallel whithout corrupting container state.
 * Error handling is done with `ContainerException` inherited from `InvalidOperationException` to filter container related exceptions.
-* You could check on underlying expression used for service creation by resolving as `DebugFactory<T>`.
+* You could check on underlying expression used for service creation by resolving as `DebugExpression<T>`.
 
 ### Supports ###
 * Constructor, property and field injection.
