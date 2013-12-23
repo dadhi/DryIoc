@@ -33,7 +33,7 @@ DryIoc - fast, small and rich IoC Container.
 * Arbitrary metadata object accociated with service implementation.
 * Resolution of generic wrappers:
 	* `Lazy<T>`, `Func<T>`, `IEnumerable<T>`, `T[]`, `Meta<TMetadata, T>`.
-	* Func with parameters to specify constructor arguments: `Func<A, T>`, `Func<A1, A2, T>`, etc.
+	* Func with free parameters to specify constructor arguments: `Func<A, T>`, `Func<A1, A2, T>`, etc.
 	* `Many<T>` for dynamic resolution of available services.
 	* User-defined wrappers.
 	* Wrappers could be freely nested, e.g. `IEnumerable<Meta<SomeMetadata, Func<int, SomeService>>>`.
@@ -46,8 +46,9 @@ DryIoc - fast, small and rich IoC Container.
 * [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern).
 * Unregistered service resolution via `ResolutionRules`.
 * Toggling features on/off via `ContanerSetup`.
-* Optionally [MEF attributed programming model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) with some exceptions (see *AttributedModel.cs* docs for details).
-    * MEF attributes: `Export`, `InheritedExport`, `Import`, `PartCreationPolicy`, metadata export attributes and more.  
-    * Additional DryIoc attributes: `ExportAsDecorator`, `ExportAsGenericWrapper`, `ExportWithMetadata`, `ExportOnce`, etc.
-    * Custom factories to deal with foreign code via exporting `IFactory<T>`. 
-    * Provides ability for compile-time types discovery. To speed-up application startup.
+
+### Optionally supports [MEF attributed programming model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx).
+* Standard attributes with some exceptions (check docs in *AttributedModel.cs*): `Export`, `InheritedExport`, `Import`, `PartCreationPolicy`, etc.
+* Additional DryIoc attributes: `ExportAll`, `ExportAsDecorator`, `ExportAsGenericWrapper`, `ExportWithMetadata`, `ImportWithMetadata`.
+* Dialing with foreign code via implementing `IFactory<T>` or use of `ExportOnce` attribute.
+* Provides ability for compile-time types discovery. To speed-up application startup.
