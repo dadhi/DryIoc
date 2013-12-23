@@ -1,1 +1,4 @@
-nuget push ..\bin\nuget\DryIoc.%1.nupkg -Source https://staging.nuget.org -ApiKey 4a500fe1-f295-4475-9b45-54ca18e9d027
+set /p apikey= < apikey.txt
+set version=%1
+call nuget push ..\bin\nuget\DryIoc.%version%.nupkg -Source https://staging.nuget.org -ApiKey %apikey%
+call nuget push ..\bin\nuget\DryIoc.Code.%version%.nupkg -Source https://staging.nuget.org -ApiKey %apikey%

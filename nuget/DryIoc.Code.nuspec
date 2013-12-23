@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
-        <id>DryIoc</id>
+        <id>DryIoc.Code</id>
         <version>1.0.7</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013 Maksim Volkau</copyright>
@@ -12,7 +12,7 @@
         <tags>IoC Container InversionOfControl DI DependencyInjection DRY ServiceProvider Factory</tags>
     </metadata>
     <files>
-        <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />
-        <file src="..\bin\Release\DryIoc.net40.dll" target="lib\net40\DryIoc.dll" />
+        <file src="..\DryIoc\**\*.cs" target="content\net35\DryIoc" exclude="..\DryIoc\Properties\*.*" />
+        <file src="..\DryIoc\**\*.cs;..\DryIoc.net40\*.cs" target="content\net40\DryIoc" exclude="..\DryIoc\Properties\*.*;..\DryIoc\**\net40\*.*" />
     </files>
 </package>

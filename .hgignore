@@ -116,6 +116,7 @@ publish/
 ## TODO: If you have NuGet Package Restore enabled, uncomment the next line
 #packages/
 *.nupkg
+apikey.*
 
 # Windows Azure Build Output
 csx
