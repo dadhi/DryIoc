@@ -23,7 +23,7 @@ DryIoc - fast, small and rich IoC Container.
 * Unit-tested with 100% coverage.
 * Thread-safe: registrations and resolutions could be done in parallel whithout corrupting container state.
 * Error handling is done with `ContainerException` inherited from `InvalidOperationException` to filter container related exceptions.
-* You could check on underlying expression used for service creation by resolving as `DebugExpression<T>`.
+* Resolve as `DebugExpression<T>` to find underlying expression used for service creation.
 
 ### Supports ###
 * Constructor, property and field injection.
@@ -33,13 +33,13 @@ DryIoc - fast, small and rich IoC Container.
 * Arbitrary metadata object accociated with service implementation.
 * Resolution of generic wrappers:
 	* `Lazy<T>`, `Func<T>`, `IEnumerable<T>`, `T[]`, `Meta<TMetadata, T>`.
-	* Func with free parameters to specify constructor arguments: `Func<A, T>`, `Func<A1, A2, T>`, etc.
+	* Func with free parameters for constructor arguments: `Func<A, T>`, `Func<A1, A2, T>`, etc.
 	* `Many<T>` for dynamic resolution of available services.
 	* User-defined wrappers.
-	* Wrappers could be freely nested, e.g. `IEnumerable<Meta<SomeMetadata, Func<int, SomeService>>>`.
+	* Wrappers could be freely nested, e.g. `Meta<SomeMetadata, Func<SomeService>>[]`.
 * Instance lifetime control (*instance reuse* in DryIoc terms):
     * `Transient`, `Singleton`, `InCurrentScope`, `InResolutionScope`.
-    * Custom reuse by implementing `IReuse` interface, check `ThreadReuse` in unit-tests for example.
+    * Custom reuse by implementing `IReuse`. Check `ThreadReuse` in unit-tests.
     * Nested disposable scopes of reuse.
     * Disposing of `Singleton` on Container dispose. 
 * [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern). 
