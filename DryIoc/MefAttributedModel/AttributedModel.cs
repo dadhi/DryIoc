@@ -34,10 +34,11 @@ namespace DryIoc.MefAttributedModel
 {
     /// <summary>
     /// Implements part of MEF Attributed Programming Model - http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx
-    /// Not supported: 
+    /// Supports everything except:
     /// <list type="bullet">
-    /// <item>Export of entities other than classes, e.g. exporting of properties, fields, methods.</item>
-    /// <item>ImportMany attribute. Use <see cref="IEnumerable{T}"/> or array instead.</item>
+    /// <item>Export of entities other than classes, e.g. exporting of properties, fields, static methods 
+    ///     Supports exporting of instance methods implementing <see cref="IFactory{T}"/> interface.</item>
+    /// <item>ImportMany attribute. Use <see cref="IEnumerable{T}"/> or array instead without any attributes.</item>
     /// <item>RequiredCreationPolicy.</item>
     /// <item>Dynamic resolution with IPartImportsSatisfiedNotification.</item>
     /// <item>ExportFactory&lt;T&gt;. Use <see cref="Func{TResult}"/> instead.</item>
