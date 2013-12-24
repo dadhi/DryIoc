@@ -7,7 +7,7 @@ DryIoc is fast, small and rich IoC Container.
 
 Implemented using [Expression Trees API](http://msdn.microsoft.com/en-us/library/bb397951.aspx).  
 Working on .NET 3.5, 4.0, 4.5.  
-Available via nuget: [TODO]
+Available via **NuGet** as code [DryIoc](https://www.nuget.org/packages/DryIoc/) or as binary [DryIoc.dll](https://www.nuget.org/packages/DryIoc.dll/).
 
 #### Fast ####
 * On par with fastest containers listed in [IoC Container Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
