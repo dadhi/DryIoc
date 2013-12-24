@@ -27,7 +27,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51-76A9-479E-8FF2-66C903C5856E}"
 	ProjectSection(SolutionItems) = preProject
 		nuget\BuildPackage.bat = nuget\BuildPackage.bat
-		nuget\DryIoc.Code.nuspec = nuget\DryIoc.Code.nuspec
+		nuget\DryIoc.dll.nuspec = nuget\DryIoc.dll.nuspec
 		nuget\DryIoc.nuspec = nuget\DryIoc.nuspec
 		nuget\PushPackage.bat = nuget\PushPackage.bat
 	EndProjectSection
