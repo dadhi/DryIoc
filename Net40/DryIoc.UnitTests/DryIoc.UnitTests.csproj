@@ -8,8 +8,8 @@
     <ProjectGuid>{C8A2BC7E-C806-4191-B525-C0D72679041A}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.UnitTests.Net40</RootNamespace>
-    <AssemblyName>DryIoc.UnitTests.Net40</AssemblyName>
+    <RootNamespace>DryIoc.UnitTests</RootNamespace>
+    <AssemblyName>DryIoc.UnitTests</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -118,7 +118,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.Net40\DryIoc.Net40.csproj">
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
       <Name>DryIoc.Net40</Name>
       <Private>False</Private>

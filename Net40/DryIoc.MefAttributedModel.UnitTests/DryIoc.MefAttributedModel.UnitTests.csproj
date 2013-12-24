@@ -5,11 +5,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{1A7C2E33-4076-492B-A82D-D3B875F18A2A}</ProjectGuid>
+    <ProjectGuid>{BC652607-1F3B-451D-A619-C2652232DC8B}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.MefAttributedModel.UnitTests.CUT.Net40</RootNamespace>
-    <AssemblyName>DryIoc.MefAttributedModel.UnitTests.CUT.Net40</AssemblyName>
+    <RootNamespace>DryIoc.MefAttributedModel.UnitTests</RootNamespace>
+    <AssemblyName>DryIoc.MefAttributedModel.UnitTests</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -31,33 +31,48 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="nunit.framework">
+      <HintPath>..\..\lib\nunit.framework.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\AttributedRegistrationTests.CUT.cs">
-      <Link>AttributedRegistrationTests.CUT.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\AttributedModelTests.cs">
+      <Link>AttributedModelTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsDecoratorTests.CUT.cs">
-      <Link>ExportAsDecoratorTests.CUT.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAllTests.cs">
+      <Link>ExportAllTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsGenericWrapperTests.CUT.cs">
-      <Link>ExportAsGenericWrapperTests.CUT.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAsDecoratorTests.cs">
+      <Link>ExportAsDecoratorTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportOnceTests.CUT.cs">
-      <Link>ExportOnceTests.CUT.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAsGenericWrapperTests.cs">
+      <Link>ExportAsGenericWrapperTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportWithMetadataTests.CUT.cs">
-      <Link>ImportWithMetadataTests.CUT.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportFactoryTests.cs">
+      <Link>ExportFactoryTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\InheritedExportTests.CUT.cs">
-      <Link>InheritedExportTests.CUT.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportOnceTests.cs">
+      <Link>ExportOnceTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportWithMetadataTests.cs">
+      <Link>ImportWithMetadataTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\InheritedExportTests.cs">
+      <Link>InheritedExportTests.cs</Link>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.Net40\DryIoc.Net40.csproj">
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">
+      <Project>{1A7C2E33-4076-492B-A82D-D3B875F18A2A}</Project>
+      <Name>DryIoc.MefAttributedModel.UnitTests.CUT.Net40</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
       <Name>DryIoc.Net40</Name>
       <Private>False</Private>

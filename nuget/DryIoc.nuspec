@@ -13,6 +13,6 @@
     </metadata>
     <files>
         <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />
-        <file src="..\bin\Release\DryIoc.net40.dll" target="lib\net40\DryIoc.dll" />
+        <file src="..\Net40\bin\Release\DryIoc.dll" target="lib\net40" />
     </files>
 </package>

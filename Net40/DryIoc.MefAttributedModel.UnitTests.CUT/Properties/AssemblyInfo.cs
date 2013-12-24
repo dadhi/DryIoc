@@ -4,11 +4,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("DryIoc.MefAttributedModel.UnitTests.Net40")]
+[assembly: AssemblyTitle("DryIoc.MefAttributedModel.UnitTests.CUT")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("DryIoc.MefAttributedModel.UnitTests.Net40")]
+[assembly: AssemblyProduct("DryIoc.MefAttributedModel.UnitTests.CUT")]
 [assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -19,7 +19,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("81430200-c0bd-40e3-b1d7-5f41f51cf97a")]
+[assembly: Guid("e3a3a54d-1882-490a-895c-628a7ff81888")]
 
 // Version information for an assembly consists of the following four values:
 //

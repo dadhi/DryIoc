@@ -13,6 +13,6 @@
     </metadata>
     <files>
         <file src="..\DryIoc\**\*.cs" target="content\net35\DryIoc" exclude="..\DryIoc\Properties\*.*" />
-        <file src="..\DryIoc\**\*.cs;..\DryIoc.net40\*.cs" target="content\net40\DryIoc" exclude="..\DryIoc\Properties\*.*;..\DryIoc\**\net40\*.*" />
+        <file src="..\DryIoc\**\*.cs;..\Net40\DryIoc\*.cs" target="content\net40\DryIoc" exclude="..\DryIoc\Properties\*.*;..\DryIoc\**\net40\*.*" />
     </files>
 </package>
