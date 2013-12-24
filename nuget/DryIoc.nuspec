@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc</id>
-        <version>1.0.8</version>
+        <version>1.0.9</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
@@ -10,6 +10,9 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc is fast, small and rich IoC container.</description>
         <tags>IoC Container InversionOfControl DI DependencyInjection DRY ServiceProvider Factory</tags>
+        <frameworkAssemblies>
+            <frameworkAssembly assemblyName="System.ComponentModel.Composition" targetFramework="net40" />
+        </frameworkAssemblies>
     </metadata>
     <files>
         <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />

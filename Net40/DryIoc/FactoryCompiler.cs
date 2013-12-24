@@ -26,11 +26,7 @@ using System;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
 using System.Threading;
-using DryIoc;
-
-[assembly: InternalsVisibleTo(FactoryCompiler.DYNAMIC_ASSEMBLY_NAME)]
 
 namespace DryIoc
 {
