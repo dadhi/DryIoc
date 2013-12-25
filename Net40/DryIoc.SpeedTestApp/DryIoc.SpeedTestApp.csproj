@@ -49,11 +49,10 @@
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj">
       <Project>{C8A2BC7E-C806-4191-B525-C0D72679041A}</Project>
-      <Name>DryIoc.UnitTests.Net40</Name>
+      <Name>DryIoc.UnitTests %28Net40\DryIoc.UnitTests%29</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -59,7 +59,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
-      <Name>DryIoc.Net40</Name>
+      <Name>DryIoc %28Net40\DryIoc%29</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
