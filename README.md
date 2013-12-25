@@ -22,7 +22,7 @@ Available via **NuGet** as code [DryIoc](https://www.nuget.org/packages/DryIoc/)
 
 #### Safe ####
 * Unit-tested with 100% coverage.
-* Thread-safe: registrations and resolutions could be done in parallel whithout corrupting container state.
+* Thread-safe: registrations and resolutions could be done in parallel without corrupting container state.
 * Error handling is done with `ContainerException` inherited from `InvalidOperationException` to filter container related exceptions.
 * Resolve as `DebugExpression<T>` to find underlying expression used for service creation.
 
