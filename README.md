@@ -52,5 +52,5 @@ Available via **NuGet** as code [DryIoc](https://www.nuget.org/packages/DryIoc/)
 #### Optionally supports [MEF attributed programming model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx).
 * Standard attributes with some exceptions (check docs in *AttributedModel.cs*): `Export`, `InheritedExport`, `Import`, `PartCreationPolicy`, etc.
 * Additional DryIoc attributes: `ExportAll`, `ExportAsDecorator`, `ExportAsGenericWrapper`, `ExportWithMetadata`, `ImportWithMetadata`.
-* Dialing with foreign code via implementing `IFactory<T>` or use of `ExportOnce` attribute.
+* Dealing with foreign code via implementing `IFactory<T>` or use of `ExportOnce` attribute.
 * Provides ability for compile-time types discovery. To speed-up application startup.
