@@ -58,6 +58,11 @@
       <Name>DryIoc.MefAttributedModel.UnitTests.CUT</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
+      <Project>{13516F3C-E48D-43DC-89D4-5FE00DE3C7D2}</Project>
+      <Name>DryIoc.MefAttributedModel</Name>
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
       <Name>DryIoc</Name>

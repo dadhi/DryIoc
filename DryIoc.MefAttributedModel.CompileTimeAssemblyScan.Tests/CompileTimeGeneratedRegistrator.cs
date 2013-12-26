@@ -70,7 +70,7 @@ new TypeExportInfo {
         new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IFooService), ServiceName = null },
     },
     IsSingleton = true,
-    MetadataAttributeIndex = 0,
+    MetadataAttributeIndex = 1,
     FactoryType = DryIoc.FactoryType.Service
 }, 
 new TypeExportInfo {
@@ -80,7 +80,7 @@ new TypeExportInfo {
         new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IFooService), ServiceName = null },
     },
     IsSingleton = true,
-    MetadataAttributeIndex = 1,
+    MetadataAttributeIndex = 0,
     FactoryType = DryIoc.FactoryType.Service
 }, 
 new TypeExportInfo {
@@ -128,7 +128,7 @@ new TypeExportInfo {
         new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), ServiceName = "transact" },
     },
     IsSingleton = true,
-    MetadataAttributeIndex = 1,
+    MetadataAttributeIndex = 0,
     FactoryType = DryIoc.FactoryType.Service
 }, 
 new TypeExportInfo {
@@ -149,7 +149,7 @@ new TypeExportInfo {
         new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), ServiceName = null },
     },
     IsSingleton = false,
-    MetadataAttributeIndex = 0,
+    MetadataAttributeIndex = 1,
     FactoryType = DryIoc.FactoryType.Decorator,
     Decorator = new DecoratorInfo { ServiceName = null, ShouldCompareMetadata = true, ConditionType = null}
 }, 
@@ -160,7 +160,7 @@ new TypeExportInfo {
         new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), ServiceName = null },
     },
     IsSingleton = false,
-    MetadataAttributeIndex = 0,
+    MetadataAttributeIndex = 1,
     FactoryType = DryIoc.FactoryType.Decorator,
     Decorator = new DecoratorInfo { ServiceName = "transact", ShouldCompareMetadata = true, ConditionType = null}
 }, 
@@ -184,6 +184,38 @@ new TypeExportInfo {
     MetadataAttributeIndex = -1,
     FactoryType = DryIoc.FactoryType.Decorator,
     Decorator = new DecoratorInfo { ServiceName = null, ShouldCompareMetadata = false, ConditionType = null}
+}, 
+new TypeExportInfo {
+    Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExport),
+    Exports = new[] {
+        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport), ServiceName = null },
+    },
+    IsSingleton = true,
+    MetadataAttributeIndex = -1,
+    FactoryType = DryIoc.FactoryType.Service
+}, 
+new TypeExportInfo {
+    Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExportBaseImpl),
+    Exports = new[] {
+        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExportBase), ServiceName = null },
+    },
+    IsSingleton = true,
+    MetadataAttributeIndex = -1,
+    FactoryType = DryIoc.FactoryType.Service
+}, 
+new TypeExportInfo {
+    Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported),
+    Exports = new[] {
+        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported), ServiceName = "c" },
+        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported), ServiceName = "c" },
+        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported), ServiceName = "b" },
+        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported), ServiceName = "a" },
+        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported), ServiceName = "j" },
+        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported), ServiceName = "i" },
+    },
+    IsSingleton = true,
+    MetadataAttributeIndex = -1,
+    FactoryType = DryIoc.FactoryType.Service
 }, 
 new TypeExportInfo {
     Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NativeUser),
@@ -216,38 +248,6 @@ new TypeExportInfo {
     Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithFieldAndProperty),
     Exports = new[] {
         new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithFieldAndProperty), ServiceName = null },
-    },
-    IsSingleton = true,
-    MetadataAttributeIndex = -1,
-    FactoryType = DryIoc.FactoryType.Service
-}, 
-new TypeExportInfo {
-    Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExport),
-    Exports = new[] {
-        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport), ServiceName = null },
-    },
-    IsSingleton = true,
-    MetadataAttributeIndex = -1,
-    FactoryType = DryIoc.FactoryType.Service
-}, 
-new TypeExportInfo {
-    Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExportBaseImpl),
-    Exports = new[] {
-        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExportBase), ServiceName = null },
-    },
-    IsSingleton = true,
-    MetadataAttributeIndex = -1,
-    FactoryType = DryIoc.FactoryType.Service
-}, 
-new TypeExportInfo {
-    Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported),
-    Exports = new[] {
-        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported), ServiceName = "c" },
-        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported), ServiceName = "c" },
-        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported), ServiceName = "b" },
-        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported), ServiceName = "a" },
-        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported), ServiceName = "j" },
-        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported), ServiceName = "i" },
     },
     IsSingleton = true,
     MetadataAttributeIndex = -1,
@@ -333,7 +333,7 @@ new TypeExportInfo {
         new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), ServiceName = null },
     },
     IsSingleton = false,
-    MetadataAttributeIndex = 0,
+    MetadataAttributeIndex = 1,
     FactoryType = DryIoc.FactoryType.Service
 }, 
 new TypeExportInfo {
@@ -396,7 +396,7 @@ new TypeExportInfo {
         new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.SingleServiceWithMetadata), ServiceName = null },
     },
     IsSingleton = true,
-    MetadataAttributeIndex = 0,
+    MetadataAttributeIndex = 1,
     FactoryType = DryIoc.FactoryType.Service
 }, 
 new TypeExportInfo {

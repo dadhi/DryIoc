@@ -64,12 +64,18 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\InheritedExportTests.cs">
       <Link>InheritedExportTests.cs</Link>
     </Compile>
+    <Compile Include="Playground\MefMultiExports.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">
       <Project>{1A7C2E33-4076-492B-A82D-D3B875F18A2A}</Project>
       <Name>DryIoc.MefAttributedModel.UnitTests.CUT %28Net40\DryIoc.MefAttributedModel.UnitTests.CUT%29</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
+      <Project>{4F120D18-ABE6-4C79-B49F-8099F01E2F7F}</Project>
+      <Name>DryIoc.MefAttributedModel %28Net40\DryIoc.MefAttributedModel%29</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">

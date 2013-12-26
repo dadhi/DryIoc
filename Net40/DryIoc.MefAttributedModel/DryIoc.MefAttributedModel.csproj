@@ -5,11 +5,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</ProjectGuid>
+    <ProjectGuid>{4F120D18-ABE6-4C79-B49F-8099F01E2F7F}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc</RootNamespace>
-    <AssemblyName>DryIoc</AssemblyName>
+    <RootNamespace>DryIoc.MefAttributedModel</RootNamespace>
+    <AssemblyName>DryIoc.MefAttributedModel</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -32,17 +32,23 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\DryIoc\Container.cs">
-      <Link>Container.cs</Link>
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
+      <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
+      <Name>DryIoc %28Net40\DryIoc%29</Name>
+      <Private>False</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\DryIoc.MefAttributedModel\AttributedModel.cs">
+      <Link>AttributedModel.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
+    <Compile Include="..\..\DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="FactoryCompiler.cs" />
-    <Compile Include="InternalsVisibleToDryIocFactoryCompiler.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -36,9 +36,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\DryIoc.UnitTests\CompositePatternTests.cs">
@@ -114,7 +112,6 @@
       <Link>TypeCSharpNameFormattingTests.cs</Link>
     </Compile>
     <Compile Include="Playground\ClosureFieldsAccessSpeed.cs" />
-    <Compile Include="Playground\MefMultiExports.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
