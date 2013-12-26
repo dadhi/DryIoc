@@ -117,6 +117,7 @@ publish/
 packages/
 *.nupkg
 apikey.*
+nuget/**/DryIoc/*
 
 # Windows Azure Build Output
 csx

@@ -31,12 +31,13 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="DryIoc, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="DryIoc, Version=1.1.1.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\DryIoc.dll.1.1.0\lib\net40\DryIoc.dll</HintPath>
+      <HintPath>..\..\packages\DryIoc.dll.1.1.1\lib\net40\DryIoc.dll</HintPath>
     </Reference>
-    <Reference Include="DryIoc.MefAttributedModel">
-      <HintPath>..\..\packages\DryIoc.MefAttributedModel.dll.1.1.0\lib\net40\DryIoc.MefAttributedModel.dll</HintPath>
+    <Reference Include="DryIoc.MefAttributedModel, Version=1.1.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\packages\DryIoc.MefAttributedModel.dll.1.1.1\lib\net40\DryIoc.MefAttributedModel.dll</HintPath>
     </Reference>
     <Reference Include="nunit.framework">
       <HintPath>..\..\lib\nunit.framework.dll</HintPath>
@@ -53,7 +54,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Class1.cs" />
-    <Compile Include="InternalsVisibleToDryIocFactoryCompiler.cs" />
+    <Compile Include="DryIoc\InternalsVisibleToFactoryCompilerDynamicAssembly.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
