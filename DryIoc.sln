@@ -28,7 +28,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51
 	ProjectSection(SolutionItems) = preProject
 		nuget\BuildPackage.bat = nuget\BuildPackage.bat
 		nuget\DryIoc.dll.nuspec = nuget\DryIoc.dll.nuspec
+		NuGet\DryIoc.MefAttributedModel.dll.nuspec = NuGet\DryIoc.MefAttributedModel.dll.nuspec
+		NuGet\DryIoc.MefAttributedModel.nuspec = NuGet\DryIoc.MefAttributedModel.nuspec
 		nuget\DryIoc.nuspec = nuget\DryIoc.nuspec
+		NuGet\PublishPackage.bat = NuGet\PublishPackage.bat
+		NuGet\StagePackage.bat = NuGet\StagePackage.bat
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocClient.NuGet.Net35", "NuGet\DryIocClient.NuGet.Net35\DryIocClient.NuGet.Net35.csproj", "{2C709B4B-4076-4C36-AF42-E6E49C32F0A6}"

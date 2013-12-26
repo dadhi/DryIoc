@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <metadata>
+        <id>DryIoc.MefAttributedModel</id>
+        <version>1.1.0</version>
+        <authors>Maksim Volkau</authors>
+        <copyright>Copyright © 2013 Maksim Volkau</copyright>
+        <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
+        <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>DryIoc.MefAttributedModel source files. Mef attributed programming model for DryIoc IoC container.</description>
+        <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
+        <dependencies>
+            <group>
+                <dependency id="DryIoc" />  
+            </group>
+        </dependencies>
+        <frameworkAssemblies>
+            <frameworkAssembly assemblyName="System.ComponentModel.Composition" targetFramework="net40" />
+        </frameworkAssemblies>
+    </metadata>
+    <files>
+        <file src="..\DryIoc.MefAttributedModel\**\*.cs" target="content\net35\DryIoc.MefAttributedModel" exclude="..\DryIoc.MefAttributedModel\Properties\*.*" />
+        <file src="..\DryIoc.MefAttributedModel\**\*.cs" target="content\net40\DryIoc.MefAttributedModel" exclude="..\DryIoc.MefAttributedModel\Properties\*.*;..\DryIoc.MefAttributedModel\**\net40\*.*" />
+    </files>
+</package>
