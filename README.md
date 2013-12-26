@@ -7,7 +7,12 @@ DryIoc is fast, small and rich IoC Container.
 
 Implemented using [Expression Trees API](http://msdn.microsoft.com/en-us/library/bb397951.aspx).  
 Working on .NET 3.5, 4.0, 4.5.  
-Available via **NuGet** as code [DryIoc](https://www.nuget.org/packages/DryIoc/) or as binary [DryIoc.dll](https://www.nuget.org/packages/DryIoc.dll/).
+Available via **NuGet** as code [DryIoc], [DryIoc.MefAttributedModel] or as assembly [DryIoc.dll], [DryIoc.MefAttributedModel.dll].
+
+[DryIoc]: https://www.nuget.org/packages/DryIoc/
+[DryIoc.MefAttributedModel]: https://www.nuget.org/packages/DryIoc.MefAttributedModel/
+[DryIoc.dll]: https://www.nuget.org/packages/DryIoc.dll/
+[DryIoc.MefAttributedModel.dll]: https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll/
 
 #### Fast ####
 * On par with fastest containers listed in [IoC Container Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
@@ -35,7 +40,7 @@ Available via **NuGet** as code [DryIoc](https://www.nuget.org/packages/DryIoc/)
 * Arbitrary metadata object accociated with service implementation.
 * Resolution of generic wrappers:
     * `Lazy<T>`, `Func<T>`, `IEnumerable<T>`, `T[]`, `Meta<TMetadata, T>`.
-	* Func with free parameters to specify constructor arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
+    * Func with parameters to specify constructor arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
 	* `Many<T>` for dynamic resolution of available services.
 	* User-defined wrappers.
 	* Wrappers can be freely nested, e.g. `Meta<SomeMetadata, Func<SomeService>>[]`.
