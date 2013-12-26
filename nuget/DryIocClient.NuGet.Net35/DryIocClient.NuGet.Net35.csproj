@@ -31,8 +31,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="DryIoc">
-      <HintPath>..\..\packages\DryIoc.dll.1.0.11\lib\net35\DryIoc.dll</HintPath>
+    <Reference Include="DryIoc, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\packages\DryIoc.dll.1.1.0\lib\net35\DryIoc.dll</HintPath>
+    </Reference>
+    <Reference Include="DryIoc.MefAttributedModel">
+      <HintPath>..\..\packages\DryIoc.MefAttributedModel.dll.1.1.0\lib\net35\DryIoc.MefAttributedModel.dll</HintPath>
     </Reference>
     <Reference Include="nunit.framework">
       <HintPath>..\..\lib\nunit.framework.dll</HintPath>
