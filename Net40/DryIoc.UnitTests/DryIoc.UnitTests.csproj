@@ -90,6 +90,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\OpenGenericsTests.cs">
       <Link>OpenGenericsTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\Playground\AutoWiringTests.cs">
+      <Link>Playground\AutoWiringTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\PropertyResolutionTests.cs">
       <Link>PropertyResolutionTests.cs</Link>
     </Compile>
