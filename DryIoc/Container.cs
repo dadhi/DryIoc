@@ -35,45 +35,7 @@ using System.Threading;
 namespace DryIoc
 {
     /// <summary>
-    /// <para>
-    /// Supports registration of:
-    /// <list type="bullet">
-    /// <item>Transient or Singleton instance reuse (Transient means - not reuse, so it just a null). 
-    /// Custom reuse policy is possible via specifying your own <see cref="IReuse"/> implementation.</item>
-    /// <item>Arbitrary lambda factory to return service.</item>
-    /// <item>Optional service name.</item>
-    /// <item>Open generics are registered the same way as concrete types.</item>
-    /// <item>User-defined service metadata.</item>
-    /// <item>Check if service is registered via <see cref="Registrator.IsRegistered"/>.</item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// Supports resolution of:
-    /// <list type="bullet">
-    /// <item>Service instance.</item>
-    /// <item>Automatic constructor parameters injection.</item>
-    /// <item>User-defined service constructor selection, Throws if not defined.</item>
-    /// <item>Func&lt;TService&gt; - will create Transient TService each time when invoked but Singleton only once on first invoke.</item>
-    /// <item>Lazy&lt;TService&gt; - will create instance only once on first access to Value property.</item>
-    /// <item>Func&lt;..., TService&gt; - Func with parameters. Parameters identified by Type, not by name. Order of parameters does not matter.</item>
-    /// <item>Meta&lt;TService, TMetadata&gt; - service wrapped in Meta with registered TMetadata. TService could be a registered type or Func, Lazy variations.</item>
-    /// <item>IEnumerable&lt;TService&gt; and TService[] - TService could be a registered type or Func, Lazy, Meta variations.</item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// Additional features:
-    /// <list type="bullet">
-    /// <item>Minimal mode with all default rules switched off via Container constructor parameter.</item>
-    /// <item>Control of service resolution via <see cref="ResolutionRules"/>.</item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// TODO:
-    /// <list type="bullet">
-    /// <item>add: Nuget Source and optionally DLL packages.</item>
-    /// <item>upd: Remove most of Container doc-comments.</item>
-    /// </list>
-    /// </para>
+    /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -86,7 +48,8 @@ namespace DryIoc
             _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
 
             _constants = new object[3];
-            // Put container itself into constants, to support container access inside expression. 
+
+            // Put reference to container into constants, to support container access inside expression. 
             // It is common for dynamic scenarios.
             _constants[REGISTRY_WEAKREF_CONST_INDEX] = new WeakReference(this);
             _constants[CURRENT_SCOPE_CONST_INDEX] = _constants[SINGLETON_SCOPE_CONST_INDEX] = new Scope();

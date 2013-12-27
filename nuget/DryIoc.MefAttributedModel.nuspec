@@ -8,7 +8,7 @@
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIoc.MefAttributedModel source files. Mef attributed programming model for DryIoc IoC container.</description>
+        <description>DryIoc.MefAttributedModel source files. Mef attributed programming model for DryIoc IoC container. Project is available at https://bitbucket.org/dadhi/dryioc. </description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <dependencies>
             <group>
