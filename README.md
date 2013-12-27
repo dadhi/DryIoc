@@ -22,7 +22,7 @@ Extensions: __MefAttributedModel__ ([code][DryIoc.MefAttributedModel], [lib][Dry
 * Memory footprint preserved as low as possible.
 
 #### Small
-* Minimal setup require single source file: *Container.cs*. 
+* Minimal setup requires single source file: *Container.cs*. 
 * No more than 2200 lines of code including comments.
 * Code written to be readable.
 * Uses [Caliburn.Micro](http://caliburnmicro.codeplex.com/) alike approach for customization.
@@ -36,7 +36,7 @@ Extensions: __MefAttributedModel__ ([code][DryIoc.MefAttributedModel], [lib][Dry
 * Resolving as `DebugExpression<T>` to find underlying expression used for instance creation.
 
 #### Features
-* Constructor, property and field injection. You can select What and Where to inject.
+* Constructor, property and field injection. *You can select What and Where to inject.*
 * Delegate factory registration.
 * Auto-registration via __MefAttributedModel__ extension (see below).
 * Tools for custom auto-wiring and registation. Check `DryIoc.UnitTests.AutoWiringTests` for example.
@@ -46,8 +46,8 @@ Extensions: __MefAttributedModel__ ([code][DryIoc.MefAttributedModel], [lib][Dry
 * Multiple named and unnamed implementations of single service.
 * Multiple services of single impelementation.
 * Resolution of multiple implementations as:
-    * `IEnumerable<T>` or `T[]`. Static view - next resolution woN't see new registrations.
-    * `Many<T>`. Dynamic view - next resolution Will see new registrations.
+    * `IEnumerable<T>` or `T[]`. *Static view - next resolution woN't see new registrations.*
+    * `Many<T>`. *Dynamic view - next resolution Will see new registrations.*
     *  [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern). Composite implementation will be exlcuded from itself.
 * Generic wrappers:
     * `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>`.
