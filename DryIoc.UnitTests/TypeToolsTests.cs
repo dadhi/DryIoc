@@ -40,19 +40,88 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_fill_generic_type_args_based_on_implemented_type_args()
+        public void Can_fill_generic_implmentation_type_args_based_on_base_type_args()
         {
             var openImplType = typeof(Buzz<,>);
             var closedBaseType = typeof(IFizz<int, Wrap<IFizz<Wrap<bool>, int>>>);
 
-            var baseTypes = openImplType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
             var closedBaseTypeDefinition = closedBaseType.GetGenericTypeDefinition();
+            
+            var baseTypes = openImplType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
             var openBaseType = Array.Find(baseTypes, type => type.GetGenericTypeDefinition() == closedBaseTypeDefinition);
+            
             var targetTypeArgs = openImplType.GetGenericArguments();
 
-            closedBaseType.FillTypeArgsForGenericImplementation(openBaseType, ref targetTypeArgs);
+            closedBaseType.MatchGenericImplTypeArgsFromBaseType(openBaseType, ref targetTypeArgs);
             //Assert.That(Array.Exists(targetTypeArgs, type => type.IsGenericParameter), Is.False);
             CollectionAssert.AreEqual(new object[] { typeof(bool), typeof(int) }, targetTypeArgs);
+        }
+
+        [Test]
+        public void Should_find_mismatch_between_closed_and_base_generic_args()
+        {
+            var openImplType = typeof(Buzz<,>);
+            var baseTypeDef = typeof(IFizz<,>);
+            var baseTypes = openImplType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+            var openBaseType = Array.Find(baseTypes, type => type.GetGenericTypeDefinition() == baseTypeDef);
+            var openBaseTypeArgs = openBaseType.GetGenericArguments();
+
+            Assert.IsFalse(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<int, string>).GetGenericArguments(), openBaseTypeArgs));
+            Assert.IsFalse(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<int, Wrap<string>>).GetGenericArguments(), openBaseTypeArgs));
+            Assert.IsFalse(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<int, Wrap<IFizz<string, int>>>).GetGenericArguments(), openBaseTypeArgs));
+            Assert.IsTrue(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<int, Wrap<IFizz<Wrap<string>, int>>>).GetGenericArguments(), openBaseTypeArgs));
+        }
+
+        [Test]
+        public void Should_find_mismatch_between_closed_and_base_generic_args_With_closed_arg_in_the_middle()
+        {
+            var openImplType = typeof(BuzzInt<,>);
+            var baseTypeDef = typeof(IFizz<,>);
+            var baseTypes = openImplType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+            var openBaseType = Array.Find(baseTypes, type => type.GetGenericTypeDefinition() == baseTypeDef);
+            var openBaseTypeArgs = openBaseType.GetGenericArguments();
+
+            Assert.IsTrue(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<IFizz<string, string>, bool>).GetGenericArguments(), openBaseTypeArgs));
+            Assert.IsFalse(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<IFizz<string, Wrap<double>>, bool>).GetGenericArguments(), openBaseTypeArgs));
+        }
+
+        [Test]
+        public void Should_find_mismatch_between_closed_and_base_generic_args_With_closed_generic_arg_in_the_middle()
+        {
+            var openImplType = typeof(BuzzWrapInt<,>);
+            var baseTypeDef = typeof(IFizz<,>);
+            var baseTypes = openImplType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+            var openBaseType = Array.Find(baseTypes, type => type.GetGenericTypeDefinition() == baseTypeDef);
+            var openBaseTypeArgs = openBaseType.GetGenericArguments();
+
+            Assert.IsTrue(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<IFizz<string, Wrap<int>>, bool>).GetGenericArguments(), openBaseTypeArgs));
+            Assert.IsFalse(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<IFizz<string, Wrap<double>>, bool>).GetGenericArguments(), openBaseTypeArgs));
+        }
+
+        [Test]
+        public void Should_find_mismatch_between_closed_and_base_generic_args_With_different_generic_type_arg()
+        {
+            var openImplType = typeof(BuzzDiffArg<,>);
+            var baseTypeDef = typeof(IFizz<,>);
+            var baseTypes = openImplType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+            var openBaseType = Array.Find(baseTypes, type => type.GetGenericTypeDefinition() == baseTypeDef);
+            var openBaseTypeArgs = openBaseType.GetGenericArguments();
+
+            Assert.IsTrue(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<Wrap<string>, bool>).GetGenericArguments(), openBaseTypeArgs));
+            Assert.IsFalse(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<DifferentWrap<string>, bool>).GetGenericArguments(), openBaseTypeArgs));
+        }
+
+        [Test]
+        public void Should_find_mismatch_between_closed_and_base_generic_args_With_different_arguments_number()
+        {
+            var openImplType = typeof(BuzzDiffArgCount<,>);
+            var baseTypeDef = typeof(IFizz<,>);
+            var baseTypes = openImplType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+            var openBaseType = Array.Find(baseTypes, type => type.GetGenericTypeDefinition() == baseTypeDef);
+            var openBaseTypeArgs = openBaseType.GetGenericArguments();
+
+            Assert.IsTrue(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<Wrap<string>, bool>).GetGenericArguments(), openBaseTypeArgs));
+            Assert.IsFalse(TypeTools.CompareClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<Wrap<string, double>, bool>).GetGenericArguments(), openBaseTypeArgs));
         }
     }
 
@@ -87,7 +156,21 @@ namespace DryIoc.UnitTests
 
     public class Buzz<T1, T2> : IFizz<T2, Wrap<IFizz<Wrap<T1>, T2>>> { }
 
+    public class BuzzInt<T1, T2> : IFizz<IFizz<T1, string>, T2> { }
+
+    public class BuzzWrapInt<T1, T2> : IFizz<IFizz<T1, Wrap<int>>, T2> { }
+
+    public class BuzzDiffArg<T1, T2> : IFizz<Wrap<T2>, T1> { }
+
+    public class BuzzDiffArgCount<T1, T2> : IFizz<Wrap<T2>, T1> { }
+
     public class Wrap<T> { }
+    public class Wrap<T1, T2> { }
+    public class DifferentWrap<T> { }
+
+    public class BuzzWithConstaints<T> : IBuzzWithConstraint<T> where T : IFizz<int, string> {}
+
+    public interface IBuzzWithConstraint<T> where T : IFizz<int, string> {}
 
     #endregion
 }
