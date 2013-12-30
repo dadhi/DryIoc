@@ -169,21 +169,22 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Should_Throw_when_registering_service_with_not_all_type_args_required_by_implementation()
+        {
+            var container = new Container();
+            container.Register(typeof(Banana<>), typeof(BananaSplit<,>));
+
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<Banana<string>>());
+        }
+
+        [Test]
         public void Should_Throw_container_exception_for_service_type_with_mismatched_type_arguments()
         {
             var container = new Container();
             container.Register(typeof(IDouble<,>), typeof(DoubleNested<,>));
 
             container.Resolve<IDouble<int, string>>();
-        }
-
-        [Test]
-        public void Should_Throw_when_registering_service_with_not_all_type_args_required_by_implementation()
-        {
-            var container = new Container();
-            container.Register(typeof(Banana<>), typeof(BananaSplit<,>));
-
-            container.Resolve<Banana<string>>();
         }
     }
 
@@ -219,13 +220,13 @@ namespace DryIoc.UnitTests
 
     public class Double<T1, T2> : IDouble<T2, T1> { }
 
-    public class DoubleNested<T1, T2> : IDouble<Nested<T2>, T1> {}
+    public class DoubleNested<T1, T2> : IDouble<Nested<T2>, T1> { }
 
-    public class Nested<T> {}
+    public class Nested<T> { }
 
-    public class BananaSplit<T1, T2> : Banana<T1>, IceCream<T2> {}
+    public class BananaSplit<T1, T2> : Banana<T1>, IceCream<T2> { }
 
-    public class Banana<T> {}
+    public class Banana<T> { }
 
     public interface IceCream<T> { }
 
