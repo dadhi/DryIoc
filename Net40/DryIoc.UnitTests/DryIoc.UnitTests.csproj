@@ -105,14 +105,14 @@
     <Compile Include="..\..\DryIoc.UnitTests\ReuseTests.cs">
       <Link>ReuseTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\SugarTests.cs">
-      <Link>SugarTests.cs</Link>
-    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\ThrowTests.cs">
       <Link>ThrowTests.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\TypeCSharpNameFormattingTests.cs">
       <Link>TypeCSharpNameFormattingTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\TypeToolsTests.cs">
+      <Link>TypeToolsTests.cs</Link>
     </Compile>
     <Compile Include="Playground\ClosureFieldsAccessSpeed.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

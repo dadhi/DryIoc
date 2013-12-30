@@ -111,7 +111,7 @@ namespace DryIoc
         {
             var implementationType = factory.ThrowIfNull().ImplementationType;
             if (implementationType != null && serviceType.ThrowIfNull() != typeof(object))
-                Throw.If(!implementationType.GetSelfAndImplementedTypes().Contains(serviceType),
+                Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
                     Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
 
             lock (_syncRoot)
@@ -858,8 +858,11 @@ when resolving {1}.";
         public static readonly string UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS =
             "Unable to resolve any service of item type {0} when resolving {1}.";
 
-        public static readonly string DELEGATE_FACTORY_EXPRESSION_RETURNED_NULL = 
+        public static readonly string DELEGATE_FACTORY_EXPRESSION_RETURNED_NULL =
             "Delegate factory expression returned NULL when resolving {0}.";
+
+        public static readonly string UNABLE_TO_MATCH_SOME_GENERIC_IMPL_TYPE_ARGS =
+            "Unable to match some of generic implementation {0} type arguments with service type {1} arguments when resolving: {2}.";
     }
 
     public static class Registrator
@@ -940,7 +943,7 @@ when resolving {1}.";
         }
 
         /// <summary>
-        /// Registers single registration for all implemented public interfaces and base classes.
+        /// Registers implementation type <typeparamref name="TImplementation"/> with itself as service type.
         /// </summary>
         /// <typeparam name="TImplementation">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
@@ -973,7 +976,7 @@ when resolving {1}.";
             string named = null, Func<Type, bool> types = null)
         {
             var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
-            foreach (var serviceType in implementationType.GetSelfAndImplementedTypes().Where(types ?? PublicTypes))
+            foreach (var serviceType in implementationType.GetImplementedTypes().Where(types ?? PublicTypes))
                 registrator.Register(registration, serviceType, named);
         }
 
@@ -1339,8 +1342,29 @@ when resolving {1}.";
 
         public override Factory GetFactoryPerRequestOrDefault(Request request, IRegistry _)
         {
-            if (!_implementationType.IsGenericTypeDefinition) return null;
-            var closedImplType = _implementationType.MakeGenericType(request.ServiceType.GetGenericArguments());
+            var implType = _implementationType;
+            if (!implType.IsGenericTypeDefinition)
+                return null;
+
+            Type[] resultImplTypeArgs;
+            if (implType == request.OpenGenericServiceType)
+            {
+                resultImplTypeArgs = request.ServiceType.GetGenericArguments();
+            }
+            else
+            {
+                var baseTypes = implType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+                var openGenericBaseType = Array.Find(baseTypes, t => 
+                    t.GetGenericTypeDefinition() == request.OpenGenericServiceType).ThrowIfNull();
+
+                resultImplTypeArgs = implType.GetGenericArguments();
+                request.ServiceType.FillTypeArgsForGenericImplementation(openGenericBaseType, ref resultImplTypeArgs);
+                
+                Throw.If(Array.Exists(resultImplTypeArgs, t => t.IsGenericParameter), 
+                    Error.UNABLE_TO_MATCH_SOME_GENERIC_IMPL_TYPE_ARGS, implType, openGenericBaseType, request);
+            }
+
+            var closedImplType = implType.MakeGenericType(resultImplTypeArgs);
             return new ReflectionFactory(closedImplType, Reuse, _getConstructor, Setup);
         }
 
@@ -1853,48 +1877,20 @@ when resolving {1}.";
         private static readonly string ARG_HAS_IMVALID_CONDITION = "Argument of type {0} has invalid condition.";
     }
 
-    public static class Sugar
+    public static class TypeTools
     {
-        public static string Print(object x)
-        {
-            return x is string ? (string)x
-                : (x is Type ? ((Type)x).Print()
-                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine)
-                : (x is IEnumerable ? ((IEnumerable)x).Print()
-                : (string.Empty + x))));
-        }
+        public enum ReturnBaseOpenGenerics { AsGenericTypeDefinition, AsIs }
+        public enum IncludeSelf { IncludeAsFirst, Exclude }
 
-        public static string Print(this IEnumerable items, string separator = ", ", Func<object, string> printItem = null)
-        {
-            if (items == null) return null;
-            printItem = printItem ?? Print;
-            var builder = new StringBuilder();
-            foreach (var item in items)
-                (builder.Length == 0 ? builder : builder.Append(separator)).Append(printItem(item));
-            return builder.ToString();
-        }
-
-        public static string Print(this Type type, Func<Type, string> print = null /* prints Type.FullName by default */)
-        {
-            if (type == null) return null;
-            var name = print == null ? type.FullName : print(type);
-            if (type.IsGenericType) // for generic types
-            {
-                var genericArgs = type.GetGenericArguments();
-                var genericArgsString = type.IsGenericTypeDefinition
-                    ? new string(',', genericArgs.Length - 1)
-                    : string.Join(", ", genericArgs.Select(x => x.Print(print)).ToArray());
-                name = name.Substring(0, name.IndexOf('`')) + "<" + genericArgsString + ">";
-            }
-            return name.Replace('+', '.'); // for nested classes
-        }
-
-        public static Type[] GetSelfAndImplementedTypes(this Type type)
+        public static Type[] GetImplementedTypes(this Type type,
+            ReturnBaseOpenGenerics returnBaseOpenGenerics = ReturnBaseOpenGenerics.AsGenericTypeDefinition,
+            IncludeSelf includeSelf = IncludeSelf.IncludeAsFirst)
         {
             Type[] results;
 
             var interfaces = type.GetInterfaces();
-            var selfPlusInterfaceCount = 1 + interfaces.Length;
+            var interfaceStartIndex = includeSelf == IncludeSelf.IncludeAsFirst ? 1 : 0;
+            var selfPlusInterfaceCount = interfaceStartIndex + interfaces.Length;
 
             var baseType = type.BaseType;
             if (baseType == null || baseType == typeof(object))
@@ -1916,25 +1912,87 @@ when resolving {1}.";
                 results[selfPlusInterfaceCount] = baseType;
             }
 
-            results[0] = type;
+            if (includeSelf == IncludeSelf.IncludeAsFirst)
+                results[0] = type;
 
-            if (selfPlusInterfaceCount == 2)
-                results[1] = interfaces[0];
-            else if (selfPlusInterfaceCount > 2)
-                Array.Copy(interfaces, 0, results, 1, interfaces.Length);
+            if (interfaces.Length == 1)
+                results[interfaceStartIndex] = interfaces[0];
+            else if (interfaces.Length > 1)
+                Array.Copy(interfaces, 0, results, interfaceStartIndex, interfaces.Length);
 
-            if (results.Length > 1 && type.IsGenericTypeDefinition)
+            if (returnBaseOpenGenerics == ReturnBaseOpenGenerics.AsGenericTypeDefinition &&
+                results.Length > interfaceStartIndex && type.IsGenericTypeDefinition)
             {
-                for (var i = 1; i < results.Length; i++)
+                for (var i = interfaceStartIndex; i < results.Length; i++)
                 {
                     var interfaceOrBase = results[i];
-                    if (interfaceOrBase.IsGenericType && !interfaceOrBase.IsGenericTypeDefinition &&
-                        interfaceOrBase.ContainsGenericParameters)
+                    if (interfaceOrBase.IsGenericType && interfaceOrBase.ContainsGenericParameters &&
+                        !interfaceOrBase.IsGenericTypeDefinition)
                         results[i] = interfaceOrBase.GetGenericTypeDefinition();
                 }
             }
 
             return results;
+        }
+
+        public static void FillTypeArgsForGenericImplementation(this Type closedBaseType, Type openBaseType, ref Type[] implTypeArgs)
+        {
+            var openBaseTypeArgs = openBaseType.GetGenericArguments();
+            var closedBaseTypeArgs = closedBaseType.GetGenericArguments();
+
+            for (var i = 0; i < openBaseTypeArgs.Length; i++)
+            {
+                var baseTypeArg = openBaseTypeArgs[i];
+                if (baseTypeArg.IsGenericParameter)
+                {
+                    var matchingArgIndex = Array.FindIndex(implTypeArgs,
+                        implTypeArg => implTypeArg.IsGenericParameter && implTypeArg.Name == baseTypeArg.Name);
+                    if (matchingArgIndex != -1)
+                        implTypeArgs[matchingArgIndex] = closedBaseTypeArgs[i];
+                }
+                else if (baseTypeArg.IsGenericType && baseTypeArg.ContainsGenericParameters)
+                {
+                    closedBaseTypeArgs[i].FillTypeArgsForGenericImplementation(baseTypeArg, ref implTypeArgs);
+                }
+            }
+        }
+
+        public static string Print(this Type type, 
+            Func<Type, string> print = null /* prints Type.FullName by default, or  Type.Name for generic parameters */)
+        {
+            if (type == null) return null;
+            var name = print == null ? (type.FullName ?? type.Name): print(type);
+            if (type.IsGenericType) // for generic types
+            {
+                var genericArgs = type.GetGenericArguments();
+                var genericArgsString = type.IsGenericTypeDefinition
+                    ? new string(',', genericArgs.Length - 1)
+                    : String.Join(", ", genericArgs.Select(x => x.Print(print)).ToArray());
+                name = name.Substring(0, name.IndexOf('`')) + "<" + genericArgsString + ">";
+            }
+            return name.Replace('+', '.'); // for nested classes
+        }
+    }
+
+    public static class Sugar
+    {
+        public static string Print(object x)
+        {
+            return x is string ? (string)x
+                : (x is Type ? ((Type)x).Print()
+                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine)
+                : (x is IEnumerable ? ((IEnumerable)x).Print()
+                : (string.Empty + x))));
+        }
+
+        public static string Print(this IEnumerable items, string separator = ", ", Func<object, string> printItem = null)
+        {
+            if (items == null) return null;
+            printItem = printItem ?? Print;
+            var builder = new StringBuilder();
+            foreach (var item in items)
+                (builder.Length == 0 ? builder : builder.Append(separator)).Append(printItem(item));
+            return builder.ToString();
         }
 
         public static Type GetMemberType(this MemberInfo member)

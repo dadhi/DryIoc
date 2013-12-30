@@ -572,7 +572,7 @@ Only single metadata is supported per implementation type, please remove the res
 
         public IEnumerable<Type> GetAllContractTypes(Type targetType)
         {
-            var contractTypes = targetType.GetSelfAndImplementedTypes().Where(ExportedTypes);
+            var contractTypes = targetType.GetImplementedTypes().Where(ExportedTypes);
             return ExcludeTypes == null || ExcludeTypes.Length == 0 ? contractTypes : contractTypes.Except(ExcludeTypes);
         }
     }

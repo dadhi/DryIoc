@@ -134,6 +134,57 @@ namespace DryIoc.UnitTests
 
             Assert.That(service.Service, Is.InstanceOf<Service>());
         }
+
+        [Test]
+        public void Should_handle_reordered_type_arguments_for_closed_generics()
+        {
+            var container = new Container();
+            container.Register(typeof(IDouble<int, string>), typeof(Double<string, int>));
+
+            var service = container.Resolve<IDouble<int, string>>();
+
+            Assert.That(service, Is.InstanceOf<Double<string, int>>());
+        }
+
+        [Test]
+        public void Should_resolve_with_reordered_type_arguments()
+        {
+            var container = new Container();
+            container.Register(typeof(IDouble<,>), typeof(Double<,>));
+
+            var service = container.Resolve<IDouble<int, string>>();
+
+            Assert.That(service, Is.InstanceOf<Double<string, int>>());
+        }
+
+        [Test]
+        public void Should_resolve_with_nested_type_arguments()
+        {
+            var container = new Container();
+            container.Register(typeof(IDouble<,>), typeof(DoubleNested<,>));
+
+            var service = container.Resolve<IDouble<Nested<int>, string>>();
+
+            Assert.That(service, Is.InstanceOf<DoubleNested<string, int>>());
+        }
+
+        [Test]
+        public void Should_Throw_container_exception_for_service_type_with_mismatched_type_arguments()
+        {
+            var container = new Container();
+            container.Register(typeof(IDouble<,>), typeof(DoubleNested<,>));
+
+            container.Resolve<IDouble<int, string>>();
+        }
+
+        [Test]
+        public void Should_Throw_when_registering_service_with_not_all_type_args_required_by_implementation()
+        {
+            var container = new Container();
+
+            Assert.Throws<ContainerException>(() => 
+                container.Register(typeof(Banana<>), typeof(BananaSplit<,>)));
+        }
     }
 
     #region CUT
@@ -163,6 +214,20 @@ namespace DryIoc.UnitTests
             Service = service;
         }
     }
+
+    public interface IDouble<T1, T2> { }
+
+    public class Double<T1, T2> : IDouble<T2, T1> { }
+
+    public class DoubleNested<T1, T2> : IDouble<Nested<T2>, T1> {}
+
+    public class Nested<T> {}
+
+    public class BananaSplit<T1, T2> : Banana<T1>, IceCream<T2> {}
+
+    public class Banana<T> {}
+
+    public interface IceCream<T> { }
 
     #endregion
 }

@@ -16,7 +16,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.Playground
             var pluginAssembly = typeof(AutoWiringTests).Assembly;
 
             var pluginTypes = pluginAssembly.GetTypes().Where(t => t.IsPublic && !t.IsAbstract 
-                && t.GetSelfAndImplementedTypes().Contains(typeof(IPlugin)));
+                && t.GetImplementedTypes().Contains(typeof(IPlugin)));
 
             foreach (var pluginType in pluginTypes)
                 container.Register(typeof(IPlugin), pluginType, Reuse.Singleton);
