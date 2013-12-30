@@ -863,8 +863,11 @@ when resolving {1}.";
         public static readonly string DELEGATE_FACTORY_EXPRESSION_RETURNED_NULL =
             "Delegate factory expression returned NULL when resolving {0}.";
 
-        public static readonly string UNABLE_TO_FIND_SOME_GENERIC_IMPL_TYPE_ARGS =
-            "Unable to find some type arguments <{0}> for implementation {1} when resolving {2}.";
+        public static readonly string UNABLE_TO_GET_SOME_GENERIC_IMPL_TYPE_ARGS =
+            "Unable to get some type arguments <{0}> for implementation {1} when resolving {2}.";
+
+        public static readonly string UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE = 
+            "For open-generic implementation {0} Unable to match any base types ({1}) with requested service {2}.";
     }
 
     public static class Registrator
@@ -1344,29 +1347,12 @@ when resolving {1}.";
 
         public override Factory GetFactoryPerRequestOrDefault(Request request, IRegistry _)
         {
-            var implType = _implementationType;
-            if (!implType.IsGenericTypeDefinition)
+            if (!_implementationType.IsGenericTypeDefinition)
                 return null;
 
-            Type[] resultImplTypeArgs;
-            if (implType == request.OpenGenericServiceType)
-            {
-                resultImplTypeArgs = request.ServiceType.GetGenericArguments();
-            }
-            else
-            {
-                var baseTypes = implType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
-                var openGenericBaseType = Array.Find(baseTypes, t => 
-                    t.GetGenericTypeDefinition() == request.OpenGenericServiceType).ThrowIfNull();
+            var closedTypeArgs = GetClosedTypeArgsForOpenGenericImplType(_implementationType, request);
+            var closedImplType = _implementationType.MakeGenericType(closedTypeArgs);
 
-                resultImplTypeArgs = implType.GetGenericArguments();
-                request.ServiceType.MatchGenericImplTypeArgsFromBaseType(openGenericBaseType, ref resultImplTypeArgs);
-                
-                Throw.If(Array.Exists(resultImplTypeArgs, t => t.IsGenericParameter),
-                    Error.UNABLE_TO_FIND_SOME_GENERIC_IMPL_TYPE_ARGS, resultImplTypeArgs, implType, request);
-            }
-
-            var closedImplType = implType.MakeGenericType(resultImplTypeArgs);
             return new ReflectionFactory(closedImplType, Reuse, _getConstructor, Setup);
         }
 
@@ -1480,6 +1466,28 @@ when resolving {1}.";
             }
 
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
+        }
+
+        private static Type[] GetClosedTypeArgsForOpenGenericImplType(Type implType, Request request)
+        {
+            var serviceTypeArgs = request.ServiceType.GetGenericArguments();
+            if (implType == request.OpenGenericServiceType)
+                return serviceTypeArgs;
+
+            var baseTypes = implType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+
+            var openGenericBaseType = Array.Find(baseTypes, t =>
+                t.GetGenericTypeDefinition() == request.OpenGenericServiceType &&
+                TypeTools.MatchClosedGenericWithBaseOpenGenericTypeArgs(serviceTypeArgs, t.GetGenericArguments()))
+                .ThrowIfNull(Error.UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, implType, baseTypes, request);
+
+            var implTypeArgs = implType.GetGenericArguments();
+            request.ServiceType.GetGenericImplTypeArgsFromBaseType(openGenericBaseType, ref implTypeArgs);
+
+            Throw.If(Array.Exists(implTypeArgs, t => t.IsGenericParameter),
+                Error.UNABLE_TO_GET_SOME_GENERIC_IMPL_TYPE_ARGS, implTypeArgs, implType, request);
+            
+            return implTypeArgs;
         }
 
         #endregion
@@ -1937,7 +1945,7 @@ when resolving {1}.";
             return results;
         }
 
-        public static bool CompareClosedGenericWithBaseOpenGenericTypeArgs(Type[] closedArgs, Type[] openArgs)
+        public static bool MatchClosedGenericWithBaseOpenGenericTypeArgs(Type[] closedArgs, Type[] openArgs)
         {
             for (var i = 0; i < openArgs.Length; i++)
             {
@@ -1951,7 +1959,7 @@ when resolving {1}.";
                             !openArg.ContainsGenericParameters ||
                             !closedArg.IsGenericType ||
                             (closedArg.GetGenericTypeDefinition() != openArg.GetGenericTypeDefinition()) ||
-                            !CompareClosedGenericWithBaseOpenGenericTypeArgs(
+                            !MatchClosedGenericWithBaseOpenGenericTypeArgs(
                                 closedArg.GetGenericArguments(),
                                 openArg.GetGenericArguments()))
                             return false;
@@ -1962,8 +1970,7 @@ when resolving {1}.";
             return true;
         }
 
-        public static void MatchGenericImplTypeArgsFromBaseType(this Type closedBaseType, 
-            Type openBaseType, ref Type[] implTypeArgs)
+        public static void GetGenericImplTypeArgsFromBaseType(this Type closedBaseType, Type openBaseType, ref Type[] implTypeArgs)
         {
             var openBaseTypeArgs = openBaseType.GetGenericArguments();
             var closedBaseTypeArgs = closedBaseType.GetGenericArguments();
@@ -1980,18 +1987,18 @@ when resolving {1}.";
                 }
                 else if (baseTypeArg.IsGenericType && baseTypeArg.ContainsGenericParameters)
                 {
-                    closedBaseTypeArgs[i].MatchGenericImplTypeArgsFromBaseType(baseTypeArg, ref implTypeArgs);
+                    closedBaseTypeArgs[i].GetGenericImplTypeArgsFromBaseType(baseTypeArg, ref implTypeArgs);
                 }
             }
         }
 
         public static string Print(this Type type,
-            Func<Type, string> print = null /* prints Type.FullName by default, or  Type.Name for generic parameters */)
+            Func<Type, string> print = null /* by default prints Type.FullName or Type.Name for generic parameters */)
         {
             if (type == null) return null;
-// ReSharper disable ConstantNullCoalescingCondition
-            var name = print == null ? (type.FullName ?? type.Name): print(type);
-// ReSharper restore ConstantNullCoalescingCondition
+            // ReSharper disable ConstantNullCoalescingCondition
+            var name = print == null ? (type.FullName ?? type.Name) : print(type); // TODO Move default option to setup.
+            // ReSharper restore ConstantNullCoalescingCondition
             if (type.IsGenericType) // for generic types
             {
                 var genericArgs = type.GetGenericArguments();

@@ -184,7 +184,11 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register(typeof(IDouble<,>), typeof(DoubleNested<,>));
 
-            container.Resolve<IDouble<int, string>>();
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<IDouble<int, string>>());
+
+            Assert.DoesNotThrow(() =>
+                container.Resolve<IDouble<Nested<int>, string>>());
         }
     }
 
