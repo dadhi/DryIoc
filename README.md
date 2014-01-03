@@ -1,5 +1,5 @@
 DryIoc is fast, small and rich IoC Container.
---------------------------------------------
+---------------------------------------------
 **Container with [Autofac]+[MEF] level of functionality BUT much faster and small enough to embed as code.**
 
 [Autofac]: https://code.google.com/p/autofac/
