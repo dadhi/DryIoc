@@ -1476,9 +1476,11 @@ when resolving {1}.";
 
             var baseTypes = implType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
 
+            IDictionary<string, Type> matches = new Dictionary<string, Type>();
             var openGenericBaseType = Array.Find(baseTypes, t =>
+                t.ContainsGenericParameters &&
                 t.GetGenericTypeDefinition() == request.OpenGenericServiceType &&
-                TypeTools.MatchClosedGenericWithBaseOpenGenericTypeArgs(serviceTypeArgs, t.GetGenericArguments()))
+                TypeTools.MatchClosedGenericWithBaseOpenGenericTypeArgs(serviceTypeArgs, t.GetGenericArguments(), ref matches))
                 .ThrowIfNull(Error.UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, implType, baseTypes, request);
 
             var implTypeArgs = implType.GetGenericArguments();
@@ -1947,23 +1949,39 @@ when resolving {1}.";
 
         public static bool MatchClosedGenericWithBaseOpenGenericTypeArgs(Type[] closedArgs, Type[] openArgs)
         {
+            IDictionary<string, Type> matches = new Dictionary<string, Type>();
+            return MatchClosedGenericWithBaseOpenGenericTypeArgs(closedArgs, openArgs, ref matches);
+        }
+
+        public static bool MatchClosedGenericWithBaseOpenGenericTypeArgs(Type[] closedArgs, Type[] openArgs,
+            ref IDictionary<string, Type> matches)
+        {
             for (var i = 0; i < openArgs.Length; i++)
             {
                 var openArg = openArgs[i];
+                var closedArg = closedArgs[i];
                 if (!openArg.IsGenericParameter)
                 {
-                    var closedArg = closedArgs[i];
                     if (openArg != closedArg)
                     {
-                        if (!openArg.IsGenericType ||
-                            !openArg.ContainsGenericParameters ||
+                        if (!openArg.IsGenericType || !openArg.ContainsGenericParameters || 
                             !closedArg.IsGenericType ||
-                            (closedArg.GetGenericTypeDefinition() != openArg.GetGenericTypeDefinition()) ||
-                            !MatchClosedGenericWithBaseOpenGenericTypeArgs(
-                                closedArg.GetGenericArguments(),
-                                openArg.GetGenericArguments()))
-                            return false;
+                            closedArg.GetGenericTypeDefinition() != openArg.GetGenericTypeDefinition())
+                            return false; // openArg and closedArg are different types
+
+                        
+                        if (!MatchClosedGenericWithBaseOpenGenericTypeArgs(
+                            closedArg.GetGenericArguments(), openArg.GetGenericArguments(), ref matches))
+                            return false; // nested generic openArg and closedArg don't match
                     }
+                }
+                else
+                {
+                    Type matchedClosedArg;
+                    if (!matches.TryGetValue(openArg.Name, out matchedClosedArg))
+                        matches.Add(openArg.Name, closedArg);
+                    else if (matchedClosedArg != closedArg)
+                        return false; // different matchedClosedArg and closedArg are matched with single openArg
                 }
             }
 

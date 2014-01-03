@@ -73,6 +73,19 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Should_find_mismatch_between_closed_and_base_generic_args_With_multiple_different_closed_types_matched_to_single_open_arg()
+        {
+            var openImplType = typeof(Buzz<,>);
+            var baseTypeDef = typeof(IFizz<,>);
+            var baseTypes = openImplType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+            var openBaseType = Array.Find(baseTypes, type => type.GetGenericTypeDefinition() == baseTypeDef);
+            var openBaseTypeArgs = openBaseType.GetGenericArguments();
+
+            // both INT and BOOL are matched with T2.
+            Assert.IsFalse(TypeTools.MatchClosedGenericWithBaseOpenGenericTypeArgs(typeof(IFizz<int, Wrap<IFizz<Wrap<string>, bool>>>).GetGenericArguments(), openBaseTypeArgs));
+        }
+
+        [Test]
         public void Should_find_mismatch_between_closed_and_base_generic_args_With_closed_arg_in_the_middle()
         {
             var openImplType = typeof(BuzzInt<,>);

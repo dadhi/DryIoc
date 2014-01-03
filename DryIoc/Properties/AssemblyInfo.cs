@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 [assembly: AssemblyTitle("DryIoc")]
-[assembly: AssemblyDescription("Fast, rich, small IoC container for your application or framework.")]
+[assembly: AssemblyDescription("DryIoc is fast, small and rich IoC container.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc")]
