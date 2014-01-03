@@ -65,8 +65,9 @@ Extensions: __MefAttributedModel__ ([code][DryIoc.MefAttributedModel], [lib][Dry
 * Toggling features On/Off via `ContanerSetup`.
 
 #### Extensions
-* __MefAttributedModel__
-    * Based on [MEF programming attributed model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) with some exceptions. Check `DryIoc.MefAttributedModel.AttributedModel` docs for details.
+[MefAttributedModel]: https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel
+* [__MefAttributedModel__][MefAttributedModel]
+    * Based on [MEF programming attributed model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) with some exceptions (check [wiki][MefAttributedModel]).
     * Supports all DryIoc abstractions: `IEnumerable<T>`, `T[]`, `Func<T>`, etc. 
     * Extends model with `ExportAsGenericWrapper`, `ExportAsDecorator`, `ExportAll` attributes.
     * Simplifies use of statically typed Metadata with `ExportWithMetadata` and `ImportWithMetadata` attributes.
