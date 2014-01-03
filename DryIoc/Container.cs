@@ -32,6 +32,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 
+// TODO: Add doc-comments to all public API.
 namespace DryIoc
 {
     /// <summary>
@@ -1475,16 +1476,32 @@ when resolving {1}.";
                 return serviceTypeArgs;
 
             var baseTypes = implType.GetImplementedTypes(TypeTools.ReturnBaseOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+            Type matchedBaseType = null;
+            IDictionary<string, Type> matchedTypeArgs = null;
+            for (var i = 0; i < baseTypes.Length && matchedBaseType == null; i++)
+            {
+                var t = baseTypes[i];
+                if (t.ContainsGenericParameters && t.GetGenericTypeDefinition() == request.OpenGenericServiceType)
+                {
+                    matchedTypeArgs = new Dictionary<string, Type>();
+                    if (TypeTools.MatchClosedGenericWithBaseOpenGenericTypeArgs(serviceTypeArgs, t.GetGenericArguments(), ref matchedTypeArgs)) 
+                        matchedBaseType = t;
+                }
+            }
 
-            IDictionary<string, Type> matches = new Dictionary<string, Type>();
-            var openGenericBaseType = Array.Find(baseTypes, t =>
-                t.ContainsGenericParameters &&
-                t.GetGenericTypeDefinition() == request.OpenGenericServiceType &&
-                TypeTools.MatchClosedGenericWithBaseOpenGenericTypeArgs(serviceTypeArgs, t.GetGenericArguments(), ref matches))
-                .ThrowIfNull(Error.UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, implType, baseTypes, request);
+            matchedBaseType.ThrowIfNull(Error.UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, implType, baseTypes, request);
 
             var implTypeArgs = implType.GetGenericArguments();
-            request.ServiceType.GetGenericImplTypeArgsFromBaseType(openGenericBaseType, ref implTypeArgs);
+            for (var i = 0; i < implTypeArgs.Length; i++)
+            {
+                var implTypeArg = implTypeArgs[i];
+                if (implTypeArg.IsGenericParameter)
+                {
+                    Type closedImplTypeArg;
+                    if (matchedTypeArgs.TryGetValue(implTypeArg.Name, out closedImplTypeArg))
+                        implTypeArgs[i] = closedImplTypeArg;
+                }
+            }
 
             Throw.If(Array.Exists(implTypeArgs, t => t.IsGenericParameter),
                 Error.UNABLE_TO_GET_SOME_GENERIC_IMPL_TYPE_ARGS, implTypeArgs, implType, request);
@@ -1969,7 +1986,6 @@ when resolving {1}.";
                             closedArg.GetGenericTypeDefinition() != openArg.GetGenericTypeDefinition())
                             return false; // openArg and closedArg are different types
 
-                        
                         if (!MatchClosedGenericWithBaseOpenGenericTypeArgs(
                             closedArg.GetGenericArguments(), openArg.GetGenericArguments(), ref matches))
                             return false; // nested generic openArg and closedArg don't match
