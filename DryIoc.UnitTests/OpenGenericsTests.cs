@@ -201,6 +201,26 @@ namespace DryIoc.UnitTests
             Assert.DoesNotThrow(() =>
                 container.Resolve<IDouble<Nested<int>, string>>());
         }
+
+        [Test]
+        public void Given_singleton_registered_Then_First_non_generic_service_resolution_should_Throw()
+        {
+            var container = new Container();
+            container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
+
+            var disposable = container.Resolve<IDisposable>();
+        }
+
+        [Test]
+        public void Given_singleton_registered_Then_Second_non_generic_service_resolution_should_Succeed_cause_service_is_already_created()
+        {
+            var container = new Container();
+            container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
+            container.Resolve<IceCream<bool>>();
+
+            var disposable = container.Resolve<IDisposable>();
+            Assert.That(disposable, Is.InstanceOf<IceCreamSource<bool>>());
+        }
     }
 
     #region CUT
@@ -246,6 +266,13 @@ namespace DryIoc.UnitTests
     public class Banana<T> { }
 
     public interface IceCream<T> { }
+
+    public class IceCreamSource<T> : IceCream<T>, IDisposable
+    {
+        public void Dispose()
+        {
+        }
+    }
 
     #endregion
 }
