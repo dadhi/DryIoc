@@ -113,8 +113,20 @@ namespace DryIoc
             var implementationType = factory.ThrowIfNull().ImplementationType;
             if (implementationType != null && serviceType.ThrowIfNull() != typeof(object))
             {
-                Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
+                var implementedTypes = implementationType.GetImplementedTypes();
+                Throw.If(!implementedTypes.Contains(serviceType),
                     Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
+
+                if (implementationType.ContainsGenericParameters)
+                {
+                    Throw.If(!serviceType.ContainsGenericParameters,
+                        "Unable to register open-generic implementation type {0} as service type with no generic arguments {1}.",
+                        implementationType, serviceType);
+
+                    //var serviceTypeArgs = serviceType.GetGenericArguments();
+                    //Array.Find(implementedTypes, t => t.ContainsGenericParameters &&
+                    //    TypeTools.MatchBaseOpenWithClosedGenericTypeArgs(t.GetGenericArguments(), serviceTypeArgs, ))
+                }
             }
 
             lock (_syncRoot)
@@ -1351,10 +1363,29 @@ when resolving {1}.";
             if (!_implementationType.IsGenericTypeDefinition)
                 return null;
 
-            var closedTypeArgs = GetClosedTypeArgsForGenericImplementation(_implementationType, request);
+            var closedTypeArgs = GetClosedTypeArgsForGenericImplementationType(request);
             var closedImplType = _implementationType.MakeGenericType(closedTypeArgs);
-
             return new ReflectionFactory(closedImplType, Reuse, _getConstructor, Setup);
+        }
+
+        private Type[] GetClosedTypeArgsForGenericImplementationType(Request request)
+        {
+            if (_implementationType == request.OpenGenericServiceType)
+                return request.ServiceType.GetGenericArguments();
+
+            var implementedTypes = _implementationType.GetImplementedTypes(
+                TypeTools.ReturnOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+
+            IDictionary<string, Type> matchedTypeArgs;
+            if (!FindMatchingOpenGenericImplementedType(implementedTypes, request.ServiceType, out matchedTypeArgs))
+                Throw.If(true, Error.UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, _implementationType, implementedTypes, request);
+
+            var implTypeArgs = ReplaceWithMatchedTypeArgs(_implementationType.GetGenericArguments(), matchedTypeArgs);
+
+            Throw.If(Array.Exists(implTypeArgs, t => t.IsGenericParameter),
+                Error.UNABLE_TO_GET_SOME_GENERIC_IMPL_TYPE_ARGS, implTypeArgs, _implementationType, request);
+
+            return implTypeArgs;
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -1469,46 +1500,35 @@ when resolving {1}.";
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
         }
 
-        private static Type[] GetClosedTypeArgsForGenericImplementation(Type implType, Request request)
+        private static bool FindMatchingOpenGenericImplementedType(Type[] sourceTypes, Type targetType, out IDictionary<string, Type> matchedTypeArgs)
         {
-            var serviceTypeArgs = request.ServiceType.GetGenericArguments();
-            var serviceTypeGenericDefinition = request.OpenGenericServiceType;
-            if (implType == serviceTypeGenericDefinition)
-                return serviceTypeArgs;
+            var openTargetType = targetType.GetGenericTypeDefinition();
+            var targetTypeArgs = targetType.GetGenericArguments();
 
-            var baseTypes = implType.GetImplementedTypes(TypeTools.BaseOpenGenericsAs.Is, TypeTools.IncludeSelf.Exclude);
-            IDictionary<string, Type> matchedServiceTypeArgs = null;
-            var matchFound = false;
-            for (var i = 0; i < baseTypes.Length && !matchFound; i++)
+            matchedTypeArgs = null;
+            for (var i = 0; i < sourceTypes.Length; i++)
             {
-                var baseType = baseTypes[i];
-                if (baseType.ContainsGenericParameters &&
-                    baseType.GetGenericTypeDefinition() == serviceTypeGenericDefinition)
+                var sourceType = sourceTypes[i];
+                if (sourceType.ContainsGenericParameters && sourceType.GetGenericTypeDefinition() == openTargetType)
                 {
-                    matchedServiceTypeArgs = new Dictionary<string, Type>();
-                    matchFound = TypeTools.MatchBaseOpenWithClosedGenericTypeArgs(
-                        baseType.GetGenericArguments(), serviceTypeArgs, 
-                        ref matchedServiceTypeArgs);
+                    matchedTypeArgs = new Dictionary<string, Type>();
+                    if (TypeTools.MatchBaseOpenWithClosedGenericTypeArgs(sourceType.GetGenericArguments(), targetTypeArgs,
+                        ref matchedTypeArgs))
+                        return true;
                 }
             }
 
-            matchedServiceTypeArgs = matchedServiceTypeArgs
-                .ThrowIfNull(Error.UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, implType, baseTypes, request);
+            return false;
+        }
 
-            var implTypeArgs = implType.GetGenericArguments();
+        private static Type[] ReplaceWithMatchedTypeArgs(Type[] implTypeArgs, IDictionary<string, Type> matchedBaseTypeArgs)
+        {
             for (var i = 0; i < implTypeArgs.Length; i++)
             {
-                var implTypeArg = implTypeArgs[i];
-                if (implTypeArg.IsGenericParameter)
-                {
-                    Type serviceTypeArg;
-                    if (matchedServiceTypeArgs.TryGetValue(implTypeArg.Name, out serviceTypeArg))
-                        implTypeArgs[i] = serviceTypeArg;
-                }
+                Type serviceTypeArg;
+                if (matchedBaseTypeArgs.TryGetValue(implTypeArgs[i].Name, out serviceTypeArg))
+                    implTypeArgs[i] = serviceTypeArg;
             }
-
-            Throw.If(Array.Exists(implTypeArgs, t => t.IsGenericParameter),
-                Error.UNABLE_TO_GET_SOME_GENERIC_IMPL_TYPE_ARGS, implTypeArgs, implType, request);
 
             return implTypeArgs;
         }
@@ -1912,11 +1932,11 @@ when resolving {1}.";
 
     public static class TypeTools
     {
-        public enum BaseOpenGenericsAs { GenericTypeDefinition, Is }
+        public enum ReturnOpenGenerics { AsGenericTypeDefinition, AsIs }
         public enum IncludeSelf { IncludeAsFirst, Exclude }
 
         public static Type[] GetImplementedTypes(this Type type,
-            BaseOpenGenericsAs baseOpenGenericsAs = BaseOpenGenericsAs.GenericTypeDefinition,
+            ReturnOpenGenerics returnOpenGenerics = ReturnOpenGenerics.AsGenericTypeDefinition,
             IncludeSelf includeSelf = IncludeSelf.IncludeAsFirst)
         {
             Type[] results;
@@ -1953,15 +1973,14 @@ when resolving {1}.";
             else if (interfaces.Length > 1)
                 Array.Copy(interfaces, 0, results, interfaceStartIndex, interfaces.Length);
 
-            if (baseOpenGenericsAs == BaseOpenGenericsAs.GenericTypeDefinition &&
+            if (returnOpenGenerics == ReturnOpenGenerics.AsGenericTypeDefinition &&
                 results.Length > interfaceStartIndex && type.IsGenericTypeDefinition)
             {
-                for (var i = interfaceStartIndex; i < results.Length; i++)
+                for (var i = 0; i < results.Length; i++)
                 {
-                    var interfaceOrBase = results[i];
-                    if (interfaceOrBase.IsGenericType && interfaceOrBase.ContainsGenericParameters &&
-                        !interfaceOrBase.IsGenericTypeDefinition)
-                        results[i] = interfaceOrBase.GetGenericTypeDefinition();
+                    var result = results[i];
+                    if (result.IsGenericType && result.ContainsGenericParameters && !result.IsGenericTypeDefinition)
+                        results[i] = result.GetGenericTypeDefinition();
                 }
             }
 
@@ -1969,7 +1988,7 @@ when resolving {1}.";
         }
 
         public static bool MatchBaseOpenWithClosedGenericTypeArgs(
-            Type[] openArgs, Type[] closedArgs, 
+            Type[] openArgs, Type[] closedArgs,
             ref IDictionary<string, Type> matchesSoFar)
         {
             for (var i = 0; i < openArgs.Length; i++)

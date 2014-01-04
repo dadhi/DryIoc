@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -220,6 +221,17 @@ namespace DryIoc.UnitTests
 
             var disposable = container.Resolve<IDisposable>();
             Assert.That(disposable, Is.InstanceOf<IceCreamSource<bool>>());
+        }
+
+        [Test]
+        public void Given_singleton_registered_Then_resolving_non_generic_service_as_Many_should_succeed()
+        {
+            var container = new Container();
+            container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
+
+            var disposable = container.Resolve<Many<IDisposable>>().Items.ToArray();
+
+            Assert.That(disposable.Length, Is.EqualTo(0));
         }
     }
 

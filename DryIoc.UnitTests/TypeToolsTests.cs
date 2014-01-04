@@ -87,7 +87,7 @@ namespace DryIoc.UnitTests
         private static bool MatchOpenImplWithClosedBaseTypeArgs(Type openImplType, Type closedBaseType)
         {
             var baseTypeDefinition = closedBaseType.GetGenericTypeDefinition();
-            var baseTypes = openImplType.GetImplementedTypes(TypeTools.BaseOpenGenericsAs.Is, TypeTools.IncludeSelf.Exclude);
+            var baseTypes = openImplType.GetImplementedTypes(TypeTools.ReturnOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
             var openBaseType = Array.Find(baseTypes, t => t.ContainsGenericParameters && t.GetGenericTypeDefinition() == baseTypeDefinition);
             var openBaseTypeArgs = openBaseType.GetGenericArguments();
 
