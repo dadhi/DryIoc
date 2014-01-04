@@ -169,6 +169,17 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Should_resolve_with_multiple_level_nested_and_reordered_type_arguments()
+        {
+            var container = new Container();
+            container.Register(typeof(IDouble<,>), typeof(DoubleMultiNested<,>));
+
+            var service = container.Resolve<IDouble<int, Nested<IDouble<Nested<string>, int>>>>();
+
+            Assert.That(service, Is.InstanceOf<DoubleMultiNested<string, int>>());
+        }
+
+        [Test]
         public void Should_Throw_when_registering_service_with_not_all_type_args_required_by_implementation()
         {
             var container = new Container();
@@ -225,6 +236,8 @@ namespace DryIoc.UnitTests
     public class Double<T1, T2> : IDouble<T2, T1> { }
 
     public class DoubleNested<T1, T2> : IDouble<Nested<T2>, T1> { }
+
+    public class DoubleMultiNested<T1, T2> : IDouble<T2, Nested<IDouble<Nested<T1>, T2>>> { }
 
     public class Nested<T> { }
 

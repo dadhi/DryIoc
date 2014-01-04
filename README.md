@@ -23,7 +23,7 @@ Extensions: __MefAttributedModel__ ([code][DryIoc.MefAttributedModel], [lib][Dry
 
 #### Small
 * Minimal setup requires single source file: *Container.cs*. 
-* No more than 2200 lines of code including comments.
+* No more than 2500 lines of code including comments.
 * Code written to be readable.
 * Uses [Caliburn.Micro](http://caliburnmicro.codeplex.com/) alike approach for customization.
 
