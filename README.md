@@ -39,7 +39,7 @@ Extensions: __MefAttributedModel__ ([code][DryIoc.MefAttributedModel], [lib][Dry
 * Constructor, property and field injection. *You can select What and Where to inject.*
 * Delegate factory registration.
 * Auto-registration via __MefAttributedModel__ extension (see below).
-* Tools for custom auto-wiring and registation. Check `DryIoc.UnitTests.AutoWiringTests` for example.
+* Tools for custom auto-wiring and registation. Check `DryIoc.Samples.AutoWiring` for example.
 * `IsRegistered` check.
 * Open-generics without special syntax.
 * Arbitrary metadata object accociated with implementation.

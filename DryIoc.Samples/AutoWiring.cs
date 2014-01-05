@@ -1,10 +1,10 @@
 ﻿using System.Linq;
 using NUnit.Framework;
 
-namespace DryIoc.MefAttributedModel.UnitTests.Playground
+namespace DryIoc.Samples
 {
     [TestFixture]
-    public class AutoWiringTests
+    public class AutoWiring
     {
         [Test]
         public void Discover_and_register_new_plugins_from_assembly()
@@ -13,7 +13,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.Playground
             var plugins = container.Resolve<Many<IPlugin>>();
             Assert.That(plugins.Items.Count(), Is.EqualTo(0));
 
-            var pluginAssembly = typeof(AutoWiringTests).Assembly;
+            var pluginAssembly = typeof(AutoWiring).Assembly;
 
             var pluginTypes = pluginAssembly.GetTypes().Where(t => t.IsPublic && !t.IsAbstract 
                 && t.GetImplementedTypes().Contains(typeof(IPlugin)));

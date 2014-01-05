@@ -42,7 +42,6 @@
     <Compile Include="ManyTests.cs" />
     <Compile Include="Memory\NoLeakingMemoryTests.cs" />
     <Compile Include="Performance\ClosureFieldsAccessSpeed.cs" />
-    <Compile Include="Playground\AutoWiringTests.cs" />
     <Compile Include="Playground\AvlTree.cs" />
     <Compile Include="Playground\CreateEnumerableWithExpressionTests.cs" />
     <Compile Include="Playground\HashAndIntTrees.cs" />

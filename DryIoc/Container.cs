@@ -113,20 +113,11 @@ namespace DryIoc
             var implementationType = factory.ThrowIfNull().ImplementationType;
             if (implementationType != null && serviceType.ThrowIfNull() != typeof(object))
             {
-                var implementedTypes = implementationType.GetImplementedTypes();
-                Throw.If(!implementedTypes.Contains(serviceType),
+                Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
                     Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
 
-                if (implementationType.ContainsGenericParameters)
-                {
-                    Throw.If(!serviceType.ContainsGenericParameters,
-                        "Unable to register open-generic implementation type {0} as service type with no generic arguments {1}.",
-                        implementationType, serviceType);
-
-                    //var serviceTypeArgs = serviceType.GetGenericArguments();
-                    //Array.Find(implementedTypes, t => t.ContainsGenericParameters &&
-                    //    TypeTools.MatchBaseOpenWithClosedGenericTypeArgs(t.GetGenericArguments(), serviceTypeArgs, ))
-                }
+                Throw.If(implementationType.ContainsGenericParameters && !serviceType.ContainsGenericParameters,
+                    Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE, implementationType, serviceType);
             }
 
             lock (_syncRoot)
@@ -819,6 +810,9 @@ Please register service OR adjust resolution rules.";
         public static readonly string EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE =
             "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
 
+        public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE = 
+            "Unable to register open-generic implementation {0} for service with no generic arguments {1}.";
+
         public static readonly string EXPECTED_SINGLE_DEFAULT_FACTORY =
 @"Expecting single default registration of {0} but found many:
 {1}.";
@@ -994,7 +988,8 @@ when resolving {1}.";
             string named = null, Func<Type, bool> types = null)
         {
             var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
-            foreach (var serviceType in implementationType.GetImplementedTypes().Where(types ?? PublicTypes))
+            var implementedTypes = implementationType.GetImplementedTypes();
+            foreach (var serviceType in implementedTypes.Where(types ?? PublicTypes))
                 registrator.Register(registration, serviceType, named);
         }
 
@@ -1353,8 +1348,10 @@ when resolving {1}.";
         public ReflectionFactory(Type implementationType, IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            _implementationType = implementationType.ThrowIfNull()
+            _implementationType = implementationType
+                .ThrowIfNull()
                 .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
+            
             _getConstructor = getConstructor;
         }
 
@@ -1365,6 +1362,7 @@ when resolving {1}.";
 
             var closedTypeArgs = GetClosedTypeArgsForGenericImplementationType(request);
             var closedImplType = _implementationType.MakeGenericType(closedTypeArgs);
+
             return new ReflectionFactory(closedImplType, Reuse, _getConstructor, Setup);
         }
 
@@ -1377,7 +1375,7 @@ when resolving {1}.";
                 TypeTools.ReturnOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
 
             IDictionary<string, Type> matchedTypeArgs;
-            if (!FindMatchingOpenGenericImplementedType(implementedTypes, request.ServiceType, out matchedTypeArgs))
+            if (!MatchServiceTypeWithOpenGenericImplementedTypes(request.ServiceType, implementedTypes, out matchedTypeArgs))
                 Throw.If(true, Error.UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, _implementationType, implementedTypes, request);
 
             var implTypeArgs = ReplaceWithMatchedTypeArgs(_implementationType.GetGenericArguments(), matchedTypeArgs);
@@ -1500,19 +1498,22 @@ when resolving {1}.";
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
         }
 
-        private static bool FindMatchingOpenGenericImplementedType(Type[] sourceTypes, Type targetType, out IDictionary<string, Type> matchedTypeArgs)
+        public static bool MatchServiceTypeWithOpenGenericImplementedTypes(Type serviceType, Type[] implementedTypes, 
+            out IDictionary<string, Type> matchedTypeArgs)
         {
-            var openTargetType = targetType.GetGenericTypeDefinition();
-            var targetTypeArgs = targetType.GetGenericArguments();
+            var openServiceType = serviceType.GetGenericTypeDefinition();
+            var serviceTypeArgs = serviceType.GetGenericArguments();
 
             matchedTypeArgs = null;
-            for (var i = 0; i < sourceTypes.Length; i++)
+            for (var i = 0; i < implementedTypes.Length; i++)
             {
-                var sourceType = sourceTypes[i];
-                if (sourceType.ContainsGenericParameters && sourceType.GetGenericTypeDefinition() == openTargetType)
+                var implementedType = implementedTypes[i];
+                if (implementedType.ContainsGenericParameters && 
+                    implementedType.GetGenericTypeDefinition() == openServiceType)
                 {
                     matchedTypeArgs = new Dictionary<string, Type>();
-                    if (TypeTools.MatchBaseOpenWithClosedGenericTypeArgs(sourceType.GetGenericArguments(), targetTypeArgs,
+                    var implementedTypeArgs = implementedType.GetGenericArguments();
+                    if (TypeTools.MatchBaseOpenWithClosedGenericTypeArgs(implementedTypeArgs, serviceTypeArgs,
                         ref matchedTypeArgs))
                         return true;
                 }
