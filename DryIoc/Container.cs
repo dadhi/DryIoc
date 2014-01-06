@@ -48,12 +48,12 @@ namespace DryIoc
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
             _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
 
-            _constants = new object[3];
+            _state = new object[3];
 
             // Put reference to container into constants, to support container access inside expression. 
             // It is common for dynamic scenarios.
-            _constants[REGISTRY_WEAKREF_CONST_INDEX] = new WeakReference(this);
-            _constants[CURRENT_SCOPE_CONST_INDEX] = _constants[SINGLETON_SCOPE_CONST_INDEX] = new Scope();
+            _state[REGISTRY_WEAKREF_CONST_INDEX] = new WeakReference(this);
+            _state[CURRENT_SCOPE_CONST_INDEX] = _state[SINGLETON_SCOPE_CONST_INDEX] = new Scope();
 
             ResolutionRules = new ResolutionRules();
             (setup ?? DefaultSetup).Invoke(this);
@@ -76,7 +76,7 @@ namespace DryIoc
 
         public void Dispose()
         {
-            ((Scope)_constants[CURRENT_SCOPE_CONST_INDEX]).Dispose();
+            ((Scope)_state[CURRENT_SCOPE_CONST_INDEX]).Dispose();
         }
 
         #region Compiled Factory
@@ -113,11 +113,38 @@ namespace DryIoc
             var implementationType = factory.ThrowIfNull().ImplementationType;
             if (implementationType != null && serviceType.ThrowIfNull() != typeof(object))
             {
-                Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
-                    Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
+                if (implementationType.IsGenericTypeDefinition && // for open-generic implementation serviceType is allowed if:
+                    implementationType != serviceType) // 1 - serviceType is same as implementation type.
+                {
+                    // 2 - serviceType is generic type definition, then 
+                    // first find if implementation has corresponding implemented type
+                    // and second, check that found implementation can be used service type
+                    if (serviceType.IsGenericTypeDefinition)
+                    {
+                        var implementedTypes = implementationType.GetImplementedTypes(includeSelf:TypeTools.IncludeSelf.Exclude);
+                        var implementedOpenGenericServiceTypes = implementedTypes.Where(t => 
+                            t.IsGenericType && t.ContainsGenericParameters && t.GetGenericTypeDefinition() == serviceType);
+                        
+                        var genericParameters = implementationType.GetGenericArguments();
+                        if (!implementedOpenGenericServiceTypes.Any(t => t.ContainsAllGenericParameters(genericParameters)))
+                        {
+                            Throw.If(true, "Unable to register implementation {0} with service {1} because not all generic arguments could be found in implemented {2}.",
+                                implementationType, serviceType, implementedOpenGenericServiceTypes);   
+                        }
+                    }
 
-                Throw.If(implementationType.ContainsGenericParameters && !serviceType.ContainsGenericParameters,
-                    Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE, implementationType, serviceType);
+                    // 3 - serviceType is Not generic type definition But contains generic args, 
+                    // then if same implemented type exist we can use it.
+
+                    //Throw.If(!serviceType.ContainsGenericParameters,
+                    //    Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE, implementationType,
+                    //    serviceType);
+                }
+                else
+                {
+                    Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
+                        Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
+                }
             }
 
             lock (_syncRoot)
@@ -171,7 +198,7 @@ namespace DryIoc
             var compiledFactory =
                 _defaultResolutionCache.GetValueOrDefault(serviceType) ??
                 ResolveAndCacheFactory(serviceType, ifUnresolved);
-            return compiledFactory(_constants, resolutionScope: null);
+            return compiledFactory(_state, resolutionScope: null);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -188,7 +215,7 @@ namespace DryIoc
                     _keyedResolutionCache.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, compiledFactory)));
             }
 
-            return compiledFactory(_constants, resolutionScope: null);
+            return compiledFactory(_state, resolutionScope: null);
         }
 
         private HashTree<Type, CompiledFactory> _defaultResolutionCache;
@@ -213,18 +240,18 @@ namespace DryIoc
 
         public ResolutionRules ResolutionRules { get; private set; }
 
-        public object[] Constants { get { return _constants; } }
+        public object[] Constants { get { return _state; } }
 
         public Expression GetConstantExpression(object constant, Type constantType)
         {
             int constantIndex;
             lock (_syncRoot)
             {
-                constantIndex = Array.IndexOf(_constants, constant);
+                constantIndex = Array.IndexOf(_state, constant);
                 if (constantIndex == -1)
                 {
-                    _constants = _constants.AppendOrUpdate(constant);
-                    constantIndex = _constants.Length - 1;
+                    _state = _state.AppendOrUpdate(constant);
+                    constantIndex = _state.Length - 1;
                 }
             }
 
@@ -436,11 +463,11 @@ namespace DryIoc
         {
             ResolutionRules = parent.ResolutionRules;
 
-            var parentConstants = parent._constants;
-            _constants = new object[parentConstants.Length];
-            Array.Copy(parentConstants, 0, _constants, 0, parentConstants.Length);
-            _constants[REGISTRY_WEAKREF_CONST_INDEX] = new WeakReference(this);
-            _constants[CURRENT_SCOPE_CONST_INDEX] = new Scope();
+            var parentConstants = parent._state;
+            _state = new object[parentConstants.Length];
+            Array.Copy(parentConstants, 0, _state, 0, parentConstants.Length);
+            _state[REGISTRY_WEAKREF_CONST_INDEX] = new WeakReference(this);
+            _state[CURRENT_SCOPE_CONST_INDEX] = new Scope();
 
             _syncRoot = parent._syncRoot;
             _factories = parent._factories;
@@ -452,7 +479,7 @@ namespace DryIoc
         private readonly object _syncRoot;
         private readonly Dictionary<Type, FactoriesEntry> _factories;
         private HashTree<Type, DecoratorsEntry[]> _decorators;
-        private object[] _constants;
+        private object[] _state;
 
         private sealed class FactoriesEntry
         {
@@ -1974,16 +2001,16 @@ when resolving {1}.";
             else if (interfaces.Length > 1)
                 Array.Copy(interfaces, 0, results, interfaceStartIndex, interfaces.Length);
 
-            if (returnOpenGenerics == ReturnOpenGenerics.AsGenericTypeDefinition &&
-                results.Length > interfaceStartIndex && type.IsGenericTypeDefinition)
-            {
-                for (var i = 0; i < results.Length; i++)
-                {
-                    var result = results[i];
-                    if (result.IsGenericType && result.ContainsGenericParameters && !result.IsGenericTypeDefinition)
-                        results[i] = result.GetGenericTypeDefinition();
-                }
-            }
+            //if (returnOpenGenerics == ReturnOpenGenerics.AsGenericTypeDefinition &&
+            //    results.Length > interfaceStartIndex && type.IsGenericTypeDefinition)
+            //{
+            //    for (var i = 0; i < results.Length; i++)
+            //    {
+            //        var result = results[i];
+            //        if (result.IsGenericType && result.ContainsGenericParameters && !result.IsGenericTypeDefinition)
+            //            results[i] = result.GetGenericTypeDefinition();
+            //    }
+            //}
 
             return results;
         }
@@ -2036,6 +2063,37 @@ when resolving {1}.";
                 name = name.Substring(0, name.IndexOf('`')) + "<" + genericArgsString + ">";
             }
             return name.Replace('+', '.'); // for nested classes
+        }
+
+        public static bool ContainsAllGenericParameters(this Type similarType, Type[] genericParameters)
+        {
+            var argNames = new string[genericParameters.Length];
+            for (var i = 0; i < genericParameters.Length; i++)
+                argNames[i] = genericParameters[i].Name;
+
+            MarkTargetGenericParameters(similarType.GetGenericArguments(), ref argNames);
+
+            for (var i = 0; i < argNames.Length; i++)
+                if (argNames[i] != null)
+                    return false;
+
+            return true;
+        }
+
+        private static void MarkTargetGenericParameters(Type[] sourceTypeArgs, ref string[] targetArgNames)
+        {
+            for (var i = 0; i < sourceTypeArgs.Length; i++)
+            {
+                var sourceTypeArg = sourceTypeArgs[i];
+                if (sourceTypeArg.IsGenericParameter)
+                {
+                    var matchingTargetArgIndex = Array.IndexOf(targetArgNames, sourceTypeArg.Name);
+                    if (matchingTargetArgIndex != -1)
+                        targetArgNames[matchingTargetArgIndex] = null;
+                }
+                else if (sourceTypeArg.IsGenericType && sourceTypeArg.ContainsGenericParameters)
+                    MarkTargetGenericParameters(sourceTypeArg.GetGenericArguments(), ref targetArgNames);
+            }
         }
     }
 
