@@ -32,6 +32,7 @@ Extensions: __MefAttributedModel__ ([code][DryIoc.MefAttributedModel], [lib][Dry
 * Thread-safe: registrations and resolutions could be done in parallel without corrupting container state. 
 * Recursive dependency detection (cycle in object graph).
 * Error handling with `ContainerException` inherited from `InvalidOperationException` to filter container related exceptions.
+* Throws exceptions as early as possible. 
 * Meaningful error messages with all available information about problem Cause and Context.
 * Resolving as `DebugExpression<T>` to find underlying expression used for instance creation.
 

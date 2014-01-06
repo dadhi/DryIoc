@@ -119,24 +119,30 @@ namespace DryIoc
                     // 2 - serviceType is generic type definition, then 
                     // first find if implementation has corresponding implemented type
                     // and second, check that found implementation can be used service type
-                    if (serviceType.IsGenericTypeDefinition)
+                    if (!serviceType.IsGenericType)
                     {
-                        var implementedTypes = implementationType.GetImplementedTypes(includeSelf:TypeTools.IncludeSelf.Exclude);
-                        var implementedOpenGenericServiceTypes = implementedTypes.Where(t => 
+                        Throw.If(true, Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE, 
+                            implementationType, serviceType);
+                    }
+                    else if (serviceType.IsGenericTypeDefinition)
+                    {
+                        var implementedTypes = implementationType.GetImplementedTypes(includeSelf: TypeTools.IncludeSelf.Exclude);
+                        var implementedServiceTypes = implementedTypes.Where(t =>
                             t.IsGenericType && t.ContainsGenericParameters && t.GetGenericTypeDefinition() == serviceType);
-                        
+
                         var genericParameters = implementationType.GetGenericArguments();
-                        Throw.If(!implementedOpenGenericServiceTypes.Any(t => t.ContainsAllGenericParameters(genericParameters)), 
+
+                        Throw.If(!implementedServiceTypes.Any(t => t.ContainsAllGenericParameters(genericParameters)),
                             Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_DEFINE_ALL_TYPE_ARGS,
-                            implementationType, serviceType, implementedOpenGenericServiceTypes);   
+                            implementationType, serviceType, implementedServiceTypes);
+                    }
+                    else
+                    {
+                        
                     }
 
                     // 3 - serviceType is Not generic type definition But contains generic args, 
                     // then if same implemented type exist we can use it.
-
-                    //Throw.If(!serviceType.ContainsGenericParameters,
-                    //    Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE, implementationType,
-                    //    serviceType);
                 }
                 else
                 {

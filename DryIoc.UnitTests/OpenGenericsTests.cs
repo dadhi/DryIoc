@@ -203,12 +203,12 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_singleton_registered_Then_First_non_generic_service_resolution_should_Throw()
+        public void Registering_open_generic_implementation_with_non_generic_service_should_Throw()
         {
             var container = new Container();
-            container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
 
-            var disposable = container.Resolve<IDisposable>();
+            Assert.Throws<ContainerException>(() => 
+                container.Register(typeof(IDisposable), typeof(IceCreamSource<>)));
         }
 
         [Test]
