@@ -126,11 +126,9 @@ namespace DryIoc
                             t.IsGenericType && t.ContainsGenericParameters && t.GetGenericTypeDefinition() == serviceType);
                         
                         var genericParameters = implementationType.GetGenericArguments();
-                        if (!implementedOpenGenericServiceTypes.Any(t => t.ContainsAllGenericParameters(genericParameters)))
-                        {
-                            Throw.If(true, "Unable to register implementation {0} with service {1} because not all generic arguments could be found in implemented {2}.",
-                                implementationType, serviceType, implementedOpenGenericServiceTypes);   
-                        }
+                        Throw.If(!implementedOpenGenericServiceTypes.Any(t => t.ContainsAllGenericParameters(genericParameters)), 
+                            Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_DEFINE_ALL_TYPE_ARGS,
+                            implementationType, serviceType, implementedOpenGenericServiceTypes);   
                     }
 
                     // 3 - serviceType is Not generic type definition But contains generic args, 
@@ -902,6 +900,9 @@ when resolving {1}.";
 
         public static readonly string UNABLE_TO_GET_SOME_GENERIC_IMPL_TYPE_ARGS =
             "Unable to get some type arguments <{0}> for implementation {1} when resolving {2}.";
+
+        public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_DEFINE_ALL_TYPE_ARGS = 
+            "Unable to register open-generic implementation {0} because service {1} does not define all generic arguments, but only those: {2}.";
     }
 
     public static class Registrator
