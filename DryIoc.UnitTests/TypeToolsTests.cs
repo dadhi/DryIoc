@@ -9,17 +9,19 @@ namespace DryIoc.UnitTests
     public class TypeToolsTests
     {
         [Test]
-        public void GetSelfAndAllInheritedTypes_should_work_for_open_generic_types()
+        public void GetImplementedTypes_should_work_for_open_generic_types()
         {
-            var types = typeof(Fuzz<>).GetImplementedTypes().ToArray();
+            var types = typeof(Fuzz<>).GetImplementedTypes()
+                .Select(t => t.ContainsGenericParameters ? t.GetGenericTypeDefinition() : t);
 
-            CollectionAssert.AreEqual(new[] { typeof(Fuzz<>), typeof(IBuzz), typeof(IFuzz<>), typeof(IFuzz), typeof(Buzz) }, types);
+            CollectionAssert.AreEqual(new[] { typeof(IBuzz), typeof(IFuzz<>), typeof(IFuzz), typeof(Buzz) }, types);
         }
 
         [Test]
-        public void GetSelfAndAllInheritedTypes_should_work_for_class_nested_in_open_generic_types()
+        public void GetImplementedTypes_should_work_for_class_nested_in_open_generic_types()
         {
-            var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes().ToArray();
+            var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes(TypeTools.IncludeTypeItself.AsFirst)
+                .Select(t => t.ContainsGenericParameters ? t.GetGenericTypeDefinition() : t);
 
             CollectionAssert.AreEqual(new[] { typeof(Fuzz<>.NestedClazz), typeof(IFuzz<>), typeof(IFuzz) }, types);
         }
@@ -29,7 +31,7 @@ namespace DryIoc.UnitTests
         {
             var types = typeof(A).GetImplementedTypes();
 
-            Assert.That(types, Is.EqualTo(new[] { typeof(A), typeof(IB), typeof(IA), typeof(B), typeof(C) }));
+            Assert.That(types, Is.EqualTo(new[] { typeof(IB), typeof(IA), typeof(B), typeof(C) }));
         }
 
         [Test]
@@ -37,7 +39,7 @@ namespace DryIoc.UnitTests
         {
             var types = typeof(B).GetImplementedTypes();
 
-            Assert.That(types, Is.EqualTo(new[] { typeof(B), typeof(IB), typeof(C) }));
+            Assert.That(types, Is.EqualTo(new[] { typeof(IB), typeof(C) }));
         }
 
         [Test]
@@ -87,7 +89,7 @@ namespace DryIoc.UnitTests
         private static bool MatchOpenImplWithClosedBaseTypeArgs(Type openImplType, Type closedBaseType)
         {
             var baseTypeDefinition = closedBaseType.GetGenericTypeDefinition();
-            var baseTypes = openImplType.GetImplementedTypes(TypeTools.ReturnOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+            var baseTypes = openImplType.GetImplementedTypes();
             var openBaseType = Array.Find(baseTypes, t => t.ContainsGenericParameters && t.GetGenericTypeDefinition() == baseTypeDefinition);
             var openBaseTypeArgs = openBaseType.GetGenericArguments();
 

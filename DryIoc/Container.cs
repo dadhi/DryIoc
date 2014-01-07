@@ -116,7 +116,7 @@ namespace DryIoc
             {
                 if (!implementationType.IsGenericTypeDefinition)
                 {
-                    Throw.If(!implementationType.GetImplementedTypes(includeSelf:TypeTools.IncludeSelf.Exclude).Contains(serviceType),
+                    Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
                         Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
                 }
                 else
@@ -128,8 +128,7 @@ namespace DryIoc
                     }
                     else if (serviceType.IsGenericTypeDefinition)
                     {
-                        var implementedTypes =
-                            implementationType.GetImplementedTypes(includeSelf: TypeTools.IncludeSelf.Exclude);
+                        var implementedTypes = implementationType.GetImplementedTypes();
                         var implementedServiceTypes = implementedTypes.Where(t =>
                             t.IsGenericType && t.ContainsGenericParameters &&
                             t.GetGenericTypeDefinition() == serviceType);
@@ -142,9 +141,7 @@ namespace DryIoc
                     }
                     else if (serviceType.ContainsGenericParameters)
                     {
-                        Throw.If(
-                            !implementationType.GetImplementedTypes(includeSelf: TypeTools.IncludeSelf.Exclude)
-                                .Contains(serviceType),
+                        Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
                             Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
 
                         serviceType = serviceType.GetGenericTypeDefinition();
@@ -1023,19 +1020,26 @@ when resolving {1}.";
             string named = null, Func<Type, bool> types = null)
         {
             var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
-            
-            var implementedTypes = implementationType.GetImplementedTypes()
-                .Where(types ?? PublicTypes);
-            
+
+            var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeTypeItself.AsFirst);
+            var implementedServiceTypes = implementedTypes.Where(types ?? PublicTypes);
             if (implementationType.IsGenericTypeDefinition)
             {
                 var implTypeArgs = implementationType.GetGenericArguments();
-                implementedTypes = implementedTypes.Where(t => 
-                    t.IsGenericType && t.ContainsGenericParameters && t.ContainsAllGenericParameters(implTypeArgs));
+                implementedServiceTypes = implementedServiceTypes.Where(t => 
+                    t.IsGenericType && t.ContainsGenericParameters && t.ContainsAllGenericParameters(implTypeArgs))
+                    .Select(t => t.GetGenericTypeDefinition());
             }
 
-            foreach (var serviceType in implementedTypes)
+            var someRegistered = false;
+            foreach (var serviceType in implementedServiceTypes)
+            {
                 registrator.Register(registration, serviceType, named);
+                someRegistered = true;
+            }
+
+            Throw.If(!someRegistered, "Unable to register any of implementation {0} implemented services {1}.",
+                implementationType, implementedTypes);
         }
 
         /// <summary>
@@ -1416,8 +1420,7 @@ when resolving {1}.";
             if (_implementationType == request.OpenGenericServiceType)
                 return request.ServiceType.GetGenericArguments();
 
-            var implementedTypes = _implementationType.GetImplementedTypes(
-                TypeTools.ReturnOpenGenerics.AsIs, TypeTools.IncludeSelf.Exclude);
+            var implementedTypes = _implementationType.GetImplementedTypes();
 
             IDictionary<string, Type> matchedTypeArgs;
             if (!MatchServiceTypeWithOpenGenericImplementedTypes(request.ServiceType, implementedTypes, out matchedTypeArgs))
@@ -1978,17 +1981,14 @@ when resolving {1}.";
 
     public static class TypeTools
     {
-        public enum ReturnOpenGenerics { AsGenericTypeDefinition, AsIs }
-        public enum IncludeSelf { IncludeAsFirst, Exclude }
+        public enum IncludeTypeItself { No, AsFirst }
 
-        public static Type[] GetImplementedTypes(this Type type,
-            ReturnOpenGenerics returnOpenGenerics = ReturnOpenGenerics.AsGenericTypeDefinition,
-            IncludeSelf includeSelf = IncludeSelf.IncludeAsFirst)
+        public static Type[] GetImplementedTypes(this Type type, IncludeTypeItself includeTypeItself = IncludeTypeItself.No)
         {
             Type[] results;
 
             var interfaces = type.GetInterfaces();
-            var interfaceStartIndex = includeSelf == IncludeSelf.IncludeAsFirst ? 1 : 0;
+            var interfaceStartIndex = includeTypeItself == IncludeTypeItself.AsFirst ? 1 : 0;
             var selfPlusInterfaceCount = interfaceStartIndex + interfaces.Length;
 
             var baseType = type.BaseType;
@@ -2011,24 +2011,13 @@ when resolving {1}.";
                 results[selfPlusInterfaceCount] = baseType;
             }
 
-            if (includeSelf == IncludeSelf.IncludeAsFirst)
+            if (includeTypeItself == IncludeTypeItself.AsFirst)
                 results[0] = type;
 
             if (interfaces.Length == 1)
                 results[interfaceStartIndex] = interfaces[0];
             else if (interfaces.Length > 1)
                 Array.Copy(interfaces, 0, results, interfaceStartIndex, interfaces.Length);
-
-            //if (returnOpenGenerics == ReturnOpenGenerics.AsGenericTypeDefinition &&
-            //    results.Length > interfaceStartIndex && type.IsGenericTypeDefinition)
-            //{
-            //    for (var i = 0; i < results.Length; i++)
-            //    {
-            //        var result = results[i];
-            //        if (result.IsGenericType && result.ContainsGenericParameters && !result.IsGenericTypeDefinition)
-            //            results[i] = result.GetGenericTypeDefinition();
-            //    }
-            //}
 
             return results;
         }

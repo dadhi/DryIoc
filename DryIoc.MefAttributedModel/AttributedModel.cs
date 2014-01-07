@@ -128,9 +128,22 @@ namespace DryIoc.MefAttributedModel
                 else if (attribute is ExportAllAttribute)
                 {
                     var exportAllAttribute = (ExportAllAttribute)attribute;
-                    var exportAllInfos = exportAllAttribute.GetAllContractTypes(type)
+                    var allContractTypes = exportAllAttribute.GetAllContractTypes(type);
+
+                    if (type.IsGenericTypeDefinition)
+                    {
+                        var implTypeArgs = type.GetGenericArguments();
+                        allContractTypes = allContractTypes.Where(t =>
+                            t.IsGenericType && t.ContainsGenericParameters && t.ContainsAllGenericParameters(implTypeArgs))
+                            .Select(t => t.GetGenericTypeDefinition());
+                    }
+
+                    var exportAllInfos = allContractTypes
                         .Select(t => new ExportInfo { ServiceType = t, ServiceName = exportAllAttribute.ContractName })
                         .ToArray();
+
+                    Throw.If(exportAllInfos.Length == 0, "Unable to get contract types for implementation {0} cause all of its implemented types where filtered out: {1}",
+                        type, allContractTypes);
 
                     if (info.Exports != null)
                         for (var index = 0; index < info.Exports.Length; index++)
@@ -560,10 +573,13 @@ Only single metadata is supported per implementation type, please remove the res
         public string ContractName { get; set; }
         public Type[] ExcludeTypes { get; set; }
 
-        public IEnumerable<Type> GetAllContractTypes(Type targetType)
+        public IEnumerable<Type> GetAllContractTypes(Type implementationType)
         {
-            var contractTypes = targetType.GetImplementedTypes().Where(ExportedTypes);
-            return ExcludeTypes == null || ExcludeTypes.Length == 0 ? contractTypes : contractTypes.Except(ExcludeTypes);
+            var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeTypeItself.AsFirst)
+                .Where(ExportedTypes);
+            return ExcludeTypes == null || ExcludeTypes.Length == 0 
+                ? contractTypes 
+                : contractTypes.Except(ExcludeTypes);
         }
     }
 
