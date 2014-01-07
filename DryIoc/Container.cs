@@ -111,26 +111,28 @@ namespace DryIoc
         public Factory Register(Factory factory, Type serviceType, object serviceKey)
         {
             var implementationType = factory.ThrowIfNull().ImplementationType;
-            if (implementationType != null && serviceType.ThrowIfNull() != typeof(object))
+            if (implementationType != null && serviceType.ThrowIfNull() != typeof(object) &&
+                implementationType != serviceType)
             {
-                if (implementationType.IsGenericTypeDefinition && // for open-generic implementation serviceType is allowed if:
-                    implementationType != serviceType)            // 1 - serviceType is same as implementation type.
+                if (!implementationType.IsGenericTypeDefinition)
+                {
+                    Throw.If(!implementationType.GetImplementedTypes(includeSelf:TypeTools.IncludeSelf.Exclude).Contains(serviceType),
+                        Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
+                }
+                else
                 {
                     if (!serviceType.IsGenericType)
                     {
-                        // 2 - serviceType is non generic.
                         Throw.If(true, Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE,
                             implementationType, serviceType);
                     }
                     else if (serviceType.IsGenericTypeDefinition)
                     {
-                        // 3 - serviceType is generic type definition, then 
-                        // first find if implementation has corresponding implemented type
-                        // and second, check that found implementation can be used service type
-
-                        var implementedTypes = implementationType.GetImplementedTypes(includeSelf: TypeTools.IncludeSelf.Exclude);
+                        var implementedTypes =
+                            implementationType.GetImplementedTypes(includeSelf: TypeTools.IncludeSelf.Exclude);
                         var implementedServiceTypes = implementedTypes.Where(t =>
-                            t.IsGenericType && t.ContainsGenericParameters && t.GetGenericTypeDefinition() == serviceType);
+                            t.IsGenericType && t.ContainsGenericParameters &&
+                            t.GetGenericTypeDefinition() == serviceType);
 
                         var genericParameters = implementationType.GetGenericArguments();
 
@@ -140,19 +142,13 @@ namespace DryIoc
                     }
                     else if (serviceType.ContainsGenericParameters)
                     {
-                        // 4 - serviceType is Not generic type definition But contains generic args, 
-                        // then we will get generic type definition.
-
-                        Throw.If(!implementationType.GetImplementedTypes(includeSelf: TypeTools.IncludeSelf.Exclude).Contains(serviceType),
+                        Throw.If(
+                            !implementationType.GetImplementedTypes(includeSelf: TypeTools.IncludeSelf.Exclude)
+                                .Contains(serviceType),
                             Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
 
                         serviceType = serviceType.GetGenericTypeDefinition();
                     }
-                }
-                else
-                {
-                    Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
-                        Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
                 }
             }
 
@@ -1027,8 +1023,18 @@ when resolving {1}.";
             string named = null, Func<Type, bool> types = null)
         {
             var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
-            var implementedTypes = implementationType.GetImplementedTypes();
-            foreach (var serviceType in implementedTypes.Where(types ?? PublicTypes))
+            
+            var implementedTypes = implementationType.GetImplementedTypes()
+                .Where(types ?? PublicTypes);
+            
+            if (implementationType.IsGenericTypeDefinition)
+            {
+                var implTypeArgs = implementationType.GetGenericArguments();
+                implementedTypes = implementedTypes.Where(t => 
+                    t.IsGenericType && t.ContainsGenericParameters && t.ContainsAllGenericParameters(implTypeArgs));
+            }
+
+            foreach (var serviceType in implementedTypes)
                 registrator.Register(registration, serviceType, named);
         }
 

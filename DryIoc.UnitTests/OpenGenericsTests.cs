@@ -212,14 +212,16 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_singleton_registered_Then_Second_non_generic_service_resolution_should_Succeed_cause_service_is_already_created()
+        public void Registering_all_of_implemented_services_should_register_only_those_containing_all_impl_generic_args()
         {
             var container = new Container();
             container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
+            
+            container.Resolve<IceCreamSource<bool>>();
             container.Resolve<IceCream<bool>>();
 
-            var disposable = container.Resolve<IDisposable>();
-            Assert.That(disposable, Is.InstanceOf<IceCreamSource<bool>>());
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<IDisposable>());
         }
 
         [Test]
