@@ -53,9 +53,9 @@ namespace DryIoc.SpeedTestApp
 
 	    private static void CompareTreeGet()
 	    {
-            GetAvlTreeVsHashTree(itemCount: 9);
+            GetDictVsHashTreeOfType(itemCount: 20);
             Console.WriteLine();
-            GetAvlTreeVsHashTree(itemCount: 9);
+            GetDictVsHashTreeOfType(itemCount: 2000);
 	    }
 
 	    private static void CompareTypesForEquality(Type actual)
@@ -145,7 +145,6 @@ namespace DryIoc.SpeedTestApp
             Console.WriteLine("HashTree - " + hashTreeGetTime);
         }
 
-
         public static void GetHashTree2vs1OfInt(int itemCount)
         {
             var key = itemCount;
@@ -174,34 +173,6 @@ namespace DryIoc.SpeedTestApp
             Console.WriteLine("v1 - " + v1get);
         }
 
-	    public static void GetHashTree4vs1ofType(int itemCount)
-        {
-            var key = typeof(IntTreeTests.DictVsMap);
-            var value = "hey";
-
-            var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
-
-            var v4 = UnitTests.Playground.HashTree<Type, string>.Empty;
-            var v1 = IntTree<Hashed<Type, string>>.Empty;
-
-	        var v4AddTime = HashTree4Add(ref v4, keys, key, value);
-	        var v1AddTime = HashTreeAdd(ref v1, keys, key, value);
-
-	        Console.WriteLine("Adding {0} items (ms):", itemCount);
-            Console.WriteLine("V4 - " + v4AddTime);
-            Console.WriteLine("V1 - " + v1AddTime);
-            Console.WriteLine();
-
-            var getTimes = 1 * 1000 * 1000;
-
-	        var v4GetTime = HashTree4Get(v4, key, getTimes);
-	        var v1GetTime = HashTreeGet(v1, key, getTimes);
-
-	        Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
-            Console.WriteLine("V4 - " + v4GetTime);
-            Console.WriteLine("V1 - " + v1GetTime);
-        }
-
         public static void GetHashTreeXVsHashTree(int itemCount)
         {
             var key = typeof(IntTreeTests.DictVsMap);
@@ -228,34 +199,6 @@ namespace DryIoc.SpeedTestApp
             Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
             Console.WriteLine("HashTreeX - " + typeTreeGetTime);
             Console.WriteLine("HashTree - " + hashTreeGetTime);
-        }
-
-        public static void GetHashTree2vs1ofType(int itemCount)
-        {
-            var key = typeof(IntTreeTests.DictVsMap);
-            var value = "hey";
-
-            var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
-
-            var v2 = HashTree2<Type, string>.Empty;
-            var v1 = IntTree<Hashed<Type, string>>.Empty;
-
-            var v2AddTime = HashTree2Add(ref v2, keys, key, value);
-            var v1AddTime = HashTreeAdd(ref v1, keys, key, value);
-
-            Console.WriteLine("Adding {0} items (ms):", itemCount);
-            Console.WriteLine("V2 - " + v2AddTime);
-            Console.WriteLine("V1 - " + v1AddTime);
-            Console.WriteLine();
-
-            var getTimes = 1 * 1000 * 1000;
-
-            var v2GetTime = HashTree2Get(v2, key, getTimes);
-            var v1GetTime = HashTreeGet(v1, key, getTimes);
-
-            Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
-            Console.WriteLine("V2 - " + v2GetTime);
-            Console.WriteLine("V1 - " + v1GetTime);
         }
 
         public static void GetDictVsHashTree2OfType(int itemCount)
@@ -350,7 +293,7 @@ namespace DryIoc.SpeedTestApp
 			var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
 			var dict = new Dictionary<Type, string>();
-			var tree = IntTree<Hashed<Type, string>>.Empty;
+			var tree = HashTree<Type, string>.Empty;
 
 			var dictAddTime = DictAdd(dict, keys, key, value);
 			var treeAddTime = HashTreeAdd(ref tree, keys, key, value);
@@ -567,7 +510,7 @@ namespace DryIoc.SpeedTestApp
             return treeTime.ElapsedMilliseconds;
         }
 
-		private static long HashTreeAdd<V>(ref IntTree<Hashed<Type, V>> tree, Type[] keys, Type key, V value)
+		private static long HashTreeAdd<V>(ref HashTree<Type, V> tree, Type[] keys, Type key, V value)
 		{
 			var ignored = default(V);
 			var treeTime = Stopwatch.StartNew();
@@ -654,7 +597,7 @@ namespace DryIoc.SpeedTestApp
             return treeWatch.ElapsedMilliseconds;
         }
 
-        private static long HashTreeGet<T>(IntTree<Hashed<Type, T>> tree, Type key, int times)
+        private static long HashTreeGet<T>(HashTree<Type, T> tree, Type key, int times)
 		{
 			T ignored = default(T);
 
@@ -662,7 +605,7 @@ namespace DryIoc.SpeedTestApp
 
 			for (int i = 0; i < times; i++)
 			{
-				ignored = tree.TryGet(key);
+				ignored = tree.GetValueOrDefault(key);
 			}
 
 			treeWatch.Stop();
