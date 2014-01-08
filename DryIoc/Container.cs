@@ -111,15 +111,20 @@ namespace DryIoc
         public Factory Register(Factory factory, Type serviceType, object serviceKey)
         {
             var implementationType = factory.ThrowIfNull().ImplementationType;
-            if (implementationType != null && serviceType.ThrowIfNull() != typeof(object) &&
-                implementationType != serviceType)
+            if (implementationType != null && serviceType.ThrowIfNull() != typeof(object))
             {
                 if (!implementationType.IsGenericTypeDefinition)
                 {
-                    Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
-                        Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
+                    if (implementationType.IsGenericType)
+                        Throw.If(implementationType.ContainsGenericParameters, 
+                            "Unable to register implementation {0} which is not generic type definition But contains generic arguments.",
+                            implementationType);
+
+                    if (implementationType != serviceType)
+                        Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
+                            Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
                 }
-                else
+                else if (implementationType != serviceType) // implementation is generic type definition, e.g. Blah<,>
                 {
                     if (!serviceType.IsGenericType)
                     {
