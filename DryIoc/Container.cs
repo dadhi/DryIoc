@@ -110,50 +110,8 @@ namespace DryIoc
 
         public Factory Register(Factory factory, Type serviceType, object serviceKey)
         {
-            var implementationType = factory.ThrowIfNull().ImplementationType;
-            if (implementationType != null && serviceType.ThrowIfNull() != typeof(object))
-            {
-                if (!implementationType.IsGenericTypeDefinition)
-                {
-                    if (implementationType.IsGenericType)
-                        Throw.If(implementationType.ContainsGenericParameters, 
-                            "Unable to register implementation {0} which is not generic type definition But contains generic arguments.",
-                            implementationType);
-
-                    if (implementationType != serviceType)
-                        Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
-                            Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
-                }
-                else if (implementationType != serviceType) // implementation is generic type definition, e.g. Blah<,>
-                {
-                    if (!serviceType.IsGenericType)
-                    {
-                        Throw.If(true, Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE,
-                            implementationType, serviceType);
-                    }
-                    else if (serviceType.IsGenericTypeDefinition)
-                    {
-                        var implementedTypes = implementationType.GetImplementedTypes();
-                        var implementedServiceTypes = implementedTypes.Where(t =>
-                            t.IsGenericType && t.ContainsGenericParameters &&
-                            t.GetGenericTypeDefinition() == serviceType);
-
-                        var genericParameters = implementationType.GetGenericArguments();
-
-                        Throw.If(!implementedServiceTypes.Any(t => t.ContainsAllGenericParameters(genericParameters)),
-                            Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_DEFINE_ALL_TYPE_ARGS,
-                            implementationType, serviceType, implementedServiceTypes);
-                    }
-                    else if (serviceType.ContainsGenericParameters)
-                    {
-                        Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
-                            Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
-
-                        serviceType = serviceType.GetGenericTypeDefinition();
-                    }
-                }
-            }
-
+            factory.ThrowIfNull().ThrowIfCannotBeRegisteredWithServiceType(serviceType.ThrowIfNull());
+  
             lock (_syncRoot)
             {
                 if (factory.Setup.Type == FactoryType.Decorator)
@@ -1031,7 +989,7 @@ when resolving {1}.";
             if (implementationType.IsGenericTypeDefinition)
             {
                 var implTypeArgs = implementationType.GetGenericArguments();
-                implementedServiceTypes = implementedServiceTypes.Where(t => 
+                implementedServiceTypes = implementedServiceTypes.Where(t =>
                     t.IsGenericType && t.ContainsGenericParameters && t.ContainsAllGenericParameters(implTypeArgs))
                     .Select(t => t.GetGenericTypeDefinition());
             }
@@ -1329,6 +1287,8 @@ when resolving {1}.";
             Setup = setup;
         }
 
+        public virtual void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType) { }
+
         public abstract Factory GetFactoryPerRequestOrDefault(Request request, IRegistry registry);
 
         public Expression GetExpression(Request request, IRegistry registry)
@@ -1402,11 +1362,54 @@ when resolving {1}.";
         public ReflectionFactory(Type implementationType, IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            _implementationType = implementationType
-                .ThrowIfNull()
+            _implementationType = implementationType.ThrowIfNull()
                 .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
-
             _getConstructor = getConstructor;
+        }
+
+        public override void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType)
+        {
+            var implementationType = _implementationType;
+            if (serviceType != typeof(object))
+            {
+                if (!implementationType.IsGenericTypeDefinition)
+                {
+                    if (implementationType.IsGenericType)
+                        Throw.If(implementationType.ContainsGenericParameters,
+                            "Unable to register implementation {0} which is not generic type definition But contains generic arguments.",
+                            implementationType);
+
+                    if (implementationType != serviceType)
+                        Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
+                            Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
+                }
+                else if (implementationType != serviceType) // implementation is generic type definition, e.g. Blah<,>
+                {
+                    if (!serviceType.IsGenericType)
+                    {
+                        Throw.If(true, Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE,
+                            implementationType, serviceType);
+                    }
+                    else if (serviceType.IsGenericTypeDefinition)
+                    {
+                        var implementedTypes = implementationType.GetImplementedTypes();
+                        var implementedServiceTypes = implementedTypes.Where(t =>
+                            t.IsGenericType && t.ContainsGenericParameters &&
+                            t.GetGenericTypeDefinition() == serviceType);
+
+                        var genericParameters = implementationType.GetGenericArguments();
+
+                        Throw.If(!implementedServiceTypes.Any(t => t.ContainsAllGenericParameters(genericParameters)),
+                            Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_DEFINE_ALL_TYPE_ARGS,
+                            implementationType, serviceType, implementedServiceTypes);
+                    }
+                    else if (serviceType.ContainsGenericParameters)
+                    {
+                        Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
+                            Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
+                    }
+                }
+            }
         }
 
         public override Factory GetFactoryPerRequestOrDefault(Request request, IRegistry _)
