@@ -212,6 +212,15 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Registering_open_generic_implementation_with_closed_generic_service_should_Throw()
+        {
+            var container = new Container();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Register(typeof(IceCream<int>), typeof(IceCreamSource<>)));
+        }
+
+        [Test]
         public void Registering_all_of_implemented_services_should_register_only_those_containing_all_impl_generic_args()
         {
             var container = new Container();
@@ -233,6 +242,25 @@ namespace DryIoc.UnitTests
             var disposable = container.Resolve<Many<IDisposable>>().Items.ToArray();
 
             Assert.That(disposable.Length, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Registering_generic_but_not_closed_implementation_should_Throw()
+        {
+            var container = new Container();
+            var genericButNotClosedType = typeof(Closed<>).BaseType;
+
+            Assert.Throws<ContainerException>(() => 
+                container.Register(genericButNotClosedType));
+        }
+
+        [Test]
+        public void Registering_generic_but_not_closed_service_should_Throw()
+        {
+            var container = new Container();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Register(typeof(Closed<>).BaseType, typeof(Closed<>)));
         }
     }
 
@@ -286,6 +314,10 @@ namespace DryIoc.UnitTests
         {
         }
     }
+
+    public class Open<T> {}
+
+    public class Closed<T> : Open<T> {}
 
     #endregion
 }

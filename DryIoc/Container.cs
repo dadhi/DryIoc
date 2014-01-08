@@ -110,7 +110,8 @@ namespace DryIoc
 
         public Factory Register(Factory factory, Type serviceType, object serviceKey)
         {
-            factory.ThrowIfNull().ThrowIfCannotBeRegisteredWithServiceType(serviceType.ThrowIfNull());
+            serviceType.ThrowIfNull();
+            factory.ThrowIfNull().ThrowIfCannotBeRegisteredWithServiceType(serviceType);
   
             lock (_syncRoot)
             {
@@ -120,7 +121,7 @@ namespace DryIoc
                     return factory;
                 }
 
-                var entry = _factories.GetOrAdd(serviceType, _ => new FactoriesEntry());
+                var entry = _factories.GetOrAdd(serviceType, NewFactoriesEntry);
                 if (serviceKey == null)
                 {   // default factories will contain all the factories and LastDefault will just point to the latest, 
                     // for memory saving reasons.
@@ -152,6 +153,11 @@ namespace DryIoc
         public bool IsRegistered(Type serviceType, string serviceName)
         {
             return ((IRegistry)this).GetFactoryOrDefault(serviceType.ThrowIfNull(), serviceName) != null;
+        }
+
+        private static FactoriesEntry NewFactoriesEntry(Type _)
+        {
+            return new FactoriesEntry();
         }
 
         #endregion
@@ -803,7 +809,18 @@ Please register service OR adjust resolution rules.";
             "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
 
         public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE =
-            "Unable to register open-generic implementation {0} for service with no generic arguments {1}.";
+            "Unable to register open-generic implementation {0} with non-generic service {1}.";
+
+        public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS =
+            "Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}.";
+
+        public static readonly string USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS =
+@"Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters. 
+Consider to register generic type definition {1} instead.";
+
+        public static readonly string USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS = 
+@"Unsupported registration of service {0} which is not a generic type definition but contains generic parameters. 
+Consider to register generic type definition {1} instead.";
 
         public static readonly string EXPECTED_SINGLE_DEFAULT_FACTORY =
 @"Expecting single default registration of {0} but found many:
@@ -867,9 +884,6 @@ when resolving {1}.";
 
         public static readonly string UNABLE_TO_GET_SOME_GENERIC_IMPL_TYPE_ARGS =
             "Unable to get some type arguments <{0}> for implementation {1} when resolving {2}.";
-
-        public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS =
-            "Unable to register open-generic implementation {0} because service {1} does not define all generic arguments, but only those: {2}.";
     }
 
     public static class Registrator
@@ -994,14 +1008,14 @@ when resolving {1}.";
                     .Select(t => t.GetGenericTypeDefinition());
             }
 
-            var someRegistered = false;
+            var atLeastOneRegistered = false;
             foreach (var serviceType in implementedServiceTypes)
             {
                 registrator.Register(registration, serviceType, named);
-                someRegistered = true;
+                atLeastOneRegistered = true;
             }
 
-            Throw.If(!someRegistered, "Unable to register any of implementation {0} implemented services {1}.",
+            Throw.If(!atLeastOneRegistered, "Unable to register any of implementation {0} implemented services {1}.",
                 implementationType, implementedTypes);
         }
 
@@ -1372,24 +1386,23 @@ when resolving {1}.";
             var implType = _implementationType;
             if (!implType.IsGenericTypeDefinition)
             {
-                if (implType.IsGenericType)
-                    Throw.If(implType.ContainsGenericParameters,
-                        "Unsupported registration of generic but not closed implementation type {0}.", implType);
+                if (implType.IsGenericType && implType.ContainsGenericParameters)
+                    Throw.It(Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS, 
+                        implType, implType.GetGenericTypeDefinition());
 
                 if (implType != serviceType && serviceType != typeof(object))
-                    Throw.If(!implType.GetImplementedTypes().Contains(serviceType),
+                    Throw.If(Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1,
                         Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implType, serviceType);
             }
             else if (implType != serviceType) // implementation is generic type definition, e.g. Blah<,>
             {
                 if (!serviceType.IsGenericTypeDefinition)
                 {
-                    Throw.If(!serviceType.IsGenericType,
-                        Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, implType, serviceType);
+                    if (implType.IsGenericType && serviceType.ContainsGenericParameters)
+                        Throw.It(Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS,
+                            serviceType, serviceType.GetGenericTypeDefinition());
 
-                    Throw.If(serviceType.ContainsGenericParameters,
-                        "Unsupported registration of open-generic implementation {0} with not a generic type definition service {1}.",
-                        implType, serviceType);
+                    Throw.It(Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, implType, serviceType);
                 }
                 else // service type is generic type definition, e.g. IBlah<,>
                 {
@@ -1968,6 +1981,11 @@ when resolving {1}.";
         public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             if (!throwCondition) return;
+            throw GetException(Format(message, arg0, arg1, arg2));
+        }
+
+        public static void It(string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        {
             throw GetException(Format(message, arg0, arg1, arg2));
         }
 
