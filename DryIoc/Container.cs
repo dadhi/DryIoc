@@ -32,7 +32,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 
-// TODO: Add doc-comments to all public API.
+// TODO: Add doc-comments for all public API.
 namespace DryIoc
 {
     /// <summary>
@@ -880,7 +880,7 @@ when resolving {1}.";
             "Delegate factory expression returned NULL when resolving {0}.";
 
         public static readonly string UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE =
-            "Unable to match open-generic implementation {0} base types ({1}) with service type when resolving {2}.";
+            "Unable to match service with any of open-generic implementation {0} implemented types {1} when resolving {2}.";
 
         public static readonly string UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE = 
             "Unable to find open-generic implementation {0} type argument {1} when resolving {2}.";
@@ -1407,13 +1407,13 @@ when resolving {1}.";
                 else // service type is generic type definition, e.g. IBlah<,>
                 {
                     var implementedTypes = implType.GetImplementedTypes();
-                    var implementedServiceTypes = implementedTypes.Where(t =>
+                    var implementedOpenGenericTypes = implementedTypes.Where(t =>
                         t.IsGenericType && t.ContainsGenericParameters && t.GetGenericTypeDefinition() == serviceType);
 
                     var implTypeArgs = implType.GetGenericArguments();
-                    Throw.If(!implementedServiceTypes.Any(t => t.ContainsAllGenericParameters(implTypeArgs)),
+                    Throw.If(!implementedOpenGenericTypes.Any(t => t.ContainsAllGenericParameters(implTypeArgs)),
                         Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS,
-                        implType, serviceType, implementedServiceTypes);
+                        implType, serviceType, implementedOpenGenericTypes);
                 }
             }
         }
@@ -1430,73 +1430,6 @@ when resolving {1}.";
             var closedImplType = _implementationType.MakeGenericType(closedTypeArgs);
 
             return new ReflectionFactory(closedImplType, Reuse, _getConstructor, Setup);
-        }
-
-        private static Type[] GetClosedTypeArgsForGenericImplementationType(Type implType, Request request)
-        {
-            var serviceTypeArgs = request.ServiceType.GetGenericArguments();
-            var serviceTypeGenericDefinition = request.OpenGenericServiceType;
-
-            var openImplTypeArgs = implType.GetGenericArguments();
-            var implementedTypes = implType.GetImplementedTypes();
-
-            Type[] resultImplTypeArgs = null;
-            for (var i = 0; resultImplTypeArgs == null && i < implementedTypes.Length; i++)
-            {
-                var implementedType = implementedTypes[i];
-                if (implementedType.IsGenericType && implementedType.ContainsGenericParameters &&
-                    implementedType.GetGenericTypeDefinition() == serviceTypeGenericDefinition)
-                {
-                    var matchedTypeArgs = new Type[openImplTypeArgs.Length];
-                    if (MatchBaseOpenWithClosedGenericTypeArgs(ref matchedTypeArgs,
-                        openImplTypeArgs, implementedType.GetGenericArguments(), serviceTypeArgs))
-                        resultImplTypeArgs = matchedTypeArgs;
-                }
-            }
-
-            resultImplTypeArgs = resultImplTypeArgs.ThrowIfNull(
-                Error.UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, implType, implementedTypes, request);
-
-            var unmatchedArgIndex = Array.IndexOf(resultImplTypeArgs, null);
-            if (unmatchedArgIndex != -1)
-                Throw.It(Error.UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
-                     implType, openImplTypeArgs[unmatchedArgIndex], request);
-
-            return resultImplTypeArgs;
-        }
-
-        private static bool MatchBaseOpenWithClosedGenericTypeArgs(ref Type[] matchedImplArgs, 
-            Type[] openImplementationArgs, Type[] openImplementedArgs, Type[] closedServiceArgs)
-        {
-            for (var i = 0; i < openImplementedArgs.Length; i++)
-            {
-                var openImplementedArg = openImplementedArgs[i];
-                var closedServiceArg = closedServiceArgs[i];
-                if (openImplementedArg.IsGenericParameter)
-                {
-                    var matchedIndex = Array.FindIndex(openImplementationArgs, t => t.Name == openImplementedArg.Name);
-                    if (matchedIndex != -1)
-                    {
-                        if (matchedImplArgs[matchedIndex] == null)
-                            matchedImplArgs[matchedIndex] = closedServiceArg;
-                        else if (matchedImplArgs[matchedIndex] != closedServiceArg)
-                            return false; // more than one closedServiceArg is matching with single openArg
-                    }
-                }
-                else if (openImplementedArg != closedServiceArg)
-                {
-                    if (!openImplementedArg.IsGenericType || !openImplementedArg.ContainsGenericParameters || 
-                        !closedServiceArg.IsGenericType ||
-                        closedServiceArg.GetGenericTypeDefinition() != openImplementedArg.GetGenericTypeDefinition())
-                        return false; // openArg and closedArg are different types
-
-                    if (!MatchBaseOpenWithClosedGenericTypeArgs(ref matchedImplArgs, openImplementationArgs, 
-                        openImplementedArg.GetGenericArguments(), closedServiceArg.GetGenericArguments()))
-                        return false; // nested match failed due either one of above reasons.
-                }
-            }
-
-            return true;
         }
 
         protected override Expression CreateExpression(Request request, IRegistry registry)
@@ -1592,8 +1525,8 @@ when resolving {1}.";
             if (!registry.ResolutionRules.ShouldResolvePropertiesAndFields)
                 return newService;
 
-            var properties = ImplementationType.GetProperties(Resolver.MembersToResolve).Where(p => p.GetSetMethod() != null);
-            var fields = ImplementationType.GetFields(Resolver.MembersToResolve).Where(f => !f.IsInitOnly);
+            var properties = _implementationType.GetProperties(Resolver.MembersToResolve).Where(p => p.GetSetMethod() != null);
+            var fields = _implementationType.GetFields(Resolver.MembersToResolve).Where(f => !f.IsInitOnly);
 
             var bindings = new List<MemberBinding>();
             foreach (var member in properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>()))
@@ -1609,6 +1542,73 @@ when resolving {1}.";
             }
 
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
+        }
+
+        private static Type[] GetClosedTypeArgsForGenericImplementationType(Type implType, Request request)
+        {
+            var serviceTypeArgs = request.ServiceType.GetGenericArguments();
+            var serviceTypeGenericDefinition = request.OpenGenericServiceType;
+
+            var openImplTypeArgs = implType.GetGenericArguments();
+            var implementedTypes = implType.GetImplementedTypes();
+
+            Type[] resultImplTypeArgs = null;
+            for (var i = 0; resultImplTypeArgs == null && i < implementedTypes.Length; i++)
+            {
+                var implementedType = implementedTypes[i];
+                if (implementedType.IsGenericType && implementedType.ContainsGenericParameters &&
+                    implementedType.GetGenericTypeDefinition() == serviceTypeGenericDefinition)
+                {
+                    var matchedTypeArgs = new Type[openImplTypeArgs.Length];
+                    if (MatchServiceWithImplementedTypeArgs(ref matchedTypeArgs,
+                        openImplTypeArgs, implementedType.GetGenericArguments(), serviceTypeArgs))
+                        resultImplTypeArgs = matchedTypeArgs;
+                }
+            }
+
+            resultImplTypeArgs = resultImplTypeArgs.ThrowIfNull(
+                Error.UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, implType, implementedTypes, request);
+
+            var unmatchedArgIndex = Array.IndexOf(resultImplTypeArgs, null);
+            if (unmatchedArgIndex != -1)
+                Throw.It(Error.UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
+                     implType, openImplTypeArgs[unmatchedArgIndex], request);
+
+            return resultImplTypeArgs;
+        }
+
+        private static bool MatchServiceWithImplementedTypeArgs(ref Type[] matchedImplArgs,
+            Type[] openImplementationArgs, Type[] openImplementedArgs, Type[] closedServiceArgs)
+        {
+            for (var i = 0; i < openImplementedArgs.Length; i++)
+            {
+                var openImplementedArg = openImplementedArgs[i];
+                var closedServiceArg = closedServiceArgs[i];
+                if (openImplementedArg.IsGenericParameter)
+                {
+                    var matchedIndex = Array.FindIndex(openImplementationArgs, t => t.Name == openImplementedArg.Name);
+                    if (matchedIndex != -1)
+                    {
+                        if (matchedImplArgs[matchedIndex] == null)
+                            matchedImplArgs[matchedIndex] = closedServiceArg;
+                        else if (matchedImplArgs[matchedIndex] != closedServiceArg)
+                            return false; // more than one closedServiceArg is matching with single openArg
+                    }
+                }
+                else if (openImplementedArg != closedServiceArg)
+                {
+                    if (!openImplementedArg.IsGenericType || !openImplementedArg.ContainsGenericParameters ||
+                        !closedServiceArg.IsGenericType ||
+                        closedServiceArg.GetGenericTypeDefinition() != openImplementedArg.GetGenericTypeDefinition())
+                        return false; // openArg and closedArg are different types
+
+                    if (!MatchServiceWithImplementedTypeArgs(ref matchedImplArgs, openImplementationArgs,
+                        openImplementedArg.GetGenericArguments(), closedServiceArg.GetGenericArguments()))
+                        return false; // nested match failed due either one of above reasons.
+                }
+            }
+
+            return true;
         }
 
         #endregion
@@ -2147,19 +2147,21 @@ when resolving {1}.";
         {
             return x is string ? (string)x
                 : (x is Type ? ((Type)x).Print()
-                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine)
-                : (x is IEnumerable ? ((IEnumerable)x).Print()
+                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine, ifEmpty: "<empty>")
+                : (x is IEnumerable ? ((IEnumerable)x).Print(ifEmpty: "<empty>")
                 : (string.Empty + x))));
         }
 
-        public static string Print(this IEnumerable items, string separator = ", ", Func<object, string> printItem = null)
+        public static string Print(this IEnumerable items, 
+            string separator = ", ", Func<object, string> printItem = null, string ifEmpty = null)
         {
             if (items == null) return null;
             printItem = printItem ?? Print;
             var builder = new StringBuilder();
             foreach (var item in items)
                 (builder.Length == 0 ? builder : builder.Append(separator)).Append(printItem(item));
-            return builder.ToString();
+            var result = builder.ToString();
+            return result != string.Empty ? result : (ifEmpty ?? string.Empty);
         }
 
         public static Type GetMemberType(this MemberInfo member)

@@ -181,7 +181,29 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_Throw_when_registering_service_with_not_all_type_args_required_by_implementation()
+        public void Should_Throw_when_service_has_multiple_type_args_for_single_implementation_type_parameter()
+        {
+            var container = new Container();
+            container.Register(typeof(IDouble<,>), typeof(DoubleMultiNested<,>));
+
+            Assert.Throws<ContainerException>(() =>
+                // should be INT instead of last BOOL
+                container.Resolve<IDouble<int, Nested<IDouble<Nested<string>, bool>>>>()); 
+        }
+
+        [Test]
+        public void Should_Throw_when_service_has_multiple_type_args_for_single_implementation_type_parameter2()
+        {
+            var container = new Container();
+            container.Register(typeof(IFizz<,>), typeof(BuzzDiffArgCount<,>));
+
+            Assert.Throws<ContainerException>(() =>
+                // should be INT instead of last BOOL
+                container.Resolve<IFizz<Wrap<string, int>, bool>>());
+        }
+
+        [Test]
+        public void Should_Throw_when_registering_implementation_with_service_without_some_type_args_specified()
         {
             var container = new Container();
 
@@ -198,8 +220,7 @@ namespace DryIoc.UnitTests
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IDouble<int, string>>());
 
-            Assert.DoesNotThrow(() =>
-                container.Resolve<IDouble<Nested<int>, string>>());
+            container.Resolve<IDouble<Nested<int>, string>>();
         }
 
         [Test]
@@ -318,6 +339,8 @@ namespace DryIoc.UnitTests
     public class Open<T> {}
 
     public class Closed<T> : Open<T> {}
+
+    public class BuzzDiffArgCount<T1, T2> : IFizz<Wrap<T2>, T1> { }
 
     #endregion
 }

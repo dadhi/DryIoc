@@ -79,13 +79,6 @@ namespace DryIoc.UnitTests
             Assert.IsFalse(MatchOpenImplWithClosedBaseTypeArgs(typeof(BuzzDiffArg<,>), typeof(IFizz<DifferentWrap<string>, bool>)));
         }
 
-        [Test]
-        public void Should_find_mismatch_between_closed_and_base_generic_args_With_different_arguments_number()
-        {
-            Assert.IsTrue(MatchOpenImplWithClosedBaseTypeArgs(typeof(BuzzDiffArgCount<,>), typeof(IFizz<Wrap<string>, bool>)));
-            Assert.IsFalse(MatchOpenImplWithClosedBaseTypeArgs(typeof(BuzzDiffArgCount<,>), typeof(IFizz<Wrap<string, double>, bool>)));
-        }
-
         private static bool MatchOpenImplWithClosedBaseTypeArgs(Type openImplType, Type closedBaseType)
         {
             var baseTypeDefinition = closedBaseType.GetGenericTypeDefinition();
@@ -134,8 +127,6 @@ namespace DryIoc.UnitTests
     public class BuzzWrapInt<T1, T2> : IFizz<IFizz<T1, Wrap<int>>, T2> { }
 
     public class BuzzDiffArg<T1, T2> : IFizz<Wrap<T2>, T1> { }
-
-    public class BuzzDiffArgCount<T1, T2> : IFizz<Wrap<T2>, T1> { }
 
     public class Wrap<T> { }
     public class Wrap<T1, T2> { }

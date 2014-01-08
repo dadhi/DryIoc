@@ -46,6 +46,7 @@
     <Compile Include="Playground\CreateEnumerableWithExpressionTests.cs" />
     <Compile Include="Playground\HashAndIntTrees.cs" />
     <Compile Include="Playground\IntTreeTests.cs" />
+    <Compile Include="PrintTests.cs" />
     <Compile Include="ResolutionRulesTests.cs" />
     <Compile Include="ContainerTests.cs" />
     <Compile Include="ContextDependentResolutionTests.cs" />
