@@ -802,7 +802,7 @@ Please register service OR adjust resolution rules.";
         public static readonly string EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE =
             "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
 
-        public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE =
+        public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE =
             "Unable to register open-generic implementation {0} for service with no generic arguments {1}.";
 
         public static readonly string EXPECTED_SINGLE_DEFAULT_FACTORY =
@@ -868,7 +868,7 @@ when resolving {1}.";
         public static readonly string UNABLE_TO_GET_SOME_GENERIC_IMPL_TYPE_ARGS =
             "Unable to get some type arguments <{0}> for implementation {1} when resolving {2}.";
 
-        public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_DEFINE_ALL_TYPE_ARGS =
+        public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS =
             "Unable to register open-generic implementation {0} because service {1} does not define all generic arguments, but only those: {2}.";
     }
 
@@ -1369,45 +1369,38 @@ when resolving {1}.";
 
         public override void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType)
         {
-            var implementationType = _implementationType;
-            if (serviceType != typeof(object))
+            var implType = _implementationType;
+            if (!implType.IsGenericTypeDefinition)
             {
-                if (!implementationType.IsGenericTypeDefinition)
-                {
-                    if (implementationType.IsGenericType)
-                        Throw.If(implementationType.ContainsGenericParameters,
-                            "Unable to register implementation {0} which is not generic type definition But contains generic arguments.",
-                            implementationType);
+                if (implType.IsGenericType)
+                    Throw.If(implType.ContainsGenericParameters,
+                        "Unsupported registration of generic but not closed implementation type {0}.", implType);
 
-                    if (implementationType != serviceType)
-                        Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
-                            Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
+                if (implType != serviceType && serviceType != typeof(object))
+                    Throw.If(!implType.GetImplementedTypes().Contains(serviceType),
+                        Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implType, serviceType);
+            }
+            else if (implType != serviceType) // implementation is generic type definition, e.g. Blah<,>
+            {
+                if (!serviceType.IsGenericTypeDefinition)
+                {
+                    Throw.If(!serviceType.IsGenericType,
+                        Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, implType, serviceType);
+
+                    Throw.If(serviceType.ContainsGenericParameters,
+                        "Unsupported registration of open-generic implementation {0} with not a generic type definition service {1}.",
+                        implType, serviceType);
                 }
-                else if (implementationType != serviceType) // implementation is generic type definition, e.g. Blah<,>
+                else // service type is generic type definition, e.g. IBlah<,>
                 {
-                    if (!serviceType.IsGenericType)
-                    {
-                        Throw.If(true, Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_FOR_NON_GENERIC_SERVICE,
-                            implementationType, serviceType);
-                    }
-                    else if (serviceType.IsGenericTypeDefinition)
-                    {
-                        var implementedTypes = implementationType.GetImplementedTypes();
-                        var implementedServiceTypes = implementedTypes.Where(t =>
-                            t.IsGenericType && t.ContainsGenericParameters &&
-                            t.GetGenericTypeDefinition() == serviceType);
+                    var implementedTypes = implType.GetImplementedTypes();
+                    var implementedServiceTypes = implementedTypes.Where(t =>
+                        t.IsGenericType && t.ContainsGenericParameters && t.GetGenericTypeDefinition() == serviceType);
 
-                        var genericParameters = implementationType.GetGenericArguments();
-
-                        Throw.If(!implementedServiceTypes.Any(t => t.ContainsAllGenericParameters(genericParameters)),
-                            Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_DEFINE_ALL_TYPE_ARGS,
-                            implementationType, serviceType, implementedServiceTypes);
-                    }
-                    else if (serviceType.ContainsGenericParameters)
-                    {
-                        Throw.If(!implementationType.GetImplementedTypes().Contains(serviceType),
-                            Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implementationType, serviceType);
-                    }
+                    var implTypeArgs = implType.GetGenericArguments();
+                    Throw.If(!implementedServiceTypes.Any(t => t.ContainsAllGenericParameters(implTypeArgs)),
+                        Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS,
+                        implType, serviceType, implementedServiceTypes);
                 }
             }
         }
@@ -1991,6 +1984,9 @@ when resolving {1}.";
     {
         public enum IncludeTypeItself { No, AsFirst }
 
+        /// <summary>
+        /// Returns all type interfaces and base types except object.
+        /// </summary>
         public static Type[] GetImplementedTypes(this Type type, IncludeTypeItself includeTypeItself = IncludeTypeItself.No)
         {
             Type[] results;

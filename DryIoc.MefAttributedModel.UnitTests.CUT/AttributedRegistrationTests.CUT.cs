@@ -245,7 +245,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportAll(ExcludeTypes = new []{ typeof(IAnotherDb) })]
+    [ExportAll(Except = new []{ typeof(IAnotherDb) })]
     public class DbMan<T> : ISomeDb<T>, IAnotherDb
     {
     }

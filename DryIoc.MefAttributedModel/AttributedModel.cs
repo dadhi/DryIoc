@@ -571,15 +571,13 @@ Only single metadata is supported per implementation type, please remove the res
         public static Func<Type, bool> ExportedTypes = Registrator.PublicTypes;
 
         public string ContractName { get; set; }
-        public Type[] ExcludeTypes { get; set; }
+        public Type[] Except { get; set; }
 
         public IEnumerable<Type> GetAllContractTypes(Type implementationType)
         {
             var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeTypeItself.AsFirst)
                 .Where(ExportedTypes);
-            return ExcludeTypes == null || ExcludeTypes.Length == 0 
-                ? contractTypes 
-                : contractTypes.Except(ExcludeTypes);
+            return Except == null || Except.Length == 0 ? contractTypes : contractTypes.Except(Except);
         }
     }
 
