@@ -239,7 +239,13 @@ namespace DryIoc
                 Factory factory;
                 if (_factories.TryGetValue(request.ServiceType, out entry) &&
                     entry.TryGet(out factory, request.ServiceType, request.ServiceKey, ResolutionRules.GetSingleRegisteredFactory))
-                    return factory.GetFactoryPerRequestOrDefault(request, this) ?? factory;
+                {
+                    if (factory.ProvidesFactoryPerRequest)
+                        factory = factory.GetFactoryPerRequestOrDefault(request, this);
+                    if (factory == null)
+                        Throw.If(ifUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
+                    return factory;
+                }
 
                 if (request.OpenGenericServiceType != null &&
                     _factories.TryGetValue(request.OpenGenericServiceType, out entry))
@@ -248,7 +254,8 @@ namespace DryIoc
                     if (entry.TryGet(out genericFactory, request.ServiceType, request.ServiceKey, ResolutionRules.GetSingleRegisteredFactory) ||
                         request.ServiceKey != null && // OR try find generic-wrapper by ignoring service key.
                         entry.TryGet(out genericFactory, request.ServiceType, null, ResolutionRules.GetSingleRegisteredFactory) &&
-                        genericFactory.Setup.Type == FactoryType.GenericWrapper)
+                        genericFactory.Setup.Type == FactoryType.GenericWrapper &&
+                        genericFactory.ProvidesFactoryPerRequest)
                     {
                         newFactory = genericFactory.GetFactoryPerRequestOrDefault(request, this);
                     }
@@ -327,7 +334,7 @@ namespace DryIoc
                     if (((DecoratorSetup)factory.Setup).IsApplicable(request))
                     {
                         // Cache closed generic registration produced by open-generic decorator.
-                        if (decoratorIndex++ >= openGenericDecoratorIndex)
+                        if (decoratorIndex++ >= openGenericDecoratorIndex && factory.ProvidesFactoryPerRequest)
                             factory = Register(factory.GetFactoryPerRequestOrDefault(request, this), serviceType, null);
 
                         if (decorator.CachedExpression == null)
@@ -1302,7 +1309,9 @@ when resolving {1}.";
 
         public virtual void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType) { }
 
-        public abstract Factory GetFactoryPerRequestOrDefault(Request request, IRegistry registry);
+        public virtual bool ProvidesFactoryPerRequest { get { return false; }}
+
+        public virtual Factory GetFactoryPerRequestOrDefault(Request request, IRegistry registry) { return null; }
 
         public Expression GetExpression(Request request, IRegistry registry)
         {
@@ -1372,11 +1381,14 @@ when resolving {1}.";
     {
         public override Type ImplementationType { get { return _implementationType; } }
 
+        public override bool ProvidesFactoryPerRequest { get { return _providesFactoryPerRequest; } }
+
         public ReflectionFactory(Type implementationType, IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
             _implementationType = implementationType.ThrowIfNull()
                 .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
+            _providesFactoryPerRequest = _implementationType.IsGenericTypeDefinition;
             _getConstructor = getConstructor;
         }
 
@@ -1419,9 +1431,6 @@ when resolving {1}.";
 
         public override Factory GetFactoryPerRequestOrDefault(Request request, IRegistry _)
         {
-            if (!_implementationType.IsGenericTypeDefinition)
-                return null;
-
             var closedTypeArgs = _implementationType == request.OpenGenericServiceType
                 ? request.ServiceType.GetGenericArguments()
                 : GetClosedTypeArgsForGenericImplementationType(_implementationType, request);
@@ -1506,6 +1515,7 @@ when resolving {1}.";
         #region Implementation
 
         private readonly Type _implementationType;
+        private readonly bool _providesFactoryPerRequest;
         private readonly GetConstructor _getConstructor;
 
         public ConstructorInfo GetConstructor(Type type)
@@ -1733,11 +1743,6 @@ when resolving {1}.";
             _getExpression = getExpression.ThrowIfNull();
         }
 
-        public override Factory GetFactoryPerRequestOrDefault(Request request, IRegistry registry)
-        {
-            return null;
-        }
-
         protected override Expression CreateExpression(Request request, IRegistry registry)
         {
             return _getExpression(request, registry).ThrowIfNull(Error.DELEGATE_FACTORY_EXPRESSION_RETURNED_NULL, request);
@@ -1752,6 +1757,8 @@ when resolving {1}.";
 
     public class FactoryProvider : Factory
     {
+        public override bool ProvidesFactoryPerRequest { get { return true; } }
+
         public FactoryProvider(Func<Request, IRegistry, Factory> getFactoryOrDefault, FactorySetup setup = null)
             : base(setup: setup)
         {

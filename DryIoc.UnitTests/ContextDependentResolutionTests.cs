@@ -74,7 +74,19 @@ namespace DryIoc.UnitTests
             var user1 = container.Resolve<User1>();
             Assert.That(user1.Logger, Is.InstanceOf<PlainLogger>());
         }
+
+        [Test]
+        public void If_FactoryProvider_is_returns_null_factory_it_should_Throw_Unable_to_resolve()
+        {
+            var container = new Container();
+            container.Register<object>(new FactoryProvider((request, registry) => null));
+
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<object>());
+        }
     }
+
+    #region CUT
 
     public interface ILogger
     {
@@ -144,4 +156,6 @@ namespace DryIoc.UnitTests
             Logger = logger;
         }
     }
+
+    #endregion
 }
