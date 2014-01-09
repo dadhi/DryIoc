@@ -188,7 +188,7 @@ namespace DryIoc.UnitTests
 
             Assert.Throws<ContainerException>(() =>
                 // should be INT instead of last BOOL
-                container.Resolve<IDouble<int, Nested<IDouble<Nested<string>, bool>>>>()); 
+                container.Resolve<IDouble<int, Nested<IDouble<Nested<string>, bool>>>>());
         }
 
         [Test]
@@ -207,7 +207,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
                 container.Register(typeof(Banana<>), typeof(BananaSplit<,>)));
         }
 
@@ -228,7 +228,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
                 container.Register(typeof(IDisposable), typeof(IceCreamSource<>)));
         }
 
@@ -246,11 +246,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
-            
+
             container.Resolve<IceCreamSource<bool>>();
             container.Resolve<IceCream<bool>>();
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
                 container.Resolve<IDisposable>());
         }
 
@@ -271,7 +271,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             var genericButNotClosedType = typeof(Closed<>).BaseType;
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
                 container.Register(genericButNotClosedType));
         }
 
@@ -282,6 +282,15 @@ namespace DryIoc.UnitTests
 
             Assert.Throws<ContainerException>(() =>
                 container.Register(typeof(Closed<>).BaseType, typeof(Closed<>)));
+        }
+
+        [Test]
+        public void When_using_ReflectionFactory_alone_Then_resolving_service_with_not_enough_type_args_should_Throw()
+        {
+            var factory = new ReflectionFactory(typeof(BananaSplit<,>));
+
+            Assert.Throws<ContainerException>(() =>
+                factory.GetFactoryPerRequestOrDefault(Request.Create(typeof(Banana<int>)), new Container()));
         }
     }
 
@@ -336,9 +345,15 @@ namespace DryIoc.UnitTests
         }
     }
 
-    public class Open<T> {}
+    public class Open<T> { }
 
-    public class Closed<T> : Open<T> {}
+    public class Closed<T> : Open<T> { }
+
+    public class Wrap<T> { }
+
+    public class Wrap<T1, T2> { }
+
+    public interface IFizz<T1, T2> { }
 
     public class BuzzDiffArgCount<T1, T2> : IFizz<Wrap<T2>, T1> { }
 

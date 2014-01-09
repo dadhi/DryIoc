@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -41,54 +39,6 @@ namespace DryIoc.UnitTests
 
             Assert.That(types, Is.EqualTo(new[] { typeof(IB), typeof(C) }));
         }
-
-        [Test]
-        public void Should_find_mismatch_between_closed_and_base_generic_args()
-        {
-            Assert.IsFalse(MatchOpenImplWithClosedBaseTypeArgs(typeof(Buzz<,>), typeof(IFizz<int, string>)));
-            Assert.IsFalse(MatchOpenImplWithClosedBaseTypeArgs(typeof(Buzz<,>), typeof(IFizz<int, Wrap<string>>)));
-            Assert.IsFalse(MatchOpenImplWithClosedBaseTypeArgs(typeof(Buzz<,>), typeof(IFizz<int, Wrap<IFizz<string, int>>>)));
-            Assert.IsTrue(MatchOpenImplWithClosedBaseTypeArgs(typeof(Buzz<,>), typeof(IFizz<int, Wrap<IFizz<Wrap<string>, int>>>)));
-        }
-
-        [Test]
-        public void Should_find_mismatch_between_closed_and_base_generic_args_With_multiple_different_closed_types_matched_to_single_open_arg()
-        {
-            // both INT and BOOL are matched with T2.
-            Assert.IsFalse(MatchOpenImplWithClosedBaseTypeArgs(typeof(Buzz<,>), typeof(IFizz<int, Wrap<IFizz<Wrap<string>, bool>>>)));
-        }
-
-        [Test]
-        public void Should_find_mismatch_between_closed_and_base_generic_args_With_closed_arg_in_the_middle()
-        {
-            Assert.IsTrue(MatchOpenImplWithClosedBaseTypeArgs(typeof(BuzzInt<,>), typeof(IFizz<IFizz<string, string>, bool>)));
-            Assert.IsFalse(MatchOpenImplWithClosedBaseTypeArgs(typeof(BuzzInt<,>), typeof(IFizz<IFizz<string, Wrap<double>>, bool>)));
-        }
-
-        [Test]
-        public void Should_find_mismatch_between_closed_and_base_generic_args_With_closed_generic_arg_in_the_middle()
-        {
-            Assert.IsTrue(MatchOpenImplWithClosedBaseTypeArgs(typeof(BuzzWrapInt<,>), typeof(IFizz<IFizz<string, Wrap<int>>, bool>)));
-            Assert.IsFalse(MatchOpenImplWithClosedBaseTypeArgs(typeof(BuzzWrapInt<,>), typeof(IFizz<IFizz<string, Wrap<double>>, bool>)));
-        }
-
-        [Test]
-        public void Should_find_mismatch_between_closed_and_base_generic_args_With_different_generic_type_arg()
-        {
-            Assert.IsTrue(MatchOpenImplWithClosedBaseTypeArgs(typeof(BuzzDiffArg<,>), typeof(IFizz<Wrap<string>, bool>)));
-            Assert.IsFalse(MatchOpenImplWithClosedBaseTypeArgs(typeof(BuzzDiffArg<,>), typeof(IFizz<DifferentWrap<string>, bool>)));
-        }
-
-        private static bool MatchOpenImplWithClosedBaseTypeArgs(Type openImplType, Type closedBaseType)
-        {
-            var baseTypeDefinition = closedBaseType.GetGenericTypeDefinition();
-            var baseTypes = openImplType.GetImplementedTypes();
-            var openBaseType = Array.Find(baseTypes, t => t.ContainsGenericParameters && t.GetGenericTypeDefinition() == baseTypeDefinition);
-            var openBaseTypeArgs = openBaseType.GetGenericArguments();
-
-            IDictionary<string, Type> ignored = new Dictionary<string, Type>();
-            return TypeTools.MatchBaseOpenWithClosedGenericTypeArgs(openBaseTypeArgs, closedBaseType.GetGenericArguments(), ref ignored);
-        }
     }
 
     #region CUT
@@ -115,26 +65,6 @@ namespace DryIoc.UnitTests
     public interface IFuzz { }
 
     public interface IBuzz { }
-
-    public interface IFizz<T1, T2> { }
-
-    public class Fizz<T2, T1> : IFizz<T1, T2> { }
-
-    public class Buzz<T1, T2> : IFizz<T2, Wrap<IFizz<Wrap<T1>, T2>>> { }
-
-    public class BuzzInt<T1, T2> : IFizz<IFizz<T1, string>, T2> { }
-
-    public class BuzzWrapInt<T1, T2> : IFizz<IFizz<T1, Wrap<int>>, T2> { }
-
-    public class BuzzDiffArg<T1, T2> : IFizz<Wrap<T2>, T1> { }
-
-    public class Wrap<T> { }
-    public class Wrap<T1, T2> { }
-    public class DifferentWrap<T> { }
-
-    public class BuzzWithConstaints<T> : IBuzzWithConstraint<T> where T : IFizz<int, string> { }
-
-    public interface IBuzzWithConstraint<T> where T : IFizz<int, string> { }
 
     #endregion
 }
