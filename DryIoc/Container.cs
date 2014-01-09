@@ -32,7 +32,6 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 
-// TODO: Add doc-comments for all public API.
 namespace DryIoc
 {
     /// <summary>
