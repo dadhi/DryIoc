@@ -65,7 +65,7 @@ namespace DryIoc
             return new Container(this);
         }
 
-        public ResolutionRules.ResolveUnregisteredService UseRegistrationsFrom(IRegistry registry)
+        public ResolutionRules.ResolveUnregisteredService ResolveUnregisteredFrom(IRegistry registry)
         {
             ResolutionRules.ResolveUnregisteredService
                 useRegistryRule = (request, _) => registry.GetOrAddFactory(request, IfUnresolved.ReturnNull);
