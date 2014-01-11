@@ -45,7 +45,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Samples", "DryIoc.Samples\DryIoc.Samples.csproj", "{022FD983-8D10-493F-B9D5-7D5593736D58}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Sample.CUT", "DryIoc.Sample.CUT\DryIoc.Sample.CUT.csproj", "{4D1145DB-53DF-414B-8826-A38CF83B4678}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Samples.CUT", "DryIoc.Samples.CUT\DryIoc.Samples.CUT.csproj", "{4D1145DB-53DF-414B-8826-A38CF83B4678}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

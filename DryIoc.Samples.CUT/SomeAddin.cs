@@ -1,6 +1,4 @@
-﻿using DryIoc.Samples;
-
-namespace DryIoc.Sample.CUT
+﻿namespace DryIoc.Samples.CUT
 {
     public class SomeAddin : IAddin
     {

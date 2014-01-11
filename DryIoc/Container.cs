@@ -47,12 +47,12 @@ namespace DryIoc
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
             _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
 
-            _state = new object[3];
+            _constants = new object[3];
 
             // Put reference to container into constants, to support container access inside expression. 
             // It is common for dynamic scenarios.
-            _state[REGISTRY_WEAKREF_CONST_INDEX] = new WeakReference(this);
-            _state[CURRENT_SCOPE_CONST_INDEX] = _state[SINGLETON_SCOPE_CONST_INDEX] = new Scope();
+            _constants[CONSTANTS_REGISTRY_WEAKREF_INDEX] = new WeakReference(this);
+            _constants[CONSTANTS_CURRENT_SCOPE_INDEX] = _constants[CONSTANTS_SINGLETON_SCOPE_INDEX] = new Scope();
 
             ResolutionRules = new ResolutionRules();
             (setup ?? DefaultSetup).Invoke(this);
@@ -75,7 +75,7 @@ namespace DryIoc
 
         public void Dispose()
         {
-            ((Scope)_state[CURRENT_SCOPE_CONST_INDEX]).Dispose();
+            ((Scope)_constants[CONSTANTS_CURRENT_SCOPE_INDEX]).Dispose();
         }
 
         #region Compiled Factory
@@ -83,12 +83,12 @@ namespace DryIoc
         public static readonly ParameterExpression ConstantsParameter = Expression.Parameter(typeof(object[]), "constants");
         public static readonly ParameterExpression ResolutionScopeParameter = Expression.Parameter(typeof(Scope), "resolutionScope");
 
-        public static readonly int REGISTRY_WEAKREF_CONST_INDEX = 0;
-        public static readonly int SINGLETON_SCOPE_CONST_INDEX = 1;
-        public static readonly int CURRENT_SCOPE_CONST_INDEX = 2;
+        public static readonly int CONSTANTS_REGISTRY_WEAKREF_INDEX = 0;
+        public static readonly int CONSTANTS_SINGLETON_SCOPE_INDEX = 1;
+        public static readonly int CONSTANTS_CURRENT_SCOPE_INDEX = 2;
 
         public static readonly Expression RegistryWeakRefExpression = Expression.Convert(
-            Expression.ArrayIndex(ConstantsParameter, Expression.Constant(REGISTRY_WEAKREF_CONST_INDEX)),
+            Expression.ArrayIndex(ConstantsParameter, Expression.Constant(CONSTANTS_REGISTRY_WEAKREF_INDEX)),
             typeof(WeakReference));
 
         public static readonly Expression RegistryExpression = Expression.Convert(
@@ -96,11 +96,11 @@ namespace DryIoc
             typeof(IRegistry));
 
         public static readonly Expression SingletonScopeExpression = Expression.Convert(
-            Expression.ArrayIndex(ConstantsParameter, Expression.Constant(SINGLETON_SCOPE_CONST_INDEX)),
+            Expression.ArrayIndex(ConstantsParameter, Expression.Constant(CONSTANTS_SINGLETON_SCOPE_INDEX)),
             typeof(Scope));
 
         public static readonly Expression CurrentScopeExpression = Expression.Convert(
-            Expression.ArrayIndex(ConstantsParameter, Expression.Constant(CURRENT_SCOPE_CONST_INDEX)),
+            Expression.ArrayIndex(ConstantsParameter, Expression.Constant(CONSTANTS_CURRENT_SCOPE_INDEX)),
             typeof(Scope));
 
         #endregion
@@ -168,7 +168,7 @@ namespace DryIoc
             var compiledFactory =
                 _defaultResolutionCache.GetValueOrDefault(serviceType) ??
                 ResolveAndCacheFactory(serviceType, ifUnresolved);
-            return compiledFactory(_state, resolutionScope: null);
+            return compiledFactory(_constants, resolutionScope: null);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -185,7 +185,7 @@ namespace DryIoc
                     _keyedResolutionCache.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, compiledFactory)));
             }
 
-            return compiledFactory(_state, resolutionScope: null);
+            return compiledFactory(_constants, resolutionScope: null);
         }
 
         private HashTree<Type, CompiledFactory> _defaultResolutionCache;
@@ -210,18 +210,18 @@ namespace DryIoc
 
         public ResolutionRules ResolutionRules { get; private set; }
 
-        public object[] Constants { get { return _state; } }
+        public object[] Constants { get { return _constants; } }
 
         public Expression GetConstantExpression(object constant, Type constantType)
         {
             int constantIndex;
             lock (_syncRoot)
             {
-                constantIndex = Array.IndexOf(_state, constant);
+                constantIndex = Array.IndexOf(_constants, constant);
                 if (constantIndex == -1)
                 {
-                    _state = _state.AppendOrUpdate(constant);
-                    constantIndex = _state.Length - 1;
+                    _constants = _constants.AppendOrUpdate(constant);
+                    constantIndex = _constants.Length - 1;
                 }
             }
 
@@ -440,11 +440,11 @@ namespace DryIoc
         {
             ResolutionRules = parent.ResolutionRules;
 
-            var parentConstants = parent._state;
-            _state = new object[parentConstants.Length];
-            Array.Copy(parentConstants, 0, _state, 0, parentConstants.Length);
-            _state[REGISTRY_WEAKREF_CONST_INDEX] = new WeakReference(this);
-            _state[CURRENT_SCOPE_CONST_INDEX] = new Scope();
+            var parentConstants = parent._constants;
+            _constants = new object[parentConstants.Length];
+            Array.Copy(parentConstants, 0, _constants, 0, parentConstants.Length);
+            _constants[CONSTANTS_REGISTRY_WEAKREF_INDEX] = new WeakReference(this);
+            _constants[CONSTANTS_CURRENT_SCOPE_INDEX] = new Scope();
 
             _syncRoot = parent._syncRoot;
             _factories = parent._factories;
@@ -456,7 +456,7 @@ namespace DryIoc
         private readonly object _syncRoot;
         private readonly Dictionary<Type, FactoriesEntry> _factories;
         private HashTree<Type, DecoratorsEntry[]> _decorators;
-        private object[] _state;
+        private object[] _constants;
 
         private sealed class FactoriesEntry
         {
@@ -1898,7 +1898,7 @@ when resolving {1}.";
 
                 // Create singleton now and put into constants.
                 var constants = registry.Constants;
-                var singletonScope = (Scope)constants[Container.SINGLETON_SCOPE_CONST_INDEX];
+                var singletonScope = (Scope)constants[Container.CONSTANTS_SINGLETON_SCOPE_INDEX];
                 var singleton = singletonScope.GetOrAdd(factoryID,
                     () => factoryExpr.ToFactoryExpression().CompileFactory().Invoke(constants, null));
                 return registry.GetConstantExpression(singleton, factoryExpr.Type);
