@@ -9,9 +9,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("DryIocClient.NuGet.Net40")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("EPAM Systems")]
+[assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIocClient.NuGet.Net40")]
-[assembly: AssemblyCopyright("Copyright © EPAM Systems 2013")]
+[assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
