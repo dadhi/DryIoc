@@ -49,7 +49,6 @@
     <Compile Include="ImportWithMetadataTests.cs" />
     <Compile Include="InheritedExportTests.cs" />
     <Compile Include="Performance\PerformanceTests.cs" />
-    <Compile Include="Playground\ImportPropertiesTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

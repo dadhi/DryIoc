@@ -1,8 +1,8 @@
 ﻿using System;
-using DryIoc.SpeedTestApp.Net40.Tests;
+using DryIoc.SpeedTestApp.Tests;
 using DryIoc.UnitTests.Net40.Playground;
 
-namespace DryIoc.SpeedTestApp.Net40
+namespace DryIoc.SpeedTestApp
 {
     class Program
     {

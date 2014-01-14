@@ -47,6 +47,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Samples", "DryIoc.Sa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Samples.CUT", "DryIoc.Samples.CUT\DryIoc.Samples.CUT.csproj", "{4D1145DB-53DF-414B-8826-A38CF83B4678}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Playground", "DryIoc.Playground\DryIoc.Playground.csproj", "{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -227,6 +229,16 @@ Global
 		{4D1145DB-53DF-414B-8826-A38CF83B4678}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{4D1145DB-53DF-414B-8826-A38CF83B4678}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{4D1145DB-53DF-414B-8826-A38CF83B4678}.Release|x86.ActiveCfg = Release|Any CPU
+		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

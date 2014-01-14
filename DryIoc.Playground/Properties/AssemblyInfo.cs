@@ -1,15 +1,14 @@
 ﻿using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("DryIocClient.NuGet.Net35")]
+[assembly: AssemblyTitle("DryIoc.Playground")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("DryIocClient.NuGet.Net35")]
+[assembly: AssemblyProduct("DryIoc.Playground")]
 [assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -20,7 +19,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("dda4ec0d-14fa-472e-b063-0a61598d93b4")]
+[assembly: Guid("129a162a-546c-4912-abd1-5d7d892382ca")]
 
 // Version information for an assembly consists of the following four values:
 //

@@ -1,6 +1,6 @@
 ﻿using System.Collections;
 
-namespace DryIoc.UnitTests.Playground
+namespace DryIoc.Playground
 {
     public class TreeBuilderTests
     {
