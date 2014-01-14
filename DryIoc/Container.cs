@@ -241,7 +241,6 @@ namespace DryIoc
                 }
             }
 
-
             if (factory == null)
             {
                 var factoryContext = ResolutionRules.ForUnregisteredService.Invoke(r => r(request, this));

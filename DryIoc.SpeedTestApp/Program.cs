@@ -13,7 +13,8 @@ namespace DryIoc.SpeedTestApp
 		static void Main()
 		{
 			Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            CompareTreeGet();
+		    CompareDirectVsIndirectArrayAccessSpeed();
+            //CompareTreeGet();
             //CompareClosureFieldAccess();
             //DoCompareTryGetVsGetOrDefault();
 		    //CompareHashTreeEnumeration();
@@ -21,6 +22,13 @@ namespace DryIoc.SpeedTestApp
 		    //CompareTypesForEquality(typeof(string));
 			Console.ReadKey();
 		}
+
+        private static void CompareDirectVsIndirectArrayAccessSpeed()
+        {
+            DirectVsIndirectArrayAccessSpeedTests.Compare();
+            Console.WriteLine();
+            DirectVsIndirectArrayAccessSpeedTests.Compare();
+        }
 
         private static void DoCompareTryGetVsGetOrDefault()
         {

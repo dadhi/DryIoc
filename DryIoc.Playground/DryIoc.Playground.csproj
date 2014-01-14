@@ -41,6 +41,7 @@
   <ItemGroup>
     <Compile Include="AvlTree.cs" />
     <Compile Include="CreateEnumerableWithExpressionTests.cs" />
+    <Compile Include="DirectVsIndirectArrayAccessSpeedTests.cs" />
     <Compile Include="Experiments.cs" />
     <Compile Include="HashAndIntTrees.cs" />
     <Compile Include="HashTreeAccessSpeedTests.cs" />
