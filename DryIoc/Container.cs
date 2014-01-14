@@ -561,9 +561,12 @@ namespace DryIoc
         public static void Default(IRegistry registry)
         {
             registry.ResolutionRules.UnregisteredServices =
-                registry.ResolutionRules.UnregisteredServices.Append(
-                    ResolveEnumerableAsStaticArray,
-                    ResolveManyDynamically);
+                registry.ResolutionRules.UnregisteredServices.Append(ResolveEnumerableAsStaticArray);
+
+            var manyFactory = new FactoryProvider(
+                (_, __) => new DelegateFactory(GetManyExpression),
+                ServiceSetup.With(FactoryCachePolicy.ShouldNotCacheExpression));
+                        registry.Register(typeof(Many<>), manyFactory);
 
             var funcFactory = new FactoryProvider(
                 (_, __) => new DelegateFactory(GetFuncExpression),
@@ -623,32 +626,25 @@ namespace DryIoc
             });
         };
 
-        public static ResolutionRules.ResolveUnregisteredService ResolveManyDynamically = (req, _) =>
+        public static Expression GetManyExpression(Request request, IRegistry registry)
         {
-            if (req.OpenGenericServiceType != typeof(Many<>))
-                return null;
+            var dynamicEnumerableType = request.ServiceType;
+            var itemType = dynamicEnumerableType.GetGenericArguments()[0];
 
-            return new DelegateFactory((request, registry) =>
-            {
-                var dynamicEnumerableType = request.ServiceType;
-                var itemType = dynamicEnumerableType.GetGenericArguments()[0];
+            var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
 
-                var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
+            // Composite pattern support: filter out composite root from available keys.
+            var parentFactoryID = -1;
+            var parent = request.GetNonWrapperParentOrDefault();
+            if (parent != null && parent.ServiceType == wrappedItemType)
+                parentFactoryID = parent.FactoryID;
 
-                // Composite pattern support: filter out composite root from available keys.
-                var parentFactoryID = -1;
-                var parent = request.GetNonWrapperParentOrDefault();
-                if (parent != null && parent.ServiceType == wrappedItemType)
-                    parentFactoryID = parent.FactoryID;
+            var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, wrappedItemType);
+            var resolveMethodCallExpr = Expression.Call(resolveMethod,
+                Container.RegistryWeakRefExpression, Expression.Constant(parentFactoryID));
 
-                var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, wrappedItemType);
-                var resolveMethodCallExpr = Expression.Call(resolveMethod,
-                    Container.RegistryWeakRefExpression, Expression.Constant(parentFactoryID));
-
-                return Expression.New(dynamicEnumerableType.GetConstructors()[0], resolveMethodCallExpr);
-            },
-            setup: ServiceSetup.With(FactoryCachePolicy.ShouldNotCacheExpression));
-        };
+            return Expression.New(dynamicEnumerableType.GetConstructors()[0], resolveMethodCallExpr);
+        }
 
         public static Expression GetFuncExpression(Request request, IRegistry registry)
         {
