@@ -1442,7 +1442,7 @@ when resolving {1}.";
             {
                 result = CreateExpression(request, registry);
                 if (Reuse != null)
-                    result = Reuse.Of(request, registry, ID, result);
+                    result = Reuse.Apply(request, registry, ID, result);
                 if (Setup.CachePolicy == FactoryCachePolicy.CouldCacheExpression)
                     Interlocked.Exchange(ref _cachedExpression, result);
             }
@@ -1468,7 +1468,7 @@ when resolving {1}.";
                 return Expression.Lambda(funcType, decorator, func.Parameters);
 
             if (Reuse != null)
-                func = Expression.Lambda(funcType, Reuse.Of(request, registry, ID, func.Body), func.Parameters);
+                func = Expression.Lambda(funcType, Reuse.Apply(request, registry, ID, func.Body), func.Parameters);
 
             if (decorator != null)
                 func = Expression.Lambda(funcType, Expression.Invoke(decorator, func.Body), func.Parameters);
@@ -1840,7 +1840,7 @@ when resolving {1}.";
 
     public interface IReuse
     {
-        Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr);
+        Expression Apply(Request request, IRegistry registry, int factoryID, Expression factoryExpr);
     }
 
     public static class Reuse
@@ -1880,7 +1880,7 @@ when resolving {1}.";
                 _scope = scope;
             }
 
-            public Expression Of(Request _, IRegistry __, int factoryID, Expression factoryExpr)
+            public Expression Apply(Request _, IRegistry __, int factoryID, Expression factoryExpr)
             {
                 return GetScopedServiceExpression(_scope, factoryID, factoryExpr);
             }
@@ -1890,7 +1890,7 @@ when resolving {1}.";
 
         private sealed class SingletonReuse : IReuse
         {
-            public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+            public Expression Apply(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
             {
                 // Create lazy singleton if we have Func somewhere in dependency chain.
                 var parent = request.Parent;
