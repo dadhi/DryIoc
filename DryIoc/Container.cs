@@ -566,7 +566,7 @@ namespace DryIoc
                     ResolveManyDynamically);
 
             var funcFactory = new FactoryProvider(
-                (_, __) => new DelegateFactory(GetFuncExpression, Reuse.Singleton),
+                (_, __) => new DelegateFactory(GetFuncExpression),
                 GenericWrapperSetup.With(t => t[t.Length - 1]));
             foreach (var funcType in FuncTypes)
                 registry.Register(funcType, funcFactory);
@@ -1232,7 +1232,8 @@ when resolving {1}.";
         public Request ResolveTo(Factory factory)
         {
             for (var p = Parent; p != null; p = p.Parent)
-                Throw.If(p.FactoryID == factory.ID, Error.RECURSIVE_DEPENDENCY_DETECTED, this);
+                Throw.If(p.FactoryID == factory.ID && p.FactoryType == FactoryType.Service, 
+                    Error.RECURSIVE_DEPENDENCY_DETECTED, this);
             return new Request(Parent, ServiceType, ServiceKey, Dependency, DecoratedFactoryID, factory);
         }
 
