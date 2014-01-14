@@ -426,8 +426,9 @@ namespace DryIoc
 
         private bool TryFindEntry(out FactoriesEntry entry, Type serviceType)
         {
-            return _factories.TryGetValue(serviceType, out entry) || serviceType.IsGenericType &&
-                   _factories.TryGetValue(serviceType.GetGenericTypeDefinition().ThrowIfNull(), out entry);
+            return _factories.TryGetValue(serviceType, out entry) || 
+                serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition &&
+                _factories.TryGetValue(serviceType.GetGenericTypeDefinition().ThrowIfNull(), out entry);
         }
 
         private static bool AlwaysTrue<T>(T _) { return true; }
