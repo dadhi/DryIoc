@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace DryIoc.UnitTests.Playground
+namespace DryIoc.Playground
 {
     /// <summary>
     /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree, where actual node key is hash code of <typeparamref name="K"/>.

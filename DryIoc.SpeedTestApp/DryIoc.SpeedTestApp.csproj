@@ -41,6 +41,11 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\DryIoc.Playground\DryIoc.Playground.csproj">
+      <Project>{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}</Project>
+      <Name>DryIoc.Playground</Name>
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj">
       <Project>{E9D09703-354F-4BEB-A4A9-F614485BEC61}</Project>
       <Name>DryIoc.UnitTests</Name>

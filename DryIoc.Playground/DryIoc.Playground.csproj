@@ -5,11 +5,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{E9D09703-354F-4BEB-A4A9-F614485BEC61}</ProjectGuid>
+    <ProjectGuid>{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.UnitTests</RootNamespace>
-    <AssemblyName>DryIoc.UnitTests</AssemblyName>
+    <RootNamespace>DryIoc.Playground</RootNamespace>
+    <AssemblyName>DryIoc.Playground</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -31,56 +31,42 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="nunit.framework">
+    <Reference Include="nunit.framework, Version=2.6.2.12296, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\lib\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CompositePatternTests.cs" />
-    <Compile Include="ManyTests.cs" />
-    <Compile Include="Memory\NoLeakingMemoryTests.cs" />
-    <Compile Include="Performance\ClosureFieldsAccessSpeed.cs" />
-    <Compile Include="PrintTests.cs" />
-    <Compile Include="ResolutionRulesTests.cs" />
-    <Compile Include="ContainerTests.cs" />
-    <Compile Include="ContextDependentResolutionTests.cs" />
-    <Compile Include="CUT\ContainerTests.CUT.cs" />
-    <Compile Include="DiagnosticsTests.cs" />
-    <Compile Include="DecoratorTests.cs" />
-    <Compile Include="DynamicFactoryTests.cs" />
-    <Compile Include="EnumerableAndArrayTests.cs" />
-    <Compile Include="FuncTests.cs" />
-    <Compile Include="OpenGenericsTests.cs" />
-    <Compile Include="GenericWrapperTests.cs" />
-    <Compile Include="HashTreeTests.cs" />
-    <Compile Include="DelegateFactoryTests.cs" />
-    <Compile Include="LazyTests.cs" />
-    <Compile Include="MetadataTests.cs" />
-    <Compile Include="Performance\CompareTryGetVsGetOrNull.cs" />
-    <Compile Include="Performance\MethodArgumentsPassingSpeedComparison.cs" />
-    <Compile Include="Performance\ReflectionPerformanceTests.cs" />
-    <Compile Include="DecoratorConditionTests.cs" />
+    <Compile Include="AvlTree.cs" />
+    <Compile Include="CreateEnumerableWithExpressionTests.cs" />
+    <Compile Include="Experiments.cs" />
+    <Compile Include="HashAndIntTrees.cs" />
+    <Compile Include="HashTreeAccessSpeedTests.cs" />
+    <Compile Include="HashTreeEnumerationSpeedTests.cs" />
+    <Compile Include="HashTreeWithMonoidUpdate.cs" />
+    <Compile Include="IntNTree.cs" />
+    <Compile Include="IntNTreeTests.cs" />
+    <Compile Include="IntTreeTests.cs" />
+    <Compile Include="OptionsPlayTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="PropertyResolutionTests.cs" />
-    <Compile Include="RegisterAll.cs" />
-    <Compile Include="ReuseTests.cs" />
-    <Compile Include="TypeToolsTests.cs" />
-    <Compile Include="ThrowTests.cs" />
-    <Compile Include="TypeCSharpNameFormattingTests.cs" />
+    <Compile Include="ThrowPlayTests.cs" />
+    <Compile Include="TreeBuilderTests.cs" />
+    <Compile Include="TypeTree.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
+    <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj">
+      <Project>{E9D09703-354F-4BEB-A4A9-F614485BEC61}</Project>
+      <Name>DryIoc.UnitTests</Name>
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
       <Name>DryIoc</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

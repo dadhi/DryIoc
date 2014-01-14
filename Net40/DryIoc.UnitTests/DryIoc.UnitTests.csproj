@@ -114,7 +114,6 @@
     <Compile Include="..\..\DryIoc.UnitTests\TypeToolsTests.cs">
       <Link>TypeToolsTests.cs</Link>
     </Compile>
-    <Compile Include="Playground\ClosureFieldsAccessSpeed.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

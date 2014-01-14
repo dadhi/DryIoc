@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace DryIoc.UnitTests.Playground
+namespace DryIoc.Playground
 {
     /// <summary>
     /// Immutable AVL-tree (http://en.wikipedia.org/wiki/AVL_tree) with node key of type int.

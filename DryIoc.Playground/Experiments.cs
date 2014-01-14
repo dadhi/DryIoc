@@ -8,7 +8,7 @@ using System.Reflection.Emit;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.Playground
+namespace DryIoc.Playground
 {
     [TestFixture]
     [Ignore]

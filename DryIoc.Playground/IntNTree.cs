@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DryIoc.UnitTests.Playground
+namespace DryIoc.Playground
 {
     public sealed class IntNTree<V>
     {
@@ -45,16 +45,16 @@ namespace DryIoc.UnitTests.Playground
 
         public IntNTree<V> AddOrUpdate(int key, V value, UpdateValue updateValue = null)
         {
-            return AddOrUpdate(new KV<int, V>(key, value), updateValue);
+            return AddOrUpdate(new DryIoc.Playground.KV<int, V>(key, value), updateValue);
         }
 
-        internal readonly KV<int, V>[] Items;
+        internal readonly DryIoc.Playground.KV<int, V>[] Items;
         internal readonly int LeftKey;
         internal readonly int RightKey;
 
         private IntNTree() { }
 
-        private IntNTree(KV<int, V>[] items, IntNTree<V> left, IntNTree<V> right)
+        private IntNTree(DryIoc.Playground.KV<int, V>[] items, IntNTree<V> left, IntNTree<V> right)
         {
             Items = items;
             LeftKey = Items[0].Key;
@@ -65,7 +65,7 @@ namespace DryIoc.UnitTests.Playground
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private IntNTree<V> AddOrUpdate(KV<int, V> item, UpdateValue updateValue)
+        private IntNTree<V> AddOrUpdate(DryIoc.Playground.KV<int, V> item, UpdateValue updateValue)
         {
             if (Height == 0)
                 return new IntNTree<V>(new[] { item }, Empty, Empty);
@@ -74,7 +74,7 @@ namespace DryIoc.UnitTests.Playground
             {
                 if (Items.Length < N)
                 {
-                    var newItems = new KV<int, V>[Items.Length + 1];
+                    var newItems = new DryIoc.Playground.KV<int, V>[Items.Length + 1];
                     newItems[0] = item;
                     Array.Copy(Items, 0, newItems, 1, Items.Length);
                     return new IntNTree<V>(newItems, Left, Right);
@@ -87,7 +87,7 @@ namespace DryIoc.UnitTests.Playground
             {
                 if (Items.Length < N)
                 {
-                    var newItems = new KV<int, V>[Items.Length + 1];
+                    var newItems = new DryIoc.Playground.KV<int, V>[Items.Length + 1];
                     Array.Copy(Items, 0, newItems, 0, Items.Length);
                     newItems[Items.Length] = item;
                     return new IntNTree<V>(newItems, Left, Right);
@@ -101,22 +101,22 @@ namespace DryIoc.UnitTests.Playground
 
             if (item.Key == Items[i].Key) // Update value
             {
-                var newItems = new KV<int, V>[Items.Length];
+                var newItems = new DryIoc.Playground.KV<int, V>[Items.Length];
                 Array.Copy(Items, 0, newItems, 0, Items.Length);
-                newItems[i] = updateValue == null ? item : new KV<int, V>(item.Key, updateValue(Items[i].Value, item.Value));
+                newItems[i] = updateValue == null ? item : new DryIoc.Playground.KV<int, V>(item.Key, updateValue(Items[i].Value, item.Value));
                 return new IntNTree<V>(newItems, Left, Right);
             }
 
             if (Items.Length < N) // Insert value into current node
             {
-                var newItems = new KV<int, V>[Items.Length + 1];
+                var newItems = new DryIoc.Playground.KV<int, V>[Items.Length + 1];
                 Array.Copy(Items, 0, newItems, 0, i);
                 newItems[i] = item;
                 Array.Copy(Items, i, newItems, i + 1, Items.Length - i);
                 return new IntNTree<V>(newItems, Left, Right);
             }
 
-            var items = new KV<int, V>[Items.Length];
+            var items = new DryIoc.Playground.KV<int, V>[Items.Length];
 
             // Drop left item to the left node if it has room for insert, otherwise drop right item to right node.
             if (Left.Height == 0 || Left.Items.Length < N)

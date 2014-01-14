@@ -5,8 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using NUnit.Framework;
 
-
-namespace DryIoc.SpeedTestApp.Net40.Tests
+namespace DryIoc.SpeedTestApp.Tests
 {
     public class TestEnumerableCreationSpeed
     {

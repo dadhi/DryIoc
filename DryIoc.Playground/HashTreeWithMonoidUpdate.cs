@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.Playground
+namespace DryIoc.Playground
 {
     [TestFixture]
     public class HashTreeOfArrayTests

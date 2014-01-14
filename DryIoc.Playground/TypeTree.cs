@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace DryIoc.UnitTests.Playground
+namespace DryIoc.Playground
 {
     public sealed class TypeTree<V> : IEnumerable<TypeTree<V>>
     {

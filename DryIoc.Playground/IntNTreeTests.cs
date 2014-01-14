@@ -1,6 +1,6 @@
 ﻿using NUnit.Framework;
 
-namespace DryIoc.UnitTests.Playground
+namespace DryIoc.Playground
 {
     [TestFixture]
     public class IntNTreeTests

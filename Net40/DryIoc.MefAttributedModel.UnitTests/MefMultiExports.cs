@@ -2,7 +2,7 @@
 using System.ComponentModel.Composition.Hosting;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.Net40.Playground
+namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
     public class MefMultiExports
