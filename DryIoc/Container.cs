@@ -54,7 +54,7 @@ namespace DryIoc
             _constants[CONSTANTS_REGISTRY_WEAKREF_INDEX] = new WeakReference(this);
             _constants[CONSTANTS_CURRENT_SCOPE_INDEX] = _constants[CONSTANTS_SINGLETON_SCOPE_INDEX] = new Scope();
 
-            ResolutionRules = new ResolutionRules();
+            _resolutionRules = new ResolutionRules();
             (setup ?? DefaultSetup).Invoke(this);
         }
 
@@ -188,9 +188,6 @@ namespace DryIoc
             return compiledFactory(_constants, resolutionScope: null);
         }
 
-        private HashTree<Type, CompiledFactory> _defaultResolutionCache;
-        private HashTree<Type, HashTree<object, CompiledFactory>> _keyedResolutionCache;
-
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
         {
             var request = Request.Create(serviceType);
@@ -209,7 +206,7 @@ namespace DryIoc
 
         #region IRegistry
 
-        public ResolutionRules ResolutionRules { get; private set; }
+        public ResolutionRules ResolutionRules { get { return _resolutionRules; } }
 
         public object[] Constants { get { return _constants; } }
 
@@ -426,7 +423,7 @@ namespace DryIoc
 
         private bool TryFindEntry(out FactoriesEntry entry, Type serviceType)
         {
-            return _factories.TryGetValue(serviceType, out entry) || 
+            return _factories.TryGetValue(serviceType, out entry) ||
                 serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition &&
                 _factories.TryGetValue(serviceType.GetGenericTypeDefinition().ThrowIfNull(), out entry);
         }
@@ -435,12 +432,25 @@ namespace DryIoc
 
         #endregion
 
+        #region Internal State
+
+        private readonly ResolutionRules _resolutionRules;
+        private readonly object _syncRoot;
+        private readonly Dictionary<Type, FactoriesEntry> _factories;
+        private HashTree<Type, DecoratorEntry[]> _decorators;
+
+        private object[] _constants;
+        private HashTree<Type, CompiledFactory> _defaultResolutionCache;
+        private HashTree<Type, HashTree<object, CompiledFactory>> _keyedResolutionCache;
+
+        #endregion
+
         #region Implementation
 
         // Creates child container with singleton scope, constants and cache shared with parent. BUT with new CurrentScope.
         private Container(Container parent)
         {
-            ResolutionRules = parent.ResolutionRules;
+            _resolutionRules = parent.ResolutionRules;
 
             var parentConstants = parent._constants;
             _constants = new object[parentConstants.Length];
@@ -454,11 +464,6 @@ namespace DryIoc
             _defaultResolutionCache = parent._defaultResolutionCache;
             _keyedResolutionCache = parent._keyedResolutionCache;
         }
-
-        private readonly object _syncRoot;
-        private readonly Dictionary<Type, FactoriesEntry> _factories;
-        private HashTree<Type, DecoratorEntry[]> _decorators;
-        private object[] _constants;
 
         private sealed class FactoriesEntry
         {
@@ -2024,9 +2029,9 @@ when resolving {1}.";
 
     public static class TypeTools
     {
-// ReSharper disable ConstantNullCoalescingCondition
+        // ReSharper disable ConstantNullCoalescingCondition
         public static Func<Type, string> PrintDetailsDefault = t => t.FullName ?? t.Name;
-// ReSharper restore ConstantNullCoalescingCondition
+        // ReSharper restore ConstantNullCoalescingCondition
 
         public static string Print(this Type type, Func<Type, string> printDetails = null)
         {
