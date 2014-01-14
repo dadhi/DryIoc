@@ -44,6 +44,8 @@ namespace DryIoc
             _syncRoot = new object();
             _factories = new Dictionary<Type, FactoriesEntry>();
             _decorators = HashTree<Type, DecoratorEntry[]>.Empty;
+            
+            _factoryExprCache = HashTree<int, Expression>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
             _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
 
@@ -207,26 +209,6 @@ namespace DryIoc
         #region IRegistry
 
         public ResolutionRules ResolutionRules { get { return _resolutionRules; } }
-
-        public object[] Constants { get { return _constants; } }
-
-        public Expression GetConstantExpression(object constant, Type constantType)
-        {
-            int constantIndex;
-            lock (_syncRoot)
-            {
-                constantIndex = Array.IndexOf(_constants, constant);
-                if (constantIndex == -1)
-                {
-                    _constants = _constants.AppendOrUpdate(constant);
-                    constantIndex = _constants.Length - 1;
-                }
-            }
-
-            var constantIndexExpr = Expression.Constant(constantIndex, typeof(int));
-            var constantsAccesssExpr = Expression.ArrayIndex(ConstantsParameter, constantIndexExpr);
-            return Expression.Convert(constantsAccesssExpr, constantType);
-        }
 
         Factory IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
@@ -421,6 +403,36 @@ namespace DryIoc
                 : ((IRegistry)this).GetWrappedServiceTypeOrSelf(wrappedType); // unwrap recursively.
         }
 
+        public object[] Constants { get { return _constants; } }
+
+        public Expression GetConstantExpression(object constant, Type constantType)
+        {
+            int constantIndex;
+            lock (_syncRoot)
+            {
+                constantIndex = Array.IndexOf(_constants, constant);
+                if (constantIndex == -1)
+                {
+                    _constants = _constants.AppendOrUpdate(constant);
+                    constantIndex = _constants.Length - 1;
+                }
+            }
+
+            var constantIndexExpr = Expression.Constant(constantIndex, typeof(int));
+            var constantsAccesssExpr = Expression.ArrayIndex(ConstantsParameter, constantIndexExpr);
+            return Expression.Convert(constantsAccesssExpr, constantType);
+        }
+
+        public Expression GetCachedFactoryExpression(int factoryID)
+        {
+            return _factoryExprCache.GetValueOrDefault(factoryID);
+        }
+
+        public void CacheFactoryExpression(int factoryID, Expression result)
+        {
+            Interlocked.Exchange(ref _factoryExprCache, _factoryExprCache.AddOrUpdate(factoryID, result));
+        }
+
         private bool TryFindEntry(out FactoriesEntry entry, Type serviceType)
         {
             return _factories.TryGetValue(serviceType, out entry) ||
@@ -440,6 +452,8 @@ namespace DryIoc
         private HashTree<Type, DecoratorEntry[]> _decorators;
 
         private object[] _constants;
+
+        private HashTree<int, Expression> _factoryExprCache; 
         private HashTree<Type, CompiledFactory> _defaultResolutionCache;
         private HashTree<Type, HashTree<object, CompiledFactory>> _keyedResolutionCache;
 
@@ -461,6 +475,8 @@ namespace DryIoc
             _syncRoot = parent._syncRoot;
             _factories = parent._factories;
             _decorators = parent._decorators;
+
+            _factoryExprCache = parent._factoryExprCache;
             _defaultResolutionCache = parent._defaultResolutionCache;
             _keyedResolutionCache = parent._keyedResolutionCache;
         }
@@ -566,7 +582,7 @@ namespace DryIoc
             var manyFactory = new FactoryProvider(
                 (_, __) => new DelegateFactory(GetManyExpression),
                 ServiceSetup.With(FactoryCachePolicy.ShouldNotCacheExpression));
-                        registry.Register(typeof(Many<>), manyFactory);
+            registry.Register(typeof(Many<>), manyFactory);
 
             var funcFactory = new FactoryProvider(
                 (_, __) => new DelegateFactory(GetFuncExpression),
@@ -1228,7 +1244,7 @@ when resolving {1}.";
         public Request ResolveTo(Factory factory)
         {
             for (var p = Parent; p != null; p = p.Parent)
-                Throw.If(p.FactoryID == factory.ID && p.FactoryType == FactoryType.Service, 
+                Throw.If(p.FactoryID == factory.ID && p.FactoryType == FactoryType.Service,
                     Error.RECURSIVE_DEPENDENCY_DETECTED, this);
             return new Request(Parent, ServiceType, ServiceKey, Dependency, DecoratedFactoryID, factory);
         }
@@ -1440,14 +1456,14 @@ when resolving {1}.";
             if (decorator != null && !(decorator is LambdaExpression))
                 return decorator;
 
-            var result = _cachedExpression;
+            var result = registry.GetCachedFactoryExpression(ID);
             if (result == null)
             {
                 result = CreateExpression(request, registry);
                 if (Reuse != null)
                     result = Reuse.Apply(request, registry, ID, result);
                 if (Setup.CachePolicy == FactoryCachePolicy.CouldCacheExpression)
-                    Interlocked.Exchange(ref _cachedExpression, result);
+                    registry.CacheFactoryExpression(ID, result);
             }
 
             if (decorator != null)
@@ -1489,7 +1505,6 @@ when resolving {1}.";
 
         private static int _idSeedAndCount;
         private FactorySetup _setup;
-        private Expression _cachedExpression;
 
         #endregion
     }
@@ -1932,8 +1947,6 @@ when resolving {1}.";
     {
         ResolutionRules ResolutionRules { get; }
 
-        object[] Constants { get; }
-
         Factory GetOrAddFactory(Request request, IfUnresolved ifUnresolved);
 
         Factory GetFactoryOrDefault(Type serviceType, object serviceKey);
@@ -1944,7 +1957,11 @@ when resolving {1}.";
 
         Type GetWrappedServiceTypeOrSelf(Type serviceType);
 
+        object[] Constants { get; }
         Expression GetConstantExpression(object constant, Type constantType);
+
+        Expression GetCachedFactoryExpression(int factoryID);
+        void CacheFactoryExpression(int factoryID, Expression result);
     }
 
     public sealed class Many<TService>
