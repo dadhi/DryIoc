@@ -95,13 +95,12 @@ namespace DryIoc.UnitTests
             container.Register<Guts>();
             container.Register<Brain>();
 
-            container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(
-                    (out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
-                    {
-                        resultKey = null;
-                        return propertyOrField.GetCustomAttributes(typeof(ImportAttribute), false).Length != 0;
-                    });
+            container.ResolutionRules.ForPropertyOrField.Append(
+            (out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
+            {
+                resultKey = null;
+                return propertyOrField.GetCustomAttributes(typeof(ImportAttribute), false).Length != 0;
+            });
 
             var chicken = container.Resolve<FunnyChicken>();
 
@@ -116,8 +115,7 @@ namespace DryIoc.UnitTests
             container.Register<Guts>();
             container.Register<Brain>();
 
-            container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
+            container.ResolutionRules.ForPropertyOrField.Append(TryGetPropertyOrFieldServiceKey);
 
             var chicken = container.Resolve<FunnyChicken>();
 
@@ -130,8 +128,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<FunnyDuckling>();
 
-            container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
+            container.ResolutionRules.ForPropertyOrField.Append(TryGetPropertyOrFieldServiceKey);
 
             Assert.DoesNotThrow(() =>
                 container.Resolve<FunnyDuckling>());
@@ -144,8 +141,7 @@ namespace DryIoc.UnitTests
             container.Register<FunkyChicken>();
             container.Register<Guts>();
 
-            container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
+            container.ResolutionRules.ForPropertyOrField.Append(TryGetPropertyOrFieldServiceKey);
 
             var chicken = container.Resolve<FunkyChicken>();
 
@@ -159,8 +155,7 @@ namespace DryIoc.UnitTests
             container.Register<LazyChicken>();
             container.Register<Guts>(named: "lazy-me");
 
-            container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
+            container.ResolutionRules.ForPropertyOrField.Append(TryGetPropertyOrFieldServiceKey);
 
             var chicken = container.Resolve<LazyChicken>();
 

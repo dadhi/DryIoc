@@ -64,8 +64,7 @@ namespace DryIoc.UnitTests
             var juice = container.Resolve<IJuice>();
             Assert.That(juice, Is.InstanceOf<FruitJuice>());
 
-            container.ResolutionRules.UnregisteredServices =
-                container.ResolutionRules.UnregisteredServices.Append(useRegistrationsFromParent);
+            container.ResolutionRules.ForUnregisteredService.Append(useRegistrationsFromParent);
 
             Assert.DoesNotThrow(
                 () => container.Resolve<IJuice>());

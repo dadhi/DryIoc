@@ -49,8 +49,8 @@ namespace DryIoc.MefAttributedModel
 
         public static void UseImportsForResolution(this ResolutionRules rules)
         {
-            rules.ConstructorParameters = rules.ConstructorParameters.Append(GetConstructorParameterServiceKeyOrDefault);
-            rules.PropertiesAndFields = rules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
+            rules.ForConstructorParameter.Append(GetConstructorParameterServiceKeyOrDefault);
+            rules.ForPropertyOrField.Append(TryGetPropertyOrFieldServiceKey);
         }
 
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
