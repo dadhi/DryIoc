@@ -252,7 +252,7 @@ namespace DryIoc.UnitTests
 
     public class ThreadReuse : IReuse
     {
-        public Expression Of(Request _, IRegistry __, int factoryID, Expression factoryExpr)
+        public Expression Apply(Request _, IRegistry __, int factoryID, Expression factoryExpr)
         {
             return Reuse.GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
         }

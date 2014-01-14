@@ -359,14 +359,18 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_NOT_support_decorator_of_Func_with_parameters_of_service__CAUSE_TOO_COMPLICATED()
+        public void Should_support_decorator_of_Func_with_parameters()
         {
             var container = new Container();
             container.Register<IOperation, ParameterizedOperation>();
             container.Register<IOperation, FuncWithArgDecorator>(setup: DecoratorSetup.With());
 
-            Assert.Throws<ContainerException>(
-                () => container.Resolve<Func<object, IOperation>>());
+            var func = container.Resolve<Func<object, IOperation>>();
+            var operation = func("hey");
+            Assert.That(operation, Is.InstanceOf<FuncWithArgDecorator>());
+
+            var decoratedFunc = ((FuncWithArgDecorator)operation).DecoratedFunc("hey");
+            Assert.That(decoratedFunc, Is.InstanceOf<ParameterizedOperation>());
         }
     }
 
@@ -495,11 +499,11 @@ namespace DryIoc.UnitTests
 
     public class FuncWithArgDecorator : IOperation
     {
-        public IOperation Decorated;
+        public Func<object, IOperation> DecoratedFunc;
 
         public FuncWithArgDecorator(Func<object, IOperation> decoratedFunc)
         {
-            Decorated = decoratedFunc(new object());
+            DecoratedFunc = decoratedFunc;
         }
     }
 

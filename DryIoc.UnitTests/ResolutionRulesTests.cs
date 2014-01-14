@@ -139,42 +139,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_resolve_services_from_parent_container()
-        {
-            var parentContainer = new Container();
-            parentContainer.Register(typeof(IFruit), typeof(Orange));
-
-            var container = new Container();
-            container.Register(typeof(IJuice), typeof(FruitJuice));
-
-            container.UseRegistrationsFrom(parentContainer);
-
-            var juice = container.Resolve<IJuice>();
-
-            Assert.That(juice, Is.InstanceOf<FruitJuice>());
-        }
-
-        [Test]
-        public void Once_resolved_I_can_NOT_stop_resolving_services_from_parent_container()
-        {
-            var parentContainer = new Container();
-            parentContainer.Register(typeof(IFruit), typeof(Orange));
-
-            var container = new Container();
-            container.Register(typeof(IJuice), typeof(FruitJuice));
-
-            var useRegistrationsFromParent = container.UseRegistrationsFrom(parentContainer);
-            var juice = container.Resolve<IJuice>();
-            Assert.That(juice, Is.InstanceOf<FruitJuice>());
-
-            container.ResolutionRules.UnregisteredServices =
-                container.ResolutionRules.UnregisteredServices.Append(useRegistrationsFromParent);
-
-            Assert.DoesNotThrow(
-                () => container.Resolve<IJuice>());
-        }
-
-        [Test]
         public void I_should_be_able_to_manually_register_open_generic_singletons_and_resolve_them_directly()
         {
             var container = new Container();
@@ -322,28 +286,6 @@ namespace DryIoc.UnitTests
         {
             Foo = foo;
         }
-    }
-
-    public class FruitJuice : IJuice
-    {
-        public IFruit Fruit { get; set; }
-
-        public FruitJuice(IFruit fruit)
-        {
-            Fruit = fruit;
-        }
-    }
-
-    public interface IFruit
-    {
-    }
-
-    public class Orange : IFruit
-    {
-    }
-
-    public interface IJuice
-    {
     }
 
     public class TransientOpenGenericService<T>

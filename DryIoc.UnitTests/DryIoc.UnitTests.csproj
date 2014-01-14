@@ -65,6 +65,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PropertyResolutionTests.cs" />
     <Compile Include="RegisterAll.cs" />
+    <Compile Include="ResolveUnregisteredFromTests.cs" />
     <Compile Include="ReuseTests.cs" />
     <Compile Include="TypeToolsTests.cs" />
     <Compile Include="ThrowTests.cs" />

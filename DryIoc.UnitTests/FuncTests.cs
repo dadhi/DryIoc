@@ -28,7 +28,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_Func_multiple_times_should_return_same_Func_instances()
+        public void Func_itself_is_transient()
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
@@ -36,19 +36,7 @@ namespace DryIoc.UnitTests
             var first = container.Resolve<Func<IService>>();
             var second = container.Resolve<Func<IService>>();
 
-            Assert.That(first, Is.SameAs(second));
-        }
-
-        [Test]
-        public void Resolving_Func_multiple_times_as_dependency_should_return_same_Func_instances()
-        {
-            var container = new Container();
-            container.Register(typeof(IService), typeof(Service));
-            container.Register(typeof(ServiceWithTwoSameFuncDependencies));
-
-            var service = container.Resolve<ServiceWithTwoSameFuncDependencies>();
-
-            Assert.That(service.Factory1, Is.SameAs(service.Factory2));
+            Assert.That(first, Is.Not.SameAs(second));
         }
 
         [Test]
