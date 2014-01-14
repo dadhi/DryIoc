@@ -190,7 +190,7 @@ namespace DryIoc
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var request = Request.Create(serviceType);
+            var request = Request.Create(serviceType, constants: new object[] { "Woof! "});
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null)
                 return EmptyCompiledFactory;
@@ -1264,20 +1264,22 @@ when resolving {1}.";
         public readonly Type ImplementationType;
         public readonly object Metadata;
 
+        public object[] Constants;
+
         // Start from creating request, then Resolve it with factory and Push new sub-requests.
-        public static Request Create(Type serviceType, object serviceKey = null)
+        public static Request Create(Type serviceType, object serviceKey = null, object[] constants = null)
         {
-            return new Request(null, serviceType, serviceKey);
+            return new Request(null, serviceType, serviceKey, constants: constants);
         }
 
         public Request Push(Type serviceType, object serviceKey, DependencyInfo dependency = null)
         {
-            return new Request(this, serviceType, serviceKey, dependency);
+            return new Request(this, serviceType, serviceKey, dependency, constants:Constants);
         }
 
         public Request PushPreservingParentKey(Type serviceType, DependencyInfo dependency = null)
         {
-            return new Request(this, serviceType, ServiceKey, dependency);
+            return new Request(this, serviceType, ServiceKey, dependency, constants: Constants);
         }
 
         public Request ResolveTo(Factory factory)
@@ -1285,12 +1287,12 @@ when resolving {1}.";
             for (var p = Parent; p != null; p = p.Parent)
                 Throw.If(p.FactoryID == factory.ID && p.FactoryType == FactoryType.Service,
                     Error.RECURSIVE_DEPENDENCY_DETECTED, this);
-            return new Request(Parent, ServiceType, ServiceKey, Dependency, DecoratedFactoryID, factory);
+            return new Request(Parent, ServiceType, ServiceKey, Dependency, DecoratedFactoryID, factory, Constants);
         }
 
         public Request MakeDecorated()
         {
-            return new Request(Parent, ServiceType, ServiceKey, Dependency, FactoryID);
+            return new Request(Parent, ServiceType, ServiceKey, Dependency, FactoryID, constants: Constants);
         }
 
         public Request GetNonWrapperParentOrDefault()
@@ -1318,7 +1320,7 @@ when resolving {1}.";
         #region Implementation
 
         private Request(Request parent, Type serviceType, object serviceKey, DependencyInfo dependency = null,
-            int decoratedFactoryID = 0, Factory factory = null)
+            int decoratedFactoryID = 0, Factory factory = null, object[] constants = null)
         {
             Parent = parent;
             ServiceKey = serviceKey;
@@ -1337,6 +1339,8 @@ when resolving {1}.";
                 ImplementationType = factory.ImplementationType;
                 Metadata = factory.Setup.Metadata;
             }
+
+            Constants = constants;
         }
 
         private string Print()
