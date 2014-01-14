@@ -180,7 +180,7 @@ namespace DryIoc
                 var request = Request.Create(serviceType, serviceKey);
                 var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
                 if (factory == null) return null;
-                compiledFactory = factory.GetExpression(request, this).ToFactoryExpression().CompileFactory();
+                compiledFactory = factory.GetExpression(request, this).CompileToFactory();
                 Interlocked.Exchange(ref _keyedResolutionCache,
                     _keyedResolutionCache.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, compiledFactory)));
             }
@@ -197,7 +197,7 @@ namespace DryIoc
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null)
                 return EmptyCompiledFactory;
-            var compiledFactory = factory.GetExpression(request, this).ToFactoryExpression().CompileFactory();
+            var compiledFactory = factory.GetExpression(request, this).CompileToFactory();
             Interlocked.Exchange(ref _defaultResolutionCache,
                 _defaultResolutionCache.AddOrUpdate(serviceType, compiledFactory));
             return compiledFactory;
@@ -524,7 +524,7 @@ namespace DryIoc
 
     public static partial class FactoryCompiler
     {
-        public static Expression<CompiledFactory> ToFactoryExpression(this Expression expression)
+        public static Expression<CompiledFactory> ToCompiledFactoryExpression(this Expression expression)
         {
             // Removing not required Convert from expression root, because CompiledFactory result still be converted at the end.
             if (expression.NodeType == ExpressionType.Convert)
@@ -532,8 +532,9 @@ namespace DryIoc
             return Expression.Lambda<CompiledFactory>(expression, Container.ConstantsParameter, Container.ResolutionScopeParameter);
         }
 
-        public static CompiledFactory CompileFactory(this Expression<CompiledFactory> factoryExpression)
+        public static CompiledFactory CompileToFactory(this Expression expression)
         {
+            var factoryExpression = expression.ToCompiledFactoryExpression();
             CompiledFactory factory = null;
             CompileToMethod(factoryExpression, ref factory);
             // ReSharper disable ConstantNullCoalescingCondition
@@ -672,7 +673,7 @@ namespace DryIoc
             var factoryExpr = registry
                 .GetOrAddFactory(serviceRequest, IfUnresolved.Throw)
                 .GetExpression(serviceRequest, registry)
-                .ToFactoryExpression();
+                .ToCompiledFactoryExpression();
 
             var factoryConstExpr = registry.GetConstantExpression(factoryExpr, typeof(Expression<CompiledFactory>));
             return Expression.New(ctor, factoryConstExpr);
@@ -1901,7 +1902,7 @@ when resolving {1}.";
                 // Create singleton object now and put it into constants.
                 var singletonScope = (Scope)registry.Constants[Container.CONSTANTS_SINGLETON_SCOPE_INDEX];
                 var singleton = singletonScope.GetOrAdd(factoryID,
-                    () => factoryExpr.ToFactoryExpression().CompileFactory().Invoke(registry.Constants, null));
+                    () => factoryExpr.CompileToFactory().Invoke(registry.Constants, null));
                 return registry.GetConstantExpression(singleton, factoryExpr.Type);
             }
         }
