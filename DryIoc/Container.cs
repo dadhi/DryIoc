@@ -43,7 +43,7 @@ namespace DryIoc
         {
             _syncRoot = new object();
             _factories = new Dictionary<Type, FactoriesEntry>();
-            _decorators = HashTree<Type, DecoratorEntry[]>.Empty;
+            _decorators = HashTree<Type, Factory[]>.Empty;
 
             _factoryExprCache = HashTree<int, Expression>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
@@ -116,7 +116,7 @@ namespace DryIoc
             {
                 if (factory.Setup.Type == FactoryType.Decorator)
                 {
-                    _decorators = _decorators.AddOrUpdate(serviceType, new[] { new DecoratorEntry(factory) }, Sugar.Append);
+                    _decorators = _decorators.AddOrUpdate(serviceType, new[] { factory }, Sugar.Append);
                     return factory;
                 }
 
@@ -254,7 +254,7 @@ namespace DryIoc
             return factory.With(request, this);
         }
 
-        Expression IRegistry.GetDecoratorExpressionOrDefault(Request request)
+        Expression IRegistry.GetDecoratorExpressionOrDefault(Request request, IRegistry registry)
         {
             // Decorators for non service types are not supported.
             if (request.FactoryType != FactoryType.Service)
@@ -275,7 +275,7 @@ namespace DryIoc
                 var decoratorRequest = request.MakeDecorated();
                 for (var i = 0; i < funcDecorators.Length; i++)
                 {
-                    var decorator = funcDecorators[i].Factory;
+                    var decorator = funcDecorators[i];
                     if (((DecoratorSetup)decorator.Setup).IsApplicable(request))
                     {
                         var newDecorator = decorator.With(decoratorRequest, this).GetExpression();
@@ -293,51 +293,46 @@ namespace DryIoc
                 }
             }
 
-            IEnumerable<DecoratorEntry> decorators = _decorators.GetValueOrDefault(serviceType);
-            var openGenericDecoratorIndex = decorators == null ? 0 : ((DecoratorEntry[])decorators).Length;
+            var decorators = _decorators.GetValueOrDefault(serviceType);
+            var openGenericDecoratorIndex = decorators == null ? 0 : decorators.Length;
             if (request.OpenGenericServiceType != null)
-            {
-                var openGenericDecorators = _decorators.GetValueOrDefault(request.OpenGenericServiceType);
-                if (openGenericDecorators != null)
-                    decorators = decorators == null ? openGenericDecorators : decorators.Concat(openGenericDecorators);
-            }
+                decorators = decorators.Append(_decorators.GetValueOrDefault(request.OpenGenericServiceType));
 
             Expression resultDecorator = resultFuncDecorator;
             if (decorators != null)
             {
                 var decoratorRequest = request.MakeDecorated();
-                var decoratorIndex = 0;
-                var enumerator = decorators.GetEnumerator();
-                while (enumerator.MoveNext())
+                for (var i = 0; i < decorators.Length; i++)
                 {
-                    var decorator = enumerator.Current.ThrowIfNull();
-                    var factory = decorator.Factory;
-                    if (((DecoratorSetup)factory.Setup).IsApplicable(request))
+                    var decorator = decorators[i];
+                    if (((DecoratorSetup)decorator.Setup).IsApplicable(request))
                     {
                         // Cache closed generic registration produced by open-generic decorator.
-                        if (decoratorIndex++ >= openGenericDecoratorIndex && factory.ProvidesFactoryPerRequest)
-                            factory = Register(factory.GetFactoryPerRequestOrDefault(request, this), serviceType, null);
+                        if (i >= openGenericDecoratorIndex && decorator.ProvidesFactoryPerRequest)
+                            decorator = Register(decorator.GetFactoryPerRequestOrDefault(request, this), serviceType, null);
 
-                        if (decorator.CachedExpression == null)
+                        var decoratorExpr = registry.GetCachedFactoryExpression(decorator.ID);
+                        if (decoratorExpr == null)
                         {
                             IList<Type> unusedFunArgs;
-                            var funcExpr = factory.With(decoratorRequest, this)
+                            var funcExpr = decorator.With(decoratorRequest, this)
                                 .GetFuncWithArgsOrDefault(decoratorFuncType, out unusedFunArgs)
                                 .ThrowIfNull(Error.DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION, decoratorFuncType);
 
-                            decorator.CachedExpression = unusedFunArgs != null ? funcExpr.Body : funcExpr;
+                            decoratorExpr = unusedFunArgs != null ? funcExpr.Body : funcExpr;
+                            registry.CacheFactoryExpression(decorator.ID, decoratorExpr);
                         }
 
-                        if (resultDecorator == null || !(decorator.CachedExpression is LambdaExpression))
-                            resultDecorator = decorator.CachedExpression;
+                        if (resultDecorator == null || !(decoratorExpr is LambdaExpression))
+                            resultDecorator = decoratorExpr;
                         else
                         {
                             if (!(resultDecorator is LambdaExpression))
-                                resultDecorator = Expression.Invoke(decorator.CachedExpression, resultDecorator);
+                                resultDecorator = Expression.Invoke(decoratorExpr, resultDecorator);
                             else
                             {
                                 var prevDecorators = ((LambdaExpression)resultDecorator);
-                                var decorateDecorator = Expression.Invoke(decorator.CachedExpression, prevDecorators.Body);
+                                var decorateDecorator = Expression.Invoke(decoratorExpr, prevDecorators.Body);
                                 resultDecorator = Expression.Lambda(decorateDecorator, prevDecorators.Parameters[0]);
                             }
                         }
@@ -450,7 +445,7 @@ namespace DryIoc
         private readonly ResolutionRules _resolutionRules;
         private readonly object _syncRoot;
         private readonly Dictionary<Type, FactoriesEntry> _factories;
-        private HashTree<Type, DecoratorEntry[]> _decorators;
+        private HashTree<Type, Factory[]> _decorators;
 
         private object[] _constants;
 
@@ -524,18 +519,6 @@ namespace DryIoc
                 }
 
                 return result != null;
-            }
-        }
-
-        private sealed class DecoratorEntry
-        {
-            public readonly Factory Factory;
-            public Expression CachedExpression;
-
-            public DecoratorEntry(Factory factory, Expression cachedExpression = null)
-            {
-                Factory = factory;
-                CachedExpression = cachedExpression;
             }
         }
 
@@ -1912,7 +1895,7 @@ when resolving {1}.";
 
         Factory GetFactoryOrDefault(Type serviceType, object serviceKey);
 
-        Expression GetDecoratorExpressionOrDefault(Request request);
+        Expression GetDecoratorExpressionOrDefault(Request request, IRegistry registry);
 
         IEnumerable<object> GetKeys(Type serviceType, Func<Factory, bool> condition);
 
@@ -1940,7 +1923,7 @@ when resolving {1}.";
 
         public Expression GetExpression()
         {
-            var decorator = Registry.GetDecoratorExpressionOrDefault(Request);
+            var decorator = Registry.GetDecoratorExpressionOrDefault(Request, Registry);
             if (decorator != null && !(decorator is LambdaExpression))
                 return decorator;
 
@@ -1966,7 +1949,7 @@ when resolving {1}.";
             if (func == null)
                 return null;
 
-            var decorator = Registry.GetDecoratorExpressionOrDefault(Request);
+            var decorator = Registry.GetDecoratorExpressionOrDefault(Request, Registry);
             if (decorator != null && !(decorator is LambdaExpression))
                 return Expression.Lambda(funcType, decorator, func.Parameters);
 
@@ -2199,9 +2182,9 @@ when resolving {1}.";
 
         public static T[] Append<T>(this T[] source, params T[] added)
         {
-            if (added.Length == 0)
+            if (added == null || added.Length == 0)
                 return source;
-            if (source.Length == 0)
+            if (source == null || source.Length == 0)
                 return added;
             var result = new T[source.Length + added.Length];
             Array.Copy(source, 0, result, 0, source.Length);
