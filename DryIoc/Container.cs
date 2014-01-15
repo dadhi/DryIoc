@@ -51,7 +51,7 @@ namespace DryIoc
             _factoryExprCache = HashTree<int, Expression>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
             _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
-            _store = new IndexedStore(_syncRoot, StoreParameter);
+            _store = new IndexedStore(_syncRoot);
 
             (setup ?? DefaultSetup).Invoke(this);
         }
@@ -183,7 +183,7 @@ namespace DryIoc
         public Scope CurrentScope { get { return _currentScope; } }
         public Scope SingletonScope { get { return _singletonScope; } }
 
-        FactoryContext IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
+        FactoryWithContext IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
             Factory factory = null;
             var serviceType = request.ServiceType;
@@ -428,7 +428,7 @@ namespace DryIoc
             _factoryExprCache = HashTree<int, Expression>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
             _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
-            _store = new IndexedStore(_syncRoot, StoreParameter);
+            _store = new IndexedStore(_syncRoot);
         }
 
         private sealed class FactoriesEntry
@@ -479,6 +479,33 @@ namespace DryIoc
         #endregion
     }
 
+    public static class ContainerTools
+    {
+        public static FactoryWithContext With(this Factory factory, Request request, IRegistry registry)
+        {
+            return new FactoryWithContext(request, registry, factory);
+        }
+
+        public static Expression GetItemExpression(this IndexedStore store, object item, Type itemType)
+        {
+            var itemIndex = store.GetOrAdd(item);
+            var itemExpr = Expression.Call(Container.StoreParameter, _getMethod, Expression.Constant(itemIndex, typeof(int)));
+            return Expression.Convert(itemExpr, itemType);
+        }
+
+        public static Expression GetItemExpression<T>(this IndexedStore store, T item)
+        {
+            return store.GetItemExpression(item, typeof(T));
+        }
+
+        public static Expression GetRegistryExpression(this IndexedStore store, IRegistry registry)
+        {
+            return Expression.Property(store.GetItemExpression(registry.SelfWeakReference), "Target");
+        }
+
+        private static readonly MethodInfo _getMethod = typeof(IndexedStore).GetMethod("Get");
+    }
+
     public sealed class RegistryWeakReference
     {
         public RegistryWeakReference(IRegistry registry)
@@ -496,13 +523,11 @@ namespace DryIoc
 
     public sealed class IndexedStore
     {
-        public IndexedStore(object syncRoot, ParameterExpression storeParameterExpr)
+        public IndexedStore(object syncRoot)
         {
             _syncRoot = syncRoot;
-            _storeParameterExpr = storeParameterExpr;
         }
 
-        private static readonly MethodInfo _getMethod = typeof(IndexedStore).GetMethod("Get");
         public object Get(int i)
         {
             return _items[i];
@@ -521,21 +546,12 @@ namespace DryIoc
             }
         }
 
-        public Expression GetItemExpression(object item, Type itemType)
-        {
-            var itemIndexExpr = Expression.Constant(GetOrAdd(item), typeof(int));
-            var itemExpr = Expression.Call(_storeParameterExpr, _getMethod, itemIndexExpr);
-            return Expression.Convert(itemExpr, itemType);
-        }
+        #region Implementation
 
-        public Expression GetItemExpression<T>(T item)
-        {
-            return GetItemExpression(item, typeof(T));
-        }
-
-        private object[] _items = { };
+        private object[] _items = {};
         private readonly object _syncRoot;
-        private readonly ParameterExpression _storeParameterExpr;
+
+        #endregion
     }
 
     public delegate object CompiledFactory(IndexedStore store, Scope resolutionScope);
@@ -605,7 +621,7 @@ namespace DryIoc
             if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
 
-            return new FactoryContext(req, reg, new DelegateFactory((request, registry) =>
+            return new DelegateFactory((request, registry) =>
             {
                 var collectionType = request.ServiceType;
 
@@ -635,7 +651,7 @@ namespace DryIoc
                 Throw.If(itemExpressions.Count == 0, Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS, itemType, request);
                 var newArrayExpr = Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
                 return newArrayExpr;
-            }));
+            }).With(req, reg);
         };
 
         public static Expression GetManyExpression(Request request, IRegistry registry)
@@ -764,7 +780,7 @@ namespace DryIoc
     {
         public Func<IEnumerable<Factory>, Factory> GetSingleRegisteredFactory;
 
-        public delegate FactoryContext ResolveUnregisteredService(Request request, IRegistry registry);
+        public delegate FactoryWithContext ResolveUnregisteredService(Request request, IRegistry registry);
         public Rules<ResolveUnregisteredService> ForUnregisteredService = new Rules<ResolveUnregisteredService>();
 
         public delegate object ResolveConstructorParameterServiceKey(ParameterInfo parameter, Request parent, IRegistry registry);
@@ -871,7 +887,7 @@ Please provide constructor selector when registering service.";
             "Scope is disposed and all in-scope instances are no longer available.";
 
         public static readonly string CONTAINER_IS_GARBAGE_COLLECTED =
-            "Container is no longer available (has been garbage-collected already).";
+            "Container is no longer available (has been garbage-collected).";
 
         public static readonly string DUPLICATE_SERVICE_NAME =
             "Service {0} with duplicate name '{1}' is already registered with implementation {2}.";
@@ -1069,10 +1085,8 @@ when resolving {1}.";
             Func<IResolver, TService> lambda, IReuse reuse = null, FactorySetup setup = null,
             string named = null)
         {
-            var factory = new DelegateFactory(
-                (request, registry) => Expression.Invoke(
-                    request.Store.GetItemExpression(lambda),
-                    Expression.Property(request.Store.GetItemExpression(registry.SelfWeakReference), "Target")),
+            var factory = new DelegateFactory((request, registry) => 
+                Expression.Invoke(request.Store.GetItemExpression(lambda), request.Store.GetRegistryExpression(registry)),
                 reuse, setup);
             registrator.Register(factory, typeof(TService), named);
         }
@@ -1415,11 +1429,6 @@ when resolving {1}.";
     public abstract class Factory
     {
         public static readonly FactorySetup DefaultSetup = ServiceSetup.Default;
-
-        public FactoryContext With(Request request, IRegistry registry)
-        {
-            return new FactoryContext(request, registry, this);
-        }
 
         public readonly int ID;
         public readonly IReuse Reuse;
@@ -1918,7 +1927,7 @@ when resolving {1}.";
         Scope CurrentScope { get; }
         Scope SingletonScope { get; }
 
-        FactoryContext GetOrAddFactory(Request request, IfUnresolved ifUnresolved);
+        FactoryWithContext GetOrAddFactory(Request request, IfUnresolved ifUnresolved);
 
         Factory GetFactoryOrDefault(Type serviceType, object serviceKey);
 
@@ -1932,13 +1941,13 @@ when resolving {1}.";
         void CacheFactoryExpression(int factoryID, Expression result);
     }
 
-    public class FactoryContext
+    public class FactoryWithContext
     {
         public readonly Factory Factory;
         public readonly Request Request;
         public readonly IRegistry Registry;
 
-        public FactoryContext(Request request, IRegistry registry, Factory factory)
+        public FactoryWithContext(Request request, IRegistry registry, Factory factory)
         {
             Factory = factory.ThrowIfNull();
             Request = request.ThrowIfNull().ResolveTo(factory);
