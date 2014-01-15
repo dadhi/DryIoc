@@ -9,7 +9,7 @@ namespace DryIoc.Playground
         {
             var times = 10 * 1000000;
             var itemCount = 20;
-            
+
             var arr = new object[itemCount];
             for (int i = 0; i < itemCount; i++)
                 arr[i] = i;
@@ -17,7 +17,7 @@ namespace DryIoc.Playground
             var arrWrapper = new ArrayWrapper(arr);
 
             object result = null;
-            
+
             GC.Collect();
             var watch = Stopwatch.StartNew();
             for (var i = 0; i < times; i++)
@@ -54,6 +54,11 @@ namespace DryIoc.Playground
         public object Get(int i)
         {
             return _arr[i];
+        }
+
+        public object this[int i]
+        {
+            get { return _arr[i]; }
         }
     }
 }
