@@ -31,7 +31,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var factoryType = typeof(IFactory<Orange>);
 
             Func<Request, IRegistry, Expression> getExpression = (request, registry) =>
-                Expression.Call(request.Store.GetItemExpression(registry.Resolve(factoryType), factoryType), "Create", null);
+                Expression.Call(request.GetItemExpression(registry.Resolve(factoryType), factoryType), "Create", null);
 
             container.Register(typeof(Orange), new DelegateFactory(getExpression));
 

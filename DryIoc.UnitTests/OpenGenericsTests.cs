@@ -288,9 +288,9 @@ namespace DryIoc.UnitTests
         public void When_using_ReflectionFactory_alone_Then_resolving_service_with_not_enough_type_args_should_Throw()
         {
             var factory = new ReflectionFactory(typeof(BananaSplit<,>));
-
+            IRegistry container = new Container();
             Assert.Throws<ContainerException>(() =>
-                factory.GetFactoryPerRequestOrDefault(Request.Create(typeof(Banana<int>)), new Container()));
+                factory.GetFactoryPerRequestOrDefault(Request.Create(container.SelfWeakReference, typeof(Banana<int>)), container));
         }
     }
 
