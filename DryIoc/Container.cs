@@ -551,6 +551,11 @@ namespace DryIoc
             return Expression.Convert(itemExpr, itemType);
         }
 
+        public Expression GetItemExpression<T>(T item)
+        {
+            return GetItemExpression(item, typeof(T));
+        }
+
         private object[] _items = { };
         private readonly object _syncRoot;
         private readonly ParameterExpression _storeParameterExpr;
@@ -671,7 +676,7 @@ namespace DryIoc
 
             var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, wrappedItemType);
             
-            var registryExpr = request.Store.GetItemExpression(registry, typeof(IRegistry));
+            var registryExpr = request.Store.GetItemExpression(registry);
             var weakRefCtor = typeof(WeakReference).GetConstructor(new[] { typeof(object) }).ThrowIfNull();
             var registryRefExpr = Expression.New(weakRefCtor, registryExpr);
             
@@ -708,7 +713,7 @@ namespace DryIoc
             var factoryExpr = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw)
                 .GetExpression().ToCompiledFactoryExpression();
 
-            var factoryItemExpr = request.Store.GetItemExpression(factoryExpr, typeof(Expression<CompiledFactory>));
+            var factoryItemExpr = request.Store.GetItemExpression(factoryExpr);
             return Expression.New(ctor, factoryItemExpr);
         }
 
@@ -760,7 +765,8 @@ namespace DryIoc
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
             typeof(ContainerSetup).GetMethod("ResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
 
-        static IEnumerable<TItem> ResolveManyDynamically<TItem, TWrappedItem>(WeakReference registryRef, int parentFactoryID)
+        internal static IEnumerable<TItem> ResolveManyDynamically<TItem, TWrappedItem>(
+            WeakReference registryRef, int parentFactoryID)
         {
             var itemType = typeof(TItem);
             var wrappedItemType = typeof(TWrappedItem);
@@ -1090,12 +1096,9 @@ when resolving {1}.";
             string named = null)
         {
             var factory = new DelegateFactory(
-                (request, registry) =>
-                {
-                    var lambdaExpr = request.Store.GetItemExpression(lambda, typeof(Func<IResolver, TService>));
-                    var registryExpr = request.Store.GetItemExpression(registry, typeof(IRegistry));
-                    return Expression.Invoke(lambdaExpr, registryExpr);
-                },
+                (request, registry) => Expression.Invoke(
+                    request.Store.GetItemExpression(lambda), 
+                    request.Store.GetItemExpression(registry)),
                 reuse, setup);
             registrator.Register(factory, typeof(TService), named);
         }
@@ -1844,15 +1847,9 @@ when resolving {1}.";
     public static class Reuse
     {
         public static readonly IReuse Transient = null; // no reuse.
-        public static readonly IReuse Singleton, InCurrentScope, InResolutionScope;
-
-        static Reuse()
-        {
-            Singleton = new SingletonReuse();
-            InCurrentScope = new CurrentScopeReuse();
-            InResolutionScope = new ScopedReuse(
-                Expression.Call(typeof(Reuse), "InitScope", null, Container.ResolutionScopeParameter));
-        }
+        public static readonly IReuse Singleton = new SingletonReuse();
+        public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
+        public static readonly IReuse InResolutionScope = new ResolutionScopeReuse(Container.ResolutionScopeParameter);
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
         {
@@ -1862,39 +1859,9 @@ when resolving {1}.";
                 Expression.Lambda(factoryExpr, null));
         }
 
-        // Used by reflection only (inside factory expression).
-        public static Scope InitScope(ref Scope scope)
-        {
-            return scope = scope ?? new Scope();
-        }
-
         #region Implementation
 
-        private static readonly MethodInfo _getOrAddToScopeMethod = typeof(Scope).GetMethod("GetOrAdd");
-
-        private sealed class ScopedReuse : IReuse
-        {
-            public ScopedReuse(Expression scope)
-            {
-                _scope = scope;
-            }
-
-            public Expression Apply(Request _, IRegistry __, int factoryID, Expression factoryExpr)
-            {
-                return GetScopedServiceExpression(_scope, factoryID, factoryExpr);
-            }
-
-            private readonly Expression _scope;
-        }
-
-        private sealed class CurrentScopeReuse : IReuse
-        {
-            public Expression Apply(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
-            {
-                var currentScopeExpr = request.Store.GetItemExpression(registry.CurrentScope, typeof(Scope));
-                return GetScopedServiceExpression(currentScopeExpr, factoryID, factoryExpr);
-            }
-        }
+        private static readonly MethodInfo _getOrAddToScopeMethod = typeof (Scope).GetMethod("GetOrAdd");
 
         private sealed class SingletonReuse : IReuse
         {
@@ -1905,17 +1872,48 @@ when resolving {1}.";
                 if (parent != null && parent.Enumerate().Any(p =>
                     p.OpenGenericServiceType != null && ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType)))
                 {
-                    var singletonScopeExpr = request.Store.GetItemExpression(registry.SingletonScope, typeof(Scope));
+                    var singletonScopeExpr = request.Store.GetItemExpression(registry.SingletonScope);
                     return GetScopedServiceExpression(singletonScopeExpr, factoryID, factoryExpr);
                 }
 
-                // Create singleton object now and put it into constants.
+                // Create singleton object now and put it into store.
                 var singleton = registry.SingletonScope.GetOrAdd(factoryID,
                     () => factoryExpr.CompileToFactory().Invoke(request.Store, null));
 
                 var singletonExpr = request.Store.GetItemExpression(singleton, factoryExpr.Type);
                 return singletonExpr;
             }
+        }
+
+        private sealed class CurrentScopeReuse : IReuse
+        {
+            public Expression Apply(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+            {
+                var currentScopeExpr = request.Store.GetItemExpression(registry.CurrentScope);
+                return GetScopedServiceExpression(currentScopeExpr, factoryID, factoryExpr);
+            }
+        }
+
+        private sealed class ResolutionScopeReuse : IReuse
+        {
+            public ResolutionScopeReuse(ParameterExpression scopeParameterExpr)
+            {
+                _scopeExpr = Expression.Call(typeof(ResolutionScopeReuse), "GetScope", null, scopeParameterExpr);
+            }
+
+            public Expression Apply(Request _, IRegistry __, int factoryID, Expression factoryExpr)
+            {
+                return GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
+            }
+
+            // ReSharper disable UnusedMember.Local
+            public static Scope GetScope(ref Scope scope)
+            {
+                return scope = scope ?? new Scope();
+            }
+            // ReSharper restore UnusedMember.Local
+
+            private readonly Expression _scopeExpr;
         }
 
         #endregion

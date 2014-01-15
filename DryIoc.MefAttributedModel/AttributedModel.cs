@@ -249,7 +249,7 @@ namespace DryIoc.MefAttributedModel
                 Expression.Call(
                     Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
                         //Container.RegistryExpression,
-                        request.Store.GetItemExpression(registry, typeof(IRegistry)),
+                        request.Store.GetItemExpression(registry),
                         Expression.Constant(factoryExport.ServiceName, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     "Create", null);
