@@ -1322,14 +1322,14 @@ when resolving {1}.";
         #endregion
     }
 
-    public enum FactoryType { Service = 0, Decorator, GenericWrapper };
+    public enum FactoryType { Service, Decorator, GenericWrapper };
 
-    public enum FactoryCachePolicy { CouldCacheExpression, ShouldNotCacheExpression };
+    public enum FactoryCachePolicy { ShouldNotCacheExpression, CouldCacheExpression };
 
     public abstract class FactorySetup
     {
         public abstract FactoryType Type { get; }
-        public virtual FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.CouldCacheExpression; } }
+        public virtual FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.ShouldNotCacheExpression; } }
         public virtual object Metadata { get { return null; } }
     }
 
@@ -1404,7 +1404,6 @@ when resolving {1}.";
         }
 
         public override FactoryType Type { get { return FactoryType.Decorator; } }
-        public override FactoryCachePolicy CachePolicy { get { return FactoryCachePolicy.ShouldNotCacheExpression; } }
         public readonly Func<Request, bool> IsApplicable;
 
         #region Implementation
