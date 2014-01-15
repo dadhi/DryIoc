@@ -248,8 +248,7 @@ namespace DryIoc.MefAttributedModel
             Func<Request, IRegistry, Expression> factoryCreateExpr = (request, registry) =>
                 Expression.Call(
                     Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
-                        //Container.RegistryExpression,
-                        request.Store.GetItemExpression(registry),
+                        Expression.Property(request.Store.GetItemExpression(registry.SelfWeakReference), "Target"),
                         Expression.Constant(factoryExport.ServiceName, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     "Create", null);

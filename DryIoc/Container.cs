@@ -41,7 +41,7 @@ namespace DryIoc
     {
         public Container(Action<IRegistry> setup = null)
         {
-            _selfWeakRef = new WeakReference(this);
+            _selfWeakReference = new RegistryWeakReference(this);
             _syncRoot = new object();
             _resolutionRules = new ResolutionRules();
             _factories = new Dictionary<Type, FactoriesEntry>();
@@ -53,17 +53,13 @@ namespace DryIoc
             _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
             _store = new IndexedStore(_syncRoot, StoreParameter);
 
-            //_constants = new object[3];
-            //// Put reference to container into constants, to support container access inside expression. 
-            //// It is common for dynamic scenarios.
-            //_constants[CONSTANTS_REGISTRY_WEAKREF_INDEX] = new WeakReference(this);
-            //_constants[CONSTANTS_CURRENT_SCOPE_INDEX] = _constants[CONSTANTS_SINGLETON_SCOPE_INDEX] = new Scope();
-
-
             (setup ?? DefaultSetup).Invoke(this);
         }
 
         public static Action<IRegistry> DefaultSetup = ContainerSetup.Default;
+
+        public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(IndexedStore), "store");
+        public static readonly ParameterExpression ResolutionScopeParameter = Expression.Parameter(typeof(Scope), "scope");
 
         public Container OpenScope()
         {
@@ -80,34 +76,6 @@ namespace DryIoc
         {
             _currentScope.Dispose();
         }
-
-        #region Compiled Factory
-
-        public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(IndexedStore), "store");
-        public static readonly ParameterExpression ResolutionScopeParameter = Expression.Parameter(typeof(Scope), "resolutionScope");
-
-        //public static readonly ParameterExpression ConstantsParameter = Expression.Parameter(typeof(object[]), "constants");
-        //public static readonly int CONSTANTS_REGISTRY_WEAKREF_INDEX = 0;
-        //public static readonly int CONSTANTS_SINGLETON_SCOPE_INDEX = 1;
-        //public static readonly int CONSTANTS_CURRENT_SCOPE_INDEX = 2;
-
-        //public static readonly Expression RegistryWeakRefExpression = Expression.Convert(
-        //    Expression.ArrayIndex(ConstantsParameter, Expression.Constant(CONSTANTS_REGISTRY_WEAKREF_INDEX)),
-        //    typeof(WeakReference));
-
-        //public static readonly Expression RegistryExpression = Expression.Convert(
-        //    Expression.Property(RegistryWeakRefExpression, "Target"),
-        //    typeof(IRegistry));
-
-        //public static readonly Expression SingletonScopeExpression = Expression.Convert(
-        //    Expression.ArrayIndex(ConstantsParameter, Expression.Constant(CONSTANTS_SINGLETON_SCOPE_INDEX)),
-        //    typeof(Scope));
-
-        //public static readonly Expression CurrentScopeExpression = Expression.Convert(
-        //    Expression.ArrayIndex(ConstantsParameter, Expression.Constant(CONSTANTS_CURRENT_SCOPE_INDEX)),
-        //    typeof(Scope));
-
-        #endregion
 
         #region IRegistrator
 
@@ -210,7 +178,7 @@ namespace DryIoc
 
         #region IRegistry
 
-        public WeakReference SelfWeakRef { get { return _selfWeakRef; } }
+        public RegistryWeakReference SelfWeakReference { get { return _selfWeakReference; } }
         public ResolutionRules ResolutionRules { get { return _resolutionRules; } }
         public Scope CurrentScope { get { return _currentScope; } }
         public Scope SingletonScope { get { return _singletonScope; } }
@@ -429,7 +397,7 @@ namespace DryIoc
 
         #region Internal State
 
-        private readonly WeakReference _selfWeakRef;
+        private readonly RegistryWeakReference _selfWeakReference;
         private readonly object _syncRoot;
         private readonly ResolutionRules _resolutionRules;
         private readonly Dictionary<Type, FactoriesEntry> _factories;
@@ -446,22 +414,16 @@ namespace DryIoc
 
         #region Implementation
 
-        // Creates child container with singleton scope, constants and cache shared with parent. BUT with new CurrentScope.
+        // Creates child container with new CurrentScope.
         private Container(Container parent)
         {
-            _selfWeakRef = parent._selfWeakRef;
+            _selfWeakReference = parent._selfWeakReference;
             _syncRoot = parent._syncRoot;
             _resolutionRules = parent.ResolutionRules;
             _factories = parent._factories;
-            _decorators = parent._decorators; // TODO: Fix reference to decorators will be overwritten with next registration
+            _decorators = parent._decorators; // TODO: Box reference to decorators, cause it will be overwritten with next registration
             _singletonScope = parent._singletonScope;
             _currentScope = new Scope();
-
-            //var parentConstants = parent._constants;
-            //_constants = new object[parentConstants.Length];
-            //Array.Copy(parentConstants, 0, _constants, 0, parentConstants.Length);
-            //_constants[CONSTANTS_REGISTRY_WEAKREF_INDEX] = new WeakReference(this);
-            //_constants[CONSTANTS_CURRENT_SCOPE_INDEX] = new Scope();
 
             _factoryExprCache = HashTree<int, Expression>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
@@ -515,6 +477,21 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    public sealed class RegistryWeakReference
+    {
+        public RegistryWeakReference(IRegistry registry)
+        {
+            _weakRef = new WeakReference(registry);
+        }
+
+        public IRegistry Target
+        {
+            get { return (_weakRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
+        }
+
+        private readonly WeakReference _weakRef;
     }
 
     public sealed class IndexedStore
@@ -585,7 +562,7 @@ namespace DryIoc
 
         // Partial method definition to be implemented in .NET40 version of Container.
         // It is optional and fine to be not implemented.
-        static partial void CompileToMethod(Expression<CompiledFactory> factoryExpression, ref CompiledFactory resultFactory);
+        static partial void CompileToMethod(Expression<CompiledFactory> factoryExpr, ref CompiledFactory resultFactory);
     }
 
     public static class ContainerSetup
@@ -675,11 +652,8 @@ namespace DryIoc
                 parentFactoryID = parent.FactoryID;
 
             var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, wrappedItemType);
-            
-            var registryExpr = request.Store.GetItemExpression(registry);
-            var weakRefCtor = typeof(WeakReference).GetConstructor(new[] { typeof(object) }).ThrowIfNull();
-            var registryRefExpr = Expression.New(weakRefCtor, registryExpr);
-            
+
+            var registryRefExpr = request.Store.GetItemExpression(registry.SelfWeakReference);
             var resolveCallExpr = Expression.Call(resolveMethod, registryRefExpr, Expression.Constant(parentFactoryID));
 
             return Expression.New(dynamicEnumerableType.GetConstructors()[0], resolveCallExpr);
@@ -766,11 +740,11 @@ namespace DryIoc
             typeof(ContainerSetup).GetMethod("ResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
 
         internal static IEnumerable<TItem> ResolveManyDynamically<TItem, TWrappedItem>(
-            WeakReference registryRef, int parentFactoryID)
+            RegistryWeakReference registryWeakReference, int parentFactoryID)
         {
             var itemType = typeof(TItem);
             var wrappedItemType = typeof(TWrappedItem);
-            var registry = (registryRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
+            var registry = registryWeakReference.Target;
 
             var itemKeys = registry.GetKeys(wrappedItemType,
                 parentFactoryID == -1 ? (Func<Factory, bool>)null : factory => factory.ID != parentFactoryID);
@@ -1097,8 +1071,8 @@ when resolving {1}.";
         {
             var factory = new DelegateFactory(
                 (request, registry) => Expression.Invoke(
-                    request.Store.GetItemExpression(lambda), 
-                    request.Store.GetItemExpression(registry)),
+                    request.Store.GetItemExpression(lambda),
+                    Expression.Property(request.Store.GetItemExpression(registry.SelfWeakReference), "Target")),
                 reuse, setup);
             registrator.Register(factory, typeof(TService), named);
         }
@@ -1847,21 +1821,45 @@ when resolving {1}.";
     public static class Reuse
     {
         public static readonly IReuse Transient = null; // no reuse.
-        public static readonly IReuse Singleton = new SingletonReuse();
-        public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
-        public static readonly IReuse InResolutionScope = new ResolutionScopeReuse(Container.ResolutionScopeParameter);
+        public static readonly IReuse Singleton, InCurrentScope, InResolutionScope;
+
+        static Reuse()
+        {
+            Singleton = new SingletonReuse();
+            InCurrentScope = new CurrentScopeReuse();
+            InResolutionScope = new ScopedReuse(Expression.Call(_getScopeMethod, Container.ResolutionScopeParameter));
+        }
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
         {
-            return Expression.Call(scope,
-                _getOrAddToScopeMethod.MakeGenericMethod(factoryExpr.Type),
-                Expression.Constant(factoryID),
-                Expression.Lambda(factoryExpr, null));
+            return Expression.Call(scope, _getOrAddToScopeMethod.MakeGenericMethod(factoryExpr.Type),
+                Expression.Constant(factoryID), Expression.Lambda(factoryExpr, null));
+        }
+
+        public static Scope GetScope(ref Scope scope)
+        {
+            return scope = scope ?? new Scope();
+        }
+
+        public sealed class ScopedReuse : IReuse
+        {
+            public ScopedReuse(Expression scopeExpr)
+            {
+                _scopeExpr = scopeExpr;
+            }
+
+            public Expression Apply(Request _, IRegistry __, int factoryID, Expression factoryExpr)
+            {
+                return GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
+            }
+
+            private readonly Expression _scopeExpr;
         }
 
         #region Implementation
 
-        private static readonly MethodInfo _getOrAddToScopeMethod = typeof (Scope).GetMethod("GetOrAdd");
+        private static readonly MethodInfo _getScopeMethod = typeof(Reuse).GetMethod("GetScope");
+        private static readonly MethodInfo _getOrAddToScopeMethod = typeof(Scope).GetMethod("GetOrAdd");
 
         private sealed class SingletonReuse : IReuse
         {
@@ -1894,28 +1892,6 @@ when resolving {1}.";
             }
         }
 
-        private sealed class ResolutionScopeReuse : IReuse
-        {
-            public ResolutionScopeReuse(ParameterExpression scopeParameterExpr)
-            {
-                _scopeExpr = Expression.Call(typeof(ResolutionScopeReuse), "GetScope", null, scopeParameterExpr);
-            }
-
-            public Expression Apply(Request _, IRegistry __, int factoryID, Expression factoryExpr)
-            {
-                return GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
-            }
-
-            // ReSharper disable UnusedMember.Local
-            public static Scope GetScope(ref Scope scope)
-            {
-                return scope = scope ?? new Scope();
-            }
-            // ReSharper restore UnusedMember.Local
-
-            private readonly Expression _scopeExpr;
-        }
-
         #endregion
     }
 
@@ -1937,7 +1913,7 @@ when resolving {1}.";
 
     public interface IRegistry : IResolver, IRegistrator
     {
-        WeakReference SelfWeakRef { get; }
+        RegistryWeakReference SelfWeakReference { get; }
         ResolutionRules ResolutionRules { get; }
         Scope CurrentScope { get; }
         Scope SingletonScope { get; }
