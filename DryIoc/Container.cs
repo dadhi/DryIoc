@@ -39,6 +39,9 @@ namespace DryIoc
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
+        public static Action<IRegistry> DefaultSetup = ContainerSetup.Default;
+        public readonly Action<IRegistry> Setup;
+
         public Container(Action<IRegistry> setup = null)
         {
             _selfWeakReference = new RegistryWeakReference(this);
@@ -51,12 +54,12 @@ namespace DryIoc
 
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
             _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
-            _resolutionRoot = new ResolutionRoot(_syncRoot);
+            _resolutionStore = new IndexedStore(_syncRoot);
+            _resolutionRoot = new ResolutionRoot(_resolutionStore);
 
-            (setup ?? DefaultSetup).Invoke(this);
+            Setup = setup ?? DefaultSetup;
+            Setup(this);
         }
-
-        public static Action<IRegistry> DefaultSetup = ContainerSetup.Default;
 
         public Request CreateRequest(Type serviceType, object serviceKey = null)
         {
@@ -74,6 +77,13 @@ namespace DryIoc
                 _singletonScope = _singletonScope,
                 _currentScope = new Scope()
             };
+            return container;
+        }
+
+        public Container CreateNestedContainer()
+        {
+            var container = new Container(Setup);
+            container.ResolveUnregisteredFrom(this);
             return container;
         }
 
@@ -153,7 +163,7 @@ namespace DryIoc
             var compiledFactory =
                 _defaultResolutionCache.GetValueOrDefault(serviceType) ??
                 ResolveAndCacheFactory(serviceType, ifUnresolved);
-            return compiledFactory(_resolutionRoot.Store, resolutionScope: null);
+            return compiledFactory(_resolutionStore, resolutionScope: null);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -170,7 +180,7 @@ namespace DryIoc
                     _keyedResolutionCache.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, compiledFactory)));
             }
 
-            return compiledFactory(_resolutionRoot.Store, resolutionScope: null);
+            return compiledFactory(_resolutionStore, resolutionScope: null);
         }
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
@@ -419,6 +429,7 @@ namespace DryIoc
         private HashTree<Type, CompiledFactory> _defaultResolutionCache;
         private HashTree<Type, HashTree<object, CompiledFactory>> _keyedResolutionCache;
 
+        private readonly IndexedStore _resolutionStore;
         private readonly ResolutionRoot _resolutionRoot;
 
         #endregion
@@ -480,9 +491,9 @@ namespace DryIoc
 
         public readonly IndexedStore Store;
 
-        public ResolutionRoot(object syncRoot)
+        public ResolutionRoot(IndexedStore store)
         {
-            Store = new IndexedStore(syncRoot);
+            Store = store;
             _factoryExprCache = HashTree<int, Expression>.Empty;
         }
 
