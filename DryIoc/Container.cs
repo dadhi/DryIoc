@@ -46,7 +46,7 @@ namespace DryIoc
             _syncRoot = new object();
             _resolutionRules = new ResolutionRules();
             _factories = new Dictionary<Type, FactoriesEntry>();
-            _decorators = HashTree<Type, Factory[]>.Empty;
+            _decorators = new Dictionary<Type, Factory[]>();
             _currentScope = _singletonScope = new Scope();
 
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
@@ -65,10 +65,15 @@ namespace DryIoc
 
         public Container OpenScope()
         {
-            var container = new Container();
-            container.ResolveUnregisteredFrom(this);
-            container._singletonScope = _singletonScope;
-            container._currentScope = new Scope();
+            var container = new Container
+            {
+                _syncRoot = _syncRoot,
+                _resolutionRules = _resolutionRules,
+                _factories = _factories,
+                _decorators = _decorators,
+                _singletonScope = _singletonScope,
+                _currentScope = new Scope()
+            };
             return container;
         }
 
@@ -94,7 +99,9 @@ namespace DryIoc
             {
                 if (factory.Setup.Type == FactoryType.Decorator)
                 {
-                    _decorators = _decorators.AddOrUpdate(serviceType, new[] { factory }, Sugar.Append);
+                    Factory[] factories;
+                    _decorators.TryGetValue(serviceType, out factories);
+                    _decorators[serviceType] = factories.Append(new[] { factory });
                     return factory;
                 }
 
@@ -156,7 +163,7 @@ namespace DryIoc
             if (compiledFactory == null)
             {
                 var factory = ((IRegistry)this).GetOrAddFactory(CreateRequest(serviceType, serviceKey), ifUnresolved);
-                if (factory == null) 
+                if (factory == null)
                     return null;
                 compiledFactory = factory.GetExpression().CompileToFactory();
                 Interlocked.Exchange(ref _keyedResolutionCache,
@@ -185,11 +192,11 @@ namespace DryIoc
         #region IRegistry
 
         RegistryWeakReference IRegistry.SelfWeakReference { get { return _selfWeakReference; } }
-        
+
         public ResolutionRules ResolutionRules { get { return _resolutionRules; } }
 
-        Scope IRegistry.CurrentScope { get { return _currentScope; } }
         Scope IRegistry.SingletonScope { get { return _singletonScope; } }
+        Scope IRegistry.CurrentScope { get { return _currentScope; } }
 
         FactoryWithContext IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
@@ -252,7 +259,8 @@ namespace DryIoc
             var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
 
             LambdaExpression resultFuncDecorator = null;
-            var funcDecorators = _decorators.GetValueOrDefault(decoratorFuncType);
+            Factory[] funcDecorators;
+            lock (_syncRoot) _decorators.TryGetValue(decoratorFuncType, out funcDecorators);
             if (funcDecorators != null)
             {
                 var decoratorRequest = request.MakeDecorated();
@@ -276,10 +284,15 @@ namespace DryIoc
                 }
             }
 
-            var decorators = _decorators.GetValueOrDefault(serviceType);
+            Factory[] decorators;
+            lock (_syncRoot) _decorators.TryGetValue(serviceType, out decorators);
             var openGenericDecoratorIndex = decorators == null ? 0 : decorators.Length;
             if (request.OpenGenericServiceType != null)
-                decorators = decorators.Append(_decorators.GetValueOrDefault(request.OpenGenericServiceType));
+            {
+                Factory[] openGenericDecorators;
+                lock (_syncRoot) _decorators.TryGetValue(request.OpenGenericServiceType, out openGenericDecorators);
+                decorators = decorators.Append(openGenericDecorators);
+            }
 
             Expression resultDecorator = resultFuncDecorator;
             if (decorators != null)
@@ -396,10 +409,10 @@ namespace DryIoc
         #region Internal State
 
         private readonly RegistryWeakReference _selfWeakReference;
-        private readonly object _syncRoot;
-        private readonly ResolutionRules _resolutionRules;
-        private readonly Dictionary<Type, FactoriesEntry> _factories;
-        private HashTree<Type, Factory[]> _decorators;
+        private object _syncRoot;
+        private ResolutionRules _resolutionRules;
+        private Dictionary<Type, FactoriesEntry> _factories;
+        private Dictionary<Type, Factory[]> _decorators;
         private Scope _currentScope;
         private Scope _singletonScope;
 

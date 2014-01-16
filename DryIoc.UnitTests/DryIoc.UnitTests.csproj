@@ -66,6 +66,7 @@
     <Compile Include="PropertyResolutionTests.cs" />
     <Compile Include="RegisterAll.cs" />
     <Compile Include="ResolveUnregisteredFromTests.cs" />
+    <Compile Include="ReuseInCurrentScopeTests.cs" />
     <Compile Include="ReuseTests.cs" />
     <Compile Include="TypeToolsTests.cs" />
     <Compile Include="ThrowTests.cs" />

@@ -102,6 +102,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\ResolutionRulesTests.cs">
       <Link>ResolutionRulesTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\ReuseInCurrentScopeTests.cs">
+      <Link>ReuseInCurrentScopeTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\ReuseTests.cs">
       <Link>ReuseTests.cs</Link>
     </Compile>
