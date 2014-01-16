@@ -58,9 +58,6 @@ namespace DryIoc
 
         public static Action<IRegistry> DefaultSetup = ContainerSetup.Default;
 
-        public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(IndexedStore), "store");
-        public static readonly ParameterExpression ResolutionScopeParameter = Expression.Parameter(typeof(Scope), "scope");
-
         public Request CreateRequest(Type serviceType, object serviceKey = null)
         {
             return new Request(_resolutionRoot, null, serviceType, serviceKey);
@@ -465,6 +462,9 @@ namespace DryIoc
 
     public sealed class ResolutionRoot
     {
+        public static readonly ParameterExpression ScopeParameter = Expression.Parameter(typeof(Scope), "scope");
+        public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(IndexedStore), "store");
+
         public readonly IndexedStore Store;
 
         public ResolutionRoot(object syncRoot)
@@ -477,7 +477,7 @@ namespace DryIoc
         {
             var itemIndex = Store.GetOrAdd(item);
             var itemIndexExpr = Expression.Constant(itemIndex, typeof(int));
-            var itemExpr = Expression.Call(Container.StoreParameter, IndexedStore.GetMethod, itemIndexExpr);
+            var itemExpr = Expression.Call(StoreParameter, IndexedStore.GetMethod, itemIndexExpr);
             return Expression.Convert(itemExpr, itemType);
         }
 
@@ -566,7 +566,7 @@ namespace DryIoc
             // Removing not required Convert from expression root, because CompiledFactory result still be converted at the end.
             if (expression.NodeType == ExpressionType.Convert)
                 expression = ((UnaryExpression)expression).Operand;
-            return Expression.Lambda<CompiledFactory>(expression, Container.StoreParameter, Container.ResolutionScopeParameter);
+            return Expression.Lambda<CompiledFactory>(expression, ResolutionRoot.StoreParameter, ResolutionRoot.ScopeParameter);
         }
 
         public static CompiledFactory CompileToFactory(this Expression expression)
@@ -1836,7 +1836,7 @@ when resolving {1}.";
         {
             Singleton = new SingletonReuse();
             InCurrentScope = new CurrentScopeReuse();
-            InResolutionScope = new ScopedReuse(Expression.Call(GetScopeMethod, Container.ResolutionScopeParameter));
+            InResolutionScope = new ScopedReuse(Expression.Call(GetScopeMethod, ResolutionRoot.ScopeParameter));
         }
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
