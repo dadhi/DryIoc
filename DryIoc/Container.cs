@@ -47,7 +47,7 @@ namespace DryIoc
             _selfWeakReference = new RegistryWeakReference(this);
 
             _syncRoot = new object();
-            _resolutionRules = new ResolutionRules();
+            _resolutionRules = new ResolutionRules(_syncRoot);
             _factories = new Dictionary<Type, FactoriesEntry>();
             _decorators = new Dictionary<Type, Factory[]>();
             _currentScope = _singletonScope = new Scope();
@@ -103,7 +103,14 @@ namespace DryIoc
         public Factory Register(Factory factory, Type serviceType, object serviceKey)
         {
             serviceType.ThrowIfNull();
-            factory.ThrowIfNull().ThrowIfCannotBeRegisteredWithServiceType(serviceType);
+
+            serviceKey.ThrowIf(!(serviceKey == null || serviceKey is string || serviceKey is int),
+                Error.UNABLE_TO_REGISTER_WITH_NON_INT_OR_STRING_SERVICE_KEY, serviceType, serviceKey);
+
+            factory.ThrowIfNull()
+                .ThrowIf(serviceType.IsGenericTypeDefinition && !factory.ProvidesFactoryPerRequest,
+                    Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE, serviceType, serviceKey)
+                .ThrowIfCannotBeRegisteredWithServiceType(serviceType);
 
             lock (_syncRoot)
             {
@@ -208,6 +215,35 @@ namespace DryIoc
         Scope IRegistry.SingletonScope { get { return _singletonScope; } }
         Scope IRegistry.CurrentScope { get { return _currentScope; } }
 
+        FactoryWithContext GetOrAddFactory2(Request request, IfUnresolved ifUnresolved)
+        {
+            Factory factory = null;
+            var serviceType = request.ServiceType;
+            var serviceKey = request.ServiceKey;
+
+            lock (_syncRoot)
+            {
+                FactoriesEntry entry;
+                if (_factories.TryGetValue(serviceType, out entry) &&
+                    entry.TryGet(out factory, serviceType, serviceKey, ResolutionRules.GetSingleRegisteredFactory) &&
+                    factory.ProvidesFactoryPerRequest)
+                    factory = factory.GetFactoryPerRequestOrDefault(request, this);
+            }
+
+            if (factory != null)
+                return factory.WithContext(request, this);
+
+            var factoryContext = ResolutionRules.ForUnregisteredService.Invoke(r => r(request, this));
+            if (factoryContext != null)
+            {
+                Register(factoryContext.Factory, serviceType, serviceKey);
+                return factoryContext;
+            }
+
+            Throw.If(ifUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
+            return null;
+        }
+
         FactoryWithContext IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
             Factory factory = null;
@@ -251,7 +287,7 @@ namespace DryIoc
                 return factoryContext;
             }
 
-            return factory.With(request, this);
+            return factory.WithContext(request, this);
         }
 
         Expression IRegistry.GetDecoratorExpressionOrDefault(Request request)
@@ -279,7 +315,7 @@ namespace DryIoc
                     var decorator = funcDecorators[i];
                     if (((DecoratorSetup)decorator.Setup).IsApplicable(request))
                     {
-                        var newDecorator = decorator.With(decoratorRequest, this).GetExpression();
+                        var newDecorator = decorator.WithContext(decoratorRequest, this).GetExpression();
                         if (resultFuncDecorator == null)
                         {
                             var decorated = Expression.Parameter(serviceType, "decorated");
@@ -321,7 +357,7 @@ namespace DryIoc
                         if (decoratorExpr == null)
                         {
                             IList<Type> unusedFunArgs;
-                            var funcExpr = decorator.With(decoratorRequest, this)
+                            var funcExpr = decorator.WithContext(decoratorRequest, this)
                                 .GetFuncWithArgsOrDefault(decoratorFuncType, out unusedFunArgs)
                                 .ThrowIfNull(Error.DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION, decoratorFuncType);
 
@@ -643,6 +679,29 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
+        public static FactoryWithContext ResolveOpenGeneric(Request request, IRegistry registry)
+        {
+            if (request.OpenGenericServiceType == null)
+                return null;
+
+            var factory = registry.GetFactoryOrDefault(request.OpenGenericServiceType, request.ServiceKey);
+            if (factory == null)
+            {
+                if (request.ServiceKey == null)
+                    return null;
+
+                factory = registry.GetFactoryOrDefault(request.OpenGenericServiceType, null);
+                if (factory == null || factory.Setup.Type != FactoryType.GenericWrapper)
+                    return null;
+            }
+
+            factory = factory.GetFactoryPerRequestOrDefault(request, registry);
+            if (factory == null)
+                return null;
+
+            return factory.WithContext(request, registry);
+        }
+
         public static ResolutionRules.ResolveUnregisteredService ResolveEnumerableAsStaticArray = (req, reg) =>
         {
             if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
@@ -678,7 +737,7 @@ namespace DryIoc
                 Throw.If(itemExpressions.Count == 0, Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS, itemType, request);
                 var newArrayExpr = Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
                 return newArrayExpr;
-            }).With(req, reg);
+            }).WithContext(req, reg);
         };
 
         public static Expression GetManyExpression(Request request, IRegistry registry)
@@ -805,20 +864,32 @@ namespace DryIoc
         public Func<IEnumerable<Factory>, Factory> GetSingleRegisteredFactory;
 
         public delegate FactoryWithContext ResolveUnregisteredService(Request request, IRegistry registry);
-        public Rules<ResolveUnregisteredService> ForUnregisteredService = new Rules<ResolveUnregisteredService>();
+        public Rules<ResolveUnregisteredService> ForUnregisteredService;
 
         public delegate object ResolveConstructorParameterServiceKey(ParameterInfo parameter, Request parent, IRegistry registry);
-        public Rules<ResolveConstructorParameterServiceKey> ForConstructorParameter = new Rules<ResolveConstructorParameterServiceKey>();
+        public Rules<ResolveConstructorParameterServiceKey> ForConstructorParameter;
 
         public delegate bool ResolvePropertyOrFieldServiceKey(out object key, MemberInfo member, Request parent, IRegistry registry);
-        public Rules<ResolvePropertyOrFieldServiceKey> ForPropertyOrField = new Rules<ResolvePropertyOrFieldServiceKey>();
+        public Rules<ResolvePropertyOrFieldServiceKey> ForPropertyOrField;
+
+        public ResolutionRules(object syncRoot)
+        {
+            ForUnregisteredService = new Rules<ResolveUnregisteredService>(syncRoot);
+            ForConstructorParameter = new Rules<ResolveConstructorParameterServiceKey>(syncRoot);
+            ForPropertyOrField = new Rules<ResolvePropertyOrFieldServiceKey>(syncRoot);
+        }
 
         public sealed class Rules<TRule>
         {
+            public Rules(object syncRoot)
+            {
+                _syncRoot = syncRoot;
+            }
+
             public IEnumerable<TRule> List
             {
                 get { return _list ?? Enumerable.Empty<TRule>(); }
-                set { Interlocked.Exchange(ref _list, value.ToArray()); }
+                set { lock (_syncRoot) _list = value == null ? null : value.ToArray(); }
             }
 
             public bool IsEmpty
@@ -833,25 +904,26 @@ namespace DryIoc
             public R Invoke<R>(Func<TRule, R> invoke)
             {
                 var result = default(R);
-                var rules = _list;
-                if (rules != null)
-                    for (var i = 0; i < rules.Length && Equals(result, default(R)); i++)
-                        result = invoke(rules[i]);
+                lock (_syncRoot)
+                    if (_list != null)
+                        for (var i = 0; i < _list.Length && Equals(result, default(R)); i++)
+                            result = invoke(_list[i]);
                 return result;
             }
 
             public TRule Append(TRule rule)
             {
-                Interlocked.Exchange(ref _list, (_list ?? new TRule[0]).AppendOrUpdate(rule));
+                lock (_syncRoot) _list = _list.Append(rule);
                 return rule;
             }
 
             public void Remove(TRule rule)
             {
-                List = List.Except(new[] { rule });
+                lock (_syncRoot) List = List.Except(new[] { rule });
             }
 
             private TRule[] _list;
+            private readonly object _syncRoot;
         }
     }
 
@@ -866,6 +938,12 @@ Please register service OR adjust resolution rules.";
 
         public static readonly string EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE =
             "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
+
+        public static readonly string UNABLE_TO_REGISTER_WITH_NON_INT_OR_STRING_SERVICE_KEY =
+            "Unable to register service {0} with key that is not null, nor string, nor integer index, but {1}.";
+
+        public static readonly string UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE =
+            "Unable to register not a factory provider for open-generic service {0} (with key {1})";
 
         public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE =
             "Unable to register open-generic implementation {0} with non-generic service {1}.";
@@ -1448,7 +1526,7 @@ when resolving {1}.";
     {
         public static readonly FactorySetup DefaultSetup = ServiceSetup.Default;
 
-        public FactoryWithContext With(Request request, IRegistry registry)
+        public FactoryWithContext WithContext(Request request, IRegistry registry)
         {
             return new FactoryWithContext(request, registry, this);
         }
