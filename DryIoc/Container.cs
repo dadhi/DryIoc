@@ -679,6 +679,35 @@ namespace DryIoc
             registry.Register(typeof(DebugExpression<>), debugExprFactory);
         }
 
+        public static Dictionary<Type, Factory> GenericWrappers;
+
+        static ContainerSetup()
+        {
+            GenericWrappers = new Dictionary<Type, Factory>();
+
+            GenericWrappers.Add(typeof(Many<>), 
+                new FactoryProvider(
+                    (_, __) => new DelegateFactory(GetManyExpression),
+                    ServiceSetup.With(FactoryCachePolicy.ShouldNotCacheExpression)));
+
+            var funcFactory = new FactoryProvider(
+                (_, __) => new DelegateFactory(GetFuncExpression),
+                GenericWrapperSetup.With(t => t[t.Length - 1]));
+            foreach (var funcType in FuncTypes)
+                GenericWrappers.Add(funcType, funcFactory);
+
+            GenericWrappers.Add(typeof(Lazy<>), 
+                new ReflectionFactory(typeof(Lazy<>),
+                    getConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }),
+                    setup: GenericWrapperSetup.Default));
+
+            GenericWrappers.Add(typeof(Meta<,>),
+                new FactoryProvider(GetMetaFactoryOrDefault, GenericWrapperSetup.With(t => t[0])));
+
+            GenericWrappers.Add(typeof(DebugExpression<>),
+                new FactoryProvider((_, __) => new DelegateFactory(GetDebugExpression), GenericWrapperSetup.Default));
+        }
+
         public static FactoryWithContext ResolveOpenGeneric(Request request, IRegistry registry)
         {
             if (request.OpenGenericServiceType == null)
