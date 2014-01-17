@@ -598,14 +598,10 @@ namespace DryIoc
 
         public int GetOrAdd(object item)
         {
-            var index = Array.IndexOf(_items, item);
-            if (index != -1)
-                return index;
-
             lock (_syncRoot)
             {
-                _items = _items.AppendOrUpdate(item);
-                return _items.Length - 1;
+                var index = Array.IndexOf(_items, item);
+                return index != -1 ? index : (_items = _items.AppendOrUpdate(item)).Length - 1;
             }
         }
 
