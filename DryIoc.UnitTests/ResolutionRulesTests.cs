@@ -197,8 +197,9 @@ namespace DryIoc.UnitTests
 
             var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
             var metadata = import.Metadata;
-            key = registry.GetKeys(serviceType, factory => metadata.Equals(factory.Setup.Metadata)).FirstOrDefault()
-                .ThrowIfNull("Unable to resolve", serviceType, metadata, parent);
+            key = registry.GetAll(serviceType).FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
+                .ThrowIfNull("Unable to resolve", serviceType, metadata, parent)
+                .Key;
             return true;
         }
 
