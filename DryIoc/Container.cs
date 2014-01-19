@@ -44,8 +44,6 @@ namespace DryIoc
 
         public Container(Action<IRegistry> setup = null)
         {
-            _selfWeakReference = new RegistryWeakReference(this);
-
             _syncRoot = new object();
             _resolutionRules = new ResolutionRules(_syncRoot);
             _factories = new Dictionary<Type, FactoriesEntry>();
@@ -187,7 +185,10 @@ namespace DryIoc
 
         #region IRegistry
 
-        RegistryWeakReference IRegistry.SelfWeakReference { get { return _selfWeakReference; } }
+        RegistryWeakReference IRegistry.SelfWeakReference
+        {
+            get { return _selfWeakReference ?? (_selfWeakReference = new RegistryWeakReference(this)); }
+        }
 
         public ResolutionRules ResolutionRules { get { return _resolutionRules; } }
 
@@ -412,7 +413,7 @@ namespace DryIoc
 
         #region Internal State
 
-        private readonly RegistryWeakReference _selfWeakReference;
+        private RegistryWeakReference _selfWeakReference;
         private object _syncRoot;
         private ResolutionRules _resolutionRules;
         private Dictionary<Type, FactoriesEntry> _factories;
@@ -658,7 +659,7 @@ namespace DryIoc
 
             var manyFactory = new FactoryProvider(
                 (_, __) => new DelegateFactory(GetManyExpression),
-                ServiceSetup.With(FactoryCachePolicy.ShouldNotCacheExpression));
+                GenericWrapperSetup.Default);
             registry.Register(typeof(Many<>), manyFactory);
 
             var funcFactory = new FactoryProvider(
@@ -690,7 +691,7 @@ namespace DryIoc
             GenericWrappers.Add(typeof(Many<>),
                 new FactoryProvider(
                     (_, __) => new DelegateFactory(GetManyExpression),
-                    ServiceSetup.With(FactoryCachePolicy.ShouldNotCacheExpression)));
+                    GenericWrapperSetup.Default));
 
             var funcFactory = new FactoryProvider(
                 (_, __) => new DelegateFactory(GetFuncExpression),
@@ -738,7 +739,9 @@ namespace DryIoc
             if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
 
-            return new DelegateFactory((request, registry) =>
+            return new DelegateFactory(
+                setup: GenericWrapperSetup.Default,
+                getExpression: (request, registry) =>
             {
                 var collectionType = request.ServiceType;
 

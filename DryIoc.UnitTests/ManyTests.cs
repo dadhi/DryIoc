@@ -141,13 +141,29 @@ namespace DryIoc.UnitTests
 		{
 			var container = new Container();
 			container.Register(typeof(IService), typeof(Service));
-			container.Register(typeof(IService), typeof(Service));
+			container.Register(typeof(IService), typeof(AnotherService));
 
 			var result = container.Resolve<Lazy<Func<Many<IService>>>>();
 
             Assert.That(result, Is.InstanceOf<Lazy<Func<Many<IService>>>>());
             Assert.That(result.Value.Invoke().Items.Count(), Is.EqualTo(2));
 		}
+
+        [Test]
+        public void I_should_be_able_to_resolve_Meta_of_Many()
+        {
+            var container = new Container();
+            container.Register(typeof(IService), typeof(Service), setup: ServiceSetup.WithMetadata("a"));
+            container.Register(typeof(IService), typeof(AnotherService), setup: ServiceSetup.WithMetadata("b"));
+
+            var result = container.Resolve<Meta<Many<IService>, string>>();
+
+            Assert.That(result, Is.InstanceOf<Meta<Many<IService>, string>>());
+            Assert.That(result.Metadata, Is.EqualTo("a"));
+            var services = result.Value.Items.ToArray();
+            Assert.That(services[0], Is.InstanceOf<Service>());
+            Assert.That(services[1], Is.InstanceOf<AnotherService>());
+        }
 
 	    [Test]
 	    public void If_some_item_is_not_resolved_then_it_would_not_throw()
