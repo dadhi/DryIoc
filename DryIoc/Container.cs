@@ -48,6 +48,7 @@ namespace DryIoc
             _resolutionRules = new ResolutionRules(_syncRoot);
             _factories = new Dictionary<Type, FactoriesEntry>();
             _decorators = new Dictionary<Type, Factory[]>();
+            _genericWrappers = ContainerSetup.GenericWrappers;
             _currentScope = _singletonScope = new Scope();
 
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
@@ -114,15 +115,21 @@ namespace DryIoc
 
             lock (_syncRoot)
             {
-                if (factory.Setup.Type == FactoryType.Decorator)
+                var factoryType = factory.Setup.Type;
+                if (factoryType == FactoryType.Decorator)
                 {
                     Factory[] factories;
                     _decorators.TryGetValue(serviceType, out factories);
                     _decorators[serviceType] = factories.Append(new[] { factory });
-                    return factory;
                 }
-
-                _factories.GetOrAdd(serviceType, NewFactoriesEntry).Add(factory, serviceType, serviceKey);
+                else if (factoryType == FactoryType.GenericWrapper && serviceType.IsGenericTypeDefinition)
+                {
+                    _genericWrappers = _genericWrappers.AddOrUpdate(serviceType, factory);
+                }
+                else
+                {
+                    _factories.GetOrAdd(serviceType, NewFactoriesEntry).Add(factory, serviceType, serviceKey);
+                }
             }
 
             return factory;
@@ -195,7 +202,7 @@ namespace DryIoc
         Scope IRegistry.SingletonScope { get { return _singletonScope; } }
         Scope IRegistry.CurrentScope { get { return _currentScope; } }
 
-        FactoryWithContext GetOrAddFactory2(Request request, IfUnresolved ifUnresolved)
+        FactoryWithContext GetOrAddFactory_NEW(Request request, IfUnresolved ifUnresolved)
         {
             Factory factory = null;
             var serviceType = request.ServiceType;
@@ -376,15 +383,17 @@ namespace DryIoc
 
         Factory IRegistry.GetFactoryOrDefault(Type serviceType, object serviceKey)
         {
+            FactoriesEntry entry;
+            Factory factory;
             lock (_syncRoot)
-            {
-                FactoriesEntry entry;
-                Factory factory;
-                if (TryFindEntry(out entry, serviceType) &&
-                    entry.TryGet(out factory, serviceType, serviceKey, ResolutionRules.GetSingleRegisteredFactory))
-                    return factory;
-                return null;
-            }
+                return TryFindEntry(out entry, serviceType) &&
+                       entry.TryGet(out factory, serviceType, serviceKey, ResolutionRules.GetSingleRegisteredFactory)
+                    ? factory : null;
+        }
+
+        Factory IRegistry.GetGenericWrapperOrDefault(Type openGenericServiceType)
+        {
+            return _genericWrappers.GetValueOrDefault(openGenericServiceType);
         }
 
         Type IRegistry.GetWrappedServiceTypeOrSelf(Type serviceType)
@@ -392,14 +401,13 @@ namespace DryIoc
             if (!serviceType.IsGenericType)
                 return serviceType;
 
-            var factory = ((IRegistry)this).GetFactoryOrDefault(serviceType.GetGenericTypeDefinition(), null);
+            var factory = _genericWrappers.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
             if (factory == null || factory.Setup.Type != FactoryType.GenericWrapper)
                 return serviceType;
 
             var wrapperSetup = ((GenericWrapperSetup)factory.Setup);
             var wrappedType = wrapperSetup.GetWrappedServiceType(serviceType.GetGenericArguments());
-            return wrappedType == serviceType ? serviceType
-                : ((IRegistry)this).GetWrappedServiceTypeOrSelf(wrappedType); // unwrap recursively.
+            return ((IRegistry)this).GetWrappedServiceTypeOrSelf(wrappedType);
         }
 
         private bool TryFindEntry(out FactoriesEntry entry, Type serviceType)
@@ -418,6 +426,8 @@ namespace DryIoc
         private ResolutionRules _resolutionRules;
         private Dictionary<Type, FactoriesEntry> _factories;
         private Dictionary<Type, Factory[]> _decorators;
+        private HashTree<Type, Factory> _genericWrappers;
+
         private Scope _currentScope;
         private Scope _singletonScope;
 
@@ -656,39 +666,14 @@ namespace DryIoc
         public static void Default(IRegistry registry)
         {
             registry.ResolutionRules.ForUnregisteredService.Append(ResolveEnumerableAsStaticArray);
-
-            var manyFactory = new FactoryProvider(
-                (_, __) => new DelegateFactory(GetManyExpression),
-                GenericWrapperSetup.Default);
-            registry.Register(typeof(Many<>), manyFactory);
-
-            var funcFactory = new FactoryProvider(
-                (_, __) => new DelegateFactory(GetFuncExpression),
-                GenericWrapperSetup.With(t => t[t.Length - 1]));
-            foreach (var funcType in FuncTypes)
-                registry.Register(funcType, funcFactory);
-
-            var lazyFactory = new ReflectionFactory(typeof(Lazy<>),
-                getConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }),
-                setup: GenericWrapperSetup.Default);
-            registry.Register(typeof(Lazy<>), lazyFactory);
-
-            var metaFactory = new FactoryProvider(GetMetaFactoryOrDefault, GenericWrapperSetup.With(t => t[0]));
-            registry.Register(typeof(Meta<,>), metaFactory);
-
-            var debugExprFactory = new FactoryProvider(
-                (_, __) => new DelegateFactory(GetDebugExpression),
-                GenericWrapperSetup.Default);
-            registry.Register(typeof(DebugExpression<>), debugExprFactory);
+            registry.ResolutionRules.ForUnregisteredService.Append(ResolveGenericWrappers);
         }
 
-        public static Dictionary<Type, Factory> GenericWrappers;
+        public static HashTree<Type, Factory> GenericWrappers = HashTree<Type, Factory>.Empty;
 
         static ContainerSetup()
         {
-            GenericWrappers = new Dictionary<Type, Factory>();
-
-            GenericWrappers.Add(typeof(Many<>),
+            GenericWrappers = GenericWrappers.AddOrUpdate(typeof(Many<>),
                 new FactoryProvider(
                     (_, __) => new DelegateFactory(GetManyExpression),
                     GenericWrapperSetup.Default));
@@ -697,18 +682,33 @@ namespace DryIoc
                 (_, __) => new DelegateFactory(GetFuncExpression),
                 GenericWrapperSetup.With(t => t[t.Length - 1]));
             foreach (var funcType in FuncTypes)
-                GenericWrappers.Add(funcType, funcFactory);
+                GenericWrappers = GenericWrappers.AddOrUpdate(funcType, funcFactory);
 
-            GenericWrappers.Add(typeof(Lazy<>),
+            GenericWrappers = GenericWrappers.AddOrUpdate(typeof(Lazy<>),
                 new ReflectionFactory(typeof(Lazy<>),
                     getConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }),
                     setup: GenericWrapperSetup.Default));
 
-            GenericWrappers.Add(typeof(Meta<,>),
+            GenericWrappers = GenericWrappers.AddOrUpdate(typeof(Meta<,>),
                 new FactoryProvider(GetMetaFactoryOrDefault, GenericWrapperSetup.With(t => t[0])));
 
-            GenericWrappers.Add(typeof(DebugExpression<>),
+            GenericWrappers = GenericWrappers.AddOrUpdate(typeof(DebugExpression<>),
                 new FactoryProvider((_, __) => new DelegateFactory(GetDebugExpression), GenericWrapperSetup.Default));
+        }
+
+        public static FactoryWithContext ResolveGenericWrappers(Request request, IRegistry registry)
+        {
+            if (request.OpenGenericServiceType == null)
+                return null;
+
+            var factory = registry.GetGenericWrapperOrDefault(request.OpenGenericServiceType);
+            if (factory != null && factory.ProvidesFactoryPerRequest)
+                factory = factory.GetFactoryPerRequestOrDefault(request, registry);
+                
+            if (factory == null)
+                return null;
+
+            return factory.WithContext(request, registry);
         }
 
         public static FactoryWithContext ResolveOpenGeneric(Request request, IRegistry registry)
@@ -717,17 +717,9 @@ namespace DryIoc
                 return null;
 
             var factory = registry.GetFactoryOrDefault(request.OpenGenericServiceType, request.ServiceKey);
-            if (factory == null)
-            {
-                if (request.ServiceKey == null)
-                    return null;
+            if (factory != null && factory.ProvidesFactoryPerRequest)
+                factory = factory.GetFactoryPerRequestOrDefault(request, registry);
 
-                factory = registry.GetFactoryOrDefault(request.OpenGenericServiceType, null);
-                if (factory == null || factory.Setup.Type != FactoryType.GenericWrapper)
-                    return null;
-            }
-
-            factory = factory.GetFactoryPerRequestOrDefault(request, registry);
             if (factory == null)
                 return null;
 
@@ -1956,8 +1948,9 @@ when resolving {1}.";
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
 
-            foreach (var item in _items.TraverseInOrder().Select(x => x.Value).OfType<IDisposable>())
-                item.Dispose();
+            if (!_items.IsEmpty)
+                foreach (var item in _items.TraverseInOrder().Select(x => x.Value).OfType<IDisposable>())
+                    item.Dispose();
             _items = null;
         }
 
@@ -2078,9 +2071,9 @@ when resolving {1}.";
 
         FactoryWithContext GetOrAddFactory(Request request, IfUnresolved ifUnresolved);
 
-        Expression GetDecoratorExpressionOrDefault(Request request);
-
         Factory GetFactoryOrDefault(Type serviceType, object serviceKey);
+        Factory GetGenericWrapperOrDefault(Type openGenericServiceType);
+        Expression GetDecoratorExpressionOrDefault(Request request);
 
         IEnumerable<KV<object, Factory>> GetAll(Type serviceType);
 
