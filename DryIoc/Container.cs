@@ -104,16 +104,15 @@ namespace DryIoc
         {
             serviceType.ThrowIfNull();
 
-            serviceKey.ThrowIf(
-                !(serviceKey == null
+            if (!(serviceKey == null
                 || serviceKey is string
-                || serviceKey is int && (int)serviceKey >= 0),
-                Error.UNABLE_TO_REGISTER_WITH_NON_INT_OR_STRING_SERVICE_KEY, serviceType, serviceKey);
+                || serviceKey is int && (int)serviceKey >= 0))
+                throw Error.UNABLE_TO_REGISTER_WITH_NON_INT_OR_STRING_SERVICE_KEY.Of(serviceType, serviceKey);
 
-            factory.ThrowIfNull()
-                .ThrowIf(serviceType.IsGenericTypeDefinition && !factory.ProvidesFactoryPerRequest,
-                    Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE, serviceType, serviceKey)
-                .ThrowIfCannotBeRegisteredWithServiceType(serviceType);
+            factory.ThrowIfNull().ThrowIfCannotBeRegisteredWithServiceType(serviceType);
+
+            if (serviceType.IsGenericTypeDefinition && !factory.ProvidesFactoryPerRequest)
+                throw Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE.Of(serviceType, serviceKey);
 
             lock (_syncRoot)
             {
@@ -485,8 +484,8 @@ namespace DryIoc
                             .ToArray();
 
                         if (indexedFactories.Length > 1 && getSingleFactory == null)
-                            Throw.It(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType,
-                                indexedFactories.Select(kv => kv.Value));
+                            throw Error.EXPECTED_SINGLE_DEFAULT_FACTORY.Of(
+                                serviceType, indexedFactories.Select(kv => kv.Value));
 
                         if (getSingleFactory != null)
                         {
@@ -1640,12 +1639,12 @@ when resolving {1}.";
             if (!implType.IsGenericTypeDefinition)
             {
                 if (implType.IsGenericType && implType.ContainsGenericParameters)
-                    Throw.It(Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS,
+                    throw Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS.Of(
                         implType, implType.GetGenericTypeDefinition());
 
-                if (implType != serviceType && serviceType != typeof(object))
-                    Throw.If(Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1,
-                        Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implType, serviceType);
+                if (implType != serviceType && serviceType != typeof(object) &&
+                    Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1)
+                    throw Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE.Of(implType, serviceType);
             }
             else if (implType != serviceType)
             {
@@ -1661,10 +1660,10 @@ when resolving {1}.";
                         implType, serviceType, implementedOpenGenericTypes);
                 }
                 else if (implType.IsGenericType && serviceType.ContainsGenericParameters)
-                    Throw.It(Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS,
+                    throw Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS.Of(
                         serviceType, serviceType.GetGenericTypeDefinition());
                 else
-                    Throw.It(Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, implType, serviceType);
+                    throw Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE.Of(implType, serviceType);
             }
         }
 
@@ -1824,7 +1823,7 @@ when resolving {1}.";
 
             var unmatchedArgIndex = Array.IndexOf(resultImplTypeArgs, null);
             if (unmatchedArgIndex != -1)
-                Throw.It(Error.UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
+                throw Error.UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE.Of(
                     implType, openImplTypeArgs[unmatchedArgIndex], request);
 
             return resultImplTypeArgs;
@@ -2200,11 +2199,6 @@ when resolving {1}.";
         public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             if (!throwCondition) return;
-            throw GetException(Format(message, arg0, arg1, arg2));
-        }
-
-        public static void It(string message, object arg0 = null, object arg1 = null, object arg2 = null)
-        {
             throw GetException(Format(message, arg0, arg1, arg2));
         }
 
