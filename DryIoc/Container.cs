@@ -60,23 +60,15 @@ namespace DryIoc
             Setup(this);
         }
 
-        public Request CreateRequest(Type serviceType, object serviceKey = null)
+        public Container(Container parent, ContainerParentRelation parentRelation)
         {
-            return new Request(_resolutionRoot, null, serviceType, serviceKey);
+            _parent = parent;
+            _parentRelation = parentRelation;
         }
 
-        public Container OpenScope()
+        public Container CreateNewScope()
         {
-            var container = new Container
-            {
-                _syncRoot = _syncRoot,
-                _resolutionRules = _resolutionRules,
-                _factories = _factories,
-                _decorators = _decorators,
-                _singletonScope = _singletonScope,
-                _currentScope = new Scope()
-            };
-            return container;
+            return new Container(this, ContainerParentRelation.ReuseAll) { _currentScope = new Scope() };
         }
 
         public Container CreateNestedContainer()
@@ -95,6 +87,11 @@ namespace DryIoc
         public void Dispose()
         {
             _currentScope.Dispose();
+        }
+
+        public Request CreateRequest(Type serviceType, object serviceKey = null)
+        {
+            return new Request(_resolutionRoot, null, serviceType, serviceKey);
         }
 
         #region IRegistrator
@@ -421,6 +418,9 @@ namespace DryIoc
 
         #region Internal State
 
+        private readonly Container _parent;
+        private readonly ContainerParentRelation _parentRelation;
+
         private RegistryWeakReference _selfWeakReference;
         private object _syncRoot;
         private ResolutionRules _resolutionRules;
@@ -536,6 +536,8 @@ namespace DryIoc
 
         #endregion
     }
+
+    public enum ContainerParentRelation { ReuseAll, ReuseRegistryAkaCacheFacade, ReuseCacheInQUESTION }
 
     public sealed class ResolutionRoot
     {
@@ -704,7 +706,7 @@ namespace DryIoc
             var factory = registry.GetGenericWrapperOrDefault(request.OpenGenericServiceType);
             if (factory != null && factory.ProvidesFactoryPerRequest)
                 factory = factory.GetFactoryPerRequestOrDefault(request, registry);
-                
+
             if (factory == null)
                 return null;
 

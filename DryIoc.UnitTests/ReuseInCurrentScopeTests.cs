@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var log = container.Resolve<Log>();
-            using (var containerWithNewScope = container.OpenScope())
+            using (var containerWithNewScope = container.CreateNewScope())
             {
                 var logScoped1 = containerWithNewScope.Resolve<Log>();
                 var logScoped2 = containerWithNewScope.Resolve<Log>();
@@ -33,7 +33,7 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var consumer = container.Resolve<Consumer>();
-            using (var containerWithNewScope = container.OpenScope())
+            using (var containerWithNewScope = container.CreateNewScope())
             {
                 var consumerScoped1 = containerWithNewScope.Resolve<Consumer>();
                 var consumerScoped2 = containerWithNewScope.Resolve<Consumer>();
@@ -49,7 +49,7 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             Func<Log> getLog;
-            using (var containerWithNewScope = container.OpenScope())
+            using (var containerWithNewScope = container.CreateNewScope())
                 getLog = containerWithNewScope.Resolve<Func<Log>>();
 
             Assert.Throws<ContainerException>(() => getLog());
@@ -62,7 +62,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Log>(Reuse.InCurrentScope);
 
-            var containerWithNewScope = container.OpenScope();
+            var containerWithNewScope = container.CreateNewScope();
             containerWithNewScope.Resolve<Log>();
             containerWithNewScope.Dispose();
 
@@ -77,7 +77,7 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var getLog = container.Resolve<Func<Log>>();
-            using (container.OpenScope()) { }
+            using (container.CreateNewScope()) { }
 
             Assert.DoesNotThrow(() => getLog());
         }
@@ -89,7 +89,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(Reuse.Singleton);
 
             IService serviceInNestedScope;
-            using (container.OpenScope())
+            using (container.CreateNewScope())
                 serviceInNestedScope = container.Resolve<Func<IService>>()();
 
             var serviceInOuterScope = container.Resolve<Func<IService>>()();

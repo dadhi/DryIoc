@@ -9,14 +9,14 @@ namespace DryIoc.UnitTests
     public class GenericWrapperTests
     {
         [Test]
-        public void IsRegistered_for_Func_of_registered_service_should_return_true_Same_as_for_open_generics()
+        public void IsRegistered_wont_work_for_generic_wrappers()
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
 
             var registered = container.IsRegistered<Func<IService>>();
 
-            Assert.That(registered, Is.True);
+            Assert.That(registered, Is.False);
         }
 
         [Test]
