@@ -33,12 +33,12 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var consumer = container.Resolve<Consumer>();
-            using (var containerWithNewScope = container.CreateNewScope())
+            using (var scope = container.CreateNewScope())
             {
-                var consumerScoped1 = containerWithNewScope.Resolve<Consumer>();
-                var consumerScoped2 = containerWithNewScope.Resolve<Consumer>();
+                var scopedConsumer1 = scope.Resolve<Consumer>();
+                var scopedConsumer2 = scope.Resolve<Consumer>();
 
-                Assert.That(consumerScoped1.Log, Is.SameAs(consumerScoped2.Log).And.Not.SameAs(consumer.Log));
+                Assert.That(scopedConsumer1.Log, Is.SameAs(scopedConsumer2.Log).And.Not.SameAs(consumer.Log));
             }
         }
 

@@ -102,8 +102,8 @@ namespace DryIoc.MefAttributedModel
         public static TypeExportInfo GetExportInfoOrDefault(Type type, object[] attributes)
         {
             if (attributes.Length == 0 ||
-                !Array.Exists(attributes, a => a is ExportAttribute || a is ExportAllAttribute) ||
-                Array.Exists(attributes, a => a is PartNotDiscoverableAttribute))
+                attributes.IndexOf(a => a is ExportAttribute || a is ExportAllAttribute) == -1 ||
+                attributes.IndexOf(a => a is PartNotDiscoverableAttribute) != -1)
                 return null;
 
             var info = new TypeExportInfo { Type = type };
@@ -236,7 +236,9 @@ namespace DryIoc.MefAttributedModel
 
         private static void RegisterFactory(IRegistrator registrator, Type factoryType, ExportInfo factoryExport)
         {
+            // TODO: Replace GetInterfaceMap with custom code, as not supported in PCL
             var factoryMethod = factoryType.GetInterfaceMap(factoryExport.ServiceType).TargetMethods[0];
+
             var attributes = factoryMethod.GetCustomAttributes(false);
             var serviceType = factoryExport.ServiceType.GetGenericArguments()[0];
 
@@ -385,7 +387,6 @@ Only single metadata is supported per implementation type, please remove the res
     #region Registration Info DTOs
 #pragma warning disable 659
 
-    [Serializable]
     public sealed class TypeExportInfo
     {
         public Type Type;
@@ -485,7 +486,6 @@ Only single metadata is supported per implementation type, please remove the res
         }
     }
 
-    [Serializable]
     public sealed class ExportInfo
     {
         public Type ServiceType;
@@ -498,7 +498,6 @@ Only single metadata is supported per implementation type, please remove the res
         }
     }
 
-    [Serializable]
     public sealed class GenericWrapperInfo
     {
         public int ServiceTypeIndex;
@@ -520,7 +519,6 @@ Only single metadata is supported per implementation type, please remove the res
         }
     }
 
-    [Serializable]
     public sealed class DecoratorInfo
     {
         public string ServiceName;
