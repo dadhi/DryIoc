@@ -321,7 +321,7 @@ namespace DryIoc.MefAttributedModel
             var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
             var metadata = import.Metadata;
 
-            var item = registry.GetAll(serviceType).FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
+            var item = registry.GetAllFactories(serviceType).FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
                 .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, metadata, parent);
             key = item.Key; 
             return true;
