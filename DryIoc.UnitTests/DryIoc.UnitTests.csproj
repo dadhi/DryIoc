@@ -73,9 +73,6 @@
     <Compile Include="TypeCSharpNameFormattingTests.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
       <Name>DryIoc</Name>
