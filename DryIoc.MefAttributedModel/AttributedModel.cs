@@ -234,13 +234,18 @@ namespace DryIoc.MefAttributedModel
         private static readonly MethodInfo _resolveMethod =
             typeof(Resolver).GetMethod("Resolve", new[] { typeof(IResolver), typeof(string), typeof(IfUnresolved) });
 
+        private static readonly string _factoryMethodName = "Create";
+        private static readonly string _dotFactoryMethodName = "." + _factoryMethodName;
         private static void RegisterFactory(IRegistrator registrator, Type factoryType, ExportInfo factoryExport)
         {
-            // TODO: Replace GetInterfaceMap with custom code, as not supported in PCL
-            var factoryMethod = factoryType.GetInterfaceMap(factoryExport.ServiceType).TargetMethods[0];
-
-            var attributes = factoryMethod.GetCustomAttributes(false);
             var serviceType = factoryExport.ServiceType.GetGenericArguments()[0];
+            var allMethods = factoryType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var factoryMethod = allMethods.FirstOrDefault(m =>
+                (m.Name == _factoryMethodName || m.Name.EndsWith(_dotFactoryMethodName)) 
+                && m.GetParameters().Length == 0 && m.ReturnType == serviceType)
+                .ThrowIfNull();
+            
+            var attributes = factoryMethod.GetCustomAttributes(false);
 
             var exportInfo = GetExportInfoOrDefault(serviceType, attributes);
             if (exportInfo == null)
@@ -253,7 +258,7 @@ namespace DryIoc.MefAttributedModel
                         request.Root.GetRegistryItemExpression(registry),
                         Expression.Constant(factoryExport.ServiceName, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
-                    "Create", null);
+                    _factoryMethodName, null);
 
             var factory = new DelegateFactory(factoryCreateExpr, exportInfo.GetReuse(), exportInfo.GetSetup(attributes));
             for (var i = 0; i < exportInfo.Exports.Length; i++)
@@ -300,8 +305,10 @@ namespace DryIoc.MefAttributedModel
             if (attributes.Length == 0)
                 return false;
 
-            return TryGetServiceKeyFromImportAttribute(out key, attributes)
-                || TryGetServiceKeyFromImportOrExportAttribute(out key, member.GetMemberType(), registry, attributes);
+            return TryGetServiceKeyFromImportAttribute(out key, attributes) 
+                || TryGetServiceKeyFromImportOrExportAttribute(out key, 
+                    member is PropertyInfo ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType, 
+                    registry, attributes);
         }
 
         public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
@@ -323,7 +330,7 @@ namespace DryIoc.MefAttributedModel
 
             var item = registry.GetAllFactories(serviceType).FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
                 .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, metadata, parent);
-            key = item.Key; 
+            key = item.Key;
             return true;
         }
 

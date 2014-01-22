@@ -454,7 +454,7 @@ namespace DryIoc
 
     public static class Ref
     {
-        public static Ref<T> Of<T>(T value) where T : class 
+        public static Ref<T> Of<T>(T value) where T : class
         {
             var r = new Ref<T>();
             r.Swap(value);
@@ -1803,20 +1803,22 @@ when resolving {1}.";
             if (registry.ResolutionRules.ForPropertyOrField.IsEmpty)
                 return newService;
 
-            var properties = implementationType.GetProperties(Resolver.MembersToResolve).Where(p => p.GetSetMethod() != null);
+            var props = implementationType.GetProperties(Resolver.MembersToResolve).Where(p => p.GetSetMethod() != null);
             var fields = implementationType.GetFields(Resolver.MembersToResolve).Where(f => !f.IsInitOnly);
 
             var bindings = new List<MemberBinding>();
-            foreach (var member in properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>()))
+            foreach (var member in props.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>()))
             {
-                var pf = member;
+                var m = member;
                 object key = null;
-                if (registry.ResolutionRules.ForPropertyOrField.Invoke(r => r(out key, pf, request, registry)))
+                if (registry.ResolutionRules.ForPropertyOrField.Invoke(r => r(out key, m, request, registry)))
                 {
-                    var memberRequest = request.Push(pf.GetMemberType(), key,
-                        new DependencyInfo(pf is PropertyInfo ? DependencyKind.Property : DependencyKind.Field, pf.Name));
+                    var type = m is PropertyInfo ? ((PropertyInfo)m).PropertyType : ((FieldInfo)m).FieldType;
+                    var kind = m is PropertyInfo ? DependencyKind.Property : DependencyKind.Field;
+
+                    var memberRequest = request.Push(type, key, new DependencyInfo(kind, m.Name));
                     var memberExpr = registry.GetOrAddFactory(memberRequest, IfUnresolved.Throw).GetExpression();
-                    bindings.Add(Expression.Bind(pf, memberExpr));
+                    bindings.Add(Expression.Bind(m, memberExpr));
                 }
             }
 
@@ -2051,7 +2053,7 @@ when resolving {1}.";
                 if (parent != null && parent.Enumerate().Any(p =>
                     p.OpenGenericServiceType != null && ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType)))
                     return GetScopedServiceExpression(
-                        request.Root.GetItemExpression(registry.SingletonScope), 
+                        request.Root.GetItemExpression(registry.SingletonScope),
                         factoryID, factoryExpr);
 
                 // Create singleton object now and put it into store.
@@ -2362,14 +2364,6 @@ when resolving {1}.";
                 (builder.Length == 0 ? builder : builder.Append(separator)).Append(printItem(item));
             var result = builder.ToString();
             return result != string.Empty ? result : (ifEmpty ?? string.Empty);
-        }
-
-        // TODO: Replace with direct operation on Property/FieldInfo.
-        public static Type GetMemberType(this MemberInfo member)
-        {
-            var mt = member.MemberType;
-            mt.ThrowIf(mt != MemberTypes.Field && mt != MemberTypes.Property);
-            return mt == MemberTypes.Field ? ((FieldInfo)member).FieldType : ((PropertyInfo)member).PropertyType;
         }
 
         public static V GetOrAdd<K, V>(this IDictionary<K, V> source, K key, Func<K, V> valueFactory)
