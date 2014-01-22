@@ -24,7 +24,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.U
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.UnitTests", "Net40\DryIoc.UnitTests\DryIoc.UnitTests.csproj", "{C8A2BC7E-C806-4191-B525-C0D72679041A}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51-76A9-479E-8FF2-66C903C5856E}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{34781A51-76A9-479E-8FF2-66C903C5856E}"
 	ProjectSection(SolutionItems) = preProject
 		nuget\BuildPackage.bat = nuget\BuildPackage.bat
 		nuget\DryIoc.dll.nuspec = nuget\DryIoc.dll.nuspec
@@ -48,6 +48,12 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Samples.CUT", "DryIoc.Samples.CUT\DryIoc.Samples.CUT.csproj", "{4D1145DB-53DF-414B-8826-A38CF83B4678}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Playground", "DryIoc.Playground\DryIoc.Playground.csproj", "{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PCL", "PCL", "{CDBDBE9E-2B1C-4586-B120-7572303F9065}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc", "PCL\DryIoc\DryIoc.csproj", "{878E401E-474B-4AAB-AE20-122051755C81}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel", "PCL\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj", "{A4810DAB-2E12-4582-AAD5-2321AD333EC6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -239,6 +245,26 @@ Global
 		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|x86.ActiveCfg = Release|Any CPU
+		{878E401E-474B-4AAB-AE20-122051755C81}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{878E401E-474B-4AAB-AE20-122051755C81}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{878E401E-474B-4AAB-AE20-122051755C81}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{878E401E-474B-4AAB-AE20-122051755C81}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{878E401E-474B-4AAB-AE20-122051755C81}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{878E401E-474B-4AAB-AE20-122051755C81}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{878E401E-474B-4AAB-AE20-122051755C81}.Release|Any CPU.Build.0 = Release|Any CPU
+		{878E401E-474B-4AAB-AE20-122051755C81}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{878E401E-474B-4AAB-AE20-122051755C81}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{878E401E-474B-4AAB-AE20-122051755C81}.Release|x86.ActiveCfg = Release|Any CPU
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -252,5 +278,7 @@ Global
 		{4F120D18-ABE6-4C79-B49F-8099F01E2F7F} = {84205448-1773-45D6-8D42-548A7997A7E1}
 		{2C709B4B-4076-4C36-AF42-E6E49C32F0A6} = {34781A51-76A9-479E-8FF2-66C903C5856E}
 		{CD8A9FB5-5902-4E49-93A5-C29D148BBAF4} = {34781A51-76A9-479E-8FF2-66C903C5856E}
+		{878E401E-474B-4AAB-AE20-122051755C81} = {CDBDBE9E-2B1C-4586-B120-7572303F9065}
+		{A4810DAB-2E12-4582-AAD5-2321AD333EC6} = {CDBDBE9E-2B1C-4586-B120-7572303F9065}
 	EndGlobalSection
 EndGlobal

@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 [assembly: AssemblyTitle("DryIoc")]
 [assembly: AssemblyDescription("DryIoc is fast, small and rich IoC container.")]
@@ -14,7 +13,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyVersion("1.2.0")]
 [assembly: AssemblyFileVersion("1.2.0")]
 
-[assembly: ComVisible(false)]
-[assembly: Guid("6f2bee9b-8e7f-4806-97b7-4b63f2f0cde0")]
+//[assembly: ComVisible(false)]
+//[assembly: Guid("6f2bee9b-8e7f-4806-97b7-4b63f2f0cde0")]
 
 [assembly: InternalsVisibleTo("DryIoc.UnitTests")]

@@ -182,7 +182,9 @@ namespace DryIoc.UnitTests.CUT
 		}
 	}
 
-	public interface IService<T>
+    public interface ICloneable {}
+
+    public interface IService<T>
 	{
 		T Dependency { get; set; }
 	}
