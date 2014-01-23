@@ -217,20 +217,16 @@ namespace DryIoc
         Scope IRegistry.SingletonScope { get { return _singletonScope; } }
         Scope IRegistry.CurrentScope { get { return _currentScope; } }
 
-        FactoryWithContext GetOrAddFactory_NEW(Request request, IfUnresolved ifUnresolved)
+        FactoryWithContext IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
             Factory factory = null;
-            var serviceType = request.ServiceType;
-            var serviceKey = request.ServiceKey;
-
+            
+            FactoriesEntry entry;
             lock (_syncRoot)
-            {
-                FactoriesEntry entry;
-                if (_factories.Value.TryGetValue(serviceType, out entry) &&
-                    entry.TryGet(out factory, serviceType, serviceKey, ResolutionRules.GetSingleRegisteredFactory) &&
+                if (_factories.Value.TryGetValue(request.ServiceType, out entry) &&
+                    entry.TryGet(out factory, request.ServiceType, request.ServiceKey, ResolutionRules.GetSingleRegisteredFactory) &&
                     factory.ProvidesFactoryPerRequest)
                     factory = factory.GetFactoryPerRequestOrDefault(request, this);
-            }
 
             if (factory != null)
                 return factory.WithContext(request, this);
@@ -238,59 +234,12 @@ namespace DryIoc
             var factoryContext = ResolutionRules.ForUnregisteredService.Invoke(r => r(request, this));
             if (factoryContext != null)
             {
-                Register(factoryContext.Factory, serviceType, serviceKey);
+                Register(factoryContext.Factory, request.ServiceType, request.ServiceKey);
                 return factoryContext;
             }
 
             Throw.If(ifUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
             return null;
-        }
-
-        FactoryWithContext IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
-        {
-            Factory factory = null;
-            var serviceType = request.ServiceType;
-            var serviceKey = request.ServiceKey;
-
-            lock (_syncRoot)
-            {
-                FactoriesEntry entry;
-                var factories = _factories.Value;
-                if (factories.TryGetValue(serviceType, out entry) &&
-                    entry.TryGet(out factory, serviceType, serviceKey, ResolutionRules.GetSingleRegisteredFactory))
-                {
-                    if (factory.ProvidesFactoryPerRequest)
-                        factory = factory.GetFactoryPerRequestOrDefault(request, this);
-                }
-
-                if (factory == null && request.OpenGenericServiceType != null &&
-                    factories.TryGetValue(request.OpenGenericServiceType, out entry))
-                {
-                    Factory openGenericFactory;
-                    if (entry.TryGet(out openGenericFactory, serviceType, serviceKey, ResolutionRules.GetSingleRegisteredFactory) ||
-                        serviceKey != null && // OR try find generic-wrapper by ignoring service key.
-                        entry.TryGet(out openGenericFactory, serviceType, null, ResolutionRules.GetSingleRegisteredFactory) &&
-                        openGenericFactory.Setup.Type == FactoryType.GenericWrapper &&
-                        openGenericFactory.ProvidesFactoryPerRequest)
-                    {
-                        factory = openGenericFactory.GetFactoryPerRequestOrDefault(request, this);
-                        if (factory != null)
-                            Register(factory, serviceType, serviceKey);
-                    }
-                }
-            }
-
-            if (factory == null)
-            {
-                var factoryContext = ResolutionRules.ForUnregisteredService.Invoke(r => r(request, this));
-                if (factoryContext != null)
-                    Register(factoryContext.Factory, serviceType, serviceKey);
-                else
-                    Throw.If(ifUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
-                return factoryContext;
-            }
-
-            return factory.WithContext(request, this);
         }
 
         Factory IRegistry.GetFactoryOrDefault(Type serviceType, object serviceKey)
@@ -698,7 +647,7 @@ namespace DryIoc
         public static void Default(IRegistry registry)
         {
             registry.ResolutionRules.ForUnregisteredService.Append(ResolveEnumerableAsStaticArray);
-            registry.ResolutionRules.ForUnregisteredService.Append(ResolveGenericWrappers);
+            registry.ResolutionRules.ForUnregisteredService.Append(ResolveOpenGeneric);
         }
 
         public static HashTree<Type, Factory> GenericWrappers = HashTree<Type, Factory>.Empty;
@@ -728,34 +677,18 @@ namespace DryIoc
                 new FactoryProvider((_, __) => new DelegateFactory(GetDebugExpression), GenericWrapperSetup.Default));
         }
 
-        public static FactoryWithContext ResolveGenericWrappers(Request request, IRegistry registry)
-        {
-            if (request.OpenGenericServiceType == null)
-                return null;
-
-            var factory = registry.GetGenericWrapperOrDefault(request.OpenGenericServiceType);
-            if (factory != null && factory.ProvidesFactoryPerRequest)
-                factory = factory.GetFactoryPerRequestOrDefault(request, registry);
-
-            if (factory == null)
-                return null;
-
-            return factory.WithContext(request, registry);
-        }
-
         public static FactoryWithContext ResolveOpenGeneric(Request request, IRegistry registry)
         {
             if (request.OpenGenericServiceType == null)
                 return null;
 
-            var factory = registry.GetFactoryOrDefault(request.OpenGenericServiceType, request.ServiceKey);
+            var factory = registry.GetFactoryOrDefault(request.OpenGenericServiceType, request.ServiceKey)
+                ?? registry.GetGenericWrapperOrDefault(request.OpenGenericServiceType);
+
             if (factory != null && factory.ProvidesFactoryPerRequest)
                 factory = factory.GetFactoryPerRequestOrDefault(request, registry);
 
-            if (factory == null)
-                return null;
-
-            return factory.WithContext(request, registry);
+            return factory == null ? null : factory.WithContext(request, registry);
         }
 
         public static ResolutionRules.ResolveUnregisteredService ResolveEnumerableAsStaticArray = (req, reg) =>
