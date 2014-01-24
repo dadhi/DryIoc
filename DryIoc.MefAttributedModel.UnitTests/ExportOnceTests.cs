@@ -10,7 +10,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void I_can_export_ctor_param_service_on_resolve()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(NativeUser));
 
             var user = container.Resolve<NativeUser>();
@@ -21,7 +21,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void I_can_specify_constructor_while_exporting_once_a_ctor_param_service()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(HomeUser));
 
             var user = container.Resolve<HomeUser>();
@@ -32,7 +32,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void I_can_specify_metadata()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(MyCode));
 
             var code = container.Resolve<MyCode>();
@@ -44,8 +44,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void I_can_import_or_export_fields_and_properties_as_well()
         {
-            var container = new Container();
-            container.ResolutionRules.UseImportsForResolution();
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(ServiceWithFieldAndProperty));
 
             var service = container.Resolve<ServiceWithFieldAndProperty>();
@@ -57,7 +56,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void When_something_else_than_Import_specified_It_should_throw()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(WithUnregisteredExternalEdependency));
 
             Assert.Throws<ContainerException>(() => 

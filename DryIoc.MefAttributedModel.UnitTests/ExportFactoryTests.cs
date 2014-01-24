@@ -43,7 +43,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Could_register_factory_automatically_when_exported()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(OrangeFactory));
 
             var orange = container.Resolve<Orange>();
@@ -54,7 +54,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Could_register_multi_factory_automatically_when_exported()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(FruitFactory));
 
             var orange = container.Resolve<Orange>();
@@ -67,7 +67,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Could_register_multi_factory_with_separate_named_Exports()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(NamedFruitFactory));
 
             var orange = container.Resolve<Orange>("orange");
@@ -80,7 +80,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Reuse_should_be_applied_for_factory_created_services()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(OrangeFactory));
 
             var one = container.Resolve<Orange>();
@@ -92,7 +92,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Specified_transient_reuse_should_be_applied_for_factory_created_services()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(TransientOrangeFactory));
 
             var one = container.Resolve<Orange>();
@@ -104,7 +104,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Could_export_Func_with_parameters_as_Factory()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(FuncFactory));
 
             var factory = container.Resolve<Func<string, Orange>>();
@@ -115,7 +115,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void You_should_attribute_Create_with_Export_to_register_Otherwise_only_factory_itself_will_be_registered()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(BareFactory));
 
             container.Resolve<IFactory<Apple>>();

@@ -36,50 +36,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_minimal_container_I_should_be_able_to_resolve_service()
-        {
-            var container = new Container(_ => { });
-            container.Register(typeof(Service));
-
-            var service = container.Resolve<Service>();
-
-            Assert.That(service, Is.Not.Null);
-        }
-
-        [Test]
-        public void Given_minimal_container_I_should_be_able_to_resolve_service_with_dependencies()
-        {
-            var container = new Container(ContainerSetup.Minimal);
-            container.Register(typeof(IDependency), typeof(Dependency));
-            container.Register(typeof(ServiceWithDependency));
-
-            var service = container.Resolve<ServiceWithDependency>();
-
-            Assert.That(service, Is.Not.Null);
-        }
-
-        [Test]
-        public void Given_minimal_container_setup_I_can_NOT_resolve_func_of_service()
-        {
-            var container = new Container(ContainerSetup.Minimal);
-            container.Register(typeof(Service));
-
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<Func<Service>>());
-        }
-
-        [Test]
-        public void Given_minimal_container_I_should_be_able_to_resolve_open_generic_service()
-        {
-            var container = new Container(ContainerSetup.Minimal);
-            container.Register(typeof(TransientOpenGenericService<>));
-
-            var service = container.Resolve<TransientOpenGenericService<int>>();
-
-            Assert.That(service, Is.Not.Null);
-        }
-
-        [Test]
         public void I_should_be_able_to_add_rule_to_resolve_not_registered_service()
         {
             var container = new Container();
@@ -171,8 +127,8 @@ namespace DryIoc.UnitTests
         [Test]
         public void You_can_customize_resolving_single_implementation_from_multiple_registrations()
         {
-            var container = new Container(
-                _ => _.ResolutionRules.GetSingleRegisteredFactory = factories => factories.Last());
+            var container = new Container();
+            container.ResolutionRules.ForSelectingSingleRegisteredFactory = factories => factories.Last();
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));

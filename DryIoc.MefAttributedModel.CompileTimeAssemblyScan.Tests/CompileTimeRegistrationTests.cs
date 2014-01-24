@@ -9,7 +9,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         [Test]
         public void Can_register_service_with_constants_alone()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(new[]
             {
                 new TypeExportInfo
@@ -31,7 +31,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         [Test]
         public void Can_register_decorator_and_wrapper_with_constants_alone()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(new[]
             {
                 new TypeExportInfo

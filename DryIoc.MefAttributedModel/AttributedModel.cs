@@ -37,20 +37,14 @@ namespace DryIoc.MefAttributedModel
     /// </summary>
     public static class AttributedModel
     {
-        public static Action<IRegistry> DefaultSetup = UseImportsForResolution;
+        // NOTE: Default reuse policy is Singleton, the same as in MEF.
+        public static readonly CreationPolicy DefaultCreationPolicy = CreationPolicy.Shared; 
 
-        public static readonly CreationPolicy DefaultCreationPolicy = CreationPolicy.Shared;
-
-        public static void UseImportsForResolution(this IRegistry source)
+        public static Container WithAttributedModel(this Container container)
         {
-            Container.DefaultSetup(source);
-            source.ResolutionRules.UseImportsForResolution();
-        }
-
-        public static void UseImportsForResolution(this ResolutionRules rules)
-        {
-            rules.ForConstructorParameter.Append(GetConstructorParameterServiceKeyOrDefault);
-            rules.ForPropertyOrField.Append(TryGetPropertyOrFieldServiceKey);
+            container.ResolutionRules.ForConstructorParameter.Append(GetConstructorParameterServiceKeyOrDefault);
+            container.ResolutionRules.ForPropertyOrField.Append(TryGetPropertyOrFieldServiceKey);
+            return container;
         }
 
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
@@ -241,10 +235,10 @@ namespace DryIoc.MefAttributedModel
             var serviceType = factoryExport.ServiceType.GetGenericArguments()[0];
             var allMethods = factoryType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             var factoryMethod = allMethods.FirstOrDefault(m =>
-                (m.Name == _factoryMethodName || m.Name.EndsWith(_dotFactoryMethodName)) 
+                (m.Name == _factoryMethodName || m.Name.EndsWith(_dotFactoryMethodName))
                 && m.GetParameters().Length == 0 && m.ReturnType == serviceType)
                 .ThrowIfNull();
-            
+
             var attributes = factoryMethod.GetCustomAttributes(false);
 
             var exportInfo = GetExportInfoOrDefault(serviceType, attributes);
@@ -305,9 +299,9 @@ namespace DryIoc.MefAttributedModel
             if (attributes.Length == 0)
                 return false;
 
-            return TryGetServiceKeyFromImportAttribute(out key, attributes) 
-                || TryGetServiceKeyFromImportOrExportAttribute(out key, 
-                    member is PropertyInfo ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType, 
+            return TryGetServiceKeyFromImportAttribute(out key, attributes)
+                || TryGetServiceKeyFromImportOrExportAttribute(out key,
+                    member is PropertyInfo ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType,
                     registry, attributes);
         }
 

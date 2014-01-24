@@ -39,17 +39,23 @@ namespace DryIoc
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
-        public static Action<IRegistry> DefaultSetup = ContainerSetup.Default;
-        public readonly Action<IRegistry> Setup;
+        public static HashTree<Type, Factory> DefaultGenericWrappers = ContainerSetup.GenericWrappers;
 
-        public Container(Action<IRegistry> setup = null)
+        public static Func<ResolutionRules> GetDefaultResolutionRules = () =>
+        {
+            var rules = new ResolutionRules();
+            rules.ForUnregisteredService.Update(_ => ContainerSetup.UnregisteredServiceResolutionRules);
+            return rules;
+        };
+
+        public Container(ResolutionRules resolutionRules = null, HashTree<Type, Factory> genericWrappers = null)
         {
             _syncRoot = new object();
-            _resolutionRules = new ResolutionRules(_syncRoot);
 
-            _factories = Ref.Of(new Dictionary<Type, FactoriesEntry>());
+            _factories = new Dictionary<Type, FactoriesEntry>();
             _decorators = Ref.Of(HashTree<Type, Factory[]>.Empty);
-            _genericWrappers = Ref.Of(ContainerSetup.GenericWrappers);
+            _genericWrappers = Ref.Of(genericWrappers ?? DefaultGenericWrappers);
+            _resolutionRules = resolutionRules ?? GetDefaultResolutionRules();
 
             var scope = new Scope();
             _currentScope = scope;
@@ -60,12 +66,9 @@ namespace DryIoc
 
             _resolutionStore = new IndexedStore(_syncRoot);
             _resolutionRoot = new ResolutionRoot(_resolutionStore);
-
-            Setup = setup ?? DefaultSetup;
-            Setup(this);
         }
 
-        public Container(Container parent, ContainerParentRelation parentRelation)
+        public Container(Container parent)
         {
             parent.ThrowIfNull();
 
@@ -87,12 +90,12 @@ namespace DryIoc
 
         public Container CreateNewScope()
         {
-            return new Container(this, ContainerParentRelation.ReuseAll) { _currentScope = new Scope() };
+            return new Container(this) { _currentScope = new Scope() };
         }
 
         public Container CreateNestedContainer()
         {
-            var container = new Container(Setup);
+            var container = new Container(_resolutionRules, _genericWrappers.Value);
             container.ResolveUnregisteredFrom(this);
             return container;
         }
@@ -134,15 +137,15 @@ namespace DryIoc
                 var factoryType = factory.Setup.Type;
                 if (factoryType == FactoryType.Decorator)
                 {
-                    _decorators.Swap(_decorators.Value.AddOrUpdate(serviceType, new[] { factory }, Sugar.Append));
+                    _decorators.Update(x => x.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append));
                 }
                 else if (factoryType == FactoryType.GenericWrapper && serviceType.IsGenericTypeDefinition)
                 {
-                    _genericWrappers.Swap(_genericWrappers.Value.AddOrUpdate(serviceType, factory));
+                    _genericWrappers.Update(x => x.AddOrUpdate(serviceType, factory));
                 }
                 else
                 {
-                    _factories.Value.GetOrAdd(serviceType, NewFactoriesEntry).Add(factory, serviceType, serviceKey);
+                    _factories.GetOrAdd(serviceType, NewFactoriesEntry).Add(factory, serviceType, serviceKey);
                 }
             }
 
@@ -186,7 +189,7 @@ namespace DryIoc
 
             var newFactory = factory.GetExpression().CompileToFactory();
             entry = (entry ?? HashTree<object, CompiledFactory>.Empty).AddOrUpdate(serviceKey, newFactory);
-            _keyedResolutionCache.Swap(_keyedResolutionCache.Value.AddOrUpdate(serviceType, entry));
+            _keyedResolutionCache.Update(x => x.AddOrUpdate(serviceType, entry));
             return newFactory(_resolutionStore, resolutionScope: null);
         }
 
@@ -197,7 +200,7 @@ namespace DryIoc
             if (factory == null)
                 return EmptyCompiledFactory;
             var newFactory = factory.GetExpression().CompileToFactory();
-            _defaultResolutionCache.Swap(_defaultResolutionCache.Value.AddOrUpdate(serviceType, newFactory));
+            _defaultResolutionCache.Update(x => x.AddOrUpdate(serviceType, newFactory));
             return newFactory;
         }
 
@@ -220,13 +223,15 @@ namespace DryIoc
         FactoryWithContext IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
             Factory factory = null;
-            
-            FactoriesEntry entry;
+
             lock (_syncRoot)
-                if (_factories.Value.TryGetValue(request.ServiceType, out entry) &&
-                    entry.TryGet(out factory, request.ServiceType, request.ServiceKey, ResolutionRules.GetSingleRegisteredFactory) &&
+            {
+                FactoriesEntry entry;
+                if (_factories.TryGetValue(request.ServiceType, out entry) &&
+                    entry.TryGet(out factory, request.ServiceType, request.ServiceKey, ResolutionRules.ForSelectingSingleRegisteredFactory) &&
                     factory.ProvidesFactoryPerRequest)
                     factory = factory.GetFactoryPerRequestOrDefault(request, this);
+            }
 
             if (factory != null)
                 return factory.WithContext(request, this);
@@ -248,7 +253,7 @@ namespace DryIoc
             FactoriesEntry entry;
             lock (_syncRoot)
                 return TryFindEntry(out entry, serviceType)
-                    && entry.TryGet(out factory, serviceType, serviceKey, ResolutionRules.GetSingleRegisteredFactory)
+                    && entry.TryGet(out factory, serviceType, serviceKey, ResolutionRules.ForSelectingSingleRegisteredFactory)
                     ? factory : null;
         }
 
@@ -371,10 +376,9 @@ namespace DryIoc
 
         private bool TryFindEntry(out FactoriesEntry entry, Type serviceType)
         {
-            var factories = _factories.Value;
-            return factories.TryGetValue(serviceType, out entry) ||
+            return _factories.TryGetValue(serviceType, out entry) ||
                 serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition &&
-                factories.TryGetValue(serviceType.GetGenericTypeDefinition().ThrowIfNull(), out entry);
+                _factories.TryGetValue(serviceType.GetGenericTypeDefinition().ThrowIfNull(), out entry);
         }
 
         #endregion
@@ -385,7 +389,7 @@ namespace DryIoc
         private readonly object _syncRoot;
         private readonly ResolutionRules _resolutionRules;
 
-        private readonly Ref<Dictionary<Type, FactoriesEntry>> _factories;
+        private readonly Dictionary<Type, FactoriesEntry> _factories;
         private readonly Ref<HashTree<Type, Factory[]>> _decorators;
         private readonly Ref<HashTree<Type, Factory>> _genericWrappers;
 
@@ -405,25 +409,26 @@ namespace DryIoc
     {
         public static Ref<T> Of<T>(T value) where T : class
         {
-            var r = new Ref<T>();
-            r.Swap(value);
-            return r;
+            return new Ref<T>(value);
         }
     }
 
     public sealed class Ref<T> where T : class
     {
+        public Ref(T value)
+        {
+            _value = value;
+        }
+
         public T Value { get { return _value; } }
 
-        public T Swap(T value)
+        public T Update(Func<T, T> update)
         {
-            return Interlocked.Exchange(ref _value, value);
+            return Interlocked.Exchange(ref _value, update(_value));
         }
 
         private T _value;
     }
-
-    public enum ContainerParentRelation { ReuseAll, ReuseRegistryAkaCacheFacade, ReuseCacheInQUESTION }
 
     public sealed class FactoriesEntry
     {
@@ -642,19 +647,19 @@ namespace DryIoc
     {
         public static Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
 
-        public static void Minimal(IRegistry registry) { }
+        public static ResolutionRules.ResolveUnregisteredService[] UnregisteredServiceResolutionRules;
 
-        public static void Default(IRegistry registry)
-        {
-            registry.ResolutionRules.ForUnregisteredService.Append(ResolveEnumerableAsStaticArray);
-            registry.ResolutionRules.ForUnregisteredService.Append(ResolveOpenGeneric);
-        }
-
-        public static HashTree<Type, Factory> GenericWrappers = HashTree<Type, Factory>.Empty;
+        public static HashTree<Type, Factory> GenericWrappers;
 
         static ContainerSetup()
         {
-            GenericWrappers = GenericWrappers.AddOrUpdate(typeof(Many<>),
+            UnregisteredServiceResolutionRules = new[]
+            {
+                ResolveEnumerableAsStaticArray,
+                ResolveOpenGeneric
+            };
+
+            GenericWrappers = HashTree<Type, Factory>.Empty.AddOrUpdate(typeof(Many<>),
                 new FactoryProvider(
                     (_, __) => new DelegateFactory(GetManyExpression),
                     GenericWrapperSetup.Default));
@@ -677,7 +682,7 @@ namespace DryIoc
                 new FactoryProvider((_, __) => new DelegateFactory(GetDebugExpression), GenericWrapperSetup.Default));
         }
 
-        public static FactoryWithContext ResolveOpenGeneric(Request request, IRegistry registry)
+        public static ResolutionRules.ResolveUnregisteredService ResolveOpenGeneric = (request, registry) =>
         {
             if (request.OpenGenericServiceType == null)
                 return null;
@@ -689,48 +694,49 @@ namespace DryIoc
                 factory = factory.GetFactoryPerRequestOrDefault(request, registry);
 
             return factory == null ? null : factory.WithContext(request, registry);
-        }
+        };
 
-        public static ResolutionRules.ResolveUnregisteredService ResolveEnumerableAsStaticArray = (req, reg) =>
+        public static ResolutionRules.ResolveUnregisteredService ResolveEnumerableAsStaticArray = (request, registry) =>
         {
-            if (!req.ServiceType.IsArray && req.OpenGenericServiceType != typeof(IEnumerable<>))
+            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
 
             return new DelegateFactory(
                 setup: GenericWrapperSetup.Default,
-                getExpression: (request, registry) =>
-            {
-                var collectionType = request.ServiceType;
-
-                var itemType = collectionType.IsArray
-                    ? collectionType.GetElementType()
-                    : collectionType.GetGenericArguments()[0];
-
-                var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
-
-                // Composite pattern support: filter out composite root from available keys.
-                var parent = request.GetNonWrapperParentOrDefault();
-                var items = registry.GetAllFactories(wrappedItemType);
-                if (parent != null && parent.ServiceType == wrappedItemType)
-                    items = items.Where(kv => kv.Value.ID != parent.FactoryID);
-
-                var itemArray = items.ToArray();
-                Throw.If(itemArray.Length == 0, Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS, wrappedItemType, request);
-
-                var itemExpressions = new List<Expression>(itemArray.Length);
-                for (var i = 0; i < itemArray.Length; i++)
+                getExpression: (req, reg) =>
                 {
-                    var item = itemArray[i];
-                    var itemRequest = request.Push(itemType, item.Key);
-                    var itemFactory = registry.GetOrAddFactory(itemRequest, IfUnresolved.ReturnNull);
-                    if (itemFactory != null)
-                        itemExpressions.Add(itemFactory.GetExpression());
-                }
+                    var collectionType = req.ServiceType;
 
-                Throw.If(itemExpressions.Count == 0, Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS, itemType, request);
-                var newArrayExpr = Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
-                return newArrayExpr;
-            }).WithContext(req, reg);
+                    var itemType = collectionType.IsArray
+                        ? collectionType.GetElementType()
+                        : collectionType.GetGenericArguments()[0];
+
+                    var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
+
+                    // Composite pattern support: filter out composite root from available keys.
+                    var parent = req.GetNonWrapperParentOrDefault();
+                    var items = reg.GetAllFactories(wrappedItemType);
+                    if (parent != null && parent.ServiceType == wrappedItemType)
+                        items = items.Where(kv => kv.Value.ID != parent.FactoryID);
+
+                    var itemArray = items.ToArray();
+                    Throw.If(itemArray.Length == 0, Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS, wrappedItemType,
+                        req);
+
+                    var itemExpressions = new List<Expression>(itemArray.Length);
+                    for (var i = 0; i < itemArray.Length; i++)
+                    {
+                        var item = itemArray[i];
+                        var itemRequest = req.Push(itemType, item.Key);
+                        var itemFactory = reg.GetOrAddFactory(itemRequest, IfUnresolved.ReturnNull);
+                        if (itemFactory != null)
+                            itemExpressions.Add(itemFactory.GetExpression());
+                    }
+
+                    Throw.If(itemExpressions.Count == 0, Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS, itemType, req);
+                    var newArrayExpr = Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
+                    return newArrayExpr;
+                }).WithContext(request, registry);
         };
 
         public static Expression GetManyExpression(Request request, IRegistry registry)
@@ -855,69 +861,67 @@ namespace DryIoc
 
     public sealed class ResolutionRules
     {
-        public Func<IEnumerable<Factory>, Factory> GetSingleRegisteredFactory;
+        public Func<IEnumerable<Factory>, Factory> ForSelectingSingleRegisteredFactory;
 
         public delegate FactoryWithContext ResolveUnregisteredService(Request request, IRegistry registry);
-        public Rules<ResolveUnregisteredService> ForUnregisteredService;
+        public Rules<ResolveUnregisteredService> ForUnregisteredService = new Rules<ResolveUnregisteredService>();
 
         public delegate object ResolveConstructorParameterServiceKey(ParameterInfo parameter, Request parent, IRegistry registry);
-        public Rules<ResolveConstructorParameterServiceKey> ForConstructorParameter;
+        public Rules<ResolveConstructorParameterServiceKey> ForConstructorParameter = new Rules<ResolveConstructorParameterServiceKey>();
 
         public delegate bool ResolvePropertyOrFieldServiceKey(out object key, MemberInfo member, Request parent, IRegistry registry);
-        public Rules<ResolvePropertyOrFieldServiceKey> ForPropertyOrField;
-
-        public ResolutionRules(object syncRoot)
-        {
-            ForUnregisteredService = new Rules<ResolveUnregisteredService>(syncRoot);
-            ForConstructorParameter = new Rules<ResolveConstructorParameterServiceKey>(syncRoot);
-            ForPropertyOrField = new Rules<ResolvePropertyOrFieldServiceKey>(syncRoot);
-        }
+        public Rules<ResolvePropertyOrFieldServiceKey> ForPropertyOrField = new Rules<ResolvePropertyOrFieldServiceKey>();
 
         public sealed class Rules<TRule>
         {
-            public Rules(object syncRoot)
+            public Rules(TRule[] items = null)
             {
-                _syncRoot = syncRoot;
-            }
-
-            public IEnumerable<TRule> List
-            {
-                get { return _list ?? Enumerable.Empty<TRule>(); }
-                set { lock (_syncRoot) _list = value == null ? null : value.ToArray(); }
+                _items = items;
             }
 
             public bool IsEmpty
             {
                 get
                 {
-                    var list = _list;
+                    var list = _items;
                     return list == null || list.Length == 0;
                 }
             }
 
-            public R Invoke<R>(Func<TRule, R> invoke)
+            public IEnumerable<TRule> Items
             {
-                var result = default(R);
-                lock (_syncRoot)
-                    if (_list != null)
-                        for (var i = 0; i < _list.Length && Equals(result, default(R)); i++)
-                            result = invoke(_list[i]);
+                get { return _items ?? Enumerable.Empty<TRule>(); }
+            }
+
+            public TResult Invoke<TResult>(Func<TRule, TResult> invoke)
+            {
+                var result = default(TResult);
+                var items = _items;
+                if (items != null)
+                    for (var i = 0; i < items.Length && Equals(result, default(TResult)); i++)
+                        result = invoke(items[i]);
                 return result;
+            }
+
+            public TRule[] Update(Func<TRule[], TRule[]> swap)
+            {
+                var items = _items;
+                _items = swap(items == null ? null : items.ToArray());
+                return items;
             }
 
             public TRule Append(TRule rule)
             {
-                lock (_syncRoot) _list = _list.Append(rule);
+                _items = _items.Append(rule);
                 return rule;
             }
 
             public void Remove(TRule rule)
             {
-                lock (_syncRoot) List = List.Except(new[] { rule });
+                Update(rules => rules.Remove(rule));
             }
 
-            private TRule[] _list;
-            private readonly object _syncRoot;
+            private TRule[] _items;
         }
     }
 
@@ -2276,37 +2280,8 @@ when resolving {1}.";
         #endregion
     }
 
-    public static class Sugar
+    public static class ArrayTools
     {
-        public static string Print(object x)
-        {
-            return x is string ? (string)x
-                : (x is Type ? ((Type)x).Print()
-                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine, ifEmpty: "<empty>")
-                : (x is IEnumerable ? ((IEnumerable)x).Print(ifEmpty: "<empty>")
-                : (string.Empty + x))));
-        }
-
-        public static string Print(this IEnumerable items,
-            string separator = ", ", Func<object, string> printItem = null, string ifEmpty = null)
-        {
-            if (items == null) return null;
-            printItem = printItem ?? Print;
-            var builder = new StringBuilder();
-            foreach (var item in items)
-                (builder.Length == 0 ? builder : builder.Append(separator)).Append(printItem(item));
-            var result = builder.ToString();
-            return result != string.Empty ? result : (ifEmpty ?? string.Empty);
-        }
-
-        public static V GetOrAdd<K, V>(this IDictionary<K, V> source, K key, Func<K, V> valueFactory)
-        {
-            V value;
-            if (!source.TryGetValue(key, out value))
-                source.Add(key, value = valueFactory(key));
-            return value;
-        }
-
         public static T[] Append<T>(this T[] source, params T[] added)
         {
             if (added == null || added.Length == 0)
@@ -2340,6 +2315,55 @@ when resolving {1}.";
                 if (predicate(source[i]))
                     return i;
             return -1;
+        }
+
+        public static T[] Remove<T>(this T[] source, T value)
+        {
+            if (source == null || source.Length == 0)
+                return source;
+            var valueIndex = source.IndexOf(x => Equals(x, value));
+            if (valueIndex == -1)
+                return source;
+            if (source.Length == 1)
+                return new T[0];
+            var result = new T[source.Length - 1];
+            if (valueIndex != 0)
+                Array.Copy(source, 0, result, 0, valueIndex);
+            if (valueIndex != result.Length)
+                Array.Copy(source, valueIndex + 1, result, valueIndex, result.Length - valueIndex);
+            return result;
+        }
+    }
+
+    public static class Sugar
+    {
+        public static string Print(object x)
+        {
+            return x is string ? (string)x
+                : (x is Type ? ((Type)x).Print()
+                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine, ifEmpty: "<empty>")
+                : (x is IEnumerable ? ((IEnumerable)x).Print(ifEmpty: "<empty>")
+                : (string.Empty + x))));
+        }
+
+        public static string Print(this IEnumerable items,
+            string separator = ", ", Func<object, string> printItem = null, string ifEmpty = null)
+        {
+            if (items == null) return null;
+            printItem = printItem ?? Print;
+            var builder = new StringBuilder();
+            foreach (var item in items)
+                (builder.Length == 0 ? builder : builder.Append(separator)).Append(printItem(item));
+            var result = builder.ToString();
+            return result != string.Empty ? result : (ifEmpty ?? string.Empty);
+        }
+
+        public static V GetOrAdd<K, V>(this IDictionary<K, V> source, K key, Func<K, V> valueFactory)
+        {
+            V value;
+            if (!source.TryGetValue(key, out value))
+                source.Add(key, value = valueFactory(key));
+            return value;
         }
     }
 

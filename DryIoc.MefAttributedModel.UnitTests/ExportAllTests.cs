@@ -35,7 +35,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Individual_Export_is_simply_added_to_ExportAll_settings()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(BothExportAllAndExport));
 
             var named = container.Resolve<INamed>("named");
@@ -48,7 +48,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void If_both_export_and_export_all_specifying_the_same_setup_Then_only_single_will_be_registered()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(WithBothTheSameExports));
 
             Assert.DoesNotThrow(() =>
