@@ -87,6 +87,7 @@ namespace DryIoc
             _defaultResolutionCache = source._defaultResolutionCache;
             _keyedResolutionCache = source._keyedResolutionCache;
 
+            _currentScopeIndexInStore = source._currentScopeIndexInStore;
             _resolutionStore = source._resolutionStore;
             _resolutionRoot = source._resolutionRoot;
         }
@@ -101,7 +102,7 @@ namespace DryIoc
             {
                 _currentScope = currentScope,
                 _resolutionStore = resolutionStore,
-                _resolutionRoot = new ResolutionRoot(resolutionStore)
+                _resolutionRoot = new ResolutionRoot(resolutionStore, _resolutionRoot.FactoryExprCache)
             };
         }
 
@@ -406,13 +407,13 @@ namespace DryIoc
         private readonly Ref<HashTree<Type, Factory>> _genericWrappers;
 
         private readonly Scope _singletonScope;
-        private Scope _currentScope;
 
         private readonly Ref<HashTree<Type, CompiledFactory>> _defaultResolutionCache;
         private readonly Ref<HashTree<Type, HashTree<object, CompiledFactory>>> _keyedResolutionCache;
 
+        private Scope _currentScope;
         private IndexedStore _resolutionStore;
-        private readonly int _currentScopeIndexInStore;
+        private int _currentScopeIndexInStore;
         private ResolutionRoot _resolutionRoot;
 
         #endregion
@@ -542,11 +543,12 @@ namespace DryIoc
         public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(IndexedStore), "store");
 
         public readonly IndexedStore Store;
+        public HashTree<int, Expression> FactoryExprCache;
 
-        public ResolutionRoot(IndexedStore store)
+        public ResolutionRoot(IndexedStore store, HashTree<int, Expression> factoryExprCache = null)
         {
             Store = store;
-            _factoryExprCache = HashTree<int, Expression>.Empty;
+            FactoryExprCache = factoryExprCache ?? HashTree<int, Expression>.Empty;
         }
 
         public Expression GetItemExpression(object item, Type itemType)
@@ -569,19 +571,13 @@ namespace DryIoc
 
         public Expression GetCachedFactoryExpression(int factoryID)
         {
-            return _factoryExprCache.GetValueOrDefault(factoryID);
+            return FactoryExprCache.GetValueOrDefault(factoryID);
         }
 
         public void CacheFactoryExpression(int factoryID, Expression result)
         {
-            Interlocked.Exchange(ref _factoryExprCache, _factoryExprCache.AddOrUpdate(factoryID, result));
+            Interlocked.Exchange(ref FactoryExprCache, FactoryExprCache.AddOrUpdate(factoryID, result));
         }
-
-        #region Implementation
-
-        private HashTree<int, Expression> _factoryExprCache;
-
-        #endregion
     }
 
     public sealed class RegistryWeakRef

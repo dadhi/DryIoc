@@ -14,12 +14,10 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var outerLog = container.Resolve<Log>();
-            //var debugExpression = container.Resolve<DebugExpression<Log>>();
-            using (var containerWithNewScope = container.CreateNewScope())
+            using (var scope = container.CreateNewScope())
             {
-                var scopedLog1 = containerWithNewScope.Resolve<Log>();
-                //debugExpression = container.Resolve<DebugExpression<Log>>();
-                var scopedLog2 = containerWithNewScope.Resolve<Log>();
+                var scopedLog1 = scope.Resolve<Log>();
+                var scopedLog2 = scope.Resolve<Log>();
 
                 Assert.That(scopedLog1, Is.SameAs(scopedLog2));
                 Assert.That(scopedLog1, Is.Not.SameAs(outerLog));
@@ -27,7 +25,32 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_reuse_dependencies_in_new_open_scope()
+        public void Can_reuse_instances_in_two_level_nested_scope()
+        {
+            var container = new Container();
+            container.Register<Log>(Reuse.InCurrentScope);
+
+            var outerLog = container.Resolve<Log>();
+            using (var scope = container.CreateNewScope())
+            {
+                var scopedLog = scope.Resolve<Log>();
+
+                using (var deepScope = scope.CreateNewScope())
+                {
+                    var deepLog1 = deepScope.Resolve<Log>();
+                    var deepLog2 = deepScope.Resolve<Log>();
+
+                    Assert.That(deepLog1, Is.SameAs(deepLog2));
+                    Assert.That(deepLog1, Is.Not.SameAs(scopedLog));
+                    Assert.That(deepLog1, Is.Not.SameAs(outerLog));
+                }
+
+                Assert.That(scopedLog, Is.Not.SameAs(outerLog));
+            }
+        }
+
+        [Test]
+        public void Can_reuse_injected_dependencies_in_new_open_scope()
         {
             var container = new Container();
             container.Register<Consumer>();
@@ -42,6 +65,33 @@ namespace DryIoc.UnitTests
 
                 Assert.That(scopedConsumer1.Log, Is.SameAs(scopedConsumer2.Log));
                 Assert.That(scopedConsumer1.Log, Is.Not.SameAs(outerConsumer.Log));
+            }
+        }
+
+        [Test]
+        public void Can_reuse_injected_dependencies_in_two_level_nested_scope()
+        {
+            var container = new Container();
+            container.Register<Consumer>();
+            container.Register<Account>(Reuse.Singleton);
+            container.Register<Log>(Reuse.InCurrentScope);
+
+            var outerConsumer = container.Resolve<Consumer>();
+            using (var scope = container.CreateNewScope())
+            {
+                var scopedConsumer = scope.Resolve<Consumer>();
+
+                using (var deepScope = scope.CreateNewScope())
+                {
+                    var deepConsumer1 = deepScope.Resolve<Consumer>();
+                    var deepConsumer2 = deepScope.Resolve<Consumer>();
+
+                    Assert.That(deepConsumer1.Log, Is.SameAs(deepConsumer2.Log));
+                    Assert.That(deepConsumer1.Log, Is.Not.SameAs(scopedConsumer.Log));
+                    Assert.That(deepConsumer1.Log, Is.Not.SameAs(outerConsumer.Log));
+                }
+
+                Assert.That(scopedConsumer.Log, Is.Not.SameAs(outerConsumer.Log));
             }
         }
 
