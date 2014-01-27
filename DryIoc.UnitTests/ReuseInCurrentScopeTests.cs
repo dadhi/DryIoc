@@ -14,9 +14,11 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var outerLog = container.Resolve<Log>();
+            //var debugExpression = container.Resolve<DebugExpression<Log>>();
             using (var containerWithNewScope = container.CreateNewScope())
             {
                 var scopedLog1 = containerWithNewScope.Resolve<Log>();
+                //debugExpression = container.Resolve<DebugExpression<Log>>();
                 var scopedLog2 = containerWithNewScope.Resolve<Log>();
 
                 Assert.That(scopedLog1, Is.SameAs(scopedLog2));

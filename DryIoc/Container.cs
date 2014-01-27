@@ -65,6 +65,8 @@ namespace DryIoc
             _keyedResolutionCache = Ref.Of(HashTree<Type, HashTree<object, CompiledFactory>>.Empty);
 
             _resolutionStore = new IndexedStore(_syncRoot);
+            _currentScopeIndexInStore = _resolutionStore.GetOrAdd(_currentScope);
+
             _resolutionRoot = new ResolutionRoot(_resolutionStore);
         }
 
@@ -91,7 +93,16 @@ namespace DryIoc
 
         public Container CreateNewScope()
         {
-            return new Container(this) { _currentScope = new Scope() };
+            var currentScope = new Scope();
+            var resolutionStore = _resolutionStore.Copy();
+            resolutionStore.UpdateAt(_currentScopeIndexInStore, currentScope);
+            
+            return new Container(this)
+            {
+                _currentScope = currentScope,
+                _resolutionStore = resolutionStore,
+                _resolutionRoot = new ResolutionRoot(resolutionStore)
+            };
         }
 
         public Container CreateNestedContainer()
@@ -400,8 +411,9 @@ namespace DryIoc
         private readonly Ref<HashTree<Type, CompiledFactory>> _defaultResolutionCache;
         private readonly Ref<HashTree<Type, HashTree<object, CompiledFactory>>> _keyedResolutionCache;
 
-        private readonly IndexedStore _resolutionStore;
-        private readonly ResolutionRoot _resolutionRoot;
+        private IndexedStore _resolutionStore;
+        private readonly int _currentScopeIndexInStore;
+        private ResolutionRoot _resolutionRoot;
 
         #endregion
     }
@@ -594,6 +606,18 @@ namespace DryIoc
             _syncRoot = syncRoot;
         }
 
+        public IndexedStore Copy()
+        {
+            lock (_syncRoot)
+            {
+                if (_items == null)
+                    return null;
+                var items = new object[_items.Length];
+                Array.Copy(_items, 0, items, 0, items.Length);
+                return new IndexedStore(_syncRoot) {  _items = items };
+            }
+        }
+
         public static readonly MethodInfo GetMethod = typeof(IndexedStore).GetMethod("Get");
         public object Get(int i)
         {
@@ -606,6 +630,16 @@ namespace DryIoc
             {
                 var index = _items.IndexOf(x => Equals(x, item));
                 return index != -1 ? index : (_items = _items.AppendOrUpdate(item)).Length - 1;
+            }
+        }
+
+        public void UpdateAt(int index, object item)
+        {
+            lock (_syncRoot)
+            {
+                if (_items == null || _items.Length == 0 || index < 0 || index >= _items.Length)
+                    return;
+                _items[index] = item;
             }
         }
 
@@ -984,7 +1018,7 @@ namespace DryIoc
             "Recursive dependency is detected in resolution of:\n{0}.";
 
         public static readonly string SCOPE_IS_DISPOSED =
-            "Scope is disposed and all in-scope instances are no longer available.";
+            "Scope is disposed and scoped instances are no longer available.";
 
         public static readonly string CONTAINER_IS_GARBAGE_COLLECTED =
             "Container is no longer available (has been garbage-collected).";
