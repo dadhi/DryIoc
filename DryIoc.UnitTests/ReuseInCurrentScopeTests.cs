@@ -13,14 +13,14 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Log>(Reuse.InCurrentScope);
 
-            var log = container.Resolve<Log>();
+            var outerLog = container.Resolve<Log>();
             using (var containerWithNewScope = container.CreateNewScope())
             {
-                var logScoped1 = containerWithNewScope.Resolve<Log>();
-                var logScoped2 = containerWithNewScope.Resolve<Log>();
+                var scopedLog1 = containerWithNewScope.Resolve<Log>();
+                var scopedLog2 = containerWithNewScope.Resolve<Log>();
 
-                Assert.That(logScoped1, Is.SameAs(logScoped2));
-                Assert.That(logScoped1, Is.Not.SameAs(log));
+                Assert.That(scopedLog1, Is.SameAs(scopedLog2));
+                Assert.That(scopedLog1, Is.Not.SameAs(outerLog));
             }
         }
 
@@ -32,13 +32,14 @@ namespace DryIoc.UnitTests
             container.Register<Account>(Reuse.Singleton);
             container.Register<Log>(Reuse.InCurrentScope);
 
-            var consumer = container.Resolve<Consumer>();
+            var outerConsumer = container.Resolve<Consumer>();
             using (var scope = container.CreateNewScope())
             {
                 var scopedConsumer1 = scope.Resolve<Consumer>();
                 var scopedConsumer2 = scope.Resolve<Consumer>();
 
-                Assert.That(scopedConsumer1.Log, Is.SameAs(scopedConsumer2.Log).And.Not.SameAs(consumer.Log));
+                Assert.That(scopedConsumer1.Log, Is.SameAs(scopedConsumer2.Log));
+                Assert.That(scopedConsumer1.Log, Is.Not.SameAs(outerConsumer.Log));
             }
         }
 

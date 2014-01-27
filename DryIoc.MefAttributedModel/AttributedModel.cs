@@ -38,7 +38,7 @@ namespace DryIoc.MefAttributedModel
     public static class AttributedModel
     {
         // NOTE: Default reuse policy is Singleton, the same as in MEF.
-        public static readonly CreationPolicy DefaultCreationPolicy = CreationPolicy.Shared; 
+        public static CreationPolicy DefaultCreationPolicy = CreationPolicy.Shared; 
 
         public static Container WithAttributedModel(this Container container)
         {
@@ -371,8 +371,8 @@ namespace DryIoc.MefAttributedModel
             "Unable to resolve dependency {0} with metadata [{1}] in {2}";
 
         public static readonly string UNSUPPORTED_MULTIPLE_METADATA =
-@"Multiple associated metadata found while exporting {0}. 
-Only single metadata is supported per implementation type, please remove the rest.";
+            "Multiple associated metadata found while exporting {0}.\n" + 
+            "Only single metadata is supported per implementation type, please remove the rest.";
 
         public static readonly string UNSUPPORTED_MULTIPLE_FACTORY_TYPES =
             "Found multiple factory types associated with exported {0}. " +

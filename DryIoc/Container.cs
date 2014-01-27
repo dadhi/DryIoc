@@ -39,12 +39,12 @@ namespace DryIoc
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
-        public static HashTree<Type, Factory> DefaultGenericWrappers = ContainerSetup.GenericWrappers;
+        public static HashTree<Type, Factory> DefaultGenericWrappers = OpenGenericsSupport.GenericWrappers;
 
         public static Func<ResolutionRules> GetDefaultResolutionRules = () =>
         {
             var rules = new ResolutionRules();
-            rules.ForUnregisteredService.Update(_ => ContainerSetup.UnregisteredServiceResolutionRules);
+            rules.ForUnregisteredService.Update(_ => OpenGenericsSupport.ResolveOpenGenericsAndEnumerable);
             return rules;
         };
 
@@ -68,24 +68,25 @@ namespace DryIoc
             _resolutionRoot = new ResolutionRoot(_resolutionStore);
         }
 
-        public Container(Container parent)
+        public Container(Container source)
         {
-            parent.ThrowIfNull();
+            source.ThrowIfNull();
 
-            _syncRoot = new object();
-            _resolutionRules = parent._resolutionRules;
-            _resolutionStore = parent._resolutionStore;
-            _resolutionRoot = parent._resolutionRoot;
+            _syncRoot = source._syncRoot;
 
-            _factories = parent._factories;
-            _decorators = parent._decorators;
-            _genericWrappers = parent._genericWrappers;
+            _factories = source._factories;
+            _decorators = source._decorators;
+            _genericWrappers = source._genericWrappers;
+            _resolutionRules = source._resolutionRules;
 
-            _singletonScope = parent._singletonScope;
-            _currentScope = parent._currentScope;
+            _singletonScope = source._singletonScope;
+            _currentScope = source._currentScope;
 
-            _defaultResolutionCache = Ref.Of(HashTree<Type, CompiledFactory>.Empty);
-            _keyedResolutionCache = Ref.Of(HashTree<Type, HashTree<object, CompiledFactory>>.Empty);
+            _defaultResolutionCache = source._defaultResolutionCache;
+            _keyedResolutionCache = source._keyedResolutionCache;
+
+            _resolutionStore = source._resolutionStore;
+            _resolutionRoot = source._resolutionRoot;
         }
 
         public Container CreateNewScope()
@@ -603,14 +604,14 @@ namespace DryIoc
         {
             lock (_syncRoot)
             {
-                var index = Array.IndexOf(_items, item);
+                var index = _items.IndexOf(x => Equals(x, item));
                 return index != -1 ? index : (_items = _items.AppendOrUpdate(item)).Length - 1;
             }
         }
 
         #region Implementation
 
-        private object[] _items = { };
+        private object[] _items;
         private readonly object _syncRoot;
 
         #endregion
@@ -643,23 +644,24 @@ namespace DryIoc
         static partial void CompileToMethod(Expression<CompiledFactory> factoryExpr, ref CompiledFactory resultFactory);
     }
 
-    public static class ContainerSetup
+    public static class OpenGenericsSupport
     {
         public static Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
 
-        public static ResolutionRules.ResolveUnregisteredService[] UnregisteredServiceResolutionRules;
+        public static ResolutionRules.ResolveUnregisteredService[] ResolveOpenGenericsAndEnumerable;
 
         public static HashTree<Type, Factory> GenericWrappers;
 
-        static ContainerSetup()
+        static OpenGenericsSupport()
         {
-            UnregisteredServiceResolutionRules = new[]
+            ResolveOpenGenericsAndEnumerable = new[]
             {
-                ResolveEnumerableAsStaticArray,
-                ResolveOpenGeneric
+                ResolveOpenGeneric,
+                ResolveEnumerableAsStaticArray
             };
 
-            GenericWrappers = HashTree<Type, Factory>.Empty.AddOrUpdate(typeof(Many<>),
+            GenericWrappers = HashTree<Type, Factory>.Empty;
+            GenericWrappers = GenericWrappers.AddOrUpdate(typeof(Many<>),
                 new FactoryProvider(
                     (_, __) => new DelegateFactory(GetManyExpression),
                     GenericWrapperSetup.Default));
@@ -835,7 +837,7 @@ namespace DryIoc
         #region Implementation
 
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
-            typeof(ContainerSetup).GetMethod("ResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
+            typeof(OpenGenericsSupport).GetMethod("ResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
 
         internal static IEnumerable<TService> ResolveManyDynamically<TService, TWrappedService>(
             RegistryWeakRef registryWeakRef, int parentFactoryID)
@@ -903,16 +905,16 @@ namespace DryIoc
                 return result;
             }
 
-            public TRule[] Update(Func<TRule[], TRule[]> swap)
+            public TRule[] Update(Func<TRule[], TRule[]> update)
             {
                 var items = _items;
-                _items = swap(items == null ? null : items.ToArray());
+                _items = update(items == null ? null : items.ToArray());
                 return items;
             }
 
             public TRule Append(TRule rule)
             {
-                _items = _items.Append(rule);
+                Update(rules => rules.Append(rule));
                 return rule;
             }
 
@@ -928,8 +930,7 @@ namespace DryIoc
     public static class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
-@"Unable to resolve service {0}. 
-Please register service OR adjust resolution rules.";
+            "Unable to resolve service {0}\n. Please register service OR adjust resolution rules.";
 
         public static readonly string UNSUPPORTED_FUNC_WITH_ARGS =
             "Unsupported resolution as {0} of {1}.";
@@ -950,16 +951,15 @@ Please register service OR adjust resolution rules.";
             "Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}.";
 
         public static readonly string USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS =
-@"Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters. 
-Consider to register generic type definition {1} instead.";
+            "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters.\n" +
+            "Consider to register generic type definition {1} instead.";
 
         public static readonly string USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS =
-@"Unsupported registration of service {0} which is not a generic type definition but contains generic parameters. 
-Consider to register generic type definition {1} instead.";
+            "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters.\n" +
+            "Consider to register generic type definition {1} instead.";
 
         public static readonly string EXPECTED_SINGLE_DEFAULT_FACTORY =
-@"Expecting single default registration of {0} but found many:
-{1}.";
+            "Expecting single default registration of {0} but found many:\n{1}.";
 
         public static readonly string EXPECTED_NON_ABSTRACT_IMPL_TYPE =
             "Expecting not abstract and not interface implementation type, but found {0}.";
@@ -971,8 +971,8 @@ Consider to register generic type definition {1} instead.";
             "Constructor [{0}] of {1} misses some arguments required for {2} dependency.";
 
         public static readonly string UNABLE_TO_SELECT_CONSTRUCTOR =
-@"Unable to select single constructor from {0} available in {1}.
-Please provide constructor selector when registering service.";
+            "Unable to select single constructor from {0} available in {1}.\n" +
+            "Please provide constructor selector when registering service.";
 
         public static readonly string EXPECTED_FUNC_WITH_MULTIPLE_ARGS =
             "Expecting Func with one or more arguments but found {0}.";
@@ -996,14 +996,11 @@ Please provide constructor selector when registering service.";
             "Service {0} with the same index '{1}' is already registered with {2}.";
 
         public static readonly string GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT =
-@"Generic Wrapper is working with single service type only, but found many: 
-{0}.
-Please specify service type selector in Generic Wrapper setup upon registration.";
+            "Generic Wrapper is working with single service type only, but found many:\n{0}.\n" +
+            "Please specify service type selector in Generic Wrapper setup upon registration.";
 
         public static readonly string SOME_FUNC_PARAMS_ARE_UNUSED =
-@"Found some unused Func parameters: 
-{0} 
-when resolving {1}.";
+            "Found some unused Func parameters:\n{0}\nwhen resolving {1}.";
 
         public static readonly string DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION =
             "Decorator factory should support resolution as {0}, but it does not.";
@@ -1919,10 +1916,13 @@ when resolving {1}.";
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
 
-            if (!_items.IsEmpty)
-                foreach (var item in _items.TraverseInOrder().Select(x => x.Value).OfType<IDisposable>())
-                    item.Dispose();
-            _items = null;
+            lock (_syncRoot)
+            {
+                if (!_items.IsEmpty)
+                    foreach (var item in _items.TraverseInOrder().Select(x => x.Value).OfType<IDisposable>())
+                        item.Dispose();
+                _items = null;
+            }
         }
 
         #region Implementation
@@ -1988,7 +1988,7 @@ when resolving {1}.";
                 // Create lazy singleton if we have Func somewhere in dependency chain.
                 var parent = request.Parent;
                 if (parent != null && parent.Enumerate().Any(p =>
-                    p.OpenGenericServiceType != null && ContainerSetup.FuncTypes.Contains(p.OpenGenericServiceType)))
+                    p.OpenGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(p.OpenGenericServiceType)))
                     return GetScopedServiceExpression(
                         request.Root.GetItemExpression(registry.SingletonScope),
                         factoryID, factoryExpr);
@@ -2299,6 +2299,8 @@ when resolving {1}.";
 
         public static T[] AppendOrUpdate<T>(this T[] source, T value, int index = -1)
         {
+            if (source == null || source.Length == 0)
+                return new[] { value };
             var sourceLength = source.Length;
             index = index < 0 ? sourceLength : index;
             var result = new T[index < sourceLength ? sourceLength : sourceLength + 1];

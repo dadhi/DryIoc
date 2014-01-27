@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Service>();
 
-            container.ResolutionRules.ForUnregisteredService.Remove(ContainerSetup.ResolveEnumerableAsStaticArray);
+            container.ResolutionRules.ForUnregisteredService.Remove(OpenGenericsSupport.ResolveEnumerableAsStaticArray);
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service[]>());
