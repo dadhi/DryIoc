@@ -30,10 +30,10 @@ namespace DryIoc.Playground
 
         public V GetValueOrDefault(int key, V defaultValue = default(V))
         {
-            for (var node = this; node.Height != 0; node = key < node.Key ? node.Left : node.Right)
-                if (node.Key == key)
-                    return node.Value;
-            return defaultValue;
+            var t = this;
+            while (t.Height != 0 && t.Key != key)
+                t = key < t.Key ? t.Left : t.Right;
+            return t.Height != 0 ? t.Value : defaultValue;
         }
 
         /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
