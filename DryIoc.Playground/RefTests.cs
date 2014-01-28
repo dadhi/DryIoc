@@ -83,16 +83,14 @@ namespace DryIoc.Playground
             _value = initialValue;
         }
 
-        public T Update(Func<T, T> update, Func<T, T> makeSnapshot = null)
+        public T Update(Func<T, T> update)
         {
-            makeSnapshot = makeSnapshot ?? UseOriginalValue;
-
             var retryCount = 0;
             while (retryCount++ < NUMBER_OF_RETRIES)
             {
                 var version = _version; // remember snapshot version locally
-                var snapshotValue = makeSnapshot(_value);
-                var newValue = update(snapshotValue);
+                var oldValue = _value;
+                var newValue = update(oldValue);
 
                 // Await here for finished commit, spin maybe?
                 // Why not Thread.Sleep(0): http://joeduffyblog.com/2006/08/22/priorityinduced-starvation-why-sleep1-is-better-than-sleep0-and-the-windows-balance-set-manager/
@@ -112,7 +110,7 @@ namespace DryIoc.Playground
                     {
                         _value = newValue;
                         Interlocked.Increment(ref _version);
-                        return snapshotValue; // return snapshot used for update
+                        return oldValue; // return snapshot used for update
                     }
                 }
                 finally
@@ -130,14 +128,6 @@ namespace DryIoc.Playground
         private int _version;
         private int _isCommitInProgress;
 
-        private static T UseOriginalValue(T value)
-        {
-            return value;
-        }
-
         #endregion
     }
 }
-
-
-
