@@ -37,11 +37,22 @@ namespace DryIoc.Playground
         }
     }
 
+    /// <summary>
+    /// Immutable Hash Array Mapped Trie similar to the one described at http://lampwww.epfl.ch/papers/idealhashtrees.pdf.
+    /// It is basically a http://en.wikipedia.org/wiki/Trie built on hash chunks. It provides constant access-time and
+    /// does not require balancing. The maximum number of tree levels would be (32 bits of hash / 5 bits level chunk = 7).
+    /// In addition it is space efficient and requires single integer (to store index bitmap) per 1 to 32 values.
+    /// TODO: ? Optimize get/add speed by to 5% at cost of space by storing `sparse` array at root level and skip on GetSetBitsCount use.
+    /// </summary>
+    /// <typeparam name="V">Type of value stored in trie.</typeparam>
     public sealed class HashTrie<V>
     {
         public static readonly HashTrie<V> Empty = new HashTrie<V>();
 
-        public bool IsEmpty { get { return _indexBitmap == 0; } }
+        public bool IsEmpty
+        {
+            get { return _indexBitmap == 0; }
+        }
 
         public V GetValueOrDefault(int hash, V defaultValue = default(V))
         {
@@ -49,10 +60,11 @@ namespace DryIoc.Playground
             do
             {
                 var index = hash & LEVEL_MASK; // index from 0 to 31
-                if ((node._indexBitmap & (1u << index)) == 0)
-                    return defaultValue;
 
                 var pastIndexBitmap = node._indexBitmap >> index;
+                if ((pastIndexBitmap & 1) == 0)
+                    return defaultValue;
+
                 var realIndex = pastIndexBitmap == 1
                     ? node._nodes.Length - 1 // the last bit matched, that means index is the last
                     : node._nodes.Length - GetSetBitsCount(pastIndexBitmap);
@@ -76,30 +88,26 @@ namespace DryIoc.Playground
             var restOfHash = hash >> LEVEL_BITS;
             var valueOrNode = restOfHash == 0 ? (object)value : Empty.AddOrUpdate(restOfHash, value);
 
-            // insert or update node
-            var indexBit = 1u << index;
-            if (_nodes == null)
-                return new HashTrie<V>(new[] { valueOrNode }, indexBit);
+            // for empty node immediately create new node with single value
+            if (_indexBitmap == 0) 
+                return new HashTrie<V>(new[] { valueOrNode }, 1u << index);
 
             // find real index where to insert into new nodes
             var pastIndexBitmap = _indexBitmap >> index;
             var pastIndexCount = pastIndexBitmap == 0 ? 0 : GetSetBitsCount(pastIndexBitmap);
             var realIndex = _nodes.Length - pastIndexCount;
 
-            // insert:
-            if ((_indexBitmap & indexBit) == 0)
+            // insert: copy up to index, set node to index, and copy past of index nodes.
+            if ((pastIndexBitmap & 1) == 0)
             {
-                // otherwise copy old nodes with extra room for new node
                 var nodesToInsert = new object[_nodes.Length + 1];
-
-                // copy up to index, set node to index, and copy past of index nodes.
                 if (realIndex != 0)
                     Array.Copy(_nodes, 0, nodesToInsert, 0, realIndex);
                 nodesToInsert[realIndex] = valueOrNode;
                 if (pastIndexCount != 0)
                     Array.Copy(_nodes, realIndex, nodesToInsert, realIndex + 1, pastIndexCount);
 
-                return new HashTrie<V>(nodesToInsert, _indexBitmap | indexBit);
+                return new HashTrie<V>(nodesToInsert, _indexBitmap | (1u << index));
             }
 
             // update: copy nodes and replace value at index
