@@ -14,7 +14,7 @@ namespace DryIoc.Playground
             Console.WriteLine("Enumerating {0} items {1:n0} times in for cycle: ", itemCount, times);
 
             var list = new List<string>(itemCount);
-            var tree = IntTree<string>.Empty;
+            var tree = HashTree<string>.Empty;
 
             foreach (var i in Enumerable.Range(0, itemCount))
             {

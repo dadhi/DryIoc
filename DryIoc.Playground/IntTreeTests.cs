@@ -11,7 +11,7 @@ namespace DryIoc.Playground
         [Test]
         public void CanGetSuccessfully()
         {
-            var t = IntTree<int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(1, 11)
                 .AddOrUpdate(2, 22)
                 .AddOrUpdate(3, 33);
@@ -24,7 +24,7 @@ namespace DryIoc.Playground
         [Test]
         public void LLCase()
         {
-            var t = IntTree<int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(3, 3);
@@ -37,7 +37,7 @@ namespace DryIoc.Playground
         [Test]
         public void TreeRemainsBalancedAfterUnbalancedInsertIntoBalancedTree()
         {
-            var t = IntTree<int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(3, 3)
@@ -54,7 +54,7 @@ namespace DryIoc.Playground
         [Test]
         public void LRCase()
         {
-            var t = IntTree<int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(3, 2)
                 .AddOrUpdate(4, 3);
@@ -67,7 +67,7 @@ namespace DryIoc.Playground
         [Test]
         public void RRCase()
         {
-            var t = IntTree<int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(3, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(5, 3);
@@ -80,7 +80,7 @@ namespace DryIoc.Playground
         [Test]
         public void RLCase()
         {
-            var t = IntTree<int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(3, 1)
                 .AddOrUpdate(5, 2)
                 .AddOrUpdate(4, 3);
@@ -93,7 +93,7 @@ namespace DryIoc.Playground
         [Test]
         public void Search_in_empty_tree_should_not_throw()
         {
-            var tree = IntTree<int>.Empty;
+            var tree = HashTree<int>.Empty;
 
             Assert.DoesNotThrow(
                 () => tree.GetValueOrDefault(0));
@@ -102,7 +102,7 @@ namespace DryIoc.Playground
         [Test]
         public void For_two_same_added_items_height_should_be_one()
         {
-            var tree = IntTree<string>
+            var tree = HashTree<string>
                 .Empty
                 .AddOrUpdate(1, "x")
                 .AddOrUpdate(1, "y");
@@ -114,7 +114,7 @@ namespace DryIoc.Playground
         public void Enumerated_values_should_be_returned_in_sorted_order()
         {
             var items = Enumerable.Range(0, 10).ToArray();
-            var tree = items.Aggregate(IntTree<int>.Empty, (t, i) => t.AddOrUpdate(i, i));
+            var tree = items.Aggregate(HashTree<int>.Empty, (t, i) => t.AddOrUpdate(i, i));
 
             var enumerated = tree.TraverseInOrder().Select(t => t.Value).ToArray();
 
@@ -124,7 +124,7 @@ namespace DryIoc.Playground
         [Test]
         public void Can_create_tree_with_int_keys()
         {
-            var tree = IntTree<string>.Empty
+            var tree = HashTree<string>.Empty
                 .AddOrUpdate(1, "a")
                 .AddOrUpdate(2, "b")
                 .AddOrUpdate(3, "c");
@@ -137,13 +137,13 @@ namespace DryIoc.Playground
         [Test]
         public void Can_use_HashTree_to_represent_general_HashTree()
         {
-            var tree = IntTree<KeyValuePair<Type, string>[]>.Empty;
+            var tree = HashTree<KeyValuePair<Type, string>[]>.Empty;
 
             var key = typeof(IntTreeTests);
             var keyHash = key.GetHashCode();
             var value = "test";
 
-            IntTree<KeyValuePair<Type, string>[]>.UpdateValue updateValue = (old, added) =>
+            HashTree<KeyValuePair<Type, string>[]>.UpdateValue updateValue = (old, added) =>
             {
                 var newItem = added[0];
                 var oldItemCount = old.Length;

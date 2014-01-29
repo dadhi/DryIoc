@@ -480,7 +480,7 @@ namespace DryIoc
                     result = _latestFactory;
                 else if (_latestIndex != -1)
                 {
-                    var indexedFactories = _keyedFactories.TraverseInOrder().Where(kv => kv.Key is int)
+                    var indexedFactories = _keyedFactories.TraverseInHashOrder().Where(kv => kv.Key is int)
                         .Concat(new[] { new KV<object, Factory>(_latestIndex, _latestFactory) })
                         .ToArray();
 
@@ -517,7 +517,7 @@ namespace DryIoc
         {
             var all = Enumerable.Empty<KV<object, Factory>>();
             if (!_keyedFactories.IsEmpty)
-                all = _keyedFactories.TraverseInOrder();
+                all = _keyedFactories.TraverseInHashOrder();
             if (_latestIndex != -1)
                 all = all.Concat(new[] { new KV<object, Factory>(_latestIndex, _latestFactory) });
             return all;
@@ -1919,7 +1919,7 @@ namespace DryIoc
             lock (_syncRoot)
             {
                 if (!_items.IsEmpty)
-                    foreach (var item in _items.TraverseInOrder().Select(x => x.Value).OfType<IDisposable>())
+                    foreach (var item in _items.TraverseInHashOrder().Select(x => x.Value).OfType<IDisposable>())
                         item.Dispose();
                 _items = null;
             }
@@ -2426,7 +2426,7 @@ namespace DryIoc
         /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).
         /// </summary>
-        public IEnumerable<KV<K, V>> TraverseInOrder()
+        public IEnumerable<KV<K, V>> TraverseInHashOrder()
         {
             var parents = new HashTree<K, V>[Height];
             var parentCount = -1;

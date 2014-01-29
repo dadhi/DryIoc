@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 
 namespace DryIoc.Playground
@@ -50,6 +51,13 @@ namespace DryIoc.Playground
             return new HashTrie<V>(_root.AddOrUpdate(key, value));
         }
 
+        public IEnumerable<V> TraverseInKeyOrder()
+        {
+            return _root.TraverseInKeyOrder();
+        }
+
+        #region Implementation
+
         private readonly Node _root;
 
         private HashTrie(Node root = null)
@@ -64,13 +72,14 @@ namespace DryIoc.Playground
             public V GetValueOrDefault(int hash, V defaultValue)
             {
                 var index = hash & LEVEL_MASK; // index from 0 to 31
-                var indexBit = (uint)1 << index;
+                var indexBit = 1u << index;
                 if ((_indexBitmap & indexBit) == 0)
                     return defaultValue;
 
                 // get node or value by looking at real index
                 var pastIndexBitmap = _indexBitmap >> index;
-                var realIndex = pastIndexBitmap == 1 ? _nodes.Length - 1 // the last bit matched, that means index is the last
+                var realIndex = pastIndexBitmap == 1
+                    ? _nodes.Length - 1 // the last bit matched, that means index is the last
                     : _nodes.Length - GetSetBitsCount(pastIndexBitmap);
 
                 var valueOrNode = _nodes[realIndex];
@@ -91,7 +100,7 @@ namespace DryIoc.Playground
                 var valueOrNode = restOfHash == 0 ? (object)value : EmptyNode.AddOrUpdate(restOfHash, value);
 
                 // insert or update node
-                var indexBit = (uint)1 << index;
+                var indexBit = 1u << index;
                 if (_nodes == null)
                     return new Node(new[] { valueOrNode }, indexBit);
 
@@ -106,7 +115,7 @@ namespace DryIoc.Playground
                     // otherwise copy old nodes with extra room for new node
                     var nodesToInsert = new object[_nodes.Length + 1];
 
-                    // Copy up to index, set node to index, and copy past of index nodes.
+                    // copy up to index, set node to index, and copy past of index nodes.
                     if (realIndex != 0)
                         Array.Copy(_nodes, 0, nodesToInsert, 0, realIndex);
                     nodesToInsert[realIndex] = valueOrNode;
@@ -116,8 +125,7 @@ namespace DryIoc.Playground
                     return new Node(nodesToInsert, _indexBitmap | indexBit);
                 }
 
-                // update:
-                // copy nodes and replace value at index
+                // update: copy nodes and replace value at index
                 var nodesToUpdate = new object[_nodes.Length];
                 if (nodesToUpdate.Length > 1)
                     Array.Copy(_nodes, 0, nodesToUpdate, 0, nodesToUpdate.Length);
@@ -126,10 +134,23 @@ namespace DryIoc.Playground
                 return new Node(nodesToUpdate, _indexBitmap);
             }
 
-            private const int LEVEL_MASK = 31;  // Hash mask to find hash part on each trie level.
-            private const int LEVEL_BITS = 5;   // Number of bits from hash corresponding to one level.
-            
-            private readonly object[] _nodes;   // Up to 32 nodes: sub nodes or values.
+            public IEnumerable<V> TraverseInKeyOrder()
+            {
+                for (var i = 0; i < _nodes.Length; --i)
+                {
+                    var n = _nodes[i];
+                    if (n is Node)
+                        foreach (var subnode in ((Node)n).TraverseInKeyOrder())
+                            yield return subnode;
+                    else
+                        yield return (V)n;
+                }
+            }
+
+            private const int LEVEL_MASK = 31; // Hash mask to find hash part on each trie level.
+            private const int LEVEL_BITS = 5; // Number of bits from hash corresponding to one level.
+
+            private readonly object[] _nodes; // Up to 32 nodes: sub nodes or values.
             private readonly uint _indexBitmap; // Bits indicating nodes at what index are in use.
 
             private Node() { }
@@ -140,26 +161,17 @@ namespace DryIoc.Playground
                 _indexBitmap = indexBitmap;
             }
 
-            // http://www-graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan
-            private static int GetSetBitsCount(uint i)
+            // Variable-precision SWAR algorithm http://playingwithpointers.com/swar.html
+            // Fastest compared to the rest (did not check pre-computed word counts): http://gurmeet.net/puzzles/fast-bit-counting-routines/
+            private static uint GetSetBitsCount(uint i)
             {
-                var count = 0;
-                while (i != 0)
-                {
-                    i &= i - 1;
-                    ++count;
-                }
-                return count;
+                i = i - ((i >> 1) & 0x55555555);
+                i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
+                return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
             }
-
-            // variable-precision SWAR algorithm http://playingwithpointers.com/swar.html
-            //private static int GetSetBitsCountSWAR(uint i)
-            //{
-            //    i = i - ((i >> 1) & 0x55555555);
-            //    i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
-            //    return (int)((((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24);
-            //}
         }
+
+        #endregion
     }
 
     public static class Bits

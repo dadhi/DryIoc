@@ -6,23 +6,23 @@ namespace DryIoc.Playground
     /// <summary>
     /// Immutable AVL-tree (http://en.wikipedia.org/wiki/AVL_tree) with node key of type int.
     /// </summary>
-    public sealed class IntTree<V>
+    public sealed class HashTree<V>
     {
-        public static readonly IntTree<V> Empty = new IntTree<V>();
+        public static readonly HashTree<V> Empty = new HashTree<V>();
         public bool IsEmpty { get { return Height == 0; } }
 
         public readonly int Key;
         public readonly V Value;
 
         public readonly int Height;
-        public readonly IntTree<V> Left, Right;
+        public readonly HashTree<V> Left, Right;
 
         public delegate V UpdateValue(V existing, V added);
 
-        public IntTree<V> AddOrUpdate(int key, V value, UpdateValue updateValue = null)
+        public HashTree<V> AddOrUpdate(int key, V value, UpdateValue updateValue = null)
         {
-            return Height == 0 ? new IntTree<V>(key, value, Empty, Empty)
-                : (key == Key ? new IntTree<V>(key, updateValue == null ? value : updateValue(Value, value), Left, Right)
+            return Height == 0 ? new HashTree<V>(key, value, Empty, Empty)
+                : (key == Key ? new HashTree<V>(key, updateValue == null ? value : updateValue(Value, value), Left, Right)
                 : (key < Key
                     ? With(Left.AddOrUpdate(key, value, updateValue), Right)
                     : With(Left, Right.AddOrUpdate(key, value, updateValue))).EnsureBalanced());
@@ -38,9 +38,9 @@ namespace DryIoc.Playground
 
         /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).</summary>
-        public IEnumerable<IntTree<V>> TraverseInOrder()
+        public IEnumerable<HashTree<V>> TraverseInOrder()
         {
-            var parents = new IntTree<V>[Height];
+            var parents = new HashTree<V>[Height];
             var parentCount = -1;
             var node = this;
             while (!node.IsEmpty || parentCount != -1)
@@ -61,9 +61,9 @@ namespace DryIoc.Playground
 
         #region Implementation
 
-        private IntTree() { }
+        private HashTree() { }
 
-        private IntTree(int key, V value, IntTree<V> left, IntTree<V> right)
+        private HashTree(int key, V value, HashTree<V> left, HashTree<V> right)
         {
             Key = key;
             Value = value;
@@ -72,7 +72,7 @@ namespace DryIoc.Playground
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private IntTree<V> EnsureBalanced()
+        private HashTree<V> EnsureBalanced()
         {
             var delta = Left.Height - Right.Height;
             return delta >= 2 ? With(Left.Right.Height - Left.Left.Height == 1 ? Left.RotateLeft() : Left, Right).RotateRight()
@@ -80,19 +80,19 @@ namespace DryIoc.Playground
                 : this);
         }
 
-        private IntTree<V> RotateRight()
+        private HashTree<V> RotateRight()
         {
             return Left.With(Left.Left, With(Left.Right, Right));
         }
 
-        private IntTree<V> RotateLeft()
+        private HashTree<V> RotateLeft()
         {
             return Right.With(With(Left, Right.Left), Right.Right);
         }
 
-        private IntTree<V> With(IntTree<V> left, IntTree<V> right)
+        private HashTree<V> With(HashTree<V> left, HashTree<V> right)
         {
-            return new IntTree<V>(Key, Value, left, right);
+            return new HashTree<V>(Key, Value, left, right);
         }
 
         #endregion
@@ -100,11 +100,11 @@ namespace DryIoc.Playground
 
     public sealed class HashTree<K, V>
     {
-        public static readonly HashTree<K, V> Empty = new HashTree<K, V>(IntTree<DryIoc.KV<K, V>>.Empty, null);
+        public static readonly HashTree<K, V> Empty = new HashTree<K, V>(HashTree<DryIoc.KV<K, V>>.Empty, null);
 
         public static HashTree<K, V> Using(Func<V, V, V> updateValue)
         {
-            return new HashTree<K, V>(IntTree<DryIoc.KV<K, V>>.Empty, updateValue);
+            return new HashTree<K, V>(HashTree<DryIoc.KV<K, V>>.Empty, updateValue);
         }
 
         public HashTree<K, V> AddOrUpdate(K key, V value)
@@ -122,13 +122,13 @@ namespace DryIoc.Playground
 
         #region Implementation
 
-        private HashTree(IntTree<DryIoc.KV<K, V>> tree, Func<V, V, V> updateValue)
+        private HashTree(HashTree<DryIoc.KV<K, V>> tree, Func<V, V, V> updateValue)
         {
             _tree = tree;
             _updateValue = updateValue;
         }
 
-        private readonly IntTree<DryIoc.KV<K, V>> _tree;
+        private readonly HashTree<DryIoc.KV<K, V>> _tree;
         private readonly Func<V, V, V> _updateValue;
 
         private DryIoc.KV<K, V> UpdateConflicts(DryIoc.KV<K, V> existing, DryIoc.KV<K, V> added)
