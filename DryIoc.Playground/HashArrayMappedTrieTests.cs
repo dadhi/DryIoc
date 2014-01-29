@@ -41,14 +41,15 @@ namespace DryIoc.Playground
     {
         public static readonly HashTrie<V> Empty = new HashTrie<V>();
 
+        public bool IsEmpty { get { return _indexBitmap == 0; } }
+
         public V GetValueOrDefault(int hash, V defaultValue = default(V))
         {
             var node = this;
             do
             {
                 var index = hash & LEVEL_MASK; // index from 0 to 31
-                var indexBit = 1u << index;
-                if ((node._indexBitmap & indexBit) == 0)
+                if ((node._indexBitmap & (1u << index)) == 0)
                     return defaultValue;
 
                 var pastIndexBitmap = node._indexBitmap >> index;
