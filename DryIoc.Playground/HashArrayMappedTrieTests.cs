@@ -39,136 +39,113 @@ namespace DryIoc.Playground
 
     public sealed class HashTrie<V>
     {
-        public static HashTrie<V> Empty = new HashTrie<V>();
+        public static readonly HashTrie<V> Empty = new HashTrie<V>();
 
-        public V GetValueOrDefault(int key, V defaultValue = default (V))
+        public V GetValueOrDefault(int hash, V defaultValue = default(V))
         {
-            return _root.GetValueOrDefault(key, defaultValue);
+            var node = this;
+            do
+            {
+                var index = hash & LEVEL_MASK; // index from 0 to 31
+                var indexBit = 1u << index;
+                if ((node._indexBitmap & indexBit) == 0)
+                    return defaultValue;
+
+                var pastIndexBitmap = node._indexBitmap >> index;
+                var realIndex = pastIndexBitmap == 1
+                    ? node._nodes.Length - 1 // the last bit matched, that means index is the last
+                    : node._nodes.Length - GetSetBitsCount(pastIndexBitmap);
+
+                var result = node._nodes[realIndex];
+                if (!(result is HashTrie<V>))
+                    return (V)result;
+
+                node = (HashTrie<V>)result;
+                hash >>= LEVEL_BITS;
+            } while (hash != 0);
+
+            return defaultValue;
         }
 
-        public HashTrie<V> AddOrUpdate(int key, V value)
+        public HashTrie<V> AddOrUpdate(int hash, V value)
         {
-            return new HashTrie<V>(_root.AddOrUpdate(key, value));
+            var index = hash & LEVEL_MASK; // index from 0 to 31
+
+            // get value or node
+            var restOfHash = hash >> LEVEL_BITS;
+            var valueOrNode = restOfHash == 0 ? (object)value : Empty.AddOrUpdate(restOfHash, value);
+
+            // insert or update node
+            var indexBit = 1u << index;
+            if (_nodes == null)
+                return new HashTrie<V>(new[] { valueOrNode }, indexBit);
+
+            // find real index where to insert into new nodes
+            var pastIndexBitmap = _indexBitmap >> index;
+            var pastIndexCount = pastIndexBitmap == 0 ? 0 : GetSetBitsCount(pastIndexBitmap);
+            var realIndex = _nodes.Length - pastIndexCount;
+
+            // insert:
+            if ((_indexBitmap & indexBit) == 0)
+            {
+                // otherwise copy old nodes with extra room for new node
+                var nodesToInsert = new object[_nodes.Length + 1];
+
+                // copy up to index, set node to index, and copy past of index nodes.
+                if (realIndex != 0)
+                    Array.Copy(_nodes, 0, nodesToInsert, 0, realIndex);
+                nodesToInsert[realIndex] = valueOrNode;
+                if (pastIndexCount != 0)
+                    Array.Copy(_nodes, realIndex, nodesToInsert, realIndex + 1, pastIndexCount);
+
+                return new HashTrie<V>(nodesToInsert, _indexBitmap | indexBit);
+            }
+
+            // update: copy nodes and replace value at index
+            var nodesToUpdate = new object[_nodes.Length];
+            if (nodesToUpdate.Length > 1)
+                Array.Copy(_nodes, 0, nodesToUpdate, 0, nodesToUpdate.Length);
+            nodesToUpdate[realIndex] = valueOrNode;
+
+            return new HashTrie<V>(nodesToUpdate, _indexBitmap);
         }
 
         public IEnumerable<V> TraverseInKeyOrder()
         {
-            return _root.TraverseInKeyOrder();
+            for (var i = 0; i < _nodes.Length; --i)
+            {
+                var n = _nodes[i];
+                if (n is HashTrie<V>)
+                    foreach (var subnode in ((HashTrie<V>)n).TraverseInKeyOrder())
+                        yield return subnode;
+                else
+                    yield return (V)n;
+            }
         }
 
         #region Implementation
 
-        private readonly Node _root;
+        private const int LEVEL_MASK = 31;  // Hash mask to find hash part on each trie level.
+        private const int LEVEL_BITS = 5;   // Number of bits from hash corresponding to one level.
 
-        private HashTrie(Node root = null)
+        private readonly object[] _nodes;   // Up to 32 nodes: sub nodes or values.
+        private readonly uint _indexBitmap; // Bits indicating nodes at what index are in use.
+
+        private HashTrie() { }
+
+        private HashTrie(object[] nodes, uint indexBitmap)
         {
-            _root = root ?? Node.EmptyNode;
+            _nodes = nodes;
+            _indexBitmap = indexBitmap;
         }
 
-        private sealed class Node
+        // Variable-precision SWAR algorithm http://playingwithpointers.com/swar.html
+        // Fastest compared to the rest (but did not check pre-computed WORD counts): http://gurmeet.net/puzzles/fast-bit-counting-routines/
+        private static uint GetSetBitsCount(uint i)
         {
-            public static readonly Node EmptyNode = new Node();
-
-            public V GetValueOrDefault(int hash, V defaultValue)
-            {
-                var index = hash & LEVEL_MASK; // index from 0 to 31
-                var indexBit = 1u << index;
-                if ((_indexBitmap & indexBit) == 0)
-                    return defaultValue;
-
-                // get node or value by looking at real index
-                var pastIndexBitmap = _indexBitmap >> index;
-                var realIndex = pastIndexBitmap == 1
-                    ? _nodes.Length - 1 // the last bit matched, that means index is the last
-                    : _nodes.Length - GetSetBitsCount(pastIndexBitmap);
-
-                var valueOrNode = _nodes[realIndex];
-                if (!(valueOrNode is Node))
-                    return (V)valueOrNode;
-
-                var restOfHash = hash >> LEVEL_BITS;
-                return restOfHash == 0 ? defaultValue
-                    : ((Node)valueOrNode).GetValueOrDefault(restOfHash, defaultValue);
-            }
-
-            public Node AddOrUpdate(int hash, V value)
-            {
-                var index = hash & LEVEL_MASK; // index from 0 to 31
-
-                // get value or node
-                var restOfHash = hash >> LEVEL_BITS;
-                var valueOrNode = restOfHash == 0 ? (object)value : EmptyNode.AddOrUpdate(restOfHash, value);
-
-                // insert or update node
-                var indexBit = 1u << index;
-                if (_nodes == null)
-                    return new Node(new[] { valueOrNode }, indexBit);
-
-                // find real index where to insert into new nodes
-                var pastIndexBitmap = _indexBitmap >> index;
-                var pastIndexCount = pastIndexBitmap == 0 ? 0 : GetSetBitsCount(pastIndexBitmap);
-                var realIndex = _nodes.Length - pastIndexCount;
-
-                // insert:
-                if ((_indexBitmap & indexBit) == 0)
-                {
-                    // otherwise copy old nodes with extra room for new node
-                    var nodesToInsert = new object[_nodes.Length + 1];
-
-                    // copy up to index, set node to index, and copy past of index nodes.
-                    if (realIndex != 0)
-                        Array.Copy(_nodes, 0, nodesToInsert, 0, realIndex);
-                    nodesToInsert[realIndex] = valueOrNode;
-                    if (pastIndexCount != 0)
-                        Array.Copy(_nodes, realIndex, nodesToInsert, realIndex + 1, pastIndexCount);
-
-                    return new Node(nodesToInsert, _indexBitmap | indexBit);
-                }
-
-                // update: copy nodes and replace value at index
-                var nodesToUpdate = new object[_nodes.Length];
-                if (nodesToUpdate.Length > 1)
-                    Array.Copy(_nodes, 0, nodesToUpdate, 0, nodesToUpdate.Length);
-                nodesToUpdate[realIndex] = valueOrNode;
-
-                return new Node(nodesToUpdate, _indexBitmap);
-            }
-
-            public IEnumerable<V> TraverseInKeyOrder()
-            {
-                for (var i = 0; i < _nodes.Length; --i)
-                {
-                    var n = _nodes[i];
-                    if (n is Node)
-                        foreach (var subnode in ((Node)n).TraverseInKeyOrder())
-                            yield return subnode;
-                    else
-                        yield return (V)n;
-                }
-            }
-
-            private const int LEVEL_MASK = 31; // Hash mask to find hash part on each trie level.
-            private const int LEVEL_BITS = 5; // Number of bits from hash corresponding to one level.
-
-            private readonly object[] _nodes; // Up to 32 nodes: sub nodes or values.
-            private readonly uint _indexBitmap; // Bits indicating nodes at what index are in use.
-
-            private Node() { }
-
-            private Node(object[] nodes, uint indexBitmap)
-            {
-                _nodes = nodes;
-                _indexBitmap = indexBitmap;
-            }
-
-            // Variable-precision SWAR algorithm http://playingwithpointers.com/swar.html
-            // Fastest compared to the rest (did not check pre-computed word counts): http://gurmeet.net/puzzles/fast-bit-counting-routines/
-            private static uint GetSetBitsCount(uint i)
-            {
-                i = i - ((i >> 1) & 0x55555555);
-                i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
-                return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
-            }
+            i = i - ((i >> 1) & 0x55555555);
+            i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
+            return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
         }
 
         #endregion

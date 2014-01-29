@@ -62,7 +62,7 @@ namespace DryIoc.SpeedTestApp
 	    {
             GetDictVsHashTrieOfInt(itemCount: 20);
             Console.WriteLine();
-            GetDictVsHashTrieOfInt(itemCount: 10000);
+            GetDictVsHashTrieOfInt(itemCount: 2000);
 	    }
 
 	    private static void CompareTypesForEquality(Type actual)
