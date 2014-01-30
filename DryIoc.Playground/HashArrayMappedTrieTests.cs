@@ -58,21 +58,20 @@ namespace DryIoc.Playground
         public V GetValueOrDefault(int hash, V defaultValue = default(V))
         {
             var node = this;
-            do
+            while (node != null)
             {
                 var pastIndexBitmap = node._indexBitmap >> (hash & LEVEL_MASK);
                 if ((pastIndexBitmap & 1) == 0)
-                    break;
+                    return defaultValue;
 
                 hash >>= LEVEL_BITS;
 
                 var subnode = node._nodes[node._nodes.Length - (pastIndexBitmap == 1 ? 1 : GetSetBitsCount(pastIndexBitmap))];
-                if (subnode is HashTrie<V>)
-                    node = (HashTrie<V>)subnode;
-                else if (hash == 0)
-                    return (V)subnode;
+                if (!(subnode is HashTrie<V>)) // is leaf value node
+                    return hash == 0 ? (V)subnode : defaultValue;
+
+                node = hash == 0 ? null : (HashTrie<V>)subnode;
             }
-            while (hash != 0);
 
             return defaultValue;
         }
