@@ -38,9 +38,10 @@ namespace DryIoc.Playground
     }
 
     /// <summary>
-    /// Immutable Hash Array Mapped Trie similar to the one described at http://lampwww.epfl.ch/papers/idealhashtrees.pdf.
-    /// It is basically a http://en.wikipedia.org/wiki/Trie built on hash chunks. It provides constant access-time and
-    /// does not require balancing. The maximum number of tree levels would be (32 bits of hash / 5 bits level chunk = 7).
+    /// Immutable Hash Array Mapped Trie (http://en.wikipedia.org/wiki/Hash_array_mapped_trie)
+    /// similar to the one described at http://lampwww.epfl.ch/papers/idealhashtrees.pdf.
+    /// It is basically a http://en.wikipedia.org/wiki/Trie built on hash chunks. It provides O(1) access-time and
+    /// does not require self-balancing. The maximum number of tree levels would be (32 bits of hash / 5 bits level chunk = 7).
     /// In addition it is space efficient and requires single integer (to store index bitmap) per 1 to 32 values.
     /// TODO: ? Optimize get/add speed by to 5% at cost of space by storing `sparse` array at root level and skip on GetSetBitsCount use.
     /// </summary>
@@ -57,23 +58,18 @@ namespace DryIoc.Playground
         public V GetValueOrDefault(int hash, V defaultValue = default(V))
         {
             var node = this;
-            do
-            {
-                var index = hash & LEVEL_MASK; // index from 0 to 31
+            do 
+            {   var index = hash & LEVEL_MASK; // index from 0 to 31
 
                 var pastIndexBitmap = node._indexBitmap >> index;
                 if ((pastIndexBitmap & 1) == 0)
                     return defaultValue;
 
-                var realIndex = pastIndexBitmap == 1
-                    ? node._nodes.Length - 1 // the last bit matched, that means index is the last
-                    : node._nodes.Length - GetSetBitsCount(pastIndexBitmap);
+                var subnode = node._nodes[node._nodes.Length - (pastIndexBitmap == 1 ? 1 : GetSetBitsCount(pastIndexBitmap))];
+                if (!(subnode is HashTrie<V>))
+                    return (V)subnode;
 
-                var result = node._nodes[realIndex];
-                if (!(result is HashTrie<V>))
-                    return (V)result;
-
-                node = (HashTrie<V>)result;
+                node = (HashTrie<V>)subnode;
                 hash >>= LEVEL_BITS;
             } while (hash != 0);
 
@@ -89,7 +85,7 @@ namespace DryIoc.Playground
             var valueOrNode = restOfHash == 0 ? (object)value : Empty.AddOrUpdate(restOfHash, value);
 
             // for empty node immediately create new node with single value
-            if (_indexBitmap == 0) 
+            if (_indexBitmap == 0)
                 return new HashTrie<V>(new[] { valueOrNode }, 1u << index);
 
             // find real index where to insert into new nodes
@@ -150,31 +146,13 @@ namespace DryIoc.Playground
 
         // Variable-precision SWAR algorithm http://playingwithpointers.com/swar.html
         // Fastest compared to the rest (but did not check pre-computed WORD counts): http://gurmeet.net/puzzles/fast-bit-counting-routines/
-        private static uint GetSetBitsCount(uint i)
+        private static uint GetSetBitsCount(uint n)
         {
-            i = i - ((i >> 1) & 0x55555555);
-            i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
-            return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
+            n = n - ((n >> 1) & 0x55555555);
+            n = (n & 0x33333333) + ((n >> 2) & 0x33333333);
+            return (((n + (n >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
         }
 
         #endregion
-    }
-
-    public static class Bits
-    {
-        private const int BITS_NUMBER = 32;
-
-        public static string PrintBits(this uint key)
-        {
-            var bits = new char[BITS_NUMBER];
-            var test = key;
-            for (var i = BITS_NUMBER - 1; i >= 0; i--)
-            {
-                bits[i] = (test & 1) == 1 ? '1' : '0';
-                test >>= 1;
-            }
-
-            return new string(bits);
-        }
     }
 }
