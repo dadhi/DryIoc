@@ -92,24 +92,21 @@ namespace DryIoc.Playground
         public V GetValueOrDefault(int hash, V defaultValue = default(V))
         {
             var node = this;
-            while (true)
+            var pastIndexBitmap = node._indexBitmap >> (hash & LEVEL_MASK);
+            while ((pastIndexBitmap & 1) == 1)
             {
-                var pastIndexBitmap = node._indexBitmap >> (hash & LEVEL_MASK);
-                if ((pastIndexBitmap & 1) == 0)
-                    return defaultValue;
+                var subnode = node._nodes[
+                    node._nodes.Length - (pastIndexBitmap == 1 ? 1 : GetSetBitsCount(pastIndexBitmap))];
 
-                hash = hash >> LEVEL_BITS;
-
-                var subnodes = node._nodes;
-                var subnode = subnodes[
-                    subnodes.Length == 1 ? 0 :
-                    subnodes.Length - (pastIndexBitmap == 1 ? 1 : GetSetBitsCount(pastIndexBitmap))];
-                
+                hash >>= LEVEL_BITS;
                 if (!(subnode is HashTrie<V>)) // is leaf value node
-                    return hash >> LEVEL_BITS == 0 ? (V)subnode : defaultValue;
+                    return hash == 0 ? (V)subnode : defaultValue;
 
                 node = (HashTrie<V>)subnode;
+                pastIndexBitmap = node._indexBitmap >> (hash & LEVEL_MASK);
             }
+
+            return defaultValue;
         }
 
         public HashTrie<V> AddOrUpdate(int hash, V value, UpdateMethod<V> updateValue = null)
