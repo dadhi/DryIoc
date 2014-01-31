@@ -102,7 +102,7 @@ namespace DryIoc.Playground
     {
         public static readonly HashTree<K, V> Empty = new HashTree<K, V>(HashTree<DryIoc.KV<K, V>>.Empty, null);
 
-        public static HashTree<K, V> Using(Func<V, V, V> updateValue)
+        public static HashTree<K, V> Using(UpdateMethod<V> updateValue)
         {
             return new HashTree<K, V>(HashTree<DryIoc.KV<K, V>>.Empty, updateValue);
         }
@@ -122,14 +122,14 @@ namespace DryIoc.Playground
 
         #region Implementation
 
-        private HashTree(HashTree<DryIoc.KV<K, V>> tree, Func<V, V, V> updateValue)
+        private HashTree(HashTree<DryIoc.KV<K, V>> tree, UpdateMethod<V> updateValue)
         {
             _tree = tree;
             _updateValue = updateValue;
         }
 
         private readonly HashTree<DryIoc.KV<K, V>> _tree;
-        private readonly Func<V, V, V> _updateValue;
+        private readonly UpdateMethod<V> _updateValue;
 
         private DryIoc.KV<K, V> UpdateConflicts(DryIoc.KV<K, V> existing, DryIoc.KV<K, V> added)
         {

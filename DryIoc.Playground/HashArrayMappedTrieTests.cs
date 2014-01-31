@@ -35,7 +35,41 @@ namespace DryIoc.Playground
             Assert.AreEqual("55x", trie.GetValueOrDefault(555555555));
             Assert.AreEqual(null, trie.GetValueOrDefault(-1));
         }
+
+        [Test]
+        public void Store_value_with_0_hash_then_with_0_plus_some_hash()
+        {
+            var trie = HashTrie<string>.Empty;
+            trie = trie.AddOrUpdate(0, "a");
+            trie = trie.AddOrUpdate(64, "b");
+
+            Assert.AreEqual("b", trie.GetValueOrDefault(64));
+            Assert.AreEqual("a", trie.GetValueOrDefault(0));
+        }
+
+        [Test]
+        public void Store_value_with_0_plus_some_hash_then_with_0_hash()
+        {
+            var trie = HashTrie<string>.Empty;
+            trie = trie.AddOrUpdate(64, "a");
+            trie = trie.AddOrUpdate(0, "b");
+
+            Assert.AreEqual("a", trie.GetValueOrDefault(64));
+            Assert.AreEqual("b", trie.GetValueOrDefault(0));
+        }
+
+        [Test]
+        public void Update_values_with_0_hash()
+        {
+            var trie = HashTrie<string>.Empty;
+            trie = trie.AddOrUpdate(0, "a");
+            trie = trie.AddOrUpdate(0, "b");
+
+            Assert.AreEqual("b", trie.GetValueOrDefault(0));
+        }
     }
+
+    public delegate T UpdateMethod<T>(T old, T newOne);
 
     /// <summary>
     /// Immutable Hash Array Mapped Trie (http://en.wikipedia.org/wiki/Hash_array_mapped_trie)
@@ -43,7 +77,7 @@ namespace DryIoc.Playground
     /// It is basically a http://en.wikipedia.org/wiki/Trie built on hash chunks. It provides O(1) access-time and
     /// does not require self-balancing. The maximum number of tree levels would be (32 bits of hash / 5 bits level chunk = 7).
     /// In addition it is space efficient and requires single integer (to store index bitmap) per 1 to 32 values.
-    /// TODO: ? Optimize get/add speed by to 5% at cost of space by storing `sparse` array at root level and skip on GetSetBitsCount use.
+    /// TODO: ? Optimize get/add speed with mutable sparse array (for insert) at root level. That safe cause bitmapIndex will Not see new inserted values.
     /// </summary>
     /// <typeparam name="V">Type of value stored in trie.</typeparam>
     public sealed class HashTrie<V>
@@ -58,61 +92,71 @@ namespace DryIoc.Playground
         public V GetValueOrDefault(int hash, V defaultValue = default(V))
         {
             var node = this;
-            while (node != null)
+            while (true)
             {
                 var pastIndexBitmap = node._indexBitmap >> (hash & LEVEL_MASK);
                 if ((pastIndexBitmap & 1) == 0)
                     return defaultValue;
 
-                hash >>= LEVEL_BITS;
+                hash = hash >> LEVEL_BITS;
 
-                var subnode = node._nodes[node._nodes.Length - (pastIndexBitmap == 1 ? 1 : GetSetBitsCount(pastIndexBitmap))];
+                var subnodes = node._nodes;
+                var subnode = subnodes[
+                    subnodes.Length == 1 ? 0 :
+                    subnodes.Length - (pastIndexBitmap == 1 ? 1 : GetSetBitsCount(pastIndexBitmap))];
+                
                 if (!(subnode is HashTrie<V>)) // is leaf value node
-                    return hash == 0 ? (V)subnode : defaultValue;
+                    return hash >> LEVEL_BITS == 0 ? (V)subnode : defaultValue;
 
-                node = hash == 0 ? null : (HashTrie<V>)subnode;
+                node = (HashTrie<V>)subnode;
             }
-
-            return defaultValue;
         }
 
-        public HashTrie<V> AddOrUpdate(int hash, V value)
+        public HashTrie<V> AddOrUpdate(int hash, V value, UpdateMethod<V> updateValue = null)
         {
             var index = hash & LEVEL_MASK; // index from 0 to 31
-
-            // get value or node
             var restOfHash = hash >> LEVEL_BITS;
-            var valueOrNode = restOfHash == 0 ? (object)value : Empty.AddOrUpdate(restOfHash, value);
-
-            // for empty node immediately create new node with single value
             if (_indexBitmap == 0)
-                return new HashTrie<V>(new[] { valueOrNode }, 1u << index);
+                return new HashTrie<V>(1u << index, restOfHash == 0 ? (object)value : Empty.AddOrUpdate(restOfHash, value));
 
-            // find real index where to insert into new nodes
+            var nodeCount = _nodes.Length;
+
             var pastIndexBitmap = _indexBitmap >> index;
-            var pastIndexCount = pastIndexBitmap == 0 ? 0 : GetSetBitsCount(pastIndexBitmap);
-            var realIndex = _nodes.Length - pastIndexCount;
-
-            // insert: copy up to index, set node to index, and copy past of index nodes.
-            if ((pastIndexBitmap & 1) == 0)
+            if ((pastIndexBitmap & 1) == 0) // no nodes at the index, could be inserted.
             {
-                var nodesToInsert = new object[_nodes.Length + 1];
-                if (realIndex != 0)
-                    Array.Copy(_nodes, 0, nodesToInsert, 0, realIndex);
-                nodesToInsert[realIndex] = valueOrNode;
-                if (pastIndexCount != 0)
-                    Array.Copy(_nodes, realIndex, nodesToInsert, realIndex + 1, pastIndexCount);
+                var subnode = restOfHash == 0 ? (object)value : Empty.AddOrUpdate(restOfHash, value);
 
-                return new HashTrie<V>(nodesToInsert, _indexBitmap | (1u << index));
+                var pastIndexCount = pastIndexBitmap == 0 ? 0 : GetSetBitsCount(pastIndexBitmap);
+                var insertIndex = nodeCount - pastIndexCount;
+
+                var nodesToInsert = new object[nodeCount + 1];
+                if (insertIndex != 0)
+                    Array.Copy(_nodes, 0, nodesToInsert, 0, insertIndex);
+                nodesToInsert[insertIndex] = subnode;
+                if (pastIndexCount != 0)
+                    Array.Copy(_nodes, insertIndex, nodesToInsert, insertIndex + 1, pastIndexCount);
+
+                return new HashTrie<V>(_indexBitmap | (1u << index), nodesToInsert);
             }
 
-            // update: copy nodes and replace value at index
-            var nodesToUpdate = new object[_nodes.Length];
+            var updateIndex = nodeCount == 1 ? 0
+                : nodeCount - (pastIndexBitmap == 1 ? 1 : GetSetBitsCount(pastIndexBitmap));
+
+            var updatedNode = _nodes[updateIndex];
+            if (updatedNode is HashTrie<V>)
+                updatedNode = ((HashTrie<V>)updatedNode).AddOrUpdate(restOfHash, value, updateValue);
+            else                     // if node to update is some value
+                if (restOfHash != 0) // if we need to update value with node we will move value down to new node sub-nodes at index 0. 
+                    updatedNode = new HashTrie<V>(1u, updatedNode).AddOrUpdate(restOfHash, value, updateValue);
+                else // here the actual update should go, cause old and new nodes contain values.
+                    updatedNode = updateValue == null ? value : updateValue((V)updatedNode, value);
+
+            var nodesToUpdate = new object[nodeCount];
             if (nodesToUpdate.Length > 1)
                 Array.Copy(_nodes, 0, nodesToUpdate, 0, nodesToUpdate.Length);
-            nodesToUpdate[realIndex] = valueOrNode;
+            nodesToUpdate[updateIndex] = updatedNode;
 
-            return new HashTrie<V>(nodesToUpdate, _indexBitmap);
+            return new HashTrie<V>(_indexBitmap, nodesToUpdate);
         }
 
         public IEnumerable<V> TraverseInKeyOrder()
@@ -138,7 +182,7 @@ namespace DryIoc.Playground
 
         private HashTrie() { }
 
-        private HashTrie(object[] nodes, uint indexBitmap)
+        private HashTrie(uint indexBitmap, params object[] nodes)
         {
             _nodes = nodes;
             _indexBitmap = indexBitmap;
@@ -154,5 +198,59 @@ namespace DryIoc.Playground
         }
 
         #endregion
+    }
+
+    public sealed class HashTrie<K, V>
+    {
+        public static readonly HashTrie<K, V> Empty = new HashTrie<K, V>(HashTrie<DryIoc.KV<K, V>>.Empty, null);
+
+        public HashTrie<K, V> AddOrUpdate(K key, V value)
+        {
+            return new HashTrie<K, V>(
+                _root.AddOrUpdate(key.GetHashCode(), new DryIoc.KV<K, V>(key, value), UpdateConflicts),
+                _updateValue);
+        }
+
+        private readonly HashTrie<DryIoc.KV<K, V>> _root;
+        private readonly Func<V, V, V> _updateValue;
+
+        private HashTrie(HashTrie<DryIoc.KV<K, V>> root, Func<V, V, V> updateValue)
+        {
+            _root = root;
+            _updateValue = updateValue;
+        }
+
+        private DryIoc.KV<K, V> UpdateConflicts(DryIoc.KV<K, V> old, DryIoc.KV<K, V> added)
+        {
+            var conflicts = old is KVWithConflicts ? ((KVWithConflicts)old).Conflicts : null;
+            if (ReferenceEquals(old.Key, added.Key) || old.Key.Equals(added.Key))
+                return conflicts == null ? UpdateValue(old, added)
+                     : new KVWithConflicts(UpdateValue(old, added), conflicts);
+
+            if (conflicts == null)
+                return new KVWithConflicts(old, new[] { added });
+
+            var i = conflicts.Length - 1;
+            while (i >= 0 && !Equals(conflicts[i].Key, added.Key)) --i;
+            if (i != -1) added = UpdateValue(old, added);
+            return new KVWithConflicts(old, conflicts.AppendOrUpdate(added, i));
+        }
+
+        private DryIoc.KV<K, V> UpdateValue(DryIoc.KV<K, V> existing, DryIoc.KV<K, V> added)
+        {
+            return _updateValue == null ? added
+                : new DryIoc.KV<K, V>(existing.Key, _updateValue(existing.Value, added.Value));
+        }
+
+        private sealed class KVWithConflicts : DryIoc.KV<K, V>
+        {
+            public readonly DryIoc.KV<K, V>[] Conflicts;
+
+            public KVWithConflicts(DryIoc.KV<K, V> kv, DryIoc.KV<K, V>[] conflicts)
+                : base(kv.Key, kv.Value)
+            {
+                Conflicts = conflicts;
+            }
+        }
     }
 }
