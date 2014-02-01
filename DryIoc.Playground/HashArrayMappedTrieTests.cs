@@ -89,26 +89,6 @@ namespace DryIoc.Playground
             get { return _indexBitmap == 0; }
         }
 
-        public V GetValueOrDefault(int hash, V defaultValue = default(V))
-        {
-            var node = this;
-            var pastIndexBitmap = node._indexBitmap >> (hash & LEVEL_MASK);
-            while ((pastIndexBitmap & 1) == 1)
-            {
-                var subnode = node._nodes[
-                    node._nodes.Length - (pastIndexBitmap == 1 ? 1 : GetSetBitsCount(pastIndexBitmap))];
-
-                hash >>= LEVEL_BITS;
-                if (!(subnode is HashTrie<V>)) // is leaf value node
-                    return hash == 0 ? (V)subnode : defaultValue;
-
-                node = (HashTrie<V>)subnode;
-                pastIndexBitmap = node._indexBitmap >> (hash & LEVEL_MASK);
-            }
-
-            return defaultValue;
-        }
-
         public HashTrie<V> AddOrUpdate(int hash, V value, UpdateMethod<V> updateValue = null)
         {
             var index = hash & LEVEL_MASK; // index from 0 to 31
@@ -142,11 +122,10 @@ namespace DryIoc.Playground
             var updatedNode = _nodes[updateIndex];
             if (updatedNode is HashTrie<V>)
                 updatedNode = ((HashTrie<V>)updatedNode).AddOrUpdate(restOfHash, value, updateValue);
-            else                     // if node to update is some value
-                if (restOfHash != 0) // if we need to update value with node we will move value down to new node sub-nodes at index 0. 
-                    updatedNode = new HashTrie<V>(1u, updatedNode).AddOrUpdate(restOfHash, value, updateValue);
-                else // here the actual update should go, cause old and new nodes contain values.
-                    updatedNode = updateValue == null ? value : updateValue((V)updatedNode, value);
+            else if (restOfHash != 0) // if we need to update value with node we will move value down to new node sub-nodes at index 0. 
+                updatedNode = new HashTrie<V>(1u, updatedNode).AddOrUpdate(restOfHash, value, updateValue);
+            else // here the actual update should go, cause old and new nodes contain values.
+                updatedNode = updateValue == null ? value : updateValue((V)updatedNode, value);
 
             var nodesToUpdate = new object[nodeCount];
             if (nodesToUpdate.Length > 1)
@@ -156,13 +135,33 @@ namespace DryIoc.Playground
             return new HashTrie<V>(_indexBitmap, nodesToUpdate);
         }
 
-        public IEnumerable<V> TraverseInKeyOrder()
+        public V GetValueOrDefault(int hash, V defaultValue = default(V))
+        {
+            var node = this;
+            var pastIndexBitmap = node._indexBitmap >> (hash & LEVEL_MASK);
+            while ((pastIndexBitmap & 1) == 1)
+            {
+                var subnode = node._nodes[
+                    node._nodes.Length - (pastIndexBitmap == 1 ? 1 : GetSetBitsCount(pastIndexBitmap))];
+
+                hash >>= LEVEL_BITS;
+                if (!(subnode is HashTrie<V>)) // reached the leaf value node
+                    return hash == 0 ? (V)subnode : defaultValue;
+
+                node = (HashTrie<V>)subnode;
+                pastIndexBitmap = node._indexBitmap >> (hash & LEVEL_MASK);
+            }
+
+            return defaultValue;
+        }
+
+        public IEnumerable<V> Enumerate()
         {
             for (var i = 0; i < _nodes.Length; --i)
             {
                 var n = _nodes[i];
                 if (n is HashTrie<V>)
-                    foreach (var subnode in ((HashTrie<V>)n).TraverseInKeyOrder())
+                    foreach (var subnode in ((HashTrie<V>)n).Enumerate())
                         yield return subnode;
                 else
                     yield return (V)n;
@@ -208,35 +207,67 @@ namespace DryIoc.Playground
                 _updateValue);
         }
 
-        private readonly HashTrie<DryIoc.KV<K, V>> _root;
-        private readonly Func<V, V, V> _updateValue;
+        public V GetValueOrDefault(K key, V defaultValue = default(V))
+        {
+            var kv = _root.GetValueOrDefault(key.GetHashCode());
+            return kv != null && (ReferenceEquals(key, kv.Key) || key.Equals(kv.Key)) 
+                ? kv.Value : GetConflictedOrDefault(kv, key, defaultValue);
+        }
 
-        private HashTrie(HashTrie<DryIoc.KV<K, V>> root, Func<V, V, V> updateValue)
+        public IEnumerable<DryIoc.KV<K, V>> Enumerate()
+        {
+            foreach (var kv in _root.Enumerate())
+            {
+                yield return kv;
+                if (kv is KVWithConflicts)
+                    foreach (var conflict in ((KVWithConflicts) kv).Conflicts)
+                        yield return conflict;
+            }
+        }
+
+        #region Implementation
+
+        private readonly HashTrie<DryIoc.KV<K, V>> _root;
+        private readonly UpdateMethod<V> _updateValue;
+
+        private HashTrie(HashTrie<DryIoc.KV<K, V>> root, UpdateMethod<V> updateValue)
         {
             _root = root;
             _updateValue = updateValue;
         }
 
-        private DryIoc.KV<K, V> UpdateConflicts(DryIoc.KV<K, V> old, DryIoc.KV<K, V> added)
+        private DryIoc.KV<K, V> UpdateConflicts(DryIoc.KV<K, V> old, DryIoc.KV<K, V> newOne)
         {
             var conflicts = old is KVWithConflicts ? ((KVWithConflicts)old).Conflicts : null;
-            if (ReferenceEquals(old.Key, added.Key) || old.Key.Equals(added.Key))
-                return conflicts == null ? UpdateValue(old, added)
-                     : new KVWithConflicts(UpdateValue(old, added), conflicts);
+            if (ReferenceEquals(old.Key, newOne.Key) || old.Key.Equals(newOne.Key))
+                return conflicts == null
+                    ? UpdateValue(old, newOne)
+                    : new KVWithConflicts(UpdateValue(old, newOne), conflicts);
 
             if (conflicts == null)
-                return new KVWithConflicts(old, new[] { added });
+                return new KVWithConflicts(old, new[] { newOne });
 
             var i = conflicts.Length - 1;
-            while (i >= 0 && !Equals(conflicts[i].Key, added.Key)) --i;
-            if (i != -1) added = UpdateValue(old, added);
-            return new KVWithConflicts(old, conflicts.AppendOrUpdate(added, i));
+            while (i >= 0 && !Equals(conflicts[i].Key, newOne.Key)) --i;
+            if (i != -1) newOne = UpdateValue(old, newOne);
+            return new KVWithConflicts(old, conflicts.AppendOrUpdate(newOne, i));
         }
 
         private DryIoc.KV<K, V> UpdateValue(DryIoc.KV<K, V> existing, DryIoc.KV<K, V> added)
         {
-            return _updateValue == null ? added
+            return _updateValue == null
+                ? added
                 : new DryIoc.KV<K, V>(existing.Key, _updateValue(existing.Value, added.Value));
+        }
+
+        private static V GetConflictedOrDefault(DryIoc.KV<K, V> item, K key, V defaultValue = default(V))
+        {
+            var conflicts = item is KVWithConflicts ? ((KVWithConflicts)item).Conflicts : null;
+            if (conflicts != null)
+                for (var i = 0; i < conflicts.Length; i++)
+                    if (Equals(conflicts[i].Key, key))
+                        return conflicts[i].Value;
+            return defaultValue;
         }
 
         private sealed class KVWithConflicts : DryIoc.KV<K, V>
@@ -249,5 +280,7 @@ namespace DryIoc.Playground
                 Conflicts = conflicts;
             }
         }
+
+        #endregion
     }
 }
