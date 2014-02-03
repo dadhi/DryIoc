@@ -49,7 +49,7 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate(key2, 2)
                 .AddOrUpdate(key3, 3);
 
-            var values = tree.TraverseInOrder().ToDictionary(kv => kv.Key.Key, kv => kv.Value);
+            var values = tree.Enumerate().ToDictionary(kv => kv.Key.Key, kv => kv.Value);
 
             Assert.That(values, Is.EqualTo(new Dictionary<string, int>
             {
@@ -183,7 +183,7 @@ namespace DryIoc.UnitTests
             var items = Enumerable.Range(0, 10).ToArray();
             var tree = items.Aggregate(HashTree<int, int>.Empty, (t, i) => t.AddOrUpdate(i, i));
 
-            var enumerated = tree.TraverseInOrder().Select(t => t.Value).ToArray();
+            var enumerated = tree.Enumerate().Select(t => t.Value).ToArray();
 
             CollectionAssert.AreEqual(items, enumerated);
         }

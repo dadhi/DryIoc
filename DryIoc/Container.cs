@@ -493,7 +493,7 @@ namespace DryIoc
                     result = _latestFactory;
                 else if (_latestIndex != -1)
                 {
-                    var indexedFactories = _keyedFactories.TraverseInOrder().Where(kv => kv.Key is int)
+                    var indexedFactories = _keyedFactories.Enumerate().Where(kv => kv.Key is int)
                         .Concat(new[] { new KV<object, Factory>(_latestIndex, _latestFactory) })
                         .ToArray();
 
@@ -530,7 +530,7 @@ namespace DryIoc
         {
             var all = Enumerable.Empty<KV<object, Factory>>();
             if (!_keyedFactories.IsEmpty)
-                all = _keyedFactories.TraverseInOrder();
+                all = _keyedFactories.Enumerate();
             if (_latestIndex != -1)
                 all = all.Concat(new[] { new KV<object, Factory>(_latestIndex, _latestFactory) });
             return all;
@@ -1949,7 +1949,7 @@ namespace DryIoc
             lock (_syncRoot)
             {
                 if (!_items.IsEmpty)
-                    foreach (var item in _items.TraverseInOrder().Select(x => x.Value).OfType<IDisposable>())
+                    foreach (var item in _items.Enumerate().Select(x => x.Value).OfType<IDisposable>())
                         item.Dispose();
                 _items = null;
             }
@@ -2427,7 +2427,7 @@ namespace DryIoc
 
         public bool IsEmpty { get { return Height == 0; } }
 
-        public delegate V UpdateValue(V current, V added);
+        public delegate V UpdateValue(V old, V newOne);
 
         public HashTree<K, V> AddOrUpdate(K key, V value, UpdateValue updateValue = null)
         {
@@ -2456,7 +2456,7 @@ namespace DryIoc
         /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).
         /// </summary>
-        public IEnumerable<KV<K, V>> TraverseInOrder()
+        public IEnumerable<KV<K, V>> Enumerate()
         {
             var parents = new HashTree<K, V>[Height];
             var parentCount = -1;

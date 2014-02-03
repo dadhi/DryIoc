@@ -14,7 +14,7 @@ namespace DryIoc.Playground
             Console.WriteLine("Enumerating {0} items {1:n0} times in for cycle: ", itemCount, times);
 
             var list = new List<string>(itemCount);
-            var tree = IntTree<string>.Empty;
+            var tree = HashTree<string>.Empty;
 
             foreach (var i in Enumerable.Range(0, itemCount))
             {
@@ -43,7 +43,7 @@ namespace DryIoc.Playground
             timer = Stopwatch.StartNew();
             for (int t = 0; t < times; t++)
             {
-                foreach (var i in tree.TraverseInOrder())
+                foreach (var i in tree.Enumerate())
                 {
                     result = i.Value;
                 }

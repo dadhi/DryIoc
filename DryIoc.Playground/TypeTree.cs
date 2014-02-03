@@ -7,7 +7,7 @@ namespace DryIoc.Playground
 {
     public sealed class TypeTree<V> : IEnumerable<TypeTree<V>>
     {
-        public static readonly TypeTree<V> Empty = new TypeTree<V>(IntTree<KV>.Empty);
+        public static readonly TypeTree<V> Empty = new TypeTree<V>(HashTree<KV>.Empty);
 
         public TypeTree<V> AddOrUpdate(Type key, V value)
         {
@@ -22,7 +22,7 @@ namespace DryIoc.Playground
 
         public IEnumerator<TypeTree<V>> GetEnumerator()
         {
-            return _tree.TraverseInOrder().Select(t => new TypeTree<V>(t)).GetEnumerator();
+            return _tree.Enumerate().Select(t => new TypeTree<V>(t)).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -32,9 +32,9 @@ namespace DryIoc.Playground
 
         #region Implementation
 
-        private readonly IntTree<KV> _tree;
+        private readonly HashTree<KV> _tree;
 
-        private TypeTree(IntTree<KV> tree)
+        private TypeTree(HashTree<KV> tree)
         {
             _tree = tree;
         }

@@ -1,75 +1,133 @@
 ﻿using System;
+using System.Linq;
 using System.Threading;
 using NUnit.Framework;
 
 namespace DryIoc.Playground
 {
     [TestFixture]
-    [Ignore]
     public class RefTests
     {
         [Test]
-        public void Test()
+        public void Consistently_updated_by_multiple_threads()
         {
+            const int itemCount = 10;
+            var items = new int[itemCount];
+            for (var i = 0; i < itemCount; i++)
+                items[i] = i;
+
+            var itemsRef = Ref.Of(items.ToArray());
+
+            const int threadCount = 10;
+            var latch = new CountdownLatch(threadCount);
+
+            for (var i = threadCount - 1; i >= 0; i--)
+            {
+                var delay = i * 10;
+                var thread = new Thread(() =>
+                {
+                    Thread.Sleep(delay);
+                    itemsRef.Update(xs => xs.Reverse().ToArray());
+                    latch.Signal();
+                }) { IsBackground = true };
+                thread.Start();
+            }
+
+            latch.Wait();
+
+            CollectionAssert.AreEqual(items, itemsRef.Value);
         }
 
-        //private const int s_spinCount = 4000;
+        private sealed class CountdownLatch
+        {
+            public CountdownLatch(int count)
+            {
+                _remain = count;
+                _event = new ManualResetEvent(false);
+            }
 
-        //public void Wait()
-        //{
-        //    var s = new SpinWait();
-        //    while (m_remain > 0)
-        //    {
-        //        if (s.Spin() >= s_spinCount) 
-        //            m_event.WaitOne();
-        //    }
-        //}
+            public void Signal()
+            {
+                // The last thread to signal also sets the event. 
+                if (Interlocked.Decrement(ref _remain) == 0)
+                    _event.Set();
+            }
+
+            public void Wait()
+            {
+                _event.WaitOne();
+            }
+
+            private int _remain;
+            private readonly EventWaitHandle _event;
+        }
     }
 
-    public struct SpinWait
+    public static class Ref
     {
-        private int _count;
-        private static readonly bool _isSingleProc = Environment.ProcessorCount == 1;
-        private const int YIELD_FREQUENCY = 4000;
-        private const int YIELD_ONE_FREQUENCY = 3 * YIELD_FREQUENCY;
-
-        public int Spin()
+        public static Ref<T> Of<T>(T value)
         {
-            var oldCount = _count;
-
-            // On a single-CPU machine, we ensure our counter is always 
-            // a multiple of YIELD_FREQUENCY, so we yield every time. 
-            // Else, we just increment by one. 
-            _count += _isSingleProc ? YIELD_FREQUENCY : 1;
-
-            // If not a multiple of YIELD_FREQUENCY spin (w/ back-off). 
-            var countModFrequency = _count % YIELD_FREQUENCY;
-            if (countModFrequency > 0)
-                Thread.SpinWait((int)(1 + countModFrequency * 0.05f));
-            else
-                Thread.Sleep(_count <= YIELD_ONE_FREQUENCY ? 0 : 1);
-
-            return oldCount;
-        }
-
-        private void Yield()
-        {
-            Thread.Sleep(_count < YIELD_ONE_FREQUENCY ? 0 : 1);
+            return new Ref<T>(value);
         }
     }
 
-    public sealed class Ref<T> where T : class
+    public sealed class Ref<T>
     {
+        public const int NUMBER_OF_RETRIES = 10;
+        public const int NUMBER_OF_AWAITS = 100;
+
         public T Value { get { return _value; } }
 
-        public T Swap(T value)
+        public Ref(T initialValue)
         {
-            return Interlocked.Exchange(ref _value, value);
+            _value = initialValue;
         }
 
+        public T Update(Func<T, T> update)
+        {
+            var retryCount = 0;
+            while (retryCount++ < NUMBER_OF_RETRIES)
+            {
+                var version = _version; // remember snapshot version locally
+                var oldValue = _value;
+                var newValue = update(oldValue);
+
+                // Await here for finished commit, spin maybe?
+                // Why not Thread.Sleep(0): http://joeduffyblog.com/2006/08/22/priorityinduced-starvation-why-sleep1-is-better-than-sleep0-and-the-windows-balance-set-manager/
+                var awaitsCount = 0;
+                while (_isCommitInProgress == 1 && awaitsCount++ < NUMBER_OF_AWAITS)
+                    Thread.Sleep(1);
+
+                // If still/already in progress then retry. Otherwise mark that current code we is committing.
+                if (Interlocked.CompareExchange(ref _isCommitInProgress, 1, 0) == 1)
+                    continue;
+
+                try
+                {
+                    // If some other code did not change original value (and version) - means it is consistent, 
+                    // then commit update and increment version to signal the change to other code.
+                    if (version == _version)
+                    {
+                        _value = newValue;
+                        Interlocked.Increment(ref _version);
+                        return oldValue; // return snapshot used for update
+                    }
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _isCommitInProgress, 0);
+                }
+            }
+
+            throw new InvalidOperationException("Retried " + NUMBER_OF_RETRIES + " times But there is always someone else intervened.");
+        }
+
+        #region Implementation
+
         private T _value;
+        private int _version;
+        private int _isCommitInProgress;
+
+        #endregion
     }
 }
-
-
-
