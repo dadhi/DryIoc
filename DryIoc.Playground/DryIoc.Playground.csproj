@@ -40,6 +40,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AvlTree.cs" />
+    <Compile Include="BitOpVsIsOpSpeedTests.cs" />
     <Compile Include="CreateEnumerableWithExpressionTests.cs" />
     <Compile Include="DirectVsIndirectArrayAccessSpeedTests.cs" />
     <Compile Include="Experiments.cs" />
@@ -49,6 +50,7 @@
     <Compile Include="HashTreeAccessSpeedTests.cs" />
     <Compile Include="HashTreeEnumerationSpeedTests.cs" />
     <Compile Include="HashTreeWithMonoidUpdate.cs" />
+    <Compile Include="HashTrieWithIntKeyTests.cs" />
     <Compile Include="IntNTree.cs" />
     <Compile Include="IntNTreeTests.cs" />
     <Compile Include="IntTreeTests.cs" />

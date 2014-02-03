@@ -13,6 +13,7 @@ namespace DryIoc.SpeedTestApp
 		static void Main()
 		{
 			Thread.CurrentThread.Priority = ThreadPriority.Highest;
+            //CompareBitOpVsIsOpSpeed();
             //CompareDirectVsIndirectArrayAccessSpeed();
             CompareTreeGet();
             //CompareClosureFieldAccess();
@@ -23,11 +24,28 @@ namespace DryIoc.SpeedTestApp
 			Console.ReadKey();
 		}
 
+        private static void CompareTreeGet()
+        {
+            //GetDictVsHashTrieOfInt(25);
+            //GetHashTreeVsHashTrie(itemCount: 20);
+            //GetDictVsHashTrie2OfInt(25);
+            GetHashTreeVsHashTrie2OfInt(25);
+            Console.WriteLine();
+            GetHashTreeVsHashTrie2OfInt(25);
+        }
+
         private static void CompareDirectVsIndirectArrayAccessSpeed()
         {
             DirectVsIndirectArrayAccessSpeedTests.Compare();
             Console.WriteLine();
             DirectVsIndirectArrayAccessSpeedTests.Compare();
+        }
+
+        private static void CompareBitOpVsIsOpSpeed()
+        {
+            BitOpVsIsOpSpeedTests.Compare();
+            Console.WriteLine();
+            BitOpVsIsOpSpeedTests.Compare();
         }
 
         private static void DoCompareTryGetVsGetOrDefault()
@@ -57,13 +75,6 @@ namespace DryIoc.SpeedTestApp
             Console.WriteLine();
             ClosureFieldsAccessSpeed.Test();
         }
-
-	    private static void CompareTreeGet()
-	    {
-            GetHashTreeVsHashTrie(itemCount: 20);
-            Console.WriteLine();
-            GetHashTreeVsHashTrie(itemCount: 2000);
-	    }
 
 	    private static void CompareTypesForEquality(Type actual)
 	    {
@@ -320,7 +331,35 @@ namespace DryIoc.SpeedTestApp
             Console.WriteLine("Tree - " + treeGetTime);
         }
 
-		public static void GetDictVsHashTrieOfInt(int itemCount)
+        public static void GetDictVsHashTrieOfInt(int itemCount)
+        {
+            var key = itemCount;
+            var value = "hey";
+
+            var keys = Enumerable.Range(0, itemCount).ToArray();
+
+            var dict = new Dictionary<int, string>();
+            var trie = HashTrie<string>.Empty;
+
+            var dictAddTime = DictAdd(dict, keys, key, value);
+            var treeAddTime = IntTrieAdd(ref trie, keys, key, value);
+
+            Console.WriteLine("Adding {0} items (ms):", itemCount);
+            Console.WriteLine("Dict - " + dictAddTime);
+            Console.WriteLine("Trie - " + treeAddTime);
+            Console.WriteLine();
+
+            var getTimes = 1 * 1000 * 1000;
+
+            var dictGetTime = DictGet(dict, key, getTimes);
+            var treeGetTime = IntTrieGet(trie, key, getTimes);
+
+            Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
+            Console.WriteLine("Dict - " + dictGetTime);
+            Console.WriteLine("Trie - " + treeGetTime);
+        }
+
+		public static void GetDictVsHashTrie2OfInt(int itemCount)
 		{
 			var key = itemCount;
 			var value = "hey";
@@ -328,7 +367,7 @@ namespace DryIoc.SpeedTestApp
 			var keys = Enumerable.Range(0, itemCount).ToArray();
 
 			var dict = new Dictionary<int, string>();
-			var trie = HashTrie<string>.Empty;
+			var trie = HashTrie2<string>.Empty;
 
 			var dictAddTime = DictAdd(dict, keys, key, value);
 			var treeAddTime = IntTrieAdd(ref trie, keys, key, value);
@@ -347,6 +386,34 @@ namespace DryIoc.SpeedTestApp
 			Console.WriteLine("Dict - " + dictGetTime);
 			Console.WriteLine("Trie - " + treeGetTime);
 		}
+
+        public static void GetHashTreeVsHashTrie2OfInt(int itemCount)
+        {
+            var key = itemCount;
+            var value = "hey";
+
+            var keys = Enumerable.Range(0, itemCount).ToArray();
+
+            var tree = HashTree<int, string>.Empty;
+            var trie = HashTrie2<string>.Empty;
+
+            var treeAddTime = IntTreeAdd(ref tree, keys, key, value);
+            var trieAddTime = IntTrieAdd(ref trie, keys, key, value);
+
+            Console.WriteLine("Adding {0} items (ms):", itemCount);
+            Console.WriteLine("Tree - " + treeAddTime);
+            Console.WriteLine("Trie - " + trieAddTime);
+            Console.WriteLine();
+
+            var getTimes = 1 * 1000 * 1000;
+
+            var treeGetTime = IntTreeGet(tree, key, getTimes);
+            var trieGetTime = IntTrieGet(trie, key, getTimes);
+
+            Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
+            Console.WriteLine("Tree - " + treeGetTime);
+            Console.WriteLine("Trie - " + trieGetTime);
+        }
 
 		public static void GetDictVsHashTreeOfType(int itemCount)
 		{
@@ -455,6 +522,21 @@ namespace DryIoc.SpeedTestApp
             return treeTime.ElapsedMilliseconds;
         }
 
+        private static long IntTrieAdd(ref HashTrie2<string> trie, int[] keys, int key, string value)
+        {
+            var ignored = "ignored";
+            var treeTime = Stopwatch.StartNew();
+
+            for (var i = 0; i < keys.Length; i++)
+                Interlocked.Exchange(ref trie, trie.AddOrUpdate(keys[i], ignored));
+
+            Interlocked.Exchange(ref trie, trie.AddOrUpdate(key, value));
+
+            treeTime.Stop();
+            GC.Collect();
+            return treeTime.ElapsedMilliseconds;
+        }
+
         private static long IntTreeV2Add<V>(ref HashTreeV2<V> tree, int[] keys, int key, V value)
         {
             var ignored = default(V);
@@ -499,6 +581,20 @@ namespace DryIoc.SpeedTestApp
 		}
 
         private static long IntTrieGet<V>(HashTrie<V> trie, int key, int times)
+        {
+            V ignored = default(V);
+            var watch = Stopwatch.StartNew();
+
+            for (int i = 0; i < times; i++)
+                ignored = trie.GetValueOrDefault(key);
+
+            watch.Stop();
+            GC.KeepAlive(ignored);
+            GC.Collect();
+            return watch.ElapsedMilliseconds;
+        }
+
+        private static long IntTrieGet<V>(HashTrie2<V> trie, int key, int times)
         {
             V ignored = default(V);
             var watch = Stopwatch.StartNew();
