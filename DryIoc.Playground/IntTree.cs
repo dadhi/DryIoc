@@ -1,96 +1,10 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.Playground
 {
-    [TestFixture]
-    public partial class IntTreeTests
-    {
-        [Test]
-        public void Append_to_end_of_vector()
-        {
-            var tree = HashTree<string>.Empty;
-            int key;
-            tree = tree
-                .Append("a", out key)
-                .Append("b", out key)
-                .Append("c", out key)
-                .Append("d", out key);
-
-            Assert.AreEqual("d", tree.GetValueOrDefault(3));
-            Assert.AreEqual("c", tree.GetValueOrDefault(2));
-            Assert.AreEqual("b", tree.GetValueOrDefault(1));
-            Assert.AreEqual("a", tree.GetValueOrDefault(0));
-        }
-
-        [Test]
-        public void Indexed_store_get_or_add()
-        {
-            var store = new IndexedStore();
-
-            store.GetIndexOrAdd("a");
-            store.GetIndexOrAdd("b");
-            store.GetIndexOrAdd("c");
-            var i = store.GetIndexOrAdd("d");
-
-            Assert.AreEqual("d", store.Get(i));
-        }
-
-        [Test]
-        public void Indexed_store_get_twice_use_cache()
-        {
-            var store = new IndexedStore();
-
-            store.GetIndexOrAdd("a");
-            store.GetIndexOrAdd("b");
-            store.GetIndexOrAdd("c");
-            var i = store.GetIndexOrAdd("d");
-
-            var d1 = store.Get(i);
-            var d2 = store.Get(i);
-
-            Assert.AreEqual(d1, "d");
-            Assert.AreEqual(d1, d2);
-        }
-    }
-
-    public sealed class IndexedStore
-    {
-        public object Get(int i)
-        {
-            if (i < 32 && (_cacheBitmap >> i & 1) == 1) 
-                return _cache[i];
-
-            var value = _items.GetValueOrDefault(i);
-            if (i < 32)
-            {
-                if (_cache == null)
-                    _cache = new object[32];
-                _cache[i] = value;
-                _cacheBitmap |= 1u << i;
-            }
-
-            return value;
-        }
-
-        public int GetIndexOrAdd(object value)
-        {
-            var item = _items.Enumerate().FirstOrDefault(kv => Equals(kv.Value, value));
-            if (item != null) 
-                return item.Key;
-            int index;
-            _items = _items.Append(value, out index);
-            return index;
-        }
-
-        private HashTree<object> _items = HashTree<object>.Empty;
-        private uint _cacheBitmap;
-        private object[] _cache;
-    }
-
     /// <summary>
-    /// Immutable AVL-tree (http://en.wikipedia.org/wiki/AVL_tree) with node key of type int.
+    /// Immutable AVL-tree (http://en.wikipedia.org/wiki/AVL_tree) with key of type int.
     /// </summary>
     public sealed class HashTree<V>
     {
@@ -211,7 +125,7 @@ namespace DryIoc.Playground
         public HashTree<K, V> AddOrUpdate(K key, V value)
         {
             return new HashTree<K, V>(
-                _tree.AddOrUpdate(key.GetHashCode(), new DryIoc.KV<K, V>(key, value), UpdateConflicts), 
+                _tree.AddOrUpdate(key.GetHashCode(), new DryIoc.KV<K, V>(key, value), UpdateConflicts),
                 _updateValue);
         }
 
@@ -250,7 +164,7 @@ namespace DryIoc.Playground
 
         private DryIoc.KV<K, V> UpdateValue(DryIoc.KV<K, V> existing, DryIoc.KV<K, V> added)
         {
-            return _updateValue == null ? added 
+            return _updateValue == null ? added
                 : new DryIoc.KV<K, V>(existing.Key, _updateValue(existing.Value, added.Value));
         }
 

@@ -73,12 +73,9 @@ namespace DryIoc.Playground
 
     public sealed class Ref<T>
     {
-        public const int NUMBER_OF_RETRIES = 10;
-        public const int NUMBER_OF_AWAITS = 100;
-
         public T Value { get { return _value; } }
 
-        public Ref(T initialValue)
+        public Ref(T initialValue = default(T))
         {
             _value = initialValue;
         }
@@ -86,16 +83,16 @@ namespace DryIoc.Playground
         public T Update(Func<T, T> update)
         {
             var retryCount = 0;
-            while (retryCount++ < NUMBER_OF_RETRIES)
+            while (retryCount++ < NUMBER_OF_RETRIES_UNTIL_THROW)
             {
                 var version = _version; // remember snapshot version locally
                 var oldValue = _value;
                 var newValue = update(oldValue);
 
-                // Await here for finished commit, spin maybe?
+                // Await here for finished commit.
                 // Why not Thread.Sleep(0): http://joeduffyblog.com/2006/08/22/priorityinduced-starvation-why-sleep1-is-better-than-sleep0-and-the-windows-balance-set-manager/
                 var awaitsCount = 0;
-                while (_isCommitInProgress == 1 && awaitsCount++ < NUMBER_OF_AWAITS)
+                while (_isCommitInProgress == 1 && awaitsCount++ < NUMBER_OF_AWAIT_LOOPS_PER_RETRY)
                     Thread.Sleep(1);
 
                 // If still/already in progress then retry. Otherwise mark that current code we is committing.
@@ -119,14 +116,20 @@ namespace DryIoc.Playground
                 }
             }
 
-            throw new InvalidOperationException("Retried " + NUMBER_OF_RETRIES + " times But there is always someone else intervened.");
+            throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_NUMBER);
         }
 
         #region Implementation
 
+        private const int NUMBER_OF_RETRIES_UNTIL_THROW = 10;
+        private const int NUMBER_OF_AWAIT_LOOPS_PER_RETRY = 100;
+
+        private static readonly string ERROR_EXCEEDED_RETRY_NUMBER =
+            "Ref tried to commit update for " + NUMBER_OF_RETRIES_UNTIL_THROW + " times But there is always someone else intervened.";
+
         private T _value;
         private int _version;
-        private int _isCommitInProgress;
+        private int _isCommitInProgress; // 0 means false
 
         #endregion
     }

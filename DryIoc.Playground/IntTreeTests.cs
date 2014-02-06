@@ -9,7 +9,7 @@ namespace DryIoc.Playground
     public partial class IntTreeTests
     {
         [Test]
-        public void CanGetSuccessfully()
+        public void Can_get()
         {
             var t = HashTree<int>.Empty
                 .AddOrUpdate(1, 11)

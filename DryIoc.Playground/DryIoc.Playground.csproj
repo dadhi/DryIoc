@@ -46,7 +46,8 @@
     <Compile Include="Experiments.cs" />
     <Compile Include="GetInterfaceMapCustomImplTests.cs" />
     <Compile Include="HashArrayMappedTrieTests.cs" />
-    <Compile Include="HashTree.cs" />
+    <Compile Include="AppendStore.cs" />
+    <Compile Include="IntTree.cs" />
     <Compile Include="HashTreeAccessSpeedTests.cs" />
     <Compile Include="HashTreeEnumerationSpeedTests.cs" />
     <Compile Include="HashTreeWithMonoidUpdate.cs" />

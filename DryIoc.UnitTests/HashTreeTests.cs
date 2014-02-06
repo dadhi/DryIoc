@@ -75,7 +75,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_left_left_tree()
         {
-            var t = HashTree<int, int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(3, 3);
@@ -91,7 +91,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_preserved_when_add_to_balanced_tree()
         {
-            var t = HashTree<int, int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(3, 3)
@@ -113,7 +113,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_left_right_tree()
         {
-            var t = HashTree<int, int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(3, 2)
                 .AddOrUpdate(4, 3);
@@ -129,7 +129,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_right_right_tree()
         {
-            var t = HashTree<int, int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(3, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(5, 3);
@@ -145,7 +145,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_right_left_tree()
         {
-            var t = HashTree<int, int>.Empty
+            var t = HashTree<int>.Empty
                 .AddOrUpdate(3, 1)
                 .AddOrUpdate(5, 2)
                 .AddOrUpdate(4, 3);
@@ -159,7 +159,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Search_in_empty_tree_should_not_throw()
+        public void Search_in_empty_tree_should_NOT_throw()
         {
             var tree = HashTree<int, int>.Empty;
 
@@ -168,9 +168,20 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Search_for_non_existent_key_should_NOT_throw()
+        {
+            var tree = HashTree<int>.Empty
+                .AddOrUpdate(1, 1)
+                .AddOrUpdate(3, 2);
+
+            Assert.DoesNotThrow(
+                () => tree.GetValueOrDefault(2));
+        }
+
+        [Test]
         public void For_two_same_added_items_height_should_be_one()
         {
-            var tree = HashTree<int, string>.Empty
+            var tree = HashTree<string>.Empty
                 .AddOrUpdate(1, "x")
                 .AddOrUpdate(1, "y");
 
@@ -187,9 +198,83 @@ namespace DryIoc.UnitTests
 
             CollectionAssert.AreEqual(items, enumerated);
         }
+
+        [Test]
+        public void Can_use_HashTree_to_represent_general_HashTree()
+        {
+            var tree = HashTree<KeyValuePair<Type, string>[]>.Empty;
+
+            var key = typeof(HashTreeTests);
+            var keyHash = key.GetHashCode();
+            var value = "test";
+
+            UpdateMethod<KeyValuePair<Type, string>[]> updateValue = (old, added) =>
+            {
+                var newItem = added[0];
+                var oldItemCount = old.Length;
+                for (var i = 0; i < oldItemCount; i++)
+                {
+                    if (old[i].Key == newItem.Key)
+                    {
+                        var updatedItems = new KeyValuePair<Type, string>[oldItemCount];
+                        Array.Copy(old, updatedItems, updatedItems.Length);
+                        updatedItems[i] = newItem;
+                        return updatedItems;
+                    }
+                }
+
+                var addedItems = new KeyValuePair<Type, string>[oldItemCount + 1];
+                Array.Copy(old, addedItems, addedItems.Length);
+                addedItems[oldItemCount] = newItem;
+                return addedItems;
+            };
+
+            tree = tree.AddOrUpdate(keyHash, new[] { new KeyValuePair<Type, string>(key, value) }, updateValue);
+            tree = tree.AddOrUpdate(keyHash, new[] { new KeyValuePair<Type, string>(key, value) }, updateValue);
+
+            string result = null;
+
+            var items = tree.GetValueOrDefault(keyHash);
+            if (items != null)
+            {
+                var firstItem = items[0];
+                if (firstItem.Key == key)
+                    result = firstItem.Value;
+                else if (items.Length > 1)
+                {
+                    for (var i = 1; i < items.Length; i++)
+                    {
+                        if (items[i].Key == key)
+                        {
+                            result = items[i].Value;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            Assert.That(result, Is.EqualTo("test"));
+        }
+
+        [Test]
+        public void Append_to_end_of_vector()
+        {
+            var tree = HashTree<string>.Empty;
+            int key;
+            tree = tree
+                .Append("a", out key)
+                .Append("b", out key)
+                .Append("c", out key)
+                .Append("d", out key);
+
+            Assert.AreEqual("d", tree.GetValueOrDefault(3));
+            Assert.AreEqual("c", tree.GetValueOrDefault(2));
+            Assert.AreEqual("b", tree.GetValueOrDefault(1));
+            Assert.AreEqual("a", tree.GetValueOrDefault(0));
+        }
     }
 
-    public class HashConflictingKey<T>
+    internal class HashConflictingKey<T>
     {
         public T Key;
 

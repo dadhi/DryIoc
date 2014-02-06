@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace DryIoc.Playground
 {
     /// <summary>
-    /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree, where actual node key is hash code of <typeparamref name="K"/>.
+    /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.
     /// </summary>
     public sealed class AvlTree<K, V>
     {
@@ -19,7 +19,7 @@ namespace DryIoc.Playground
 
         public bool IsEmpty { get { return Height == 0; } }
 
-        public delegate V UpdateValue(V current, V added);
+        public delegate V UpdateValue(V old, V newOne);
 
         public AvlTree<K, V> AddOrUpdate(K key, V value, UpdateValue updateValue = null)
         {
@@ -28,16 +28,27 @@ namespace DryIoc.Playground
 
         public V GetValueOrDefault(K key, V defaultValue = default(V))
         {
+            var t = this;
             var hash = key.GetHashCode();
-            for (var t = this; t.Height != 0; t = hash < t.Hash ? t.Left : t.Right)
-                if (hash == t.Hash)
-                    return ReferenceEquals(key, t.Key) || key.Equals(t.Key) ? t.Value : t.GetConflictedValueOrDefault(key, defaultValue);
-            return defaultValue;
+            while (t.Height != 0 && t.Hash != hash)
+                t = hash < t.Hash ? t.Left : t.Right;
+            return t.Height != 0 && (ReferenceEquals(key, t.Key) || key.Equals(t.Key)) ? t.Value
+                : t.GetConflictedValueOrDefault(key, defaultValue);
         }
 
-        /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).</summary>
-        public IEnumerable<KV<K, V>> TraverseInOrder()
+        public V GetValueOrDefault(int intKey, V defaultValue = default(V))
+        {
+            var t = this;
+            while (t.Height != 0 && t.Hash != intKey)
+                t = intKey < t.Hash ? t.Left : t.Right;
+            return t.Height != 0 ? t.Value : defaultValue;
+        }
+
+        /// <summary>
+        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).
+        /// </summary>
+        public IEnumerable<KV<K, V>> Enumerate()
         {
             var parents = new AvlTree<K, V>[Height];
             var parentCount = -1;

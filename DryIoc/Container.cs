@@ -64,9 +64,8 @@ namespace DryIoc
             _defaultResolutionCache = Ref.Of(HashTree<Type, CompiledFactory>.Empty);
             _keyedResolutionCache = Ref.Of(HashTree<Type, HashTree<object, CompiledFactory>>.Empty);
 
-            _resolutionStore = new IndexedStore(_syncRoot);
-            _currentScopeIndexInStore = _resolutionStore.GetOrAdd(_currentScope);
-
+            _resolutionStore = Ref.Of(HashTree<object>.Empty);
+            _resolutionStore.Update(x => x.Append(_currentScope, out _currentScopeIndexInStore));
             _resolutionRoot = new ResolutionRoot(_resolutionStore);
         }
 
@@ -95,9 +94,8 @@ namespace DryIoc
         public Container CreateNewScope()
         {
             var currentScope = new Scope();
-            var resolutionStore = _resolutionStore.Copy();
-            resolutionStore.UpdateAt(_currentScopeIndexInStore, currentScope);
-            
+            var resolutionStore = Ref.Of(_resolutionStore.Value.AddOrUpdate(_currentScopeIndexInStore, currentScope));
+
             return new Container(this)
             {
                 _currentScope = currentScope,
@@ -183,7 +181,7 @@ namespace DryIoc
         {
             var compiledFactory = _defaultResolutionCache.Value.GetValueOrDefault(serviceType)
                 ?? ResolveAndCacheFactory(serviceType, ifUnresolved);
-            return compiledFactory(_resolutionStore, resolutionScope: null);
+            return compiledFactory(_resolutionStore.Value, resolutionScope: null);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -193,7 +191,7 @@ namespace DryIoc
             {
                 var cachedFactory = entry.GetValueOrDefault(serviceKey);
                 if (cachedFactory != null)
-                    return cachedFactory(_resolutionStore, resolutionScope: null);
+                    return cachedFactory(_resolutionStore.Value, resolutionScope: null);
             }
 
             var factory = ((IRegistry)this).GetOrAddFactory(CreateRequest(serviceType, serviceKey), ifUnresolved);
@@ -203,7 +201,7 @@ namespace DryIoc
             var newFactory = factory.GetExpression().CompileToFactory();
             entry = (entry ?? HashTree<object, CompiledFactory>.Empty).AddOrUpdate(serviceKey, newFactory);
             _keyedResolutionCache.Update(x => x.AddOrUpdate(serviceType, entry));
-            return newFactory(_resolutionStore, resolutionScope: null);
+            return newFactory(_resolutionStore.Value, resolutionScope: null);
         }
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
@@ -217,7 +215,7 @@ namespace DryIoc
             return newFactory;
         }
 
-        private static object EmptyCompiledFactory(IndexedStore store, Scope resolutionScope) { return null; }
+        private static object EmptyCompiledFactory(HashTree<object> store, Scope resolutionScope) { return null; }
 
         #endregion
 
@@ -412,7 +410,8 @@ namespace DryIoc
         private readonly Ref<HashTree<Type, HashTree<object, CompiledFactory>>> _keyedResolutionCache;
 
         private Scope _currentScope;
-        private IndexedStore _resolutionStore;
+        //private IndexedStore _resolutionStore;
+        private Ref<HashTree<object>> _resolutionStore;
         private int _currentScopeIndexInStore;
         private ResolutionRoot _resolutionRoot;
 
@@ -427,21 +426,67 @@ namespace DryIoc
         }
     }
 
-    public sealed class Ref<T> where T : class
+    public sealed class Ref<T>
     {
-        public Ref(T value)
-        {
-            _value = value;
-        }
-
         public T Value { get { return _value; } }
+
+        public Ref(T initialValue = default(T))
+        {
+            _value = initialValue;
+        }
 
         public T Update(Func<T, T> update)
         {
-            return Interlocked.Exchange(ref _value, update(_value));
+            var retryCount = 0;
+            while (retryCount++ < NUMBER_OF_RETRIES_UNTIL_THROW)
+            {
+                var version = _version; // remember snapshot version locally
+                var oldValue = _value;
+                var newValue = update(oldValue);
+
+                // Await here for finished commit.
+                // Why not Thread.Sleep(0): http://joeduffyblog.com/2006/08/22/priorityinduced-starvation-why-sleep1-is-better-than-sleep0-and-the-windows-balance-set-manager/
+                var awaitsCount = 0;
+                while (_isCommitInProgress == 1 && awaitsCount++ < NUMBER_OF_AWAIT_LOOPS_PER_RETRY)
+                    Thread.Sleep(1);
+
+                // If still/already in progress then retry. Otherwise mark that current code we is committing.
+                if (Interlocked.CompareExchange(ref _isCommitInProgress, 1, 0) == 1)
+                    continue;
+
+                try
+                {
+                    // If some other code did not change original value (and version) - means it is consistent, 
+                    // then commit update and increment version to signal the change to other code.
+                    if (version == _version)
+                    {
+                        _value = newValue;
+                        Interlocked.Increment(ref _version);
+                        return oldValue; // return snapshot used for update
+                    }
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _isCommitInProgress, 0);
+                }
+            }
+
+            throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_NUMBER);
         }
 
+        #region Implementation
+
+        private const int NUMBER_OF_RETRIES_UNTIL_THROW = 10;
+        private const int NUMBER_OF_AWAIT_LOOPS_PER_RETRY = 100;
+
+        private static readonly string ERROR_EXCEEDED_RETRY_NUMBER =
+            "Ref tried to commit update for " + NUMBER_OF_RETRIES_UNTIL_THROW + " times But there is always someone else intervened.";
+
         private T _value;
+        private int _version;
+        private int _isCommitInProgress; // 0 means false
+
+        #endregion
     }
 
     public sealed class FactoriesEntry
@@ -540,22 +585,38 @@ namespace DryIoc
     public sealed class ResolutionRoot
     {
         public static readonly ParameterExpression ScopeParameter = Expression.Parameter(typeof(Scope), "scope");
-        public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(IndexedStore), "store");
+        public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(HashTree<object>), "store");
 
-        public readonly IndexedStore Store;
-        public HashTree<int, Expression> FactoryExprCache;
+        public readonly Ref<HashTree<object>> Store;
+        public HashTree<Expression> FactoryExprCache;
 
-        public ResolutionRoot(IndexedStore store, HashTree<int, Expression> factoryExprCache = null)
+        public ResolutionRoot(Ref<HashTree<object>> store, HashTree<Expression> factoryExprCache = null)
         {
             Store = store;
-            FactoryExprCache = factoryExprCache ?? HashTree<int, Expression>.Empty;
+            FactoryExprCache = factoryExprCache ?? HashTree<Expression>.Empty;
         }
+
+        private static readonly MethodInfo _getMethod = typeof(ResolutionRoot).GetMethod("Get");
+
+        public static object Get(HashTree<object> store, int index)
+        {
+            return store.GetValueOrDefault(index);
+        }
+
+        private static readonly MethodInfo _getStoreMethod = typeof(HashTree<object>).GetMethod("GetValueOrDefault");
 
         public Expression GetItemExpression(object item, Type itemType)
         {
-            var itemIndex = Store.GetOrAdd(item);
-            var itemIndexExpr = Expression.Constant(itemIndex, typeof(int));
-            var itemExpr = Expression.Call(StoreParameter, IndexedStore.GetMethod, itemIndexExpr);
+            var itemIndex = -1;
+            Store.Update(x =>
+            {
+                itemIndex = x.GetKeyOrDefault(item);
+                return itemIndex == -1 ? x.Append(item, out itemIndex) : x;
+            });
+
+            var itemIndexExpr = Expression.Constant(itemIndex.ThrowIf(itemIndex == -1), typeof(int));
+            //var itemExpr = Expression.Call(_getMethod, StoreParameter, itemIndexExpr, Expression.Constant(null, typeof(object)));
+            var itemExpr = Expression.Call(StoreParameter, _getStoreMethod, itemIndexExpr, Expression.Constant(null, typeof(object)));
             return Expression.Convert(itemExpr, itemType);
         }
 
@@ -595,59 +656,103 @@ namespace DryIoc
         private readonly WeakReference _weakRef;
     }
 
+    //public sealed class IndexedStore2
+    //{
+    //    public IndexedStore2(object syncRoot)
+    //    {
+    //        _syncRoot = syncRoot;
+    //    }
+
+    //    public IndexedStore2 Copy()
+    //    {
+    //        lock (_syncRoot)
+    //        {
+    //            if (_items == null)
+    //                return null;
+    //            var items = new object[_items.Length];
+    //            Array.Copy(_items, 0, items, 0, items.Length);
+    //            return new IndexedStore(_syncRoot) { _items = items };
+    //        }
+    //    }
+
+    //    public static readonly MethodInfo GetMethod = typeof(IndexedStore2).GetMethod("Get");
+    //    public object Get(int i)
+    //    {
+    //        return _items[i];
+    //    }
+
+    //    public int GetOrAdd(object item)
+    //    {
+    //        lock (_syncRoot)
+    //        {
+    //            var index = _items.IndexOf(x => Equals(x, item));
+    //            return index != -1 ? index : (_items = _items.AppendOrUpdate(item)).Length - 1;
+    //        }
+    //    }
+
+    //    public void UpdateAt(int index, object item)
+    //    {
+    //        lock (_syncRoot)
+    //        {
+    //            if (_items == null || _items.Length == 0 || index < 0 || index >= _items.Length)
+    //                return;
+    //            _items[index] = item;
+    //        }
+    //    }
+
+    //    #region Implementation
+
+    //    private object[] _items;
+    //    private readonly object _syncRoot;
+
+    //    #endregion
+    //}
+
     public sealed class IndexedStore
     {
-        public IndexedStore(object syncRoot)
-        {
-            _syncRoot = syncRoot;
-        }
-
-        public IndexedStore Copy()
-        {
-            lock (_syncRoot)
-            {
-                if (_items == null)
-                    return null;
-                var items = new object[_items.Length];
-                Array.Copy(_items, 0, items, 0, items.Length);
-                return new IndexedStore(_syncRoot) {  _items = items };
-            }
-        }
-
-        public static readonly MethodInfo GetMethod = typeof(IndexedStore).GetMethod("Get");
         public object Get(int i)
         {
-            return _items[i];
+            return _items.GetValueOrDefault(i);
         }
 
-        public int GetOrAdd(object item)
+        //public object Get2(int i)
+        //{
+        //    if (i < 32 && (_cacheBitmap >> i & 1) == 1)
+        //        return _cache[i];
+
+        //    var value = _items.GetValueOrDefault(i);
+        //    if (i < 32)
+        //    {
+        //        if (_cache == null)
+        //            _cache = new object[32];
+        //        _cache[i] = value;
+        //        _cacheBitmap |= 1u << i;
+        //    }
+
+        //    return value;
+        //}
+
+        public int AddOrGetIndex(object value)
         {
-            lock (_syncRoot)
-            {
-                var index = _items.IndexOf(x => Equals(x, item));
-                return index != -1 ? index : (_items = _items.AppendOrUpdate(item)).Length - 1;
-            }
+            var item = _items.Enumerate().FirstOrDefault(kv => Equals(kv.Value, value));
+            if (item != null)
+                return item.Key;
+            int index;
+            _items = _items.Append(value, out index);
+            return index;
         }
 
-        public void UpdateAt(int index, object item)
+        private HashTree<object> _items = HashTree<object>.Empty;
+
+        public IndexedStore(object syncRoot)
         {
-            lock (_syncRoot)
-            {
-                if (_items == null || _items.Length == 0 || index < 0 || index >= _items.Length)
-                    return;
-                _items[index] = item;
-            }
         }
 
-        #region Implementation
-
-        private object[] _items;
-        private readonly object _syncRoot;
-
-        #endregion
+        //private uint _cacheBitmap;
+        //private object[] _cache;
     }
 
-    public delegate object CompiledFactory(IndexedStore store, Scope resolutionScope);
+    public delegate object CompiledFactory(HashTree<object> resolutionStore, Scope resolutionScope);
 
     public static partial class FactoryCompiler
     {
@@ -2025,7 +2130,7 @@ namespace DryIoc
 
                 // Create singleton object now and put it into store.
                 var singleton = registry.SingletonScope.GetOrAdd(factoryID,
-                    () => factoryExpr.CompileToFactory().Invoke(request.Root.Store, null));
+                    () => factoryExpr.CompileToFactory().Invoke(request.Root.Store.Value, null));
                 return request.Root.GetItemExpression(singleton, factoryExpr.Type);
             }
         }
@@ -2034,8 +2139,7 @@ namespace DryIoc
         {
             public Expression Apply(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
             {
-                var currentScopeExpr = request.Root.GetItemExpression(registry.CurrentScope);
-                return GetScopedServiceExpression(currentScopeExpr, factoryID, factoryExpr);
+                return GetScopedServiceExpression(request.Root.GetItemExpression(registry.CurrentScope), factoryID, factoryExpr);
             }
         }
 
@@ -2411,71 +2515,82 @@ namespace DryIoc
         }
     }
 
+    public delegate T UpdateMethod<T>(T old, T newOne);
+
     /// <summary>
-    /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.
+    /// Immutable AVL-tree (http://en.wikipedia.org/wiki/AVL_tree) with key of type int.
     /// </summary>
-    public sealed class HashTree<K, V>
+    public sealed class HashTree<V>
     {
-        public static readonly HashTree<K, V> Empty = new HashTree<K, V>();
-
-        public readonly int Hash;
-        public readonly K Key;
-        public readonly V Value;
-        public readonly KV<K, V>[] Conflicts;
-        public readonly HashTree<K, V> Left, Right;
-        public readonly int Height;
-
+        public static readonly HashTree<V> Empty = new HashTree<V>();
         public bool IsEmpty { get { return Height == 0; } }
 
-        public delegate V UpdateValue(V old, V newOne);
+        public readonly int Key;
+        public readonly V Value;
 
-        public HashTree<K, V> AddOrUpdate(K key, V value, UpdateValue updateValue = null)
+        public readonly int Height;
+        public readonly HashTree<V> Left, Right;
+
+        public HashTree<V> AddOrUpdate(int key, V value, UpdateMethod<V> updateValue = null)
         {
-            return AddOrUpdate(key.GetHashCode(), key, value, updateValue ?? ReplaceValue);
+            return Height == 0 ? new HashTree<V>(key, value, Empty, Empty)
+                : (key == Key ? new HashTree<V>(key, updateValue == null ? value : updateValue(Value, value), Left, Right)
+                : (key < Key
+                    ? With(Left.AddOrUpdate(key, value, updateValue), Right)
+                    : With(Left, Right.AddOrUpdate(key, value, updateValue))).EnsureBalanced());
         }
 
-        public V GetValueOrDefault(K key, V defaultValue = default(V))
+        public HashTree<V> Append(V value, out int key)
         {
-            var t = this;
-            var hash = key.GetHashCode();
-            while (t.Height != 0 && t.Hash != hash)
-                t = hash < t.Hash ? t.Left : t.Right;
-            return t.Height != 0 && (ReferenceEquals(key, t.Key) || key.Equals(t.Key)) ? t.Value
-                : t.GetConflictedValueOrDefault(key, defaultValue);
+            if (Height == 0)
+            {
+                key = 0;
+                return new HashTree<V>(key, value, Empty, Empty);
+            }
+
+            if (Right.Height == 0)
+            {
+                key = Key + 1;
+                return AddOrUpdate(key, value);
+            }
+
+            return new HashTree<V>(Key, Value, Left, Right.Append(value, out key)).EnsureBalanced();
         }
 
-        public V GetValueOrDefault(int intKey, V defaultValue = default(V))
+        public V GetValueOrDefault(int key, V defaultValue = default(V))
         {
             var t = this;
-            while (t.Height != 0 && t.Hash != intKey)
-                t = intKey < t.Hash ? t.Left : t.Right;
+            while (t.Height != 0 && t.Key != key)
+                t = key < t.Key ? t.Left : t.Right;
             return t.Height != 0 ? t.Value : defaultValue;
         }
 
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).
-        /// </summary>
-        public IEnumerable<KV<K, V>> Enumerate()
+        public int GetKeyOrDefault(V value, int defaultKey = -1)
         {
-            var parents = new HashTree<K, V>[Height];
+            var item = Enumerate().FirstOrDefault(kv => ReferenceEquals(value, kv.Value) || Equals(value, kv.Value));
+            return item != null ? item.Key : defaultKey;
+        }
+
+        /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).</summary>
+        public IEnumerable<HashTree<V>> Enumerate()
+        {
+            if (Height == 0) yield break;
+            var parents = new HashTree<V>[Height];
             var parentCount = -1;
-            var t = this;
-            while (!t.IsEmpty || parentCount != -1)
+            var node = this;
+            while (!node.IsEmpty || parentCount != -1)
             {
-                if (!t.IsEmpty)
+                if (!node.IsEmpty)
                 {
-                    parents[++parentCount] = t;
-                    t = t.Left;
+                    parents[++parentCount] = node;
+                    node = node.Left;
                 }
                 else
                 {
-                    t = parents[parentCount--];
-                    yield return new KV<K, V>(t.Key, t.Value);
-                    if (t.Conflicts != null)
-                        for (var i = 0; i < t.Conflicts.Length; i++)
-                            yield return t.Conflicts[i];
-                    t = t.Right;
+                    node = parents[parentCount--];
+                    yield return node;
+                    node = node.Right;
                 }
             }
         }
@@ -2484,55 +2599,16 @@ namespace DryIoc
 
         private HashTree() { }
 
-        private HashTree(int hash, K key, V value, KV<K, V>[] conficts, HashTree<K, V> left, HashTree<K, V> right)
+        private HashTree(int key, V value, HashTree<V> left, HashTree<V> right)
         {
-            Hash = hash;
             Key = key;
             Value = value;
-            Conflicts = conficts;
             Left = left;
             Right = right;
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private static V ReplaceValue(V _, V added) { return added; }
-
-        private HashTree<K, V> AddOrUpdate(int hash, K key, V value, UpdateValue updateValue)
-        {
-            return Height == 0 ? new HashTree<K, V>(hash, key, value, null, Empty, Empty)
-                : (hash == Hash ? ResolveConflicts(key, value, updateValue)
-                : (hash < Hash
-                    ? With(Left.AddOrUpdate(hash, key, value, updateValue), Right)
-                    : With(Left, Right.AddOrUpdate(hash, key, value, updateValue)))
-                        .EnsureBalanced());
-        }
-
-        private HashTree<K, V> ResolveConflicts(K key, V value, UpdateValue updateValue)
-        {
-            if (ReferenceEquals(Key, key) || Key.Equals(key))
-                return new HashTree<K, V>(Hash, key, updateValue(Value, value), Conflicts, Left, Right);
-
-            if (Conflicts == null)
-                return new HashTree<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
-
-            var i = Conflicts.Length - 1;
-            while (i >= 0 && !Equals(Conflicts[i].Key, Key)) i--;
-            var conflicts = new KV<K, V>[i != -1 ? Conflicts.Length : Conflicts.Length + 1];
-            Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
-            conflicts[i != -1 ? i : Conflicts.Length] = new KV<K, V>(key, i != -1 ? updateValue(Conflicts[i].Value, value) : value);
-            return new HashTree<K, V>(Hash, Key, Value, conflicts, Left, Right);
-        }
-
-        private V GetConflictedValueOrDefault(K key, V defaultValue)
-        {
-            if (Conflicts != null)
-                for (var i = 0; i < Conflicts.Length; i++)
-                    if (Equals(Conflicts[i].Key, key))
-                        return Conflicts[i].Value;
-            return defaultValue;
-        }
-
-        private HashTree<K, V> EnsureBalanced()
+        private HashTree<V> EnsureBalanced()
         {
             var delta = Left.Height - Right.Height;
             return delta >= 2 ? With(Left.Right.Height - Left.Left.Height == 1 ? Left.RotateLeft() : Left, Right).RotateRight()
@@ -2540,19 +2616,108 @@ namespace DryIoc
                 : this);
         }
 
-        private HashTree<K, V> RotateRight()
+        private HashTree<V> RotateRight()
         {
             return Left.With(Left.Left, With(Left.Right, Right));
         }
 
-        private HashTree<K, V> RotateLeft()
+        private HashTree<V> RotateLeft()
         {
             return Right.With(With(Left, Right.Left), Right.Right);
         }
 
-        private HashTree<K, V> With(HashTree<K, V> left, HashTree<K, V> right)
+        private HashTree<V> With(HashTree<V> left, HashTree<V> right)
         {
-            return new HashTree<K, V>(Hash, Key, Value, Conflicts, left, right);
+            return new HashTree<V>(Key, Value, left, right);
+        }
+
+        #endregion
+    }
+
+    public sealed class HashTree<K, V>
+    {
+        public static readonly HashTree<K, V> Empty = new HashTree<K, V>(HashTree<KV<K, V>>.Empty);
+        public bool IsEmpty { get { return _root.IsEmpty; } }
+
+        public HashTree<K, V> AddOrUpdate(K key, V value, UpdateMethod<V> updateValue = null)
+        {
+            return new HashTree<K, V>(_root.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateValueWithRespectToConflicts(updateValue)));
+        }
+
+        public V GetValueOrDefault(K key, V defaultValue = default(V))
+        {
+            var kv = _root.GetValueOrDefault(key.GetHashCode());
+            return kv != null && (ReferenceEquals(key, kv.Key) || key.Equals(kv.Key))
+                ? kv.Value : GetConflictedValueOrDefault(kv, key, defaultValue);
+        }
+
+        public IEnumerable<KV<K, V>> Enumerate()
+        {
+            if (!_root.IsEmpty)
+                foreach (var t in _root.Enumerate())
+                {
+                    yield return t.Value;
+                    if (t.Value is KVWithConflicts)
+                    {
+                        var conflicts = ((KVWithConflicts)t.Value).Conflicts;
+                        for (var i = 0; i < conflicts.Length; ++i)
+                            yield return conflicts[i];
+                    }
+                }
+        }
+
+        #region Implementation
+
+        private readonly HashTree<KV<K, V>> _root;
+
+        private HashTree(HashTree<KV<K, V>> root)
+        {
+            _root = root;
+        }
+
+        private static UpdateMethod<KV<K, V>> UpdateValueWithRespectToConflicts(UpdateMethod<V> updateValue)
+        {
+            return (old, newOne) =>
+            {
+                var conflicts = old is KVWithConflicts ? ((KVWithConflicts)old).Conflicts : null;
+                if (ReferenceEquals(old.Key, newOne.Key) || old.Key.Equals(newOne.Key))
+                    return conflicts == null ? UpdateValue(old, newOne, updateValue)
+                         : new KVWithConflicts(UpdateValue(old, newOne, updateValue), conflicts);
+
+                if (conflicts == null)
+                    return new KVWithConflicts(old, new[] { newOne });
+
+                var i = conflicts.Length - 1;
+                while (i >= 0 && !Equals(conflicts[i].Key, newOne.Key)) --i;
+                if (i != -1) newOne = UpdateValue(old, newOne, updateValue);
+                return new KVWithConflicts(old, conflicts.AppendOrUpdate(newOne, i));
+            };
+        }
+
+        private static KV<K, V> UpdateValue(KV<K, V> old, KV<K, V> newOne, UpdateMethod<V> updateValue)
+        {
+            return updateValue == null ? newOne : new KV<K, V>(old.Key, updateValue(old.Value, newOne.Value));
+        }
+
+        private static V GetConflictedValueOrDefault(KV<K, V> item, K key, V defaultValue)
+        {
+            var conflicts = item is KVWithConflicts ? ((KVWithConflicts)item).Conflicts : null;
+            if (conflicts != null)
+                for (var i = 0; i < conflicts.Length; ++i)
+                    if (Equals(conflicts[i].Key, key))
+                        return conflicts[i].Value;
+            return defaultValue;
+        }
+
+        private sealed class KVWithConflicts : KV<K, V>
+        {
+            public readonly KV<K, V>[] Conflicts;
+
+            public KVWithConflicts(KV<K, V> kv, KV<K, V>[] conflicts)
+                : base(kv.Key, kv.Value)
+            {
+                Conflicts = conflicts;
+            }
         }
 
         #endregion
