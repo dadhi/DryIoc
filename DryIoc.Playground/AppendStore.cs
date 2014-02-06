@@ -82,7 +82,8 @@ namespace DryIoc.Playground
         public AppendStore<T> Append(T value, out int index)
         {
             index = Count;
-            return new AppendStore<T>(Count + 1, _nodes.AddOrUpdate(Count >> 5, new[] { value }, ArrayTools.Append));
+            return new AppendStore<T>(Count + 1,
+                _nodes.AddOrUpdate(Count >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
         }
 
         public int IndexOf(object value, int defaultIndex = -1)
@@ -91,7 +92,7 @@ namespace DryIoc.Playground
             {
                 var indexInNode = node.Value.IndexOf(x => ReferenceEquals(x, value) || Equals(x, value));
                 if (indexInNode != -1)
-                    return node.Key << 5 | indexInNode;
+                    return node.Key << NODE_ARRAY_BIT_COUNT | indexInNode;
             }
 
             return defaultIndex;
@@ -99,12 +100,13 @@ namespace DryIoc.Playground
 
         public object Get(int index)
         {
-            return _nodes.GetValueOrDefault(index >> 5)[index & 31];
+            return _nodes.GetValueOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_MASK];
         }
 
         #region Implementation
 
-        private const int NODE_ARRAY_SIZE = 32;
+        private const int NODE_ARRAY_MASK = 31; // (11111 binary). So the array would be size of 32. Make it 15 (1111) and BIT_COUNT=4 for array of size 16
+        private const int NODE_ARRAY_BIT_COUNT = 5; // number of bits in NODE_ARRAY_MASK.
 
         private readonly HashTree<T[]> _nodes;
 
