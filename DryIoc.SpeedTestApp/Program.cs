@@ -566,7 +566,7 @@ namespace DryIoc.SpeedTestApp
             return treeTime.ElapsedMilliseconds;
         }
 
-        private static long IntAdd(ref Playground.AppendStore<string> store, int[] keys, string value)
+        private static long IntAdd(ref AppendStore<string> store, int[] keys, string value)
         {
             const string ignored = "";
             var treeTime = Stopwatch.StartNew();
@@ -654,7 +654,7 @@ namespace DryIoc.SpeedTestApp
             return treeWatch.ElapsedMilliseconds;
         }
 
-        private static long IntGet(Playground.AppendStore<string> store, int key, int times)
+        private static long IntGet(AppendStore<string> store, int key, int times)
         {
             object ignored = "ignored";
             var treeWatch = Stopwatch.StartNew();

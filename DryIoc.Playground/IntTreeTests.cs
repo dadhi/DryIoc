@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using DryIoc.UnitTests;
 using NUnit.Framework;
 
 namespace DryIoc.Playground
 {
     [TestFixture]
-    public partial class IntTreeTests
+    [Ignore]
+    public class IntTreeTests
     {
         [Test]
         public void Can_get()
@@ -139,7 +141,7 @@ namespace DryIoc.Playground
         {
             var tree = HashTree<KeyValuePair<Type, string>[]>.Empty;
 
-            var key = typeof(IntTreeTests);
+            var key = typeof(AppendStoreTests);
             var keyHash = key.GetHashCode();
             var value = "test";
 
@@ -196,7 +198,7 @@ namespace DryIoc.Playground
         {
             var tree = DryIoc.HashTree<Type, string>.Empty;
 
-            var key = typeof(IntTreeTests);
+            var key = typeof(AppendStoreTests);
             var value = "test";
 
             tree = tree.AddOrUpdate(key, value);

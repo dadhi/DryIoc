@@ -64,8 +64,8 @@ namespace DryIoc
             _defaultResolutionCache = Ref.Of(HashTree<Type, CompiledFactory>.Empty);
             _keyedResolutionCache = Ref.Of(HashTree<Type, HashTree<object, CompiledFactory>>.Empty);
 
-            _resolutionStore = Ref.Of(HashTree<object>.Empty);
-            _resolutionStore.Update(x => x.Append(_currentScope, out _currentScopeIndexInStore));
+            var appendStore = AppendStore<object>.Empty.Append(_currentScope, out _currentScopeIndexInStore);
+            _resolutionStore = Ref.Of(appendStore);
             _resolutionRoot = new ResolutionRoot(_resolutionStore);
         }
 
@@ -94,7 +94,7 @@ namespace DryIoc
         public Container CreateNewScope()
         {
             var currentScope = new Scope();
-            var resolutionStore = Ref.Of(_resolutionStore.Value.AddOrUpdate(_currentScopeIndexInStore, currentScope));
+            var resolutionStore = Ref.Of(_resolutionStore.Value.Set(_currentScopeIndexInStore, currentScope));
 
             return new Container(this)
             {
@@ -215,7 +215,7 @@ namespace DryIoc
             return newFactory;
         }
 
-        private static object EmptyCompiledFactory(HashTree<object> store, Scope resolutionScope) { return null; }
+        private static object EmptyCompiledFactory(AppendStore<object> store, Scope resolutionScope) { return null; }
 
         #endregion
 
@@ -410,9 +410,8 @@ namespace DryIoc
         private readonly Ref<HashTree<Type, HashTree<object, CompiledFactory>>> _keyedResolutionCache;
 
         private Scope _currentScope;
-        //private IndexedStore _resolutionStore;
-        private Ref<HashTree<object>> _resolutionStore;
-        private int _currentScopeIndexInStore;
+        private Ref<AppendStore<object>> _resolutionStore;
+        private readonly int _currentScopeIndexInStore;
         private ResolutionRoot _resolutionRoot;
 
         #endregion
@@ -420,7 +419,7 @@ namespace DryIoc
 
     public static class Ref
     {
-        public static Ref<T> Of<T>(T value) where T : class
+        public static Ref<T> Of<T>(T value)
         {
             return new Ref<T>(value);
         }
@@ -584,39 +583,31 @@ namespace DryIoc
 
     public sealed class ResolutionRoot
     {
+        public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(AppendStore<object>), "store");
         public static readonly ParameterExpression ScopeParameter = Expression.Parameter(typeof(Scope), "scope");
-        public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(HashTree<object>), "store");
 
-        public readonly Ref<HashTree<object>> Store;
+        public readonly Ref<AppendStore<object>> Store;
         public HashTree<Expression> FactoryExprCache;
 
-        public ResolutionRoot(Ref<HashTree<object>> store, HashTree<Expression> factoryExprCache = null)
+        public ResolutionRoot(Ref<AppendStore<object>> store, HashTree<Expression> factoryExprCache = null)
         {
             Store = store;
             FactoryExprCache = factoryExprCache ?? HashTree<Expression>.Empty;
         }
 
-        private static readonly MethodInfo _getMethod = typeof(ResolutionRoot).GetMethod("Get");
-
-        public static object Get(HashTree<object> store, int index)
-        {
-            return store.GetValueOrDefault(index);
-        }
-
-        private static readonly MethodInfo _getStoreMethod = typeof(HashTree<object>).GetMethod("GetValueOrDefault");
+        private static readonly MethodInfo _storeGetMethod = typeof(AppendStore<object>).GetMethod("Get");
 
         public Expression GetItemExpression(object item, Type itemType)
         {
             var itemIndex = -1;
             Store.Update(x =>
             {
-                itemIndex = x.GetKeyOrDefault(item);
+                itemIndex = x.IndexOf(item);
                 return itemIndex == -1 ? x.Append(item, out itemIndex) : x;
             });
 
             var itemIndexExpr = Expression.Constant(itemIndex.ThrowIf(itemIndex == -1), typeof(int));
-            //var itemExpr = Expression.Call(_getMethod, StoreParameter, itemIndexExpr, Expression.Constant(null, typeof(object)));
-            var itemExpr = Expression.Call(StoreParameter, _getStoreMethod, itemIndexExpr, Expression.Constant(null, typeof(object)));
+            var itemExpr = Expression.Call(StoreParameter, _storeGetMethod, itemIndexExpr);
             return Expression.Convert(itemExpr, itemType);
         }
 
@@ -656,103 +647,61 @@ namespace DryIoc
         private readonly WeakReference _weakRef;
     }
 
-    //public sealed class IndexedStore2
-    //{
-    //    public IndexedStore2(object syncRoot)
-    //    {
-    //        _syncRoot = syncRoot;
-    //    }
-
-    //    public IndexedStore2 Copy()
-    //    {
-    //        lock (_syncRoot)
-    //        {
-    //            if (_items == null)
-    //                return null;
-    //            var items = new object[_items.Length];
-    //            Array.Copy(_items, 0, items, 0, items.Length);
-    //            return new IndexedStore(_syncRoot) { _items = items };
-    //        }
-    //    }
-
-    //    public static readonly MethodInfo GetMethod = typeof(IndexedStore2).GetMethod("Get");
-    //    public object Get(int i)
-    //    {
-    //        return _items[i];
-    //    }
-
-    //    public int GetOrAdd(object item)
-    //    {
-    //        lock (_syncRoot)
-    //        {
-    //            var index = _items.IndexOf(x => Equals(x, item));
-    //            return index != -1 ? index : (_items = _items.AppendOrUpdate(item)).Length - 1;
-    //        }
-    //    }
-
-    //    public void UpdateAt(int index, object item)
-    //    {
-    //        lock (_syncRoot)
-    //        {
-    //            if (_items == null || _items.Length == 0 || index < 0 || index >= _items.Length)
-    //                return;
-    //            _items[index] = item;
-    //        }
-    //    }
-
-    //    #region Implementation
-
-    //    private object[] _items;
-    //    private readonly object _syncRoot;
-
-    //    #endregion
-    //}
-
-    public sealed class IndexedStore
+    public sealed class AppendStore<T>
     {
-        public object Get(int i)
+        public static readonly AppendStore<T> Empty = new AppendStore<T>(0, HashTree<T[]>.Empty);
+
+        public readonly int Count;
+
+        public AppendStore<T> Append(T value, out int index)
         {
-            return _items.GetValueOrDefault(i);
+            index = Count;
+            return new AppendStore<T>(Count + 1,
+                _tree.AddOrUpdate(Count >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
         }
 
-        //public object Get2(int i)
-        //{
-        //    if (i < 32 && (_cacheBitmap >> i & 1) == 1)
-        //        return _cache[i];
-
-        //    var value = _items.GetValueOrDefault(i);
-        //    if (i < 32)
-        //    {
-        //        if (_cache == null)
-        //            _cache = new object[32];
-        //        _cache[i] = value;
-        //        _cacheBitmap |= 1u << i;
-        //    }
-
-        //    return value;
-        //}
-
-        public int AddOrGetIndex(object value)
+        public int IndexOf(object value, int defaultIndex = -1)
         {
-            var item = _items.Enumerate().FirstOrDefault(kv => Equals(kv.Value, value));
-            if (item != null)
-                return item.Key;
-            int index;
-            _items = _items.Append(value, out index);
-            return index;
+            foreach (var node in _tree.Enumerate())
+            {
+                var indexInNode = node.Value.IndexOf(x => ReferenceEquals(x, value) || Equals(x, value));
+                if (indexInNode != -1)
+                    return node.Key << NODE_ARRAY_BIT_COUNT | indexInNode;
+            }
+
+            return defaultIndex;
         }
 
-        private HashTree<object> _items = HashTree<object>.Empty;
-
-        public IndexedStore(object syncRoot)
+        public object Get(int index)
         {
+            return index <= NODE_ARRAY_MASK ? _tree.Value[index]
+                : _tree.GetValueOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_MASK];
         }
 
-        //private uint _cacheBitmap;
-        //private object[] _cache;
+        public AppendStore<T> Set(int index, T value)
+        {
+            return new AppendStore<T>(Count,
+                _tree.AddOrUpdate(index >> NODE_ARRAY_BIT_COUNT, null,
+                    (old, newOne) => old.AppendOrUpdate(value, index & NODE_ARRAY_MASK)));
+        }
+
+        #region Implementation
+
+        private const int NODE_ARRAY_MASK = 31; // (11111 binary). So the array would be size of 32. Make it 15 (1111) and BIT_COUNT=4 for array of size 16
+        private const int NODE_ARRAY_BIT_COUNT = 5; // number of bits in NODE_ARRAY_MASK.
+
+        private readonly HashTree<T[]> _tree;
+
+        private AppendStore(int count, HashTree<T[]> tree)
+        {
+            Count = count;
+            _tree = tree;
+        }
+
+        #endregion
     }
 
-    public delegate object CompiledFactory(HashTree<object> resolutionStore, Scope resolutionScope);
+    public delegate object CompiledFactory(AppendStore<object> resolutionStore, Scope resolutionScope);
 
     public static partial class FactoryCompiler
     {

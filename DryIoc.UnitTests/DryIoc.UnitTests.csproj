@@ -38,6 +38,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AppendStoreTests.cs" />
     <Compile Include="CompositePatternTests.cs" />
     <Compile Include="ManyTests.cs" />
     <Compile Include="Memory\NoLeakingMemoryTests.cs" />
