@@ -255,23 +255,6 @@ namespace DryIoc.UnitTests
 
             Assert.That(result, Is.EqualTo("test"));
         }
-
-        [Test]
-        public void Append_to_end_of_vector()
-        {
-            var tree = HashTree<string>.Empty;
-            int key;
-            tree = tree
-                .Append("a", out key)
-                .Append("b", out key)
-                .Append("c", out key)
-                .Append("d", out key);
-
-            Assert.AreEqual("d", tree.GetValueOrDefault(3));
-            Assert.AreEqual("c", tree.GetValueOrDefault(2));
-            Assert.AreEqual("b", tree.GetValueOrDefault(1));
-            Assert.AreEqual("a", tree.GetValueOrDefault(0));
-        }
     }
 
     internal class HashConflictingKey<T>

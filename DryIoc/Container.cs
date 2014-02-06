@@ -2464,7 +2464,7 @@ namespace DryIoc
         }
     }
 
-    public delegate T UpdateMethod<T>(T old, T newOne);
+    public delegate T UpdateMethod<T>(T oldValue, T value);
 
     /// <summary>
     /// Immutable AVL-tree (http://en.wikipedia.org/wiki/AVL_tree) with key of type int.
@@ -2489,35 +2489,12 @@ namespace DryIoc
                     : With(Left, Right.AddOrUpdate(key, value, updateValue))).EnsureBalanced());
         }
 
-        public HashTree<V> Append(V value, out int key)
-        {
-            if (Height == 0)
-            {
-                key = 0;
-                return new HashTree<V>(key, value, Empty, Empty);
-            }
-
-            if (Right.Height == 0)
-            {
-                key = Key + 1;
-                return AddOrUpdate(key, value);
-            }
-
-            return new HashTree<V>(Key, Value, Left, Right.Append(value, out key)).EnsureBalanced();
-        }
-
         public V GetValueOrDefault(int key, V defaultValue = default(V))
         {
             var t = this;
             while (t.Height != 0 && t.Key != key)
                 t = key < t.Key ? t.Left : t.Right;
             return t.Height != 0 ? t.Value : defaultValue;
-        }
-
-        public int GetKeyOrDefault(V value, int defaultKey = -1)
-        {
-            var item = Enumerate().FirstOrDefault(kv => ReferenceEquals(value, kv.Value) || Equals(value, kv.Value));
-            return item != null ? item.Key : defaultKey;
         }
 
         /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
