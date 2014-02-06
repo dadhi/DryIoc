@@ -9,12 +9,11 @@ namespace DryIoc.UnitTests
         public void Append_to_end()
         {
             var store = AppendStore<string>.Empty;
-            int key;
             store = store
-                .Append("a", out key)
-                .Append("b", out key)
-                .Append("c", out key)
-                .Append("d", out key);
+                .Append("a")
+                .Append("b")
+                .Append("c")
+                .Append("d");
 
             Assert.AreEqual("d", store.Get(3));
             Assert.AreEqual("c", store.Get(2));
@@ -27,12 +26,13 @@ namespace DryIoc.UnitTests
         {
             var store = AppendStore<string>.Empty;
 
-            int i; 
             store = store
-                .Append("a", out i)
-                .Append("b", out i)
-                .Append("c", out i)
-                .Append("d", out i);
+                .Append("a")
+                .Append("b")
+                .Append("c")
+                .Append("d");
+
+            var i = store.Count - 1; 
 
             Assert.AreEqual("d", store.Get(i));
         }
@@ -50,9 +50,7 @@ namespace DryIoc.UnitTests
         {
             var store = AppendStore<string>.Empty;
 
-            int i;
-            store = store
-                .Append("a", out i);
+            store = store.Append("a");
 
             Assert.AreEqual(-1, store.IndexOf("b"));
         }
@@ -62,11 +60,10 @@ namespace DryIoc.UnitTests
         {
             var store = AppendStore<string>.Empty;
 
-            int i;
             store = store
-                .Append("a", out i)
-                .Append("b", out i)
-                .Append("c", out i);
+                .Append("a")
+                .Append("b")
+                .Append("c");
 
             Assert.AreEqual(1, store.IndexOf("b"));
         }

@@ -571,11 +571,10 @@ namespace DryIoc.SpeedTestApp
             const string ignored = "";
             var treeTime = Stopwatch.StartNew();
 
-            int index;
             for (var i = 0; i < keys.Length; i++)
-                Interlocked.Exchange(ref store, store.Append(ignored + i, out index));
+                Interlocked.Exchange(ref store, store.Append(ignored + i));
 
-            Interlocked.Exchange(ref store, store.Append(value, out index));
+            Interlocked.Exchange(ref store, store.Append(value));
 
             treeTime.Stop();
             GC.Collect();

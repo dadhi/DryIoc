@@ -64,8 +64,7 @@ namespace DryIoc
             _defaultResolutionCache = Ref.Of(HashTree<Type, CompiledFactory>.Empty);
             _keyedResolutionCache = Ref.Of(HashTree<Type, HashTree<object, CompiledFactory>>.Empty);
 
-            var appendStore = AppendStore<object>.Empty.Append(_currentScope, out _currentScopeIndexInStore);
-            _resolutionStore = Ref.Of(appendStore);
+            _resolutionStore = Ref.Of(AppendStore<object>.Empty);
             _resolutionRoot = new ResolutionRoot(_resolutionStore);
         }
 
@@ -86,22 +85,13 @@ namespace DryIoc
             _defaultResolutionCache = source._defaultResolutionCache;
             _keyedResolutionCache = source._keyedResolutionCache;
 
-            _currentScopeIndexInStore = source._currentScopeIndexInStore;
             _resolutionStore = source._resolutionStore;
             _resolutionRoot = source._resolutionRoot;
         }
 
         public Container CreateNewScope()
         {
-            var currentScope = new Scope();
-            var resolutionStore = Ref.Of(_resolutionStore.Value.Set(_currentScopeIndexInStore, currentScope));
-
-            return new Container(this)
-            {
-                _currentScope = currentScope,
-                _resolutionStore = resolutionStore,
-                _resolutionRoot = new ResolutionRoot(resolutionStore, _resolutionRoot.FactoryExprCache)
-            };
+            return new Container(this) { _currentScope = new Scope() };
         }
 
         public Container CreateNestedContainer()
@@ -181,7 +171,7 @@ namespace DryIoc
         {
             var compiledFactory = _defaultResolutionCache.Value.GetValueOrDefault(serviceType)
                 ?? ResolveAndCacheFactory(serviceType, ifUnresolved);
-            return compiledFactory(_resolutionStore.Value, resolutionScope: null);
+            return compiledFactory(_resolutionStore.Value, _currentScope, resolutionScope: null);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -191,7 +181,7 @@ namespace DryIoc
             {
                 var cachedFactory = entry.GetValueOrDefault(serviceKey);
                 if (cachedFactory != null)
-                    return cachedFactory(_resolutionStore.Value, resolutionScope: null);
+                    return cachedFactory(_resolutionStore.Value, _currentScope, resolutionScope: null);
             }
 
             var factory = ((IRegistry)this).GetOrAddFactory(CreateRequest(serviceType, serviceKey), ifUnresolved);
@@ -201,7 +191,7 @@ namespace DryIoc
             var newFactory = factory.GetExpression().CompileToFactory();
             entry = (entry ?? HashTree<object, CompiledFactory>.Empty).AddOrUpdate(serviceKey, newFactory);
             _keyedResolutionCache.Update(x => x.AddOrUpdate(serviceType, entry));
-            return newFactory(_resolutionStore.Value, resolutionScope: null);
+            return newFactory(_resolutionStore.Value, _currentScope, resolutionScope: null);
         }
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
@@ -209,13 +199,11 @@ namespace DryIoc
             var request = CreateRequest(serviceType);
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null)
-                return EmptyCompiledFactory;
+                return delegate { return null; };
             var newFactory = factory.GetExpression().CompileToFactory();
             _defaultResolutionCache.Update(x => x.AddOrUpdate(serviceType, newFactory));
             return newFactory;
         }
-
-        private static object EmptyCompiledFactory(AppendStore<object> store, Scope resolutionScope) { return null; }
 
         #endregion
 
@@ -405,14 +393,13 @@ namespace DryIoc
         private readonly Ref<HashTree<Type, Factory>> _genericWrappers;
 
         private readonly Scope _singletonScope;
+        private Scope _currentScope;
 
         private readonly Ref<HashTree<Type, CompiledFactory>> _defaultResolutionCache;
         private readonly Ref<HashTree<Type, HashTree<object, CompiledFactory>>> _keyedResolutionCache;
 
-        private Scope _currentScope;
-        private Ref<AppendStore<object>> _resolutionStore;
-        private readonly int _currentScopeIndexInStore;
-        private ResolutionRoot _resolutionRoot;
+        private readonly Ref<AppendStore<object>> _resolutionStore;
+        private readonly ResolutionRoot _resolutionRoot;
 
         #endregion
     }
@@ -584,7 +571,8 @@ namespace DryIoc
     public sealed class ResolutionRoot
     {
         public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(AppendStore<object>), "store");
-        public static readonly ParameterExpression ScopeParameter = Expression.Parameter(typeof(Scope), "scope");
+        public static readonly ParameterExpression CurrentScopeParameter = Expression.Parameter(typeof(Scope), "currentScope");
+        public static readonly ParameterExpression ResolutionScopeParameter = Expression.Parameter(typeof(Scope), "rsolutionScope");
 
         public readonly Ref<AppendStore<object>> Store;
         public HashTree<Expression> FactoryExprCache;
@@ -603,7 +591,9 @@ namespace DryIoc
             Store.Update(x =>
             {
                 itemIndex = x.IndexOf(item);
-                return itemIndex == -1 ? x.Append(item, out itemIndex) : x;
+                if (itemIndex == -1)
+                    itemIndex = (x = x.Append(item)).Count - 1;
+                return x;
             });
 
             var itemIndexExpr = Expression.Constant(itemIndex.ThrowIf(itemIndex == -1), typeof(int));
@@ -653,9 +643,8 @@ namespace DryIoc
 
         public readonly int Count;
 
-        public AppendStore<T> Append(T value, out int index)
+        public AppendStore<T> Append(T value)
         {
-            index = Count;
             return new AppendStore<T>(Count + 1,
                 _tree.AddOrUpdate(Count >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
         }
@@ -678,13 +667,6 @@ namespace DryIoc
                 : _tree.GetValueOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_MASK];
         }
 
-        public AppendStore<T> Set(int index, T value)
-        {
-            return new AppendStore<T>(Count,
-                _tree.AddOrUpdate(index >> NODE_ARRAY_BIT_COUNT, null,
-                    (old, newOne) => old.AppendOrUpdate(value, index & NODE_ARRAY_MASK)));
-        }
-
         #region Implementation
 
         private const int NODE_ARRAY_MASK = 31; // (11111 binary). So the array would be size of 32. Make it 15 (1111) and BIT_COUNT=4 for array of size 16
@@ -701,7 +683,7 @@ namespace DryIoc
         #endregion
     }
 
-    public delegate object CompiledFactory(AppendStore<object> resolutionStore, Scope resolutionScope);
+    public delegate object CompiledFactory(AppendStore<object> resolutionStore, Scope currentScope, Scope resolutionScope);
 
     public static partial class FactoryCompiler
     {
@@ -710,7 +692,8 @@ namespace DryIoc
             // Removing not required Convert from expression root, because CompiledFactory result still be converted at the end.
             if (expression.NodeType == ExpressionType.Convert)
                 expression = ((UnaryExpression)expression).Operand;
-            return Expression.Lambda<CompiledFactory>(expression, ResolutionRoot.StoreParameter, ResolutionRoot.ScopeParameter);
+            return Expression.Lambda<CompiledFactory>(expression,
+                ResolutionRoot.StoreParameter, ResolutionRoot.CurrentScopeParameter, ResolutionRoot.ResolutionScopeParameter);
         }
 
         public static CompiledFactory CompileToFactory(this Expression expression)
@@ -2031,8 +2014,8 @@ namespace DryIoc
         static Reuse()
         {
             Singleton = new SingletonReuse();
-            InCurrentScope = new CurrentScopeReuse();
-            InResolutionScope = new ScopedReuse(Expression.Call(GetScopeMethod, ResolutionRoot.ScopeParameter));
+            InCurrentScope = new ScopedReuse(ResolutionRoot.CurrentScopeParameter);
+            InResolutionScope = new ScopedReuse(Expression.Call(GetScopeMethod, ResolutionRoot.ResolutionScopeParameter));
         }
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
@@ -2078,17 +2061,10 @@ namespace DryIoc
                         factoryID, factoryExpr);
 
                 // Create singleton object now and put it into store.
+                var currentScope = registry.CurrentScope;
                 var singleton = registry.SingletonScope.GetOrAdd(factoryID,
-                    () => factoryExpr.CompileToFactory().Invoke(request.Root.Store.Value, null));
+                    () => factoryExpr.CompileToFactory().Invoke(request.Root.Store.Value, currentScope, null));
                 return request.Root.GetItemExpression(singleton, factoryExpr.Type);
-            }
-        }
-
-        private sealed class CurrentScopeReuse : IReuse
-        {
-            public Expression Apply(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
-            {
-                return GetScopedServiceExpression(request.Root.GetItemExpression(registry.CurrentScope), factoryID, factoryExpr);
             }
         }
 
