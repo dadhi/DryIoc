@@ -11,10 +11,10 @@ namespace DryIoc.UnitTests
         public void Can_reuse_instances_in_new_open_scope()
         {
             var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var outerLog = container.Resolve<Log>();
-            using (var scope = container.CreateNewScope())
+            using (var scope = container.CreateScope())
             {
                 var scopedLog1 = scope.Resolve<Log>();
                 var scopedLog2 = scope.Resolve<Log>();
@@ -28,14 +28,14 @@ namespace DryIoc.UnitTests
         public void Can_reuse_instances_in_two_level_nested_scope()
         {
             var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var outerLog = container.Resolve<Log>();
-            using (var scope = container.CreateNewScope())
+            using (var scope = container.CreateScope())
             {
                 var scopedLog = scope.Resolve<Log>();
 
-                using (var deepScope = scope.CreateNewScope())
+                using (var deepScope = scope.CreateScope())
                 {
                     var deepLog1 = deepScope.Resolve<Log>();
                     var deepLog2 = deepScope.Resolve<Log>();
@@ -55,10 +55,10 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Consumer>();
             container.Register<Account>(Reuse.Singleton);
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var outerConsumer = container.Resolve<Consumer>();
-            using (var scope = container.CreateNewScope())
+            using (var scope = container.CreateScope())
             {
                 var scopedConsumer1 = scope.Resolve<Consumer>();
                 var scopedConsumer2 = scope.Resolve<Consumer>();
@@ -74,14 +74,14 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Consumer>();
             container.Register<Account>(Reuse.Singleton);
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var outerConsumer = container.Resolve<Consumer>();
-            using (var scope = container.CreateNewScope())
+            using (var scope = container.CreateScope())
             {
                 var scopedConsumer = scope.Resolve<Consumer>();
 
-                using (var deepScope = scope.CreateNewScope())
+                using (var deepScope = scope.CreateScope())
                 {
                     var deepConsumer1 = deepScope.Resolve<Consumer>();
                     var deepConsumer2 = deepScope.Resolve<Consumer>();
@@ -99,10 +99,10 @@ namespace DryIoc.UnitTests
         public void Cannot_create_service_after_scope_is_disposed()
         {
             var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             Func<Log> getLog;
-            using (var containerWithNewScope = container.CreateNewScope())
+            using (var containerWithNewScope = container.CreateScope())
                 getLog = containerWithNewScope.Resolve<Func<Log>>();
 
             Assert.Throws<ContainerException>(() => getLog());
@@ -113,9 +113,9 @@ namespace DryIoc.UnitTests
         public void Scope_can_be_safely_disposed_multiple_times_It_does_NOT_throw()
         {
             var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
-            var containerWithNewScope = container.CreateNewScope();
+            var containerWithNewScope = container.CreateScope();
             containerWithNewScope.Resolve<Log>();
             containerWithNewScope.Dispose();
 
@@ -127,10 +127,10 @@ namespace DryIoc.UnitTests
         public void Nested_scope_disposition_should_not_affect_outer_scope_factories()
         {
             var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var getLog = container.Resolve<Func<Log>>();
-            using (container.CreateNewScope()) { }
+            using (container.CreateScope()) { }
 
             Assert.DoesNotThrow(() => getLog());
         }
@@ -142,7 +142,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(Reuse.Singleton);
 
             IService serviceInNestedScope;
-            using (container.CreateNewScope())
+            using (container.CreateScope())
                 serviceInNestedScope = container.Resolve<Func<IService>>()();
 
             var serviceInOuterScope = container.Resolve<Func<IService>>()();

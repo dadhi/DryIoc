@@ -54,6 +54,7 @@
     <Compile Include="IntNTree.cs" />
     <Compile Include="IntNTreeTests.cs" />
     <Compile Include="IntTreeTests.cs" />
+    <Compile Include="ModelTreeValidationTests.cs" />
     <Compile Include="OptionsPlayTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RefTests.cs" />
