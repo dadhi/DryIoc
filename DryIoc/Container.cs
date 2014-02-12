@@ -36,6 +36,9 @@ namespace DryIoc
 {
     /// <summary>
     /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
+    /// TODO:
+    /// - Add ToString to Factory, etc.
+    /// - Speed up registration.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -117,33 +120,20 @@ namespace DryIoc
 
         public Factory Register(Factory factory, Type serviceType, object serviceKey)
         {
-            serviceType.ThrowIfNull();
-
-            if (!(serviceKey == null
-                || serviceKey is string
-                || serviceKey is int && (int)serviceKey >= 0))
-                throw Error.UNABLE_TO_REGISTER_WITH_NON_INT_OR_STRING_SERVICE_KEY.Of(serviceType, serviceKey);
-
-            factory.ThrowIfNull().ThrowIfCannotBeRegisteredWithServiceType(serviceType);
-
-            if (serviceType.IsGenericTypeDefinition && !factory.ProvidesFactoryPerRequest)
-                throw Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE.Of(serviceType, serviceKey);
-
-            lock (_syncRoot)
+            factory.ThrowIfNull().ThrowIfCannotBeRegisteredWithServiceType(serviceType.ThrowIfNull());
+            
+            switch (factory.Setup.Type)
             {
-                var factoryType = factory.Setup.Type;
-                if (factoryType == FactoryType.Decorator)
-                {
-                    _decorators.Update(x => x.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append));
-                }
-                else if (factoryType == FactoryType.GenericWrapper && serviceType.IsGenericTypeDefinition)
-                {
+                case FactoryType.Decorator:
+                    _decorators.Update(x => x.AddOrUpdate(serviceType, new[] {factory}, ArrayTools.Append));
+                    break;
+                case FactoryType.GenericWrapper:
                     _genericWrappers.Update(x => x.AddOrUpdate(serviceType, factory));
-                }
-                else
-                {
-                    _factories.GetOrAdd(serviceType, NewFactoriesEntry).Add(factory, serviceType, serviceKey);
-                }
+                    break;
+                default:
+                    lock (_syncRoot)
+                        _factories.GetOrAdd(serviceType, NewFactoriesEntry).Add(factory, serviceType, serviceKey);
+                    break;
             }
 
             return factory;
@@ -386,6 +376,7 @@ namespace DryIoc
         private readonly ResolutionRules _resolutionRules;
 
         private readonly Dictionary<Type, FactoriesEntry> _factories;
+        private readonly Ref<HashTree<Type, FactoriesEntry2>> _factories2;
         private readonly Ref<HashTree<Type, Factory[]>> _decorators;
         private readonly Ref<HashTree<Type, Factory>> _genericWrappers;
 
@@ -474,6 +465,117 @@ namespace DryIoc
         #endregion
     }
 
+    public sealed class FactoriesEntry2
+    {
+        public FactoriesEntry2(HashTree<object, Factory> keyedFactories, Factory latestFactory, int latestIndex = -1)
+        {
+            _keyedFactories = keyedFactories ?? HashTree<object, Factory>.Empty;
+            _latestFactory = latestFactory;
+            _latestIndex = latestIndex;
+        }
+
+        readonly int _latestIndex = -1;
+        readonly Factory _latestFactory;
+        readonly HashTree<object, Factory> _keyedFactories;
+
+        public FactoriesEntry2 Add(Factory factory, Type serviceType, object serviceKey = null)
+        {
+            if (serviceKey == null)
+            {
+                return new FactoriesEntry2(
+                    _latestIndex == -1 ? _keyedFactories : _keyedFactories.AddOrUpdate(_latestIndex, _latestFactory),
+                    factory, _latestIndex + 1);
+            }
+            
+            if (serviceKey is int)
+            {
+                var index = (int)serviceKey;
+                if (index < 0)
+                    throw Error.UNABLE_TO_REGISTER_WITH_NON_INT_OR_STRING_SERVICE_KEY.Of(serviceType, serviceKey);
+
+                if (index > _latestIndex)
+                {
+                    return new FactoriesEntry2(
+                        _latestIndex == -1 ? _keyedFactories : _keyedFactories.AddOrUpdate(_latestIndex, _latestFactory),
+                        factory, index);
+                }
+                
+                if (index < _latestIndex)
+                {
+                    return new FactoriesEntry2(
+                        _keyedFactories.AddOrUpdate(serviceKey, factory, 
+                            (current, _) => { throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, serviceKey, current); }),
+                            _latestFactory, _latestIndex);
+                }
+                
+                throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, _latestIndex, _latestFactory);
+            }
+            
+            if (serviceKey is string)
+            {
+                return new FactoriesEntry2(
+                    _keyedFactories.AddOrUpdate(serviceKey, factory, (current, _) =>
+                        { throw Error.DUPLICATE_SERVICE_NAME.Of(serviceType, serviceKey, current); }),
+                        _latestFactory, _latestIndex);
+            }
+            
+            throw Error.UNABLE_TO_REGISTER_WITH_NON_INT_OR_STRING_SERVICE_KEY.Of(serviceType, serviceKey);
+        }
+
+        public bool TryGet(out Factory result, 
+            Type serviceType, object serviceKey,
+            Func<IEnumerable<Factory>, Factory> getSingleFactory = null)
+        {
+            result = null;
+
+            if (serviceKey == null)
+            {
+                if (_latestIndex == 0 || _keyedFactories.IsEmpty)
+                    result = _latestFactory;
+                else if (_latestIndex != -1)
+                {
+                    var indexedFactories = _keyedFactories.Enumerate().Where(kv => kv.Key is int)
+                        .Concat(new[] { new KV<object, Factory>(_latestIndex, _latestFactory) })
+                        .ToArray();
+
+                    if (indexedFactories.Length > 1 && getSingleFactory == null)
+                        throw Error.EXPECTED_SINGLE_DEFAULT_FACTORY.Of(
+                            serviceType, indexedFactories.Select(kv => kv.Value));
+
+                    if (getSingleFactory != null)
+                    {
+                        var factories = new Factory[indexedFactories.Length];
+                        for (var i = 0; i < indexedFactories.Length; i++)
+                            factories[(int)indexedFactories[i].Key] = indexedFactories[i].Value;
+                        result = getSingleFactory(factories);
+                    }
+                }
+            }
+            else if (serviceKey is int)
+            {
+                var index = (int)serviceKey;
+                if (index == _latestIndex)
+                    result = _latestFactory;
+                else if (!_keyedFactories.IsEmpty)
+                    result = _keyedFactories.GetValueOrDefault(serviceKey);
+            }
+            else if (!_keyedFactories.IsEmpty)
+            {
+                result = _keyedFactories.GetValueOrDefault(serviceKey);
+            }
+
+            return result != null;
+        }
+
+        public IEnumerable<KV<object, Factory>> GetAll()
+        {
+            var all = _keyedFactories.Enumerate();
+            if (_latestIndex != -1)
+                all = all.Concat(new[] { new KV<object, Factory>(_latestIndex, _latestFactory) });
+            return all;
+        }
+    }
+
     public sealed class FactoriesEntry
     {
         int _latestIndex = -1;
@@ -488,8 +590,17 @@ namespace DryIoc
                     _keyedFactories = _keyedFactories.AddOrUpdate(_latestIndex, _latestFactory);
                 _latestFactory = factory;
                 ++_latestIndex;
+                return;
             }
-            else if (serviceKey is int)
+
+            if (serviceKey is string)
+            {
+                _keyedFactories = _keyedFactories.AddOrUpdate(serviceKey, factory, (current, _) =>
+                { throw Error.DUPLICATE_SERVICE_NAME.Of(serviceType, serviceKey, current); });
+                return;
+            }
+
+            if (serviceKey is int && (int)serviceKey >= 0)
             {
                 var index = (int)serviceKey;
                 if (index > _latestIndex)
@@ -501,15 +612,13 @@ namespace DryIoc
                 }
                 else if (index < _latestIndex)
                     _keyedFactories = _keyedFactories.AddOrUpdate(serviceKey, factory, (current, _) =>
-                    { throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, serviceKey, current); });
+                        { throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, serviceKey, current); });
                 else
                     throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, _latestIndex, _latestFactory);
+                return;
             }
-            else if (serviceKey is string)
-            {
-                _keyedFactories = _keyedFactories.AddOrUpdate(serviceKey, factory, (current, _) =>
-                { throw Error.DUPLICATE_SERVICE_NAME.Of(serviceType, serviceKey, current); });
-            }
+
+            throw Error.UNABLE_TO_REGISTER_WITH_NON_INT_OR_STRING_SERVICE_KEY.Of(serviceType, serviceKey);
         }
 
         public bool TryGet(out Factory result, Type serviceType, object serviceKey,
@@ -558,9 +667,7 @@ namespace DryIoc
 
         public IEnumerable<KV<object, Factory>> GetAll()
         {
-            var all = Enumerable.Empty<KV<object, Factory>>();
-            if (!_keyedFactories.IsEmpty)
-                all = _keyedFactories.Enumerate();
+            var all = _keyedFactories.Enumerate();
             if (_latestIndex != -1)
                 all = all.Concat(new[] { new KV<object, Factory>(_latestIndex, _latestFactory) });
             return all;
@@ -1011,7 +1118,7 @@ namespace DryIoc
             "Unable to register service {0} with key that is not null, nor string, nor integer index, but {1}.";
 
         public static readonly string UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE =
-            "Unable to register not a factory provider for open-generic service {0} (with key {1})";
+            "Unable to register not a factory provider for open-generic service {0}.";
 
         public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE =
             "Unable to register open-generic implementation {0} with non-generic service {1}.";
@@ -1616,7 +1723,11 @@ namespace DryIoc
             Setup = setup;
         }
 
-        public virtual void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType) { }
+        public virtual void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType)
+        {
+            if (serviceType.IsGenericTypeDefinition && !ProvidesFactoryPerRequest)
+                throw Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE.Of(serviceType);
+        }
 
         public virtual bool ProvidesFactoryPerRequest { get { return false; } }
 
@@ -1665,6 +1776,8 @@ namespace DryIoc
 
         public override void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType)
         {
+            base.ThrowIfCannotBeRegisteredWithServiceType(serviceType);
+
             var implType = _implementationType;
             if (!implType.IsGenericTypeDefinition)
             {
@@ -2210,13 +2323,13 @@ namespace DryIoc
         public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
         {
             if (arg != null) return arg;
-            throw GetException(message == null ? Format(ARG_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2));
+            throw GetException(message == null ? Format(ERROR_ARG_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2));
         }
 
         public static T ThrowIf<T>(this T arg, bool throwCondition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             if (!throwCondition) return arg;
-            throw GetException(message == null ? Format(ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
+            throw GetException(message == null ? Format(ERROR_ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
         }
 
         public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
@@ -2235,8 +2348,8 @@ namespace DryIoc
             return string.Format(message, PrintArg(arg0), PrintArg(arg1), PrintArg(arg2));
         }
 
-        private static readonly string ARG_IS_NULL = "Argument of type {0} is null.";
-        private static readonly string ARG_HAS_IMVALID_CONDITION = "Argument of type {0} has invalid condition.";
+        public static readonly string ERROR_ARG_IS_NULL = "Argument of type {0} is null.";
+        public static readonly string ERROR_ARG_HAS_IMVALID_CONDITION = "Argument of type {0} has invalid condition.";
     }
 
     public static class TypeTools
@@ -2545,7 +2658,8 @@ namespace DryIoc
 
         public HashTree<K, V> AddOrUpdate(K key, V value, UpdateMethod<V> updateValue = null)
         {
-            return new HashTree<K, V>(_root.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateValueWithRespectToConflicts(updateValue)));
+            return new HashTree<K, V>(
+                _root.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateValueWithRespectToConflicts(updateValue)));
         }
 
         public V GetValueOrDefault(K key, V defaultValue = default(V))
