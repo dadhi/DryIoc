@@ -5,11 +5,10 @@ using NUnit.Framework;
 
 namespace DryIoc.Playground
 {
-	[TestFixture]
+	[TestFixture][Ignore]
 	public class ThrowPlayTests
 	{
 		[Test]
-		[Ignore]
 		public void Check_that_empty_params_array_is_NOT_the_same_in_multiple_calls()
 		{
 			Assert.That(GetEmptyParams(), Is.Not.SameAs(GetEmptyParams()));
@@ -21,7 +20,6 @@ namespace DryIoc.Playground
 		}
 
 		[Test]
-		[Ignore]
 		public void Check_that_more_args_then_stated_in_Format_wont_throw()
 		{
 			Assert.DoesNotThrow(() => 
@@ -29,7 +27,6 @@ namespace DryIoc.Playground
 		}
 
 		[Test]
-		[Ignore]
 		public void Check_that_params_array_created_if_omitted_parameters()
 		{
 			var time = TestDefaultParamsTime();

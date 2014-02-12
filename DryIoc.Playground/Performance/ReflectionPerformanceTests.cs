@@ -3,13 +3,12 @@ using System.Diagnostics;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests.Performance
+namespace DryIoc.Playground.Performance
 {
-	[TestFixture]
+	[TestFixture][Ignore]
 	public class ReflectionPerformanceTests
 	{
 		[Test]
-		[Ignore]
 		public void Compare_speed_of_IsGenericType_vs_stored_value_access()
 		{
 			const int times = 1000 * 1000;
@@ -38,7 +37,6 @@ namespace DryIoc.UnitTests.Performance
 		}
 
 		[Test]
-		[Ignore]
 		public void Compare_speed_of_GetGenericTypeDefinition_vs_stored_value_access()
 		{
 			const int times = 1000 * 1000;
@@ -67,7 +65,6 @@ namespace DryIoc.UnitTests.Performance
 		}
 
 		[Test]
-		[Ignore]
 		public void Compare_speed_of_GetGenericArguments_vs_stored_value_access()
 		{
 			const int times = 1000 * 1000;

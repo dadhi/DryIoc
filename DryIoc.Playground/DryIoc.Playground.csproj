@@ -55,6 +55,10 @@
     <Compile Include="IntNTree.cs" />
     <Compile Include="IntNTreeTests.cs" />
     <Compile Include="IntTreeTests.cs" />
+    <Compile Include="Performance\ClosureFieldsAccessSpeed.cs" />
+    <Compile Include="Performance\CompareTryGetVsGetOrNull.cs" />
+    <Compile Include="Performance\MethodArgumentsPassingSpeedComparison.cs" />
+    <Compile Include="Performance\ReflectionPerformanceTests.cs" />
     <Compile Include="ValidatorTests.cs" />
     <Compile Include="OptionsPlayTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

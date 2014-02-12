@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using DryIoc.Playground;
-using DryIoc.UnitTests.Performance;
+using DryIoc.Playground.Performance;
 
 namespace DryIoc.SpeedTestApp
 {
