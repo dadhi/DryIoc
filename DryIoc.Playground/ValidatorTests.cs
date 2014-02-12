@@ -1,11 +1,21 @@
 ﻿/*
- * Unabtrusive Validator for model/view-model designed to work with nested models hierarchy. 
+ * Unobtrusive Validator for model/view-model designed to work with nested models hierarchy. 
  * Only requirement for models is implementing IValidated interface which should create Validator.
  * Supports enabling/disabling of validation and automatic tracking of nested model reassignements.
  * 
+ *  v4.2.1
+ * - fixed: Enabled property changed raised only when Enabled value changed.
+ * 
+ * v4.2.0
+ * - added: Property changed notification about Enabled changed.
+ * 
+ * v4.1.0
+ * - fixed: CanChangeEnabled to be more flexible and take all available information pieces about how Enabled was changed and changing. To allow
+ *          cases such as disabling property enabled by parent.
+ * 
  * v4.0.0
  * - changed: Made Validator implement IEnumerable<KeyValuePair<string, Validator.GetValidationErrorOrNull>>.
- * - changed: Enable collection initializer on Validor to specify rules more simply.
+ * - changed: Enabled collection initializer on Validator to Add validation rules without specifying Dictionary type.
  * 
  * v3.0.0
  * - changed: To convention based property validators discovery and binding.
@@ -26,7 +36,7 @@
  * - fixed: Enabled change is not propagated into property validators.
  * 
  * v1.1.0:
- * - improved: Optimized case when property with validator reassigned to itself. That will prevent uneccessary re-binding.
+ * - improved: Optimized case when property with validator reassigned to itself. That will prevent unnecessary re-binding.
  * 
  * v1.0.0
  * - Initial release.
@@ -149,7 +159,7 @@ namespace Validation
         }
 
         [Test]
-        public void Disabling_validation_should_invalidate_model_bindings()
+        public void Disabling_validation_should_notify_That_all_model_properties_changed_In_order_to_reset_UI()
         {
             var root = new RootModel();
             var invalidated = false;
@@ -165,27 +175,52 @@ namespace Validation
         public void Disabled_parent_should_prevent_enabling_of_property_validation()
         {
             var root = new RootModel();
-            root.Validator.Enabled = false;
-            Assert.That(root.SubModel.Validator.Enabled, Is.False);
+            root.Validator.Enabled = false;                         // disable parent validation
+            Assert.That(root.SubModel.Validator.Enabled, Is.False); // check that property validation disabled too
 
-            root.SubModel.Validator.Enabled = true;
-            Assert.That(root.SubModel.Validator.Enabled, Is.False);
+            root.SubModel.Validator.Enabled = true;                 // enable root validation
+
+            Assert.That(root.SubModel.Validator.Enabled, Is.False); // check that property enabled too 
         }
 
         [Test]
         public void Only_parent_could_enable_property_validation_disabled_by_parent()
         {
             var root = new RootModel();
-            root.Validator.Enabled = false;
-            root.SubModel.Validator.Enabled = true;
-            Assert.That(root.SubModel.Validator.Enabled, Is.False);
+            root.Validator.Enabled = false;                         // disable root validation
+            root.SubModel.Validator.Enabled = true;                 // then try to enable property validation
+            Assert.That(root.SubModel.Validator.Enabled, Is.False); // check that enabling property is failed, prevented by parent.
 
-            root.Validator.Enabled = true;
-            Assert.That(root.SubModel.Validator.Enabled, Is.True);
+            root.Validator.Enabled = true;                          // enable root validation
+
+            Assert.That(root.SubModel.Validator.Enabled, Is.True);  // check that property enabled too 
         }
 
         [Test]
-        public void Invalidating_model_bindings_should_work_for_PropertyChanged_implemented_in_base_model_class()
+        public void Only_parent_could_enable_property_validation_disabled_by_parent_After_it_was_disabled_by_property()
+        {
+            var root = new RootModel();
+            root.SubModel.Validator.Enabled = false;                // disable property validation
+            root.Validator.Enabled = false;                         // disable root validation, for property it changes nothing cause it was already disabled 
+
+            root.SubModel.Validator.Enabled = true;                 // try to enable property validation
+
+            Assert.That(root.SubModel.Validator.Enabled, Is.False); // check that it is prevented, cause root is still disabled
+        }
+
+        [Test]
+        public void Disabling_property_enabled_by_parent_should_work()
+        {
+            var root = new RootModel();
+            root.Validator.Enabled = true;                          // enable root validation, no effect cause it was enabled by default
+
+            root.SubModel.Validator.Enabled = false;                // disable property validation
+
+            Assert.That(root.SubModel.Validator.Enabled, Is.False); // check that property validation is successfully disabled
+        }
+
+        [Test]
+        public void Notifying_on_all_model_property_changes_should_work_for_PropertyChanged_implemented_in_base_model_class()
         {
             var concrete = new Concrete();
 
@@ -355,7 +390,7 @@ namespace Validation
         Validator Validator { get; }
     }
 
-    public sealed class Validator : INotifyPropertyChanged, IDisposable, IEnumerable<KeyValuePair<string, Validator.GetValidationErrorOrNull>> 
+    public sealed class Validator : INotifyPropertyChanged, IDisposable, IEnumerable<KeyValuePair<string, Validator.GetValidationErrorOrNull>>
     {
         // These two properties could be used for binding to UI.
         public bool IsValid { get; private set; }
@@ -367,25 +402,25 @@ namespace Validation
             set { Enable(value); }
         }
 
-        public delegate bool CanProceedEnabledChanging(bool wasChangedByParent, bool nowChangedByParent);
-        public static CanProceedEnabledChanging CanProceedEnabledChangingDefault = PreventDirectChangeIfChangedByParent;
+        public delegate bool CanChangeEnabled(bool enabled, bool changedByParent, bool enabling, bool changingByParent);
+        public static CanChangeEnabled CanChangeEnabledDefault = PreventEnablingIfDisabledByParent;
 
         public Validator(
             INotifyPropertyChanged model,
             bool enabledInitially = true,
-            CanProceedEnabledChanging canProceedEnabledChanging = null)
+            CanChangeEnabled canChangeEnabled = null)
         {
             if (model == null) throw new ArgumentNullException("model");
-            
+
             _model = new WeakReference(model);
             _propertyValidationRules = new Dictionary<string, GetValidationErrorOrNull>();
             _enabled = enabledInitially;
-            _canProceedEnabledChanging = canProceedEnabledChanging ?? CanProceedEnabledChangingDefault;
+            _canChangeEnabled = canChangeEnabled ?? CanChangeEnabledDefault;
 
             IsValid = true;
             Errors = new Dictionary<string, string>();
 
-            BindPropertyValidators(model);
+            BindValidatedProperties(model);
         }
 
         public delegate string GetValidationErrorOrNull();
@@ -401,7 +436,7 @@ namespace Validation
                 return null;
 
             var error = _propertyValidationRules[propertyName].Invoke();
-            OnValidated(propertyName, error);
+            OnPropertyValidated(propertyName, error);
             return error;
         }
 
@@ -416,9 +451,9 @@ namespace Validation
 
             if (_propertyValidationRules != null)
                 foreach (var validator in _propertyValidationRules)
-                    OnValidated(validator.Key, validator.Value.Invoke(), notifyIfSameValidity: true);
+                    OnPropertyValidated(validator.Key, validator.Value.Invoke(), notifyIfSameValidity: true);
 
-            InvalidateModelBindings();
+            NotifyAllModelPropertiesChanged();
         }
 
         #region IDisposable
@@ -427,7 +462,7 @@ namespace Validation
         {
             if (_subscribedPropertyValidators != null)
                 foreach (var validator in _subscribedPropertyValidators)
-                    validator.Value.PropertyChanged -= OnModelPropertyValidated;
+                    validator.Value.PropertyChanged -= OnPropertyValidatorValidityChanged;
 
             _validatedPropertySelectors = null;
             _subscribedPropertyValidators = null;
@@ -466,7 +501,7 @@ namespace Validation
         #region Implementation
 
         private readonly WeakReference _model;
-        private readonly CanProceedEnabledChanging _canProceedEnabledChanging;
+        private readonly CanChangeEnabled _canChangeEnabled;
 
         private Dictionary<string, GetValidationErrorOrNull> _propertyValidationRules;
         private Dictionary<string, Func<object, IValidated>> _validatedPropertySelectors;
@@ -474,12 +509,14 @@ namespace Validation
         private bool _enabled;
         private bool _enabledChangedByParent;
 
-        private static bool PreventDirectChangeIfChangedByParent(bool wasChangedByParent, bool nowChangedByParent)
+        private static bool PreventEnablingIfDisabledByParent(bool enabled, bool changedByParent, bool enabling, bool changingByParent)
         {
-            return !wasChangedByParent || nowChangedByParent;
+            if (!enabled && changedByParent && enabling && !changingByParent)
+                return false;
+            return true;
         }
 
-        private void BindPropertyValidators(INotifyPropertyChanged model)
+        private void BindValidatedProperties(INotifyPropertyChanged model)
         {
             var validatedProperties = model.GetType()
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
@@ -499,17 +536,17 @@ namespace Validation
                 if (property != null && property.Validator != null)
                 {
                     var validator = property.Validator;
-                    validator.PropertyChanged += OnModelPropertyValidated;
+                    validator.PropertyChanged += OnPropertyValidatorValidityChanged;
                     _subscribedPropertyValidators[propertyName] = validator;
                 }
 
                 _validatedPropertySelectors.Add(propertyName, m => (IValidated)propertyInfo.GetValue(m, null));
             }
 
-            model.PropertyChanged += OnModelPropertyChanged;
+            model.PropertyChanged += OnValidatedPropertyChanged;
         }
 
-        private void OnModelPropertyChanged(object modelObject, PropertyChangedEventArgs e)
+        private void OnValidatedPropertyChanged(object modelObject, PropertyChangedEventArgs e)
         {
             if (_validatedPropertySelectors == null)
                 return;
@@ -519,16 +556,16 @@ namespace Validation
             {
                 Func<object, IValidated> selectProperty;
                 if (_validatedPropertySelectors.TryGetValue(propertyName, out selectProperty))
-                    ReBindModelProperty(selectProperty(modelObject), propertyName);
+                    ReBindValidatedProperty(selectProperty(modelObject), propertyName);
             }
             else
             {
                 foreach (var propertySelector in _validatedPropertySelectors)
-                    ReBindModelProperty(propertySelector.Value(modelObject), propertySelector.Key);
+                    ReBindValidatedProperty(propertySelector.Value(modelObject), propertySelector.Key);
             }
         }
 
-        private void ReBindModelProperty(IValidated property, string propertyName)
+        private void ReBindValidatedProperty(IValidated property, string propertyName)
         {
             if (property == null || property.Validator == null)
                 return;
@@ -541,28 +578,29 @@ namespace Validation
                 return;
 
             if (oldValidator != null)
-                oldValidator.PropertyChanged -= OnModelPropertyValidated;
+                oldValidator.PropertyChanged -= OnPropertyValidatorValidityChanged;
 
-            validator.PropertyChanged += OnModelPropertyValidated;
+            validator.PropertyChanged += OnPropertyValidatorValidityChanged;
             _subscribedPropertyValidators[propertyName] = validator;
 
             validator.ValidateAll(); // enforce validation on property to notify parent model
         }
 
-        private void OnModelPropertyValidated(object validatorObject, PropertyChangedEventArgs e)
+        private void OnPropertyValidatorValidityChanged(object validatorObject, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == "IsValid")
-            {
-                var validator = (Validator)validatorObject;
-                var error = validator.IsValid ? null : "Invalid";
-                var propertyName = _subscribedPropertyValidators.Where(x => x.Value == validator).Select(x => x.Key).FirstOrDefault();
-                if (propertyName == null)
-                    throw new InvalidOperationException("Unknown property validator we never subscribed for.");
-                OnValidated(propertyName, error);
-            }
+            if (e.PropertyName != "IsValid")
+                return;
+
+            var validator = (Validator)validatorObject;
+            var error = validator.IsValid ? null : "Invalid";
+            var propertyName = _subscribedPropertyValidators.Where(x => x.Value == validator).Select(x => x.Key).FirstOrDefault();
+            if (propertyName == null)
+                throw new InvalidOperationException("Unknown property validator we never subscribed for.");
+
+            OnPropertyValidated(propertyName, error);
         }
 
-        private void OnValidated(string propertyName, string error, bool notifyIfSameValidity = false)
+        private void OnPropertyValidated(string propertyName, string error, bool notifyIfSameValidity = false)
         {
             if (!_enabled)
                 return;
@@ -583,40 +621,44 @@ namespace Validation
                 OnPropertyChanged("IsValid");
         }
 
-        private void Enable(bool value, bool byParent = false)
+        private void Enable(bool enabling, bool changingByParent = false)
         {
-            if (!_canProceedEnabledChanging(_enabledChangedByParent, byParent))
+            if (!_canChangeEnabled(_enabled, _enabledChangedByParent, enabling, changingByParent))
                 return;
 
-            _enabledChangedByParent = byParent;
+            _enabledChangedByParent = changingByParent;
 
-            var wasEnabled = _enabled;
-            _enabled = value;
+            var enabled = _enabled;
+            _enabled = enabling;
 
-            if (wasEnabled && !_enabled)
+            // first changed enabled for all validated properties
+            if (enabled != enabling && _subscribedPropertyValidators != null)
+                foreach (var validator in _subscribedPropertyValidators)
+                    validator.Value.Enable(enabling, changingByParent: true);
+
+            if (enabled && !enabling)
             {
                 if (!IsValid)
                 {
                     Errors.Clear();
                     OnPropertyChanged("Errors");
-
+                    
                     IsValid = true;
                     OnPropertyChanged("IsValid");
 
-                    InvalidateModelBindings();
+                    NotifyAllModelPropertiesChanged();
                 }
             }
-            else if (!wasEnabled && _enabled)
+            else if (!enabled && enabling)
             {
                 ValidateAll();
             }
 
-            if (wasEnabled != _enabled && _subscribedPropertyValidators != null)
-                foreach (var validator in _subscribedPropertyValidators.Values)
-                    validator.Enable(_enabled, byParent: true);
+            if (enabled != !enabling)
+                OnPropertyChanged("Enabled");
         }
 
-        private void InvalidateModelBindings()
+        private void NotifyAllModelPropertiesChanged()
         {
             var model = _model.Target as INotifyPropertyChanged;
             if (model != null)
@@ -628,22 +670,25 @@ namespace Validation
 
     public static class ReflectionTools
     {
-        public static void RaisePropertyChanged(this INotifyPropertyChanged model, string propertyName)
+        public static void RaisePropertyChanged(this INotifyPropertyChanged source, string propertyName)
         {
+            if (source == null)
+                throw new ArgumentNullException("source");
+
             FieldInfo propertyChanged = null;
-            for (var modelType = model.GetType(); modelType != null && propertyChanged == null; modelType = modelType.BaseType)
+            for (var modelType = source.GetType(); modelType != null && propertyChanged == null; modelType = modelType.BaseType)
                 propertyChanged = modelType.GetField("PropertyChanged",
                     BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.GetField);
 
             if (propertyChanged == null)
                 throw new InvalidOperationException("Unable to find PropertyChanged event in model and its base types.");
 
-            var handler = (MulticastDelegate)propertyChanged.GetValue(model);
+            var handler = (MulticastDelegate)propertyChanged.GetValue(source);
             if (handler == null) // There are no subscribers to event yet.
                 return;
 
             var subscribers = handler.GetInvocationList();
-            var eventArgs = new object[] { model, new PropertyChangedEventArgs(propertyName) };
+            var eventArgs = new object[] { source, new PropertyChangedEventArgs(propertyName) };
             for (var i = 0; i < subscribers.Length; i++)
                 subscribers[i].Method.Invoke(subscribers[i].Target, eventArgs);
         }

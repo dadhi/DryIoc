@@ -3,7 +3,7 @@
 namespace DryIoc.Samples
 {
     [TestFixture]
-    public class RegisterResolve
+    public class RegisterInjectResolve
     {
         [Test]
         public void Register_and_resolve()
