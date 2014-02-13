@@ -438,8 +438,7 @@ namespace DryIoc
         private RegistryWeakRef _selfWeakRef;
         private readonly ResolutionRules _resolutionRules;
 
-        private readonly Dictionary<Type, FactoriesEntry> _factories;
-        private readonly Ref<HashTree<Type, FactoriesEntry2>> _factories2;
+        private readonly Ref<HashTree<Type, object>> _factories; // where object is Factory or KeyedFactories
         private readonly Ref<HashTree<Type, Factory[]>> _decorators;
         private readonly Ref<HashTree<Type, Factory>> _genericWrappers;
 
