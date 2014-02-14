@@ -134,7 +134,7 @@ namespace DryIoc
             return factory;
         }
 
-        private void AddFactory(Factory factory, Type serviceType, object serviceKey = null)
+        private void AddFactory(Factory factory, Type serviceType, object serviceKey)
         {
             if (serviceKey == null)
             {
@@ -314,8 +314,7 @@ namespace DryIoc
         IEnumerable<KV<object, Factory>> IRegistry.GetAllFactories(Type serviceType)
         {
             var entry = _factories.Value.GetValueOrDefault(serviceType);
-            if (entry == null &&
-                serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition)
+            if (entry == null && serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition)
                 entry = _factories.Value.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
             return entry == null ? Enumerable.Empty<KV<object, Factory>>()
                 : entry is Factory ? new[] { new KV<object, Factory>(0, (Factory)entry) }
