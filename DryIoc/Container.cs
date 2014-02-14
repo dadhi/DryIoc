@@ -465,77 +465,6 @@ namespace DryIoc
         #endregion
     }
 
-    public static class Ref
-    {
-        public static Ref<T> Of<T>(T value)
-        {
-            return new Ref<T>(value);
-        }
-    }
-
-    public sealed class Ref<T>
-    {
-        public T Value { get { return _value; } }
-
-        public Ref(T initialValue = default(T))
-        {
-            _value = initialValue;
-        }
-
-        public T Update(Func<T, T> update)
-        {
-            var retryCount = 0;
-            while (true)
-            {
-                var version = _version; // remember current version before update
-                var oldValue = _value;
-                var newValue = update(oldValue);
-
-                // If no other commits in progress, mark that our commit is in progress and Try to commit updated value.
-                // If succeeded return old value used for update. Otherwise retry.
-                if (Interlocked.CompareExchange(ref _isCommitInProgress, 1, 0) == 0)
-                {
-                    try
-                    {
-                        // If some other code did not change version yet (means old value is consistent with updated one).
-                        // Then save updated value and increment version to mark the change for other committers.
-                        if (version == _version)
-                        {
-                            _value = newValue;
-                            Interlocked.Increment(ref _version);
-                            return oldValue; // return snapshot used for update
-                        }
-                    }
-                    finally
-                    {
-                        Interlocked.Exchange(ref _isCommitInProgress, 0);
-                    }
-                }
-                else if (retryCount++ < RETRY_UNTIL_THROW_COUNT)
-                {
-                    var awaitsCount = 0; // Before retry wait a bit for finished commit of other committer.
-                    while (_isCommitInProgress == 1 && awaitsCount++ < AWAIT_LOOPS_PER_RETRY_COUNT)
-                        Thread.Sleep(1); // Not a Sleep(0) because of http://joeduffyblog.com/2006/08/22/priorityinduced-starvation-why-sleep1-is-better-than-sleep0-and-the-windows-balance-set-manager/
-                }
-                else throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_COUNT);
-            }
-        }
-
-        #region Implementation
-
-        private const int RETRY_UNTIL_THROW_COUNT = 10;
-        private const int AWAIT_LOOPS_PER_RETRY_COUNT = 100;
-
-        private static readonly string ERROR_EXCEEDED_RETRY_COUNT =
-            "Ref tried to commit update for " + RETRY_UNTIL_THROW_COUNT + " times But there is always someone else intervened.";
-
-        private T _value;
-        private int _version;
-        private int _isCommitInProgress; // 0 means false
-
-        #endregion
-    }
-
     public sealed class ResolutionRoot
     {
         public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(AppendStore<object>), "store");
@@ -2174,7 +2103,7 @@ namespace DryIoc
     {
         public static Func<string, Exception> GetException = message => new ContainerException(message);
 
-        public static Func<object, string> PrintArg = Sugar.Print;
+        public static Func<object, string> PrintArg = PrintTools.Print;
 
         public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
         {
@@ -2367,7 +2296,7 @@ namespace DryIoc
         }
     }
 
-    public static class Sugar
+    public static class PrintTools
     {
         public static string Print(object x)
         {
@@ -2388,14 +2317,6 @@ namespace DryIoc
                 (builder.Length == 0 ? builder : builder.Append(separator)).Append(printItem(item));
             var result = builder.ToString();
             return result != string.Empty ? result : (ifEmpty ?? string.Empty);
-        }
-
-        public static V GetOrAdd<K, V>(this IDictionary<K, V> source, K key, Func<K, V> valueFactory)
-        {
-            V value;
-            if (!source.TryGetValue(key, out value))
-                source.Add(key, value = valueFactory(key));
-            return value;
         }
     }
 
@@ -2593,6 +2514,77 @@ namespace DryIoc
                 Conflicts = conflicts;
             }
         }
+
+        #endregion
+    }
+
+    public static class Ref
+    {
+        public static Ref<T> Of<T>(T value)
+        {
+            return new Ref<T>(value);
+        }
+    }
+
+    public sealed class Ref<T>
+    {
+        public T Value { get { return _value; } }
+
+        public Ref(T initialValue = default(T))
+        {
+            _value = initialValue;
+        }
+
+        public T Update(Func<T, T> update)
+        {
+            var retryCount = 0;
+            while (true)
+            {
+                var version = _version; // remember current version before update
+                var oldValue = _value;
+                var newValue = update(oldValue);
+
+                // If no other commits in progress, mark that our commit is in progress and Try to commit updated value.
+                // If succeeded return old value used for update. Otherwise retry.
+                if (Interlocked.CompareExchange(ref _isCommitInProgress, 1, 0) == 0)
+                {
+                    try
+                    {
+                        // If some other code did not change version yet (means old value is consistent with updated one).
+                        // Then save updated value and increment version to mark the change for other committers.
+                        if (version == _version)
+                        {
+                            _value = newValue;
+                            Interlocked.Increment(ref _version);
+                            return oldValue; // return snapshot used for update
+                        }
+                    }
+                    finally
+                    {
+                        Interlocked.Exchange(ref _isCommitInProgress, 0);
+                    }
+                }
+                else if (retryCount++ < RETRY_UNTIL_THROW_COUNT)
+                {
+                    var awaitsCount = 0; // Before retry wait a bit for finished commit of other committer.
+                    while (_isCommitInProgress == 1 && awaitsCount++ < AWAIT_LOOPS_PER_RETRY_COUNT)
+                        Thread.Sleep(1); // Not a Sleep(0) because of http://joeduffyblog.com/2006/08/22/priorityinduced-starvation-why-sleep1-is-better-than-sleep0-and-the-windows-balance-set-manager/
+                }
+                else throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_COUNT);
+            }
+        }
+
+        #region Implementation
+
+        private const int RETRY_UNTIL_THROW_COUNT = 10;
+        private const int AWAIT_LOOPS_PER_RETRY_COUNT = 100;
+
+        private static readonly string ERROR_EXCEEDED_RETRY_COUNT =
+            "Ref tried to commit update for " + RETRY_UNTIL_THROW_COUNT + " times But there is always someone else intervened.";
+
+        private T _value;
+        private int _version;
+        private int _isCommitInProgress; // 0 means false
 
         #endregion
     }
