@@ -61,13 +61,9 @@ namespace DryIoc
             _singletons = _reusedInScope = new Scope();
 
             _defaultResolutionCache = Ref.Of(HashTree<Type, CompiledFactory>.Empty);
-            _defaultResolutionCacheValue = _defaultResolutionCache.Value;
-
             _keyedResolutionCache = Ref.Of(HashTree<Type, HashTree<object, CompiledFactory>>.Empty);
 
-            _resolutionStore = Ref.Of(AppendStore<object>.Empty);
-            _resolutionRoot = new ResolutionRoot(_resolutionStore, store => _resolutionStoreValue = store);
-            _resolutionStoreValue = AppendStore<object>.Empty;
+            _resolutionRoot = new ResolutionRoot();
         }
 
         public Container(Container source)
@@ -85,7 +81,6 @@ namespace DryIoc
             _defaultResolutionCache = source._defaultResolutionCache;
             _keyedResolutionCache = source._keyedResolutionCache;
 
-            _resolutionStore = source._resolutionStore;
             _resolutionRoot = source._resolutionRoot;
         }
 
@@ -117,7 +112,6 @@ namespace DryIoc
         public Factory Register(Factory factory, Type serviceType, object serviceKey)
         {
             factory.ThrowIfNull().ThrowIfCannotBeRegisteredWithServiceType(serviceType.ThrowIfNull());
-
             switch (factory.Setup.Type)
             {
                 case FactoryType.Decorator:
@@ -130,97 +124,7 @@ namespace DryIoc
                     AddFactory(factory, serviceType, serviceKey);
                     break;
             }
-
             return factory;
-        }
-
-        private void AddFactory(Factory factory, Type serviceType, object serviceKey)
-        {
-            if (serviceKey == null)
-            {
-                _factories.Update(x => x.AddOrUpdate(serviceType, factory,
-                    (oldValue, value) =>
-                    {
-                        if (oldValue is Factory)
-                            return new KeyedFactories(1,
-                                HashTree<object, Factory>.Empty.AddOrUpdate(0, (Factory)oldValue).AddOrUpdate(1, (Factory)value));
-
-                        var oldFactories = ((KeyedFactories)oldValue);
-                        var latestIndex = oldFactories.LatestIndex + 1;
-                        return new KeyedFactories(latestIndex, oldFactories.Factories.AddOrUpdate(latestIndex, (Factory)value));
-                    }));
-            }
-            else if (serviceKey is string)
-            {
-                var namedFactories = new KeyedFactories(-1, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
-                _factories.Update(x => x.AddOrUpdate(serviceType, namedFactories,
-                    (oldValue, value) =>
-                    {
-                        if (oldValue is Factory)
-                            return new KeyedFactories(0,
-                                ((KeyedFactories)value).Factories.AddOrUpdate(0, (Factory)oldValue));
-
-                        var oldFactories = ((KeyedFactories)oldValue);
-                        return new KeyedFactories(oldFactories.LatestIndex,
-                            oldFactories.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, _) =>
-                                { throw Error.DUPLICATE_SERVICE_NAME.Of(serviceType, serviceKey, oldFactory); }));
-                    }));
-            }
-            else if (serviceKey is int && ((int)serviceKey) >= 0)
-            {
-                var index = (int)serviceKey;
-                var indexedFactories = new KeyedFactories(index, HashTree<object, Factory>.Empty.AddOrUpdate(index, factory));
-                _factories.Update(x => x.AddOrUpdate(serviceType, indexedFactories,
-                    (oldValue, value) =>
-                    {
-                        if (oldValue is Factory)
-                        {
-                            if (index == 0)
-                                throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, index, oldValue);
-                            return new KeyedFactories(index,
-                                ((KeyedFactories)value).Factories.AddOrUpdate(0, (Factory)oldValue));
-                        }
-
-                        var oldFactories = ((KeyedFactories)oldValue);
-                        return new KeyedFactories(index > oldFactories.LatestIndex ? index : oldFactories.LatestIndex,
-                            oldFactories.Factories.AddOrUpdate(index, factory, (oldFactory, _) =>
-                                { throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, index, oldFactory); }));
-                    }));
-            }
-            else throw Error.UNABLE_TO_REGISTER_WITH_NON_INT_OR_STRING_SERVICE_KEY.Of(serviceType, serviceKey);
-        }
-
-        public Factory GetFactoryOrDefault2(
-            Type serviceType, object serviceKey,
-            Func<IEnumerable<Factory>, Factory> getSingleFactory = null,
-            bool lookForOpenGenericServiceTypeToo = false)
-        {
-            var entry = _factories.Value.GetValueOrDefault(serviceType);
-            if (entry == null && lookForOpenGenericServiceTypeToo &&
-                serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition)
-                entry = _factories.Value.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
-
-            if (entry != null)
-            {
-                if (entry is Factory)
-                    return serviceKey == null || (serviceKey is int && (int)serviceKey == 0) 
-                        ? (Factory)entry : null;
-
-                var factories = ((KeyedFactories)entry).Factories;
-                if (serviceKey != null)
-                    return factories.GetValueOrDefault(serviceKey);
-
-                var indexed = factories.Enumerate().Where(kv => kv.Key is int).Select(kv => kv.Value).ToArray();
-                if (indexed.Length == 1)
-                    return indexed[0];
-
-                if (indexed.Length > 1)
-                    return getSingleFactory
-                        .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, indexed)
-                        .Invoke(indexed);
-            }
-
-            return null;
         }
 
         public bool IsRegistered(Type serviceType, string serviceName)
@@ -234,9 +138,9 @@ namespace DryIoc
 
         object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var compiledFactory = _defaultResolutionCacheValue.GetValueOrDefault(serviceType)
+            var compiledFactory = _defaultResolutionCache.Value.GetValueOrDefault(serviceType)
                 ?? ResolveAndCacheFactory(serviceType, ifUnresolved);
-            return compiledFactory(_resolutionStoreValue, _reusedInScope, resolutionScope: null);
+            return compiledFactory(_resolutionRoot.Store.Value, _reusedInScope, resolutionScope: null);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -246,7 +150,7 @@ namespace DryIoc
             {
                 var cachedFactory = entry.GetValueOrDefault(serviceKey);
                 if (cachedFactory != null)
-                    return cachedFactory(_resolutionStore.Value, _reusedInScope, resolutionScope: null);
+                    return cachedFactory(_resolutionRoot.Store.Value, _reusedInScope, resolutionScope: null);
             }
 
             var factory = ((IRegistry)this).GetOrAddFactory(CreateRequest(serviceType, serviceKey), ifUnresolved);
@@ -256,7 +160,7 @@ namespace DryIoc
             var newFactory = factory.GetExpression().CompileToFactory();
             entry = (entry ?? HashTree<object, CompiledFactory>.Empty).AddOrUpdate(serviceKey, newFactory);
             _keyedResolutionCache.Update(x => x.AddOrUpdate(serviceType, entry));
-            return newFactory(_resolutionStore.Value, _reusedInScope, resolutionScope: null);
+            return newFactory(_resolutionRoot.Store.Value, _reusedInScope, resolutionScope: null);
         }
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
@@ -267,7 +171,6 @@ namespace DryIoc
                 return delegate { return null; };
             var newFactory = factory.GetExpression().CompileToFactory();
             _defaultResolutionCache.Update(x => x.AddOrUpdate(serviceType, newFactory));
-            _defaultResolutionCacheValue = _defaultResolutionCache.Value;
             return newFactory;
         }
 
@@ -287,18 +190,18 @@ namespace DryIoc
 
         FactoryWithContext IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
-            var factory = GetFactoryOrDefault2(request.ServiceType, request.ServiceKey, ResolutionRules.ToGetSingleFactory);
+            var factory = GetFactoryOrDefault(request.ServiceType, request.ServiceKey, ResolutionRules.ToGetSingleFactory);
             if (factory != null && factory.ProvidesFactoryPerRequest)
                 factory = factory.GetFactoryPerRequestOrDefault(request, this);
 
             if (factory != null)
                 return factory.WithContext(request, this);
 
-            var factoryContext = ResolutionRules.ForUnregisteredService.Invoke(rule => rule(request, this));
-            if (factoryContext != null)
+            var ruleFactoryContext = ResolutionRules.ForUnregisteredService.Invoke(rule => rule(request, this));
+            if (ruleFactoryContext != null)
             {
-                Register(factoryContext.Factory, request.ServiceType, request.ServiceKey);
-                return factoryContext;
+                Register(ruleFactoryContext.Factory, request.ServiceType, request.ServiceKey);
+                return ruleFactoryContext;
             }
 
             Throw.If(ifUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
@@ -307,8 +210,8 @@ namespace DryIoc
 
         Factory IRegistry.GetFactoryOrDefault(Type serviceType, object serviceKey)
         {
-            return GetFactoryOrDefault2(serviceType, serviceKey, ResolutionRules.ToGetSingleFactory,
-                lookForOpenGenericServiceTypeToo: true);
+            return GetFactoryOrDefault(serviceType, serviceKey, ResolutionRules.ToGetSingleFactory,
+                ifNotFoundLookForOpenGenericServiceType: true);
         }
 
         IEnumerable<KV<object, Factory>> IRegistry.GetAllFactories(Type serviceType)
@@ -432,6 +335,116 @@ namespace DryIoc
 
         #endregion
 
+        #region Factories Add/Get
+
+        private sealed class KeyedFactories
+        {
+            public readonly HashTree<object, Factory> Factories;
+            public readonly int LatestIndex = -1;
+
+            public KeyedFactories(int latestIndex, HashTree<object, Factory> factories)
+            {
+                Factories = factories;
+                LatestIndex = latestIndex;
+            }
+        }
+
+        private void AddFactory(Factory factory, Type serviceType, object serviceKey)
+        {
+            if (serviceKey == null)
+            {
+                _factories.Update(x => x.AddOrUpdate(serviceType, factory, (oldValue, value) =>
+                {
+                    if (oldValue is Factory)
+                        return new KeyedFactories(1,
+                            HashTree<object, Factory>.Empty.AddOrUpdate(0, (Factory)oldValue)
+                                .AddOrUpdate(1, (Factory)value));
+
+                    var oldFactories = ((KeyedFactories)oldValue);
+                    var latestIndex = oldFactories.LatestIndex + 1;
+                    return new KeyedFactories(latestIndex,
+                        oldFactories.Factories.AddOrUpdate(latestIndex, (Factory)value));
+                }));
+            }
+            else if (serviceKey is string)
+            {
+                var namedFactories = new KeyedFactories(-1,
+                    HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
+                _factories.Update(x => x.AddOrUpdate(serviceType, namedFactories, (oldValue, value) =>
+                {
+                    if (oldValue is Factory)
+                        return new KeyedFactories(0,
+                            ((KeyedFactories)value).Factories.AddOrUpdate(0, (Factory)oldValue));
+
+                    var oldFactories = ((KeyedFactories)oldValue);
+                    return new KeyedFactories(oldFactories.LatestIndex,
+                        oldFactories.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, _) =>
+                        {
+                            throw Error.DUPLICATE_SERVICE_NAME.Of(serviceType, serviceKey, oldFactory);
+                        }));
+                }));
+            }
+            else if (serviceKey is int && ((int)serviceKey) >= 0)
+            {
+                var index = (int)serviceKey;
+                var indexedFactories = new KeyedFactories(index,
+                    HashTree<object, Factory>.Empty.AddOrUpdate(index, factory));
+                _factories.Update(x => x.AddOrUpdate(serviceType, indexedFactories, (oldValue, value) =>
+                {
+                    if (oldValue is Factory)
+                    {
+                        if (index == 0)
+                            throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, index, oldValue);
+                        return new KeyedFactories(index,
+                            ((KeyedFactories)value).Factories.AddOrUpdate(0, (Factory)oldValue));
+                    }
+
+                    var oldFactories = ((KeyedFactories)oldValue);
+                    return new KeyedFactories(index > oldFactories.LatestIndex ? index : oldFactories.LatestIndex,
+                        oldFactories.Factories.AddOrUpdate(index, factory, (oldFactory, _) =>
+                        {
+                            throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, index, oldFactory);
+                        }));
+                }));
+            }
+            else throw Error.UNABLE_TO_REGISTER_WITH_NON_INT_OR_STRING_SERVICE_KEY.Of(serviceType, serviceKey);
+        }
+
+        private Factory GetFactoryOrDefault(
+            Type serviceType, object serviceKey, ResolutionRules.GetSingleFactory getSingleFactory,
+            bool ifNotFoundLookForOpenGenericServiceType = false)
+        {
+            var entry = _factories.Value.GetValueOrDefault(serviceType);
+            if (entry == null && ifNotFoundLookForOpenGenericServiceType &&
+                serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition)
+                entry = _factories.Value.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
+
+            if (entry != null)
+            {
+                if (entry is Factory)
+                    return serviceKey == null || (serviceKey is int && (int)serviceKey == 0)
+                        ? (Factory)entry
+                        : null;
+
+                var factories = ((KeyedFactories)entry).Factories;
+                if (serviceKey != null)
+                    return factories.GetValueOrDefault(serviceKey);
+
+                var indexed = factories.Enumerate().Where(x => x.Key is int).Select(x => x.Value).ToArray();
+                if (indexed.Length == 1)
+                    return indexed[0];
+
+                if (indexed.Length > 1)
+                    return getSingleFactory
+                        .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, indexed)
+                        .Invoke(indexed);
+            }
+
+            return null;
+        }
+
+        #endregion
+
         #region Internal State
 
         private RegistryWeakRef _selfWeakRef;
@@ -445,26 +458,11 @@ namespace DryIoc
         private Scope _reusedInScope;
 
         private readonly Ref<HashTree<Type, CompiledFactory>> _defaultResolutionCache;
-        private HashTree<Type, CompiledFactory> _defaultResolutionCacheValue;
         private readonly Ref<HashTree<Type, HashTree<object, CompiledFactory>>> _keyedResolutionCache;
 
-        private readonly Ref<AppendStore<object>> _resolutionStore;
         private readonly ResolutionRoot _resolutionRoot;
-        private AppendStore<object> _resolutionStoreValue;
 
         #endregion
-
-        private sealed class KeyedFactories
-        {
-            public readonly HashTree<object, Factory> Factories;
-            public readonly int LatestIndex = -1;
-
-            public KeyedFactories(int latestIndex, HashTree<object, Factory> factories)
-            {
-                Factories = factories;
-                LatestIndex = latestIndex;
-            }
-        }
     }
 
     public static class Ref
@@ -487,49 +485,49 @@ namespace DryIoc
         public T Update(Func<T, T> update)
         {
             var retryCount = 0;
-            while (retryCount++ < NUMBER_OF_RETRIES_UNTIL_THROW)
+            while (true)
             {
-                var version = _version; // remember snapshot version locally
+                var version = _version; // remember current version before update
                 var oldValue = _value;
                 var newValue = update(oldValue);
 
-                // Await here for finished commit.
-                // Why not Thread.Sleep(0): http://joeduffyblog.com/2006/08/22/priorityinduced-starvation-why-sleep1-is-better-than-sleep0-and-the-windows-balance-set-manager/
-                var awaitsCount = 0;
-                while (_isCommitInProgress == 1 && awaitsCount++ < NUMBER_OF_AWAIT_LOOPS_PER_RETRY)
-                    Thread.Sleep(1);
-
-                // If still/already in progress then retry. Otherwise mark that current code we is committing.
-                if (Interlocked.CompareExchange(ref _isCommitInProgress, 1, 0) == 1)
-                    continue;
-
-                try
+                // If no other commits in progress, mark that our commit is in progress and Try to commit updated value.
+                // If succeeded return old value used for update. Otherwise retry.
+                if (Interlocked.CompareExchange(ref _isCommitInProgress, 1, 0) == 0)
                 {
-                    // If some other code did not change original value (and version) - means it is consistent, 
-                    // then commit update and increment version to signal the change to other code.
-                    if (version == _version)
+                    try
                     {
-                        _value = newValue;
-                        Interlocked.Increment(ref _version);
-                        return oldValue; // return snapshot used for update
+                        // If some other code did not change version yet (means old value is consistent with updated one).
+                        // Then save updated value and increment version to mark the change for other committers.
+                        if (version == _version)
+                        {
+                            _value = newValue;
+                            Interlocked.Increment(ref _version);
+                            return oldValue; // return snapshot used for update
+                        }
+                    }
+                    finally
+                    {
+                        Interlocked.Exchange(ref _isCommitInProgress, 0);
                     }
                 }
-                finally
+                else if (retryCount++ < RETRY_UNTIL_THROW_COUNT)
                 {
-                    Interlocked.Exchange(ref _isCommitInProgress, 0);
+                    var awaitsCount = 0; // Before retry wait a bit for finished commit of other committer.
+                    while (_isCommitInProgress == 1 && awaitsCount++ < AWAIT_LOOPS_PER_RETRY_COUNT)
+                        Thread.Sleep(1); // Not a Sleep(0) because of http://joeduffyblog.com/2006/08/22/priorityinduced-starvation-why-sleep1-is-better-than-sleep0-and-the-windows-balance-set-manager/
                 }
+                else throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_COUNT);
             }
-
-            throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_NUMBER);
         }
 
         #region Implementation
 
-        private const int NUMBER_OF_RETRIES_UNTIL_THROW = 10;
-        private const int NUMBER_OF_AWAIT_LOOPS_PER_RETRY = 100;
+        private const int RETRY_UNTIL_THROW_COUNT = 10;
+        private const int AWAIT_LOOPS_PER_RETRY_COUNT = 100;
 
-        private static readonly string ERROR_EXCEEDED_RETRY_NUMBER =
-            "Ref tried to commit update for " + NUMBER_OF_RETRIES_UNTIL_THROW + " times But there is always someone else intervened.";
+        private static readonly string ERROR_EXCEEDED_RETRY_COUNT =
+            "Ref tried to commit update for " + RETRY_UNTIL_THROW_COUNT + " times But there is always someone else intervened.";
 
         private T _value;
         private int _version;
@@ -544,18 +542,8 @@ namespace DryIoc
         public static readonly ParameterExpression ReusedInScopeParameter = Expression.Parameter(typeof(Scope), "reusedInScope");
         public static readonly ParameterExpression ReusedInResolutionParameter = Expression.Parameter(typeof(Scope), "reusedHere");
 
-        public readonly Ref<AppendStore<object>> Store;
-        private readonly Action<AppendStore<object>> _onStoreUpdated;
-        public HashTree<Expression> FactoryExprCache;
-
-        public ResolutionRoot(Ref<AppendStore<object>> store, Action<AppendStore<object>> onStoreUpdated)
-        {
-            Store = store;
-            _onStoreUpdated = onStoreUpdated;
-            FactoryExprCache = HashTree<Expression>.Empty;
-        }
-
-        private static readonly MethodInfo _storeGetMethod = typeof(AppendStore<object>).GetMethod("Get");
+        public readonly Ref<AppendStore<object>> Store = Ref.Of(AppendStore<object>.Empty);
+        public HashTree<Expression> FactoryExprCache = HashTree<Expression>.Empty;
 
         public Expression GetItemExpression(object item, Type itemType)
         {
@@ -567,7 +555,6 @@ namespace DryIoc
                     itemIndex = (x = x.Append(item)).Count - 1;
                 return x;
             });
-            _onStoreUpdated(Store.Value);
 
             var itemIndexExpr = Expression.Constant(itemIndex.ThrowIf(itemIndex == -1), typeof(int));
             var itemExpr = Expression.Call(StoreParameter, _storeGetMethod, itemIndexExpr);
@@ -593,6 +580,8 @@ namespace DryIoc
         {
             Interlocked.Exchange(ref FactoryExprCache, FactoryExprCache.AddOrUpdate(factoryID, result));
         }
+
+        private static readonly MethodInfo _storeGetMethod = typeof(AppendStore<object>).GetMethod("Get");
     }
 
     public sealed class RegistryWeakRef
@@ -903,7 +892,8 @@ namespace DryIoc
 
     public sealed class ResolutionRules
     {
-        public Func<IEnumerable<Factory>, Factory> ToGetSingleFactory;
+        public delegate Factory GetSingleFactory(IEnumerable<Factory> factories);
+        public GetSingleFactory ToGetSingleFactory = null;
 
         public delegate FactoryWithContext ResolveUnregisteredService(Request request, IRegistry registry);
         public Rules<ResolveUnregisteredService> ForUnregisteredService = new Rules<ResolveUnregisteredService>();
