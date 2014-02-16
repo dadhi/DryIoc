@@ -109,7 +109,7 @@ namespace DryIoc
 
         #region IRegistrator
 
-        public Factory Register(Factory factory, Type serviceType, object serviceKey)
+        public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
             factory.ThrowIfNull().ThrowIfCannotBeRegisteredWithServiceType(serviceType.ThrowIfNull());
             switch (factory.Setup.Type)
@@ -121,15 +121,15 @@ namespace DryIoc
                     _genericWrappers.Update(x => x.AddOrUpdate(serviceType, factory));
                     break;
                 default:
-                    AddFactory(factory, serviceType, serviceKey);
+                    AddFactory(factory, serviceType, serviceKey, ifAlreadyRegistered);
                     break;
             }
-            return factory;
         }
 
         public bool IsRegistered(Type serviceType, string serviceName)
         {
-            return ((IRegistry)this).GetFactoryOrDefault(serviceType.ThrowIfNull(), serviceName) != null;
+            return GetFactoryOrDefault(serviceType.ThrowIfNull(), serviceName, ResolutionRules.ToGetSingleFactory,
+                ifNotFoundLookForOpenGenericServiceType: true) != null;
         }
 
         #endregion
@@ -200,7 +200,7 @@ namespace DryIoc
             var ruleFactoryContext = ResolutionRules.ForUnregisteredService.Invoke(rule => rule(request, this));
             if (ruleFactoryContext != null)
             {
-                Register(ruleFactoryContext.Factory, request.ServiceType, request.ServiceKey);
+                Register(ruleFactoryContext.Factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.ThrowIfNamed);
                 return ruleFactoryContext;
             }
 
@@ -210,7 +210,7 @@ namespace DryIoc
 
         Factory IRegistry.GetFactoryOrDefault(Type serviceType, object serviceKey)
         {
-            return GetFactoryOrDefault(serviceType, serviceKey, ResolutionRules.ToGetSingleFactory,
+            return GetFactoryOrDefault(serviceType.ThrowIfNull(), serviceKey, ResolutionRules.ToGetSingleFactory,
                 ifNotFoundLookForOpenGenericServiceType: true);
         }
 
@@ -221,7 +221,7 @@ namespace DryIoc
                 entry = _factories.Value.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
             return entry == null ? Enumerable.Empty<KV<object, Factory>>()
                 : entry is Factory ? new[] { new KV<object, Factory>(0, (Factory)entry) }
-                : ((KeyedFactories)entry).Factories.Enumerate();
+                : ((KeyedFactoriesEntry)entry).Factories.Enumerate();
         }
 
         Expression IRegistry.GetDecoratorExpressionOrDefault(Request request)
@@ -280,7 +280,10 @@ namespace DryIoc
                     {
                         // Cache closed generic registration produced by open-generic decorator.
                         if (i >= openGenericDecoratorIndex && decorator.ProvidesFactoryPerRequest)
-                            decorator = Register(decorator.GetFactoryPerRequestOrDefault(request, this), serviceType, null);
+                        {
+                            decorator = decorator.GetFactoryPerRequestOrDefault(request, this);
+                            Register(decorator, serviceType, null, IfAlreadyRegistered.ThrowIfNamed);
+                        }
 
                         var decoratorExpr = request.Root.GetCachedFactoryExpression(decorator.ID);
                         if (decoratorExpr == null)
@@ -337,49 +340,54 @@ namespace DryIoc
 
         #region Factories Add/Get
 
-        private sealed class KeyedFactories
+        private sealed class KeyedFactoriesEntry
         {
             public readonly HashTree<object, Factory> Factories;
             public readonly int LatestIndex = -1;
 
-            public KeyedFactories(int latestIndex, HashTree<object, Factory> factories)
+            public KeyedFactoriesEntry(int latestIndex, HashTree<object, Factory> factories)
             {
                 Factories = factories;
                 LatestIndex = latestIndex;
             }
         }
 
-        private void AddFactory(Factory factory, Type serviceType, object serviceKey)
+        private void AddFactory(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
             if (serviceKey == null)
             {
-                _factories.Update(x => x.AddOrUpdate(serviceType, factory, (oldValue, value) =>
+                _factories.Update(x => x.AddOrUpdate(serviceType, factory, (oldEntry, entry) =>
                 {
-                    if (oldValue is Factory)
-                        return new KeyedFactories(1,
-                            HashTree<object, Factory>.Empty.AddOrUpdate(0, (Factory)oldValue)
-                                .AddOrUpdate(1, (Factory)value));
+                    if (oldEntry is Factory)
+                        return ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered
+                            ? oldEntry
+                            : new KeyedFactoriesEntry(1, HashTree<object, Factory>.Empty
+                                .AddOrUpdate(0, (Factory)oldEntry)
+                                .AddOrUpdate(1, (Factory)entry));
 
-                    var oldFactories = ((KeyedFactories)oldValue);
+                    var oldFactories = ((KeyedFactoriesEntry)oldEntry);
                     var latestIndex = oldFactories.LatestIndex + 1;
-                    return new KeyedFactories(latestIndex,
-                        oldFactories.Factories.AddOrUpdate(latestIndex, (Factory)value));
+                    if (latestIndex > 0 && ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered)
+                        return oldEntry;
+                    return new KeyedFactoriesEntry(latestIndex,
+                        oldFactories.Factories.AddOrUpdate(latestIndex, (Factory)entry));
                 }));
             }
             else if (serviceKey is string)
             {
-                var namedFactories = new KeyedFactories(-1,
-                    HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
-                _factories.Update(x => x.AddOrUpdate(serviceType, namedFactories, (oldValue, value) =>
+                var newEntry = new KeyedFactoriesEntry(-1, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
+                _factories.Update(x => x.AddOrUpdate(serviceType, newEntry, (oldEntry, entry) =>
                 {
-                    if (oldValue is Factory)
-                        return new KeyedFactories(0,
-                            ((KeyedFactories)value).Factories.AddOrUpdate(0, (Factory)oldValue));
+                    if (oldEntry is Factory)
+                        return new KeyedFactoriesEntry(0,
+                            ((KeyedFactoriesEntry)entry).Factories.AddOrUpdate(0, (Factory)oldEntry));
 
-                    var oldFactories = ((KeyedFactories)oldValue);
-                    return new KeyedFactories(oldFactories.LatestIndex,
+                    var oldFactories = ((KeyedFactoriesEntry)oldEntry);
+                    return new KeyedFactoriesEntry(oldFactories.LatestIndex,
                         oldFactories.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, _) =>
                         {
+                            if (ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered)
+                                return oldFactory;
                             throw Error.DUPLICATE_SERVICE_NAME.Of(serviceType, serviceKey, oldFactory);
                         }));
                 }));
@@ -387,22 +395,27 @@ namespace DryIoc
             else if (serviceKey is int && ((int)serviceKey) >= 0)
             {
                 var index = (int)serviceKey;
-                var indexedFactories = new KeyedFactories(index,
-                    HashTree<object, Factory>.Empty.AddOrUpdate(index, factory));
-                _factories.Update(x => x.AddOrUpdate(serviceType, indexedFactories, (oldValue, value) =>
+                var newEntry = new KeyedFactoriesEntry(index, HashTree<object, Factory>.Empty.AddOrUpdate(index, factory));
+                _factories.Update(x => x.AddOrUpdate(serviceType, newEntry, (oldEntry, entry) =>
                 {
-                    if (oldValue is Factory)
+                    if (oldEntry is Factory)
                     {
                         if (index == 0)
-                            throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, index, oldValue);
-                        return new KeyedFactories(index,
-                            ((KeyedFactories)value).Factories.AddOrUpdate(0, (Factory)oldValue));
+                        {
+                            if (ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered)
+                                return oldEntry;
+                            throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, index, oldEntry);
+                        }
+                        return new KeyedFactoriesEntry(index,
+                            ((KeyedFactoriesEntry)entry).Factories.AddOrUpdate(0, (Factory)oldEntry));
                     }
 
-                    var oldFactories = ((KeyedFactories)oldValue);
-                    return new KeyedFactories(index > oldFactories.LatestIndex ? index : oldFactories.LatestIndex,
+                    var oldFactories = ((KeyedFactoriesEntry)oldEntry);
+                    return new KeyedFactoriesEntry(index > oldFactories.LatestIndex ? index : oldFactories.LatestIndex,
                         oldFactories.Factories.AddOrUpdate(index, factory, (oldFactory, _) =>
                         {
+                            if (ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered)
+                                return oldFactory;
                             throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, index, oldFactory);
                         }));
                 }));
@@ -426,7 +439,7 @@ namespace DryIoc
                         ? (Factory)entry
                         : null;
 
-                var factories = ((KeyedFactories)entry).Factories;
+                var factories = ((KeyedFactoriesEntry)entry).Factories;
                 if (serviceKey != null)
                     return factories.GetValueOrDefault(serviceKey);
 
@@ -450,7 +463,7 @@ namespace DryIoc
         private RegistryWeakRef _selfWeakRef;
         private readonly ResolutionRules _resolutionRules;
 
-        private readonly Ref<HashTree<Type, object>> _factories; // where object is Factory or KeyedFactories
+        private readonly Ref<HashTree<Type, object>> _factories; // where object is Factory or KeyedFactoriesEntry
         private readonly Ref<HashTree<Type, Factory[]>> _decorators;
         private readonly Ref<HashTree<Type, Factory>> _genericWrappers;
 
@@ -989,9 +1002,11 @@ namespace DryIoc
         /// <param name="serviceType">The service type to register</param>
         /// <param name="factory"><see cref="Factory"/> details object.</param>
         /// <param name="named">Optional name of the service.</param>
-        public static void Register(this IRegistrator registrator, Type serviceType, Factory factory, string named = null)
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
+        public static void Register(this IRegistrator registrator, Type serviceType, Factory factory,
+            string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
-            registrator.Register(factory, serviceType, named);
+            registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1001,9 +1016,11 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="factory"><see cref="Factory"/> details object.</param>
         /// <param name="named">Optional name of the service.</param>
-        public static void Register<TService>(this IRegistrator registrator, Factory factory, string named = null)
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
+        public static void Register<TService>(this IRegistrator registrator, Factory factory,
+            string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
-            registrator.Register(factory, typeof(TService), named);
+            registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1016,11 +1033,13 @@ namespace DryIoc
         /// <param name="getConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType,
             Type implementationType, IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null,
-            string named = null)
+            string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
-            registrator.Register(new ReflectionFactory(implementationType, reuse, getConstructor, setup), serviceType, named);
+            var factory = new ReflectionFactory(implementationType, reuse, getConstructor, setup);
+            registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1032,11 +1051,13 @@ namespace DryIoc
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator,
             Type implementationType, IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
-            string named = null)
+            string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
-            registrator.Register(new ReflectionFactory(implementationType, reuse, withConstructor, setup), implementationType, named);
+            var factory = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
+            registrator.Register(factory, implementationType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1049,12 +1070,14 @@ namespace DryIoc
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
-            string named = null)
+            string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
             where TImplementation : TService
         {
-            registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup), typeof(TService), named);
+            var factory = new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup);
+            registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1066,11 +1089,13 @@ namespace DryIoc
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
-            string named = null)
+            string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
-            registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup), typeof(TImplementation), named);
+            var factory = new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup);
+            registrator.Register(factory, typeof(TImplementation), named, ifAlreadyRegistered);
         }
 
         public static Func<Type, bool> PublicTypes =
@@ -1084,28 +1109,29 @@ namespace DryIoc
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
-        /// <param name="named">Optional registration name.</param>
         /// <param name="types">Optional condition to include selected types only. Default value is <see cref="PublicTypes"/></param>
+        /// <param name="named">Optional registration name.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterAll(this IRegistrator registrator,
             Type implementationType, IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
-            string named = null, Func<Type, bool> types = null)
+            Func<Type, bool> types = null, string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
             var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
 
-            var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeTypeItself.AsFirst);
+            var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeItself.AsFirst);
             var implementedServiceTypes = implementedTypes.Where(types ?? PublicTypes);
             if (implementationType.IsGenericTypeDefinition)
             {
                 var implTypeArgs = implementationType.GetGenericArguments();
-                implementedServiceTypes = implementedServiceTypes.Where(t =>
-                    t.IsGenericType && t.ContainsGenericParameters && t.ContainsAllGenericParameters(implTypeArgs))
+                implementedServiceTypes = implementedServiceTypes
+                    .Where(t => t.IsGenericType && t.ContainsGenericParameters && t.ContainsAllGenericParameters(implTypeArgs))
                     .Select(t => t.GetGenericTypeDefinition());
             }
 
             var atLeastOneRegistered = false;
             foreach (var serviceType in implementedServiceTypes)
             {
-                registrator.Register(registration, serviceType, named);
+                registrator.Register(registration, serviceType, named, ifAlreadyRegistered);
                 atLeastOneRegistered = true;
             }
 
@@ -1122,11 +1148,12 @@ namespace DryIoc
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional registration name.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterAll<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
-            string named = null)
+            string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
-            registrator.RegisterAll(typeof(TImplementation), reuse, withConstructor, setup, named);
+            registrator.RegisterAll(typeof(TImplementation), reuse, withConstructor, setup, null, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1140,14 +1167,15 @@ namespace DryIoc
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional service name.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterDelegate<TService>(this IRegistrator registrator,
             Func<IResolver, TService> lambda, IReuse reuse = null, FactorySetup setup = null,
-            string named = null)
+            string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
             var factory = new DelegateFactory((request, registry) =>
                 Expression.Invoke(request.Root.GetItemExpression(lambda), request.Root.GetRegistryItemExpression(registry)),
                 reuse, setup);
-            registrator.Register(factory, typeof(TService), named);
+            registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1158,11 +1186,12 @@ namespace DryIoc
         /// <param name="instance">The pre-created instance of <typeparamref name="TService"/>.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional service name.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterInstance<TService>(this IRegistrator registrator,
             TService instance, FactorySetup setup = null,
-            string named = null)
+            string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
-            registrator.RegisterDelegate(_ => instance, Reuse.Transient, setup, named);
+            registrator.RegisterDelegate(_ => instance, Reuse.Transient, setup, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1980,9 +2009,11 @@ namespace DryIoc
         object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved);
     }
 
+    public enum IfAlreadyRegistered { ThrowIfNamed, KeepAlreadyRegistered }
+
     public interface IRegistrator
     {
-        Factory Register(Factory factory, Type serviceType, object serviceKey);
+        void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered);
 
         bool IsRegistered(Type serviceType, string serviceName);
     }
@@ -2159,17 +2190,17 @@ namespace DryIoc
             return name.Replace('+', '.'); // for nested classes
         }
 
-        public enum IncludeTypeItself { No, AsFirst }
+        public enum IncludeItself { No, AsFirst }
 
         /// <summary>
         /// Returns all type interfaces and base types except object.
         /// </summary>
-        public static Type[] GetImplementedTypes(this Type type, IncludeTypeItself includeTypeItself = IncludeTypeItself.No)
+        public static Type[] GetImplementedTypes(this Type type, IncludeItself includeItself = IncludeItself.No)
         {
             Type[] results;
 
             var interfaces = type.GetInterfaces();
-            var interfaceStartIndex = includeTypeItself == IncludeTypeItself.AsFirst ? 1 : 0;
+            var interfaceStartIndex = includeItself == IncludeItself.AsFirst ? 1 : 0;
             var selfPlusInterfaceCount = interfaceStartIndex + interfaces.Length;
 
             var baseType = type.BaseType;
@@ -2192,7 +2223,7 @@ namespace DryIoc
                 results[selfPlusInterfaceCount] = baseType;
             }
 
-            if (includeTypeItself == IncludeTypeItself.AsFirst)
+            if (includeItself == IncludeItself.AsFirst)
                 results[0] = type;
 
             if (interfaces.Length == 1)

@@ -72,7 +72,7 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceName);
+                registrator.Register(factory, export.ServiceType, export.ServiceName, IfAlreadyRegistered.ThrowIfNamed);
 
                 if (export.ServiceType.IsGenericType &&
                     export.ServiceType.GetGenericTypeDefinition() == typeof(IFactory<>))
@@ -258,7 +258,7 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < exportInfo.Exports.Length; i++)
             {
                 var export = exportInfo.Exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceName);
+                registrator.Register(factory, export.ServiceType, export.ServiceName, IfAlreadyRegistered.ThrowIfNamed);
             }
         }
 
@@ -576,7 +576,7 @@ namespace DryIoc.MefAttributedModel
 
         public IEnumerable<Type> GetAllContractTypes(Type implementationType)
         {
-            var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeTypeItself.AsFirst)
+            var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeItself.AsFirst)
                 .Where(ExportedTypes);
             return Except == null || Except.Length == 0 ? contractTypes : contractTypes.Except(Except);
         }

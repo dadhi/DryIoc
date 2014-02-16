@@ -255,7 +255,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Possible_to_register_and_resolve_object_as_service_type()
+        public void Possible_to_register_and_resolve_with_object_service_type()
         {
             var container = new Container();
             container.Register<object, Service>();
@@ -274,5 +274,54 @@ namespace DryIoc.UnitTests
 
             Assert.Null(service);
         }
+
+        [Test]
+        public void Register_once_for_default_service()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepAlreadyRegistered);
+
+            var service = container.Resolve<IService>();
+
+            Assert.That(service, Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void Register_once_for_default_service_Should_not_be_affected_by_already_registered_named_services()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(named: "a");
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepAlreadyRegistered);
+
+            var service = container.Resolve<IService>();
+
+            Assert.That(service, Is.InstanceOf<AnotherService>());
+        }
+
+        [Test]
+        public void Register_once_for_default_service_when_couple_of_defaults_were_already_registered()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.Register<IService, AnotherService>();
+            container.Register<IService, DisposableService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepAlreadyRegistered);
+
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<IService>());
+        }
+
+        [Test]
+        public void Register_once_for_named_service()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(named: "a");
+            container.Register<IService, AnotherService>(named: "a", ifAlreadyRegistered: IfAlreadyRegistered.KeepAlreadyRegistered);
+
+            var service = container.Resolve<IService>("a");
+
+            Assert.That(service, Is.InstanceOf<Service>());
+        }
+
     }
 }

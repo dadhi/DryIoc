@@ -18,7 +18,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void GetImplementedTypes_should_work_for_class_nested_in_open_generic_types()
         {
-            var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes(TypeTools.IncludeTypeItself.AsFirst)
+            var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes(TypeTools.IncludeItself.AsFirst)
                 .Select(t => t.ContainsGenericParameters ? t.GetGenericTypeDefinition() : t);
 
             CollectionAssert.AreEqual(new[] { typeof(Fuzz<>.NestedClazz), typeof(IFuzz<>), typeof(IFuzz) }, types);
