@@ -1310,10 +1310,10 @@ namespace DryIoc
     public sealed class Request
     {
         public readonly ResolutionRoot Root;
-        public readonly Request Parent;     // null for resolution root
+        public readonly Request Parent;             // null for resolution root
         public readonly Type ServiceType;
-        public readonly object ServiceKey;  // null by default, string for named or integer index for multiple defaults.
-        public readonly DependencyInfo Dependency;
+        public readonly object ServiceKey;          // null by default, string for named or integer index for multiple defaults
+        public readonly object DependencyInfo;      // either Reflection.ParameterInfo, PropertyInfo or FieldInfo. Used for Print only
         public readonly Factory ResolvedFactory;
 
         public Type OpenGenericServiceType
@@ -1323,9 +1323,9 @@ namespace DryIoc
 
         public Type ImplementationType { get { return ResolvedFactory.ImplementationType; } }
 
-        public Request Push(Type serviceType, object serviceKey, DependencyInfo dependency = null)
+        public Request Push(Type serviceType, object serviceKey, object dependencyInfo = null)
         {
-            return new Request(Root, this, serviceType, serviceKey, dependency);
+            return new Request(Root, this, serviceType, serviceKey, dependencyInfo);
         }
 
         public Request ResolveWith(Factory factory)
@@ -1333,7 +1333,7 @@ namespace DryIoc
             for (var p = Parent; p != null; p = p.Parent)
                 Throw.If(p.ResolvedFactory != null && p.ResolvedFactory.ID == factory.ID && p.ResolvedFactory.Setup.Type == FactoryType.Service,
                     Error.RECURSIVE_DEPENDENCY_DETECTED, this);
-            return new Request(Root, Parent, ServiceType, ServiceKey, Dependency, factory);
+            return new Request(Root, Parent, ServiceType, ServiceKey, DependencyInfo, factory);
         }
 
         public Request GetNonWrapperParentOrDefault()
@@ -1350,6 +1350,40 @@ namespace DryIoc
                 yield return x;
         }
 
+        // Prints something like "DryIoc.UnitTests.IService 'blah' (parameter 'blah') of DryIoc.UnitTests.Service"
+        public string Print()
+        {
+            var str = new StringBuilder();
+
+            if (ResolvedFactory != null && ResolvedFactory.Setup.Type != FactoryType.Service)
+                str.Append(Enum.GetName(typeof(FactoryType), ResolvedFactory.Setup.Type)).Append(' ');
+
+            str.Append(ServiceType.Print());
+
+            if (ServiceKey != null)
+                if (ServiceKey is string)
+                    str.Append(" '").Append(ServiceKey).Append("'");
+                else
+                    str.Append(" #").Append(ServiceKey);
+
+            if (DependencyInfo != null)
+            {
+                str.Append(" (");
+                if (DependencyInfo is ParameterInfo)
+                    str.Append("parameter '").Append(((ParameterInfo)DependencyInfo).Name);
+                else if (DependencyInfo is PropertyInfo)
+                    str.Append("property '").Append(((PropertyInfo)DependencyInfo).Name);
+                else if (DependencyInfo is FieldInfo)
+                    str.Append("field '").Append(((FieldInfo)DependencyInfo).Name);
+                str.Append("')");
+            }
+
+            if (ResolvedFactory != null && ResolvedFactory.ImplementationType != null)
+                str.Append(" of ").Append(ResolvedFactory.ImplementationType.Print());
+
+            return str.ToString();
+        }
+
         public override string ToString()
         {
             var message = new StringBuilder().Append(Print());
@@ -1360,46 +1394,16 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(ResolutionRoot root, Request parent, Type serviceType, 
-            object serviceKey = null, DependencyInfo dependency = null, Factory factory = null)
+        internal Request(ResolutionRoot root, Request parent, Type serviceType,
+            object serviceKey = null, object dependencyInfo = null, Factory factory = null)
         {
             Root = root;
-
             Parent = parent;
             ServiceType = serviceType.ThrowIfNull()
                 .ThrowIf(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
             ServiceKey = serviceKey;
-
-            Dependency = dependency;
-
-            if (factory != null)
-                ResolvedFactory = factory;
-        }
-
-        // example: "unnamed generic-wrapper DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
-        private string Print()
-        {
-            var message = ServiceKey is string ? "\"" + ServiceKey + "\""
-                : ServiceKey is int ? "#" + ServiceKey
-                : "unnamed";
-
-            if (ResolvedFactory != null)
-            {
-                var factoryType = ResolvedFactory.Setup.Type;
-                var kind = factoryType == FactoryType.Decorator
-                    ? " decorator" : factoryType == FactoryType.GenericWrapper
-                    ? " generic-wrapper" : string.Empty;
-
-                var implementationType = ResolvedFactory.ImplementationType;
-                var type = implementationType != null && implementationType != ServiceType
-                    ? implementationType.Print() + " : " + ServiceType.Print()
-                    : ServiceType.Print();
-
-                message += kind + " " + type;
-            }
-
-            message += Dependency == null ? string.Empty : " (" + Dependency + ")";
-            return message;
+            DependencyInfo = dependencyInfo;
+            ResolvedFactory = factory;
         }
 
         #endregion
@@ -1637,10 +1641,8 @@ namespace DryIoc
                     var ctorParam = ctorParams[i];
                     var paramKey = Setup.Type != FactoryType.Service ? request.ServiceKey // propagate key from wrapper or decorator.
                         : registry.ResolutionRules.ForConstructorParameter.Invoke(rule => rule(ctorParam, request, registry));
-                    
-                    var paramRequest = request.Push(ctorParam.ParameterType, paramKey,
-                        new DependencyInfo(DependencyKind.CtorParam, ctorParam.Name));
-                    
+
+                    var paramRequest = request.Push(ctorParam.ParameterType, paramKey, ctorParam);
                     paramExprs[i] = registry.GetOrAddFactory(paramRequest, IfUnresolved.Throw).GetExpression();
                 }
             }
@@ -1677,10 +1679,8 @@ namespace DryIoc
                 {
                     var paramKey = Setup.Type != FactoryType.Service ? request.ServiceKey // propagate key from wrapper or decorator.
                         : registry.ResolutionRules.ForConstructorParameter.Invoke(rule => rule(ctorParam, request, registry));
-                    
-                    var paramRequest = request.Push(ctorParam.ParameterType, paramKey,
-                        new DependencyInfo(DependencyKind.CtorParam, ctorParam.Name));
-                    
+
+                    var paramRequest = request.Push(ctorParam.ParameterType, paramKey, ctorParam);
                     ctorParamExprs[cp] = registry.GetOrAddFactory(paramRequest, IfUnresolved.Throw).GetExpression();
                 }
             }
@@ -1733,15 +1733,13 @@ namespace DryIoc
             foreach (var member in props.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>()))
             {
                 var m = member;
-                object key = null;
-                if (registry.ResolutionRules.ForPropertyOrField.Invoke(r => r(out key, m, request, registry)))
+                object memberKey = null;
+                if (registry.ResolutionRules.ForPropertyOrField.Invoke(rule => rule(out memberKey, m, request, registry)))
                 {
-                    var type = m is PropertyInfo ? ((PropertyInfo)m).PropertyType : ((FieldInfo)m).FieldType;
-                    var kind = m is PropertyInfo ? DependencyKind.Property : DependencyKind.Field;
-
-                    var memberRequest = request.Push(type, key, new DependencyInfo(kind, m.Name));
+                    var memberType = member is PropertyInfo ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType;
+                    var memberRequest = request.Push(memberType, memberKey, member);
                     var memberExpr = registry.GetOrAddFactory(memberRequest, IfUnresolved.Throw).GetExpression();
-                    bindings.Add(Expression.Bind(m, memberExpr));
+                    bindings.Add(Expression.Bind(member, memberExpr));
                 }
             }
 
@@ -1867,23 +1865,6 @@ namespace DryIoc
     }
 
     public enum DependencyKind { CtorParam, Property, Field }
-
-    public sealed class DependencyInfo
-    {
-        public readonly DependencyKind Kind;
-        public readonly string Name;
-
-        public DependencyInfo(DependencyKind kind, string name)
-        {
-            Kind = kind;
-            Name = name;
-        }
-
-        public override string ToString()
-        {
-            return Kind + " " + Name;
-        }
-    }
 
     public sealed class Scope : IDisposable
     {
