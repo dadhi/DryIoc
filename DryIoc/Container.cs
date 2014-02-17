@@ -238,8 +238,8 @@ namespace DryIoc
             var serviceType = request.ServiceType;
             var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
 
-            LambdaExpression resultFuncDecorator = null;
             var decorators = _decorators.Value;
+            LambdaExpression resultFuncDecorator = null;
             var funcDecorators = decorators.GetValueOrDefault(decoratorFuncType);
             if (funcDecorators != null)
             {
@@ -689,10 +689,13 @@ namespace DryIoc
                     var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
 
                     // Composite pattern support: filter out composite root from available keys.
-                    var parent = req.GetNonWrapperParentOrDefault();
                     var items = reg.GetAllFactories(wrappedItemType);
+                    var parent = req.GetNonWrapperParentOrDefault();
                     if (parent != null && parent.ServiceType == wrappedItemType)
-                        items = items.Where(kv => kv.Value.ID != parent.FactoryID);
+                    {
+                        var parentFactoryID = parent.ResolvedFactory.ID;
+                        items = items.Where(x => x.Value.ID != parentFactoryID);
+                    }
 
                     var itemArray = items.ToArray();
                     Throw.If(itemArray.Length == 0, Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS, wrappedItemType,
@@ -722,10 +725,10 @@ namespace DryIoc
             var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
 
             // Composite pattern support: filter out composite root from available keys.
-            var parentFactoryID = -1;
+            var parentFactoryID = 0;
             var parent = request.GetNonWrapperParentOrDefault();
             if (parent != null && parent.ServiceType == wrappedItemType)
-                parentFactoryID = parent.FactoryID;
+                parentFactoryID = parent.ResolvedFactory.ID;
 
             var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, wrappedItemType);
 
@@ -796,12 +799,11 @@ namespace DryIoc
             if (resultMetadata == null)
                 return null;
 
-            return new DelegateFactory((req, __) =>
+            return new DelegateFactory((req, _) =>
             {
-                var serviceRequest = request.Push(serviceType, serviceKey);
-                var serviceFactory = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw);
-                var metaCtor = request.ServiceType.GetConstructors()[0];
-                var serviceExpr = serviceFactory.GetExpression();
+                var serviceRequest = req.Push(serviceType, serviceKey);
+                var serviceExpr = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw).GetExpression();
+                var metaCtor = req.ServiceType.GetConstructors()[0];
                 var metadataExpr = req.Root.GetItemExpression(resultMetadata, metadataType);
                 return Expression.New(metaCtor, serviceExpr, metadataExpr);
             });
@@ -1312,14 +1314,16 @@ namespace DryIoc
         public readonly Request Parent; // can be null for resolution root
         public readonly Type ServiceType;
         public readonly object ServiceKey; // null for default, string for named or integer index for multiple defaults.
-        public readonly DependencyInfo Dependency;
 
+        public readonly DependencyInfo Dependency;
         public readonly int DecoratedFactoryID;
 
-        public readonly int FactoryID;
-        public readonly FactoryType FactoryType;
-        public readonly Type ImplementationType;
-        public readonly object Metadata;
+        public Factory ResolvedFactory;
+
+        public int FactoryID { get { return ResolvedFactory.ID; } }
+        public Type ImplementationType { get { return ResolvedFactory.ImplementationType; } }
+        public FactoryType FactoryType { get { return ResolvedFactory.Setup.Type; } }
+        public object Metadata { get { return ResolvedFactory.Setup.Metadata; } }
 
         public Type OpenGenericServiceType
         {
@@ -1339,20 +1343,21 @@ namespace DryIoc
         public Request ResolveWith(Factory factory)
         {
             for (var p = Parent; p != null; p = p.Parent)
-                Throw.If(p.FactoryID == factory.ID && p.FactoryType == FactoryType.Service,
+                Throw.If(p.ResolvedFactory != null && p.ResolvedFactory.ID == factory.ID && p.ResolvedFactory.Setup.Type == FactoryType.Service,
                     Error.RECURSIVE_DEPENDENCY_DETECTED, this);
+
             return new Request(Root, Parent, ServiceType, ServiceKey, Dependency, DecoratedFactoryID, factory);
         }
 
         public Request MakeDecorated()
         {
-            return new Request(Root, Parent, ServiceType, ServiceKey, Dependency, FactoryID);
+            return new Request(Root, Parent, ServiceType, ServiceKey, Dependency, decoratedFactoryID: FactoryID, factory: ResolvedFactory);
         }
 
         public Request GetNonWrapperParentOrDefault()
         {
             var p = Parent;
-            while (p != null && p.FactoryType == FactoryType.GenericWrapper)
+            while (p != null && p.ResolvedFactory.Setup.Type == FactoryType.GenericWrapper)
                 p = p.Parent;
             return p;
         }
@@ -1379,40 +1384,41 @@ namespace DryIoc
             Root = root;
 
             Parent = parent;
-            ServiceKey = serviceKey;
-            Dependency = dependency;
 
             ServiceType = serviceType.ThrowIfNull()
                 .ThrowIf(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
 
-            DecoratedFactoryID = decoratedFactoryID;
+            ServiceKey = serviceKey;
+            Dependency = dependency;
+
             if (factory != null)
-            {
-                FactoryType = factory.Setup.Type;
-                FactoryID = factory.ID;
-                ImplementationType = factory.ImplementationType;
-                Metadata = factory.Setup.Metadata;
-            }
+                ResolvedFactory = factory;
+
+            DecoratedFactoryID = decoratedFactoryID;
         }
 
+        // example: "unnamed generic-wrapper DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
         private string Print()
         {
-            var key = ServiceKey is string ? "\"" + ServiceKey + "\""
+            var message = ServiceKey is string ? "\"" + ServiceKey + "\""
                 : ServiceKey is int ? "#" + ServiceKey
                 : "unnamed";
 
-            var kind = FactoryType == FactoryType.Decorator
+            if (ResolvedFactory != null)
+            {
+                var kind = FactoryType == FactoryType.Decorator
                 ? " decorator" : FactoryType == FactoryType.GenericWrapper
-                ? " generic wrapper" : string.Empty;
+                ? " generic-wrapper" : string.Empty;
 
-            var type = ImplementationType != null && ImplementationType != ServiceType
-                ? ImplementationType.Print() + " : " + ServiceType.Print()
-                : ServiceType.Print();
+                var type = ImplementationType != null && ImplementationType != ServiceType
+                    ? ImplementationType.Print() + " : " + ServiceType.Print()
+                    : ServiceType.Print();
+
+                message += kind + " " + type;
+            }
 
             var dependency = Dependency == null ? string.Empty : " (" + Dependency + ")";
-
-            // example: "unnamed generic wrapper DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
-            return key + kind + " " + type + dependency;
+            return message + dependency;
         }
 
         #endregion
@@ -1650,8 +1656,10 @@ namespace DryIoc
                     var ctorParam = ctorParams[i];
                     var paramKey = request.FactoryType != FactoryType.Service ? request.ServiceKey // propagate key from wrapper or decorator.
                         : registry.ResolutionRules.ForConstructorParameter.Invoke(r => r(ctorParam, request, registry));
+                    
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey,
                         new DependencyInfo(DependencyKind.CtorParam, ctorParam.Name));
+                    
                     paramExprs[i] = registry.GetOrAddFactory(paramRequest, IfUnresolved.Throw).GetExpression();
                 }
             }
@@ -1979,9 +1987,7 @@ namespace DryIoc
             private readonly Expression _scopeExpr;
         }
 
-        #region Implementation
-
-        private sealed class SingletonReuse : IReuse
+        public sealed class SingletonReuse : IReuse
         {
             public Expression Apply(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
             {
@@ -2003,8 +2009,6 @@ namespace DryIoc
                 return request.Root.GetItemExpression(singleton, factoryExpr.Type);
             }
         }
-
-        #endregion
     }
 
     public enum IfUnresolved { Throw, ReturnNull }
@@ -2051,9 +2055,9 @@ namespace DryIoc
 
         public FactoryWithContext(Request request, IRegistry registry, Factory factory)
         {
-            Factory = factory.ThrowIfNull();
-            Request = request.ThrowIfNull().ResolveWith(factory);
-            Registry = registry.ThrowIfNull();
+            Factory = factory;
+            Request = request.ResolveWith(factory);
+            Registry = registry;
         }
 
         public Expression GetExpression()
