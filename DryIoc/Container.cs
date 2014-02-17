@@ -227,12 +227,12 @@ namespace DryIoc
         Expression IRegistry.GetDecoratorExpressionOrDefault(Request request)
         {
             // Decorators for non service types are not supported.
-            if (request.FactoryType != FactoryType.Service)
+            if (request.ResolvedFactory.Setup.Type != FactoryType.Service)
                 return null;
 
             // We are already resolving decorator for the service, so stop now.
             var parent = request.GetNonWrapperParentOrDefault();
-            if (parent != null && parent.DecoratedFactoryID == request.FactoryID)
+            if (parent != null && parent.ResolvedFactory.Setup.Type == FactoryType.Decorator)
                 return null;
 
             var serviceType = request.ServiceType;
@@ -243,10 +243,10 @@ namespace DryIoc
             var funcDecorators = decorators.GetValueOrDefault(decoratorFuncType);
             if (funcDecorators != null)
             {
-                var decoratorRequest = request.MakeDecorated();
                 for (var i = 0; i < funcDecorators.Length; i++)
                 {
                     var decorator = funcDecorators[i];
+                    var decoratorRequest = request.ResolveWith(decorator);
                     if (((DecoratorSetup)decorator.Setup).IsApplicable(request))
                     {
                         var newDecorator = decorator.WithContext(decoratorRequest, this).GetExpression();
@@ -273,10 +273,10 @@ namespace DryIoc
             Expression resultDecorator = resultFuncDecorator;
             if (serviceDecorators != null)
             {
-                var decoratorRequest = request.MakeDecorated();
                 for (var i = 0; i < serviceDecorators.Length; i++)
                 {
                     var decorator = serviceDecorators[i];
+                    var decoratorRequest = request.ResolveWith(decorator);
                     if (((DecoratorSetup)decorator.Setup).IsApplicable(request))
                     {
                         // Cache closed generic registration produced by open-generic decorator.
@@ -1310,25 +1310,18 @@ namespace DryIoc
     public sealed class Request
     {
         public readonly ResolutionRoot Root;
-
-        public readonly Request Parent; // can be null for resolution root
+        public readonly Request Parent;     // null for resolution root
         public readonly Type ServiceType;
-        public readonly object ServiceKey; // null for default, string for named or integer index for multiple defaults.
-
+        public readonly object ServiceKey;  // null by default, string for named or integer index for multiple defaults.
         public readonly DependencyInfo Dependency;
-        public readonly int DecoratedFactoryID;
-
-        public Factory ResolvedFactory;
-
-        public int FactoryID { get { return ResolvedFactory.ID; } }
-        public Type ImplementationType { get { return ResolvedFactory.ImplementationType; } }
-        public FactoryType FactoryType { get { return ResolvedFactory.Setup.Type; } }
-        public object Metadata { get { return ResolvedFactory.Setup.Metadata; } }
+        public readonly Factory ResolvedFactory;
 
         public Type OpenGenericServiceType
         {
             get { return ServiceType.IsGenericType ? ServiceType.GetGenericTypeDefinition() : null; }
         }
+
+        public Type ImplementationType { get { return ResolvedFactory.ImplementationType; } }
 
         public Request Push(Type serviceType, object serviceKey, DependencyInfo dependency = null)
         {
@@ -1340,13 +1333,7 @@ namespace DryIoc
             for (var p = Parent; p != null; p = p.Parent)
                 Throw.If(p.ResolvedFactory != null && p.ResolvedFactory.ID == factory.ID && p.ResolvedFactory.Setup.Type == FactoryType.Service,
                     Error.RECURSIVE_DEPENDENCY_DETECTED, this);
-
-            return new Request(Root, Parent, ServiceType, ServiceKey, Dependency, DecoratedFactoryID, factory);
-        }
-
-        public Request MakeDecorated()
-        {
-            return new Request(Root, Parent, ServiceType, ServiceKey, Dependency, decoratedFactoryID: FactoryID, factory: ResolvedFactory);
+            return new Request(Root, Parent, ServiceType, ServiceKey, Dependency, factory);
         }
 
         public Request GetNonWrapperParentOrDefault()
@@ -1373,23 +1360,20 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(ResolutionRoot root, Request parent, Type serviceType, object serviceKey,
-            DependencyInfo dependency = null, int decoratedFactoryID = 0, Factory factory = null)
+        internal Request(ResolutionRoot root, Request parent, Type serviceType, 
+            object serviceKey = null, DependencyInfo dependency = null, Factory factory = null)
         {
             Root = root;
 
             Parent = parent;
-
             ServiceType = serviceType.ThrowIfNull()
                 .ThrowIf(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
-
             ServiceKey = serviceKey;
+
             Dependency = dependency;
 
             if (factory != null)
                 ResolvedFactory = factory;
-
-            DecoratedFactoryID = decoratedFactoryID;
         }
 
         // example: "unnamed generic-wrapper DryIoc.UnitTests.IService : DryIoc.UnitTests.Service (CtorParam service)"
@@ -1401,19 +1385,21 @@ namespace DryIoc
 
             if (ResolvedFactory != null)
             {
-                var kind = FactoryType == FactoryType.Decorator
-                ? " decorator" : FactoryType == FactoryType.GenericWrapper
-                ? " generic-wrapper" : string.Empty;
+                var factoryType = ResolvedFactory.Setup.Type;
+                var kind = factoryType == FactoryType.Decorator
+                    ? " decorator" : factoryType == FactoryType.GenericWrapper
+                    ? " generic-wrapper" : string.Empty;
 
-                var type = ImplementationType != null && ImplementationType != ServiceType
-                    ? ImplementationType.Print() + " : " + ServiceType.Print()
+                var implementationType = ResolvedFactory.ImplementationType;
+                var type = implementationType != null && implementationType != ServiceType
+                    ? implementationType.Print() + " : " + ServiceType.Print()
                     : ServiceType.Print();
 
                 message += kind + " " + type;
             }
 
-            var dependency = Dependency == null ? string.Empty : " (" + Dependency + ")";
-            return message + dependency;
+            message += Dependency == null ? string.Empty : " (" + Dependency + ")";
+            return message;
         }
 
         #endregion
@@ -1649,8 +1635,8 @@ namespace DryIoc
                 for (var i = 0; i < ctorParams.Length; i++)
                 {
                     var ctorParam = ctorParams[i];
-                    var paramKey = request.FactoryType != FactoryType.Service ? request.ServiceKey // propagate key from wrapper or decorator.
-                        : registry.ResolutionRules.ForConstructorParameter.Invoke(r => r(ctorParam, request, registry));
+                    var paramKey = Setup.Type != FactoryType.Service ? request.ServiceKey // propagate key from wrapper or decorator.
+                        : registry.ResolutionRules.ForConstructorParameter.Invoke(rule => rule(ctorParam, request, registry));
                     
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey,
                         new DependencyInfo(DependencyKind.CtorParam, ctorParam.Name));
@@ -1689,10 +1675,12 @@ namespace DryIoc
 
                 if (ctorParamExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
-                    var paramKey = request.FactoryType != FactoryType.Service ? request.ServiceKey // propagate key from wrapper or decorator.
-                        : registry.ResolutionRules.ForConstructorParameter.Invoke(r => r(ctorParam, request, registry));
+                    var paramKey = Setup.Type != FactoryType.Service ? request.ServiceKey // propagate key from wrapper or decorator.
+                        : registry.ResolutionRules.ForConstructorParameter.Invoke(rule => rule(ctorParam, request, registry));
+                    
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey,
                         new DependencyInfo(DependencyKind.CtorParam, ctorParam.Name));
+                    
                     ctorParamExprs[cp] = registry.GetOrAddFactory(paramRequest, IfUnresolved.Throw).GetExpression();
                 }
             }

@@ -533,7 +533,7 @@ namespace DryIoc.MefAttributedModel
 
             if (ShouldCompareMetadata || ServiceName != null)
                 return DecoratorSetup.With(request =>
-                    (!ShouldCompareMetadata || Equals(metadata, request.Metadata)) &&
+                    (!ShouldCompareMetadata || Equals(metadata, request.ResolvedFactory.Setup.Metadata)) &&
                     (ServiceName == null || ServiceName.Equals(request.ServiceKey)));
 
             return DecoratorSetup.Default;
