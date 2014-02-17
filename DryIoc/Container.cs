@@ -744,7 +744,7 @@ namespace DryIoc
             var funcTypeArgs = funcType.GetGenericArguments();
             var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
 
-            var serviceRequest = request.PushPreservingParentKey(serviceType);
+            var serviceRequest = request.Push(serviceType, request.ServiceKey);
             var serviceFactory = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw);
 
             if (funcTypeArgs.Length == 1)
@@ -761,7 +761,7 @@ namespace DryIoc
         {
             var ctor = request.ServiceType.GetConstructors()[0];
             var serviceType = request.ServiceType.GetGenericArguments()[0];
-            var serviceRequest = request.PushPreservingParentKey(serviceType);
+            var serviceRequest = request.Push(serviceType, request.ServiceKey);
             var factory = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw);
             var factoryExpr = factory.GetExpression().ToCompiledFactoryExpression();
             return Expression.New(ctor, request.Root.GetItemExpression(factoryExpr));
@@ -1333,11 +1333,6 @@ namespace DryIoc
         public Request Push(Type serviceType, object serviceKey, DependencyInfo dependency = null)
         {
             return new Request(Root, this, serviceType, serviceKey, dependency);
-        }
-
-        public Request PushPreservingParentKey(Type serviceType, DependencyInfo dependency = null)
-        {
-            return new Request(Root, this, serviceType, ServiceKey, dependency);
         }
 
         public Request ResolveWith(Factory factory)
