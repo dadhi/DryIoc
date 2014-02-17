@@ -266,8 +266,9 @@ namespace DryIoc
 
             var serviceDecorators = decorators.GetValueOrDefault(serviceType);
             var openGenericDecoratorIndex = serviceDecorators == null ? 0 : serviceDecorators.Length;
-            if (request.OpenGenericServiceType != null)
-                serviceDecorators = serviceDecorators.Append(decorators.GetValueOrDefault(request.OpenGenericServiceType));
+            var openGenericServiceType = request.OpenGenericServiceType;
+            if (openGenericServiceType != null)
+                serviceDecorators = serviceDecorators.Append(decorators.GetValueOrDefault(openGenericServiceType));
 
             Expression resultDecorator = resultFuncDecorator;
             if (serviceDecorators != null)
@@ -657,11 +658,12 @@ namespace DryIoc
 
         public static ResolutionRules.ResolveUnregisteredService ResolveOpenGeneric = (request, registry) =>
         {
-            if (request.OpenGenericServiceType == null)
+            var openGenericServiceType = request.OpenGenericServiceType;
+            if (openGenericServiceType == null)
                 return null;
 
-            var factory = registry.GetFactoryOrDefault(request.OpenGenericServiceType, request.ServiceKey)
-                ?? registry.GetGenericWrapperOrDefault(request.OpenGenericServiceType);
+            var factory = registry.GetFactoryOrDefault(openGenericServiceType, request.ServiceKey)
+                ?? registry.GetGenericWrapperOrDefault(openGenericServiceType);
 
             if (factory != null && factory.ProvidesFactoryPerRequest)
                 factory = factory.GetFactoryPerRequestOrDefault(request, registry);
@@ -1310,7 +1312,6 @@ namespace DryIoc
         public readonly Request Parent; // can be null for resolution root
         public readonly Type ServiceType;
         public readonly object ServiceKey; // null for default, string for named or integer index for multiple defaults.
-        public readonly Type OpenGenericServiceType;
         public readonly DependencyInfo Dependency;
 
         public readonly int DecoratedFactoryID;
@@ -1319,6 +1320,11 @@ namespace DryIoc
         public readonly FactoryType FactoryType;
         public readonly Type ImplementationType;
         public readonly object Metadata;
+
+        public Type OpenGenericServiceType
+        {
+            get { return ServiceType.IsGenericType ? ServiceType.GetGenericTypeDefinition() : null; }
+        }
 
         public Request Push(Type serviceType, object serviceKey, DependencyInfo dependency = null)
         {
@@ -1378,8 +1384,6 @@ namespace DryIoc
 
             ServiceType = serviceType.ThrowIfNull()
                 .ThrowIf(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
-
-            OpenGenericServiceType = serviceType.IsGenericType ? serviceType.GetGenericTypeDefinition() : null;
 
             DecoratedFactoryID = decoratedFactoryID;
             if (factory != null)
@@ -1984,7 +1988,10 @@ namespace DryIoc
                 // Create lazy singleton if we have Func somewhere in dependency chain.
                 var parent = request.Parent;
                 if (parent != null && parent.Enumerate().Any(p =>
-                    p.OpenGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(p.OpenGenericServiceType)))
+                {
+                    var openGenericServiceType = p.OpenGenericServiceType;
+                    return openGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(openGenericServiceType);
+                }))
                     return GetScopedServiceExpression(
                         request.Root.GetItemExpression(registry.Singletons),
                         factoryID, factoryExpr);
