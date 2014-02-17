@@ -67,15 +67,15 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate(2, 22)
                 .AddOrUpdate(3, 33);
 
-            Assert.AreEqual(11, t.GetValueOrDefault(1));
-            Assert.AreEqual(22, t.GetValueOrDefault(2));
-            Assert.AreEqual(33, t.GetValueOrDefault(3));
+            Assert.AreEqual(11, t.GetFirstValueOfHashOrDefault(1));
+            Assert.AreEqual(22, t.GetFirstValueOfHashOrDefault(2));
+            Assert.AreEqual(33, t.GetFirstValueOfHashOrDefault(3));
         }
 
         [Test]
         public void Test_balance_ensured_for_left_left_tree()
         {
-            var t = HashTree<int>.Empty
+            var t = HashTree<int, int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(3, 3);
@@ -91,7 +91,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_preserved_when_add_to_balanced_tree()
         {
-            var t = HashTree<int>.Empty
+            var t = HashTree<int, int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(3, 3)
@@ -113,7 +113,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_left_right_tree()
         {
-            var t = HashTree<int>.Empty
+            var t = HashTree<int, int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(3, 2)
                 .AddOrUpdate(4, 3);
@@ -129,7 +129,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_right_right_tree()
         {
-            var t = HashTree<int>.Empty
+            var t = HashTree<int, int>.Empty
                 .AddOrUpdate(3, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(5, 3);
@@ -145,7 +145,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_right_left_tree()
         {
-            var t = HashTree<int>.Empty
+            var t = HashTree<int, int>.Empty
                 .AddOrUpdate(3, 1)
                 .AddOrUpdate(5, 2)
                 .AddOrUpdate(4, 3);
@@ -164,24 +164,24 @@ namespace DryIoc.UnitTests
             var tree = HashTree<int, int>.Empty;
 
             Assert.DoesNotThrow(
-                () => tree.GetValueOrDefault(0));
+                () => tree.GetFirstValueOfHashOrDefault(0));
         }
 
         [Test]
         public void Search_for_non_existent_key_should_NOT_throw()
         {
-            var tree = HashTree<int>.Empty
+            var tree = HashTree<int, int>.Empty
                 .AddOrUpdate(1, 1)
                 .AddOrUpdate(3, 2);
 
             Assert.DoesNotThrow(
-                () => tree.GetValueOrDefault(2));
+                () => tree.GetFirstValueOfHashOrDefault(2));
         }
 
         [Test]
         public void For_two_same_added_items_height_should_be_one()
         {
-            var tree = HashTree<string>.Empty
+            var tree = HashTree<int, string>.Empty
                 .AddOrUpdate(1, "x")
                 .AddOrUpdate(1, "y");
 
@@ -202,13 +202,13 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_use_HashTree_to_represent_general_HashTree()
         {
-            var tree = HashTree<KeyValuePair<Type, string>[]>.Empty;
+            var tree = HashTree<int, KeyValuePair<Type, string>[]>.Empty;
 
             var key = typeof(HashTreeTests);
             var keyHash = key.GetHashCode();
             var value = "test";
 
-            UpdateMethod<KeyValuePair<Type, string>[]> updateValue = (old, added) =>
+            HashTree<int, KeyValuePair<Type, string>[]>.UpdateValue updateValue = (old, added) =>
             {
                 var newItem = added[0];
                 var oldItemCount = old.Length;
@@ -234,7 +234,7 @@ namespace DryIoc.UnitTests
 
             string result = null;
 
-            var items = tree.GetValueOrDefault(keyHash);
+            var items = tree.GetFirstValueOfHashOrDefault(keyHash);
             if (items != null)
             {
                 var firstItem = items[0];

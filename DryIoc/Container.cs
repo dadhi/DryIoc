@@ -485,7 +485,7 @@ namespace DryIoc
         public static readonly ParameterExpression ReusedInResolutionParameter = Expression.Parameter(typeof(Scope), "reusedHere");
 
         public readonly Ref<AppendStore<object>> Store = Ref.Of(AppendStore<object>.Empty);
-        public HashTree<Expression> FactoryExprCache = HashTree<Expression>.Empty;
+        public HashTree<int, Expression> FactoryExprCache = HashTree<int, Expression>.Empty;
 
         public Expression GetItemExpression(object item, Type itemType)
         {
@@ -515,7 +515,7 @@ namespace DryIoc
 
         public Expression GetCachedFactoryExpression(int factoryID)
         {
-            return FactoryExprCache.GetValueOrDefault(factoryID);
+            return FactoryExprCache.GetFirstValueOfHashOrDefault(factoryID);
         }
 
         public void CacheFactoryExpression(int factoryID, Expression result)
@@ -543,7 +543,7 @@ namespace DryIoc
 
     public sealed class AppendStore<T>
     {
-        public static readonly AppendStore<T> Empty = new AppendStore<T>(0, HashTree<T[]>.Empty);
+        public static readonly AppendStore<T> Empty = new AppendStore<T>(0, HashTree<int, T[]>.Empty);
 
         public readonly int Count;
 
@@ -568,7 +568,7 @@ namespace DryIoc
         public object Get(int index)
         {
             return index <= NODE_ARRAY_BITS ? _tree.Value[index]
-                : _tree.GetValueOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BITS];
+                : _tree.GetFirstValueOfHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BITS];
         }
 
         #region Implementation
@@ -576,9 +576,9 @@ namespace DryIoc
         private const int NODE_ARRAY_BITS = 31;     // (11111 binary). So the array would be size of 32. Make it 15 (1111) and BIT_COUNT=4 for array of size 16
         private const int NODE_ARRAY_BIT_COUNT = 5; // number of bits in NODE_ARRAY_BITS.
 
-        private readonly HashTree<T[]> _tree;
+        private readonly HashTree<int, T[]> _tree;
 
-        private AppendStore(int count, HashTree<T[]> tree)
+        private AppendStore(int count, HashTree<int, T[]> tree)
         {
             Count = count;
             _tree = tree;
@@ -1898,7 +1898,7 @@ namespace DryIoc
             Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
             lock (_syncRoot)
             {
-                var item = _items.GetValueOrDefault(id);
+                var item = _items.GetFirstValueOfHashOrDefault(id);
                 if (item == null)
                     _items = _items.AddOrUpdate(id, item = factory());
                 return (T)item;
@@ -1921,7 +1921,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private HashTree<object> _items = HashTree<object>.Empty;
+        private HashTree<int, object> _items = HashTree<int, object>.Empty;
         private int _disposed;
 
         // Sync root is required to create single only instance of item. The same as for Lazy<T>
@@ -2363,59 +2363,72 @@ namespace DryIoc
         }
     }
 
-    public delegate T UpdateMethod<T>(T oldValue, T value);
-
     /// <summary>
-    /// Immutable AVL-tree (http://en.wikipedia.org/wiki/AVL_tree) with key of type int.
+    /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.
     /// </summary>
-    public sealed class HashTree<V>
+    public sealed class HashTree<K, V>
     {
-        public static readonly HashTree<V> Empty = new HashTree<V>();
-        public bool IsEmpty { get { return Height == 0; } }
+        public static readonly HashTree<K, V> Empty = new HashTree<K, V>();
 
-        public readonly int Key;
+        public readonly K Key;
         public readonly V Value;
 
+        public readonly int Hash;
+        public readonly KV<K, V>[] Conflicts;
+        public readonly HashTree<K, V> Left, Right;
         public readonly int Height;
-        public readonly HashTree<V> Left, Right;
 
-        public HashTree<V> AddOrUpdate(int key, V value, UpdateMethod<V> updateValue = null)
+        public bool IsEmpty { get { return Height == 0; } }
+
+        public delegate V UpdateValue(V oldValue, V value);
+
+        public HashTree<K, V> AddOrUpdate(K key, V value, UpdateValue updateValue = null)
         {
-            return Height == 0 ? new HashTree<V>(key, value, Empty, Empty)
-                : (key == Key ? new HashTree<V>(key, updateValue == null ? value : updateValue(Value, value), Left, Right)
-                : (key < Key
-                    ? With(Left.AddOrUpdate(key, value, updateValue), Right)
-                    : With(Left, Right.AddOrUpdate(key, value, updateValue))).EnsureBalanced());
+            return AddOrUpdate(key.GetHashCode(), key, value, updateValue);
         }
 
-        public V GetValueOrDefault(int key, V defaultValue = default(V))
+        public V GetValueOrDefault(K key, V defaultValue = default(V))
         {
             var t = this;
-            while (t.Height != 0 && t.Key != key)
-                t = key < t.Key ? t.Left : t.Right;
+            var hash = key.GetHashCode();
+            while (t.Height != 0 && t.Hash != hash)
+                t = hash < t.Hash ? t.Left : t.Right;
+            return t.Height != 0 && (ReferenceEquals(key, t.Key) || key.Equals(t.Key)) ? t.Value
+                : t.GetConflictedValueOrDefault(key, defaultValue);
+        }
+
+        public V GetFirstValueOfHashOrDefault(int hash, V defaultValue = default(V))
+        {
+            var t = this;
+            while (t.Height != 0 && t.Hash != hash)
+                t = hash < t.Hash ? t.Left : t.Right;
             return t.Height != 0 ? t.Value : defaultValue;
         }
 
-        /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).</summary>
-        public IEnumerable<HashTree<V>> Enumerate()
+        /// <summary>
+        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).
+        /// </summary>
+        public IEnumerable<KV<K, V>> Enumerate()
         {
-            if (Height == 0) yield break;
-            var parents = new HashTree<V>[Height];
+            var parents = new HashTree<K, V>[Height];
             var parentCount = -1;
-            var node = this;
-            while (!node.IsEmpty || parentCount != -1)
+            var t = this;
+            while (!t.IsEmpty || parentCount != -1)
             {
-                if (!node.IsEmpty)
+                if (!t.IsEmpty)
                 {
-                    parents[++parentCount] = node;
-                    node = node.Left;
+                    parents[++parentCount] = t;
+                    t = t.Left;
                 }
                 else
                 {
-                    node = parents[parentCount--];
-                    yield return node;
-                    node = node.Right;
+                    t = parents[parentCount--];
+                    yield return new KV<K, V>(t.Key, t.Value);
+                    if (t.Conflicts != null)
+                        for (var i = 0; i < t.Conflicts.Length; i++)
+                            yield return t.Conflicts[i];
+                    t = t.Right;
                 }
             }
         }
@@ -2424,16 +2437,54 @@ namespace DryIoc
 
         private HashTree() { }
 
-        private HashTree(int key, V value, HashTree<V> left, HashTree<V> right)
+        private HashTree(int hash, K key, V value, KV<K, V>[] conficts, HashTree<K, V> left, HashTree<K, V> right)
         {
+            Hash = hash;
             Key = key;
             Value = value;
+            Conflicts = conficts;
             Left = left;
             Right = right;
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private HashTree<V> EnsureBalanced()
+        private HashTree<K, V> AddOrUpdate(int hash, K key, V value, UpdateValue updateValue)
+        {
+            return Height == 0 ? new HashTree<K, V>(hash, key, value, null, Empty, Empty)
+                : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, updateValue)
+                : (hash < Hash
+                    ? With(Left.AddOrUpdate(hash, key, value, updateValue), Right)
+                    : With(Left, Right.AddOrUpdate(hash, key, value, updateValue)))
+                        .EnsureBalanced());
+        }
+
+        private HashTree<K, V> UpdateValueAndResolveConflicts(K key, V value, UpdateValue updateValue)
+        {
+            if (ReferenceEquals(Key, key) || Key.Equals(key))
+                return new HashTree<K, V>(Hash, key, updateValue == null ? value : updateValue(Value, value), Conflicts, Left, Right);
+
+            if (Conflicts == null)
+                return new HashTree<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
+
+            var i = Conflicts.Length - 1;
+            while (i >= 0 && !Equals(Conflicts[i].Key, Key)) i--;
+            var conflicts = new KV<K, V>[i != -1 ? Conflicts.Length : Conflicts.Length + 1];
+            Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
+            conflicts[i != -1 ? i : Conflicts.Length] =
+                new KV<K, V>(key, i != -1 && updateValue != null ? updateValue(Conflicts[i].Value, value) : value);
+            return new HashTree<K, V>(Hash, Key, Value, conflicts, Left, Right);
+        }
+
+        private V GetConflictedValueOrDefault(K key, V defaultValue)
+        {
+            if (Conflicts != null)
+                for (var i = 0; i < Conflicts.Length; i++)
+                    if (Equals(Conflicts[i].Key, key))
+                        return Conflicts[i].Value;
+            return defaultValue;
+        }
+
+        private HashTree<K, V> EnsureBalanced()
         {
             var delta = Left.Height - Right.Height;
             return delta >= 2 ? With(Left.Right.Height - Left.Left.Height == 1 ? Left.RotateLeft() : Left, Right).RotateRight()
@@ -2441,109 +2492,19 @@ namespace DryIoc
                 : this);
         }
 
-        private HashTree<V> RotateRight()
+        private HashTree<K, V> RotateRight()
         {
             return Left.With(Left.Left, With(Left.Right, Right));
         }
 
-        private HashTree<V> RotateLeft()
+        private HashTree<K, V> RotateLeft()
         {
             return Right.With(With(Left, Right.Left), Right.Right);
         }
 
-        private HashTree<V> With(HashTree<V> left, HashTree<V> right)
+        private HashTree<K, V> With(HashTree<K, V> left, HashTree<K, V> right)
         {
-            return new HashTree<V>(Key, Value, left, right);
-        }
-
-        #endregion
-    }
-
-    public sealed class HashTree<K, V>
-    {
-        public static readonly HashTree<K, V> Empty = new HashTree<K, V>(HashTree<KV<K, V>>.Empty);
-        public bool IsEmpty { get { return _root.IsEmpty; } }
-
-        public HashTree<K, V> AddOrUpdate(K key, V value, UpdateMethod<V> updateValue = null)
-        {
-            return new HashTree<K, V>(
-                _root.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateValueWithRespectToConflicts(updateValue)));
-        }
-
-        public V GetValueOrDefault(K key, V defaultValue = default(V))
-        {
-            var kv = _root.GetValueOrDefault(key.GetHashCode());
-            return kv != null && (ReferenceEquals(key, kv.Key) || key.Equals(kv.Key))
-                ? kv.Value : GetConflictedValueOrDefault(kv, key, defaultValue);
-        }
-
-        public IEnumerable<KV<K, V>> Enumerate()
-        {
-            if (!_root.IsEmpty)
-                foreach (var t in _root.Enumerate())
-                {
-                    yield return t.Value;
-                    if (t.Value is KVWithConflicts)
-                    {
-                        var conflicts = ((KVWithConflicts)t.Value).Conflicts;
-                        for (var i = 0; i < conflicts.Length; ++i)
-                            yield return conflicts[i];
-                    }
-                }
-        }
-
-        #region Implementation
-
-        private readonly HashTree<KV<K, V>> _root;
-
-        private HashTree(HashTree<KV<K, V>> root)
-        {
-            _root = root;
-        }
-
-        private static UpdateMethod<KV<K, V>> UpdateValueWithRespectToConflicts(UpdateMethod<V> updateValue)
-        {
-            return (old, newOne) =>
-            {
-                var conflicts = old is KVWithConflicts ? ((KVWithConflicts)old).Conflicts : null;
-                if (ReferenceEquals(old.Key, newOne.Key) || old.Key.Equals(newOne.Key))
-                    return conflicts == null ? UpdateValue(old, newOne, updateValue)
-                         : new KVWithConflicts(UpdateValue(old, newOne, updateValue), conflicts);
-
-                if (conflicts == null)
-                    return new KVWithConflicts(old, new[] { newOne });
-
-                var i = conflicts.Length - 1;
-                while (i >= 0 && !Equals(conflicts[i].Key, newOne.Key)) --i;
-                if (i != -1) newOne = UpdateValue(old, newOne, updateValue);
-                return new KVWithConflicts(old, conflicts.AppendOrUpdate(newOne, i));
-            };
-        }
-
-        private static KV<K, V> UpdateValue(KV<K, V> old, KV<K, V> newOne, UpdateMethod<V> updateValue)
-        {
-            return updateValue == null ? newOne : new KV<K, V>(old.Key, updateValue(old.Value, newOne.Value));
-        }
-
-        private static V GetConflictedValueOrDefault(KV<K, V> item, K key, V defaultValue)
-        {
-            var conflicts = item is KVWithConflicts ? ((KVWithConflicts)item).Conflicts : null;
-            if (conflicts != null)
-                for (var i = 0; i < conflicts.Length; ++i)
-                    if (Equals(conflicts[i].Key, key))
-                        return conflicts[i].Value;
-            return defaultValue;
-        }
-
-        private sealed class KVWithConflicts : KV<K, V>
-        {
-            public readonly KV<K, V>[] Conflicts;
-
-            public KVWithConflicts(KV<K, V> kv, KV<K, V>[] conflicts)
-                : base(kv.Key, kv.Value)
-            {
-                Conflicts = conflicts;
-            }
+            return new HashTree<K, V>(Hash, Key, Value, Conflicts, left, right);
         }
 
         #endregion
