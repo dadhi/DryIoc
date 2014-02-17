@@ -12,10 +12,11 @@ namespace DryIoc.SpeedTestApp
 	{
 		static void Main()
 		{
-			Thread.CurrentThread.Priority = ThreadPriority.Highest;
+            //Thread.CurrentThread.Priority = ThreadPriority.Highest;
+		    CompareIlEmitDynamicMethodVsExpressionCompileSpeed();
             //CompareBitOpVsIsOpSpeed();
             //CompareDirectVsIndirectArrayAccessSpeed();
-            CompareTreeGet();
+            //CompareTreeGet();
             //CompareClosureFieldAccess();
             //DoCompareTryGetVsGetOrDefault();
 		    //CompareHashTreeEnumeration();
@@ -40,6 +41,13 @@ namespace DryIoc.SpeedTestApp
             DirectVsIndirectArrayAccessSpeedTests.Compare();
             Console.WriteLine();
             DirectVsIndirectArrayAccessSpeedTests.Compare();
+        }
+
+        private static void CompareIlEmitDynamicMethodVsExpressionCompileSpeed()
+        {
+            IlEmitDynamicMethodVsExpressionCompile.Compare();
+            Console.WriteLine();
+            IlEmitDynamicMethodVsExpressionCompile.Compare();
         }
 
         private static void CompareBitOpVsIsOpSpeed()
