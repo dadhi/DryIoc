@@ -3,7 +3,7 @@
 namespace DryIoc.Samples
 {
     [TestFixture]
-    public class RegisterResolve
+    public class RegisterInjectResolve
     {
         [Test]
         public void Register_and_resolve()
@@ -67,6 +67,18 @@ namespace DryIoc.Samples
 
             Assert.That(one, Is.SameAs(another));
         }
+
+        [Test]
+        public void Inject_registered_service_in_constructor_parameter_of_other_registered_service()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.Register<ServiceClient>();
+
+            var client = container.Resolve<ServiceClient>();
+
+            Assert.That(client.Service, Is.InstanceOf<Service>());
+        }
     }
 
     public interface IService { }
@@ -76,4 +88,14 @@ namespace DryIoc.Samples
     public interface IService<T> { }
 
     public class Service<T> : IService<T> { }
+
+    public class ServiceClient
+    {
+        public IService Service { get; private set; }
+
+        public ServiceClient(IService service)
+        {
+            Service = service;
+        }
+    }
 }

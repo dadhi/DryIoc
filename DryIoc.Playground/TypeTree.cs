@@ -22,7 +22,7 @@ namespace DryIoc.Playground
 
         public IEnumerator<TypeTree<V>> GetEnumerator()
         {
-            return _tree.TraverseInOrder().Select(t => new TypeTree<V>(t)).GetEnumerator();
+            return _tree.Enumerate().Select(t => new TypeTree<V>(t)).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()

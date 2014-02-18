@@ -49,7 +49,7 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate(key2, 2)
                 .AddOrUpdate(key3, 3);
 
-            var values = tree.TraverseInHashOrder().ToDictionary(kv => kv.Key.Key, kv => kv.Value);
+            var values = tree.Enumerate().ToDictionary(kv => kv.Key.Key, kv => kv.Value);
 
             Assert.That(values, Is.EqualTo(new Dictionary<string, int>
             {
@@ -67,9 +67,9 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate(2, 22)
                 .AddOrUpdate(3, 33);
 
-            Assert.AreEqual(11, t.GetValueOrDefault(1));
-            Assert.AreEqual(22, t.GetValueOrDefault(2));
-            Assert.AreEqual(33, t.GetValueOrDefault(3));
+            Assert.AreEqual(11, t.GetFirstValueByHashOrDefault(1));
+            Assert.AreEqual(22, t.GetFirstValueByHashOrDefault(2));
+            Assert.AreEqual(33, t.GetFirstValueByHashOrDefault(3));
         }
 
         [Test]
@@ -159,12 +159,23 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Search_in_empty_tree_should_not_throw()
+        public void Search_in_empty_tree_should_NOT_throw()
         {
             var tree = HashTree<int, int>.Empty;
 
             Assert.DoesNotThrow(
-                () => tree.GetValueOrDefault(0));
+                () => tree.GetFirstValueByHashOrDefault(0));
+        }
+
+        [Test]
+        public void Search_for_non_existent_key_should_NOT_throw()
+        {
+            var tree = HashTree<int, int>.Empty
+                .AddOrUpdate(1, 1)
+                .AddOrUpdate(3, 2);
+
+            Assert.DoesNotThrow(
+                () => tree.GetFirstValueByHashOrDefault(2));
         }
 
         [Test]
@@ -183,13 +194,70 @@ namespace DryIoc.UnitTests
             var items = Enumerable.Range(0, 10).ToArray();
             var tree = items.Aggregate(HashTree<int, int>.Empty, (t, i) => t.AddOrUpdate(i, i));
 
-            var enumerated = tree.TraverseInHashOrder().Select(t => t.Value).ToArray();
+            var enumerated = tree.Enumerate().Select(t => t.Value).ToArray();
 
             CollectionAssert.AreEqual(items, enumerated);
         }
+
+        [Test]
+        public void Can_use_HashTree_to_represent_general_HashTree()
+        {
+            var tree = HashTree<int, KeyValuePair<Type, string>[]>.Empty;
+
+            var key = typeof(HashTreeTests);
+            var keyHash = key.GetHashCode();
+            var value = "test";
+
+            HashTree<int, KeyValuePair<Type, string>[]>.UpdateValue updateValue = (old, added) =>
+            {
+                var newItem = added[0];
+                var oldItemCount = old.Length;
+                for (var i = 0; i < oldItemCount; i++)
+                {
+                    if (old[i].Key == newItem.Key)
+                    {
+                        var updatedItems = new KeyValuePair<Type, string>[oldItemCount];
+                        Array.Copy(old, updatedItems, updatedItems.Length);
+                        updatedItems[i] = newItem;
+                        return updatedItems;
+                    }
+                }
+
+                var addedItems = new KeyValuePair<Type, string>[oldItemCount + 1];
+                Array.Copy(old, addedItems, addedItems.Length);
+                addedItems[oldItemCount] = newItem;
+                return addedItems;
+            };
+
+            tree = tree.AddOrUpdate(keyHash, new[] { new KeyValuePair<Type, string>(key, value) }, updateValue);
+            tree = tree.AddOrUpdate(keyHash, new[] { new KeyValuePair<Type, string>(key, value) }, updateValue);
+
+            string result = null;
+
+            var items = tree.GetFirstValueByHashOrDefault(keyHash);
+            if (items != null)
+            {
+                var firstItem = items[0];
+                if (firstItem.Key == key)
+                    result = firstItem.Value;
+                else if (items.Length > 1)
+                {
+                    for (var i = 1; i < items.Length; i++)
+                    {
+                        if (items[i].Key == key)
+                        {
+                            result = items[i].Value;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            Assert.That(result, Is.EqualTo("test"));
+        }
     }
 
-    public class HashConflictingKey<T>
+    internal class HashConflictingKey<T>
     {
         public T Key;
 

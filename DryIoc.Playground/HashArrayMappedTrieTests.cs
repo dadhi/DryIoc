@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DryIoc.Playground
 {
     [TestFixture]
-    //[Ignore]
+    [Ignore]
     public class HashArrayMappedTrieTests
     {
         [Test]

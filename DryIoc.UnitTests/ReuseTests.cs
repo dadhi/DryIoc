@@ -62,7 +62,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Consumer>();
             container.Register<Account>();
-            container.Register<Log>(Reuse.InResolutionScope);
+            container.Register<Log>(Reuse.InResolution);
 
             var consumer = container.Resolve<Consumer>();
             //var consumerExpr = container.Resolve<Container.DebugExpression<Consumer>>();
@@ -76,7 +76,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Consumer>();
             container.Register<Account>();
-            container.Register<Log>(Reuse.InResolutionScope);
+            container.Register<Log>(Reuse.InResolution);
 
             var consumer = container.Resolve<Consumer>();
             var account = container.Resolve<Account>();

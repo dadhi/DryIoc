@@ -44,9 +44,10 @@
     <Compile Include="CreateEnumerableWithExpressionTests.cs" />
     <Compile Include="DirectVsIndirectArrayAccessSpeedTests.cs" />
     <Compile Include="Experiments.cs" />
+    <Compile Include="FasterAppendStore.cs" />
     <Compile Include="GetInterfaceMapCustomImplTests.cs" />
     <Compile Include="HashArrayMappedTrieTests.cs" />
-    <Compile Include="HashTree.cs" />
+    <Compile Include="IntTree.cs" />
     <Compile Include="HashTreeAccessSpeedTests.cs" />
     <Compile Include="HashTreeEnumerationSpeedTests.cs" />
     <Compile Include="HashTreeWithMonoidUpdate.cs" />
@@ -54,6 +55,12 @@
     <Compile Include="IntNTree.cs" />
     <Compile Include="IntNTreeTests.cs" />
     <Compile Include="IntTreeTests.cs" />
+    <Compile Include="Performance\ClosureFieldsAccessSpeed.cs" />
+    <Compile Include="Performance\CompareTryGetVsGetOrNull.cs" />
+    <Compile Include="Performance\IlEmitDynamicMethodVsExpressionCompile.cs" />
+    <Compile Include="Performance\MethodArgumentsPassingSpeedComparison.cs" />
+    <Compile Include="Performance\ReflectionPerformanceTests.cs" />
+    <Compile Include="ValidatorTests.cs" />
     <Compile Include="OptionsPlayTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RefTests.cs" />

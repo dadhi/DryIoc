@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace DryIoc.UnitTests.Performance
+namespace DryIoc.Playground.Performance
 {
     public static class MethodArgumentsPassingSpeedComparison
     {

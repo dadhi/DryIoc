@@ -42,9 +42,9 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="CompileTimeGeneratedRegistrator.cs">
-      <DependentUpon>CompileTimeGeneratedRegistrator.tt</DependentUpon>
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
+      <DependentUpon>CompileTimeGeneratedRegistrator.tt</DependentUpon>
     </Content>
     <Compile Include="CompileTimeRegistrationInfoSerializationTests.cs" />
     <Compile Include="CompileTimeRegistrationTests.cs" />

@@ -4,40 +4,52 @@ using System.Collections.Generic;
 namespace DryIoc.Playground
 {
     /// <summary>
-    /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree, where actual node key is hash code of <typeparamref name="K"/>.
+    /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.
     /// </summary>
     public sealed class AvlTree<K, V>
     {
         public static readonly AvlTree<K, V> Empty = new AvlTree<K, V>();
 
-        public readonly int Hash;
         public readonly K Key;
         public readonly V Value;
+
+        public readonly int Hash;
         public readonly KV<K, V>[] Conflicts;
         public readonly AvlTree<K, V> Left, Right;
         public readonly int Height;
 
         public bool IsEmpty { get { return Height == 0; } }
 
-        public delegate V UpdateValue(V current, V added);
+        public delegate V UpdateValue(V oldValue, V value);
 
         public AvlTree<K, V> AddOrUpdate(K key, V value, UpdateValue updateValue = null)
         {
-            return AddOrUpdate(key.GetHashCode(), key, value, updateValue ?? ReplaceValue);
+            return AddOrUpdate(key.GetHashCode(), key, value, updateValue);
         }
 
         public V GetValueOrDefault(K key, V defaultValue = default(V))
         {
+            var t = this;
             var hash = key.GetHashCode();
-            for (var t = this; t.Height != 0; t = hash < t.Hash ? t.Left : t.Right)
-                if (hash == t.Hash)
-                    return ReferenceEquals(key, t.Key) || key.Equals(t.Key) ? t.Value : t.GetConflictedValueOrDefault(key, defaultValue);
-            return defaultValue;
+            while (t.Height != 0 && t.Hash != hash)
+                t = hash < t.Hash ? t.Left : t.Right;
+            return t.Height != 0 && (ReferenceEquals(key, t.Key) || key.Equals(t.Key)) ? t.Value
+                : t.GetConflictedValueOrDefault(key, defaultValue);
         }
 
-        /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).</summary>
-        public IEnumerable<KV<K, V>> TraverseInOrder()
+        public V GetValueOrDefault(int uniqueHash, V defaultValue = default(V))
+        {
+            var t = this;
+            while (t.Height != 0 && t.Hash != uniqueHash)
+                t = uniqueHash < t.Hash ? t.Left : t.Right;
+            return t.Height != 0 ? t.Value : defaultValue;
+        }
+
+        /// <summary>
+        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).
+        /// </summary>
+        public IEnumerable<KV<K, V>> Enumerate()
         {
             var parents = new AvlTree<K, V>[Height];
             var parentCount = -1;
@@ -76,22 +88,20 @@ namespace DryIoc.Playground
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private static V ReplaceValue(V _, V added) { return added; }
-
         private AvlTree<K, V> AddOrUpdate(int hash, K key, V value, UpdateValue updateValue)
         {
             return Height == 0 ? new AvlTree<K, V>(hash, key, value, null, Empty, Empty)
-                : (hash == Hash ? ResolveConflicts(key, value, updateValue)
+                : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, updateValue)
                 : (hash < Hash
                     ? With(Left.AddOrUpdate(hash, key, value, updateValue), Right)
                     : With(Left, Right.AddOrUpdate(hash, key, value, updateValue)))
                         .EnsureBalanced());
         }
 
-        private AvlTree<K, V> ResolveConflicts(K key, V value, UpdateValue updateValue)
+        private AvlTree<K, V> UpdateValueAndResolveConflicts(K key, V value, UpdateValue updateValue)
         {
             if (ReferenceEquals(Key, key) || Key.Equals(key))
-                return new AvlTree<K, V>(Hash, key, updateValue(Value, value), Conflicts, Left, Right);
+                return new AvlTree<K, V>(Hash, key, updateValue == null ? value : updateValue(Value, value), Conflicts, Left, Right);
 
             if (Conflicts == null)
                 return new AvlTree<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
@@ -100,7 +110,8 @@ namespace DryIoc.Playground
             while (i >= 0 && !Equals(Conflicts[i].Key, Key)) i--;
             var conflicts = new KV<K, V>[i != -1 ? Conflicts.Length : Conflicts.Length + 1];
             Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
-            conflicts[i != -1 ? i : Conflicts.Length] = new KV<K, V>(key, i != -1 ? updateValue(Conflicts[i].Value, value) : value);
+            conflicts[i != -1 ? i : Conflicts.Length] = 
+                new KV<K, V>(key, i != -1 && updateValue != null ? updateValue(Conflicts[i].Value, value) : value);
             return new AvlTree<K, V>(Hash, Key, Value, conflicts, Left, Right);
         }
 

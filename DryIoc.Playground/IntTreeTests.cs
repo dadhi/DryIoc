@@ -1,15 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using DryIoc.UnitTests;
 using NUnit.Framework;
 
 namespace DryIoc.Playground
 {
     [TestFixture]
+    [Ignore]
     public class IntTreeTests
     {
         [Test]
-        public void CanGetSuccessfully()
+        public void Can_get()
         {
             var t = HashTree<int>.Empty
                 .AddOrUpdate(1, 11)
@@ -116,7 +118,7 @@ namespace DryIoc.Playground
             var items = Enumerable.Range(0, 10).ToArray();
             var tree = items.Aggregate(HashTree<int>.Empty, (t, i) => t.AddOrUpdate(i, i));
 
-            var enumerated = tree.TraverseInOrder().Select(t => t.Value).ToArray();
+            var enumerated = tree.Enumerate().Select(t => t.Value).ToArray();
 
             CollectionAssert.AreEqual(items, enumerated);
         }
@@ -139,11 +141,11 @@ namespace DryIoc.Playground
         {
             var tree = HashTree<KeyValuePair<Type, string>[]>.Empty;
 
-            var key = typeof(IntTreeTests);
+            var key = typeof(AppendStoreTests);
             var keyHash = key.GetHashCode();
             var value = "test";
 
-            HashTree<KeyValuePair<Type, string>[]>.UpdateValue updateValue = (old, added) =>
+            UpdateMethod<KeyValuePair<Type, string>[]> updateValue = (old, added) =>
             {
                 var newItem = added[0];
                 var oldItemCount = old.Length;
@@ -196,7 +198,7 @@ namespace DryIoc.Playground
         {
             var tree = DryIoc.HashTree<Type, string>.Empty;
 
-            var key = typeof(IntTreeTests);
+            var key = typeof(AppendStoreTests);
             var value = "test";
 
             tree = tree.AddOrUpdate(key, value);

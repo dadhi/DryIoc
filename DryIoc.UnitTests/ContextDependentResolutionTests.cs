@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -13,13 +12,17 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register(typeof(Client));
 
-            var factories = new Dictionary<Type, Factory>();
+            var factories = HashTree<Type, Factory>.Empty;
             container.Register<ILogger>(new FactoryProvider((request, _) =>
             {
                 var parent = request.GetNonWrapperParentOrDefault();
                 parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
                 var typeArg = parent.ImplementationType ?? parent.ServiceType;
-                return factories.GetOrAdd(typeArg, t => new ReflectionFactory(typeof(Logger<>).MakeGenericType(t)));
+
+                var factory = factories.GetValueOrDefault(typeArg);
+                if (factory == null)
+                    factories = factories.AddOrUpdate(typeArg, factory = new ReflectionFactory(typeof(Logger<>).MakeGenericType(typeArg)));
+                return factory;
             }));
 
             var client = container.Resolve<Client>();
@@ -35,13 +38,17 @@ namespace DryIoc.UnitTests
             container.Register(typeof(Client));
             container.Register(typeof(ClientOfClient));
 
-            var factories = new Dictionary<Type, Factory>();
+            var factories = HashTree<Type, Factory>.Empty;
             container.Register<ILogger>(new FactoryProvider((request, _) =>
             {
                 var parent = request.GetNonWrapperParentOrDefault();
                 parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
-                var genericArg = parent.ImplementationType ?? parent.ServiceType;
-                return factories.GetOrAdd(genericArg, t => new ReflectionFactory(typeof(Logger<>).MakeGenericType(t), Reuse.Singleton));
+                var typeArg = parent.ImplementationType ?? parent.ServiceType;
+
+                var factory = factories.GetValueOrDefault(typeArg);
+                if (factory == null)
+                    factories = factories.AddOrUpdate(typeArg, factory = new ReflectionFactory(typeof(Logger<>).MakeGenericType(typeArg), Reuse.Singleton));
+                return factory;
             }));
 
             var client = container.Resolve<Client>();
@@ -57,7 +64,7 @@ namespace DryIoc.UnitTests
             container.Register<User1>();
             container.Register<User2>();
 
-            var factories = new Dictionary<Type, Factory>();
+            var factories = HashTree<Type, Factory>.Empty;
             container.Register<ILogger>(
                 new FactoryProvider((request, _) =>
                 {
@@ -65,7 +72,11 @@ namespace DryIoc.UnitTests
                     var parent = request.GetNonWrapperParentOrDefault();
                     if (parent != null && parent.ImplementationType == typeof(User2))
                         implType = typeof(FastLogger);
-                    return factories.GetOrAdd(implType, t => new ReflectionFactory(t));
+
+                    var factory = factories.GetValueOrDefault(implType);
+                    if (factory == null)
+                        factories = factories.AddOrUpdate(implType, factory = new ReflectionFactory(implType));
+                    return factory;
                 }));
 
             var user2 = container.Resolve<User2>();
