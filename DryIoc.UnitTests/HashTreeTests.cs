@@ -67,9 +67,9 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate(2, 22)
                 .AddOrUpdate(3, 33);
 
-            Assert.AreEqual(11, t.GetFirstValueOfHashOrDefault(1));
-            Assert.AreEqual(22, t.GetFirstValueOfHashOrDefault(2));
-            Assert.AreEqual(33, t.GetFirstValueOfHashOrDefault(3));
+            Assert.AreEqual(11, t.GetFirstValueByHashOrDefault(1));
+            Assert.AreEqual(22, t.GetFirstValueByHashOrDefault(2));
+            Assert.AreEqual(33, t.GetFirstValueByHashOrDefault(3));
         }
 
         [Test]
@@ -164,7 +164,7 @@ namespace DryIoc.UnitTests
             var tree = HashTree<int, int>.Empty;
 
             Assert.DoesNotThrow(
-                () => tree.GetFirstValueOfHashOrDefault(0));
+                () => tree.GetFirstValueByHashOrDefault(0));
         }
 
         [Test]
@@ -175,7 +175,7 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate(3, 2);
 
             Assert.DoesNotThrow(
-                () => tree.GetFirstValueOfHashOrDefault(2));
+                () => tree.GetFirstValueByHashOrDefault(2));
         }
 
         [Test]
@@ -234,7 +234,7 @@ namespace DryIoc.UnitTests
 
             string result = null;
 
-            var items = tree.GetFirstValueOfHashOrDefault(keyHash);
+            var items = tree.GetFirstValueByHashOrDefault(keyHash);
             if (items != null)
             {
                 var firstItem = items[0];
