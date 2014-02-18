@@ -128,7 +128,7 @@ namespace DryIoc.UnitTests
         public void You_can_customize_resolving_single_implementation_from_multiple_registrations()
         {
             var container = new Container();
-            container.ResolutionRules.ToGetSingleFactory = factories => factories.Last();
+            container.ResolutionRules.ToGetSingleFactory = (_, factories) => factories.Last();
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));

@@ -129,8 +129,21 @@ namespace DryIoc
 
         public bool IsRegistered(Type serviceType, string serviceName)
         {
-            return GetFactoryOrDefault(serviceType.ThrowIfNull(), serviceName, ResolutionRules.ToGetSingleFactory,
-                ifNotFoundLookForOpenGenericServiceType: true) != null;
+            return GetFactoryOrDefault(serviceType.ThrowIfNull(), serviceName,
+                (_, factories) => factories.First(), ifNotFoundLookForOpenGenericServiceType: true) != null;
+        }
+
+        public enum HandleCache { Wipe, Keep }
+        public bool Unregister(Type serviceType, string serviceName, HandleCache handleCache)
+        {
+            // if type/key is not registered - do nothing Or return false?
+            if (!IsRegistered(serviceType, serviceName))
+                return false;
+
+            // else - remove factory from factories, and optionally wipe all the cache (expression and resolution)
+            
+
+            return true;
         }
 
         #endregion
@@ -426,7 +439,8 @@ namespace DryIoc
         }
 
         private Factory GetFactoryOrDefault(
-            Type serviceType, object serviceKey, ResolutionRules.GetSingleFactory getSingleFactory,
+            Type serviceType, object serviceKey,
+            ResolutionRules.GetSingleFactory getSingleFactory,
             bool ifNotFoundLookForOpenGenericServiceType = false)
         {
             var entry = _factories.Value.GetValueOrDefault(serviceType);
@@ -445,14 +459,14 @@ namespace DryIoc
                 if (serviceKey != null)
                     return factories.GetValueOrDefault(serviceKey);
 
-                var indexed = factories.Enumerate().Where(x => x.Key is int).Select(x => x.Value).ToArray();
-                if (indexed.Length == 1)
-                    return indexed[0];
+                var indexedFactories = factories.Enumerate().Where(x => x.Key is int).Select(x => x.Value).ToArray();
+                if (indexedFactories.Length == 1)
+                    return indexedFactories[0];
 
-                if (indexed.Length > 1)
+                if (indexedFactories.Length > 1)
                     return getSingleFactory
-                        .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, indexed)
-                        .Invoke(indexed);
+                        .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, factories)
+                        .Invoke(serviceType, indexedFactories);
             }
 
             return null;
@@ -838,8 +852,8 @@ namespace DryIoc
 
     public sealed class ResolutionRules
     {
-        public delegate Factory GetSingleFactory(IEnumerable<Factory> factories);
-        public GetSingleFactory ToGetSingleFactory = null;
+        public delegate Factory GetSingleFactory(Type serviceType, IEnumerable<Factory> factories);
+        public GetSingleFactory ToGetSingleFactory; // If not specified then Throws for multiple factories registered.
 
         public delegate FactoryWithContext ResolveUnregisteredService(Request request, IRegistry registry);
         public Rules<ResolveUnregisteredService> ForUnregisteredService = new Rules<ResolveUnregisteredService>();
