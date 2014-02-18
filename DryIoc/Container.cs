@@ -53,10 +53,11 @@ namespace DryIoc
 
         public Container(ResolutionRules resolutionRules = null, HashTree<Type, Factory> genericWrappers = null)
         {
+            _resolutionRules = resolutionRules ?? GetDefaultResolutionRules();
+
             _factories = Ref.Of(HashTree<Type, object>.Empty);
             _decorators = Ref.Of(HashTree<Type, Factory[]>.Empty);
             _genericWrappers = Ref.Of(genericWrappers ?? DefaultGenericWrappers);
-            _resolutionRules = resolutionRules ?? GetDefaultResolutionRules();
 
             _singletons = _reusedInScope = new Scope();
 
@@ -462,19 +463,18 @@ namespace DryIoc
         #region Internal State
 
         private RegistryWeakRef _selfWeakRef;
-        private readonly ResolutionRules _resolutionRules;
+        private ResolutionRules _resolutionRules;
 
-        private readonly Ref<HashTree<Type, object>> _factories; // where object is Factory or KeyedFactoriesEntry
-        private readonly Ref<HashTree<Type, Factory[]>> _decorators;
-        private readonly Ref<HashTree<Type, Factory>> _genericWrappers;
+        private Ref<HashTree<Type, object>> _factories; // where object is Factory or KeyedFactoriesEntry
+        private Ref<HashTree<Type, Factory[]>> _decorators;
+        private Ref<HashTree<Type, Factory>> _genericWrappers;
 
-        private readonly Scope _singletons;
-        private Scope _reusedInScope;
+        private Scope _singletons, _reusedInScope;
 
-        private readonly Ref<HashTree<Type, CompiledFactory>> _defaultResolutionCache;
-        private readonly Ref<HashTree<Type, HashTree<object, CompiledFactory>>> _keyedResolutionCache;
+        private Ref<HashTree<Type, CompiledFactory>> _defaultResolutionCache;
+        private Ref<HashTree<Type, HashTree<object, CompiledFactory>>> _keyedResolutionCache;
 
-        private readonly ResolutionRoot _resolutionRoot;
+        private ResolutionRoot _resolutionRoot;
 
         #endregion
     }
@@ -516,7 +516,7 @@ namespace DryIoc
 
         public Expression GetCachedFactoryExpression(int factoryID)
         {
-            return FactoryExprCache.GetFirstValueOfHashOrDefault(factoryID);
+            return FactoryExprCache.GetFirstValueByHashOrDefault(factoryID);
         }
 
         public void CacheFactoryExpression(int factoryID, Expression result)
@@ -569,7 +569,7 @@ namespace DryIoc
         public object Get(int index)
         {
             return index <= NODE_ARRAY_BITS ? _tree.Value[index]
-                : _tree.GetFirstValueOfHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BITS];
+                : _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BITS];
         }
 
         #region Implementation
@@ -1552,8 +1552,11 @@ namespace DryIoc
 
         public override string ToString()
         {
-            return "Factory {ID=" + ID + (ImplementationType == null ? ""
-                : ", ImplType=" + ImplementationType.Print()) + "}";
+            var str = new StringBuilder();
+            str.Append("Factory {ID=").Append(ID);
+            if (ImplementationType != null)
+                str.Append(", ImplType=").Append(ImplementationType.Print());
+            return str.ToString();
         }
 
         #region Implementation
@@ -1874,7 +1877,7 @@ namespace DryIoc
             Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
             lock (_syncRoot)
             {
-                var item = _items.GetFirstValueOfHashOrDefault(id);
+                var item = _items.GetFirstValueByHashOrDefault(id);
                 if (item == null)
                     _items = _items.AddOrUpdate(id, item = factory());
                 return (T)item;
@@ -2372,7 +2375,7 @@ namespace DryIoc
                 : t.GetConflictedValueOrDefault(key, defaultValue);
         }
 
-        public V GetFirstValueOfHashOrDefault(int hash, V defaultValue = default(V))
+        public V GetFirstValueByHashOrDefault(int hash, V defaultValue = default(V))
         {
             var t = this;
             while (t.Height != 0 && t.Hash != hash)
