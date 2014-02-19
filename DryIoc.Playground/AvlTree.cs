@@ -73,13 +73,66 @@ namespace DryIoc.Playground
             }
         }
 
-        // Based on Eric Lippert's http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
+        /// <summary>
+        /// Based on Eric Lippert's http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
+        /// </summary>
         public AvlTree<K, V> Remove(K key)
         {
             return Remove(key.GetHashCode(), key);
         }
 
-        public AvlTree<K, V> Remove(int hash, K key)
+        #region Implementation
+
+        private AvlTree() { }
+
+        private AvlTree(int hash, K key, V value, KV<K, V>[] conficts, AvlTree<K, V> left, AvlTree<K, V> right)
+        {
+            Hash = hash;
+            Key = key;
+            Value = value;
+            Conflicts = conficts;
+            Left = left;
+            Right = right;
+            Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
+        }
+
+        private AvlTree<K, V> AddOrUpdate(int hash, K key, V value, UpdateValue updateValue)
+        {
+            return Height == 0 ? new AvlTree<K, V>(hash, key, value, null, Empty, Empty)
+                : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, updateValue)
+                : (hash < Hash
+                    ? With(Left.AddOrUpdate(hash, key, value, updateValue), Right)
+                    : With(Left, Right.AddOrUpdate(hash, key, value, updateValue)))
+                        .KeepBalanced());
+        }
+
+        private AvlTree<K, V> UpdateValueAndResolveConflicts(K key, V value, UpdateValue updateValue)
+        {
+            if (ReferenceEquals(Key, key) || Key.Equals(key))
+                return new AvlTree<K, V>(Hash, key, updateValue == null ? value : updateValue(Value, value), Conflicts, Left, Right);
+
+            if (Conflicts == null)
+                return new AvlTree<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
+
+            var i = Conflicts.Length - 1;
+            while (i >= 0 && !Equals(Conflicts[i].Key, Key)) --i;
+            var conflicts = new KV<K, V>[i != -1 ? Conflicts.Length : Conflicts.Length + 1];
+            Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
+            conflicts[i != -1 ? i : Conflicts.Length] =
+                new KV<K, V>(key, i != -1 && updateValue != null ? updateValue(Conflicts[i].Value, value) : value);
+            return new AvlTree<K, V>(Hash, Key, Value, conflicts, Left, Right);
+        }
+
+        private V GetConflictedValueOrDefault(K key, V defaultValue)
+        {
+            if (Conflicts != null)
+                for (var i = 0; i < Conflicts.Length; i++)
+                    if (Equals(Conflicts[i].Key, key))
+                        return Conflicts[i].Value;
+            return defaultValue;
+        }
+
+        private AvlTree<K, V> Remove(int hash, K key)
         {
             AvlTree<K, V> result;
             if (hash == Hash)
@@ -136,61 +189,10 @@ namespace DryIoc.Playground
                 result = With(Left.Remove(hash, key), Right);
             else
                 result = With(Left, Right.Remove(hash, key));
-            return result.EnsureBalanced();
+            return result.KeepBalanced();
         }
 
-        #region Implementation
-
-        private AvlTree() { }
-
-        private AvlTree(int hash, K key, V value, KV<K, V>[] conficts, AvlTree<K, V> left, AvlTree<K, V> right)
-        {
-            Hash = hash;
-            Key = key;
-            Value = value;
-            Conflicts = conficts;
-            Left = left;
-            Right = right;
-            Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
-        }
-
-        private AvlTree<K, V> AddOrUpdate(int hash, K key, V value, UpdateValue updateValue)
-        {
-            return Height == 0 ? new AvlTree<K, V>(hash, key, value, null, Empty, Empty)
-                : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, updateValue)
-                : (hash < Hash
-                    ? With(Left.AddOrUpdate(hash, key, value, updateValue), Right)
-                    : With(Left, Right.AddOrUpdate(hash, key, value, updateValue)))
-                        .EnsureBalanced());
-        }
-
-        private AvlTree<K, V> UpdateValueAndResolveConflicts(K key, V value, UpdateValue updateValue)
-        {
-            if (ReferenceEquals(Key, key) || Key.Equals(key))
-                return new AvlTree<K, V>(Hash, key, updateValue == null ? value : updateValue(Value, value), Conflicts, Left, Right);
-
-            if (Conflicts == null)
-                return new AvlTree<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
-
-            var i = Conflicts.Length - 1;
-            while (i >= 0 && !Equals(Conflicts[i].Key, Key)) --i;
-            var conflicts = new KV<K, V>[i != -1 ? Conflicts.Length : Conflicts.Length + 1];
-            Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
-            conflicts[i != -1 ? i : Conflicts.Length] =
-                new KV<K, V>(key, i != -1 && updateValue != null ? updateValue(Conflicts[i].Value, value) : value);
-            return new AvlTree<K, V>(Hash, Key, Value, conflicts, Left, Right);
-        }
-
-        private V GetConflictedValueOrDefault(K key, V defaultValue)
-        {
-            if (Conflicts != null)
-                for (var i = 0; i < Conflicts.Length; i++)
-                    if (Equals(Conflicts[i].Key, key))
-                        return Conflicts[i].Value;
-            return defaultValue;
-        }
-
-        private AvlTree<K, V> EnsureBalanced()
+        private AvlTree<K, V> KeepBalanced()
         {
             var delta = Left.Height - Right.Height;
             return delta >= 2 ? With(Left.Right.Height - Left.Left.Height == 1 ? Left.RotateLeft() : Left, Right).RotateRight()

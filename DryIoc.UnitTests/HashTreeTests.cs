@@ -25,9 +25,9 @@ namespace DryIoc.UnitTests
         [Test]
         public void When_adding_value_with_hash_conflicted_key_Then_I_should_be_able_to_get_it_back()
         {
-            var key1 = new HashConflictingKey<string>("a");
-            var key2 = new HashConflictingKey<string>("b");
-            var key3 = new HashConflictingKey<string>("c");
+            var key1 = new HashConflictingKey<string>("a", 1);
+            var key2 = new HashConflictingKey<string>("b", 1);
+            var key3 = new HashConflictingKey<string>("c", 1);
             var tree = HashTree<HashConflictingKey<string>, int>.Empty
                 .AddOrUpdate(key1, 1)
                 .AddOrUpdate(key2, 2)
@@ -41,9 +41,9 @@ namespace DryIoc.UnitTests
         [Test]
         public void When_adding_couple_of_values_with_hash_conflicted_key_Then_I_should_be_able_to_get_them_back()
         {
-            var key1 = new HashConflictingKey<string>("a");
-            var key2 = new HashConflictingKey<string>("b");
-            var key3 = new HashConflictingKey<string>("c");
+            var key1 = new HashConflictingKey<string>("a", 1);
+            var key2 = new HashConflictingKey<string>("b", 1);
+            var key3 = new HashConflictingKey<string>("c", 1);
             var tree = HashTree<HashConflictingKey<string>, int>.Empty
                 .AddOrUpdate(key1, 1)
                 .AddOrUpdate(key2, 2)
@@ -255,20 +255,207 @@ namespace DryIoc.UnitTests
 
             Assert.That(result, Is.EqualTo("test"));
         }
+
+        [Test]
+        public void Remove_from_one_node_tree()
+        {
+            var tree = HashTree<int, string>.Empty.AddOrUpdate(0, "a");
+
+            tree = tree.Remove(0);
+
+            Assert.That(tree.IsEmpty, Is.True);
+        }
+
+        [Test]
+        public void Remove_from_Empty_tree_should_not_throw()
+        {
+            var tree = HashTree<int, string>.Empty.Remove(0);
+            Assert.That(tree.IsEmpty, Is.True);
+        }
+
+        [Test]
+        public void Remove_from_top_of_LL_tree()
+        {
+            var tree = HashTree<int, string>.Empty
+                .AddOrUpdate(1, "a").AddOrUpdate(0, "b");
+
+            tree = tree.Remove(1);
+
+            Assert.That(tree.Height, Is.EqualTo(1));
+            Assert.That(tree.Value, Is.EqualTo("b"));
+        }
+
+        [Test]
+        public void Remove_not_found_key()
+        {
+            var tree = HashTree<int, string>.Empty
+                .AddOrUpdate(1, "a").AddOrUpdate(0, "b");
+
+            tree = tree.Remove(3);
+
+            Assert.That(tree.Value, Is.EqualTo("a"));
+            Assert.That(tree.Left.Value, Is.EqualTo("b"));
+        }
+
+        [Test]
+        public void Remove_from_top_of_RR_tree()
+        {
+            var tree = HashTree<int, string>.Empty
+                .AddOrUpdate(0, "a").AddOrUpdate(1, "b");
+
+            tree = tree.Remove(0);
+
+            Assert.That(tree.Height, Is.EqualTo(1));
+            Assert.That(tree.Value, Is.EqualTo("b"));
+        }
+
+        [Test]
+        public void Remove_from_top_of_tree()
+        {
+            var tree = HashTree<int, string>.Empty
+             .AddOrUpdate(1, "a").AddOrUpdate(0, "b")
+             .AddOrUpdate(3, "c").AddOrUpdate(2, "d").AddOrUpdate(4, "e");
+            Assert.That(tree.Value, Is.EqualTo("a"));
+
+            tree = tree.Remove(1);
+
+            Assert.That(tree.Value, Is.EqualTo("d"));
+            Assert.That(tree.Left.Value, Is.EqualTo("b"));
+            Assert.That(tree.Right.Value, Is.EqualTo("c"));
+            Assert.That(tree.Right.Right.Value, Is.EqualTo("e"));
+        }
+
+        [Test]
+        public void Remove_from_right_tree()
+        {
+            var tree = HashTree<int, string>.Empty
+             .AddOrUpdate(1, "a").AddOrUpdate(0, "b")
+             .AddOrUpdate(3, "c").AddOrUpdate(2, "d").AddOrUpdate(4, "e");
+            Assert.That(tree.Value, Is.EqualTo("a"));
+
+            tree = tree.Remove(2);
+
+            Assert.That(tree.Value, Is.EqualTo("a"));
+            Assert.That(tree.Left.Value, Is.EqualTo("b"));
+            Assert.That(tree.Right.Value, Is.EqualTo("c"));
+            Assert.That(tree.Right.Right.Value, Is.EqualTo("e"));
+        }
+
+        [Test]
+        public void Remove_from_node_with_one_conflict()
+        {
+            var tree = HashTree<HashConflictingKey<int>, string>.Empty
+                .AddOrUpdate(new HashConflictingKey<int>(1, 1), "a")
+                .AddOrUpdate(new HashConflictingKey<int>(0, 0), "b")
+                .AddOrUpdate(new HashConflictingKey<int>(2, 2), "c")
+                .AddOrUpdate(new HashConflictingKey<int>(3, 2), "d");
+
+            tree = tree.Remove(new HashConflictingKey<int>(2, 2));
+
+            Assert.That(tree.Value, Is.EqualTo("a"));
+            Assert.That(tree.Left.Value, Is.EqualTo("b"));
+            Assert.That(tree.Right.Value, Is.EqualTo("d"));
+            Assert.That(tree.Right.Conflicts, Is.Null);
+        }
+
+        [Test]
+        public void Remove_from_node_with_multiple_conflicts()
+        {
+            var tree = HashTree<HashConflictingKey<int>, string>.Empty
+                .AddOrUpdate(new HashConflictingKey<int>(1, 1), "a")
+                .AddOrUpdate(new HashConflictingKey<int>(0, 0), "b")
+                .AddOrUpdate(new HashConflictingKey<int>(2, 2), "c")
+                .AddOrUpdate(new HashConflictingKey<int>(3, 2), "d")
+                .AddOrUpdate(new HashConflictingKey<int>(4, 2), "e");
+
+            tree = tree.Remove(new HashConflictingKey<int>(2, 2));
+
+            Assert.That(tree.Value, Is.EqualTo("a"));
+            Assert.That(tree.Left.Value, Is.EqualTo("b"));
+            Assert.That(tree.Right.Value, Is.EqualTo("d"));
+            Assert.That(tree.Right.Conflicts[0].Value, Is.EqualTo("e"));
+        }
+
+        [Test]
+        public void Remove_from_conflicts_with_one_conflict()
+        {
+            var tree = HashTree<HashConflictingKey<int>, string>.Empty
+                .AddOrUpdate(new HashConflictingKey<int>(1, 1), "a")
+                .AddOrUpdate(new HashConflictingKey<int>(0, 0), "b")
+                .AddOrUpdate(new HashConflictingKey<int>(2, 2), "c")
+                .AddOrUpdate(new HashConflictingKey<int>(3, 2), "d");
+
+            tree = tree.Remove(new HashConflictingKey<int>(3, 2));
+
+            Assert.That(tree.Value, Is.EqualTo("a"));
+            Assert.That(tree.Left.Value, Is.EqualTo("b"));
+            Assert.That(tree.Right.Value, Is.EqualTo("c"));
+            Assert.That(tree.Right.Conflicts, Is.Null);
+        }
+
+        [Test]
+        public void Remove_from_conflicts_with_multiple_conflicts()
+        {
+            var tree = HashTree<HashConflictingKey<int>, string>.Empty
+                .AddOrUpdate(new HashConflictingKey<int>(1, 1), "a")
+                .AddOrUpdate(new HashConflictingKey<int>(0, 0), "b")
+                .AddOrUpdate(new HashConflictingKey<int>(2, 2), "c")
+                .AddOrUpdate(new HashConflictingKey<int>(3, 2), "d")
+                .AddOrUpdate(new HashConflictingKey<int>(4, 2), "e");
+
+            tree = tree.Remove(new HashConflictingKey<int>(3, 2));
+
+            Assert.That(tree.Value, Is.EqualTo("a"));
+            Assert.That(tree.Left.Value, Is.EqualTo("b"));
+            Assert.That(tree.Right.Value, Is.EqualTo("c"));
+            Assert.That(tree.Right.Conflicts[0].Value, Is.EqualTo("e"));
+        }
+
+        [Test]
+        public void Remove_from_node_when_not_found_conflict()
+        {
+            var tree = HashTree<HashConflictingKey<int>, string>.Empty
+                .AddOrUpdate(new HashConflictingKey<int>(1, 1), "a")
+                .AddOrUpdate(new HashConflictingKey<int>(0, 0), "b");
+
+
+            tree = tree.Remove(new HashConflictingKey<int>(2, 1));
+
+            Assert.That(tree.Value, Is.EqualTo("a"));
+            Assert.That(tree.Left.Value, Is.EqualTo("b"));
+        }
+
+        [Test]
+        public void Remove_from_node_with_conflicts_when_not_found_conflict()
+        {
+            var tree = HashTree<HashConflictingKey<int>, string>.Empty
+                .AddOrUpdate(new HashConflictingKey<int>(1, 1), "a")
+                .AddOrUpdate(new HashConflictingKey<int>(0, 0), "b")
+                .AddOrUpdate(new HashConflictingKey<int>(2, 2), "c")
+                .AddOrUpdate(new HashConflictingKey<int>(3, 2), "d");
+
+            tree = tree.Remove(new HashConflictingKey<int>(4, 2));
+
+            Assert.That(tree.Value, Is.EqualTo("a"));
+            Assert.That(tree.Left.Value, Is.EqualTo("b"));
+            Assert.That(tree.Right.Value, Is.EqualTo("c"));
+        }
     }
 
     internal class HashConflictingKey<T>
     {
-        public T Key;
+        public readonly T Key;
+        private readonly int _hash;
 
-        public HashConflictingKey(T key)
+        public HashConflictingKey(T key, int hash)
         {
             Key = key;
+            _hash = hash;
         }
 
         public override int GetHashCode()
         {
-            return 1;
+            return _hash;
         }
 
         public override bool Equals(object obj)

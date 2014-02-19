@@ -141,7 +141,7 @@ namespace DryIoc
                 return false;
 
             // else - remove factory from factories, and optionally wipe all the cache (expression and resolution)
-            
+
 
             return true;
         }
@@ -2425,6 +2425,14 @@ namespace DryIoc
             }
         }
 
+        /// <summary>
+        /// Based on Eric Lippert's http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
+        /// </summary>
+        public HashTree<K, V> Remove(K key)
+        {
+            return Remove(key.GetHashCode(), key);
+        }
+
         #region Implementation
 
         private HashTree() { }
@@ -2447,7 +2455,7 @@ namespace DryIoc
                 : (hash < Hash
                     ? With(Left.AddOrUpdate(hash, key, value, updateValue), Right)
                     : With(Left, Right.AddOrUpdate(hash, key, value, updateValue)))
-                        .EnsureBalanced());
+                        .KeepBalanced());
         }
 
         private HashTree<K, V> UpdateValueAndResolveConflicts(K key, V value, UpdateValue updateValue)
@@ -2476,7 +2484,71 @@ namespace DryIoc
             return defaultValue;
         }
 
-        private HashTree<K, V> EnsureBalanced()
+        private HashTree<K, V> Remove(int hash, K key, bool ignoreKey = false)
+        {
+            if (Height == 0)
+                return this;
+
+            HashTree<K, V> result;
+            if (hash == Hash)
+            {
+                if (ignoreKey || Equals(Key, key) && Conflicts == null)
+                {
+                    // We have a match. If this is a leaf, just remove it by returning Empty.  
+                    // If we have only one child, replace the node with the child.
+                    if (Height == 1)
+                        return Empty;
+                    
+                    if (Right.IsEmpty)
+                        result = Left;
+                    else if (Left.IsEmpty)
+                        result = Right;
+                    else
+                    {
+                        // We have two children. Remove the next-highest node and replace this node with it.
+                        var successor = Right;
+                        while (!successor.Left.IsEmpty) successor = successor.Left;
+                        result = successor.With(Left, Right.Remove(successor.Hash, default(K), ignoreKey: true));
+                    }
+                }
+                else if (Conflicts == null) // Means that keys are different and no conflicts - do not remove - just return current node as is.
+                {
+                    return this;
+                }
+                else if (Equals(Key, key))
+                {
+                    if (Conflicts.Length == 1)
+                        return new HashTree<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, null, Left, Right);
+
+                    var newConflicts = new KV<K, V>[Conflicts.Length - 1];
+                    Array.Copy(Conflicts, 1, newConflicts, 0, newConflicts.Length);
+                    return new HashTree<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, newConflicts, Left, Right);
+                }
+                else
+                {
+                    var index = Conflicts.Length - 1;
+                    while (index >= 0 && !Equals(Conflicts[index].Key, key)) --index;
+                    if (index == -1)
+                        return this; // key is not found in Conflicts - return node as is.
+
+                    if (Conflicts.Length == 1)
+                        return new HashTree<K, V>(Hash, Key, Value, null, Left, Right);
+
+                    var newConflicts = new KV<K, V>[Conflicts.Length - 1];
+                    var newIndex = 0;
+                    for (var i = 0; i < Conflicts.Length; ++i)
+                        if (i != index) newConflicts[newIndex++] = Conflicts[i];
+                    return new HashTree<K, V>(Hash, Key, Value, newConflicts, Left, Right);
+                }
+            }
+            else if (hash < Hash)
+                result = With(Left.Remove(hash, key, ignoreKey), Right);
+            else
+                result = With(Left, Right.Remove(hash, key, ignoreKey));
+            return result.KeepBalanced();
+        }
+
+        private HashTree<K, V> KeepBalanced()
         {
             var delta = Left.Height - Right.Height;
             return delta >= 2 ? With(Left.Right.Height - Left.Left.Height == 1 ? Left.RotateLeft() : Left, Right).RotateRight()
