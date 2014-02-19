@@ -37,8 +37,8 @@ namespace DryIoc
     /// <summary>
     /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
     /// TODO:
-    /// - Add ToString to Factory, etc.
-    /// - Speed up registration.
+    /// - add IsRegistered specialized by factory type.
+    /// - add Unregister.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -127,21 +127,40 @@ namespace DryIoc
             }
         }
 
-        public bool IsRegistered(Type serviceType, string serviceName)
+        public bool IsRegistered(Type serviceType, string serviceName, FactoryType factoryType)
         {
-            return GetFactoryOrDefault(serviceType.ThrowIfNull(), serviceName,
-                (_, factories) => factories.First(), ifNotFoundLookForOpenGenericServiceType: true) != null;
+            serviceType = serviceType.ThrowIfNull();
+            switch (factoryType)
+            {
+                case FactoryType.GenericWrapper:
+                    Throw.If(!serviceType.IsGenericType, "Expecting generic type to check if GenericWrapper is registered but found {0}", serviceType);
+                    return _genericWrappers.Value.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) != null;
+                case FactoryType.Decorator:
+                    return _decorators.Value.GetValueOrDefault(serviceType) != null;
+                default:
+                    return GetFactoryOrDefault(serviceType, serviceName,
+                        (_, factories) => factories.First(), ifNotFoundLookForOpenGenericServiceType: true) != null;
+            }
         }
 
         public enum HandleCache { Wipe, Keep }
-        public bool Unregister(Type serviceType, string serviceName, HandleCache handleCache)
+        public bool Unregister(Type serviceType, string serviceName, FactoryType factoryType, HandleCache handleCache)
         {
             // if type/key is not registered - do nothing Or return false?
-            if (!IsRegistered(serviceType, serviceName))
+            if (!IsRegistered(serviceType, serviceName, factoryType))
                 return false;
 
-            // else - remove factory from factories, and optionally wipe all the cache (expression and resolution)
+            switch (factoryType)
+            {
+                default:
+                    _factories.Update(x => x.Remove(serviceType));
+                    break;
+            }
 
+            if (handleCache == HandleCache.Wipe)
+            {
+                // wipe cache
+            }
 
             return true;
         }
@@ -1218,10 +1237,11 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceType">The type of the registered service.</param>
         /// <param name="named">Optional service name</param>
+        /// <param name="factoryType">Optional factory type to lookup, <see cref="FactoryType.Service"/> by default.</param>
         /// <returns>True if <paramref name="serviceType"/> is registered, false - otherwise.</returns>
-        public static bool IsRegistered(this IRegistrator registrator, Type serviceType, string named = null)
+        public static bool IsRegistered(this IRegistrator registrator, Type serviceType, string named = null, FactoryType factoryType = FactoryType.Service)
         {
-            return registrator.IsRegistered(serviceType, named);
+            return registrator.IsRegistered(serviceType, named, factoryType);
         }
 
         /// <summary>
@@ -2007,7 +2027,7 @@ namespace DryIoc
     {
         void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered);
 
-        bool IsRegistered(Type serviceType, string serviceName);
+        bool IsRegistered(Type serviceType, string serviceName, FactoryType factoryType);
     }
 
     public interface IRegistry : IResolver, IRegistrator
@@ -2498,7 +2518,7 @@ namespace DryIoc
                     // If we have only one child, replace the node with the child.
                     if (Height == 1)
                         return Empty;
-                    
+
                     if (Right.IsEmpty)
                         result = Left;
                     else if (Left.IsEmpty)
