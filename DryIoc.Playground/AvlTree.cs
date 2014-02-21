@@ -81,6 +81,13 @@ namespace DryIoc.Playground
             return Remove(key.GetHashCode(), key);
         }
 
+        public delegate bool UpdateValueInstead(K key, V oldValue, out V newValue);
+
+        public AvlTree<K, V> RemoveOrUpdate(K key, UpdateValueInstead updateValue = null)
+        {
+            return RemoveOrUpdate(key.GetHashCode(), key, updateValue);
+        }
+
         #region Implementation
 
         private AvlTree() { }
@@ -189,6 +196,83 @@ namespace DryIoc.Playground
                 result = With(Left.Remove(hash, key), Right);
             else
                 result = With(Left, Right.Remove(hash, key));
+            return result.KeepBalanced();
+        }
+
+        private AvlTree<K, V> RemoveOrUpdate(int hash, K key, UpdateValueInstead updateValueInstead = null, bool ignoreKey = false)
+        {
+            if (Height == 0)
+                return this;
+
+            AvlTree<K, V> result;
+            if (hash == Hash) // found matched Node
+            {
+                if (ignoreKey || Equals(Key, key))
+                {
+                    if (!ignoreKey)
+                    {
+                        V newValue;
+                        if (updateValueInstead != null && updateValueInstead(Key, Value, out newValue))
+                            return new AvlTree<K, V>(Hash, Key, newValue, Conflicts, Left, Right);
+
+                        if (Conflicts != null)
+                        {
+                            if (Conflicts.Length == 1)
+                                return new AvlTree<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, null, Left, Right);
+                            var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
+                            Array.Copy(Conflicts, 1, shrinkedConflicts, 0, shrinkedConflicts.Length);
+                            return new AvlTree<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, shrinkedConflicts, Left, Right);
+                        }
+                    }
+
+                    // remove node
+                    if (Height == 1)
+                        return Empty;
+
+                    if (Right.IsEmpty)
+                        result = Left;
+                    else if (Left.IsEmpty)
+                        result = Right;
+                    else
+                    {
+                        // We have two children. Remove the next-highest node and replace this node with it.
+                        var successor = Right;
+                        while (!successor.Left.IsEmpty) successor = successor.Left;
+                        result = successor.With(Left, Right.RemoveOrUpdate(successor.Hash, default(K), ignoreKey: true));
+                    }
+                }
+                else if (Conflicts != null)
+                {
+                    var index = Conflicts.Length - 1;
+                    while (index >= 0 && !Equals(Conflicts[index].Key, key)) --index;
+                    if (index == -1)        // key is not found in conflicts - just return
+                        return this;
+
+                    V newValue;
+                    var conflict = Conflicts[index];
+                    if (updateValueInstead != null && updateValueInstead(conflict.Key, conflict.Value, out newValue))
+                    {
+                        var updatedConflicts = new KV<K, V>[Conflicts.Length];
+                        Array.Copy(Conflicts, 0, updatedConflicts, 0, updatedConflicts.Length);
+                        updatedConflicts[index] = new KV<K, V>(conflict.Key, newValue);
+                        return new AvlTree<K, V>(Hash, Key, Value, updatedConflicts, Left, Right);
+                    }
+
+                    if (Conflicts.Length == 1)
+                        return new AvlTree<K, V>(Hash, Key, Value, null, Left, Right);
+                    var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
+                    var newIndex = 0;
+                    for (var i = 0; i < Conflicts.Length; ++i)
+                        if (i != index) shrinkedConflicts[newIndex++] = Conflicts[i];
+                    return new AvlTree<K, V>(Hash, Key, Value, shrinkedConflicts, Left, Right);
+                }
+                else  // key is not matching and no conflicts to lookup - just return
+                    return this;
+            }
+            else if (hash < Hash)
+                result = With(Left.RemoveOrUpdate(hash, key, updateValueInstead, ignoreKey), Right);
+            else
+                result = With(Left, Right.RemoveOrUpdate(hash, key, updateValueInstead, ignoreKey));
             return result.KeepBalanced();
         }
 

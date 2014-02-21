@@ -153,7 +153,7 @@ namespace DryIoc
             switch (factoryType)
             {
                 default:
-                    _factories.Update(x => x.Remove(serviceType));
+                    _factories.Update(x => x.RemoveOrUpdate(serviceType));
                     break;
             }
 
@@ -178,22 +178,23 @@ namespace DryIoc
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
         {
-            var entry = _keyedResolutionCache.Value.GetValueOrDefault(serviceType);
-            if (entry != null)
+            var compiledFactories = _keyedResolutionCache.Value.GetValueOrDefault(serviceType);
+            if (compiledFactories != null)
             {
-                var cachedFactory = entry.GetValueOrDefault(serviceKey);
-                if (cachedFactory != null)
-                    return cachedFactory(_resolutionRoot.Store.Value, _reusedInScope, resolutionScope: null);
+                var compiledFactory = compiledFactories.GetValueOrDefault(serviceKey);
+                if (compiledFactory != null)
+                    return compiledFactory(_resolutionRoot.Store.Value, _reusedInScope, resolutionScope: null);
             }
 
-            var factory = ((IRegistry)this).GetOrAddFactory(CreateRequest(serviceType, serviceKey), ifUnresolved);
+            var request = CreateRequest(serviceType, serviceKey);
+            var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null)
                 return null;
 
-            var newFactory = factory.GetExpression().CompileToFactory();
-            entry = (entry ?? HashTree<object, CompiledFactory>.Empty).AddOrUpdate(serviceKey, newFactory);
-            _keyedResolutionCache.Update(x => x.AddOrUpdate(serviceType, entry));
-            return newFactory(_resolutionRoot.Store.Value, _reusedInScope, resolutionScope: null);
+            var newCompiledFactory = factory.GetExpression().CompileToFactory();
+            _keyedResolutionCache.Update(x => x.AddOrUpdate(serviceType,
+                (compiledFactories ?? HashTree<object, CompiledFactory>.Empty).AddOrUpdate(serviceKey, newCompiledFactory)));
+            return newCompiledFactory(_resolutionRoot.Store.Value, _reusedInScope, resolutionScope: null);
         }
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
@@ -2445,12 +2446,14 @@ namespace DryIoc
             }
         }
 
+        public delegate bool UpdateValueInstead(K key, V oldValue, out V newValue);
+
         /// <summary>
         /// Based on Eric Lippert's http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
         /// </summary>
-        public HashTree<K, V> Remove(K key)
+        public HashTree<K, V> RemoveOrUpdate(K key, UpdateValueInstead updateValue = null)
         {
-            return Remove(key.GetHashCode(), key);
+            return RemoveOrUpdate(key.GetHashCode(), key, updateValue);
         }
 
         #region Implementation
@@ -2504,18 +2507,33 @@ namespace DryIoc
             return defaultValue;
         }
 
-        private HashTree<K, V> Remove(int hash, K key, bool ignoreKey = false)
+        private HashTree<K, V> RemoveOrUpdate(int hash, K key, UpdateValueInstead updateValueInstead = null, bool ignoreKey = false)
         {
             if (Height == 0)
                 return this;
 
             HashTree<K, V> result;
-            if (hash == Hash)
+            if (hash == Hash) // found matched Node
             {
-                if (ignoreKey || Equals(Key, key) && Conflicts == null)
+                if (ignoreKey || Equals(Key, key))
                 {
-                    // We have a match. If this is a leaf, just remove it by returning Empty.  
-                    // If we have only one child, replace the node with the child.
+                    if (!ignoreKey)
+                    {
+                        V newValue;
+                        if (updateValueInstead != null && updateValueInstead(Key, Value, out newValue))
+                            return new HashTree<K, V>(Hash, Key, newValue, Conflicts, Left, Right);
+
+                        if (Conflicts != null)
+                        {
+                            if (Conflicts.Length == 1)
+                                return new HashTree<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, null, Left, Right);
+                            var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
+                            Array.Copy(Conflicts, 1, shrinkedConflicts, 0, shrinkedConflicts.Length);
+                            return new HashTree<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, shrinkedConflicts, Left, Right);
+                        }
+                    }
+
+                    // remove node
                     if (Height == 1)
                         return Empty;
 
@@ -2528,43 +2546,41 @@ namespace DryIoc
                         // We have two children. Remove the next-highest node and replace this node with it.
                         var successor = Right;
                         while (!successor.Left.IsEmpty) successor = successor.Left;
-                        result = successor.With(Left, Right.Remove(successor.Hash, default(K), ignoreKey: true));
+                        result = successor.With(Left, Right.RemoveOrUpdate(successor.Hash, default(K), ignoreKey: true));
                     }
                 }
-                else if (Conflicts == null) // Means that keys are different and no conflicts - do not remove - just return current node as is.
-                {
-                    return this;
-                }
-                else if (Equals(Key, key))
-                {
-                    if (Conflicts.Length == 1)
-                        return new HashTree<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, null, Left, Right);
-
-                    var newConflicts = new KV<K, V>[Conflicts.Length - 1];
-                    Array.Copy(Conflicts, 1, newConflicts, 0, newConflicts.Length);
-                    return new HashTree<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, newConflicts, Left, Right);
-                }
-                else
+                else if (Conflicts != null)
                 {
                     var index = Conflicts.Length - 1;
                     while (index >= 0 && !Equals(Conflicts[index].Key, key)) --index;
-                    if (index == -1)
-                        return this; // key is not found in Conflicts - return node as is.
+                    if (index == -1)        // key is not found in conflicts - just return
+                        return this;
+
+                    V newValue;
+                    var conflict = Conflicts[index];
+                    if (updateValueInstead != null && updateValueInstead(conflict.Key, conflict.Value, out newValue))
+                    {
+                        var updatedConflicts = new KV<K, V>[Conflicts.Length];
+                        Array.Copy(Conflicts, 0, updatedConflicts, 0, updatedConflicts.Length);
+                        updatedConflicts[index] = new KV<K, V>(conflict.Key, newValue);
+                        return new HashTree<K, V>(Hash, Key, Value, updatedConflicts, Left, Right);
+                    }
 
                     if (Conflicts.Length == 1)
                         return new HashTree<K, V>(Hash, Key, Value, null, Left, Right);
-
-                    var newConflicts = new KV<K, V>[Conflicts.Length - 1];
+                    var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
                     var newIndex = 0;
                     for (var i = 0; i < Conflicts.Length; ++i)
-                        if (i != index) newConflicts[newIndex++] = Conflicts[i];
-                    return new HashTree<K, V>(Hash, Key, Value, newConflicts, Left, Right);
+                        if (i != index) shrinkedConflicts[newIndex++] = Conflicts[i];
+                    return new HashTree<K, V>(Hash, Key, Value, shrinkedConflicts, Left, Right);
                 }
+                else  // key is not matching and no conflicts to lookup - just return
+                    return this;
             }
             else if (hash < Hash)
-                result = With(Left.Remove(hash, key, ignoreKey), Right);
+                result = With(Left.RemoveOrUpdate(hash, key, updateValueInstead, ignoreKey), Right);
             else
-                result = With(Left, Right.Remove(hash, key, ignoreKey));
+                result = With(Left, Right.RemoveOrUpdate(hash, key, updateValueInstead, ignoreKey));
             return result.KeepBalanced();
         }
 
