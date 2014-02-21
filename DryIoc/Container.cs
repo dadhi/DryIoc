@@ -127,7 +127,7 @@ namespace DryIoc
             }
         }
 
-        public bool IsRegistered(Type serviceType, string serviceName, FactoryType factoryType)
+        public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType)
         {
             serviceType = serviceType.ThrowIfNull();
             switch (factoryType)
@@ -138,22 +138,62 @@ namespace DryIoc
                 case FactoryType.Decorator:
                     return _decorators.Value.GetValueOrDefault(serviceType) != null;
                 default:
-                    return GetFactoryOrDefault(serviceType, serviceName,
+                    return GetFactoryOrDefault(serviceType, serviceKey,
                         (_, factories) => factories.First(), ifNotFoundLookForOpenGenericServiceType: true) != null;
             }
         }
 
         public enum HandleCache { Wipe, Keep }
-        public bool Unregister(Type serviceType, string serviceName, FactoryType factoryType, HandleCache handleCache)
+        public bool Unregister(Type serviceType, object serviceKey, FactoryType factoryType, HandleCache handleCache)
         {
             // if type/key is not registered - do nothing Or return false?
-            if (!IsRegistered(serviceType, serviceName, factoryType))
+            if (!IsRegistered(serviceType, serviceKey, factoryType))
                 return false;
 
             switch (factoryType)
             {
+                case FactoryType.GenericWrapper:
+                    _genericWrappers.Update(_ => _.RemoveOrUpdate(serviceType));
+                    break;
+                case FactoryType.Decorator:
+                    _decorators.Update(_ => _.RemoveOrUpdate(serviceType));
+                    break;
                 default:
-                    _factories.Update(x => x.RemoveOrUpdate(serviceType));
+                    _factories.Update(_ => _.RemoveOrUpdate(serviceType,
+                        (Type key, object entry, out object newEntry) =>
+                        {
+                            newEntry = entry;     // by default keep existing entry
+                            if (serviceKey == null)
+                            {
+                                if (entry is Factory)
+                                    return false; // remove node
+
+                                var keyedEntry = ((KeyedFactoriesEntry)entry);
+                                var factories = keyedEntry.Factories;
+                                var indexedFactories = factories.Enumerate().Where(x => x.Key is int).ToArray();
+                                if (indexedFactories.Length != 0)
+                                {
+                                    for (var i = 0; i < indexedFactories.Length; i++)
+                                        factories = factories.RemoveOrUpdate(indexedFactories[i].Key);
+                                    if (factories.IsEmpty)
+                                        return false; // remove node
+                                    newEntry = new KeyedFactoriesEntry(-1, factories);
+                                }
+                            }
+                            else
+                            {
+                                if (entry is KeyedFactoriesEntry)
+                                {
+                                    var keyedEntry = ((KeyedFactoriesEntry)entry);
+                                    var factories = keyedEntry.Factories.RemoveOrUpdate(serviceKey);
+                                    if (factories.IsEmpty)
+                                        return false;
+                                    newEntry = new KeyedFactoriesEntry(keyedEntry.LatestIndex, factories);
+                                }
+                            }
+
+                            return true;
+                        }));
                     break;
             }
 
@@ -2028,7 +2068,7 @@ namespace DryIoc
     {
         void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered);
 
-        bool IsRegistered(Type serviceType, string serviceName, FactoryType factoryType);
+        bool IsRegistered(Type serviceType, object serviceName, FactoryType factoryType);
     }
 
     public interface IRegistry : IResolver, IRegistrator
