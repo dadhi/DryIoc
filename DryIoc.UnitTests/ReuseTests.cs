@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Threading;
+using System.Web;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -156,14 +158,9 @@ namespace DryIoc.UnitTests
         }
     }
 
-    public static class CustomReuse
-    {
-        public static ThreadReuse InThreadScope = new ThreadReuse();
-    }
-
     public class ThreadReuse : IReuse
     {
-        public Expression Apply(Request _, IRegistry __, int factoryID, Expression factoryExpr)
+        public Expression Of(Request _, IRegistry __, int factoryID, Expression factoryExpr)
         {
             return Reuse.GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
         }
@@ -177,6 +174,31 @@ namespace DryIoc.UnitTests
         private static Scope _scope;
 
         private static readonly Expression _scopeExpr = Expression.Call(typeof(ThreadReuse), "GetScope", null);
+    }
+
+    public static class CustomReuse
+    {
+        public static ThreadReuse InThreadScope = new ThreadReuse();
+        public static HttpContextReuse InHttpContext = new HttpContextReuse();
+    }
+
+    public class HttpContextReuse : IReuse
+    {
+        private readonly MethodInfo _getOrAddToContextMethod = typeof(HttpContextReuse).GetMethod("GetOrAddToContext");
+        public static T GetOrAddToContext<T>(int factoryID, Func<T> factory)
+        {
+            var key = "IoC." + factoryID;
+            if (HttpContext.Current.Items[key] == null)
+                HttpContext.Current.Items[key] = factory();
+            return (T)HttpContext.Current.Items[key];
+        }
+
+        public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+        {
+            return Expression.Call(_getOrAddToContextMethod.MakeGenericMethod(factoryExpr.Type), 
+                Expression.Constant(factoryID),        // use factoryID (unique per Container) as service ID.
+                Expression.Lambda(factoryExpr, null)); // pass Func<TService> to create service only when not found in context.
+        }
     }
 
     #region CUT

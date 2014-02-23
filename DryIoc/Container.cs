@@ -1986,7 +1986,7 @@ namespace DryIoc
 
     public interface IReuse
     {
-        Expression Apply(Request request, IRegistry registry, int factoryID, Expression factoryExpr);
+        Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr);
     }
 
     public static class Reuse
@@ -2021,7 +2021,7 @@ namespace DryIoc
                 _scopeExpr = scopeExpr;
             }
 
-            public Expression Apply(Request _, IRegistry __, int factoryID, Expression factoryExpr)
+            public Expression Of(Request _, IRegistry __, int factoryID, Expression factoryExpr)
             {
                 return GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
             }
@@ -2031,7 +2031,7 @@ namespace DryIoc
 
         public sealed class SingletonReuse : IReuse
         {
-            public Expression Apply(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+            public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
             {
                 // Create lazy singleton if we have Func somewhere in dependency chain.
                 var parent = request.Parent;
@@ -2113,7 +2113,7 @@ namespace DryIoc
             {
                 expression = Factory.CreateExpression(Request, Registry);
                 if (Factory.Reuse != null)
-                    expression = Factory.Reuse.Apply(Request, Registry, Factory.ID, expression);
+                    expression = Factory.Reuse.Of(Request, Registry, Factory.ID, expression);
                 if (Factory.Setup.CachePolicy == FactoryCachePolicy.CouldCacheExpression)
                     Request.Root.CacheFactoryExpression(Factory.ID, expression);
             }
@@ -2135,7 +2135,7 @@ namespace DryIoc
                 return Expression.Lambda(funcType, decorator, func.Parameters);
 
             if (Factory.Reuse != null)
-                func = Expression.Lambda(funcType, Factory.Reuse.Apply(Request, Registry, Factory.ID, func.Body), func.Parameters);
+                func = Expression.Lambda(funcType, Factory.Reuse.Of(Request, Registry, Factory.ID, func.Body), func.Parameters);
 
             if (decorator != null)
                 func = Expression.Lambda(funcType, Expression.Invoke(decorator, func.Body), func.Parameters);
