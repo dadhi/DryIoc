@@ -42,7 +42,7 @@ namespace DryIoc.UnitTests
 
             container.ResolutionRules.ForUnregisteredService.Append((request, registry) =>
                 request.ServiceType.IsClass && !request.ServiceType.IsAbstract
-                    ? new ReflectionFactory(request.ServiceType).WithContext(request, registry)
+                    ? new ReflectionFactory(request.ServiceType)
                     : null);
 
             var service = container.Resolve<NotRegisteredService>();
