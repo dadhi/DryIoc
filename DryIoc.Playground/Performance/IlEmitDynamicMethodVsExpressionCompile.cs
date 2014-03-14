@@ -26,10 +26,41 @@ namespace DryIoc.Playground.Performance
             timer = Stopwatch.StartNew();
             for (int t = 0; t < times; t++)
             {
-                result = ExprCompileFactory()();
+                result = CompileFactory()();
             }
             timer.Stop();
             Console.WriteLine("Expression took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
+            GC.Collect();
+
+            GC.KeepAlive(result);
+        }
+
+        public static void CompareResultDelegates()
+        {
+            var times = 5 * 1000 * 1000;
+
+            object result = null;
+            var enittedFactory = EmitFactory();
+            var compiledFactory = CompileFactory();
+
+            GC.Collect();
+
+            var timer = Stopwatch.StartNew();
+            for (int t = 0; t < times; t++)
+            {
+                result = enittedFactory();
+            }
+            timer.Stop();
+            Console.WriteLine("ILEmitted factory took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
+            GC.Collect();
+
+            timer = Stopwatch.StartNew();
+            for (int t = 0; t < times; t++)
+            {
+                result = compiledFactory();
+            }
+            timer.Stop();
+            Console.WriteLine("Compiled factory took {0} milliseconds to complete.", timer.ElapsedMilliseconds);
             GC.Collect();
 
             GC.KeepAlive(result);
@@ -51,13 +82,14 @@ namespace DryIoc.Playground.Performance
             return func;
         }
 
-        public static Func<object> ExprCompileFactory()
+        public static Func<object> CompileFactory()
         {
             var dependencyCtor = typeof(Dependency).GetConstructors()[0];
             var serviceCtor = typeof(Service).GetConstructors()[0];
 
             var funcExpr = Expression.Lambda<Func<object>>(
-                Expression.New(serviceCtor, Expression.New(dependencyCtor, null)),
+                Expression.New(serviceCtor, 
+                Expression.New(dependencyCtor, null)),
                 null);
 
             var func = funcExpr.Compile();

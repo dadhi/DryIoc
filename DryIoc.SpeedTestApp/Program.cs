@@ -45,9 +45,10 @@ namespace DryIoc.SpeedTestApp
 
         private static void CompareIlEmitDynamicMethodVsExpressionCompileSpeed()
         {
-            IlEmitDynamicMethodVsExpressionCompile.Compare();
+            //IlEmitDynamicMethodVsExpressionCompile.Compare();
+            IlEmitDynamicMethodVsExpressionCompile.CompareResultDelegates();
             Console.WriteLine();
-            IlEmitDynamicMethodVsExpressionCompile.Compare();
+            IlEmitDynamicMethodVsExpressionCompile.CompareResultDelegates();
         }
 
         private static void CompareBitOpVsIsOpSpeed()
