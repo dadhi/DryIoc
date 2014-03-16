@@ -560,8 +560,8 @@ namespace DryIoc
     public sealed class ResolutionRoot
     {
         public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(AppendStore<object>), "store");
-        public static readonly ParameterExpression ReusedInScopeParameter = Expression.Parameter(typeof(Scope), "reusedInScope");
-        public static readonly ParameterExpression ReusedInResolutionParameter = Expression.Parameter(typeof(Scope), "reusedHere");
+        public static readonly ParameterExpression CurrentScopeReuseParameter = Expression.Parameter(typeof(Scope), "currentScopeReuse");
+        public static readonly ParameterExpression ReuseInResolutionRootParameter = Expression.Parameter(typeof(Scope), "resolutionRootReuse");
 
         public readonly Ref<AppendStore<object>> Store = Ref.Of(AppendStore<object>.Empty);
         public HashTree<int, Expression> FactoryExprCache = HashTree<int, Expression>.Empty;
@@ -587,7 +587,7 @@ namespace DryIoc
             return GetItemExpression(item, typeof(T));
         }
 
-        public Expression GetRegistryItemExpression(IRegistry registry)
+        public Expression GetRegistryExpression(IRegistry registry)
         {
             return Expression.Property(GetItemExpression(registry.SelfWeakRef), "Target");
         }
@@ -676,7 +676,7 @@ namespace DryIoc
             if (expression.NodeType == ExpressionType.Convert)
                 expression = ((UnaryExpression)expression).Operand;
             return Expression.Lambda<CompiledFactory>(expression,
-                ResolutionRoot.StoreParameter, ResolutionRoot.ReusedInScopeParameter, ResolutionRoot.ReusedInResolutionParameter);
+                ResolutionRoot.StoreParameter, ResolutionRoot.CurrentScopeReuseParameter, ResolutionRoot.ReuseInResolutionRootParameter);
         }
 
         public static CompiledFactory CompileToFactory(this Expression expression)
@@ -1255,7 +1255,7 @@ namespace DryIoc
             string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
             var factory = new DelegateFactory((req, reg, root) =>
-                Expression.Invoke(root.GetItemExpression(lambda), root.GetRegistryItemExpression(reg)),
+                Expression.Invoke(root.GetItemExpression(lambda), root.GetRegistryExpression(reg)),
                 reuse, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
@@ -2044,13 +2044,13 @@ namespace DryIoc
     public static class Reuse
     {
         public static readonly IReuse Transient = null; // no reuse.
-        public static readonly IReuse Singleton, InScope, InResolution;
+        public static readonly IReuse Singleton, InCurrentScope, InResolutionRoot;
 
         static Reuse()
         {
             Singleton = new SingletonReuse();
-            InScope = new ScopedReuse(ResolutionRoot.ReusedInScopeParameter);
-            InResolution = new ScopedReuse(Expression.Call(GetScopeMethod, ResolutionRoot.ReusedInResolutionParameter));
+            InCurrentScope = new ScopedReuse(ResolutionRoot.CurrentScopeReuseParameter);
+            InResolutionRoot = new ScopedReuse(Expression.Call(GetScopeMethod, ResolutionRoot.ReuseInResolutionRootParameter));
         }
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
