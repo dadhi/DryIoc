@@ -160,7 +160,7 @@ namespace DryIoc.UnitTests
 
     public class ThreadReuse : IReuse
     {
-        public Expression Of(Request _, IRegistry __, int factoryID, Expression factoryExpr)
+        public Expression Of(Request req, IRegistry reg, ResolutionRoot root, int factoryID, Expression factoryExpr)
         {
             return Reuse.GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
         }
@@ -193,7 +193,7 @@ namespace DryIoc.UnitTests
             return (T)HttpContext.Current.Items[key];
         }
 
-        public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+        public Expression Of(Request req, IRegistry reg, ResolutionRoot root, int factoryID, Expression factoryExpr)
         {
             return Expression.Call(_getOrAddToContextMethod.MakeGenericMethod(factoryExpr.Type), 
                 Expression.Constant(factoryID),        // use factoryID (unique per Container) as service ID.
