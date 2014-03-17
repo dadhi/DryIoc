@@ -11,7 +11,7 @@ namespace DryIoc.UnitTests
         public void Can_reuse_instances_in_new_open_scope()
         {
             var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var outerLog = container.Resolve<Log>();
             using (var scope = container.CreateScope())
@@ -28,7 +28,7 @@ namespace DryIoc.UnitTests
         public void Can_reuse_instances_in_two_level_nested_scope()
         {
             var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var outerLog = container.Resolve<Log>();
             using (var scope = container.CreateScope())
@@ -55,7 +55,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Consumer>();
             container.Register<Account>(Reuse.Singleton);
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var outerConsumer = container.Resolve<Consumer>();
             using (var scope = container.CreateScope())
@@ -74,7 +74,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Consumer>();
             container.Register<Account>(Reuse.Singleton);
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var outerConsumer = container.Resolve<Consumer>();
             using (var scope = container.CreateScope())
@@ -99,7 +99,7 @@ namespace DryIoc.UnitTests
         public void Cannot_create_service_after_scope_is_disposed()
         {
             var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             Func<Log> getLog;
             using (var containerWithNewScope = container.CreateScope())
@@ -113,7 +113,7 @@ namespace DryIoc.UnitTests
         public void Scope_can_be_safely_disposed_multiple_times_It_does_NOT_throw()
         {
             var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var containerWithNewScope = container.CreateScope();
             containerWithNewScope.Resolve<Log>();
@@ -127,7 +127,7 @@ namespace DryIoc.UnitTests
         public void Nested_scope_disposition_should_not_affect_outer_scope_factories()
         {
             var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
+            container.Register<Log>(Reuse.InScope);
 
             var getLog = container.Resolve<Func<Log>>();
             using (container.CreateScope()) { }
