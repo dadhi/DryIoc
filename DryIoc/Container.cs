@@ -37,10 +37,9 @@ namespace DryIoc
     /// <summary>
     /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
     /// TODO:
-    /// - fix: Thread.Sleep in Ref for PCL.
-    /// - add: ResolutionRoot as independent 3rd parameter to GetFactoryOrDefault/GetExpression. Remove it from Request.
-    /// - change: IsRegistered specialized by factory type.
-    /// - add: Unregister.
+    /// - add: IsRegistered specialized by factory type.
+    /// - finish: Unregister.
+    /// - finish: CreateChildContainer and CreateScope.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -2647,13 +2646,13 @@ namespace DryIoc
 
     public static class Ref
     {
-        public static Ref<T> Of<T>(T value)
+        public static Ref<T> Of<T>(T value) where T : class
         {
             return new Ref<T>(value);
         }
     }
 
-    public sealed class Ref<T>
+    public sealed class Ref<T> where T : class
     {
         public T Value { get { return _value; } }
 
@@ -2667,52 +2666,19 @@ namespace DryIoc
             var retryCount = 0;
             while (true)
             {
-                var version = _version; // remember current version before update
                 var oldValue = _value;
                 var newValue = update(oldValue);
-
-                // If no other commits in progress, mark that our commit is in progress and Try to commit updated value.
-                // If succeeded return old value used for update. Otherwise retry.
-                if (Interlocked.CompareExchange(ref _isCommitInProgress, 1, 0) == 0)
-                {
-                    try
-                    {
-                        // If some other code did not change version yet (means old value is consistent with updated one).
-                        // Then save updated value and increment version to mark the change for other committers.
-                        if (version == _version)
-                        {
-                            _value = newValue;
-                            Interlocked.Increment(ref _version);
-                            return oldValue; // return snapshot used for update
-                        }
-                    }
-                    finally
-                    {
-                        Interlocked.Exchange(ref _isCommitInProgress, 0);
-                    }
-                }
-                else if (retryCount++ < RETRY_UNTIL_THROW_COUNT)
-                {
-                    var awaitsCount = 0; // Before retry wait a bit for finished commit of other committer.
-                    while (_isCommitInProgress == 1 && awaitsCount++ < AWAIT_LOOPS_PER_RETRY_COUNT)
-                        Thread.Sleep(1); // Not a Sleep(0) because of http://joeduffyblog.com/2006/08/22/priorityinduced-starvation-why-sleep1-is-better-than-sleep0-and-the-windows-balance-set-manager/
-                }
-                else throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_COUNT);
+                if (Interlocked.CompareExchange(ref _value, newValue, oldValue) == oldValue)
+                    return oldValue;
+                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
+                    throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_COUNT);
             }
         }
 
-        #region Implementation
-
-        private const int RETRY_UNTIL_THROW_COUNT = 10;
-        private const int AWAIT_LOOPS_PER_RETRY_COUNT = 100;
-
-        private static readonly string ERROR_EXCEEDED_RETRY_COUNT =
-            "Ref tried to commit update for " + RETRY_UNTIL_THROW_COUNT + " times But there is always someone else intervened.";
-
         private T _value;
-        private int _version;
-        private int _isCommitInProgress; // 0 means false
 
-        #endregion
+        private const int RETRY_COUNT_UNTIL_THROW = 10;
+        private static readonly string ERROR_EXCEEDED_RETRY_COUNT =
+            "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
     }
 }

@@ -5,7 +5,8 @@ using NUnit.Framework;
 
 namespace DryIoc.Playground
 {
-    [TestFixture][Ignore]
+    [TestFixture]
+    //[Ignore]
     public class RefTests
     {
         [Test]
@@ -65,13 +66,13 @@ namespace DryIoc.Playground
 
     public static class Ref
     {
-        public static Ref<T> Of<T>(T value)
+        public static Ref<T> Of<T>(T value) where T : class
         {
             return new Ref<T>(value);
         }
     }
 
-    public sealed class Ref<T>
+    public sealed class Ref<T> where T : class
     {
         public T Value { get { return _value; } }
 
@@ -83,54 +84,21 @@ namespace DryIoc.Playground
         public T Update(Func<T, T> update)
         {
             var retryCount = 0;
-            while (retryCount++ < NUMBER_OF_RETRIES_UNTIL_THROW)
+            while (true)
             {
-                var version = _version; // remember snapshot version locally
                 var oldValue = _value;
                 var newValue = update(oldValue);
-
-                // Await here for finished commit.
-                // Why not Thread.Sleep(0): http://joeduffyblog.com/2006/08/22/priorityinduced-starvation-why-sleep1-is-better-than-sleep0-and-the-windows-balance-set-manager/
-                var awaitsCount = 0;
-                while (_isCommitInProgress == 1 && awaitsCount++ < NUMBER_OF_AWAIT_LOOPS_PER_RETRY)
-                    Thread.Sleep(1);
-
-                // If still/already in progress then retry. Otherwise mark that current code we is committing.
-                if (Interlocked.CompareExchange(ref _isCommitInProgress, 1, 0) == 1)
-                    continue;
-
-                try
-                {
-                    // If some other code did not change original value (and version) - means it is consistent, 
-                    // then commit update and increment version to signal the change to other code.
-                    if (version == _version)
-                    {
-                        _value = newValue;
-                        Interlocked.Increment(ref _version);
-                        return oldValue; // return snapshot used for update
-                    }
-                }
-                finally
-                {
-                    Interlocked.Exchange(ref _isCommitInProgress, 0);
-                }
+                if (Interlocked.CompareExchange(ref _value, newValue, oldValue) == oldValue)
+                    return oldValue;
+                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
+                    throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_COUNT);
             }
-
-            throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_NUMBER);
         }
 
-        #region Implementation
-
-        private const int NUMBER_OF_RETRIES_UNTIL_THROW = 10;
-        private const int NUMBER_OF_AWAIT_LOOPS_PER_RETRY = 100;
-
-        private static readonly string ERROR_EXCEEDED_RETRY_NUMBER =
-            "Ref tried to commit update for " + NUMBER_OF_RETRIES_UNTIL_THROW + " times But there is always someone else intervened.";
-
         private T _value;
-        private int _version;
-        private int _isCommitInProgress; // 0 means false
 
-        #endregion
+        private const int RETRY_COUNT_UNTIL_THROW = 10;
+        private static readonly string ERROR_EXCEEDED_RETRY_COUNT =
+            "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
     }
 }
