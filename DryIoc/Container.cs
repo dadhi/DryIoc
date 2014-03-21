@@ -94,7 +94,7 @@ namespace DryIoc
         public Container CreateChildContainer()
         {
             var container = new Container(_resolutionRules, _genericWrappers.Value);
-            container.ResolutionRules.ForUnregisteredService.Update(x => x.Append(
+            container._resolutionRules.ForUnregisteredService.Update(x => x.Append(
                 (request, _) =>
                 {
                     var parentRegistry = (IRegistry)this;
@@ -124,10 +124,10 @@ namespace DryIoc
             switch (factory.Setup.Type)
             {
                 case FactoryType.Decorator:
-                    _decorators.Update(x => x.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append));
+                    _decorators.Swap(x => x.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append));
                     break;
                 case FactoryType.GenericWrapper:
-                    _genericWrappers.Update(x => x.AddOrUpdate(serviceType, factory));
+                    _genericWrappers.Swap(x => x.AddOrUpdate(serviceType, factory));
                     break;
                 default:
                     AddFactory(factory, serviceType, serviceKey, ifAlreadyRegistered);
@@ -161,13 +161,13 @@ namespace DryIoc
             switch (factoryType)
             {
                 case FactoryType.GenericWrapper:
-                    _genericWrappers.Update(_ => _.RemoveOrUpdate(serviceType));
+                    _genericWrappers.Swap(_ => _.RemoveOrUpdate(serviceType));
                     break;
                 case FactoryType.Decorator:
-                    _decorators.Update(_ => _.RemoveOrUpdate(serviceType));
+                    _decorators.Swap(_ => _.RemoveOrUpdate(serviceType));
                     break;
                 default:
-                    _factories.Update(_ => _.RemoveOrUpdate(serviceType,
+                    _factories.Swap(_ => _.RemoveOrUpdate(serviceType,
                         (Type key, object entry, out object newEntry) =>
                         {
                             newEntry = entry;     // by default keep existing entry
@@ -240,7 +240,7 @@ namespace DryIoc
                 return null;
 
             var newCompiledFactory = factory.GetExpression(request, this).CompileToFactory();
-            _keyedResolutionCache.Update(x => x.AddOrUpdate(serviceType,
+            _keyedResolutionCache.Swap(x => x.AddOrUpdate(serviceType,
                 (compiledFactories ?? HashTree<object, CompiledFactory>.Empty).AddOrUpdate(serviceKey, newCompiledFactory)));
             return newCompiledFactory(_resolutionRoot.Store.Value, _reusedInScope, resolutionScope: null);
         }
@@ -252,7 +252,7 @@ namespace DryIoc
             if (factory == null)
                 return delegate { return null; };
             var newFactory = factory.GetExpression(request, this).CompileToFactory();
-            _defaultResolutionCache.Update(x => x.AddOrUpdate(serviceType, newFactory));
+            _defaultResolutionCache.Swap(x => x.AddOrUpdate(serviceType, newFactory));
             return newFactory;
         }
 
@@ -439,7 +439,7 @@ namespace DryIoc
         {
             if (serviceKey == null)
             {
-                _factories.Update(x => x.AddOrUpdate(serviceType, factory, (oldEntry, entry) =>
+                _factories.Swap(x => x.AddOrUpdate(serviceType, factory, (oldEntry, entry) =>
                 {
                     if (oldEntry is Factory)
                         return ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered
@@ -459,7 +459,7 @@ namespace DryIoc
             else if (serviceKey is string)
             {
                 var newEntry = new KeyedFactoriesEntry(-1, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
-                _factories.Update(x => x.AddOrUpdate(serviceType, newEntry, (oldEntry, entry) =>
+                _factories.Swap(x => x.AddOrUpdate(serviceType, newEntry, (oldEntry, entry) =>
                 {
                     if (oldEntry is Factory)
                         return new KeyedFactoriesEntry(0,
@@ -479,7 +479,7 @@ namespace DryIoc
             {
                 var index = (int)serviceKey;
                 var newEntry = new KeyedFactoriesEntry(index, HashTree<object, Factory>.Empty.AddOrUpdate(index, factory));
-                _factories.Update(x => x.AddOrUpdate(serviceType, newEntry, (oldEntry, entry) =>
+                _factories.Swap(x => x.AddOrUpdate(serviceType, newEntry, (oldEntry, entry) =>
                 {
                     if (oldEntry is Factory)
                     {
@@ -573,7 +573,7 @@ namespace DryIoc
         public Expression GetItemExpression(object item, Type itemType)
         {
             var itemIndex = -1;
-            Store.Update(x =>
+            Store.Swap(x =>
             {
                 itemIndex = x.IndexOf(item);
                 if (itemIndex == -1)
@@ -920,6 +920,8 @@ namespace DryIoc
 
     public sealed class ResolutionRules
     {
+        public static readonly BindingFlags PropertyOrFieldFlags = BindingFlags.Public | BindingFlags.Instance;
+
         public delegate Factory GetSingleFactory(Type serviceType, IEnumerable<Factory> factories);
         public GetSingleFactory ToGetSingleFactory; // If not specified then Throws for multiple factories registered.
 
@@ -1360,8 +1362,6 @@ namespace DryIoc
             return (TService)resolver.Resolve(typeof(TService), serviceName, ifUnresolved);
         }
 
-        public static readonly BindingFlags MembersToResolve = BindingFlags.Public | BindingFlags.Instance;
-
         /// <summary>
         /// For given instance resolves and sets non-initialized (null) properties from container.
         /// It does not throw if property is not resolved, so you might need to check property value afterwards.
@@ -1374,14 +1374,14 @@ namespace DryIoc
             var implType = instance.ThrowIfNull().GetType();
             getServiceName = getServiceName ?? (_ => null);
 
-            foreach (var property in implType.GetProperties(MembersToResolve).Where(p => p.GetSetMethod() != null))
+            foreach (var property in implType.GetProperties(ResolutionRules.PropertyOrFieldFlags).Where(p => p.GetSetMethod() != null))
             {
                 var value = resolver.Resolve(property.PropertyType, getServiceName(property), IfUnresolved.ReturnNull);
                 if (value != null)
                     property.SetValue(instance, value, null);
             }
 
-            foreach (var field in implType.GetFields(MembersToResolve).Where(f => !f.IsInitOnly))
+            foreach (var field in implType.GetFields(ResolutionRules.PropertyOrFieldFlags).Where(f => !f.IsInitOnly))
             {
                 var value = resolver.Resolve(field.FieldType, getServiceName(field), IfUnresolved.ReturnNull);
                 if (value != null)
@@ -1853,8 +1853,8 @@ namespace DryIoc
             if (registry.ResolutionRules.ForPropertyOrField.IsEmpty)
                 return newService;
 
-            var props = implementationType.GetProperties(Resolver.MembersToResolve).Where(p => p.GetSetMethod() != null);
-            var fields = implementationType.GetFields(Resolver.MembersToResolve).Where(f => !f.IsInitOnly);
+            var props = implementationType.GetProperties(ResolutionRules.PropertyOrFieldFlags).Where(p => p.GetSetMethod() != null);
+            var fields = implementationType.GetFields(ResolutionRules.PropertyOrFieldFlags).Where(f => !f.IsInitOnly);
 
             var bindings = new List<MemberBinding>();
             foreach (var member in props.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>()))
@@ -2661,7 +2661,7 @@ namespace DryIoc
             _value = initialValue;
         }
 
-        public T Update(Func<T, T> update)
+        public T Swap(Func<T, T> update)
         {
             var retryCount = 0;
             while (true)

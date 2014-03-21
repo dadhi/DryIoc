@@ -44,6 +44,7 @@
     <Compile Include="ManyTests.cs" />
     <Compile Include="Memory\NoLeakingMemoryTests.cs" />
     <Compile Include="PrintTests.cs" />
+    <Compile Include="RefTests.cs" />
     <Compile Include="ResolutionRulesTests.cs" />
     <Compile Include="ContainerTests.cs" />
     <Compile Include="ContextDependentResolutionTests.cs" />

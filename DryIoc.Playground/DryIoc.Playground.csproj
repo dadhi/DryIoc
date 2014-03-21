@@ -60,10 +60,10 @@
     <Compile Include="Performance\IlEmitDynamicMethodVsExpressionCompile.cs" />
     <Compile Include="Performance\MethodArgumentsPassingSpeedComparison.cs" />
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
+    <Compile Include="ResolutionRulesPlay.cs" />
     <Compile Include="ValidatorTests.cs" />
     <Compile Include="OptionsPlayTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RefTests.cs" />
     <Compile Include="ThrowPlayTests.cs" />
     <Compile Include="TreeBuilderTests.cs" />
     <Compile Include="TypeTree.cs" />

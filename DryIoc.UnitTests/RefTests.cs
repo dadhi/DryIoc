@@ -1,12 +1,10 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
 using System.Threading;
 using NUnit.Framework;
 
-namespace DryIoc.Playground
+namespace DryIoc.UnitTests
 {
-    [TestFixture]
-    //[Ignore]
+    [TestFixture][Ignore]
     public class RefTests
     {
         [Test]
@@ -28,7 +26,7 @@ namespace DryIoc.Playground
                 var thread = new Thread(() =>
                 {
                     Thread.Sleep(delay);
-                    itemsRef.Update(xs => xs.Reverse().ToArray());
+                    itemsRef.Swap(xs => xs.Reverse().ToArray());
                     latch.Signal();
                 }) { IsBackground = true };
                 thread.Start();
@@ -62,43 +60,5 @@ namespace DryIoc.Playground
             private int _remain;
             private readonly EventWaitHandle _event;
         }
-    }
-
-    public static class Ref
-    {
-        public static Ref<T> Of<T>(T value) where T : class
-        {
-            return new Ref<T>(value);
-        }
-    }
-
-    public sealed class Ref<T> where T : class
-    {
-        public T Value { get { return _value; } }
-
-        public Ref(T initialValue = default(T))
-        {
-            _value = initialValue;
-        }
-
-        public T Update(Func<T, T> update)
-        {
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = _value;
-                var newValue = update(oldValue);
-                if (Interlocked.CompareExchange(ref _value, newValue, oldValue) == oldValue)
-                    return oldValue;
-                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
-                    throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_COUNT);
-            }
-        }
-
-        private T _value;
-
-        private const int RETRY_COUNT_UNTIL_THROW = 10;
-        private static readonly string ERROR_EXCEEDED_RETRY_COUNT =
-            "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
     }
 }
