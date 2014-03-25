@@ -14,7 +14,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Service>();
 
-            container.ResolutionRules.ForUnregisteredService.Remove(OpenGenericsSupport.ResolveEnumerableAsStaticArray);
+            container.ResolutionRules.Swap(r => r.With(
+                r.TryResolveUnregisteredService.Remove(OpenGenericsSupport.ResolveEnumerableAsStaticArray)));
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service[]>());
@@ -40,10 +41,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.ResolutionRules.ForUnregisteredService.Append((request, registry) =>
+            container.ResolutionRules.Swap(r => r.With(r.TryResolveUnregisteredService.Append((request, registry) =>
                 request.ServiceType.IsClass && !request.ServiceType.IsAbstract
                     ? new ReflectionFactory(request.ServiceType)
-                    : null);
+                    : null)));
 
             var service = container.Resolve<NotRegisteredService>();
 
@@ -54,11 +55,12 @@ namespace DryIoc.UnitTests
         public void When_service_registered_with_name_Then_it_could_be_resolved_with_ctor_parameter_ImportAttribute()
         {
             var container = new Container();
-            container.ResolutionRules.ForConstructorParameter.Append((parameter, _, __) =>
-            {
-                object key;
-                return TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false)) ? key : null;
-            });
+            container.ResolutionRules.Swap(r => r.With(
+                r.TryResolveConstructorParameterServiceKey.Append((parameter, _, __) =>
+                {
+                    object key;
+                    return TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false)) ? key : null;
+                })));
 
             container.Register(typeof(INamedService), typeof(NamedService));
             container.Register(typeof(INamedService), typeof(AnotherNamedService), named: "blah");
@@ -73,13 +75,14 @@ namespace DryIoc.UnitTests
         public void I_should_be_able_to_import_single_service_based_on_specified_metadata()
         {
             var container = new Container();
-            container.ResolutionRules.ForConstructorParameter.Append((parameter, parent, registry) =>
-            {
-                object key;
-                var attributes = parameter.GetCustomAttributes(false);
-                return TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes)
-                    ? key : null;
-            });
+            container.ResolutionRules.Swap(r => r.With(
+                r.TryResolveConstructorParameterServiceKey.Append((parameter, parent, registry) =>
+                {
+                    object key;
+                    var attributes = parameter.GetCustomAttributes(false);
+                    return TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes)
+                        ? key : null;
+                })));
 
             container.Register(typeof(IFooService), typeof(FooHey), setup: ServiceSetup.WithMetadata(FooMetadata.Hey));
             container.Register(typeof(IFooService), typeof(FooBlah), setup: ServiceSetup.WithMetadata(FooMetadata.Blah));
@@ -128,7 +131,7 @@ namespace DryIoc.UnitTests
         public void You_can_customize_resolving_single_implementation_from_multiple_registrations()
         {
             var container = new Container();
-            container.ResolutionRules.ToGetSingleFactory = (_, factories) => factories.Last();
+            container.ResolutionRules.Swap(r => r.With((_, factories) => factories.Last()));
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));
