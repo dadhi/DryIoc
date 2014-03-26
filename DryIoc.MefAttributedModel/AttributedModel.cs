@@ -43,8 +43,8 @@ namespace DryIoc.MefAttributedModel
         public static Container WithAttributedModel(this Container container)
         {
             container.ResolutionRules.Swap(rules => rules
-                .With(rules.TryResolveConstructorParameterServiceKey.Append(GetConstructorParameterServiceKeyOrDefault))
-                .With(rules.CanResolvePropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
+                .With(rules.ToResolveConstructorParameterServiceKey.Append(GetConstructorParameterServiceKeyOrDefault))
+                .With(rules.ToResolvePropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
             return container;
         }
 
