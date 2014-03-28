@@ -39,7 +39,7 @@
     <Reference Include="System.Web" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AppendStoreTests.cs" />
+    <Compile Include="AppendableArrayTests.cs" />
     <Compile Include="CompositePatternTests.cs" />
     <Compile Include="ManyTests.cs" />
     <Compile Include="Memory\NoLeakingMemoryTests.cs" />

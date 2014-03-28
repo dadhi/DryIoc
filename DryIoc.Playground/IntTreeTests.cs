@@ -141,7 +141,7 @@ namespace DryIoc.Playground
         {
             var tree = HashTree<KeyValuePair<Type, string>[]>.Empty;
 
-            var key = typeof(AppendStoreTests);
+            var key = typeof(AppendableArrayTests);
             var keyHash = key.GetHashCode();
             var value = "test";
 
@@ -198,7 +198,7 @@ namespace DryIoc.Playground
         {
             var tree = DryIoc.HashTree<Type, string>.Empty;
 
-            var key = typeof(AppendStoreTests);
+            var key = typeof(AppendableArrayTests);
             var value = "test";
 
             tree = tree.AddOrUpdate(key, value);

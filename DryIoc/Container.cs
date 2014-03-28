@@ -46,8 +46,8 @@ namespace DryIoc
     public class Container : IRegistry, IDisposable
     {
         public static ResolutionRules DefaultResolutionRules = DryIoc.ResolutionRules.Empty.With(
-            OpenGenericsSupport.ResolveOpenGenerics, 
-            OpenGenericsSupport.ResolveEnumerableOrArray); 
+            OpenGenericsSupport.ResolveOpenGenerics,
+            OpenGenericsSupport.ResolveEnumerableOrArray);
 
         public Container(ResolutionRules resolutionRules = null)
         {
@@ -56,13 +56,13 @@ namespace DryIoc
             _factories = Ref.Of(HashTree<Type, object>.Empty);
             _decorators = Ref.Of(HashTree<Type, Factory[]>.Empty);
             _genericWrappers = Ref.Of(OpenGenericsSupport.GenericWrappers);
-
+            
             _singletonScope = _currentScope = new Scope();
 
-            _defaultResolutionCache = Ref.Of(HashTree<Type, CompiledFactory>.Empty);
-            _keyedResolutionCache = Ref.Of(HashTree<Type, HashTree<object, CompiledFactory>>.Empty);
+            _resolvedDefaultDelegates = Ref.Of(HashTree<Type, CompiledFactory>.Empty);
+            _resolvedKeyedDelegates = Ref.Of(HashTree<Type, HashTree<object, CompiledFactory>>.Empty);
 
-            _resolutionRoot = new ResolutionRoot();
+            _resolvedExpressions = new ResolvedExpressions();
         }
 
         public Container(Container source)
@@ -78,13 +78,13 @@ namespace DryIoc
             _singletonScope = source._singletonScope;
             _currentScope = source._currentScope;
 
-            _defaultResolutionCache = source._defaultResolutionCache;
-            _keyedResolutionCache = source._keyedResolutionCache;
+            _resolvedDefaultDelegates = source._resolvedDefaultDelegates;
+            _resolvedKeyedDelegates = source._resolvedKeyedDelegates;
 
-            _resolutionRoot = source._resolutionRoot;
+            _resolvedExpressions = source._resolvedExpressions;
         }
 
-        public Container CreateScope()
+        public Container CreateReuseScope()
         {
             return new Container(this) { _currentScope = new Scope() };
         }
@@ -110,7 +110,7 @@ namespace DryIoc
 
         public Request CreateRequest(Type serviceType, object serviceKey = null)
         {
-            return new Request(_resolutionRoot, null, serviceType, serviceKey);
+            return new Request(_resolvedExpressions, null, serviceType, serviceKey);
         }
 
         #region IRegistrator
@@ -216,19 +216,19 @@ namespace DryIoc
 
         object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var compiledFactory = _defaultResolutionCache.Value.GetValueOrDefault(serviceType)
+            var compiledFactory = _resolvedDefaultDelegates.Value.GetValueOrDefault(serviceType)
                 ?? ResolveAndCacheFactory(serviceType, ifUnresolved);
-            return compiledFactory(_resolutionRoot.Store.Value, _currentScope, resolutionScope: null);
+            return compiledFactory(_resolvedExpressions.Objects.Value, _currentScope, resolutionScope: null);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
         {
-            var compiledFactories = _keyedResolutionCache.Value.GetValueOrDefault(serviceType);
+            var compiledFactories = _resolvedKeyedDelegates.Value.GetValueOrDefault(serviceType);
             if (compiledFactories != null)
             {
                 var compiledFactory = compiledFactories.GetValueOrDefault(serviceKey);
                 if (compiledFactory != null)
-                    return compiledFactory(_resolutionRoot.Store.Value, _currentScope, resolutionScope: null);
+                    return compiledFactory(_resolvedExpressions.Objects.Value, _currentScope, resolutionScope: null);
             }
 
             var request = CreateRequest(serviceType, serviceKey);
@@ -237,9 +237,9 @@ namespace DryIoc
                 return null;
 
             var newCompiledFactory = factory.GetExpression(request, this).CompileToFactory();
-            _keyedResolutionCache.Swap(x => x.AddOrUpdate(serviceType,
+            _resolvedKeyedDelegates.Swap(x => x.AddOrUpdate(serviceType,
                 (compiledFactories ?? HashTree<object, CompiledFactory>.Empty).AddOrUpdate(serviceKey, newCompiledFactory)));
-            return newCompiledFactory(_resolutionRoot.Store.Value, _currentScope, resolutionScope: null);
+            return newCompiledFactory(_resolvedExpressions.Objects.Value, _currentScope, resolutionScope: null);
         }
 
         private CompiledFactory ResolveAndCacheFactory(Type serviceType, IfUnresolved ifUnresolved)
@@ -249,7 +249,7 @@ namespace DryIoc
             if (factory == null)
                 return delegate { return null; };
             var newFactory = factory.GetExpression(request, this).CompileToFactory();
-            _defaultResolutionCache.Swap(x => x.AddOrUpdate(serviceType, newFactory));
+            _resolvedDefaultDelegates.Swap(x => x.AddOrUpdate(serviceType, newFactory));
             return newFactory;
         }
 
@@ -291,7 +291,7 @@ namespace DryIoc
         Factory IRegistry.GetFactoryOrDefault(Type serviceType, object serviceKey)
         {
             return GetFactoryOrDefault(
-                serviceType.ThrowIfNull(), serviceKey, 
+                serviceType.ThrowIfNull(), serviceKey,
                 ResolutionRules.Value.ToGetSingleFactory,
                 ifNotFoundLookForOpenGenericServiceType: true);
         }
@@ -368,16 +368,15 @@ namespace DryIoc
                             Register(decorator, serviceType, null, IfAlreadyRegistered.ThrowIfNamed);
                         }
 
-                        var decoratorExpr = request.Root.GetCachedFactoryExpression(decorator.ID);
+                        var decoratorExpr = request.ResolvedExpressions.GetCachedFactoryOrDefault(decorator.ID);
                         if (decoratorExpr == null)
                         {
                             IList<Type> unusedFunArgs;
                             var funcExpr = decorator
                                 .GetFuncWithArgsOrDefault(decoratorFuncType, decoratorRequest, this, out unusedFunArgs)
                                 .ThrowIfNull(Error.DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION, decoratorFuncType);
-
                             decoratorExpr = unusedFunArgs != null ? funcExpr.Body : funcExpr;
-                            request.Root.CacheFactoryExpression(decorator.ID, decoratorExpr);
+                            request.ResolvedExpressions.CacheFactory(decorator.ID, decoratorExpr);
                         }
 
                         if (resultDecorator == null || !(decoratorExpr is LambdaExpression))
@@ -554,60 +553,60 @@ namespace DryIoc
         private readonly Scope _singletonScope;
         private Scope _currentScope;
 
-        private readonly Ref<HashTree<Type, CompiledFactory>> _defaultResolutionCache;
-        private readonly Ref<HashTree<Type, HashTree<object, CompiledFactory>>> _keyedResolutionCache;
+        private readonly Ref<HashTree<Type, CompiledFactory>> _resolvedDefaultDelegates;
+        private readonly Ref<HashTree<Type, HashTree<object, CompiledFactory>>> _resolvedKeyedDelegates;
 
-        private readonly ResolutionRoot _resolutionRoot;
+        private readonly ResolvedExpressions _resolvedExpressions;
 
         #endregion
     }
 
-    public sealed class ResolutionRoot
+    public sealed class ResolvedExpressions
     {
-        public static readonly ParameterExpression StoreParameter = Expression.Parameter(typeof(AppendStore<object>), "store");
+        public static readonly ParameterExpression ObjectsParameter = Expression.Parameter(typeof(AppendableArray<object>), "objects");
         public static readonly ParameterExpression CurrentScopeParameter = Expression.Parameter(typeof(Scope), "currentScope");
         public static readonly ParameterExpression ResolutionScopeParameter = Expression.Parameter(typeof(Scope), "resolutionScope");
 
-        public readonly Ref<AppendStore<object>> Store = Ref.Of(AppendStore<object>.Empty);
-        public HashTree<int, Expression> FactoryExprCache = HashTree<int, Expression>.Empty;
+        public readonly Ref<AppendableArray<object>> Objects = Ref.Of(AppendableArray<object>.Empty);
+        public HashTree<int, Expression> FactoryExpressions = HashTree<int, Expression>.Empty;
 
-        public Expression GetItemExpression(object item, Type itemType)
+        public Expression GetOrAddObject(object obj, Type objectType)
         {
-            var itemIndex = -1;
-            Store.Swap(x =>
+            var index = -1;
+            Objects.Swap(x =>
             {
-                itemIndex = x.IndexOf(item);
-                if (itemIndex == -1)
-                    itemIndex = (x = x.Append(item)).Count - 1;
+                index = x.IndexOf(obj);
+                if (index == -1)
+                    index = (x = x.Append(obj)).Length - 1;
                 return x;
             });
 
-            var itemIndexExpr = Expression.Constant(itemIndex.ThrowIf(itemIndex == -1), typeof(int));
-            var itemExpr = Expression.Call(StoreParameter, _storeGetMethod, itemIndexExpr);
-            return Expression.Convert(itemExpr, itemType);
+            var indexExpr = Expression.Constant(index.ThrowIf(index == -1), typeof(int));
+            var objectExpr = Expression.Call(ObjectsParameter, _appendableArrayGetMethod, indexExpr);
+            return Expression.Convert(objectExpr, objectType);
         }
 
-        public Expression GetItemExpression<T>(T item)
+        public Expression GetOrAddObject<T>(T obj)
         {
-            return GetItemExpression(item, typeof(T));
+            return GetOrAddObject(obj, typeof(T));
         }
 
-        public Expression GetRegistryItemExpression(IRegistry registry)
+        public Expression GetOrAddRegistryObject(IRegistry registry)
         {
-            return Expression.Property(GetItemExpression(registry.SelfWeakRef), "Target");
+            return Expression.Property(GetOrAddObject(registry.SelfWeakRef), "Target");
         }
 
-        public Expression GetCachedFactoryExpression(int factoryID)
+        public Expression GetCachedFactoryOrDefault(int factoryID)
         {
-            return FactoryExprCache.GetFirstValueByHashOrDefault(factoryID);
+            return FactoryExpressions.GetFirstValueByHashOrDefault(factoryID);
         }
 
-        public void CacheFactoryExpression(int factoryID, Expression result)
+        public void CacheFactory(int factoryID, Expression factoryExpression)
         {
-            Interlocked.Exchange(ref FactoryExprCache, FactoryExprCache.AddOrUpdate(factoryID, result));
+            Interlocked.Exchange(ref FactoryExpressions, FactoryExpressions.AddOrUpdate(factoryID, factoryExpression));
         }
 
-        private static readonly MethodInfo _storeGetMethod = typeof(AppendStore<object>).GetMethod("Get");
+        private static readonly MethodInfo _appendableArrayGetMethod = typeof(AppendableArray<object>).GetMethod("Get");
     }
 
     public sealed class RegistryWeakRef
@@ -625,16 +624,16 @@ namespace DryIoc
         private readonly WeakReference _weakRef;
     }
 
-    public sealed class AppendStore<T>
+    public sealed class AppendableArray<T>
     {
-        public static readonly AppendStore<T> Empty = new AppendStore<T>(0, HashTree<int, T[]>.Empty);
+        public static readonly AppendableArray<T> Empty = new AppendableArray<T>();
 
-        public readonly int Count;
+        public readonly int Length;
 
-        public AppendStore<T> Append(T value)
+        public AppendableArray<T> Append(T value)
         {
-            return new AppendStore<T>(Count + 1,
-                _tree.AddOrUpdate(Count >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
+            return new AppendableArray<T>(Length + 1,
+                _tree.AddOrUpdate(Length >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
         }
 
         public int IndexOf(object value, int defaultIndex = -1)
@@ -662,16 +661,18 @@ namespace DryIoc
 
         private readonly HashTree<int, T[]> _tree;
 
-        private AppendStore(int count, HashTree<int, T[]> tree)
+        private AppendableArray() : this(0, HashTree<int, T[]>.Empty) { }
+
+        private AppendableArray(int length, HashTree<int, T[]> tree)
         {
-            Count = count;
+            Length = length;
             _tree = tree;
         }
 
         #endregion
     }
 
-    public delegate object CompiledFactory(AppendStore<object> resolutionStore, Scope currentScope, Scope resolutionScope);
+    public delegate object CompiledFactory(AppendableArray<object> resolutionStore, Scope currentScope, Scope resolutionScope);
 
     public static partial class FactoryCompiler
     {
@@ -681,7 +682,7 @@ namespace DryIoc
             if (expression.NodeType == ExpressionType.Convert)
                 expression = ((UnaryExpression)expression).Operand;
             return Expression.Lambda<CompiledFactory>(expression,
-                ResolutionRoot.StoreParameter, ResolutionRoot.CurrentScopeParameter, ResolutionRoot.ResolutionScopeParameter);
+                ResolvedExpressions.ObjectsParameter, ResolvedExpressions.CurrentScopeParameter, ResolvedExpressions.ResolutionScopeParameter);
         }
 
         public static CompiledFactory CompileToFactory(this Expression expression)
@@ -806,7 +807,7 @@ namespace DryIoc
 
             var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, wrappedItemType);
 
-            var registryRefExpr = request.Root.GetItemExpression(registry.SelfWeakRef);
+            var registryRefExpr = request.ResolvedExpressions.GetOrAddObject(registry.SelfWeakRef);
             var resolveCallExpr = Expression.Call(resolveMethod, registryRefExpr, Expression.Constant(parentFactoryID));
 
             return Expression.New(dynamicEnumerableType.GetConstructors()[0], resolveCallExpr);
@@ -838,7 +839,7 @@ namespace DryIoc
             var serviceRequest = request.Push(serviceType, request.ServiceKey);
             var factory = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw);
             var factoryExpr = factory.GetExpression(serviceRequest, registry).ToCompiledFactoryExpression();
-            return Expression.New(ctor, request.Root.GetItemExpression(factoryExpr));
+            return Expression.New(ctor, request.ResolvedExpressions.GetOrAddObject(factoryExpr));
         }
 
         public static Factory GetMetaFactoryOrDefault(Request request, IRegistry registry)
@@ -878,7 +879,7 @@ namespace DryIoc
                 var serviceRequest = req.Push(serviceType, serviceKey);
                 var serviceExpr = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw).GetExpression(serviceRequest, registry);
                 var metaCtor = req.ServiceType.GetConstructors()[0];
-                var metadataExpr = req.Root.GetItemExpression(resultMetadata, metadataType);
+                var metadataExpr = req.ResolvedExpressions.GetOrAddObject(resultMetadata, metadataType);
                 return Expression.New(metaCtor, serviceExpr, metadataExpr);
             });
         }
@@ -1233,7 +1234,7 @@ namespace DryIoc
             string named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
         {
             var factory = new DelegateFactory((request, registry) =>
-                Expression.Invoke(request.Root.GetItemExpression(lambda), request.Root.GetRegistryItemExpression(registry)),
+                Expression.Invoke(request.ResolvedExpressions.GetOrAddObject(lambda), request.ResolvedExpressions.GetOrAddRegistryObject(registry)),
                 reuse, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
@@ -1364,7 +1365,7 @@ namespace DryIoc
 
     public sealed class Request
     {
-        public readonly ResolutionRoot Root;
+        public readonly ResolvedExpressions ResolvedExpressions;
         public readonly Request Parent;             // null for resolution root
         public readonly Type ServiceType;
         public readonly object ServiceKey;          // null by default, string for named or integer index for multiple defaults
@@ -1383,7 +1384,7 @@ namespace DryIoc
 
         public Request Push(Type serviceType, object serviceKey, object dependencyInfo = null)
         {
-            return new Request(Root, this, serviceType, serviceKey, dependencyInfo);
+            return new Request(ResolvedExpressions, this, serviceType, serviceKey, dependencyInfo);
         }
 
         public Request ResolveWith(Factory factory)
@@ -1391,7 +1392,7 @@ namespace DryIoc
             for (var p = Parent; p != null; p = p.Parent)
                 Throw.If(p.ResolvedFactory != null && p.ResolvedFactory.ID == factory.ID && p.ResolvedFactory.Setup.Type == FactoryType.Service,
                     Error.RECURSIVE_DEPENDENCY_DETECTED, this);
-            return new Request(Root, Parent, ServiceType, ServiceKey, DependencyInfo, factory);
+            return new Request(ResolvedExpressions, Parent, ServiceType, ServiceKey, DependencyInfo, factory);
         }
 
         public Request GetNonWrapperParentOrDefault()
@@ -1452,10 +1453,10 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(ResolutionRoot root, Request parent, Type serviceType,
+        internal Request(ResolvedExpressions resolvedExpressions, Request parent, Type serviceType,
             object serviceKey = null, object dependencyInfo = null, Factory factory = null)
         {
-            Root = root;
+            ResolvedExpressions = resolvedExpressions;
             Parent = parent;
             ServiceType = serviceType.ThrowIfNull()
                 .ThrowIf(serviceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
@@ -1610,14 +1611,16 @@ namespace DryIoc
             if (decorator != null && !(decorator is LambdaExpression))
                 return decorator;
 
-            var expression = request.Root.GetCachedFactoryExpression(ID);
+            Expression expression = null;
+            if (Setup.CachePolicy == FactoryCachePolicy.CouldCacheExpression)
+                expression = request.ResolvedExpressions.GetCachedFactoryOrDefault(ID);
             if (expression == null)
             {
                 expression = CreateExpression(request, registry);
                 if (Reuse != null)
                     expression = Reuse.Of(request, registry, ID, expression);
                 if (Setup.CachePolicy == FactoryCachePolicy.CouldCacheExpression)
-                    request.Root.CacheFactoryExpression(ID, expression);
+                    request.ResolvedExpressions.CacheFactory(ID, expression);
             }
 
             if (decorator != null)
@@ -2019,8 +2022,8 @@ namespace DryIoc
         static Reuse()
         {
             Singleton = new SingletonReuse();
-            InCurrentScope = new ScopedReuse(ResolutionRoot.CurrentScopeParameter);
-            InResolutionScope = new ScopedReuse(Expression.Call(GetScopeMethod, ResolutionRoot.ResolutionScopeParameter));
+            InCurrentScope = new ScopedReuse(ResolvedExpressions.CurrentScopeParameter);
+            InResolutionScope = new ScopedReuse(Expression.Call(GetScopeMethod, ResolvedExpressions.ResolutionScopeParameter));
         }
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
@@ -2063,14 +2066,14 @@ namespace DryIoc
                     return openGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(openGenericServiceType);
                 }))
                     return GetScopedServiceExpression(
-                        request.Root.GetItemExpression(registry.Singletons),
+                        request.ResolvedExpressions.GetOrAddObject(registry.Singletons),
                         factoryID, factoryExpr);
 
                 // Create singleton object now and put it into store.
                 var currentScope = registry.ReusedInScope;
                 var singleton = registry.Singletons.GetOrAdd(factoryID,
-                    () => factoryExpr.CompileToFactory().Invoke(request.Root.Store.Value, currentScope, null));
-                return request.Root.GetItemExpression(singleton, factoryExpr.Type);
+                    () => factoryExpr.CompileToFactory().Invoke(request.ResolvedExpressions.Objects.Value, currentScope, null));
+                return request.ResolvedExpressions.GetOrAddObject(singleton, factoryExpr.Type);
             }
         }
     }
@@ -2648,18 +2651,23 @@ namespace DryIoc
             _value = initialValue;
         }
 
-        public T Swap(Func<T, T> updateValue)
+        public T Swap(Func<T, T> update)
         {
             var retryCount = 0;
             while (true)
             {
                 var oldValue = _value;
-                var newValue = updateValue(oldValue);
+                var newValue = update(oldValue);
                 if (Interlocked.CompareExchange(ref _value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > RETRY_COUNT_UNTIL_THROW)
                     throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_COUNT);
             }
+        }
+
+        public T Set(T value)
+        {
+            return Interlocked.Exchange(ref _value, value);
         }
 
         private T _value;

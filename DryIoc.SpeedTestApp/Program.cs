@@ -433,7 +433,7 @@ namespace DryIoc.SpeedTestApp
             var keys = Enumerable.Range(0, itemCount).ToArray();
 
             var tree = HashTree<string>.Empty;
-            var store = AppendStore<string>.Empty;
+            var store = AppendableArray<string>.Empty;
 
             var treeAddTime = IntAdd(ref tree, keys, key, value);
             var trieAddTime = IntAdd(ref store, keys, value);
@@ -575,7 +575,7 @@ namespace DryIoc.SpeedTestApp
             return treeTime.ElapsedMilliseconds;
         }
 
-        private static long IntAdd(ref AppendStore<string> store, int[] keys, string value)
+        private static long IntAdd(ref AppendableArray<string> store, int[] keys, string value)
         {
             const string ignored = "";
             var treeTime = Stopwatch.StartNew();
@@ -662,7 +662,7 @@ namespace DryIoc.SpeedTestApp
             return treeWatch.ElapsedMilliseconds;
         }
 
-        private static long IntGet(AppendStore<string> store, int key, int times)
+        private static long IntGet(AppendableArray<string> store, int key, int times)
         {
             object ignored = "ignored";
             var treeWatch = Stopwatch.StartNew();

@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var outerLog = container.Resolve<Log>();
-            using (var scope = container.CreateScope())
+            using (var scope = container.CreateReuseScope())
             {
                 var scopedLog1 = scope.Resolve<Log>();
                 var scopedLog2 = scope.Resolve<Log>();
@@ -31,11 +31,11 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var outerLog = container.Resolve<Log>();
-            using (var scope = container.CreateScope())
+            using (var scope = container.CreateReuseScope())
             {
                 var scopedLog = scope.Resolve<Log>();
 
-                using (var deepScope = scope.CreateScope())
+                using (var deepScope = scope.CreateReuseScope())
                 {
                     var deepLog1 = deepScope.Resolve<Log>();
                     var deepLog2 = deepScope.Resolve<Log>();
@@ -58,7 +58,7 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var outerConsumer = container.Resolve<Consumer>();
-            using (var scope = container.CreateScope())
+            using (var scope = container.CreateReuseScope())
             {
                 var scopedConsumer1 = scope.Resolve<Consumer>();
                 var scopedConsumer2 = scope.Resolve<Consumer>();
@@ -77,11 +77,11 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var outerConsumer = container.Resolve<Consumer>();
-            using (var scope = container.CreateScope())
+            using (var scope = container.CreateReuseScope())
             {
                 var scopedConsumer = scope.Resolve<Consumer>();
 
-                using (var deepScope = scope.CreateScope())
+                using (var deepScope = scope.CreateReuseScope())
                 {
                     var deepConsumer1 = deepScope.Resolve<Consumer>();
                     var deepConsumer2 = deepScope.Resolve<Consumer>();
@@ -102,7 +102,7 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             Func<Log> getLog;
-            using (var containerWithNewScope = container.CreateScope())
+            using (var containerWithNewScope = container.CreateReuseScope())
                 getLog = containerWithNewScope.Resolve<Func<Log>>();
 
             Assert.Throws<ContainerException>(() => getLog());
@@ -115,7 +115,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Log>(Reuse.InCurrentScope);
 
-            var containerWithNewScope = container.CreateScope();
+            var containerWithNewScope = container.CreateReuseScope();
             containerWithNewScope.Resolve<Log>();
             containerWithNewScope.Dispose();
 
@@ -130,7 +130,7 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InCurrentScope);
 
             var getLog = container.Resolve<Func<Log>>();
-            using (container.CreateScope()) { }
+            using (container.CreateReuseScope()) { }
 
             Assert.DoesNotThrow(() => getLog());
         }
@@ -142,7 +142,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(Reuse.Singleton);
 
             IService serviceInNestedScope;
-            using (container.CreateScope())
+            using (container.CreateReuseScope())
                 serviceInNestedScope = container.Resolve<Func<IService>>()();
 
             var serviceInOuterScope = container.Resolve<Func<IService>>()();
