@@ -570,7 +570,7 @@ namespace DryIoc.MefAttributedModel
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportAllAttribute : Attribute
     {
-        public static Func<Type, bool> ExportedTypes = Registrator.PublicTypes;
+        public static Func<Type, bool> ExportedTypes = Registrator.RegisterAllDefaultTypes;
 
         public string ContractName { get; set; }
         public Type[] Except { get; set; }
