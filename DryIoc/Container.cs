@@ -37,11 +37,13 @@ namespace DryIoc
     /// <summary>
     /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
     /// TODO:
-    /// + finished: immutable ResolutionRules with proper Ref.Swap.
-    /// - finish: CreateChildContainer and CreateScope.
-    /// - finish: IsRegistered specialized by factory type.
-    /// - finish: Unregister.
+    /// + finished: IsRegistered specialized by factory type.
     /// - change: Use any object as Key, not only String. The condition is support for GetHashCode and Equals.
+    /// - add: Keyed{T, TKey}
+    /// - add: Resolve as IDictionary{KeyType, ServiceType}.
+    /// - finish: CreateChildContainer and CreateScope.
+    /// - finish: Unregister.
+
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -59,8 +61,8 @@ namespace DryIoc
 
             _singletonScope = _currentScope = new Scope();
 
-            _resolvedDefaultDelegates = HashTree<Type, CompiledFactory>.Empty;
-            _resolvedKeyedDelegates = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
+            _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
+            _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
             _resolvedExpressions = new ResolvedExpressions();
         }
 
@@ -176,7 +178,7 @@ namespace DryIoc
                                 if (entry is Factory)
                                     return false; // remove node
 
-                                var keyedEntry = ((KeyedFactoriesEntry)entry);
+                                var keyedEntry = ((FactoriesEntry)entry);
                                 var factories = keyedEntry.Factories;
                                 var indexedFactories = factories.Enumerate().Where(x => x.Key is int).ToArray();
                                 if (indexedFactories.Length != 0)
@@ -185,18 +187,18 @@ namespace DryIoc
                                         factories = factories.RemoveOrUpdate(indexedFactories[i].Key);
                                     if (factories.IsEmpty)
                                         return false; // remove node
-                                    newEntry = new KeyedFactoriesEntry(-1, factories);
+                                    newEntry = new FactoriesEntry(-1, factories);
                                 }
                             }
                             else
                             {
-                                if (entry is KeyedFactoriesEntry)
+                                if (entry is FactoriesEntry)
                                 {
-                                    var keyedEntry = ((KeyedFactoriesEntry)entry);
+                                    var keyedEntry = ((FactoriesEntry)entry);
                                     var factories = keyedEntry.Factories.RemoveOrUpdate(serviceKey);
                                     if (factories.IsEmpty)
                                         return false;
-                                    newEntry = new KeyedFactoriesEntry(keyedEntry.LatestIndex, factories);
+                                    newEntry = new FactoriesEntry(keyedEntry.LatestIndex, factories);
                                 }
                             }
 
@@ -226,12 +228,12 @@ namespace DryIoc
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
         {
-            var compiledFactories = _resolvedKeyedDelegates.GetValueOrDefault(serviceType);
-            if (compiledFactories != null)
+            var factoryDelegates = _resolvedKeyedDelegates.GetValueOrDefault(serviceType);
+            if (factoryDelegates != null)
             {
-                var compiledFactory = compiledFactories.GetValueOrDefault(serviceKey);
-                if (compiledFactory != null)
-                    return compiledFactory(_resolvedExpressions.Objects.Value, _currentScope, resolutionScope: null);
+                var factoryDelegate = factoryDelegates.GetValueOrDefault(serviceKey);
+                if (factoryDelegate != null)
+                    return factoryDelegate(_resolvedExpressions.Objects.Value, _currentScope, resolutionScope: null);
             }
 
             var request = CreateRequest(serviceType, serviceKey);
@@ -239,23 +241,23 @@ namespace DryIoc
             if (factory == null)
                 return null;
 
-            var newCompiledFactory = factory.GetExpression(request, this).CompileToFactory();
+            var newFactoryDelegate = factory.GetExpression(request, this).CompileToDelegate();
             Interlocked.Exchange(ref _resolvedKeyedDelegates,
                 _resolvedKeyedDelegates.AddOrUpdate(serviceType,
-                (compiledFactories ?? HashTree<object, CompiledFactory>.Empty).AddOrUpdate(serviceKey, newCompiledFactory)));
-            return newCompiledFactory(_resolvedExpressions.Objects.Value, _currentScope, resolutionScope: null);
+                (factoryDelegates ?? HashTree<object, FactoryDelegate>.Empty).AddOrUpdate(serviceKey, newFactoryDelegate)));
+            return newFactoryDelegate(_resolvedExpressions.Objects.Value, _currentScope, resolutionScope: null);
         }
 
-        private CompiledFactory ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved)
+        private FactoryDelegate ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved)
         {
             var request = CreateRequest(serviceType);
             var factory = ((IRegistry)this).GetOrAddFactory(request, ifUnresolved);
             if (factory == null)
                 return delegate { return null; };
-            var newFactory = factory.GetExpression(request, this).CompileToFactory();
+            var newFactoryDelegate = factory.GetExpression(request, this).CompileToDelegate();
             Interlocked.Exchange(ref _resolvedDefaultDelegates,
-                _resolvedDefaultDelegates.AddOrUpdate(serviceType, newFactory));
-            return newFactory;
+                _resolvedDefaultDelegates.AddOrUpdate(serviceType, newFactoryDelegate));
+            return newFactoryDelegate;
         }
 
         #endregion
@@ -269,8 +271,8 @@ namespace DryIoc
             get { return _selfWeakRef ?? (_selfWeakRef = new RegistryWeakRef(this)); }
         }
 
-        Scope IRegistry.Singletons { get { return _singletonScope; } }
-        Scope IRegistry.ReusedInScope { get { return _currentScope; } }
+        Scope IRegistry.SingletonScope { get { return _singletonScope; } }
+        Scope IRegistry.CurrentScope { get { return _currentScope; } }
 
         Factory IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
@@ -285,7 +287,7 @@ namespace DryIoc
             var ruleFactory = rules.ToResolveUnregisteredService.GetFirstNonDefault(r => r(request, this));
             if (ruleFactory != null)
             {
-                Register(ruleFactory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.ThrowIfNamed);
+                Register(ruleFactory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.ThrowIfDuplicateKey);
                 return ruleFactory;
             }
 
@@ -308,7 +310,7 @@ namespace DryIoc
                 entry = _factories.Value.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
             return entry == null ? Enumerable.Empty<KV<object, Factory>>()
                 : entry is Factory ? new[] { new KV<object, Factory>(0, (Factory)entry) }
-                : ((KeyedFactoriesEntry)entry).Factories.Enumerate();
+                : ((FactoriesEntry)entry).Factories.Enumerate();
         }
 
         Expression IRegistry.GetDecoratorExpressionOrDefault(Request request)
@@ -370,7 +372,7 @@ namespace DryIoc
                         if (i >= openGenericDecoratorIndex && decorator.ProvidesFactoryPerRequest)
                         {
                             decorator = decorator.GetFactoryPerRequestOrDefault(request, this);
-                            Register(decorator, serviceType, null, IfAlreadyRegistered.ThrowIfNamed);
+                            Register(decorator, serviceType, null, IfAlreadyRegistered.ThrowIfDuplicateKey);
                         }
 
                         var decoratorExpr = request.ResolvedExpressions.GetCachedOrDefault(decorator.ID);
@@ -427,12 +429,12 @@ namespace DryIoc
 
         #region Factories Add/Get
 
-        private sealed class KeyedFactoriesEntry
+        private sealed class FactoriesEntry
         {
             public readonly HashTree<object, Factory> Factories;
             public readonly int LatestIndex = -1;
 
-            public KeyedFactoriesEntry(int latestIndex, HashTree<object, Factory> factories)
+            public FactoriesEntry(int latestIndex, HashTree<object, Factory> factories)
             {
                 Factories = factories;
                 LatestIndex = latestIndex;
@@ -443,68 +445,39 @@ namespace DryIoc
         {
             if (serviceKey == null)
             {
-                _factories.Swap(x => x.AddOrUpdate(serviceType, factory, (oldEntry, entry) =>
+                _factories.Swap(x => x.AddOrUpdate(serviceType, factory, (oldValue, _) =>
                 {
-                    if (oldEntry is Factory)
+                    if (oldValue is Factory)
                         return ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered
-                            ? oldEntry
-                            : new KeyedFactoriesEntry(1, HashTree<object, Factory>.Empty
-                                .AddOrUpdate(0, (Factory)oldEntry)
-                                .AddOrUpdate(1, (Factory)entry));
+                            ? oldValue
+                            : new FactoriesEntry(1, HashTree<object, Factory>.Empty
+                                .AddOrUpdate(0, (Factory)oldValue).AddOrUpdate(1, factory));
 
-                    var oldFactories = ((KeyedFactoriesEntry)oldEntry);
-                    var latestIndex = oldFactories.LatestIndex + 1;
-                    if (latestIndex > 0 && ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered)
-                        return oldEntry;
-                    return new KeyedFactoriesEntry(latestIndex,
-                        oldFactories.Factories.AddOrUpdate(latestIndex, (Factory)entry));
-                }));
-            }
-            else if (serviceKey is int && ((int)serviceKey) >= 0)
-            {
-                var index = (int)serviceKey;
-                var newEntry = new KeyedFactoriesEntry(index, HashTree<object, Factory>.Empty.AddOrUpdate(index, factory));
-                _factories.Swap(x => x.AddOrUpdate(serviceType, newEntry, (oldEntry, entry) =>
-                {
-                    if (oldEntry is Factory)
-                    {
-                        if (index == 0)
-                        {
-                            if (ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered)
-                                return oldEntry;
-                            throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, index, oldEntry);
-                        }
-                        return new KeyedFactoriesEntry(index,
-                            ((KeyedFactoriesEntry)entry).Factories.AddOrUpdate(0, (Factory)oldEntry));
-                    }
-
-                    var oldFactories = ((KeyedFactoriesEntry)oldEntry);
-                    return new KeyedFactoriesEntry(index > oldFactories.LatestIndex ? index : oldFactories.LatestIndex,
-                        oldFactories.Factories.AddOrUpdate(index, factory, (oldFactory, _) =>
-                        {
-                            if (ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered)
-                                return oldFactory;
-                            throw Error.DUPLICATE_SERVICE_INDEX.Of(serviceType, index, oldFactory);
-                        }));
+                    var oldEntry = ((FactoriesEntry)oldValue);
+                    var newLatestIndex = oldEntry.LatestIndex + 1;
+                    return newLatestIndex > 0 && ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered
+                        ? oldValue
+                        : new FactoriesEntry(newLatestIndex, oldEntry.Factories.AddOrUpdate(newLatestIndex, factory));
                 }));
             }
             else
             {
-                var newEntry = new KeyedFactoriesEntry(-1, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
-                _factories.Swap(x => x.AddOrUpdate(serviceType, newEntry, (oldEntry, entry) =>
+                var index = serviceKey is int ? ((int)serviceKey) : -1;
+                var newEntry = new FactoriesEntry(index, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
+                _factories.Swap(x => x.AddOrUpdate(serviceType, newEntry, (oldValue, _) =>
                 {
-                    if (oldEntry is Factory)
-                        return new KeyedFactoriesEntry(0,
-                            ((KeyedFactoriesEntry)entry).Factories.AddOrUpdate(0, (Factory)oldEntry));
+                    if (oldValue is Factory)  // means that old index is 0
+                        return index != 0     // check that latest index is not equal to old one.
+                            ? new FactoriesEntry(index, newEntry.Factories.AddOrUpdate(0, (Factory)oldValue))
+                            : oldValue.ThrowIf(ifAlreadyRegistered == IfAlreadyRegistered.ThrowIfDuplicateKey,
+                                Error.DUPLICATE_SERVICE_KEY, serviceType, "0 (default key)", oldValue);
 
-                    var oldFactories = ((KeyedFactoriesEntry)oldEntry);
-                    return new KeyedFactoriesEntry(oldFactories.LatestIndex,
-                        oldFactories.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, _) =>
-                        {
-                            if (ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered)
-                                return oldFactory;
-                            throw Error.DUPLICATE_SERVICE_NAME.Of(serviceType, serviceKey, oldFactory);
-                        }));
+                    var oldEntry = ((FactoriesEntry)oldValue);
+                    var newLatestIndex = index > oldEntry.LatestIndex ? index : oldEntry.LatestIndex;
+                    return new FactoriesEntry(newLatestIndex,
+                        oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
+                            oldFactory.ThrowIf(ifAlreadyRegistered == IfAlreadyRegistered.ThrowIfDuplicateKey,
+                                Error.DUPLICATE_SERVICE_KEY, serviceType, serviceKey, oldFactory)));
                 }));
             }
         }
@@ -523,10 +496,9 @@ namespace DryIoc
             {
                 if (entry is Factory)
                     return serviceKey == null || (serviceKey is int && (int)serviceKey == 0)
-                        ? (Factory)entry
-                        : null;
+                        ? (Factory)entry : null;
 
-                var factories = ((KeyedFactoriesEntry)entry).Factories;
+                var factories = ((FactoriesEntry)entry).Factories;
                 if (serviceKey != null)
                     return factories.GetValueOrDefault(serviceKey);
 
@@ -557,8 +529,8 @@ namespace DryIoc
         private readonly Scope _singletonScope;
         private Scope _currentScope;
 
-        private HashTree<Type, CompiledFactory> _resolvedDefaultDelegates;
-        private HashTree<Type, HashTree<object, CompiledFactory>> _resolvedKeyedDelegates;
+        private HashTree<Type, FactoryDelegate> _resolvedDefaultDelegates;
+        private HashTree<Type, HashTree<object, FactoryDelegate>> _resolvedKeyedDelegates;
         private readonly ResolvedExpressions _resolvedExpressions;
 
         #endregion
@@ -675,32 +647,32 @@ namespace DryIoc
         #endregion
     }
 
-    public delegate object CompiledFactory(AppendableArray<object> resolutionStore, Scope currentScope, Scope resolutionScope);
+    public delegate object FactoryDelegate(AppendableArray<object> resolutionStore, Scope currentScope, Scope resolutionScope);
 
     public static partial class FactoryCompiler
     {
-        public static Expression<CompiledFactory> ToCompiledFactoryExpression(this Expression expression)
+        public static Expression<FactoryDelegate> ToFactoryExpression(this Expression expression)
         {
             // Removing not required Convert from expression root, because CompiledFactory result still be converted at the end.
             if (expression.NodeType == ExpressionType.Convert)
                 expression = ((UnaryExpression)expression).Operand;
-            return Expression.Lambda<CompiledFactory>(expression,
+            return Expression.Lambda<FactoryDelegate>(expression,
                 ResolvedExpressions.ObjectsParameter, ResolvedExpressions.CurrentScopeParameter, ResolvedExpressions.ResolutionScopeParameter);
         }
 
-        public static CompiledFactory CompileToFactory(this Expression expression)
+        public static FactoryDelegate CompileToDelegate(this Expression expression)
         {
-            var factoryExpression = expression.ToCompiledFactoryExpression();
-            CompiledFactory factory = null;
-            CompileToMethod(factoryExpression, ref factory);
+            var factoryExpression = expression.ToFactoryExpression();
+            FactoryDelegate factoryDelegate = null;
+            CompileToMethod(factoryExpression, ref factoryDelegate);
             // ReSharper disable ConstantNullCoalescingCondition
-            return factory ?? factoryExpression.Compile();
+            return factoryDelegate ?? factoryExpression.Compile();
             // ReSharper restore ConstantNullCoalescingCondition
         }
 
         // Partial method definition to be implemented in .NET40 version of Container.
         // It is optional and fine to be not implemented.
-        static partial void CompileToMethod(Expression<CompiledFactory> factoryExpr, ref CompiledFactory resultFactory);
+        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpr, ref FactoryDelegate result);
     }
 
     public static class OpenGenericsSupport
@@ -841,7 +813,7 @@ namespace DryIoc
             var serviceType = request.ServiceType.GetGenericArguments()[0];
             var serviceRequest = request.Push(serviceType, request.ServiceKey);
             var factory = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw);
-            var factoryExpr = factory.GetExpression(serviceRequest, registry).ToCompiledFactoryExpression();
+            var factoryExpr = factory.GetExpression(serviceRequest, registry).ToFactoryExpression();
             return Expression.New(ctor, request.ResolvedExpressions.ToExpression(factoryExpr));
         }
 
@@ -1022,11 +994,8 @@ namespace DryIoc
         public static readonly string CONTAINER_IS_GARBAGE_COLLECTED =
             "Container is no longer available (has been garbage-collected).";
 
-        public static readonly string DUPLICATE_SERVICE_NAME =
-            "Service {0} with the same name '{1}' is already registered with {2}.";
-
-        public static readonly string DUPLICATE_SERVICE_INDEX =
-            "Service {0} with the same index '{1}' is already registered with {2}.";
+        public static readonly string DUPLICATE_SERVICE_KEY =
+            "Service {0} with the same key '{1}' is already registered as {2}.";
 
         public static readonly string GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT =
             "Generic Wrapper is working with single service type only, but found many:\n{0}.\n" +
@@ -1068,7 +1037,7 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType, Factory factory,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
@@ -1082,7 +1051,7 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TService>(this IRegistrator registrator, Factory factory,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
@@ -1100,7 +1069,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType,
             Type implementationType, IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var factory = new ReflectionFactory(implementationType, reuse, getConstructor, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
@@ -1118,7 +1087,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator,
             Type implementationType, IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var factory = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
             registrator.Register(factory, implementationType, named, ifAlreadyRegistered);
@@ -1137,7 +1106,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
             where TImplementation : TService
         {
             var factory = new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup);
@@ -1156,7 +1125,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var factory = new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup);
             registrator.Register(factory, typeof(TImplementation), named, ifAlreadyRegistered);
@@ -1177,7 +1146,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterAll(this IRegistrator registrator,
             Type implementationType, IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
-            Func<Type, bool> types = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
+            Func<Type, bool> types = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
 
@@ -1214,7 +1183,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterAll<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             registrator.RegisterAll(typeof(TImplementation), reuse, withConstructor, setup, null, named, ifAlreadyRegistered);
         }
@@ -1233,7 +1202,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterDelegate<TService>(this IRegistrator registrator,
             Func<IResolver, TService> lambda, IReuse reuse = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var factory = new DelegateFactory((request, registry) =>
                 Expression.Invoke(request.ResolvedExpressions.ToExpression(lambda), request.ResolvedExpressions.ToExpression(registry)),
@@ -1252,7 +1221,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterInstance<TService>(this IRegistrator registrator,
             TService instance, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfNamed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             registrator.RegisterDelegate(_ => instance, Reuse.Transient, setup, named, ifAlreadyRegistered);
         }
@@ -1266,7 +1235,7 @@ namespace DryIoc
         /// <param name="factoryType">Optional factory type to lookup, <see cref="FactoryType.Service"/> by default.</param>
         /// <param name="condition">Optional condition to specify what registered factory do you expect.</param>
         /// <returns>True if <paramref name="serviceType"/> is registered, false - otherwise.</returns>
-        public static bool IsRegistered(this IRegistrator registrator, Type serviceType, 
+        public static bool IsRegistered(this IRegistrator registrator, Type serviceType,
             object named = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null)
         {
             return registrator.IsRegistered(serviceType, named, factoryType, condition);
@@ -2073,13 +2042,13 @@ namespace DryIoc
                     return openGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(openGenericServiceType);
                 }))
                     return GetScopedServiceExpression(
-                        request.ResolvedExpressions.ToExpression(registry.Singletons),
+                        request.ResolvedExpressions.ToExpression(registry.SingletonScope),
                         factoryID, factoryExpr);
 
                 // Create singleton object now and put it into store.
-                var currentScope = registry.ReusedInScope;
-                var singleton = registry.Singletons.GetOrAdd(factoryID,
-                    () => factoryExpr.CompileToFactory().Invoke(request.ResolvedExpressions.Objects.Value, currentScope, null));
+                var currentScope = registry.CurrentScope;
+                var singleton = registry.SingletonScope.GetOrAdd(factoryID,
+                    () => factoryExpr.CompileToDelegate().Invoke(request.ResolvedExpressions.Objects.Value, currentScope, null));
                 return request.ResolvedExpressions.ToExpression(singleton, factoryExpr.Type);
             }
         }
@@ -2094,7 +2063,7 @@ namespace DryIoc
         object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved);
     }
 
-    public enum IfAlreadyRegistered { ThrowIfNamed, KeepAlreadyRegistered }
+    public enum IfAlreadyRegistered { ThrowIfDuplicateKey, KeepAlreadyRegistered }
 
     public interface IRegistrator
     {
@@ -2107,8 +2076,8 @@ namespace DryIoc
     {
         RegistryWeakRef SelfWeakRef { get; }
         Ref<ResolutionRules> ResolutionRules { get; }
-        Scope ReusedInScope { get; }
-        Scope Singletons { get; }
+        Scope CurrentScope { get; }
+        Scope SingletonScope { get; }
 
         Factory GetOrAddFactory(Request request, IfUnresolved ifUnresolved);
 
@@ -2147,9 +2116,9 @@ namespace DryIoc
     [DebuggerDisplay("{Expression}")]
     public sealed class DebugExpression<TService>
     {
-        public readonly Expression<CompiledFactory> Expression;
+        public readonly Expression<FactoryDelegate> Expression;
 
-        public DebugExpression(Expression<CompiledFactory> expression)
+        public DebugExpression(Expression<FactoryDelegate> expression)
         {
             Expression = expression;
         }

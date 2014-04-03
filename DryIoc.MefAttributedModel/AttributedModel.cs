@@ -73,7 +73,7 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceName, IfAlreadyRegistered.ThrowIfNamed);
+                registrator.Register(factory, export.ServiceType, export.ServiceName, IfAlreadyRegistered.ThrowIfDuplicateKey);
 
                 if (export.ServiceType.IsGenericType &&
                     export.ServiceType.GetGenericTypeDefinition() == typeof(IFactory<>))
@@ -259,7 +259,7 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < exportInfo.Exports.Length; i++)
             {
                 var export = exportInfo.Exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceName, IfAlreadyRegistered.ThrowIfNamed);
+                registrator.Register(factory, export.ServiceType, export.ServiceName, IfAlreadyRegistered.ThrowIfDuplicateKey);
             }
         }
 
