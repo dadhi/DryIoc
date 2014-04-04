@@ -154,10 +154,10 @@ namespace DryIoc
         }
 
         public enum HandleCache { Wipe, Keep }
-        public bool Unregister(Type serviceType, object serviceKey, FactoryType factoryType, HandleCache handleCache)
+        public bool Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition, HandleCache handleCache)
         {
             // if type/key is not registered - do nothing Or return false?
-            if (!IsRegistered(serviceType, serviceKey, factoryType, null))
+            if (!IsRegistered(serviceType, serviceKey, factoryType, condition))
                 return false;
 
             switch (factoryType)
@@ -2565,8 +2565,7 @@ namespace DryIoc
                         }
                     }
 
-                    // remove node
-                    if (Height == 1)
+                    if (Height == 1) // remove node
                         return Empty;
 
                     if (Right.IsEmpty)
@@ -2575,7 +2574,7 @@ namespace DryIoc
                         result = Right;
                     else
                     {
-                        // We have two children. Remove the next-highest node and replace this node with it.
+                        // we have two children, so remove the next highest node and replace this node with it.
                         var successor = Right;
                         while (!successor.Left.IsEmpty) successor = successor.Left;
                         result = successor.With(Left, Right.RemoveOrUpdate(successor.Hash, default(K), ignoreKey: true));
@@ -2606,8 +2605,7 @@ namespace DryIoc
                         if (i != index) shrinkedConflicts[newIndex++] = Conflicts[i];
                     return new HashTree<K, V>(Hash, Key, Value, shrinkedConflicts, Left, Right);
                 }
-                else  // key is not matching and no conflicts to lookup - just return
-                    return this;
+                else return this; // if key is not matching and no conflicts to lookup - just return
             }
             else if (hash < Hash)
                 result = With(Left.RemoveOrUpdate(hash, key, updateValueInstead, ignoreKey), Right);
