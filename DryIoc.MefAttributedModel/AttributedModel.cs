@@ -255,7 +255,9 @@ namespace DryIoc.MefAttributedModel
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     _factoryMethodName, null);
 
-            var factory = new DelegateFactory(factoryCreateExpr, exportInfo.GetReuse(), exportInfo.GetSetup(attributes));
+            var factory = new DelegateFactory(factoryCreateExpr, 
+                exportInfo.GetReuse(), exportInfo.GetSetup(attributes));
+            
             for (var i = 0; i < exportInfo.Exports.Length; i++)
             {
                 var export = exportInfo.Exports[i];
@@ -554,6 +556,16 @@ namespace DryIoc.MefAttributedModel
     #endregion
 
     #region Additional Export/Import attributes
+
+    public class ExportWithKeyAttribute : Attribute
+    {
+        public object Key { get; set; }
+
+        public ExportWithKeyAttribute(object key)
+        {
+            Key = key.ThrowIfNull();
+        }
+    }
 
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]

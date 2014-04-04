@@ -683,7 +683,7 @@ namespace DryIoc
 
         // Partial method definition to be implemented in .NET40 version of Container.
         // It is optional and fine to be not implemented.
-        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpr, ref FactoryDelegate result);
+        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, ref FactoryDelegate result);
     }
 
     public static class OpenGenericsSupport

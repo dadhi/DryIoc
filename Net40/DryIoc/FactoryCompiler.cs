@@ -34,9 +34,9 @@ namespace DryIoc
     {
         public const string DYNAMIC_ASSEMBLY_NAME = "DryIoc.CompiledFactoryProvider.DynamicAssembly";
 
-        static partial void CompileToMethod(Expression<CompiledFactory> factoryExpression, ref CompiledFactory resultFactory)
+        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, ref FactoryDelegate result)
         {
-            resultFactory.ThrowIf(resultFactory != null);
+            result.ThrowIf(result != null);
 
             Interlocked.CompareExchange(ref _moduleBuilder, DefineDynamicModuleBuilder(), null);
             
@@ -49,7 +49,7 @@ namespace DryIoc
             factoryExpression.CompileToMethod(methodBuilder);
             
             var dynamicType = typeBuilder.CreateType();
-            resultFactory = (CompiledFactory)Delegate.CreateDelegate(typeof(CompiledFactory), dynamicType.GetMethod("GetService"));
+            result = (FactoryDelegate)Delegate.CreateDelegate(typeof(FactoryDelegate), dynamicType.GetMethod("GetService"));
         }
 
         #region Implementation

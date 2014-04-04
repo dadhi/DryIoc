@@ -35,7 +35,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AttributedRegistrationTests.CUT.cs" />
+    <Compile Include="AttributedModelTests.CUT.cs" />
     <Compile Include="ExportAsDecoratorTests.CUT.cs" />
     <Compile Include="ExportAsGenericWrapperTests.CUT.cs" />
     <Compile Include="ExportOnceTests.CUT.cs" />

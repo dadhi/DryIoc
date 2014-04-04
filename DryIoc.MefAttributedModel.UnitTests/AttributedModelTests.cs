@@ -192,9 +192,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
     [ExportWithDisplayName("blah")]
     [ExportWithMetadata("hey")]
-    public class OneWithManyMeta
-    {
-    }
+    public class OneWithManyMeta {}
 
     #endregion
 }

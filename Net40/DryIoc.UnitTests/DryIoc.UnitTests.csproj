@@ -40,6 +40,12 @@
     <Reference Include="System.Web" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\DryIoc.UnitTests\AppendableArrayTests.cs">
+      <Link>AppendableArrayTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\ChildContainerTests.cs">
+      <Link>ChildContainerTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\CompositePatternTests.cs">
       <Link>CompositePatternTests.cs</Link>
     </Compile>
@@ -97,8 +103,14 @@
     <Compile Include="..\..\DryIoc.UnitTests\PropertyResolutionTests.cs">
       <Link>PropertyResolutionTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\RefTests.cs">
+      <Link>RefTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\RegisterAll.cs">
       <Link>RegisterAll.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\RegisterWithNonStringServiceKeyTests.cs">
+      <Link>RegisterWithNonStringServiceKeyTests.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\ResolutionRulesTests.cs">
       <Link>ResolutionRulesTests.cs</Link>
