@@ -431,13 +431,13 @@ namespace DryIoc
 
         private sealed class FactoriesEntry
         {
+            public readonly int? LatestIndex;
             public readonly HashTree<object, Factory> Factories;
-            public readonly int LatestIndex = -1;
 
-            public FactoriesEntry(int latestIndex, HashTree<object, Factory> factories)
+            public FactoriesEntry(int? latestIndex, HashTree<object, Factory> factories)
             {
-                Factories = factories;
                 LatestIndex = latestIndex;
+                Factories = factories;
             }
         }
 
@@ -454,26 +454,37 @@ namespace DryIoc
                                 .AddOrUpdate(0, (Factory)oldValue).AddOrUpdate(1, factory));
 
                     var oldEntry = ((FactoriesEntry)oldValue);
-                    var newLatestIndex = oldEntry.LatestIndex + 1;
-                    return newLatestIndex > 0 && ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered
-                        ? oldValue
-                        : new FactoriesEntry(newLatestIndex, oldEntry.Factories.AddOrUpdate(newLatestIndex, factory));
+                    var oldLatestIndex = oldEntry.LatestIndex;
+                    if (!oldLatestIndex.HasValue) // if were not default registrations, then add first one.
+                        return new FactoriesEntry(0, oldEntry.Factories.AddOrUpdate(0, factory));
+
+                    // if they were, but we need to keep old, just return the old.
+                    if (ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered) 
+                        return oldValue;
+
+                    var newLatestIndex = oldLatestIndex + 1;
+                    return new FactoriesEntry(newLatestIndex, oldEntry.Factories.AddOrUpdate(newLatestIndex, factory));
                 }));
             }
-            else
+            else // for non default service key
             {
-                var index = serviceKey is int ? ((int)serviceKey) : -1;
+                var index = serviceKey is int ? ((int?)serviceKey) : null;
                 var newEntry = new FactoriesEntry(index, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
                 _factories.Swap(x => x.AddOrUpdate(serviceType, newEntry, (oldValue, _) =>
                 {
-                    if (oldValue is Factory)  // means that old index is 0
-                        return index != 0     // check that latest index is not equal to old one.
-                            ? new FactoriesEntry(index, newEntry.Factories.AddOrUpdate(0, (Factory)oldValue))
-                            : oldValue.ThrowIf(ifAlreadyRegistered == IfAlreadyRegistered.ThrowIfDuplicateKey,
-                                Error.DUPLICATE_SERVICE_KEY, serviceType, "0 (default key)", oldValue);
+                    if (oldValue is Factory)
+                        return index.HasValue && index == 0 // if default service key
+                            ? oldValue.ThrowIf(ifAlreadyRegistered == IfAlreadyRegistered.ThrowIfDuplicateKey,
+                                Error.DUPLICATE_SERVICE_KEY, serviceType, "0 (default key)", oldValue)
+                            : new FactoriesEntry(index.HasValue && index > 0 ? index : 0,
+                                newEntry.Factories.AddOrUpdate(0, (Factory)oldValue));
 
                     var oldEntry = ((FactoriesEntry)oldValue);
-                    var newLatestIndex = index > oldEntry.LatestIndex ? index : oldEntry.LatestIndex;
+                    var oldLatestIndex = oldEntry.LatestIndex;
+
+                    var newLatestIndex = !index.HasValue ? oldLatestIndex : !oldLatestIndex.HasValue ? index
+                        : index > oldLatestIndex ? index : oldLatestIndex;
+                        
                     return new FactoriesEntry(newLatestIndex,
                         oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
                             oldFactory.ThrowIf(ifAlreadyRegistered == IfAlreadyRegistered.ThrowIfDuplicateKey,
@@ -647,7 +658,7 @@ namespace DryIoc
         #endregion
     }
 
-    public delegate object FactoryDelegate(AppendableArray<object> resolutionStore, Scope currentScope, Scope resolutionScope);
+    public delegate object FactoryDelegate(AppendableArray<object> objects, Scope currentScope, Scope resolutionScope);
 
     public static partial class FactoryCompiler
     {
@@ -1913,6 +1924,27 @@ namespace DryIoc
         private readonly Func<Request, IRegistry, Expression> _getExpression;
 
         #endregion
+    }
+
+    public sealed class DelegateFactory2 : Factory
+    {
+        public readonly FactoryDelegate FactoryDelegate;
+
+        public DelegateFactory2(FactoryDelegate factoryDelegate, IReuse reuse = null, FactorySetup setup = null)
+            : base(reuse, setup)
+        {
+            FactoryDelegate = factoryDelegate.ThrowIfNull();
+        }
+
+        public override Expression CreateExpression(Request request, IRegistry registry)
+        {
+            var expression = Expression.Invoke(
+                request.ResolvedExpressions.ToExpression(FactoryDelegate), 
+                ResolvedExpressions.ObjectsParameter,
+                ResolvedExpressions.CurrentScopeParameter,
+                ResolvedExpressions.ResolutionScopeParameter);
+            return expression;
+        }
     }
 
     public sealed class FactoryProvider : Factory

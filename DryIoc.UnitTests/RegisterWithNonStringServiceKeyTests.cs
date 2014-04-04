@@ -135,6 +135,18 @@ namespace DryIoc.UnitTests
             Assert.Throws<ContainerException>(() => 
                 container.Register<IService, AnotherService>(named: 1));
         }
+
+        [Test]
+        public void When_registering_with_minus_1_key_then_default_service_with_keep_option_Then_it_resolving_default_should_succeed()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(named: -1);
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepAlreadyRegistered);
+
+            var service = container.Resolve<IService>();
+
+            Assert.That(service, Is.InstanceOf<Service>());
+        }
     }
 
     public enum ServiceColors { Red = 0, Green, Blue }
