@@ -1,5 +1,4 @@
-﻿using System.ComponentModel.Composition;
-using DryIoc.MefAttributedModel.UnitTests.CUT;
+﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
@@ -18,23 +17,4 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.That(client.Service, Is.InstanceOf<KeyService>());
         }
     }
-
-    [Export]
-    public class KeyClient
-    {
-        public IService Service { get; set; }
-
-        public KeyClient([ImportWithKey(ServiceKey.One)]IService service)
-        {
-            Service = service;
-        }
-    }
-
-    [ExportWithKey(ServiceKey.One, typeof(IService))]
-    public class KeyService : IService {}
-
-    [ExportAll(ContractKey = ServiceKey.OtherOne)]
-    public class OtherKeyService : IService { }
-
-    public enum ServiceKey { One, OtherOne }
 }

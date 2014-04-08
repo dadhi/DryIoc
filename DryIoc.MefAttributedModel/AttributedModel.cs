@@ -73,7 +73,7 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceKey, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                registrator.Register(factory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
 
                 if (export.ServiceType.IsGenericType &&
                     export.ServiceType.GetGenericTypeDefinition() == typeof(IFactory<>))
@@ -109,12 +109,9 @@ namespace DryIoc.MefAttributedModel
                 if (attribute is ExportAttribute)
                 {
                     var exportAttribute = (ExportAttribute)attribute;
-                    var export = new ExportInfo { ServiceType = exportAttribute.ContractType ?? type };
-
-                    if (exportAttribute.ContractName != null)
-                        export.ServiceKey = exportAttribute.ContractName;
-                    else if (attribute is ExportWithKeyAttribute)
-                        export.ServiceKey = ((ExportWithKeyAttribute)attribute).ContractKey;
+                    var export = new ExportInfo(exportAttribute.ContractType ?? type,
+                        exportAttribute.ContractName ?? 
+                        (attribute is ExportWithKeyAttribute ? ((ExportWithKeyAttribute)attribute).ContractKey : null));
 
                     if (info.Exports == null)
                         info.Exports = new[] { export };
@@ -135,14 +132,10 @@ namespace DryIoc.MefAttributedModel
                     }
 
                     var exportAllInfos = allContractTypes
-                        .Select(t => new ExportInfo
-                        {
-                            ServiceType = t, 
-                            ServiceKey = exportAllAttribute.ContractName ?? exportAllAttribute.ContractKey
-                        })
+                        .Select(t => new ExportInfo(t, exportAllAttribute.ContractName ?? exportAllAttribute.ContractKey))
                         .ToArray();
 
-                    Throw.If(exportAllInfos.Length == 0, "Unable to get contract types for implementation {0} cause all of its implemented types where filtered out: {1}",
+                    Throw.If(exportAllInfos.Length == 0, Error.EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES,
                         type, allContractTypes);
 
                     if (info.Exports != null)
@@ -175,12 +168,10 @@ namespace DryIoc.MefAttributedModel
                     Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
                     var decorator = ((ExportAsDecoratorAttribute)attribute);
                     info.FactoryType = FactoryType.Decorator;
-                    info.Decorator = new DecoratorInfo
-                    {
-                        ServiceName = decorator.ContractName,
-                        ShouldCompareMetadata = decorator.ShouldCompareMetadata,
-                        ConditionType = decorator.ConditionType
-                    };
+                    info.Decorator = new DecoratorInfo(
+                        decorator.ShouldCompareMetadata,
+                        decorator.ConditionType,
+                        decorator.ContractName ?? decorator.ContractKey);
                 }
 
                 if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), true))
@@ -236,6 +227,7 @@ namespace DryIoc.MefAttributedModel
 
         private static readonly string _factoryMethodName = "Create";
         private static readonly string _dotFactoryMethodName = "." + _factoryMethodName;
+
         private static void RegisterFactory(IRegistrator registrator, Type factoryType, ExportInfo factoryExport)
         {
             var serviceType = factoryExport.ServiceType.GetGenericArguments()[0];
@@ -256,7 +248,7 @@ namespace DryIoc.MefAttributedModel
                 Expression.Call(
                     Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
                         request.ResolvedExpressions.ToExpression(registry),
-                        Expression.Constant(factoryExport.ServiceKey, typeof(string)),
+                        Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     _factoryMethodName, null);
 
@@ -266,7 +258,7 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < exportInfo.Exports.Length; i++)
             {
                 var export = exportInfo.Exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceKey, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                registrator.Register(factory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
             }
         }
 
@@ -393,6 +385,9 @@ namespace DryIoc.MefAttributedModel
 
         public static readonly string EXPORT_IS_REQUIRED =
             "At least one Export attributed should be defined for {0}.";
+
+        public static readonly string EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES = 
+            "Unable to get contract types for implementation {0} cause all of its implemented types where filtered out: {1}";
     }
 
     #region Registration Info DTOs
@@ -404,7 +399,6 @@ namespace DryIoc.MefAttributedModel
         public ExportInfo[] Exports;
         public bool IsSingleton = AttributedModel.DefaultCreationPolicy == CreationPolicy.Shared;
         public int MetadataAttributeIndex = -1;
-
         public FactoryType FactoryType;
         public GenericWrapperInfo GenericWrapper;
         public DecoratorInfo Decorator;
@@ -454,19 +448,20 @@ namespace DryIoc.MefAttributedModel
 @"new TypeExportInfo {
     Type = ").AppendType(Type).Append(@",
     Exports = new[] {
-        "); for (var i = 0; i < Exports.Length; i++) 
+        "); for (var i = 0; i < Exports.Length; i++)
                 code = Exports[i].AppendCode(code).Append(@",
-        "); code.Append(@"}
+        "); code.Append(@"},
     IsSingleton = ").AppendBool(IsSingleton).Append(@",
     MetadataAttributeIndex = ").Append(MetadataAttributeIndex).Append(@",
     FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
             if (GenericWrapper != null) code.Append(@",
     GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = ").Append(GenericWrapper.ServiceTypeIndex).Append(@" }");
-            if (Decorator != null) code.Append(@",
-    Decorator = new DecoratorInfo { ServiceName = ").AppendString(Decorator.ServiceName).Append(
-                                @", ShouldCompareMetadata = ").AppendBool(Decorator.ShouldCompareMetadata).Append(
-                                @", ConditionType = ").AppendType(Decorator.ConditionType).Append(
-                                @"}"); code.Append(@"
+            if (Decorator != null)
+            {
+                code.Append(@",
+"); Decorator.AppendCode(code);
+            }
+            code.Append(@"
 }");
             return code;
         }
@@ -497,22 +492,30 @@ namespace DryIoc.MefAttributedModel
 
     public sealed class ExportInfo
     {
+        public ExportInfo() { }
+
+        public ExportInfo(Type serviceType, object serviceKey = null)
+        {
+            ServiceType = serviceType;
+            ServiceKeyInfo = ServiceKeyInfo.Of(serviceKey);
+        }
+
         public Type ServiceType;
-        public object ServiceKey;
+        public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
 
         public override bool Equals(object obj)
         {
             var other = obj as ExportInfo;
             return other != null
                 && other.ServiceType == ServiceType
-                && Equals(other.ServiceKey, ServiceKey);
+                && Equals(other.ServiceKeyInfo.Key, ServiceKeyInfo.Key);
         }
 
         public StringBuilder AppendCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
-                .Append(@"new ExportInfo { ServiceType = ").AppendType(ServiceType)
-                .Append(@", ServiceKey = ").Append(ServiceKey).Append(@" }");
+                .Append(@"new ExportInfo(").AppendType(ServiceType).Append(@", ")
+                .Append(ServiceKeyInfo.Key).Append(@")");
         }
     }
 
@@ -539,19 +542,28 @@ namespace DryIoc.MefAttributedModel
 
     public sealed class DecoratorInfo
     {
-        public string ServiceName;
+        public DecoratorInfo() { }
+
+        public DecoratorInfo(bool shouldCompareMetadata = false, Type conditionType = null, object serviceKey = null)
+        {
+            ShouldCompareMetadata = shouldCompareMetadata;
+            ConditionType = conditionType;
+            ServiceKeyInfo = ServiceKeyInfo.Of(serviceKey);
+        }
+
         public bool ShouldCompareMetadata;
         public Type ConditionType;
+        public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
 
         public DecoratorSetup CreateSetup(object metadata)
         {
             if (ConditionType != null)
                 return DecoratorSetup.With(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).Check);
 
-            if (ShouldCompareMetadata || ServiceName != null)
+            if (ShouldCompareMetadata || ServiceKeyInfo != null)
                 return DecoratorSetup.With(request =>
                     (!ShouldCompareMetadata || Equals(metadata, request.ResolvedFactory.Setup.Metadata)) &&
-                    (ServiceName == null || ServiceName.Equals(request.ServiceKey)));
+                    (ServiceKeyInfo.Key == null || Equals(ServiceKeyInfo.Key, request.ServiceKey)));
 
             return DecoratorSetup.Default;
         }
@@ -560,10 +572,31 @@ namespace DryIoc.MefAttributedModel
         {
             var other = obj as DecoratorInfo;
             return other != null
-                   && other.ServiceName == ServiceName
-                   && other.ShouldCompareMetadata == ShouldCompareMetadata
-                   && other.ConditionType == ConditionType;
+                && other.ShouldCompareMetadata == ShouldCompareMetadata
+                && other.ConditionType == ConditionType
+                && Equals(other.ServiceKeyInfo.Key, ServiceKeyInfo.Key);
         }
+
+        public StringBuilder AppendCode(StringBuilder code = null)
+        {
+            return (code ?? new StringBuilder())
+                .Append(@"Decorator = new DecoratorInfo(")
+                .AppendBool(ShouldCompareMetadata).Append(", ")
+                .AppendType(ConditionType).Append(", ")
+                .Append(ServiceKeyInfo.Key).Append(")");
+        }
+    }
+
+    public class ServiceKeyInfo
+    {
+        public static readonly ServiceKeyInfo Default = new ServiceKeyInfo();
+
+        public static ServiceKeyInfo Of(object key)
+        {
+            return key == null ? Default : new ServiceKeyInfo { Key = key };
+        }
+
+        public object Key;
     }
 
 #pragma warning restore 659
@@ -586,7 +619,7 @@ namespace DryIoc.MefAttributedModel
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
     public class ExportWithKeyAttribute : ExportAttribute
     {
-        /// <summary>Specifies service key if <see cref="ExportAttribute.ContractName"/> is not specified.</summary>
+        /// <remarks>Specifies service key if <see cref="ExportAttribute.ContractName"/> is not specified.</remarks>
         public object ContractKey { get; set; }
 
         public ExportWithKeyAttribute(object contractKey, Type contractType)
@@ -603,10 +636,10 @@ namespace DryIoc.MefAttributedModel
     {
         public static Func<Type, bool> ExportedTypes = Registrator.RegisterAllDefaultTypes;
 
-        /// <summary>Specifies service key if <see cref="ContractName"/> is not specified.</summary>
+        /// <remarks>Specifies service key if <see cref="ContractName"/> is not specified.</remarks>
         public object ContractKey { get; set; }
 
-        /// <summary>If specified has more priority over <see cref="ContractKey"/>.</summary>
+        /// <remarks>If specified has more priority over <see cref="ContractKey"/>.</remarks>
         public string ContractName { get; set; }
 
         public Type[] Except { get; set; }
@@ -638,7 +671,10 @@ namespace DryIoc.MefAttributedModel
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportAsDecoratorAttribute : Attribute
     {
+        /// <remarks>If specified has more priority over <see cref="ContractKey"/>.</remarks>
         public string ContractName { get; set; }
+
+        public object ContractKey { get; set; }
         public bool ShouldCompareMetadata { get; set; }
         public Type ConditionType { get; set; }
     }

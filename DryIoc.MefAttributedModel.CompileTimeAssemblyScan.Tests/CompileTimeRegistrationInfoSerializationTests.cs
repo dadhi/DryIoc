@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using DryIoc.MefAttributedModel.UnitTests;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 using ProtoBuf;
@@ -91,8 +90,9 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         private static RuntimeTypeModel CreateModel()
         {
             var model = TypeModel.Create();
+            model.Add(typeof(ServiceKeyInfo), false).SetSurrogate(typeof(ServiceKeyInfoSurrogate));
             model.Add<TypeExportInfo>();
-            model.Add(typeof(ExportInfo), false).SetSurrogate(typeof(ExportInfoSurrogate));
+            model.Add<ExportInfo>();
             model.Add<GenericWrapperInfo>();
             model.Add<DecoratorInfo>();
             return model;
@@ -109,49 +109,41 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
     }
 
     [ProtoContract]
-    public sealed class ExportInfoSurrogate
+    public sealed class ServiceKeyInfoSurrogate
     {
-        [ProtoMember(1)]
-        public Type ServiceType { get; set; }
-
-        [ProtoMember(2)]
-        public string ServiceKeyAsString { get; set; }
-        [ProtoMember(3)]
-        public int? ServiceKeyAsInt { get; set; }
-        [ProtoMember(4)]
-        public ServiceKey? ServiceKeyAsServiceKey { get; set; }
+        [ProtoMember(1)] public string KeyAsString;
+        [ProtoMember(2)] public int? KeyAsInt;
+        [ProtoMember(3)] public ServiceKey? KeyAsServiceKey;
         // TODO: other types here
 
-        public static implicit operator ExportInfoSurrogate(ExportInfo info)
+        public static implicit operator ServiceKeyInfoSurrogate(ServiceKeyInfo info)
         {
             if (info == null)
                 return null;
 
-            var surrogate = new ExportInfoSurrogate { ServiceType = info.ServiceType };
-
-            var serviceKey = info.ServiceKey;
-            if (serviceKey is ServiceKey)
-                surrogate.ServiceKeyAsServiceKey = (ServiceKey?)serviceKey;
-            if (serviceKey is int)
-                surrogate.ServiceKeyAsInt = (int?)serviceKey;
-            if (serviceKey is string)
-                surrogate.ServiceKeyAsString = (string)serviceKey;
+            var surrogate = new ServiceKeyInfoSurrogate();
+            var key = info.Key;
+            if (key is ServiceKey)
+                surrogate.KeyAsServiceKey = (ServiceKey?)key;
+            if (key is int)
+                surrogate.KeyAsInt = (int?)key;
+            if (key is string)
+                surrogate.KeyAsString = (string)key;
             return surrogate;
         }
 
-        public static implicit operator ExportInfo(ExportInfoSurrogate surrogate)
+        public static implicit operator ServiceKeyInfo(ServiceKeyInfoSurrogate surrogate)
         {
             if (surrogate == null)
                 return null;
 
-            var info = new ExportInfo { ServiceType = surrogate.ServiceType };
-            if (surrogate.ServiceKeyAsServiceKey != null)
-                info.ServiceKey = surrogate.ServiceKeyAsServiceKey;
-            if (surrogate.ServiceKeyAsInt != null)
-                info.ServiceKey = surrogate.ServiceKeyAsInt;
-            if (surrogate.ServiceKeyAsString != null)
-                info.ServiceKey = surrogate.ServiceKeyAsString;
-
+            var info = new ServiceKeyInfo();
+            if (surrogate.KeyAsServiceKey != null)
+                info.Key = surrogate.KeyAsServiceKey;
+            if (surrogate.KeyAsInt != null)
+                info.Key = surrogate.KeyAsInt;
+            if (surrogate.KeyAsString != null)
+                info.Key = surrogate.KeyAsString;
             return info;
         }
     }

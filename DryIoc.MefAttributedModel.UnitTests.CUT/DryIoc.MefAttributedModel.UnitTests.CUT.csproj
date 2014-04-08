@@ -36,8 +36,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AttributedModelTests.CUT.cs" />
+    <Compile Include="CodeGenerationTests.CUT.cs" />
     <Compile Include="ExportAsDecoratorTests.CUT.cs" />
     <Compile Include="ExportAsGenericWrapperTests.CUT.cs" />
+    <Compile Include="ExportImportWithKeyTests.CUT.cs" />
     <Compile Include="ExportOnceTests.CUT.cs" />
     <Compile Include="ImportWithMetadataTests.CUT.cs" />
     <Compile Include="InheritedExportTests.CUT.cs" />

@@ -15,9 +15,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 new TypeExportInfo
                 {
                     Type = typeof(AnotherService),
-                    Exports = new[] { 
-                        new ExportInfo { ServiceType = typeof(IService), ServiceKey = "another" }
-                    },
+                    Exports = new[] { new ExportInfo(typeof(IService), "another") },
                     IsSingleton = true,
                     MetadataAttributeIndex = -1,
                 }
@@ -37,8 +35,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 new TypeExportInfo
                 {
                     Type = typeof(Service),
-                    Exports = new[] {
-                        new ExportInfo { ServiceType = typeof(IService), ServiceKey = "some" } },
+                    Exports = new[] { new ExportInfo(typeof(IService), "some") },
                     IsSingleton = true,
                     MetadataAttributeIndex = -1
                 },
@@ -46,8 +43,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 new TypeExportInfo
                 {
                     Type = typeof(AnotherService),
-                    Exports = new[] {
-                        new ExportInfo { ServiceType = typeof(IService), ServiceKey = null } },
+                    Exports = new[] { new ExportInfo(typeof(IService)) },
                     IsSingleton = false,
                     MetadataAttributeIndex = -1,
                     FactoryType = FactoryType.Decorator,
@@ -56,8 +52,8 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 new TypeExportInfo
                 {
                     Type = typeof(Wrap<>),
-                    Exports = new[] {
-                        new ExportInfo { ServiceType = typeof(Wrap<>), ServiceKey = null } }, IsSingleton = false,
+                    Exports = new[] { new ExportInfo(typeof(Wrap<>)) }, 
+                    IsSingleton = false,
                     MetadataAttributeIndex = -1,
                     FactoryType = FactoryType.GenericWrapper
                 },

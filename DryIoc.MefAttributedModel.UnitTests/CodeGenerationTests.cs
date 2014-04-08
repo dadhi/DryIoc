@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
+using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
 {
@@ -14,20 +15,15 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var codeValue = code.ToString();
             Assert.That(codeValue, Is.EqualTo(
 @"new TypeExportInfo {
-    Type = typeof(DryIoc.MefAttributedModel.UnitTests.PrintToCodeExample),
+    Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeExample),
     Exports = new[] {
-        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.PrintToCodeExample), ServiceKey = 1 },
-        new ExportInfo { ServiceType = typeof(DryIoc.MefAttributedModel.UnitTests.IPrintToCode), ServiceKey = 1 },
-        }
+        new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeExample), 1),
+        new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IPrintToCode), 1),
+        },
     IsSingleton = true,
     MetadataAttributeIndex = -1,
     FactoryType = DryIoc.FactoryType.Service
 }"));
         }
     }
-
-    [ExportAll(ContractKey = 1)]
-    public class PrintToCodeExample : IPrintToCode { }
-
-    public interface IPrintToCode { }
 }
