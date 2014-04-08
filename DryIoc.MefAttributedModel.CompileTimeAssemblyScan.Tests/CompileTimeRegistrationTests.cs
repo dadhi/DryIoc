@@ -12,7 +12,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
             var container = new Container().WithAttributedModel();
             container.RegisterExports(new[]
             {
-                new TypeExportInfo
+                new RegistrationInfo
                 {
                     Type = typeof(AnotherService),
                     Exports = new[] { new ExportInfo(typeof(IService), "another") },
@@ -32,7 +32,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
             var container = new Container().WithAttributedModel();
             container.RegisterExports(new[]
             {
-                new TypeExportInfo
+                new RegistrationInfo
                 {
                     Type = typeof(Service),
                     Exports = new[] { new ExportInfo(typeof(IService), "some") },
@@ -40,19 +40,19 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                     MetadataAttributeIndex = -1
                 },
 
-                new TypeExportInfo
+                new RegistrationInfo
                 {
                     Type = typeof(AnotherService),
-                    Exports = new[] { new ExportInfo(typeof(IService)) },
+                    Exports = new[] { new ExportInfo(typeof(IService), null) },
                     IsSingleton = false,
                     MetadataAttributeIndex = -1,
                     FactoryType = FactoryType.Decorator,
                 },
 
-                new TypeExportInfo
+                new RegistrationInfo
                 {
                     Type = typeof(Wrap<>),
-                    Exports = new[] { new ExportInfo(typeof(Wrap<>)) }, 
+                    Exports = new[] { new ExportInfo(typeof(Wrap<>), null) }, 
                     IsSingleton = false,
                     MetadataAttributeIndex = -1,
                     FactoryType = FactoryType.GenericWrapper

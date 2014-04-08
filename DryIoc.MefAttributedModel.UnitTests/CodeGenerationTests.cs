@@ -9,12 +9,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Should_properly_print_registration_info()
         {
-            var info = AttributedModel.GetExportInfoOrDefault(typeof(PrintToCodeExample));
+            var info = AttributedModel.GetRegistrationInfoOrDefault(typeof(PrintToCodeExample));
 
             var code = info.AppendCode();
             var codeValue = code.ToString();
             Assert.That(codeValue, Is.EqualTo(
-@"new TypeExportInfo {
+@"new RegistrationInfo {
     Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeExample),
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeExample), 1),

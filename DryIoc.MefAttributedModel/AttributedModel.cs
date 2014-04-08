@@ -51,21 +51,21 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
         {
             registrator.RegisterExports(types
-                .Select(GetExportInfoOrDefault).Where(info => info != null));
+                .Select(GetRegistrationInfoOrDefault).Where(info => info != null));
         }
 
         public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
         {
-            registrator.RegisterExports(DiscoverExportsInAssemblies(assemblies));
+            registrator.RegisterExports(Scan(assemblies));
         }
 
-        public static void RegisterExports(this IRegistrator registrator, IEnumerable<TypeExportInfo> infos)
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<RegistrationInfo> infos)
         {
             foreach (var info in infos)
                 RegisterExport(registrator, info);
         }
 
-        public static void RegisterExport(this IRegistrator registrator, TypeExportInfo info)
+        public static void RegisterExport(this IRegistrator registrator, RegistrationInfo info)
         {
             var factory = new ReflectionFactory(info.Type, info.GetReuse(), FindSingleImportingConstructor, info.GetSetup());
 
@@ -81,27 +81,27 @@ namespace DryIoc.MefAttributedModel
             }
         }
 
-        public static IEnumerable<TypeExportInfo> DiscoverExportsInAssemblies(IEnumerable<Assembly> assemblies)
+        public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
             return assemblies.SelectMany(a => a.GetTypes())
-                .Select(GetExportInfoOrDefault)
+                .Select(GetRegistrationInfoOrDefault)
                 .Where(info => info != null);
         }
 
-        public static TypeExportInfo GetExportInfoOrDefault(Type type)
+        public static RegistrationInfo GetRegistrationInfoOrDefault(Type type)
         {
             return !type.IsClass || type.IsAbstract ? null
-                : GetExportInfoOrDefault(type, GetAllExportRelatedAttributes(type));
+                : GetRegistrationInfoOrDefault(type, GetAllExportRelatedAttributes(type));
         }
 
-        public static TypeExportInfo GetExportInfoOrDefault(Type type, object[] attributes)
+        public static RegistrationInfo GetRegistrationInfoOrDefault(Type type, object[] attributes)
         {
             if (attributes.Length == 0 ||
                 attributes.IndexOf(a => a is ExportAttribute || a is ExportAllAttribute) == -1 ||
                 attributes.IndexOf(a => a is PartNotDiscoverableAttribute) != -1)
                 return null;
 
-            var info = new TypeExportInfo { Type = type };
+            var info = new RegistrationInfo { Type = type };
 
             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
             {
@@ -110,7 +110,7 @@ namespace DryIoc.MefAttributedModel
                 {
                     var exportAttribute = (ExportAttribute)attribute;
                     var export = new ExportInfo(exportAttribute.ContractType ?? type,
-                        exportAttribute.ContractName ?? 
+                        exportAttribute.ContractName ??
                         (attribute is ExportWithKeyAttribute ? ((ExportWithKeyAttribute)attribute).ContractKey : null));
 
                     if (info.Exports == null)
@@ -239,7 +239,7 @@ namespace DryIoc.MefAttributedModel
 
             var attributes = factoryMethod.GetCustomAttributes(false);
 
-            var exportInfo = GetExportInfoOrDefault(serviceType, attributes);
+            var exportInfo = GetRegistrationInfoOrDefault(serviceType, attributes);
             if (exportInfo == null)
                 return;
 
@@ -386,14 +386,14 @@ namespace DryIoc.MefAttributedModel
         public static readonly string EXPORT_IS_REQUIRED =
             "At least one Export attributed should be defined for {0}.";
 
-        public static readonly string EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES = 
+        public static readonly string EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES =
             "Unable to get contract types for implementation {0} cause all of its implemented types where filtered out: {1}";
     }
 
     #region Registration Info DTOs
 #pragma warning disable 659
 
-    public sealed class TypeExportInfo
+    public sealed class RegistrationInfo
     {
         public Type Type;
         public ExportInfo[] Exports;
@@ -431,7 +431,7 @@ namespace DryIoc.MefAttributedModel
 
         public override bool Equals(object obj)
         {
-            var other = obj as TypeExportInfo;
+            var other = obj as RegistrationInfo;
             return other != null
                 && other.Type == Type
                 && other.IsSingleton == IsSingleton
@@ -445,7 +445,7 @@ namespace DryIoc.MefAttributedModel
         {
             code = code ?? new StringBuilder();
             code.Append(
-@"new TypeExportInfo {
+@"new RegistrationInfo {
     Type = ").AppendType(Type).Append(@",
     Exports = new[] {
         "); for (var i = 0; i < Exports.Length; i++)
@@ -469,24 +469,47 @@ namespace DryIoc.MefAttributedModel
 
     public static class PrintCode
     {
-        public static StringBuilder AppendBool(this StringBuilder builder, bool x)
+        public static StringBuilder AppendBool(this StringBuilder code, bool x)
         {
-            return builder.Append(x ? "true" : "false");
+            return code.Append(x ? "true" : "false");
         }
 
-        public static StringBuilder AppendString(this StringBuilder builder, string x)
+        public static StringBuilder AppendString(this StringBuilder code, string x)
         {
-            return builder.Append(x == null ? "null" : ("\"" + x + "\""));
+            return code.Append(x == null ? "null" : ("\"" + x + "\""));
         }
 
-        public static StringBuilder AppendType(this StringBuilder builder, Type x)
+        public static StringBuilder AppendType(this StringBuilder code, Type x)
         {
-            return builder.Append(x == null ? "null" : "typeof(" + x.Print() + ")");
+            return code.Append(x == null ? "null" : "typeof(" + x.Print() + ")");
         }
 
-        public static StringBuilder AppendEnum(this StringBuilder builder, Type enumType, object enumValue)
+        public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object enumValue)
         {
-            return builder.Append(enumType.Print() + "." + Enum.GetName(enumType, enumValue));
+            return code.Append(enumType.Print() + "." + Enum.GetName(enumType, enumValue));
+        }
+
+        public static StringBuilder AppendObject(this StringBuilder code, object x, Action<StringBuilder, object> ifNotRecognized = null)
+        {
+            if (x == null)
+                return code.Append("null");
+            if (x is bool)
+                return code.AppendBool((bool)x);
+            if (x is string)
+                return code.AppendString((string)x);
+            if (x is Type)
+                return code.AppendType((Type)x);
+
+            var type = x.GetType();
+            if (type.IsEnum)
+                return code.AppendEnum(type, x);
+
+            if (ifNotRecognized != null)
+                ifNotRecognized(code, x);
+            else
+                code.Append(x);
+
+            return code;
         }
     }
 
@@ -515,7 +538,7 @@ namespace DryIoc.MefAttributedModel
         {
             return (code ?? new StringBuilder())
                 .Append(@"new ExportInfo(").AppendType(ServiceType).Append(@", ")
-                .Append(ServiceKeyInfo.Key).Append(@")");
+                .AppendObject(ServiceKeyInfo.Key).Append(@")");
         }
     }
 
@@ -583,7 +606,7 @@ namespace DryIoc.MefAttributedModel
                 .Append(@"Decorator = new DecoratorInfo(")
                 .AppendBool(ShouldCompareMetadata).Append(", ")
                 .AppendType(ConditionType).Append(", ")
-                .Append(ServiceKeyInfo.Key).Append(")");
+                .AppendObject(ServiceKeyInfo.Key).Append(")");
         }
     }
 
@@ -652,11 +675,6 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
-    public interface IFactory<T>
-    {
-        T Create();
-    }
-
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportAsGenericWrapperAttribute : Attribute
     {
@@ -722,6 +740,11 @@ namespace DryIoc.MefAttributedModel
         public object Metadata { get; set; }
 
         public Type[] ConstructorSignature { get; set; }
+    }
+
+    public interface IFactory<T>
+    {
+        T Create();
     }
 
     /// <summary>

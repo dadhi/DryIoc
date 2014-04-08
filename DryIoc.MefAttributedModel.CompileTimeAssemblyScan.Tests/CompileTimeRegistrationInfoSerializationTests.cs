@@ -41,7 +41,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         {
             // Given
             var assembly = typeof(TransientService).Assembly;
-            var services = AttributedModel.DiscoverExportsInAssemblies(new[] { assembly }).ToArray();
+            var services = AttributedModel.Scan(new[] { assembly }).ToArray();
 
             // When
             if (File.Exists(DATA_FILE))
@@ -53,9 +53,9 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 
             // Then
             var loadedModel = CreateModel();
-            TypeExportInfo[] infos;
+            RegistrationInfo[] infos;
             using (var file = File.OpenRead(DATA_FILE))
-                infos = (TypeExportInfo[])loadedModel.Deserialize(file, null, typeof(TypeExportInfo[]));
+                infos = (RegistrationInfo[])loadedModel.Deserialize(file, null, typeof(RegistrationInfo[]));
 
             Assert.That(services, Is.EqualTo(infos));
         }
@@ -65,7 +65,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         {
             // Given
             var assembly = typeof(TransientService).Assembly;
-            var services = AttributedModel.DiscoverExportsInAssemblies(new[] { assembly }).ToArray();
+            var services = AttributedModel.Scan(new[] { assembly }).ToArray();
 
             if (File.Exists(DATA_FILE))
                 File.Delete(DATA_FILE);
@@ -75,9 +75,9 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 model.Serialize(file, services);
 
             var loadedModel = CreateModel();
-            TypeExportInfo[] infos;
+            RegistrationInfo[] infos;
             using (var file = File.OpenRead(DATA_FILE))
-                infos = (TypeExportInfo[])loadedModel.Deserialize(file, null, typeof(TypeExportInfo[]));
+                infos = (RegistrationInfo[])loadedModel.Deserialize(file, null, typeof(RegistrationInfo[]));
 
             // When
             var container = new Container();
@@ -92,7 +92,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         {
             var model = TypeModel.Create();
             model.Add(typeof(ServiceKeyInfo), false).SetSurrogate(typeof(ServiceKeyInfoSurrogate));
-            model.Add<TypeExportInfo>();
+            model.Add<RegistrationInfo>();
             model.Add<ExportInfo>();
             model.Add<GenericWrapperInfo>();
             model.Add<DecoratorInfo>();
