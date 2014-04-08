@@ -38,7 +38,7 @@ namespace DryIoc.MefAttributedModel
     public static class AttributedModel
     {
         // NOTE: Default reuse policy is Singleton, the same as in MEF.
-        public static CreationPolicy DefaultCreationPolicy = CreationPolicy.Shared; 
+        public static CreationPolicy DefaultCreationPolicy = CreationPolicy.Shared;
 
         public static Container WithAttributedModel(this Container container)
         {
@@ -73,7 +73,7 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceName, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                registrator.Register(factory, export.ServiceType, export.ServiceKey, IfAlreadyRegistered.ThrowIfDuplicateKey);
 
                 if (export.ServiceType.IsGenericType &&
                     export.ServiceType.GetGenericTypeDefinition() == typeof(IFactory<>))
@@ -109,11 +109,12 @@ namespace DryIoc.MefAttributedModel
                 if (attribute is ExportAttribute)
                 {
                     var exportAttribute = (ExportAttribute)attribute;
-                    var export = new ExportInfo
-                    {
-                        ServiceType = exportAttribute.ContractType ?? type,
-                        ServiceName = exportAttribute.ContractName
-                    };
+                    var export = new ExportInfo { ServiceType = exportAttribute.ContractType ?? type };
+
+                    if (exportAttribute.ContractName != null)
+                        export.ServiceKey = exportAttribute.ContractName;
+                    else if (attribute is ExportWithKeyAttribute)
+                        export.ServiceKey = ((ExportWithKeyAttribute)attribute).ContractKey;
 
                     if (info.Exports == null)
                         info.Exports = new[] { export };
@@ -134,7 +135,11 @@ namespace DryIoc.MefAttributedModel
                     }
 
                     var exportAllInfos = allContractTypes
-                        .Select(t => new ExportInfo { ServiceType = t, ServiceName = exportAllAttribute.ContractName })
+                        .Select(t => new ExportInfo
+                        {
+                            ServiceType = t, 
+                            ServiceKey = exportAllAttribute.ContractName ?? exportAllAttribute.ContractKey
+                        })
                         .ToArray();
 
                     Throw.If(exportAllInfos.Length == 0, "Unable to get contract types for implementation {0} cause all of its implemented types where filtered out: {1}",
@@ -251,17 +256,17 @@ namespace DryIoc.MefAttributedModel
                 Expression.Call(
                     Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
                         request.ResolvedExpressions.ToExpression(registry),
-                        Expression.Constant(factoryExport.ServiceName, typeof(string)),
+                        Expression.Constant(factoryExport.ServiceKey, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     _factoryMethodName, null);
 
-            var factory = new DelegateFactory(factoryCreateExpr, 
+            var factory = new DelegateFactory(factoryCreateExpr,
                 exportInfo.GetReuse(), exportInfo.GetSetup(attributes));
-            
+
             for (var i = 0; i < exportInfo.Exports.Length; i++)
             {
                 var export = exportInfo.Exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceName, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                registrator.Register(factory, export.ServiceType, export.ServiceKey, IfAlreadyRegistered.ThrowIfDuplicateKey);
             }
         }
 
@@ -302,8 +307,8 @@ namespace DryIoc.MefAttributedModel
             if (attributes.Length == 0)
                 return false;
 
-            return TryGetServiceKeyFromImportAttribute(out key, attributes)
-                || TryGetServiceKeyFromImportOrExportAttribute(out key,
+            return TryGetServiceKeyFromImportAttribute(out key, attributes) ||
+                TryGetServiceKeyFromImportOrExportAttribute(out key,
                     member is PropertyInfo ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType,
                     registry, attributes);
         }
@@ -311,7 +316,9 @@ namespace DryIoc.MefAttributedModel
         public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
         {
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
-            key = import == null ? null : import.ContractName;
+            key = import == null ? null
+                : import.ContractName ??
+                (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null);
             return import != null;
         }
 
@@ -374,7 +381,7 @@ namespace DryIoc.MefAttributedModel
             "Unable to resolve dependency {0} with metadata [{1}] in {2}";
 
         public static readonly string UNSUPPORTED_MULTIPLE_METADATA =
-            "Multiple associated metadata found while exporting {0}.\n" + 
+            "Multiple associated metadata found while exporting {0}.\n" +
             "Only single metadata is supported per implementation type, please remove the rest.";
 
         public static readonly string UNSUPPORTED_MULTIPLE_FACTORY_TYPES =
@@ -440,17 +447,16 @@ namespace DryIoc.MefAttributedModel
                 && other.Exports.SequenceEqual(Exports);
         }
 
-        public string ToCode()
+        public StringBuilder AppendCode(StringBuilder code = null)
         {
-            var code = new StringBuilder(
+            code = code ?? new StringBuilder();
+            code.Append(
 @"new TypeExportInfo {
     Type = ").AppendType(Type).Append(@",
-    Exports = new[] {");
-            for (var i = 0; i < Exports.Length; i++) code.Append(@"
-        new ExportInfo { ServiceType = ").AppendType(Exports[i].ServiceType).Append(
-                     @", ServiceName = ").AppendString(Exports[i].ServiceName).Append(@" },");
-            code.Append(@"
-    },
+    Exports = new[] {
+        "); for (var i = 0; i < Exports.Length; i++) 
+                code = Exports[i].AppendCode(code).Append(@",
+        "); code.Append(@"}
     IsSingleton = ").AppendBool(IsSingleton).Append(@",
     MetadataAttributeIndex = ").Append(MetadataAttributeIndex).Append(@",
     FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
@@ -462,12 +468,11 @@ namespace DryIoc.MefAttributedModel
                                 @", ConditionType = ").AppendType(Decorator.ConditionType).Append(
                                 @"}"); code.Append(@"
 }");
-
-            return code.ToString();
+            return code;
         }
     }
 
-    public static class CodePrint
+    public static class PrintCode
     {
         public static StringBuilder AppendBool(this StringBuilder builder, bool x)
         {
@@ -493,12 +498,21 @@ namespace DryIoc.MefAttributedModel
     public sealed class ExportInfo
     {
         public Type ServiceType;
-        public string ServiceName;
+        public object ServiceKey;
 
         public override bool Equals(object obj)
         {
             var other = obj as ExportInfo;
-            return other != null && other.ServiceType == ServiceType && other.ServiceName == ServiceName;
+            return other != null
+                && other.ServiceType == ServiceType
+                && Equals(other.ServiceKey, ServiceKey);
+        }
+
+        public StringBuilder AppendCode(StringBuilder code = null)
+        {
+            return (code ?? new StringBuilder())
+                .Append(@"new ExportInfo { ServiceType = ").AppendType(ServiceType)
+                .Append(@", ServiceKey = ").Append(ServiceKey).Append(@" }");
         }
     }
 
@@ -557,16 +571,6 @@ namespace DryIoc.MefAttributedModel
 
     #region Additional Export/Import attributes
 
-    public class ExportWithKeyAttribute : Attribute
-    {
-        public object Key { get; set; }
-
-        public ExportWithKeyAttribute(object key)
-        {
-            Key = key.ThrowIfNull();
-        }
-    }
-
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportWithMetadataAttribute : Attribute
@@ -579,12 +583,32 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
+    public class ExportWithKeyAttribute : ExportAttribute
+    {
+        /// <summary>Specifies service key if <see cref="ExportAttribute.ContractName"/> is not specified.</summary>
+        public object ContractKey { get; set; }
+
+        public ExportWithKeyAttribute(object contractKey, Type contractType)
+            : base(contractType)
+        {
+            ContractKey = contractKey;
+        }
+
+        public ExportWithKeyAttribute(object contractKey) : this(contractKey, null) { }
+    }
+
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportAllAttribute : Attribute
     {
         public static Func<Type, bool> ExportedTypes = Registrator.RegisterAllDefaultTypes;
 
+        /// <summary>Specifies service key if <see cref="ContractName"/> is not specified.</summary>
+        public object ContractKey { get; set; }
+
+        /// <summary>If specified has more priority over <see cref="ContractKey"/>.</summary>
         public string ContractName { get; set; }
+
         public Type[] Except { get; set; }
 
         public IEnumerable<Type> GetAllContractTypes(Type implementationType)
@@ -624,8 +648,22 @@ namespace DryIoc.MefAttributedModel
         bool Check(Request request);
     }
 
+    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
+    public class ImportWithKeyAttribute : ImportAttribute
+    {
+        public object ContractKey { get; set; }
+
+        public ImportWithKeyAttribute(object contractKey, Type contractType)
+            : base(contractType)
+        {
+            ContractKey = contractKey;
+        }
+
+        public ImportWithKeyAttribute(object contractKey) : this(contractKey, null) { }
+    }
+
     [MetadataAttribute]
-    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
     public class ImportWithMetadataAttribute : Attribute
     {
         public ImportWithMetadataAttribute(object metadata)
@@ -636,7 +674,7 @@ namespace DryIoc.MefAttributedModel
         public readonly object Metadata;
     }
 
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
     public class ExportOnceAttribute : Attribute
     {
         public string ContractName { get; set; }

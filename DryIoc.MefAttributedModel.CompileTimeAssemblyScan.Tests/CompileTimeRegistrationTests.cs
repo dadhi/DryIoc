@@ -16,7 +16,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     Type = typeof(AnotherService),
                     Exports = new[] { 
-                        new ExportInfo { ServiceType = typeof(IService), ServiceName = "another" }
+                        new ExportInfo { ServiceType = typeof(IService), ServiceKey = "another" }
                     },
                     IsSingleton = true,
                     MetadataAttributeIndex = -1,
@@ -38,7 +38,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     Type = typeof(Service),
                     Exports = new[] {
-                        new ExportInfo { ServiceType = typeof(IService), ServiceName = "some" } },
+                        new ExportInfo { ServiceType = typeof(IService), ServiceKey = "some" } },
                     IsSingleton = true,
                     MetadataAttributeIndex = -1
                 },
@@ -47,7 +47,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     Type = typeof(AnotherService),
                     Exports = new[] {
-                        new ExportInfo { ServiceType = typeof(IService), ServiceName = null } },
+                        new ExportInfo { ServiceType = typeof(IService), ServiceKey = null } },
                     IsSingleton = false,
                     MetadataAttributeIndex = -1,
                     FactoryType = FactoryType.Decorator,
@@ -57,7 +57,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     Type = typeof(Wrap<>),
                     Exports = new[] {
-                        new ExportInfo { ServiceType = typeof(Wrap<>), ServiceName = null } }, IsSingleton = false,
+                        new ExportInfo { ServiceType = typeof(Wrap<>), ServiceKey = null } }, IsSingleton = false,
                     MetadataAttributeIndex = -1,
                     FactoryType = FactoryType.GenericWrapper
                 },
@@ -67,16 +67,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 
             Assert.That(wrapped.Value, Is.InstanceOf<AnotherService>());
         }
-
-        //[Test]
-        //public void Can_use_compile_time_generated_registrations()
-        //{
-        //    var container = new Container(AttributedRegistrator.DefaultSetup);
-        //    container.RegisterExported(CompileTimeGeneratedRegistrator.Registrations);
-
-        //    Assert.DoesNotThrow(() =>
-        //        container.Resolve<Meta<Func<IServiceWithMetadata>, IViewMetadata>[]>());
-        //}
     }
 
     public class Wrap<T>

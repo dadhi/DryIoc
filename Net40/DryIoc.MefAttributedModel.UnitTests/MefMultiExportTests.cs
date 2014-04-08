@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class MefMultiExports
+    public class MefMultiExportTests
     {
         [Import("a")]
         public Bazooka BazookaA { get; set; }

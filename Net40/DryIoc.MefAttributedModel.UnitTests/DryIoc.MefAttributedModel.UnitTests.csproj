@@ -64,7 +64,7 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\InheritedExportTests.cs">
       <Link>InheritedExportTests.cs</Link>
     </Compile>
-    <Compile Include="MefMultiExports.cs" />
+    <Compile Include="MefMultiExportTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

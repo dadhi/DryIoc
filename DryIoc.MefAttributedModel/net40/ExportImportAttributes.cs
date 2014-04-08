@@ -58,13 +58,26 @@
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
     public class ImportAttribute : Attribute
     {
+        public Type ContractType { get; set; }
         public string ContractName { get; private set; }
+        //public bool AllowDefault { get; set; } // TODO Add support for..
 
         public ImportAttribute() { }
 
+        public ImportAttribute(Type contractType)
+            : this((string)null, contractType)
+        {
+        }
+
         public ImportAttribute(string contractName)
+            : this(contractName, null)
+        {
+        }
+
+        public ImportAttribute(string contractName, Type contractType)
         {
             ContractName = contractName;
+            ContractType = contractType;
         }
     }
 

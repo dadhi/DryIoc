@@ -1,8 +1,10 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using DryIoc.MefAttributedModel.UnitTests;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
+using ProtoBuf;
 using ProtoBuf.Meta;
 
 namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
@@ -90,7 +92,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         {
             var model = TypeModel.Create();
             model.Add<TypeExportInfo>();
-            model.Add<ExportInfo>();
+            model.Add(typeof(ExportInfo), false).SetSurrogate(typeof(ExportInfoSurrogate));
             model.Add<GenericWrapperInfo>();
             model.Add<DecoratorInfo>();
             return model;
@@ -103,6 +105,54 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         {
             var publicFields = typeof(T).GetFields().Select(x => x.Name).ToArray();
             return model.Add(typeof(T), false).Add(publicFields);
+        }
+    }
+
+    [ProtoContract]
+    public sealed class ExportInfoSurrogate
+    {
+        [ProtoMember(1)]
+        public Type ServiceType { get; set; }
+
+        [ProtoMember(2)]
+        public string ServiceKeyAsString { get; set; }
+        [ProtoMember(3)]
+        public int? ServiceKeyAsInt { get; set; }
+        [ProtoMember(4)]
+        public ServiceKey? ServiceKeyAsServiceKey { get; set; }
+        // TODO: other types here
+
+        public static implicit operator ExportInfoSurrogate(ExportInfo info)
+        {
+            if (info == null)
+                return null;
+
+            var surrogate = new ExportInfoSurrogate { ServiceType = info.ServiceType };
+
+            var serviceKey = info.ServiceKey;
+            if (serviceKey is ServiceKey)
+                surrogate.ServiceKeyAsServiceKey = (ServiceKey?)serviceKey;
+            if (serviceKey is int)
+                surrogate.ServiceKeyAsInt = (int?)serviceKey;
+            if (serviceKey is string)
+                surrogate.ServiceKeyAsString = (string)serviceKey;
+            return surrogate;
+        }
+
+        public static implicit operator ExportInfo(ExportInfoSurrogate surrogate)
+        {
+            if (surrogate == null)
+                return null;
+
+            var info = new ExportInfo { ServiceType = surrogate.ServiceType };
+            if (surrogate.ServiceKeyAsServiceKey != null)
+                info.ServiceKey = surrogate.ServiceKeyAsServiceKey;
+            if (surrogate.ServiceKeyAsInt != null)
+                info.ServiceKey = surrogate.ServiceKeyAsInt;
+            if (surrogate.ServiceKeyAsString != null)
+                info.ServiceKey = surrogate.ServiceKeyAsString;
+
+            return info;
         }
     }
 }

@@ -43,7 +43,7 @@ namespace DryIoc
     /// - add: Resolve as IDictionary{KeyType, ServiceType}.
     /// - finish: CreateChildContainer and CreateScope.
     /// - finish: Unregister.
-
+    /// - add: Auto-select constructor with all resolvable parameters.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -519,7 +519,7 @@ namespace DryIoc
 
                 if (indexedFactories.Length > 1)
                     return getSingleRegisteredFactory
-                        .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, factories)
+                        .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, indexedFactories)
                         .Invoke(serviceType, indexedFactories);
             }
 
@@ -949,7 +949,7 @@ namespace DryIoc
     public static class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
-            "Unable to resolve service {0}.\n Please register service OR adjust resolution rules.";
+            "Unable to resolve {0}.\nPlease register service OR add resolution rule for unregistered service.";
 
         public static readonly string UNSUPPORTED_FUNC_WITH_ARGS =
             "Unsupported resolution as {0} of {1}.";
@@ -975,7 +975,8 @@ namespace DryIoc
             "Consider to register generic type definition {1} instead.";
 
         public static readonly string EXPECTED_SINGLE_DEFAULT_FACTORY =
-            "Expecting single default registration of {0} but found many:\n{1}.";
+            "Expecting single default registration of {0} but found many:\n{1}." +
+            "\nYou can identify service with keys or metadata OR adjust resolution rules to get single registered factory.";
 
         public static readonly string EXPECTED_NON_ABSTRACT_IMPL_TYPE =
             "Expecting not abstract and not interface implementation type, but found {0}.";
@@ -1407,21 +1408,21 @@ namespace DryIoc
             str.Append(ServiceType.Print());
 
             if (ServiceKey != null)
-                if (ServiceKey is string)
-                    str.Append(" '").Append(ServiceKey).Append("'");
-                else
+                if (ServiceKey is int)
                     str.Append(" #").Append(ServiceKey);
+                else
+                    str.Append(" '").Append(ServiceKey).Append("'");
 
             if (DependencyInfo != null)
             {
-                str.Append(" (");
+                str.Append(" as ");
                 if (DependencyInfo is ParameterInfo)
-                    str.Append("ctorParam '").Append(((ParameterInfo)DependencyInfo).Name);
+                    str.Append("ctor-parameter '").Append(((ParameterInfo)DependencyInfo).Name);
                 else if (DependencyInfo is PropertyInfo)
                     str.Append("property '").Append(((PropertyInfo)DependencyInfo).Name);
                 else if (DependencyInfo is FieldInfo)
                     str.Append("field '").Append(((FieldInfo)DependencyInfo).Name);
-                str.Append("')");
+                str.Append("' ");
             }
 
             if (ResolvedFactory != null && ResolvedFactory.ImplementationType != null)
@@ -1639,7 +1640,7 @@ namespace DryIoc
         public override string ToString()
         {
             var str = new StringBuilder();
-            str.Append("Factory {ID=").Append(ID);
+            str.Append("factory {ID=").Append(ID);
             if (ImplementationType != null)
                 str.Append(", ImplType=").Append(ImplementationType.Print());
             return str.ToString();
@@ -2374,12 +2375,12 @@ namespace DryIoc
 
     public static class PrintTools
     {
-        public static string Print(object x)
+        public static string Print(this object x)
         {
             return x is string ? (string)x
                 : (x is Type ? ((Type)x).Print()
-                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine, ifEmpty: "<empty>")
-                : (x is IEnumerable ? ((IEnumerable)x).Print(ifEmpty: "<empty>")
+                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine, ifEmpty: "''")
+                : (x is IEnumerable ? ((IEnumerable)x).Print(ifEmpty: "''")
                 : (string.Empty + x))));
         }
 

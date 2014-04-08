@@ -45,6 +45,7 @@
     <Compile Include="ExportAllTests.cs" />
     <Compile Include="ExportAsDecoratorTests.cs" />
     <Compile Include="ExportAsGenericWrapperTests.cs" />
+    <Compile Include="ExportImportWithKeyTests.cs" />
     <Compile Include="ExportOnceTests.cs" />
     <Compile Include="ImportWithMetadataTests.cs" />
     <Compile Include="InheritedExportTests.cs" />
