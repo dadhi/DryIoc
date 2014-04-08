@@ -71,6 +71,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.That(slow, Is.InstanceOf<DecoratorWithFastHandlerImport>());
             Assert.That(((DecoratorWithFastHandlerImport)slow).Handler, Is.InstanceOf<SlowHandler>());
         }
+
+        [Test]
+        public void Decorator_supports_matching_with_service_key()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(FoohHandler), typeof(BlahHandler), typeof(FoohDecorator));
+
+            var handler = container.Resolve<IHandler>(BlahFooh.Fooh);
+
+            Assert.That(handler, Is.InstanceOf<FoohDecorator>());
+            Assert.That(((FoohDecorator)handler).Handler, Is.InstanceOf<FoohHandler>());
+        }
     }
 }
 

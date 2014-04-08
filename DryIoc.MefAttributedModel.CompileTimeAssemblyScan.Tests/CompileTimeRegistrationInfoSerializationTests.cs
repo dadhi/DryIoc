@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
@@ -114,7 +115,8 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         [ProtoMember(1)] public string KeyAsString;
         [ProtoMember(2)] public int? KeyAsInt;
         [ProtoMember(3)] public ServiceKey? KeyAsServiceKey;
-        // TODO: other types here
+        [ProtoMember(4)] public BlahFooh? KeyAsBlahFooh;
+        // NOTE: add your types here
 
         public static implicit operator ServiceKeyInfoSurrogate(ServiceKeyInfo info)
         {
@@ -124,7 +126,9 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
             var surrogate = new ServiceKeyInfoSurrogate();
             var key = info.Key;
             if (key is ServiceKey)
-                surrogate.KeyAsServiceKey = (ServiceKey?)key;
+                surrogate.KeyAsServiceKey = (ServiceKey)key;
+            if (key is BlahFooh)
+                surrogate.KeyAsBlahFooh = (BlahFooh)key;
             if (key is int)
                 surrogate.KeyAsInt = (int?)key;
             if (key is string)
@@ -140,6 +144,8 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
             var info = new ServiceKeyInfo();
             if (surrogate.KeyAsServiceKey != null)
                 info.Key = surrogate.KeyAsServiceKey;
+            if (surrogate.KeyAsBlahFooh != null)
+                info.Key = surrogate.KeyAsBlahFooh;
             if (surrogate.KeyAsInt != null)
                 info.Key = surrogate.KeyAsInt;
             if (surrogate.KeyAsString != null)

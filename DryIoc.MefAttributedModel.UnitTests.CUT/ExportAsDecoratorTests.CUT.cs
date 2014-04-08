@@ -83,4 +83,23 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             Handler = handler;
         }
     }
+
+    [ExportWithKey(BlahFooh.Blah, typeof(IHandler))]
+    public class BlahHandler : IHandler { }
+
+    [ExportAll(ContractKey = BlahFooh.Fooh)]
+    public class FoohHandler : IHandler { }
+
+    public enum BlahFooh { Blah, Fooh }
+
+    [ExportAll, ExportAsDecorator(ContractKey = BlahFooh.Fooh)]
+    public class FoohDecorator : IHandler
+    {
+        public IHandler Handler { get; set; }
+
+        public FoohDecorator(IHandler handler)
+        {
+            Handler = handler;
+        }
+    }
 }
