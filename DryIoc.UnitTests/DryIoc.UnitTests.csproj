@@ -41,6 +41,7 @@
   <ItemGroup>
     <Compile Include="AppendableArrayTests.cs" />
     <Compile Include="CompositePatternTests.cs" />
+    <Compile Include="KeyValuePairResolutionTests.cs" />
     <Compile Include="ManyTests.cs" />
     <Compile Include="Memory\NoLeakingMemoryTests.cs" />
     <Compile Include="PrintTests.cs" />

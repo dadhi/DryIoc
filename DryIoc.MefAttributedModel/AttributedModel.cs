@@ -34,6 +34,8 @@ namespace DryIoc.MefAttributedModel
 {
     /// <summary>
     /// Implements MEF Attributed Programming Model. Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel.
+    /// TODO:
+    /// - add: ImportAttribute.ContractType and AllowDefault support.
     /// </summary>
     public static class AttributedModel
     {

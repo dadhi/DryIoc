@@ -85,6 +85,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\HashTreeTests.cs">
       <Link>HashTreeTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\KeyValuePairResolutionTests.cs">
+      <Link>KeyValuePairResolutionTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\LazyTests.cs">
       <Link>LazyTests.cs</Link>
     </Compile>

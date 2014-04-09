@@ -37,13 +37,15 @@ namespace DryIoc
     /// <summary>
     /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
     /// TODO:
-    /// + finished: IsRegistered specialized by factory type.
-    /// - change: Use any object as Key, not only String. The condition is support for GetHashCode and Equals.
-    /// - add: Keyed{T, TKey}
-    /// - add: Resolve as IDictionary{KeyType, ServiceType}.
-    /// - finish: CreateChildContainer and CreateScope.
+    /// + finish: IsRegistered specialized by factory type.
+    /// + change: Use any object as Key, not only String. The condition is support for GetHashCode and Equals.
+    /// + add: KeyValuePair{T, TKey}
+    /// - add: IfAlreadyRegistered.ReplaceWithNew.
+    /// - add: CreateContainerWithWipedCache.
+    /// - finish: CreateChildContainer and CreateScopedContainer.
     /// - finish: Unregister.
     /// - add: Auto-select constructor with all resolvable parameters.
+    /// - add: Rule to resolve mocks of unregistered services.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -459,7 +461,7 @@ namespace DryIoc
                         return new FactoriesEntry(0, oldEntry.Factories.AddOrUpdate(0, factory));
 
                     // if they were, but we need to keep old, just return the old.
-                    if (ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered) 
+                    if (ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered)
                         return oldValue;
 
                     var newLatestIndex = oldLatestIndex + 1;
@@ -484,7 +486,7 @@ namespace DryIoc
 
                     var newLatestIndex = !index.HasValue ? oldLatestIndex : !oldLatestIndex.HasValue ? index
                         : index > oldLatestIndex ? index : oldLatestIndex;
-                        
+
                     return new FactoriesEntry(newLatestIndex,
                         oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
                             oldFactory.ThrowIf(ifAlreadyRegistered == IfAlreadyRegistered.ThrowIfDuplicateKey,
@@ -667,6 +669,8 @@ namespace DryIoc
             // Removing not required Convert from expression root, because CompiledFactory result still be converted at the end.
             if (expression.NodeType == ExpressionType.Convert)
                 expression = ((UnaryExpression)expression).Operand;
+            if (expression.Type.IsValueType)
+                expression = Expression.Convert(expression, typeof(object));
             return Expression.Lambda<FactoryDelegate>(expression,
                 ResolvedExpressions.ObjectsParameter, ResolvedExpressions.CurrentScopeParameter, ResolvedExpressions.ResolutionScopeParameter);
         }
@@ -709,6 +713,9 @@ namespace DryIoc
                 new ReflectionFactory(typeof(Lazy<>),
                     getConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }),
                     setup: GenericWrapperSetup.Default));
+
+            GenericWrappers = GenericWrappers.AddOrUpdate(typeof(KeyValuePair<,>),
+                new FactoryProvider(GetKeyValuePairFactoryOrDefault, GenericWrapperSetup.With(t => t[1])));
 
             GenericWrappers = GenericWrappers.AddOrUpdate(typeof(Meta<,>),
                 new FactoryProvider(GetMetaFactoryOrDefault, GenericWrapperSetup.With(t => t[0])));
@@ -759,8 +766,7 @@ namespace DryIoc
                     }
 
                     var itemArray = items.ToArray();
-                    Throw.If(itemArray.Length == 0, Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS, wrappedItemType,
-                        req);
+                    Throw.If(itemArray.Length == 0, Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS, wrappedItemType, req);
 
                     var itemExpressions = new List<Expression>(itemArray.Length);
                     for (var i = 0; i < itemArray.Length; i++)
@@ -828,11 +834,32 @@ namespace DryIoc
             return Expression.New(ctor, request.ResolvedExpressions.ToExpression(factoryExpr));
         }
 
+        public static Factory GetKeyValuePairFactoryOrDefault(Request request, IRegistry registry)
+        {
+            var typeArgs = request.ServiceType.GetGenericArguments();
+            var serviceKeyType = typeArgs[0];
+            var serviceKey = request.ServiceKey;
+            if (serviceKey == null && serviceKeyType.IsValueType ||
+                serviceKey != null && !serviceKeyType.IsInstanceOfType(serviceKey))
+                return null;
+
+            var serviceType = typeArgs[1];
+            return new DelegateFactory((pairReq, _) =>
+            {
+                var serviceRequest = pairReq.Push(serviceType, serviceKey);
+                var serviceExpr = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw).GetExpression(serviceRequest, registry);
+                var pairCtor = pairReq.ServiceType.GetConstructors()[0];
+                var keyExpr = pairReq.ResolvedExpressions.ToExpression(serviceKey, serviceKeyType);
+                var pairExpr = Expression.New(pairCtor, keyExpr, serviceExpr);
+                return pairExpr;
+            });
+        }
+
         public static Factory GetMetaFactoryOrDefault(Request request, IRegistry registry)
         {
-            var genericArgs = request.ServiceType.GetGenericArguments();
-            var serviceType = genericArgs[0];
-            var metadataType = genericArgs[1];
+            var typeArgs = request.ServiceType.GetGenericArguments();
+            var serviceType = typeArgs[0];
+            var metadataType = typeArgs[1];
 
             var wrappedServiceType = registry.GetWrappedServiceTypeOrSelf(serviceType);
             object resultMetadata = null;
@@ -866,7 +893,8 @@ namespace DryIoc
                 var serviceExpr = registry.GetOrAddFactory(serviceRequest, IfUnresolved.Throw).GetExpression(serviceRequest, registry);
                 var metaCtor = req.ServiceType.GetConstructors()[0];
                 var metadataExpr = req.ResolvedExpressions.ToExpression(resultMetadata, metadataType);
-                return Expression.New(metaCtor, serviceExpr, metadataExpr);
+                var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
+                return metaExpr;
             });
         }
 
@@ -1367,7 +1395,7 @@ namespace DryIoc
 
         public Type ImplementationType
         {
-            get { return ResolvedFactory.ImplementationType; }
+            get { return ResolvedFactory == null ? null : ResolvedFactory.ImplementationType; }
         }
 
         public Request Push(Type serviceType, object serviceKey, object dependencyInfo = null)
@@ -1504,6 +1532,8 @@ namespace DryIoc
     {
         public static readonly GenericWrapperSetup Default = new GenericWrapperSetup();
 
+        public static Func<Type[], Type> SelectServiceTypeArgDefault = ThrowIfNotSingleTypeArg;
+
         public static GenericWrapperSetup With(Func<Type[], Type> selectServiceTypeArg)
         {
             return selectServiceTypeArg == null ? Default : new GenericWrapperSetup(selectServiceTypeArg);
@@ -1512,17 +1542,17 @@ namespace DryIoc
         public override FactoryType Type { get { return FactoryType.GenericWrapper; } }
         public readonly Func<Type[], Type> GetWrappedServiceType;
 
-        #region Implementation
-
-        private GenericWrapperSetup(Func<Type[], Type> selectServiceTypeFromGenericArgs = null)
-        {
-            GetWrappedServiceType = selectServiceTypeFromGenericArgs ?? SelectSingleByDefault;
-        }
-
-        private static Type SelectSingleByDefault(Type[] typeArgs)
+        public static Type ThrowIfNotSingleTypeArg(Type[] typeArgs)
         {
             Throw.If(typeArgs.Length != 1, Error.GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT, typeArgs);
             return typeArgs[0];
+        }
+
+        #region Implementation
+
+        private GenericWrapperSetup(Func<Type[], Type> selectServiceTypeArg = null)
+        {
+            GetWrappedServiceType = selectServiceTypeArg ?? ThrowIfNotSingleTypeArg;
         }
 
         #endregion
@@ -1643,6 +1673,11 @@ namespace DryIoc
             str.Append("factory {ID=").Append(ID);
             if (ImplementationType != null)
                 str.Append(", ImplType=").Append(ImplementationType.Print());
+            if (Reuse != null)
+                str.Append(", ReuseType=").Append(Reuse.GetType().Print());
+            if (Setup.Type != DefaultSetup.Type)
+                str.Append(", FactoryType=").Append(Setup.Type);
+            str.Append("}");
             return str.ToString();
         }
 
@@ -1940,7 +1975,7 @@ namespace DryIoc
         public override Expression CreateExpression(Request request, IRegistry registry)
         {
             var expression = Expression.Invoke(
-                request.ResolvedExpressions.ToExpression(FactoryDelegate), 
+                request.ResolvedExpressions.ToExpression(FactoryDelegate),
                 ResolvedExpressions.ObjectsParameter,
                 ResolvedExpressions.CurrentScopeParameter,
                 ResolvedExpressions.ResolutionScopeParameter);
@@ -2375,12 +2410,12 @@ namespace DryIoc
 
     public static class PrintTools
     {
-        public static string Print(this object x)
+        public static string Print(object x)
         {
             return x is string ? (string)x
                 : (x is Type ? ((Type)x).Print()
-                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine, ifEmpty: "''")
-                : (x is IEnumerable ? ((IEnumerable)x).Print(ifEmpty: "''")
+                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";\n", ifEmpty: "''")
+                : (x is IEnumerable ? ((IEnumerable)x).Print(";\n", ifEmpty: "''")
                 : (string.Empty + x))));
         }
 
