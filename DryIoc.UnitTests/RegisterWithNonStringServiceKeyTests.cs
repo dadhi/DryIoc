@@ -123,7 +123,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>();
 
             Assert.DoesNotThrow(() =>
-                container.Register<IService, AnotherService>(named: 0, ifAlreadyRegistered: IfAlreadyRegistered.KeepAlreadyRegistered));
+                container.Register<IService, AnotherService>(named: 0, ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered));
         }
 
         [Test]
@@ -141,7 +141,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(named: -1);
-            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepAlreadyRegistered);
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
 
             var service = container.Resolve<IService>();
 

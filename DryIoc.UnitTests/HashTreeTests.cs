@@ -448,9 +448,9 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate("a", "123")
                 .AddOrUpdate("b", "321");
 
-            tree = tree.RemoveOrUpdate("b", (string key, string value, out string newValue) =>
+            tree = tree.RemoveOrUpdate("b", (string value, out string updatedValue) =>
             {
-                newValue = value.Replace('1', '3');
+                updatedValue = value.Replace('1', '3');
                 return true;
             });
 
@@ -468,9 +468,9 @@ namespace DryIoc.UnitTests
                 .AddOrUpdate(new HashConflictingKey<int>(3, 2), "d");
 
             tree = tree.RemoveOrUpdate(new HashConflictingKey<int>(3, 2),
-                (HashConflictingKey<int> key, string value, out string newValue) =>
+                (string value, out string updatedValue) =>
                 {
-                    newValue = value + "!";
+                    updatedValue = value + "!";
                     return true;
                 });
 

@@ -40,7 +40,7 @@ namespace DryIoc
     /// + finish: IsRegistered specialized by factory type.
     /// + change: Use any object as Key, not only String. The condition is support for GetHashCode and Equals.
     /// + add: KeyValuePair{T, TKey}
-    /// - add: IfAlreadyRegistered.ReplaceWithNew.
+    /// + add: IfAlreadyRegistered.ReplaceRegistered.
     /// - add: CreateContainerWithWipedCache.
     /// - finish: CreateChildContainer and CreateScopedContainer.
     /// - finish: Unregister.
@@ -129,7 +129,7 @@ namespace DryIoc
                     _genericWrappers.Swap(x => x.AddOrUpdate(serviceType, factory));
                     break;
                 default:
-                    AddFactory(factory, serviceType, serviceKey, ifAlreadyRegistered);
+                    AddOrUpdateFactory(factory, serviceType, serviceKey, ifAlreadyRegistered);
                     break;
             }
         }
@@ -171,41 +171,40 @@ namespace DryIoc
                     _decorators.Swap(_ => _.RemoveOrUpdate(serviceType));
                     break;
                 default:
-                    _factories.Swap(_ => _.RemoveOrUpdate(serviceType,
-                        (Type key, object entry, out object newEntry) =>
+                    _factories.Swap(_ => _.RemoveOrUpdate(serviceType, (object entry, out object newEntry) =>
+                    {
+                        newEntry = entry;     // by default keep existing entry
+                        if (serviceKey == null)
                         {
-                            newEntry = entry;     // by default keep existing entry
-                            if (serviceKey == null)
+                            if (entry is Factory)
+                                return false; // remove node
+
+                            var keyedEntry = ((FactoriesEntry)entry);
+                            var factories = keyedEntry.Factories;
+                            var indexedFactories = factories.Enumerate().Where(x => x.Key is int).ToArray();
+                            if (indexedFactories.Length != 0)
                             {
-                                if (entry is Factory)
+                                for (var i = 0; i < indexedFactories.Length; i++)
+                                    factories = factories.RemoveOrUpdate(indexedFactories[i].Key);
+                                if (factories.IsEmpty)
                                     return false; // remove node
-
-                                var keyedEntry = ((FactoriesEntry)entry);
-                                var factories = keyedEntry.Factories;
-                                var indexedFactories = factories.Enumerate().Where(x => x.Key is int).ToArray();
-                                if (indexedFactories.Length != 0)
-                                {
-                                    for (var i = 0; i < indexedFactories.Length; i++)
-                                        factories = factories.RemoveOrUpdate(indexedFactories[i].Key);
-                                    if (factories.IsEmpty)
-                                        return false; // remove node
-                                    newEntry = new FactoriesEntry(-1, factories);
-                                }
+                                newEntry = new FactoriesEntry(-1, factories);
                             }
-                            else
+                        }
+                        else
+                        {
+                            if (entry is FactoriesEntry)
                             {
-                                if (entry is FactoriesEntry)
-                                {
-                                    var keyedEntry = ((FactoriesEntry)entry);
-                                    var factories = keyedEntry.Factories.RemoveOrUpdate(serviceKey);
-                                    if (factories.IsEmpty)
-                                        return false;
-                                    newEntry = new FactoriesEntry(keyedEntry.LatestIndex, factories);
-                                }
+                                var keyedEntry = ((FactoriesEntry)entry);
+                                var factories = keyedEntry.Factories.RemoveOrUpdate(serviceKey);
+                                if (factories.IsEmpty)
+                                    return false;
+                                newEntry = new FactoriesEntry(keyedEntry.LatestIndex, factories);
                             }
+                        }
 
-                            return true;
-                        }));
+                        return true;
+                    }));
                     break;
             }
 
@@ -443,29 +442,39 @@ namespace DryIoc
             }
         }
 
-        private void AddFactory(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
+        private void AddOrUpdateFactory(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
             if (serviceKey == null)
             {
                 _factories.Swap(x => x.AddOrUpdate(serviceType, factory, (oldValue, _) =>
                 {
-                    if (oldValue is Factory)
-                        return ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered
-                            ? oldValue
-                            : new FactoriesEntry(1, HashTree<object, Factory>.Empty
-                                .AddOrUpdate(0, (Factory)oldValue).AddOrUpdate(1, factory));
+                    if (oldValue is Factory) // adding new default to registered default
+                        switch (ifAlreadyRegistered)
+                        {
+                            case IfAlreadyRegistered.KeepRegistered:
+                                return oldValue;
+                            case IfAlreadyRegistered.ReplaceRegistered:
+                                return factory;
+                            default:
+                                return new FactoriesEntry(1,
+                                    HashTree<object, Factory>.Empty.AddOrUpdate(0, (Factory)oldValue).AddOrUpdate(1, factory));
+                        }
 
                     var oldEntry = ((FactoriesEntry)oldValue);
                     var oldLatestIndex = oldEntry.LatestIndex;
                     if (!oldLatestIndex.HasValue) // if were not default registrations, then add first one.
                         return new FactoriesEntry(0, oldEntry.Factories.AddOrUpdate(0, factory));
 
-                    // if they were, but we need to keep old, just return the old.
-                    if (ifAlreadyRegistered == IfAlreadyRegistered.KeepAlreadyRegistered)
-                        return oldValue;
-
-                    var newLatestIndex = oldLatestIndex + 1;
-                    return new FactoriesEntry(newLatestIndex, oldEntry.Factories.AddOrUpdate(newLatestIndex, factory));
+                    switch (ifAlreadyRegistered)
+                    {
+                        case IfAlreadyRegistered.KeepRegistered:
+                            return oldValue;
+                        case IfAlreadyRegistered.ReplaceRegistered:
+                            return new FactoriesEntry(oldLatestIndex, oldEntry.Factories.Update(oldLatestIndex, factory));
+                        default:
+                            var newLatestIndex = oldLatestIndex + 1;
+                            return new FactoriesEntry(newLatestIndex, oldEntry.Factories.AddOrUpdate(newLatestIndex, factory));
+                    }
                 }));
             }
             else // for non default service key
@@ -474,23 +483,46 @@ namespace DryIoc
                 var newEntry = new FactoriesEntry(index, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
                 _factories.Swap(x => x.AddOrUpdate(serviceType, newEntry, (oldValue, _) =>
                 {
-                    if (oldValue is Factory)
-                        return index.HasValue && index == 0 // if default service key
-                            ? oldValue.ThrowIf(ifAlreadyRegistered == IfAlreadyRegistered.ThrowIfDuplicateKey,
-                                Error.DUPLICATE_SERVICE_KEY, serviceType, "0 (default key)", oldValue)
-                            : new FactoriesEntry(index.HasValue && index > 0 ? index : 0,
-                                newEntry.Factories.AddOrUpdate(0, (Factory)oldValue));
+                    if (oldValue is Factory)              // if registered is default
+                    {
+                        if (index.HasValue && index == 0) // and new registered is default
+                            switch (ifAlreadyRegistered)
+                            {
+                                case IfAlreadyRegistered.KeepRegistered:
+                                    return oldValue;
+                                case IfAlreadyRegistered.ReplaceRegistered:
+                                    return newEntry;
+                                default:
+                                    throw Error.DUPLICATE_SERVICE_KEY.Of(serviceType, "0 (default key)", oldValue);
+                            }
+
+                        var latestIndex = index.HasValue && index > 0 ? index : 0;
+                        return new FactoriesEntry(latestIndex, newEntry.Factories.AddOrUpdate(0, (Factory)oldValue));
+                    }
 
                     var oldEntry = ((FactoriesEntry)oldValue);
                     var oldLatestIndex = oldEntry.LatestIndex;
 
-                    var newLatestIndex = !index.HasValue ? oldLatestIndex : !oldLatestIndex.HasValue ? index
-                        : index > oldLatestIndex ? index : oldLatestIndex;
+                    var newLatestIndex =
+                          !index.HasValue ? oldLatestIndex
+                        : !oldLatestIndex.HasValue ? index
+                        // it is not affected by ifAlreadyRegistered parameter, 
+                        // cause index becomes newLatestIndex only when it is different from oldLatestIndex.
+                        : index > oldLatestIndex ? index : oldLatestIndex; 
 
                     return new FactoriesEntry(newLatestIndex,
                         oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
-                            oldFactory.ThrowIf(ifAlreadyRegistered == IfAlreadyRegistered.ThrowIfDuplicateKey,
-                                Error.DUPLICATE_SERVICE_KEY, serviceType, serviceKey, oldFactory)));
+                        {
+                            switch (ifAlreadyRegistered)
+                            {
+                                case IfAlreadyRegistered.KeepRegistered:
+                                    return oldFactory;
+                                case IfAlreadyRegistered.ReplaceRegistered:
+                                    return factory;
+                                default:
+                                    throw Error.DUPLICATE_SERVICE_KEY.Of(serviceType, serviceKey, oldFactory);
+                            }
+                        }));
                 }));
             }
         }
@@ -2131,7 +2163,7 @@ namespace DryIoc
         object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved);
     }
 
-    public enum IfAlreadyRegistered { ThrowIfDuplicateKey, KeepAlreadyRegistered }
+    public enum IfAlreadyRegistered { ThrowIfDuplicateKey, KeepRegistered, ReplaceRegistered }
 
     public interface IRegistrator
     {
@@ -2486,10 +2518,10 @@ namespace DryIoc
             return t.Height != 0 ? t.Value : defaultValue;
         }
 
-        /// <summary>
+        /// <remarks>
         /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).
-        /// </summary>
+        /// </remarks>
         public IEnumerable<KV<K, V>> Enumerate()
         {
             var parents = new HashTree<K, V>[Height];
@@ -2514,14 +2546,23 @@ namespace DryIoc
             }
         }
 
-        public delegate bool UpdateValueInstead(K key, V oldValue, out V newValue);
+        public delegate bool ShouldUpdateValue(V oldValue, out V updatedValue);
 
-        /// <summary>
+        /// <remarks>
         /// Based on Eric Lippert's http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
-        /// </summary>
-        public HashTree<K, V> RemoveOrUpdate(K key, UpdateValueInstead updateValue = null)
+        /// </remarks>
+        public HashTree<K, V> RemoveOrUpdate(K key, ShouldUpdateValue shouldUpdateValueInstead = null)
         {
-            return RemoveOrUpdate(key.GetHashCode(), key, updateValue);
+            return RemoveOrUpdate(key.GetHashCode(), key, shouldUpdateValueInstead);
+        }
+
+        public HashTree<K, V> Update(K key, V value)
+        {
+            return RemoveOrUpdate(key.GetHashCode(), key, (V _, out V newValue) =>
+            {
+                newValue = value;
+                return true;
+            });
         }
 
         #region Implementation
@@ -2575,7 +2616,7 @@ namespace DryIoc
             return defaultValue;
         }
 
-        private HashTree<K, V> RemoveOrUpdate(int hash, K key, UpdateValueInstead updateValueInstead = null, bool ignoreKey = false)
+        private HashTree<K, V> RemoveOrUpdate(int hash, K key, ShouldUpdateValue shouldUpdateValueInstead = null, bool ignoreKey = false)
         {
             if (Height == 0)
                 return this;
@@ -2587,9 +2628,9 @@ namespace DryIoc
                 {
                     if (!ignoreKey)
                     {
-                        V newValue;
-                        if (updateValueInstead != null && updateValueInstead(Key, Value, out newValue))
-                            return new HashTree<K, V>(Hash, Key, newValue, Conflicts, Left, Right);
+                        V updatedValue;
+                        if (shouldUpdateValueInstead != null && shouldUpdateValueInstead(Value, out updatedValue))
+                            return new HashTree<K, V>(Hash, Key, updatedValue, Conflicts, Left, Right);
 
                         if (Conflicts != null)
                         {
@@ -2623,13 +2664,13 @@ namespace DryIoc
                     if (index == -1)        // key is not found in conflicts - just return
                         return this;
 
-                    V newValue;
+                    V updatedValue;
                     var conflict = Conflicts[index];
-                    if (updateValueInstead != null && updateValueInstead(conflict.Key, conflict.Value, out newValue))
+                    if (shouldUpdateValueInstead != null && shouldUpdateValueInstead(conflict.Value, out updatedValue))
                     {
                         var updatedConflicts = new KV<K, V>[Conflicts.Length];
                         Array.Copy(Conflicts, 0, updatedConflicts, 0, updatedConflicts.Length);
-                        updatedConflicts[index] = new KV<K, V>(conflict.Key, newValue);
+                        updatedConflicts[index] = new KV<K, V>(conflict.Key, updatedValue);
                         return new HashTree<K, V>(Hash, Key, Value, updatedConflicts, Left, Right);
                     }
 
@@ -2644,9 +2685,9 @@ namespace DryIoc
                 else return this; // if key is not matching and no conflicts to lookup - just return
             }
             else if (hash < Hash)
-                result = With(Left.RemoveOrUpdate(hash, key, updateValueInstead, ignoreKey), Right);
+                result = With(Left.RemoveOrUpdate(hash, key, shouldUpdateValueInstead, ignoreKey), Right);
             else
-                result = With(Left, Right.RemoveOrUpdate(hash, key, updateValueInstead, ignoreKey));
+                result = With(Left, Right.RemoveOrUpdate(hash, key, shouldUpdateValueInstead, ignoreKey));
             return result.KeepBalanced();
         }
 
