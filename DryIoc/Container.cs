@@ -105,6 +105,11 @@ namespace DryIoc
             return new Container(rules);
         }
 
+        public Container WithWipedCache()
+        {
+            return this; // TODO Add body.
+        }
+
         public void Dispose()
         {
             _currentScope.Dispose();
@@ -1009,7 +1014,8 @@ namespace DryIoc
     public static class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
-            "Unable to resolve {0}.\nPlease register service OR add resolution rule for unregistered service.";
+            "Unable to resolve {0}." + Environment.NewLine + 
+            "Please register service OR add resolution rule for unregistered service.";
 
         public static readonly string UNSUPPORTED_FUNC_WITH_ARGS =
             "Unsupported resolution as {0} of {1}.";
@@ -1027,16 +1033,16 @@ namespace DryIoc
             "Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}.";
 
         public static readonly string USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS =
-            "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters.\n" +
+            "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
             "Consider to register generic type definition {1} instead.";
 
         public static readonly string USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS =
-            "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters.\n" +
+            "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
             "Consider to register generic type definition {1} instead.";
 
         public static readonly string EXPECTED_SINGLE_DEFAULT_FACTORY =
-            "Expecting single default registration of {0} but found many:\n{1}." +
-            "\nYou can identify service with keys or metadata OR adjust resolution rules to get single registered factory.";
+            "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
+            "Please identify service with keys or metadata OR adjust resolution rules to select single registered factory.";
 
         public static readonly string EXPECTED_NON_ABSTRACT_IMPL_TYPE =
             "Expecting not abstract and not interface implementation type, but found {0}.";
@@ -1048,7 +1054,7 @@ namespace DryIoc
             "Constructor [{0}] of {1} misses some arguments required for {2} dependency.";
 
         public static readonly string UNABLE_TO_SELECT_CONSTRUCTOR =
-            "Unable to select single constructor from {0} available in {1}.\n" +
+            "Unable to select single constructor from {0} available in {1}." + Environment.NewLine +
             "Please provide constructor selector when registering service.";
 
         public static readonly string EXPECTED_FUNC_WITH_MULTIPLE_ARGS =
@@ -1058,7 +1064,7 @@ namespace DryIoc
             "Expecting closed-generic service type but found {0}.";
 
         public static readonly string RECURSIVE_DEPENDENCY_DETECTED =
-            "Recursive dependency is detected in resolution of:\n{0}.";
+            "Recursive dependency is detected in resolution of:" + Environment.NewLine + "{0}.";
 
         public static readonly string SCOPE_IS_DISPOSED =
             "Scope is disposed and scoped instances are no longer available.";
@@ -1070,11 +1076,11 @@ namespace DryIoc
             "Service {0} with the same key '{1}' is already registered as {2}.";
 
         public static readonly string GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT =
-            "Generic Wrapper is working with single service type only, but found many:\n{0}.\n" +
+            "Generic Wrapper is working with single service type only, but found many:" + Environment.NewLine + "{0}." + Environment.NewLine +
             "Please specify service type selector in Generic Wrapper setup upon registration.";
 
         public static readonly string SOME_FUNC_PARAMS_ARE_UNUSED =
-            "Found some unused Func parameters:\n{0}\nwhen resolving {1}.";
+            "Found some unused Func parameters:" + Environment.NewLine + "{0}" + Environment.NewLine + "when resolving {1}.";
 
         public static readonly string DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION =
             "Decorator factory should support resolution as {0}, but it does not.";
@@ -1482,7 +1488,7 @@ namespace DryIoc
                     str.Append("property '").Append(((PropertyInfo)DependencyInfo).Name);
                 else if (DependencyInfo is FieldInfo)
                     str.Append("field '").Append(((FieldInfo)DependencyInfo).Name);
-                str.Append("' ");
+                str.Append("'");
             }
 
             if (ResolvedFactory != null && ResolvedFactory.ImplementationType != null)
@@ -1496,7 +1502,7 @@ namespace DryIoc
             var message = new StringBuilder().Append(Print());
             return Parent == null ? message.ToString()
                  : Parent.Enumerate().Aggregate(message,
-                    (m, r) => m.AppendLine().Append(" in ").Append(r.Print())).ToString();
+                    (m, r) => m.AppendLine().Append("in ").Append(r.Print())).ToString();
         }
 
         #region Implementation
@@ -1994,6 +2000,7 @@ namespace DryIoc
         #endregion
     }
 
+    // TODO To finish and replace original DelegateFactory.
     public sealed class DelegateFactory2 : Factory
     {
         public readonly FactoryDelegate FactoryDelegate;
@@ -2446,8 +2453,8 @@ namespace DryIoc
         {
             return x is string ? (string)x
                 : (x is Type ? ((Type)x).Print()
-                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";\n", ifEmpty: "''")
-                : (x is IEnumerable ? ((IEnumerable)x).Print(";\n", ifEmpty: "''")
+                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine, ifEmpty: "''")
+                : (x is IEnumerable ? ((IEnumerable)x).Print(";" + Environment.NewLine, ifEmpty: "''")
                 : (string.Empty + x))));
         }
 

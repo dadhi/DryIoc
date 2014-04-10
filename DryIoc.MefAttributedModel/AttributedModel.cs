@@ -375,7 +375,7 @@ namespace DryIoc.MefAttributedModel
             "Unable to resolve dependency {0} with metadata [{1}] in {2}";
 
         public static readonly string UNSUPPORTED_MULTIPLE_METADATA =
-            "Multiple associated metadata found while exporting {0}.\n" +
+            "Multiple associated metadata found while exporting {0}." + Environment.NewLine +
             "Only single metadata is supported per implementation type, please remove the rest.";
 
         public static readonly string UNSUPPORTED_MULTIPLE_FACTORY_TYPES =
