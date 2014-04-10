@@ -1,19 +1,23 @@
-DryIoc is fast, small and rich IoC Container.
----------------------------------------------
-**Container with [Autofac]+[MEF] level of functionality BUT much faster and small enough to embed as code.**
+DryIoc is fast, small and capable IoC Container
+===============================================
 
 [Autofac]: https://code.google.com/p/autofac/
 [MEF]: http://mef.codeplex.com/
-
-Designed for low-ceremony use, adaptability and performance.   
-Available in .NET 3.5, 4.0, 4.5.  
-Distributed as __NuGet__ package: [code][DryIoc], [lib][DryIoc.dll].  
-Extensions: __MefAttributedModel__ ([code][DryIoc.MefAttributedModel], [lib][DryIoc.MefAttributedModel.dll]).
-
 [DryIoc]: https://www.nuget.org/packages/DryIoc/
 [DryIoc.MefAttributedModel]: https://www.nuget.org/packages/DryIoc.MefAttributedModel/
 [DryIoc.dll]: https://www.nuget.org/packages/DryIoc.dll/
 [DryIoc.MefAttributedModel.dll]: https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll/
+[Wiki]: https://bitbucket.org/dadhi/dryioc/wiki/Home
+[MefAttributedModel]: https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel
+[PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
+
+**Provides [Autofac]+[MEF] level of functionality but performs faster and small enough to be included as code.**
+
+* Designed for low-ceremony use, performance and extensibility.
+* Supports .NET 3.5, 4.0, 4.5 _([PCL] planned for v2)_
+* Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
+* Extensions: [MefAttributedModel] as [code][DryIoc.MefAttributedModel] or [dll][DryIoc.MefAttributedModel.dll].
+* [Docs are here][Wiki].
 
 #### Fast
 * On par with fastest containers listed in [IoC Container Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
@@ -66,11 +70,4 @@ Extensions: __MefAttributedModel__ ([code][DryIoc.MefAttributedModel], [lib][Dry
 * Toggling features On/Off via `ContanerSetup`.
 
 #### Extensions
-[MefAttributedModel]: https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel
-* [__MefAttributedModel__][MefAttributedModel]
-    * Based on [MEF programming attributed model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) with some exceptions (check [wiki][MefAttributedModel]).
-    * Supports all DryIoc abstractions: `IEnumerable<T>`, `T[]`, `Func<T>`, etc. 
-    * Extends model with `ExportAsGenericWrapper`, `ExportAsDecorator`, `ExportAll` attributes.
-    * Simplifies use of statically typed Metadata with `ExportWithMetadata` and `ImportWithMetadata` attributes.
-    * Simplifies dealing with foreign code via implementing `IFactory<T>` or via `ExportOnce` attribute.
-    * Enables compile-time types discovery to Speed-up application startup.
+* [MefAttributedModel] - emulates [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) and enables automatic types discovery and wiring.
