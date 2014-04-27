@@ -1,5 +1,4 @@
-﻿using System;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
 namespace DryIoc.Samples
 {
@@ -65,13 +64,13 @@ namespace DryIoc.Samples
             container.Register<IClient, SomeClient>();
             // forgot to container.Register<IService, SomeService>(Reuse.Singleton);
 
-            Assert.Throws<ContainerException>(() =>
+            var exception = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IClient>());
 
-            // Where exception message is:
-            // Unable to resolve DryIoc.Samples.IService as ctor-parameter 'service'
-            // in DryIoc.Samples.IClient of DryIoc.Samples.SomeClient.
-            // Please register service OR add resolution rule for unregistered service.;
+            Assert.That(exception.Message, Is.EqualTo(
+@"Unable to resolve DryIoc.Samples.IService as ctor-parameter 'service'
+in DryIoc.Samples.IClient of DryIoc.Samples.SomeClient.
+Please register service OR add resolution rule for unregistered service."));
         }
     }
 

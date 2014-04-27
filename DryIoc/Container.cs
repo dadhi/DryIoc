@@ -37,15 +37,12 @@ namespace DryIoc
     /// <summary>
     /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
     /// TODO:
-    /// + finish: IsRegistered specialized by factory type.
-    /// + change: Use any object as Key, not only String. The condition is support for GetHashCode and Equals.
-    /// + add: KeyValuePair{T, TKey}
-    /// + add: IfAlreadyRegistered.ReplaceRegistered.
     /// - add: CreateContainerWithWipedCache.
     /// - finish: CreateChildContainer and CreateScopedContainer.
     /// - finish: Unregister.
     /// - add: Auto-select constructor with all resolvable parameters.
     /// - add: Rule to resolve mocks of unregistered services.
+    /// - add: DelegateFactory which converts delegate to expression only if it is injected, and use delegate as is if resolution root.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -63,9 +60,10 @@ namespace DryIoc
 
             _singletonScope = _currentScope = new Scope();
 
+            _resolvedExpressions = new ResolvedExpressions();
+
             _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
             _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
-            _resolvedExpressions = new ResolvedExpressions();
         }
 
         public Container(Container source)
@@ -84,6 +82,29 @@ namespace DryIoc
             _resolvedDefaultDelegates = source._resolvedDefaultDelegates;
             _resolvedKeyedDelegates = source._resolvedKeyedDelegates;
             _resolvedExpressions = source._resolvedExpressions;
+        }
+
+        public Container(
+            ResolutionRules resolutionRules,
+            HashTree<Type, object> factories,
+            HashTree<Type, Factory[]> decorators,
+            HashTree<Type, Factory> genericWrappers,
+            Scope singletonScope,
+            Scope currentScope)
+        {
+            _resolutionRules = Ref.Of(resolutionRules);
+
+            _factories = Ref.Of(factories);
+            _decorators = Ref.Of(decorators);
+            _genericWrappers = Ref.Of(genericWrappers);
+
+            _singletonScope = singletonScope;
+            _currentScope = currentScope;
+
+            _resolvedExpressions = new ResolvedExpressions();
+
+            _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
+            _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
         }
 
         public Container CreateReuseScope()
@@ -155,18 +176,14 @@ namespace DryIoc
 
                 default:
                     var getSingleFactory = condition == null ? (ResolutionRules.GetSingleFactory)
-                        ((_, factories) => factories.First()) : ((_, factories) => factories.FirstOrDefault(condition));
+                        ((_, factories) => factories.First()) :
+                        ((_, factories) => factories.FirstOrDefault(condition));
                     return GetFactoryOrDefault(serviceType, serviceKey, getSingleFactory, ifNotFoundLookForOpenGenericServiceType: true) != null;
             }
         }
 
-        public enum HandleCache { Wipe, Keep }
-        public bool Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition, HandleCache handleCache)
+        public void Unregister(Type serviceType, object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null)
         {
-            // if type/key is not registered - do nothing Or return false?
-            if (!IsRegistered(serviceType, serviceKey, factoryType, condition))
-                return false;
-
             switch (factoryType)
             {
                 case FactoryType.GenericWrapper:
@@ -178,23 +195,24 @@ namespace DryIoc
                 default:
                     _factories.Swap(_ => _.RemoveOrUpdate(serviceType, (object entry, out object newEntry) =>
                     {
-                        newEntry = entry;     // by default keep existing entry
-                        if (serviceKey == null)
+                        newEntry = entry;       // by default keep existing entry, means to not remove
+                        if (serviceKey == null) // remove default registration
                         {
-                            if (entry is Factory)
+                            if (entry is Factory) // remove node
+                                return false;
+
+                            var factoriesEntry = ((FactoriesEntry) entry);
+                            var factories = factoriesEntry.Factories;
+                            var indexedFactories = factories.Enumerate().Where(x => x.Key is int).ToArray();
+                            if (indexedFactories.Length == 0) // did not found any 
+                                return true;
+
+                            for (var i = 0; i < indexedFactories.Length; i++)
+                                factories = factories.RemoveOrUpdate(indexedFactories[i].Key);
+                            if (factories.IsEmpty)
                                 return false; // remove node
 
-                            var keyedEntry = ((FactoriesEntry)entry);
-                            var factories = keyedEntry.Factories;
-                            var indexedFactories = factories.Enumerate().Where(x => x.Key is int).ToArray();
-                            if (indexedFactories.Length != 0)
-                            {
-                                for (var i = 0; i < indexedFactories.Length; i++)
-                                    factories = factories.RemoveOrUpdate(indexedFactories[i].Key);
-                                if (factories.IsEmpty)
-                                    return false; // remove node
-                                newEntry = new FactoriesEntry(-1, factories);
-                            }
+                            newEntry = new FactoriesEntry(-1, factories);
                         }
                         else
                         {
@@ -212,13 +230,6 @@ namespace DryIoc
                     }));
                     break;
             }
-
-            if (handleCache == HandleCache.Wipe)
-            {
-                // wipe cache
-            }
-
-            return true;
         }
 
         #endregion
@@ -513,7 +524,7 @@ namespace DryIoc
                         : !oldLatestIndex.HasValue ? index
                         // it is not affected by ifAlreadyRegistered parameter, 
                         // cause index becomes newLatestIndex only when it is different from oldLatestIndex.
-                        : index > oldLatestIndex ? index : oldLatestIndex; 
+                        : index > oldLatestIndex ? index : oldLatestIndex;
 
                     return new FactoriesEntry(newLatestIndex,
                         oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
@@ -1014,7 +1025,7 @@ namespace DryIoc
     public static class Error
     {
         public static readonly string UNABLE_TO_RESOLVE_SERVICE =
-            "Unable to resolve {0}." + Environment.NewLine + 
+            "Unable to resolve {0}." + Environment.NewLine +
             "Please register service OR add resolution rule for unregistered service.";
 
         public static readonly string UNSUPPORTED_FUNC_WITH_ARGS =
@@ -2729,6 +2740,11 @@ namespace DryIoc
         public static Ref<T> Of<T>(T value) where T : class
         {
             return new Ref<T>(value);
+        }
+
+        public static Ref<T> Copy<T>(Ref<T> source) where T : class
+        {
+            return new Ref<T>(source.Value);
         }
     }
 
