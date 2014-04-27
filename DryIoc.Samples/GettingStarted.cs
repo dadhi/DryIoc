@@ -92,8 +92,4 @@ Please register service OR add resolution rule for unregistered service."));
             Service = service;
         }
     }
-
-    public interface IService<T> { }
-
-    public class Service<T> : IService<T> { }
 }

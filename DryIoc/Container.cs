@@ -43,6 +43,7 @@ namespace DryIoc
     /// - add: Auto-select constructor with all resolvable parameters.
     /// - add: Rule to resolve mocks of unregistered services.
     /// - add: DelegateFactory which converts delegate to expression only if it is injected, and use delegate as is if resolution root.
+    /// - add: Mono support.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {

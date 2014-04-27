@@ -40,6 +40,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AutoWiring.cs" />
+    <Compile Include="ConstructorSelectionTests.cs" />
     <Compile Include="LazyImplementationTypeLoading.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="GettingStarted.cs" />
