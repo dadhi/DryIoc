@@ -12,11 +12,12 @@ namespace DryIoc.Samples
         {
             var container = new Container();
 
-            var addinAssemblyPath = "DryIoc.Samples.CUT.dll";
-            var addinAssembly = new Lazy<Assembly>(() => Assembly.LoadFrom(addinAssemblyPath));
+            var addinAssembly = new Lazy<Assembly>(() => Assembly.LoadFrom("DryIoc.Samples.CUT.dll"));
 
             container.Register<IAddin>(new FactoryProvider(
-                (_, __) => new ReflectionFactory(addinAssembly.Value.GetType("DryIoc.Samples.CUT.SomeAddin"), Reuse.Singleton)));
+                (_, __) => new ReflectionFactory(
+                    addinAssembly.Value.GetType("DryIoc.Samples.CUT.SomeAddin"), 
+                    Reuse.Singleton)));
             
             container.Register<AddinUser>();
 

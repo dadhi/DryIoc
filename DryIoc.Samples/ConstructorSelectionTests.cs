@@ -19,16 +19,12 @@ namespace DryIoc.Samples
         }
 
         [Test]
-        public void Registering_service_with_multiple_constructors_without_specifying_constructor_will_throw()
+        public void Registering_service_with_many_public_constructors_without_constructor_selector_will_throw()
         {
             var container = new Container();
 
-            container.Register<IService, SomeService>();
-            container.Register<ClassWithMultipleConstructors>();
-
-            var service = container.Resolve<ClassWithMultipleConstructors>();
-
-            Assert.That(service, Is.Not.Null);
+            Assert.Throws<ContainerException>(() =>
+                container.Register<ClassWithMultipleConstructors>());
         }
     }
 

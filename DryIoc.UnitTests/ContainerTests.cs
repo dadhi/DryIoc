@@ -65,7 +65,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_non_registered_service_should_throw()
+        public void Resolving_non_registered_service_should_Throw()
         {
             var container = new Container();
 
@@ -74,7 +74,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Registering_with_interface_for_service_implementation_should_throw()
+        public void Registering_with_interface_for_service_implementation_should_Throw()
         {
             var container = new Container();
 
@@ -83,13 +83,21 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_no_constructor_selector_specified_in_registration_Resolving_implementation_with_multiple_constructors_should_throw()
+        public void Registering_impl_type_without_public_constructor_and_without_constructor_selector_should_throw()
         {
             var container = new Container();
-            container.Register<ServiceWithMultipleCostructors>();
 
             Assert.Throws<ContainerException>(() =>
-                container.Resolve<ServiceWithMultipleCostructors>());
+               container.Register(typeof(ServiceWithoutPublicConstructor)));
+        }
+
+        [Test]
+        public void Registering_impl_type_with_many_public_constructors_and_without_constructor_selector_should_Throw()
+        {
+            var container = new Container();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Register<ServiceWithMultipleCostructors>());
         }
 
         [Test]
@@ -180,7 +188,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void IsRegistered_for_registered_service_should_return_true ()
+        public void IsRegistered_for_registered_service_should_return_true()
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
@@ -244,17 +252,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_service_without_public_constructor_should_throw()
-        {
-            var container = new Container();
-
-            container.Register(typeof(ServiceWithoutPublicConstructor));
-
-            Assert.Throws<ContainerException>(
-                () => container.Resolve<ServiceWithoutPublicConstructor>());
-        }
-
-        [Test]
         public void Possible_to_register_and_resolve_with_object_service_type()
         {
             var container = new Container();
@@ -307,7 +304,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, AnotherService>();
             container.Register<IService, DisposableService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
         }
 

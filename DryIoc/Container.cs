@@ -202,7 +202,7 @@ namespace DryIoc
                             if (entry is Factory) // remove node
                                 return false;
 
-                            var factoriesEntry = ((FactoriesEntry) entry);
+                            var factoriesEntry = ((FactoriesEntry)entry);
                             var factories = factoriesEntry.Factories;
                             var indexedFactories = factories.Enumerate().Where(x => x.Key is int).ToArray();
                             if (indexedFactories.Length == 0) // did not found any 
@@ -1062,6 +1062,9 @@ namespace DryIoc
         public static readonly string NO_PUBLIC_CONSTRUCTOR_DEFINED =
             "There is no public constructor defined for {0}.";
 
+        public static readonly string UNSPECIFIED_HOWTO_GET_CONSTRUCTOR_FOR_IMPLTYPE_WITH_NO_OR_MANY_CONSTRUCTORS =
+            "It is not specified how to get single constructor for implementation type with no Or many public constructors: {0}.";
+
         public static readonly string CONSTRUCTOR_MISSES_SOME_PARAMETERS =
             "Constructor [{0}] of {1} misses some arguments required for {2} dependency.";
 
@@ -1153,15 +1156,15 @@ namespace DryIoc
         /// <param name="serviceType">The service type to register.</param>
         /// <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="getConstructor">Optional strategy to select constructor when multiple available.</param>
+        /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType,
-            Type implementationType, IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            var factory = new ReflectionFactory(implementationType, reuse, getConstructor, setup);
+            var factory = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
 
@@ -1750,8 +1753,12 @@ namespace DryIoc
         public ReflectionFactory(Type implementationType, IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            _implementationType = implementationType.ThrowIfNull()
-                .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
+            _implementationType = implementationType.ThrowIfNull();
+            if (implementationType.IsAbstract)
+                throw Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE.Of(implementationType);
+            if (getConstructor == null && implementationType.GetConstructors().Length != 1)
+                throw Error.UNSPECIFIED_HOWTO_GET_CONSTRUCTOR_FOR_IMPLTYPE_WITH_NO_OR_MANY_CONSTRUCTORS.Of(implementationType);
+
             _providesFactoryPerRequest = _implementationType.IsGenericTypeDefinition;
             _getConstructor = getConstructor;
         }
@@ -1885,14 +1892,14 @@ namespace DryIoc
         private readonly bool _providesFactoryPerRequest;
         private readonly GetConstructor _getConstructor;
 
-        public ConstructorInfo GetConstructor(Type type)
+        public ConstructorInfo GetConstructor(Type implementationType)
         {
             if (_getConstructor != null)
-                return _getConstructor(type);
+                return _getConstructor(implementationType);
 
-            var constructors = type.GetConstructors();
-            Throw.If(constructors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, type);
-            Throw.If(constructors.Length > 1, Error.UNABLE_TO_SELECT_CONSTRUCTOR, constructors.Length, type);
+            var constructors = implementationType.GetConstructors();
+            Throw.If(constructors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implementationType);
+            Throw.If(constructors.Length > 1, Error.UNABLE_TO_SELECT_CONSTRUCTOR, constructors.Length, implementationType);
             return constructors[0];
         }
 
