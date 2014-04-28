@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System.Reflection;
+using NUnit.Framework;
 
 namespace DryIoc.Samples
 {
@@ -26,6 +27,19 @@ namespace DryIoc.Samples
             Assert.Throws<ContainerException>(() =>
                 container.Register<ClassWithMultipleConstructors>());
         }
+
+        [Test]
+        public void It_is_possible_to_register_and_resolve_service_with_internal_constructor()
+        {
+            var container = new Container();
+            container.Register<IService, SomeService>();
+            
+            container.Register<ClassWithInternalConstructor>(
+                withConstructor: t => t.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)[0]);
+
+            var obj = container.Resolve<ClassWithInternalConstructor>();
+            Assert.IsNotNull(obj);
+        }
     }
 
     public class ClassWithMultipleConstructors
@@ -39,6 +53,16 @@ namespace DryIoc.Samples
         }
 
         public ClassWithMultipleConstructors(IService service)
+        {
+            Service = service;
+        }
+    }
+
+    public class ClassWithInternalConstructor
+    {
+        public readonly IService Service;
+
+        internal ClassWithInternalConstructor(IService service)
         {
             Service = service;
         }

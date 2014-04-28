@@ -1117,6 +1117,9 @@ namespace DryIoc
 
         public static readonly string IS_REGISTERED_FOR_GENERIC_WRAPPER_CALLED_WITH_NONGENERIC_SERVICE_TYPE =
             "IsRegistered for GenericWrapper called with non generic service type {0}.";
+
+        public static readonly string UNABLE_TO_GET_CTOR_USING_CTOR_SELECTOR = 
+            "Unable to get constructor of {0} using provided constructor selector.";
     }
 
     public static class Registrator
@@ -1895,7 +1898,7 @@ namespace DryIoc
         public ConstructorInfo GetConstructor(Type implementationType)
         {
             if (_getConstructor != null)
-                return _getConstructor(implementationType);
+                return _getConstructor(implementationType).ThrowIfNull(Error.UNABLE_TO_GET_CTOR_USING_CTOR_SELECTOR, implementationType);
 
             var constructors = implementationType.GetConstructors();
             Throw.If(constructors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implementationType);
