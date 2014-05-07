@@ -96,7 +96,7 @@ namespace DryIoc.UnitTests
             container.Register<Brain>();
 
             container.ResolutionRules.Swap(rules => 
-                rules.With(rules.ToResolvePropertyOrFieldWithServiceKey.Append(
+                rules.With(rules.ForPropertyOrFieldWithServiceKey.Append(
                     (out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
                     {
                         resultKey = null;
@@ -117,7 +117,7 @@ namespace DryIoc.UnitTests
             container.Register<Brain>();
 
             container.ResolutionRules.Swap(rules =>
-                rules.With(rules.ToResolvePropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
+                rules.With(rules.ForPropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
             
             var chicken = container.Resolve<FunnyChicken>();
 
@@ -131,7 +131,7 @@ namespace DryIoc.UnitTests
             container.Register<FunnyDuckling>();
 
             container.ResolutionRules.Swap(rules =>
-                rules.With(rules.ToResolvePropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
+                rules.With(rules.ForPropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
 
             Assert.DoesNotThrow(() =>
                 container.Resolve<FunnyDuckling>());
@@ -145,7 +145,7 @@ namespace DryIoc.UnitTests
             container.Register<Guts>();
 
             container.ResolutionRules.Swap(rules =>
-                rules.With(rules.ToResolvePropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
+                rules.With(rules.ForPropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
 
             var chicken = container.Resolve<FunkyChicken>();
 
@@ -160,7 +160,7 @@ namespace DryIoc.UnitTests
             container.Register<Guts>(named: "lazy-me");
 
             container.ResolutionRules.Swap(rules =>
-                rules.With(rules.ToResolvePropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
+                rules.With(rules.ForPropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
 
             var chicken = container.Resolve<LazyChicken>();
 

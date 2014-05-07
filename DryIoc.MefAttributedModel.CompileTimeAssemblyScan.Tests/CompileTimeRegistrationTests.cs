@@ -14,7 +14,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
             {
                 new RegistrationInfo
                 {
-                    Type = typeof(AnotherService),
+                    ImplementationType = typeof(AnotherService),
                     Exports = new[] { new ExportInfo(typeof(IService), "another") },
                     IsSingleton = true,
                     MetadataAttributeIndex = -1,
@@ -34,7 +34,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
             {
                 new RegistrationInfo
                 {
-                    Type = typeof(Service),
+                    ImplementationType = typeof(Service),
                     Exports = new[] { new ExportInfo(typeof(IService), "some") },
                     IsSingleton = true,
                     MetadataAttributeIndex = -1
@@ -42,7 +42,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 
                 new RegistrationInfo
                 {
-                    Type = typeof(AnotherService),
+                    ImplementationType = typeof(AnotherService),
                     Exports = new[] { new ExportInfo(typeof(IService), null) },
                     IsSingleton = false,
                     MetadataAttributeIndex = -1,
@@ -51,7 +51,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 
                 new RegistrationInfo
                 {
-                    Type = typeof(Wrap<>),
+                    ImplementationType = typeof(Wrap<>),
                     Exports = new[] { new ExportInfo(typeof(Wrap<>), null) }, 
                     IsSingleton = false,
                     MetadataAttributeIndex = -1,

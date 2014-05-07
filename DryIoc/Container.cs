@@ -42,18 +42,14 @@ namespace DryIoc
     /// - finish: Unregister.
     /// - add: Auto-select constructor with all resolvable parameters.
     /// - add: Rule to resolve mocks of unregistered services.
-    /// - add: DelegateFactory which converts delegate to expression only if it is injected, and use delegate as is if resolution root.
+    /// - add: Performance increase by using user provided delegate for resolution root. Modify DelegateFactory to support that.
     /// - add: Mono support.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
-        public static ResolutionRules DefaultResolutionRules = DryIoc.ResolutionRules.Empty.With(
-            OpenGenericsSupport.ResolveOpenGenerics,
-            OpenGenericsSupport.ResolveEnumerableOrArray);
-
         public Container(ResolutionRules resolutionRules = null)
         {
-            _resolutionRules = Ref.Of(resolutionRules ?? DefaultResolutionRules);
+            _resolutionRules = Ref.Of(resolutionRules ?? DryIoc.ResolutionRules.Default);
 
             _factories = Ref.Of(HashTree<Type, object>.Empty);
             _decorators = Ref.Of(HashTree<Type, Factory[]>.Empty);
@@ -116,7 +112,7 @@ namespace DryIoc
         public Container CreateChildContainer()
         {
             var rules = ResolutionRules.Value;
-            rules = rules.With(rules.ToResolveUnregisteredService.Append((request, _) =>
+            rules = rules.With(rules.ForUnregisteredService.Append((request, _) =>
             {
                 var parentRegistry = (IRegistry)this;
                 var factory = parentRegistry.GetOrAddFactory(request, IfUnresolved.ReturnNull);
@@ -296,13 +292,13 @@ namespace DryIoc
         {
             var rules = ResolutionRules.Value;
             var factory = GetFactoryOrDefault(request.ServiceType, request.ServiceKey, rules.ToGetSingleFactory);
-            if (factory != null && factory.ProvidesFactoryPerRequest)
-                factory = factory.GetFactoryPerRequestOrDefault(request, this);
+            if (factory != null && factory.ProvidesFactoryForRequest)
+                factory = factory.GetFactoryForRequestOrDefault(request, this);
 
             if (factory != null)
                 return factory;
 
-            var ruleFactory = rules.ToResolveUnregisteredService.GetFirstNonDefault(r => r(request, this));
+            var ruleFactory = rules.ForUnregisteredService.GetFirstNonDefault(r => r(request, this));
             if (ruleFactory != null)
             {
                 Register(ruleFactory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.ThrowIfDuplicateKey);
@@ -387,9 +383,9 @@ namespace DryIoc
                     if (((DecoratorSetup)decorator.Setup).IsApplicable(request))
                     {
                         // Cache closed generic registration produced by open-generic decorator.
-                        if (i >= openGenericDecoratorIndex && decorator.ProvidesFactoryPerRequest)
+                        if (i >= openGenericDecoratorIndex && decorator.ProvidesFactoryForRequest)
                         {
-                            decorator = decorator.GetFactoryPerRequestOrDefault(request, this);
+                            decorator = decorator.GetFactoryForRequestOrDefault(request, this);
                             Register(decorator, serviceType, null, IfAlreadyRegistered.ThrowIfDuplicateKey);
                         }
 
@@ -782,8 +778,8 @@ namespace DryIoc
             var factory = registry.GetFactoryOrDefault(openGenericServiceType, request.ServiceKey)
                 ?? registry.GetGenericWrapperOrDefault(openGenericServiceType);
 
-            if (factory != null && factory.ProvidesFactoryPerRequest)
-                factory = factory.GetFactoryPerRequestOrDefault(request, registry);
+            if (factory != null && factory.ProvidesFactoryForRequest)
+                factory = factory.GetFactoryForRequestOrDefault(request, registry);
 
             return factory;
         };
@@ -978,6 +974,10 @@ namespace DryIoc
     {
         public static readonly ResolutionRules Empty = new ResolutionRules();
 
+        public static ResolutionRules Default = Empty.With(
+            OpenGenericsSupport.ResolveOpenGenerics,
+            OpenGenericsSupport.ResolveEnumerableOrArray);
+
         public delegate Factory GetSingleFactory(Type serviceType, IEnumerable<Factory> factories);
         public GetSingleFactory ToGetSingleFactory { get; private set; }
         public ResolutionRules With(GetSingleFactory toGetSingleFactory)
@@ -986,26 +986,26 @@ namespace DryIoc
         }
 
         public delegate Factory ResolveUnregisteredService(Request request, IRegistry registry);
-        public ResolveUnregisteredService[] ToResolveUnregisteredService { get; private set; }
+        public ResolveUnregisteredService[] ForUnregisteredService { get; private set; }
         public ResolutionRules With(params ResolveUnregisteredService[] toResolveUnregisteredService)
         {
-            return new ResolutionRules(this) { ToResolveUnregisteredService = toResolveUnregisteredService };
+            return new ResolutionRules(this) { ForUnregisteredService = toResolveUnregisteredService };
         }
 
         public delegate object ResolveConstructorParameterServiceKey(ParameterInfo parameter, Request parent, IRegistry registry);
-        public ResolveConstructorParameterServiceKey[] ToResolveConstructorParameterServiceKey { get; private set; }
+        public ResolveConstructorParameterServiceKey[] ForConstructorParameterServiceKey { get; private set; }
         public ResolutionRules With(params ResolveConstructorParameterServiceKey[] toResolveConstructorParameterServiceKey)
         {
-            return new ResolutionRules(this) { ToResolveConstructorParameterServiceKey = toResolveConstructorParameterServiceKey };
+            return new ResolutionRules(this) { ForConstructorParameterServiceKey = toResolveConstructorParameterServiceKey };
         }
 
         public static readonly BindingFlags PropertyOrFieldFlags = BindingFlags.Public | BindingFlags.Instance;
 
         public delegate bool ResolvePropertyOrFieldWithServiceKey(out object key, MemberInfo member, Request parent, IRegistry registry);
-        public ResolvePropertyOrFieldWithServiceKey[] ToResolvePropertyOrFieldWithServiceKey { get; private set; }
+        public ResolvePropertyOrFieldWithServiceKey[] ForPropertyOrFieldWithServiceKey { get; private set; }
         public ResolutionRules With(params ResolvePropertyOrFieldWithServiceKey[] toResolvePropertyOrFieldWithServiceKey)
         {
-            return new ResolutionRules(this) { ToResolvePropertyOrFieldWithServiceKey = toResolvePropertyOrFieldWithServiceKey };
+            return new ResolutionRules(this) { ForPropertyOrFieldWithServiceKey = toResolvePropertyOrFieldWithServiceKey };
         }
 
         #region Implementation
@@ -1015,9 +1015,9 @@ namespace DryIoc
         private ResolutionRules(ResolutionRules rules)
         {
             ToGetSingleFactory = rules.ToGetSingleFactory;
-            ToResolveUnregisteredService = rules.ToResolveUnregisteredService;
-            ToResolveConstructorParameterServiceKey = rules.ToResolveConstructorParameterServiceKey;
-            ToResolvePropertyOrFieldWithServiceKey = rules.ToResolvePropertyOrFieldWithServiceKey;
+            ForUnregisteredService = rules.ForUnregisteredService;
+            ForConstructorParameterServiceKey = rules.ForConstructorParameterServiceKey;
+            ForPropertyOrFieldWithServiceKey = rules.ForPropertyOrFieldWithServiceKey;
         }
 
         #endregion
@@ -1118,7 +1118,7 @@ namespace DryIoc
         public static readonly string IS_REGISTERED_FOR_GENERIC_WRAPPER_CALLED_WITH_NONGENERIC_SERVICE_TYPE =
             "IsRegistered for GenericWrapper called with non generic service type {0}.";
 
-        public static readonly string UNABLE_TO_GET_CTOR_USING_CTOR_SELECTOR = 
+        public static readonly string UNABLE_TO_GET_CTOR_USING_CTOR_SELECTOR =
             "Unable to get constructor of {0} using provided constructor selector.";
     }
 
@@ -1509,8 +1509,8 @@ namespace DryIoc
                 str.Append("'");
             }
 
-            if (ResolvedFactory != null && ResolvedFactory.ImplementationType != null)
-                str.Append(" of ").Append(ResolvedFactory.ImplementationType.Print());
+            if (ImplementationType != null)
+                str.Append(" of ").Append(ImplementationType.Print());
 
             return str.ToString();
         }
@@ -1650,6 +1650,7 @@ namespace DryIoc
         }
 
         public virtual Type ImplementationType { get { return null; } }
+        public virtual bool ProvidesFactoryForRequest { get { return false; } }
 
         protected Factory(IReuse reuse = null, FactorySetup setup = null)
         {
@@ -1660,14 +1661,13 @@ namespace DryIoc
 
         public virtual void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType)
         {
-            if (serviceType.IsGenericTypeDefinition && !ProvidesFactoryPerRequest)
+            if (serviceType.IsGenericTypeDefinition && !ProvidesFactoryForRequest)
                 throw Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE.Of(serviceType);
         }
 
-        public virtual bool ProvidesFactoryPerRequest { get { return false; } }
-
+        // TODO: Test it
         //ncrunch: no coverage start
-        public virtual Factory GetFactoryPerRequestOrDefault(Request request, IRegistry registry) { return null; }
+        public virtual Factory GetFactoryForRequestOrDefault(Request request, IRegistry registry) { return null; }
         //ncrunch: no coverage end
 
         public abstract Expression CreateExpression(Request request, IRegistry registry);
@@ -1750,19 +1750,18 @@ namespace DryIoc
     public sealed class ReflectionFactory : Factory
     {
         public override Type ImplementationType { get { return _implementationType; } }
+        public override bool ProvidesFactoryForRequest { get { return _implementationType.IsGenericTypeDefinition; } }
 
-        public override bool ProvidesFactoryPerRequest { get { return _providesFactoryPerRequest; } }
-
-        public ReflectionFactory(Type implementationType, IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null)
+        public ReflectionFactory(Type implementationType,
+            IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            _implementationType = implementationType.ThrowIfNull();
-            if (implementationType.IsAbstract)
+            if (implementationType.ThrowIfNull().IsAbstract)
                 throw Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE.Of(implementationType);
             if (getConstructor == null && implementationType.GetConstructors().Length != 1)
                 throw Error.UNSPECIFIED_HOWTO_GET_CONSTRUCTOR_FOR_IMPLTYPE_WITH_NO_OR_MANY_CONSTRUCTORS.Of(implementationType);
 
-            _providesFactoryPerRequest = _implementationType.IsGenericTypeDefinition;
+            _implementationType = implementationType;
             _getConstructor = getConstructor;
         }
 
@@ -1802,7 +1801,7 @@ namespace DryIoc
             }
         }
 
-        public override Factory GetFactoryPerRequestOrDefault(Request request, IRegistry _)
+        public override Factory GetFactoryForRequestOrDefault(Request request, IRegistry _)
         {
             var closedTypeArgs = _implementationType == request.OpenGenericServiceType
                 ? request.ServiceType.GetGenericArguments()
@@ -1825,7 +1824,7 @@ namespace DryIoc
                 {
                     var ctorParam = ctorParams[i];
                     var paramKey = Setup.Type != FactoryType.Service ? request.ServiceKey // propagate key from wrapper or decorator.
-                        : registry.ResolutionRules.Value.ToResolveConstructorParameterServiceKey.GetFirstNonDefault(r => r(ctorParam, request, registry));
+                        : registry.ResolutionRules.Value.ForConstructorParameterServiceKey.GetFirstNonDefault(r => r(ctorParam, request, registry));
 
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey, ctorParam);
                     paramExprs[i] = registry.GetOrAddFactory(paramRequest, IfUnresolved.Throw).GetExpression(paramRequest, registry);
@@ -1863,7 +1862,7 @@ namespace DryIoc
                 if (ctorParamExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
                     var paramKey = Setup.Type != FactoryType.Service ? request.ServiceKey // propagate key from wrapper or decorator.
-                        : registry.ResolutionRules.Value.ToResolveConstructorParameterServiceKey.GetFirstNonDefault(r => r(ctorParam, request, registry));
+                        : registry.ResolutionRules.Value.ForConstructorParameterServiceKey.GetFirstNonDefault(r => r(ctorParam, request, registry));
 
                     var paramRequest = request.Push(ctorParam.ParameterType, paramKey, ctorParam);
                     ctorParamExprs[cp] = registry.GetOrAddFactory(paramRequest, IfUnresolved.Throw).GetExpression(paramRequest, registry);
@@ -1892,7 +1891,6 @@ namespace DryIoc
         #region Implementation
 
         private readonly Type _implementationType;
-        private readonly bool _providesFactoryPerRequest;
         private readonly GetConstructor _getConstructor;
 
         public ConstructorInfo GetConstructor(Type implementationType)
@@ -1909,7 +1907,7 @@ namespace DryIoc
         private static Expression InitMembersIfRequired(Type implementationType, NewExpression newService, Request request, IRegistry registry)
         {
             var rules = registry.ResolutionRules.Value;
-            if (rules.ToResolvePropertyOrFieldWithServiceKey.IsNullOrEmpty())
+            if (rules.ForPropertyOrFieldWithServiceKey.IsNullOrEmpty())
                 return newService;
 
             var props = implementationType.GetProperties(ResolutionRules.PropertyOrFieldFlags).Where(p => p.GetSetMethod() != null);
@@ -1920,7 +1918,7 @@ namespace DryIoc
             {
                 var m = member;
                 object memberKey = null;
-                if (rules.ToResolvePropertyOrFieldWithServiceKey.GetFirstNonDefault(r => r(out memberKey, m, request, registry)))
+                if (rules.ForPropertyOrFieldWithServiceKey.GetFirstNonDefault(r => r(out memberKey, m, request, registry)))
                 {
                     var memberType = member is PropertyInfo ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType;
                     var memberRequest = request.Push(memberType, memberKey, member);
@@ -2046,7 +2044,7 @@ namespace DryIoc
 
     public sealed class FactoryProvider : Factory
     {
-        public override bool ProvidesFactoryPerRequest { get { return true; } }
+        public override bool ProvidesFactoryForRequest { get { return true; } }
 
         public FactoryProvider(Func<Request, IRegistry, Factory> getFactoryOrDefault, FactorySetup setup = null)
             : base(setup: setup)
@@ -2054,7 +2052,7 @@ namespace DryIoc
             _getFactoryOrDefault = getFactoryOrDefault.ThrowIfNull();
         }
 
-        public override Factory GetFactoryPerRequestOrDefault(Request request, IRegistry registry)
+        public override Factory GetFactoryForRequestOrDefault(Request request, IRegistry registry)
         {
             var factory = _getFactoryOrDefault(request, registry);
             if (factory != null && factory.Setup == DefaultSetup)

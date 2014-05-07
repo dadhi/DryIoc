@@ -1,6 +1,4 @@
 ﻿namespace DryIoc.Samples.CUT
 {
-    public class SomeAddin : IAddin
-    {
-    }
+    public class SomeAddin : IAddin {}
 }

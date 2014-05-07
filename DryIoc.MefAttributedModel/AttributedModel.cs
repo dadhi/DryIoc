@@ -35,6 +35,7 @@ namespace DryIoc.MefAttributedModel
     /// <summary>
     /// Implements MEF Attributed Programming Model. Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel.
     /// TODO:
+    /// - add: Support for DryIoc Reuse, currently only Transient and Singleton is supported. Maybe add ReuseAttribute.
     /// - add: ImportAttribute.ContractType and AllowDefault support.
     /// </summary>
     public static class AttributedModel
@@ -45,8 +46,8 @@ namespace DryIoc.MefAttributedModel
         public static Container WithAttributedModel(this Container container)
         {
             container.ResolutionRules.Swap(rules => rules
-                .With(rules.ToResolveConstructorParameterServiceKey.Append(GetConstructorParameterServiceKeyOrDefault))
-                .With(rules.ToResolvePropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
+                .With(rules.ForConstructorParameterServiceKey.Append(GetConstructorParameterServiceKeyOrDefault))
+                .With(rules.ForPropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
             return container;
         }
 
@@ -69,17 +70,18 @@ namespace DryIoc.MefAttributedModel
 
         public static void RegisterExport(this IRegistrator registrator, RegistrationInfo info)
         {
-            var factory = new ReflectionFactory(info.Type, info.GetReuse(), FindSingleImportingConstructor, info.GetSetup());
+            var factory = info.CreateFactory();
 
-            var exports = info.Exports;
-            for (var i = 0; i < exports.Length; i++)
+            for (var i = 0; i < info.Exports.Length; i++)
             {
-                var export = exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                var export = info.Exports[i];
+
+                registrator.Register(factory, export.ServiceType,
+                    export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
 
                 if (export.ServiceType.IsGenericType &&
                     export.ServiceType.GetGenericTypeDefinition() == typeof(IFactory<>))
-                    RegisterFactory(registrator, info.Type, export);
+                    RegisterFactory(registrator, info.ImplementationType, export);
             }
         }
 
@@ -103,7 +105,7 @@ namespace DryIoc.MefAttributedModel
                 attributes.IndexOf(a => a is PartNotDiscoverableAttribute) != -1)
                 return null;
 
-            var info = new RegistrationInfo { Type = type };
+            var info = new RegistrationInfo { ImplementationType = type };
 
             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
             {
@@ -241,8 +243,8 @@ namespace DryIoc.MefAttributedModel
 
             var attributes = factoryMethod.GetCustomAttributes(false);
 
-            var exportInfo = GetRegistrationInfoOrDefault(serviceType, attributes);
-            if (exportInfo == null)
+            var registrationInfo = GetRegistrationInfoOrDefault(serviceType, attributes);
+            if (registrationInfo == null)
                 return;
 
             // Result expression is {container.Resolve<IFactory<TService>>(factoryName).Create()} 
@@ -255,12 +257,13 @@ namespace DryIoc.MefAttributedModel
                     _factoryMethodName, null);
 
             var factory = new DelegateFactory(factoryCreateExpr,
-                exportInfo.GetReuse(), exportInfo.GetSetup(attributes));
+                registrationInfo.GetReuse(), registrationInfo.GetSetup(attributes));
 
-            for (var i = 0; i < exportInfo.Exports.Length; i++)
+            for (var i = 0; i < registrationInfo.Exports.Length; i++)
             {
-                var export = exportInfo.Exports[i];
-                registrator.Register(factory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                var export = registrationInfo.Exports[i];
+                registrator.Register(factory,
+                    export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
             }
         }
 
@@ -268,12 +271,12 @@ namespace DryIoc.MefAttributedModel
 
         #region Tools
 
-        public static ConstructorInfo FindSingleImportingConstructor(Type type)
+        public static ConstructorInfo FindSingleImportingConstructor(Type implementationType)
         {
-            var constructors = type.GetConstructors();
+            var constructors = implementationType.GetConstructors();
             return constructors.Length == 1 ? constructors[0]
                 : constructors.SingleOrDefault(x => Attribute.IsDefined(x, typeof(ImportingConstructorAttribute)))
-                    .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, type);
+                    .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, implementationType);
         }
 
         #endregion
@@ -392,83 +395,6 @@ namespace DryIoc.MefAttributedModel
             "Unable to get contract types for implementation {0} cause all of its implemented types where filtered out: {1}";
     }
 
-    #region Registration Info DTOs
-#pragma warning disable 659
-
-    public sealed class RegistrationInfo
-    {
-        public Type Type;
-        public ExportInfo[] Exports;
-        public bool IsSingleton = AttributedModel.DefaultCreationPolicy == CreationPolicy.Shared;
-        public int MetadataAttributeIndex = -1;
-        public FactoryType FactoryType;
-        public GenericWrapperInfo GenericWrapper;
-        public DecoratorInfo Decorator;
-
-        public IReuse GetReuse()
-        {
-            return IsSingleton ? Reuse.Singleton : Reuse.Transient;
-        }
-
-        public object GetMetadata(object[] attributes = null)
-        {
-            attributes = attributes ?? Type.GetCustomAttributes(false);
-            var metadataAttribute = MetadataAttributeIndex == -1 ? null
-                : attributes.ThrowIf(attributes.Length == 0)[MetadataAttributeIndex];
-            var metadata = !(metadataAttribute is ExportWithMetadataAttribute) ? metadataAttribute
-                : ((ExportWithMetadataAttribute)metadataAttribute).Metadata;
-            return metadata;
-        }
-
-        public FactorySetup GetSetup(object[] attributes = null)
-        {
-            if (FactoryType == FactoryType.GenericWrapper)
-                return GenericWrapper == null ? GenericWrapperSetup.Default : GenericWrapper.CreateSetup();
-
-            if (FactoryType == FactoryType.Decorator)
-                return Decorator == null ? DecoratorSetup.Default : Decorator.CreateSetup(GetMetadata(attributes));
-
-            return ServiceSetup.WithMetadata(GetMetadata(attributes));
-        }
-
-        public override bool Equals(object obj)
-        {
-            var other = obj as RegistrationInfo;
-            return other != null
-                && other.Type == Type
-                && other.IsSingleton == IsSingleton
-                && other.FactoryType == FactoryType
-                && Equals(other.GenericWrapper, GenericWrapper)
-                && Equals(other.Decorator, Decorator)
-                && other.Exports.SequenceEqual(Exports);
-        }
-
-        public StringBuilder AppendCode(StringBuilder code = null)
-        {
-            code = code ?? new StringBuilder();
-            code.Append(
-@"new RegistrationInfo {
-    Type = ").AppendType(Type).Append(@",
-    Exports = new[] {
-        "); for (var i = 0; i < Exports.Length; i++)
-                code = Exports[i].AppendCode(code).Append(@",
-        "); code.Append(@"},
-    IsSingleton = ").AppendBool(IsSingleton).Append(@",
-    MetadataAttributeIndex = ").Append(MetadataAttributeIndex).Append(@",
-    FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
-            if (GenericWrapper != null) code.Append(@",
-    GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = ").Append(GenericWrapper.ServiceTypeIndex).Append(@" }");
-            if (Decorator != null)
-            {
-                code.Append(@",
-"); Decorator.AppendCode(code);
-            }
-            code.Append(@"
-}");
-            return code;
-        }
-    }
-
     public static class PrintCode
     {
         public static StringBuilder AppendBool(this StringBuilder code, bool x)
@@ -515,18 +441,106 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
+    #region Registration Info DTOs
+#pragma warning disable 659
+
+    public sealed class RegistrationInfo
+    {
+        public ExportInfo[] Exports;
+
+        public Type ImplementationType;
+        public string ImplementationTypeFullName;
+
+        public bool IsSingleton = AttributedModel.DefaultCreationPolicy == CreationPolicy.Shared;
+        public int MetadataAttributeIndex = -1;
+        public FactoryType FactoryType;
+        public GenericWrapperInfo GenericWrapper;
+        public DecoratorInfo Decorator;
+
+        public Factory CreateFactory(object[] attributes = null)
+        {
+            return new ReflectionFactory(ImplementationType,
+                GetReuse(), AttributedModel.FindSingleImportingConstructor, GetSetup(attributes));
+        }
+
+        public IReuse GetReuse()
+        {
+            return IsSingleton ? Reuse.Singleton : Reuse.Transient;
+        }
+
+        public FactorySetup GetSetup(object[] attributes = null)
+        {
+            if (FactoryType == FactoryType.GenericWrapper)
+                return GenericWrapper == null ? GenericWrapperSetup.Default : GenericWrapper.CreateSetup();
+
+            if (FactoryType == FactoryType.Decorator)
+                return Decorator == null ? DecoratorSetup.Default : Decorator.CreateSetup(GetMetadata(attributes));
+
+            return ServiceSetup.WithMetadata(GetMetadata(attributes));
+        }
+
+        private object GetMetadata(object[] attributes = null)
+        {
+            attributes = attributes ?? ImplementationType.GetCustomAttributes(false);
+            var metadataAttribute = MetadataAttributeIndex == -1 ? null
+                : attributes.ThrowIf(attributes.Length == 0)[MetadataAttributeIndex];
+            var metadata = !(metadataAttribute is ExportWithMetadataAttribute) ? metadataAttribute
+                : ((ExportWithMetadataAttribute)metadataAttribute).Metadata;
+            return metadata;
+        }
+
+        public override bool Equals(object obj)
+        {
+            var other = obj as RegistrationInfo;
+            return other != null
+                && other.ImplementationType == ImplementationType
+                && other.IsSingleton == IsSingleton
+                && other.FactoryType == FactoryType
+                && Equals(other.GenericWrapper, GenericWrapper)
+                && Equals(other.Decorator, Decorator)
+                && other.Exports.SequenceEqual(Exports);
+        }
+
+        public StringBuilder AppendCode(StringBuilder code = null)
+        {
+            code = code ?? new StringBuilder();
+            code.Append(
+@"new RegistrationInfo {
+    Type = ").AppendType(ImplementationType).Append(@",
+    Exports = new[] {
+        "); for (var i = 0; i < Exports.Length; i++)
+                code = Exports[i].AppendCode(code).Append(@",
+        "); code.Append(@"},
+    IsSingleton = ").AppendBool(IsSingleton).Append(@",
+    MetadataAttributeIndex = ").Append(MetadataAttributeIndex).Append(@",
+    FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
+            if (GenericWrapper != null) code.Append(@",
+    GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = ").Append(GenericWrapper.ServiceTypeIndex).Append(@" }");
+            if (Decorator != null)
+            {
+                code.Append(@",
+"); Decorator.AppendCode(code);
+            }
+            code.Append(@"
+}");
+            return code;
+        }
+    }
+
     public sealed class ExportInfo
     {
-        public ExportInfo() { }
+        public Type ServiceType;
+        public string ServiceTypeFullName;
+
+        public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
+
+        public ExportInfo() { } // Default constructor is usually required by deserializer.
 
         public ExportInfo(Type serviceType, object serviceKey = null)
         {
             ServiceType = serviceType;
             ServiceKeyInfo = ServiceKeyInfo.Of(serviceKey);
         }
-
-        public Type ServiceType;
-        public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
 
         public override bool Equals(object obj)
         {
@@ -612,7 +626,7 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
-    public class ServiceKeyInfo
+    public sealed class ServiceKeyInfo
     {
         public static readonly ServiceKeyInfo Default = new ServiceKeyInfo();
 

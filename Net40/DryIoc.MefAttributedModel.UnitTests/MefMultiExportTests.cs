@@ -25,8 +25,5 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
     [Export("a")]
     [Export("b")]
-    public class Bazooka
-    {
-        
-    }
+    public class Bazooka {}
 }

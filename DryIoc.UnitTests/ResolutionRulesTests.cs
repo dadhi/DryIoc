@@ -15,7 +15,7 @@ namespace DryIoc.UnitTests
             container.Register<Service>();
 
             container.ResolutionRules.Swap(r => r.With(
-                r.ToResolveUnregisteredService.Remove(OpenGenericsSupport.ResolveEnumerableOrArray)));
+                r.ForUnregisteredService.Remove(OpenGenericsSupport.ResolveEnumerableOrArray)));
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service[]>());
@@ -41,7 +41,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.ResolutionRules.Swap(r => r.With(r.ToResolveUnregisteredService.Append((request, registry) =>
+            container.ResolutionRules.Swap(r => r.With(r.ForUnregisteredService.Append((request, registry) =>
                 request.ServiceType.IsClass && !request.ServiceType.IsAbstract
                     ? new ReflectionFactory(request.ServiceType)
                     : null)));
@@ -56,7 +56,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.ResolutionRules.Swap(r => r.With(
-                r.ToResolveConstructorParameterServiceKey.Append((parameter, _, __) =>
+                r.ForConstructorParameterServiceKey.Append((parameter, _, __) =>
                 {
                     object key;
                     return TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false)) ? key : null;
@@ -76,7 +76,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.ResolutionRules.Swap(r => r.With(
-                r.ToResolveConstructorParameterServiceKey.Append((parameter, parent, registry) =>
+                r.ForConstructorParameterServiceKey.Append((parameter, parent, registry) =>
                 {
                     object key;
                     var attributes = parameter.GetCustomAttributes(false);
