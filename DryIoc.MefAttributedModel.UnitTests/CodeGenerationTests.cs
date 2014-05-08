@@ -11,17 +11,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             var info = AttributedModel.GetRegistrationInfoOrDefault(typeof(PrintToCodeExample));
 
-            var code = info.AppendCode();
+            var code = info.AppendAsCode();
             var codeValue = code.ToString();
             Assert.That(codeValue, Is.EqualTo(
 @"new RegistrationInfo {
-    Type = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeExample),
+    ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeExample),
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeExample), 1),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IPrintToCode), 1),
         },
     IsSingleton = true,
-    MetadataAttributeIndex = -1,
+    HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }"));
         }

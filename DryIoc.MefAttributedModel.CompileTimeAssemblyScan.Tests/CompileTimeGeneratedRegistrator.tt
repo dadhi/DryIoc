@@ -21,7 +21,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         foreach (var info in infos)
         {
 #>
-<#= info.AppendCode().ToString() #>, 
+<#= info.AppendAsCode().ToString() #>, 
 <#
         }
 #>

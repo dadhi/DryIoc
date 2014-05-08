@@ -92,20 +92,20 @@ namespace DryIoc.MefAttributedModel
                 .Where(info => info != null);
         }
 
-        public static RegistrationInfo GetRegistrationInfoOrDefault(Type type)
+        public static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType)
         {
-            return !type.IsClass || type.IsAbstract ? null
-                : GetRegistrationInfoOrDefault(type, GetAllExportRelatedAttributes(type));
+            return !implementationType.IsClass || implementationType.IsAbstract ? null
+                : GetRegistrationInfoOrDefault(implementationType, GetAllExportRelatedAttributes(implementationType));
         }
 
-        public static RegistrationInfo GetRegistrationInfoOrDefault(Type type, object[] attributes)
+        public static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType, object[] attributes)
         {
             if (attributes.Length == 0 ||
                 attributes.IndexOf(a => a is ExportAttribute || a is ExportAllAttribute) == -1 ||
                 attributes.IndexOf(a => a is PartNotDiscoverableAttribute) != -1)
                 return null;
 
-            var info = new RegistrationInfo { ImplementationType = type };
+            var info = new RegistrationInfo { ImplementationType = implementationType };
 
             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
             {
@@ -113,7 +113,7 @@ namespace DryIoc.MefAttributedModel
                 if (attribute is ExportAttribute)
                 {
                     var exportAttribute = (ExportAttribute)attribute;
-                    var export = new ExportInfo(exportAttribute.ContractType ?? type,
+                    var export = new ExportInfo(exportAttribute.ContractType ?? implementationType,
                         exportAttribute.ContractName ??
                         (attribute is ExportWithKeyAttribute ? ((ExportWithKeyAttribute)attribute).ContractKey : null));
 
@@ -125,11 +125,11 @@ namespace DryIoc.MefAttributedModel
                 else if (attribute is ExportAllAttribute)
                 {
                     var exportAllAttribute = (ExportAllAttribute)attribute;
-                    var allContractTypes = exportAllAttribute.GetAllContractTypes(type);
+                    var allContractTypes = exportAllAttribute.GetAllContractTypes(implementationType);
 
-                    if (type.IsGenericTypeDefinition)
+                    if (implementationType.IsGenericTypeDefinition)
                     {
-                        var implTypeArgs = type.GetGenericArguments();
+                        var implTypeArgs = implementationType.GetGenericArguments();
                         allContractTypes = allContractTypes.Where(t =>
                             t.IsGenericType && t.ContainsGenericParameters && t.ContainsAllGenericParameters(implTypeArgs))
                             .Select(t => t.GetGenericTypeDefinition());
@@ -140,7 +140,7 @@ namespace DryIoc.MefAttributedModel
                         .ToArray();
 
                     Throw.If(exportAllInfos.Length == 0, Error.EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES,
-                        type, allContractTypes);
+                        implementationType, allContractTypes);
 
                     if (info.Exports != null)
                         for (var index = 0; index < info.Exports.Length; index++)
@@ -159,7 +159,7 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is ExportAsGenericWrapperAttribute)
                 {
-                    Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
+                    Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
                     info.FactoryType = FactoryType.GenericWrapper;
                     var genericWrapperAttribute = ((ExportAsGenericWrapperAttribute)attribute);
                     info.GenericWrapper = new GenericWrapperInfo
@@ -169,30 +169,23 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is ExportAsDecoratorAttribute)
                 {
-                    Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, type);
+                    Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
                     var decorator = ((ExportAsDecoratorAttribute)attribute);
                     info.FactoryType = FactoryType.Decorator;
-                    info.Decorator = new DecoratorInfo(
-                        decorator.ShouldCompareMetadata,
-                        decorator.ConditionType,
-                        decorator.ContractName ?? decorator.ContractKey);
+                    info.Decorator = new DecoratorInfo(decorator.ConditionType, decorator.ContractName ?? decorator.ContractKey);
                 }
 
-                if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), true))
+                if (Attribute.IsDefined(attribute.GetType(), typeof (MetadataAttributeAttribute), true))
                 {
-                    Throw.If(info.MetadataAttributeIndex != -1, Error.UNSUPPORTED_MULTIPLE_METADATA, type);
-                    info.MetadataAttributeIndex = attributeIndex;
+                    Throw.If(info.HasMetadataAttribute, Error.UNSUPPORTED_MULTIPLE_METADATA, implementationType);
+                    info.HasMetadataAttribute = true;
                 }
             }
 
             if (info.FactoryType == FactoryType.Decorator)
-            {
-                Throw.If(info.Decorator.ShouldCompareMetadata && info.MetadataAttributeIndex == -1,
-                    Error.METADATA_FOR_DECORATOR_IS_NOT_FOUND, type);
                 info.IsSingleton = false;
-            }
 
-            info.Exports.ThrowIfNull(Error.EXPORT_IS_REQUIRED, type);
+            info.Exports.ThrowIfNull(Error.EXPORT_IS_REQUIRED, implementationType);
             return info;
         }
 
@@ -292,7 +285,7 @@ namespace DryIoc.MefAttributedModel
             object key;
             if (TryGetServiceKeyFromImportAttribute(out key, attributes) ||
                 TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes) ||
-                TryGetServiceKeyFromImportOrExportAttribute(out key, parameter.ParameterType, registry, attributes))
+                TryGetServiceKeyFromExportOnceAttribute(out key, parameter.ParameterType, registry, attributes))
                 return key;
             return null;
         }
@@ -305,7 +298,7 @@ namespace DryIoc.MefAttributedModel
                 return false;
 
             return TryGetServiceKeyFromImportAttribute(out key, attributes) ||
-                TryGetServiceKeyFromImportOrExportAttribute(out key,
+                TryGetServiceKeyFromExportOnceAttribute(out key,
                     member is PropertyInfo ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType,
                     registry, attributes);
         }
@@ -328,30 +321,33 @@ namespace DryIoc.MefAttributedModel
 
             var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
             var metadata = import.Metadata;
-
-            var item = registry.GetAllFactories(serviceType).FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
+            var item = registry.GetAllFactories(serviceType)
+                .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
                 .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, metadata, parent);
+
             key = item.Key;
             return true;
         }
 
-        public static bool TryGetServiceKeyFromImportOrExportAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
+        public static bool TryGetServiceKeyFromExportOnceAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
             key = null;
-            var import = GetSingleAttributeOrDefault<ExportOnceAttribute>(attributes);
-            if (import == null)
+            var export = GetSingleAttributeOrDefault<ExportOnceAttribute>(attributes);
+            if (export == null)
                 return false;
 
             var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
-            var serviceName = import.ContractName;
+            var serviceName = export.ContractName;
             if (!registry.IsRegistered(serviceType, serviceName))
             {
-                var implementationType = import.ImplementationType ?? serviceType;
-                var reuse = import.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
-                var getConstructor = import.ConstructorSignature != null
-                    ? new GetConstructor(t => t.GetConstructor(import.ConstructorSignature)) : null;
-                var setup = ServiceSetup.WithMetadata(import.Metadata);
-                registry.Register(serviceType, implementationType, reuse, getConstructor, setup, serviceName);
+                var implementationType = export.ImplementationType ?? serviceType;
+                var reuse = export.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
+                var getConstructor = export.ConstructorSignature != null
+                    ? new GetConstructor(t => t.GetConstructor(export.ConstructorSignature)) : null;
+
+                registry.Register(serviceType, implementationType, 
+                    reuse, getConstructor, ServiceSetup.WithMetadata(export.Metadata), 
+                    serviceName);
             }
 
             key = serviceName;
@@ -384,9 +380,6 @@ namespace DryIoc.MefAttributedModel
         public static readonly string UNSUPPORTED_MULTIPLE_FACTORY_TYPES =
             "Found multiple factory types associated with exported {0}. " +
             "Only single ExportAs.. attribute is supported, please remove the rest.";
-
-        public static readonly string METADATA_FOR_DECORATOR_IS_NOT_FOUND =
-            "Exported Decorator should compare metadata BUT metadata is not found for {0}.";
 
         public static readonly string EXPORT_IS_REQUIRED =
             "At least one Export attributed should be defined for {0}.";
@@ -452,15 +445,15 @@ namespace DryIoc.MefAttributedModel
         public string ImplementationTypeFullName;
 
         public bool IsSingleton = AttributedModel.DefaultCreationPolicy == CreationPolicy.Shared;
-        public int MetadataAttributeIndex = -1;
+        public bool HasMetadataAttribute;
         public FactoryType FactoryType;
         public GenericWrapperInfo GenericWrapper;
         public DecoratorInfo Decorator;
 
-        public Factory CreateFactory(object[] attributes = null)
+        public Factory CreateFactory()
         {
             return new ReflectionFactory(ImplementationType,
-                GetReuse(), AttributedModel.FindSingleImportingConstructor, GetSetup(attributes));
+                GetReuse(), AttributedModel.FindSingleImportingConstructor, GetSetup());
         }
 
         public IReuse GetReuse()
@@ -471,22 +464,17 @@ namespace DryIoc.MefAttributedModel
         public FactorySetup GetSetup(object[] attributes = null)
         {
             if (FactoryType == FactoryType.GenericWrapper)
-                return GenericWrapper == null ? GenericWrapperSetup.Default : GenericWrapper.CreateSetup();
+                return GenericWrapper == null ? GenericWrapperSetup.Default : GenericWrapper.GetSetup();
 
             if (FactoryType == FactoryType.Decorator)
-                return Decorator == null ? DecoratorSetup.Default : Decorator.CreateSetup(GetMetadata(attributes));
+                return Decorator == null ? DecoratorSetup.Default
+                    : HasMetadataAttribute ? Decorator.GetSetup(() => GetMetadata(attributes))
+                    : Decorator.GetSetup();
 
-            return ServiceSetup.WithMetadata(GetMetadata(attributes));
-        }
-
-        private object GetMetadata(object[] attributes = null)
-        {
-            attributes = attributes ?? ImplementationType.GetCustomAttributes(false);
-            var metadataAttribute = MetadataAttributeIndex == -1 ? null
-                : attributes.ThrowIf(attributes.Length == 0)[MetadataAttributeIndex];
-            var metadata = !(metadataAttribute is ExportWithMetadataAttribute) ? metadataAttribute
-                : ((ExportWithMetadataAttribute)metadataAttribute).Metadata;
-            return metadata;
+            if (HasMetadataAttribute) 
+                return ServiceSetup.WithMetadata(() => GetMetadata(attributes));
+            
+            return ServiceSetup.Default;
         }
 
         public override bool Equals(object obj)
@@ -501,29 +489,41 @@ namespace DryIoc.MefAttributedModel
                 && other.Exports.SequenceEqual(Exports);
         }
 
-        public StringBuilder AppendCode(StringBuilder code = null)
+        public StringBuilder AppendAsCode(StringBuilder code = null)
         {
             code = code ?? new StringBuilder();
             code.Append(
 @"new RegistrationInfo {
-    Type = ").AppendType(ImplementationType).Append(@",
+    ImplementationType = ").AppendType(ImplementationType).Append(@",
     Exports = new[] {
         "); for (var i = 0; i < Exports.Length; i++)
                 code = Exports[i].AppendCode(code).Append(@",
         "); code.Append(@"},
     IsSingleton = ").AppendBool(IsSingleton).Append(@",
-    MetadataAttributeIndex = ").Append(MetadataAttributeIndex).Append(@",
+    HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
     FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
             if (GenericWrapper != null) code.Append(@",
     GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = ").Append(GenericWrapper.ServiceTypeIndex).Append(@" }");
             if (Decorator != null)
             {
                 code.Append(@",
-"); Decorator.AppendCode(code);
+"); Decorator.AppendAsCode(code);
             }
             code.Append(@"
 }");
             return code;
+        }
+
+        private object GetMetadata(object[] attributes = null)
+        {
+            attributes = attributes ?? ImplementationType.GetCustomAttributes(false);
+            var metadataAttr = attributes.FirstOrDefault(
+                a => Attribute.IsDefined(a.GetType(), typeof(MetadataAttributeAttribute), true));
+
+            if (metadataAttr is ExportWithMetadataAttribute)
+                return ((ExportWithMetadataAttribute)metadataAttr).Metadata;
+
+            return metadataAttr;
         }
     }
 
@@ -562,7 +562,7 @@ namespace DryIoc.MefAttributedModel
     {
         public int ServiceTypeIndex;
 
-        public GenericWrapperSetup CreateSetup()
+        public GenericWrapperSetup GetSetup()
         {
             return GenericWrapperSetup.With(SelectServiceType);
         }
@@ -583,26 +583,24 @@ namespace DryIoc.MefAttributedModel
     {
         public DecoratorInfo() { }
 
-        public DecoratorInfo(bool shouldCompareMetadata = false, Type conditionType = null, object serviceKey = null)
+        public DecoratorInfo(Type conditionType = null, object serviceKey = null)
         {
-            ShouldCompareMetadata = shouldCompareMetadata;
             ConditionType = conditionType;
             ServiceKeyInfo = ServiceKeyInfo.Of(serviceKey);
         }
 
-        public bool ShouldCompareMetadata;
         public Type ConditionType;
         public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
 
-        public DecoratorSetup CreateSetup(object metadata)
+        public DecoratorSetup GetSetup(Func<object> getMetadata = null)
         {
             if (ConditionType != null)
                 return DecoratorSetup.With(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).Check);
 
-            if (ShouldCompareMetadata || ServiceKeyInfo != null)
+            if (ServiceKeyInfo != ServiceKeyInfo.Default || getMetadata != null)
                 return DecoratorSetup.With(request =>
-                    (!ShouldCompareMetadata || Equals(metadata, request.ResolvedFactory.Setup.Metadata)) &&
-                    (ServiceKeyInfo.Key == null || Equals(ServiceKeyInfo.Key, request.ServiceKey)));
+                    (ServiceKeyInfo.Key == null || Equals(ServiceKeyInfo.Key, request.ServiceKey)) &&
+                    (getMetadata == null || Equals(getMetadata(), request.ResolvedFactory.Setup.Metadata)));
 
             return DecoratorSetup.Default;
         }
@@ -611,16 +609,14 @@ namespace DryIoc.MefAttributedModel
         {
             var other = obj as DecoratorInfo;
             return other != null
-                && other.ShouldCompareMetadata == ShouldCompareMetadata
                 && other.ConditionType == ConditionType
                 && Equals(other.ServiceKeyInfo.Key, ServiceKeyInfo.Key);
         }
 
-        public StringBuilder AppendCode(StringBuilder code = null)
+        public StringBuilder AppendAsCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
                 .Append(@"Decorator = new DecoratorInfo(")
-                .AppendBool(ShouldCompareMetadata).Append(", ")
                 .AppendType(ConditionType).Append(", ")
                 .AppendObject(ServiceKeyInfo.Key).Append(")");
         }
@@ -707,9 +703,7 @@ namespace DryIoc.MefAttributedModel
     {
         /// <remarks>If specified has more priority over <see cref="ContractKey"/>.</remarks>
         public string ContractName { get; set; }
-
         public object ContractKey { get; set; }
-        public bool ShouldCompareMetadata { get; set; }
         public Type ConditionType { get; set; }
     }
 

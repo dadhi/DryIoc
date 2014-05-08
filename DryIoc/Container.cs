@@ -44,6 +44,7 @@ namespace DryIoc
     /// - add: Rule to resolve mocks of unregistered services.
     /// - add: Performance increase by using user provided delegate for resolution root. Modify DelegateFactory to support that.
     /// - add: Mono support.
+    /// + add: metadata to Resolve method.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -1565,21 +1566,33 @@ namespace DryIoc
             return metadata == null ? Default : new ServiceSetup(metadata: metadata);
         }
 
+        public static ServiceSetup WithMetadata(Func<object> getMetadata)
+        {
+            return new ServiceSetup(getMetadata: getMetadata);
+        }
+
         public override FactoryType Type { get { return FactoryType.Service; } }
         public override FactoryCachePolicy CachePolicy { get { return _cachePolicy; } }
-        public override object Metadata { get { return _metadata; } }
+        public override object Metadata
+        {
+            get { return _metadata ?? (_metadata = _getMetadata == null ? null : _getMetadata()); }
+        }
 
         #region Implementation
 
-        private ServiceSetup(FactoryCachePolicy cachePolicy = FactoryCachePolicy.CouldCacheExpression, object metadata = null)
+        private ServiceSetup(
+            FactoryCachePolicy cachePolicy = FactoryCachePolicy.CouldCacheExpression,
+            object metadata = null, Func<object> getMetadata = null)
         {
             _cachePolicy = cachePolicy;
             _metadata = metadata;
+            _getMetadata = getMetadata;
         }
 
         private readonly FactoryCachePolicy _cachePolicy;
 
-        private readonly object _metadata;
+        private readonly Func<object> _getMetadata;
+        private object _metadata;
 
         #endregion
     }

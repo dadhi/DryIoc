@@ -32,7 +32,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, ExportAsDecorator(ShouldCompareMetadata = true), ExportWithMetadata(2)]
+    [ExportAll, ExportAsDecorator, ExportWithMetadata(2)]
     public class RetryHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -43,7 +43,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, ExportAsDecorator(ContractName = "transact", ShouldCompareMetadata = true), ExportWithMetadata(1)]
+    [ExportAll, ExportAsDecorator(ContractName = "transact"), ExportWithMetadata(1)]
     public class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
