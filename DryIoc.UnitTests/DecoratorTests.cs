@@ -330,8 +330,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.RegisterDelegate<IOperation>(_ => new SomeOperation());
-            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: DecoratorSetup.With());
-            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: DecoratorSetup.Default);
+            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: DecoratorSetup.Default);
 
             var operation = container.Resolve<IOperation>();
 
@@ -344,10 +344,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: ServiceSetup.WithMetadata("some"));
-            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: DecoratorSetup.With());
+            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: DecoratorSetup.Default);
 
             container.Register<IOperationUser<int>, OperationUser<int>>();
-            container.Register(typeof(IOperationUser<>), typeof(LogUserOps<>), setup: DecoratorSetup.With());
+            container.Register(typeof(IOperationUser<>), typeof(LogUserOps<>), setup: DecoratorSetup.Default);
 
             var user = container.Resolve<IOperationUser<int>>();
             Assert.That(user, Is.InstanceOf<LogUserOps<int>>());

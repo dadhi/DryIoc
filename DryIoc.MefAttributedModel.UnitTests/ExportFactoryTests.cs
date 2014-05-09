@@ -32,7 +32,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             container.Register(typeof(Orange), new DelegateFactory((request, registry) =>
                 Expression.Call(
-                    request.ResolvedExpressions.ToExpression(registry.Resolve(factoryType), factoryType), 
+                    request.ResolutionState.GetExpression(registry.Resolve(factoryType), factoryType), 
                     "Create", null)));
 
             var orange = container.Resolve<Orange>();
