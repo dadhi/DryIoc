@@ -249,7 +249,7 @@ namespace DryIoc.MefAttributedModel
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     _factoryMethodName, null);
 
-            var factory = new DelegateFactory(factoryCreateExpr,
+            var factory = new ExpressionFactory(factoryCreateExpr,
                 registrationInfo.GetReuse(), registrationInfo.GetSetup(attributes));
 
             for (var i = 0; i < registrationInfo.Exports.Length; i++)
