@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -48,7 +47,8 @@ namespace DryIoc.UnitTests
         public void Given_the_same_type_service_and_wrapper_registered_Wrapper_will_be_used_to_for_names_other_than_one_with_registered_service()
         {
             var container = new Container();
-            container.Register<Lazy<IService>>();
+            container.Register<Lazy<IService>>(
+                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }));
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(named: "named");
 

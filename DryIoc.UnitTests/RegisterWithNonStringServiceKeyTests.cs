@@ -28,17 +28,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_registered_with_int_key_Then_could_be_resolved_as_default()
-        {
-            var container = new Container();
-            container.Register<Service>(named: 1);
-
-            var service = container.Resolve<Service>();
-
-            Assert.IsNotNull(service);
-        }
-
-        [Test]
         public void When_registered_with_int_key_Then_could_be_resolved_with_that_key()
         {
             var container = new Container();
@@ -47,17 +36,6 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<Service>(1);
 
             Assert.IsNotNull(service);
-        }
-
-        [Test]
-        public void When_registered_as_default_and_with_int_key_Then_resolving_as_default_should_Throw()
-        {
-            var container = new Container();
-            container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: 1);
-
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<IService>());
         }
 
         [Test]
@@ -73,18 +51,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_registered_as_default_and_with_int_key_Then_resolving_default_with_int_key_should_succeed()
-        {
-            var container = new Container();
-            container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: 1);
-
-            var service = container.Resolve<IService>(0, IfUnresolved.Throw);
-
-            Assert.That(service, Is.InstanceOf<Service>());
-        }
-
-        [Test]
         public void When_registered_with_negative_int_key_Then_could_be_resolved_with_that_key()
         {
             var container = new Container();
@@ -93,27 +59,6 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<Service>(-1);
 
             Assert.IsNotNull(service);
-        }
-
-        [Test]
-        public void When_registered_with_negative_int_key_Then_could_be_resolved_default_key()
-        {
-            var container = new Container();
-            container.Register<Service>(named: -1);
-
-            var service = container.Resolve<Service>();
-
-            Assert.IsNotNull(service);
-        }
-
-        [Test]
-        public void Register_with_default_then_with_Zero_key_should_Throw()
-        {
-            var container = new Container();
-            container.Register<IService, Service>();
-
-            Assert.Throws<ContainerException>(() =>
-                container.Register<IService, AnotherService>(named: 0));
         }
 
         [Test]
@@ -134,18 +79,6 @@ namespace DryIoc.UnitTests
 
             Assert.Throws<ContainerException>(() => 
                 container.Register<IService, AnotherService>(named: 1));
-        }
-
-        [Test]
-        public void When_registering_with_minus_1_key_then_default_service_with_keep_option_Then_it_resolving_default_should_succeed()
-        {
-            var container = new Container();
-            container.Register<IService, Service>(named: -1);
-            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
-
-            var service = container.Resolve<IService>();
-
-            Assert.That(service, Is.InstanceOf<Service>());
         }
     }
 

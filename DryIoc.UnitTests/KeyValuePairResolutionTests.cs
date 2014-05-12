@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolve_indexed_registration_as_pair_When_resolving_with_that_index_()
+        public void Resolve_indexed_registration_as_pair_When_resolving_with_that_index_should_Succeed()
         {
             var container = new Container();
             container.Register<Service>(named: 0);
@@ -34,15 +34,13 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolve_indexed_registration_as_pair_When_resolving_without_index_should_return_null_for_key()
+        public void Resolve_indexed_registration_as_pair_When_resolving_without_index_should_Throw()
         {
             var container = new Container();
             container.Register<Service>(named: 0);
 
-            var pair = container.Resolve<KeyValuePair<object, Service>>();
-
-            Assert.That(pair.Key, Is.Null);
-            Assert.That(pair.Value, Is.InstanceOf<Service>());
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<KeyValuePair<object, Service>>());
         }
 
         [Test]
@@ -76,8 +74,8 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<KeyValuePair<object, IService>[]>();
 
             Assert.That(pairs.Length, Is.EqualTo(2));
-            Assert.That(pairs[0].Key, Is.EqualTo(0));
-            Assert.That(pairs[1].Key, Is.EqualTo(1));
+            Assert.That(pairs[0].Key, Is.EqualTo(DefaultKey.Default));
+            Assert.That(pairs[1].Key, Is.EqualTo(DefaultKey.Default.Next()));
         }
 
         [Test]
@@ -90,8 +88,8 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<Many<KeyValuePair<object, IService>>>().Items;
 
             Assert.That(pairs.Count(), Is.EqualTo(2));
-            Assert.That(pairs.First().Key, Is.EqualTo(0));
-            Assert.That(pairs.Last().Key, Is.EqualTo(1));
+            Assert.That(pairs.First().Key, Is.EqualTo(DefaultKey.Default));
+            Assert.That(pairs.Last().Key, Is.EqualTo(DefaultKey.Default.Next()));
         }
 
         [Test]
@@ -104,21 +102,21 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<IEnumerable<KeyValuePair<object, IService>>>().ToArray();
 
             Assert.That(pairs.Length, Is.EqualTo(2));
-            Assert.That(pairs[0].Key, Is.EqualTo(0));
+            Assert.That(pairs[0].Key, Is.EqualTo(DefaultKey.Default));
             Assert.That(pairs[1].Key, Is.EqualTo("Yeah!"));
         }
 
         [Test]
-        public void When_present_default_and_named_registrations_Then_resolving_as_pairs_with_int_key_should_return_default_only()
+        public void When_present_default_and_named_registrations_Then_resolving_as_pairs_with_default_key_should_return_default_only()
         {
             var container = new Container();
             container.Register<IService, Service>(named: "Yeah!");
             container.Register<IService, AnotherService>();
 
-            var pairs = container.Resolve<KeyValuePair<int, IService>[]>();
+            var pairs = container.Resolve<KeyValuePair<DefaultKey, IService>[]>();
 
             Assert.That(pairs.Length, Is.EqualTo(1));
-            Assert.That(pairs[0].Key, Is.EqualTo(0));
+            Assert.That(pairs[0].Key, Is.EqualTo(DefaultKey.Default));
         }
 
         [Test]
@@ -132,20 +130,6 @@ namespace DryIoc.UnitTests
 
             Assert.That(pairs.Length, Is.EqualTo(1));
             Assert.That(pairs[0].Key, Is.EqualTo("Yeah!"));
-        }
-
-        [Test]
-        public void When_present_default_and_enum_registrations_Then_resolving_as_pairs_with_int_key_should_return_default_only()
-        {
-            var container = new Container();
-            container.Register<IService, Service>(named: EnumKey.Some);
-            container.Register<IService, AnotherService>();
-
-            var pairs = container.Resolve<KeyValuePair<int, IService>[]>();
-
-            Assert.That(pairs.Length, Is.EqualTo(1));
-            Assert.That(pairs[0].Key, Is.EqualTo(0));
-            Assert.That(pairs[0].Value, Is.InstanceOf<AnotherService>());
         }
 
         [Test]
@@ -173,7 +157,7 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<KeyValuePair<object, Func<IService>>[]>();
 
             Assert.That(pairs.Length, Is.EqualTo(3));
-            CollectionAssert.AreEquivalent(new object[] { 0, "another", EnumKey.Some }, pairs.Select(p => p.Key));
+            CollectionAssert.AreEquivalent(new object[] { DefaultKey.Default, "another", EnumKey.Some }, pairs.Select(p => p.Key));
         }
     }
 

@@ -180,5 +180,18 @@ namespace DryIoc.UnitTests
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IEnumerable<Meta<Service, bool>>>());
         }
+
+        [Test]
+        public void Resove_func_of_default_service_then_array_of_default_and_named_service_should_Succeed()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(named: 1);
+            container.Register<IService, Service>();
+
+            container.Resolve<Func<IService>>();
+            var funcs = container.Resolve<Func<IService>[]>();
+
+            Assert.That(funcs.Length, Is.EqualTo(2));
+        }
     }
 }

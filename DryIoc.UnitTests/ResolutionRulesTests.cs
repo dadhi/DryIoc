@@ -131,7 +131,7 @@ namespace DryIoc.UnitTests
         public void You_can_customize_resolving_single_implementation_from_multiple_registrations()
         {
             var container = new Container();
-            container.ResolutionRules.Swap(r => r.HowToGetSingleFactory((_, factories) => factories.Last()));
+            container.ResolutionRules.Swap(r => r.WithFactorySelector((_, factories) => factories.Last()));
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));
@@ -174,9 +174,7 @@ namespace DryIoc.UnitTests
 
     #region CUT
 
-    public class SomeService
-    {
-    }
+    public class SomeService {}
 
     public class Bla<T>
     {

@@ -173,10 +173,10 @@ namespace DryIoc
                     return decorators != null && (condition == null || decorators.Any(condition));
 
                 default:
-                    var getSingleFactory = condition == null ? (ResolutionRules.GetSingleFactory)
+                    var getSingleFactory = condition == null ? (ResolutionRules.FactorySelectorRule)
                         ((_, factories) => factories.First()) :
                         ((_, factories) => factories.FirstOrDefault(condition));
-                    return GetFactoryOrDefault(serviceType, serviceKey, getSingleFactory, ifNotFoundLookForOpenGenericServiceType: true) != null;
+                    return GetFactoryOrDefault(serviceType, serviceKey, getSingleFactory, retryForOpenGenericServiceType: true) != null;
             }
         }
 
@@ -210,7 +210,7 @@ namespace DryIoc
                             if (factories.IsEmpty)
                                 return false; // remove node
 
-                            newEntry = new FactoriesEntry(-1, factories);
+                            newEntry = new FactoriesEntry(null, factories);
                         }
                         else
                         {
@@ -220,7 +220,7 @@ namespace DryIoc
                                 var factories = keyedEntry.Factories.RemoveOrUpdate(serviceKey);
                                 if (factories.IsEmpty)
                                     return false;
-                                newEntry = new FactoriesEntry(keyedEntry.LatestIndex, factories);
+                                newEntry = new FactoriesEntry(keyedEntry.LastDefaultKey, factories);
                             }
                         }
 
@@ -291,7 +291,7 @@ namespace DryIoc
         Factory IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
         {
             var rules = ResolutionRules.Value;
-            var factory = GetFactoryOrDefault(request.ServiceType, request.ServiceKey, rules.ToGetSingleFactory);
+            var factory = GetFactoryOrDefault(request.ServiceType, request.ServiceKey, rules.FactorySelector);
             if (factory != null && factory.ProvidesFactoryForRequest)
                 factory = factory.GetFactoryForRequestOrDefault(request, this);
 
@@ -311,10 +311,8 @@ namespace DryIoc
 
         Factory IRegistry.GetFactoryOrDefault(Type serviceType, object serviceKey)
         {
-            return GetFactoryOrDefault(
-                serviceType.ThrowIfNull(), serviceKey,
-                ResolutionRules.Value.ToGetSingleFactory,
-                ifNotFoundLookForOpenGenericServiceType: true);
+            return GetFactoryOrDefault(serviceType.ThrowIfNull(), serviceKey,
+                ResolutionRules.Value.FactorySelector, retryForOpenGenericServiceType: true);
         }
 
         IEnumerable<KV<object, Factory>> IRegistry.GetAllFactories(Type serviceType)
@@ -322,8 +320,9 @@ namespace DryIoc
             var entry = _factories.Value.GetValueOrDefault(serviceType);
             if (entry == null && serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition)
                 entry = _factories.Value.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
+
             return entry == null ? Enumerable.Empty<KV<object, Factory>>()
-                : entry is Factory ? new[] { new KV<object, Factory>(0, (Factory)entry) }
+                : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Default, (Factory)entry) }
                 : ((FactoriesEntry)entry).Factories.Enumerate();
         }
 
@@ -448,12 +447,12 @@ namespace DryIoc
 
         private sealed class FactoriesEntry
         {
-            public readonly int? LatestIndex;
+            public readonly DefaultKey LastDefaultKey;
             public readonly HashTree<object, Factory> Factories;
 
-            public FactoriesEntry(int? latestIndex, HashTree<object, Factory> factories)
+            public FactoriesEntry(DefaultKey lastDefaultKey, HashTree<object, Factory> factories)
             {
-                LatestIndex = latestIndex;
+                LastDefaultKey = lastDefaultKey;
                 Factories = factories;
             }
         }
@@ -465,112 +464,92 @@ namespace DryIoc
                 _factories.Swap(x => x.AddOrUpdate(serviceType, factory, (oldValue, _) =>
                 {
                     if (oldValue is Factory) // adding new default to registered default
+                    {
                         switch (ifAlreadyRegistered)
                         {
                             case IfAlreadyRegistered.KeepRegistered:
                                 return oldValue;
-                            case IfAlreadyRegistered.ReplaceRegistered:
+                            case IfAlreadyRegistered.UpdateRegistered:
                                 return factory;
                             default:
-                                return new FactoriesEntry(1,
-                                    HashTree<object, Factory>.Empty.AddOrUpdate(0, (Factory)oldValue).AddOrUpdate(1, factory));
+                                return new FactoriesEntry(DefaultKey.Default.Next(), HashTree<object, Factory>.Empty
+                                    .AddOrUpdate(DefaultKey.Default, (Factory)oldValue)
+                                    .AddOrUpdate(DefaultKey.Default.Next(), factory));
                         }
+                    }
 
+                    // otherwise, when already have some keyed factories registered.
                     var oldEntry = ((FactoriesEntry)oldValue);
-                    var oldLatestIndex = oldEntry.LatestIndex;
-                    if (!oldLatestIndex.HasValue) // if were not default registrations, then add first one.
-                        return new FactoriesEntry(0, oldEntry.Factories.AddOrUpdate(0, factory));
+                    if (oldEntry.LastDefaultKey == null) // there was not default registration, add the first one.
+                        return new FactoriesEntry(DefaultKey.Default, oldEntry.Factories.AddOrUpdate(DefaultKey.Default, factory));
 
                     switch (ifAlreadyRegistered)
                     {
                         case IfAlreadyRegistered.KeepRegistered:
                             return oldValue;
-                        case IfAlreadyRegistered.ReplaceRegistered:
-                            return new FactoriesEntry(oldLatestIndex, oldEntry.Factories.Update(oldLatestIndex, factory));
-                        default:
-                            var newLatestIndex = oldLatestIndex + 1;
-                            return new FactoriesEntry(newLatestIndex, oldEntry.Factories.AddOrUpdate(newLatestIndex, factory));
+                        case IfAlreadyRegistered.UpdateRegistered:
+                            return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.Update(oldEntry.LastDefaultKey, factory));
+                        default: // just add another default factory
+                            var newDefaultKey = oldEntry.LastDefaultKey.Next();
+                            return new FactoriesEntry(newDefaultKey, oldEntry.Factories.AddOrUpdate(newDefaultKey, factory));
                     }
                 }));
             }
             else // for non default service key
             {
-                var index = serviceKey is int ? ((int?)serviceKey) : null;
-                var newEntry = new FactoriesEntry(index, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
+                var newEntry = new FactoriesEntry(null, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
+
                 _factories.Swap(x => x.AddOrUpdate(serviceType, newEntry, (oldValue, _) =>
                 {
-                    if (oldValue is Factory)              // if registered is default
-                    {
-                        if (index.HasValue && index == 0) // and new registered is default
-                            switch (ifAlreadyRegistered)
-                            {
-                                case IfAlreadyRegistered.KeepRegistered:
-                                    return oldValue;
-                                case IfAlreadyRegistered.ReplaceRegistered:
-                                    return newEntry;
-                                default:
-                                    throw Error.DUPLICATE_SERVICE_KEY.Of(serviceType, "0 (default key)", oldValue);
-                            }
-
-                        var latestIndex = index.HasValue && index > 0 ? index : 0;
-                        return new FactoriesEntry(latestIndex, newEntry.Factories.AddOrUpdate(0, (Factory)oldValue));
-                    }
+                    if (oldValue is Factory) // if registered is default, just add it to new entry
+                        return new FactoriesEntry(DefaultKey.Default, newEntry.Factories.AddOrUpdate(DefaultKey.Default, (Factory)oldValue));
 
                     var oldEntry = ((FactoriesEntry)oldValue);
-                    var oldLatestIndex = oldEntry.LatestIndex;
-
-                    var newLatestIndex =
-                          !index.HasValue ? oldLatestIndex
-                        : !oldLatestIndex.HasValue ? index
-                        // it is not affected by ifAlreadyRegistered parameter, 
-                        // cause index becomes newLatestIndex only when it is different from oldLatestIndex.
-                        : index > oldLatestIndex ? index : oldLatestIndex;
-
-                    return new FactoriesEntry(newLatestIndex,
-                        oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
+                    return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
+                    {
+                        switch (ifAlreadyRegistered)
                         {
-                            switch (ifAlreadyRegistered)
-                            {
-                                case IfAlreadyRegistered.KeepRegistered:
-                                    return oldFactory;
-                                case IfAlreadyRegistered.ReplaceRegistered:
-                                    return factory;
-                                default:
-                                    throw Error.DUPLICATE_SERVICE_KEY.Of(serviceType, serviceKey, oldFactory);
-                            }
-                        }));
+                            case IfAlreadyRegistered.KeepRegistered:
+                                return oldFactory;
+                            case IfAlreadyRegistered.UpdateRegistered:
+                                return factory;
+                            default:
+                                throw Error.DUPLICATE_SERVICE_KEY.Of(serviceType, serviceKey, oldFactory);
+                        }
+                    }));
                 }));
             }
         }
 
-        private Factory GetFactoryOrDefault(
-            Type serviceType, object serviceKey,
-            ResolutionRules.GetSingleFactory getSingleRegisteredFactory,
-            bool ifNotFoundLookForOpenGenericServiceType = false)
+        private Factory GetFactoryOrDefault(Type serviceType, object serviceKey,
+            ResolutionRules.FactorySelectorRule factorySelector,
+            bool retryForOpenGenericServiceType = false)
         {
             var entry = _factories.Value.GetValueOrDefault(serviceType);
-            if (entry == null && ifNotFoundLookForOpenGenericServiceType &&
+            if (entry == null && retryForOpenGenericServiceType &&
                 serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition)
                 entry = _factories.Value.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
 
             if (entry != null)
             {
                 if (entry is Factory)
-                    return serviceKey == null || (serviceKey is int && (int)serviceKey == 0)
+                    return serviceKey == null || DefaultKey.Default.Equals(serviceKey)
                         ? (Factory)entry : null;
 
                 var factories = ((FactoriesEntry)entry).Factories;
                 if (serviceKey != null)
                     return factories.GetValueOrDefault(serviceKey);
 
-                var indexedFactories = factories.Enumerate().Where(x => x.Key is int).Select(x => x.Value).ToArray();
-                if (indexedFactories.Length == 1)
-                    return indexedFactories[0];
+                var defaultFactories = factories.Enumerate()
+                    .Where(x => x.Key is DefaultKey).Select(x => x.Value).ToArray();
 
-                if (indexedFactories.Length > 1)
-                    return getSingleRegisteredFactory
-                        .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, indexedFactories)
-                        .Invoke(serviceType, indexedFactories);
+                if (defaultFactories.Length == 1)
+                    return defaultFactories[0];
+
+                if (defaultFactories.Length > 1)
+                    return factorySelector
+                        .ThrowIfNull(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories)
+                        .Invoke(serviceType, defaultFactories);
             }
 
             return null;
@@ -593,6 +572,50 @@ namespace DryIoc
         private HashTree<Type, FactoryDelegate> _resolvedDefaultDelegates;
         private HashTree<Type, HashTree<object, FactoryDelegate>> _resolvedKeyedDelegates;
         private readonly ResolutionState _resolutionState;
+
+        #endregion
+    }
+
+    public sealed class DefaultKey
+    {
+        public static readonly DefaultKey Default = new DefaultKey(0);
+
+        public DefaultKey Next()
+        {
+            return Of(RegistrationOrder + 1);
+        }
+
+        public readonly int RegistrationOrder;
+
+        public override bool Equals(object other)
+        {
+            return other is DefaultKey && ((DefaultKey)other).RegistrationOrder == RegistrationOrder;
+        }
+
+        public override int GetHashCode()
+        {
+            return RegistrationOrder;
+        }
+
+        #region Implementation
+
+        private static DefaultKey[] _keyPool = { Default };
+
+        private DefaultKey(int registrationOrder)
+        {
+            RegistrationOrder = registrationOrder;
+        }
+
+        private static DefaultKey Of(int registrationOrder)
+        {
+            if (registrationOrder < _keyPool.Length)
+                return _keyPool[registrationOrder];
+
+            var nextKey = new DefaultKey(registrationOrder);
+            if (registrationOrder == _keyPool.Length)
+                _keyPool = _keyPool.AppendOrUpdate(nextKey);
+            return nextKey;
+        }
 
         #endregion
     }
@@ -778,7 +801,7 @@ namespace DryIoc
                 new FactoryProvider((_, __) => new DelegateFactory(GetDebugExpression), GenericWrapperSetup.Default));
         }
 
-        public static readonly ResolutionRules.ResolveUnregisteredService ResolveOpenGenerics = (request, registry) =>
+        public static readonly ResolutionRules.ResolveUnregisteredServiceRule ResolveOpenGenerics = (request, registry) =>
         {
             var openGenericServiceType = request.OpenGenericServiceType;
             if (openGenericServiceType == null)
@@ -793,7 +816,7 @@ namespace DryIoc
             return factory;
         };
 
-        public static readonly ResolutionRules.ResolveUnregisteredService ResolveEnumerableOrArray = (request, registry) =>
+        public static readonly ResolutionRules.ResolveUnregisteredServiceRule ResolveEnumerableOrArray = (request, registry) =>
         {
             if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
                 return null;
@@ -987,34 +1010,34 @@ namespace DryIoc
             OpenGenericsSupport.ResolveOpenGenerics,
             OpenGenericsSupport.ResolveEnumerableOrArray);
 
-        public delegate Factory GetSingleFactory(Type serviceType, IEnumerable<Factory> factories);
-        public GetSingleFactory ToGetSingleFactory { get; private set; }
-        public ResolutionRules HowToGetSingleFactory(GetSingleFactory toGetSingleFactory)
+        public delegate Factory FactorySelectorRule(Type serviceType, IEnumerable<Factory> factories);
+        public FactorySelectorRule FactorySelector { get; private set; }
+        public ResolutionRules WithFactorySelector(FactorySelectorRule rule)
         {
-            return new ResolutionRules(this) { ToGetSingleFactory = toGetSingleFactory };
+            return new ResolutionRules(this) { FactorySelector = rule };
         }
 
-        public delegate Factory ResolveUnregisteredService(Request request, IRegistry registry);
-        public ResolveUnregisteredService[] ForUnregisteredService { get; private set; }
-        public ResolutionRules With(params ResolveUnregisteredService[] toResolveUnregisteredService)
+        public delegate Factory ResolveUnregisteredServiceRule(Request request, IRegistry registry);
+        public ResolveUnregisteredServiceRule[] ForUnregisteredService { get; private set; }
+        public ResolutionRules With(params ResolveUnregisteredServiceRule[] rules)
         {
-            return new ResolutionRules(this) { ForUnregisteredService = toResolveUnregisteredService };
+            return new ResolutionRules(this) { ForUnregisteredService = rules };
         }
 
-        public delegate object ResolveConstructorParameterServiceKey(ParameterInfo parameter, Request parent, IRegistry registry);
-        public ResolveConstructorParameterServiceKey[] ForConstructorParameterServiceKey { get; private set; }
-        public ResolutionRules With(params ResolveConstructorParameterServiceKey[] toResolveConstructorParameterServiceKey)
+        public delegate object ResolveConstructorParameterServiceKeyRule(ParameterInfo parameter, Request parent, IRegistry registry);
+        public ResolveConstructorParameterServiceKeyRule[] ForConstructorParameterServiceKey { get; private set; }
+        public ResolutionRules With(params ResolveConstructorParameterServiceKeyRule[] rules)
         {
-            return new ResolutionRules(this) { ForConstructorParameterServiceKey = toResolveConstructorParameterServiceKey };
+            return new ResolutionRules(this) { ForConstructorParameterServiceKey = rules };
         }
 
         public static readonly BindingFlags PropertyOrFieldFlags = BindingFlags.Public | BindingFlags.Instance;
 
-        public delegate bool ResolvePropertyOrFieldWithServiceKey(out object key, MemberInfo member, Request parent, IRegistry registry);
-        public ResolvePropertyOrFieldWithServiceKey[] ForPropertyOrFieldWithServiceKey { get; private set; }
-        public ResolutionRules With(params ResolvePropertyOrFieldWithServiceKey[] toResolvePropertyOrFieldWithServiceKey)
+        public delegate bool ResolvePropertyOrFieldWithServiceKeyRule(out object key, MemberInfo member, Request parent, IRegistry registry);
+        public ResolvePropertyOrFieldWithServiceKeyRule[] ForPropertyOrFieldWithServiceKey { get; private set; }
+        public ResolutionRules With(params ResolvePropertyOrFieldWithServiceKeyRule[] rules)
         {
-            return new ResolutionRules(this) { ForPropertyOrFieldWithServiceKey = toResolvePropertyOrFieldWithServiceKey };
+            return new ResolutionRules(this) { ForPropertyOrFieldWithServiceKey = rules };
         }
 
         #region Implementation
@@ -1023,7 +1046,7 @@ namespace DryIoc
 
         private ResolutionRules(ResolutionRules rules)
         {
-            ToGetSingleFactory = rules.ToGetSingleFactory;
+            FactorySelector = rules.FactorySelector;
             ForUnregisteredService = rules.ForUnregisteredService;
             ForConstructorParameterServiceKey = rules.ForConstructorParameterServiceKey;
             ForPropertyOrFieldWithServiceKey = rules.ForPropertyOrFieldWithServiceKey;
@@ -2250,7 +2273,7 @@ namespace DryIoc
         object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved);
     }
 
-    public enum IfAlreadyRegistered { ThrowIfDuplicateKey, KeepRegistered, ReplaceRegistered }
+    public enum IfAlreadyRegistered { ThrowIfDuplicateKey, KeepRegistered, UpdateRegistered }
 
     public interface IRegistrator
     {
