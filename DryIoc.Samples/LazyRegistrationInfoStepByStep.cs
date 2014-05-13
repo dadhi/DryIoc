@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace DryIoc.Samples
 {
     [TestFixture]
-    public class LazyRegistration
+    public class LazyRegistrationInfoStepByStep
     {
         [Test]
         public void Can_get_registration_info_with_implementation_type_replaced_by_its_full_name()

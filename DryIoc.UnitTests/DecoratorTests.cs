@@ -223,7 +223,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: ServiceSetup.WithMetadata("blah"));
-            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: DecoratorSetup.With());
+            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: DecoratorSetup.Default);
             container.RegisterAll(typeof(OperationUser<>));
 
             var user = container.Resolve<OperationUser<object>>();
@@ -238,7 +238,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
             container.RegisterInstance<Func<IOperation, IOperation>>(
-                op => new MeasureExecutionTimeOperationDecorator(op), DecoratorSetup.With());
+                op => new MeasureExecutionTimeOperationDecorator(op), 
+                DecoratorSetup.Default);
 
             var operation = container.Resolve<IOperation>();
 
@@ -253,7 +254,7 @@ namespace DryIoc.UnitTests
             container.Register<IMeasurer, Measurer>();
             container.RegisterDelegate<Func<IOperation, IOperation>>(
                 r => (service => MeasureExecutionTimeOperationDecorator.MeasureWith(service, r.Resolve<IMeasurer>())),
-                setup: DecoratorSetup.With());
+                setup: DecoratorSetup.Default);
 
             var operation = container.Resolve<IOperation>();
 

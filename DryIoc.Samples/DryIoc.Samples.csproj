@@ -31,6 +31,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="NSubstitute">
+      <HintPath>..\packages\NSubstitute.1.7.2.0\lib\NET35\NSubstitute.dll</HintPath>
+    </Reference>
     <Reference Include="nunit.framework, Version=2.6.2.12296, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\lib\nunit.framework.dll</HintPath>
@@ -42,9 +45,10 @@
     <Compile Include="AutoWiring.cs" />
     <Compile Include="ConstructorSelectionTests.cs" />
     <Compile Include="LazyImplementationTypeLoading.cs" />
-    <Compile Include="LazyRegistration.cs" />
+    <Compile Include="LazyRegistrationInfoStepByStep.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="GettingStarted.cs" />
+    <Compile Include="ResolveMocksForNonRegisteredServices.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
@@ -62,6 +66,9 @@
     <Content Include="DryIoc.Samples.CUT.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
