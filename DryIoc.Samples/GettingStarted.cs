@@ -70,7 +70,7 @@ namespace DryIoc.Samples
             Assert.That(exception.Message, Is.EqualTo(
 @"Unable to resolve DryIoc.Samples.IService as ctor-parameter 'service'
 in DryIoc.Samples.IClient of DryIoc.Samples.SomeClient.
-Please register service OR add resolution rule for unregistered service."));
+Please register service OR adjust container resolution rules."));
         }
     }
 

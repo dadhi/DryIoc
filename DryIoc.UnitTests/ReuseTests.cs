@@ -167,7 +167,7 @@ namespace DryIoc.UnitTests
 
         public static Scope GetScope()
         {
-            return _scope = _scope ?? new Scope();
+            return _scope ?? (_scope = new Scope());
         }
 
         [ThreadStatic]

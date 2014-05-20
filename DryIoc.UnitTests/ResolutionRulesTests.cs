@@ -128,16 +128,29 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void You_can_customize_resolving_single_implementation_from_multiple_registrations()
+        public void You_can_specify_to_resolve_last_registration_from_multiple()
         {
             var container = new Container();
-            container.ResolutionRules.Swap(r => r.WithFactorySelector((_, factories) => factories.Last()));
+            container.ResolutionRules.Swap(r => r.WithFactorySelector(factories => factories.Last().Value));
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));
             var service = container.Resolve(typeof(IService));
 
             Assert.That(service, Is.InstanceOf<AnotherService>());
+        }
+
+        [Test]
+        public void You_can_firbid_to_use_registration_based_on_Factory_properties()
+        {
+            var container = new Container();
+            container.ResolutionRules.Swap(r => r.WithFactorySelector(
+                factories => factories.Select(f => f.Value).FirstOrDefault(f => !(f.Reuse is Reuse.SingletonReuse))));
+
+            container.Register<IService, Service>(Reuse.Singleton);
+            var service = container.Resolve(typeof(IService), IfUnresolved.ReturnNull);
+
+            Assert.That(service, Is.Null);
         }
 
         public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
