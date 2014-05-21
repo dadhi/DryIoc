@@ -208,23 +208,23 @@ namespace DryIoc.UnitTests
             var keyHash = key.GetHashCode();
             var value = "test";
 
-            HashTree<int, KeyValuePair<Type, string>[]>.UpdateValue updateValue = (old, added) =>
+            UpdateValue<KeyValuePair<Type, string>[]> updateValue = (oldValue, newValue) =>
             {
-                var newItem = added[0];
-                var oldItemCount = old.Length;
+                var newItem = newValue[0];
+                var oldItemCount = oldValue.Length;
                 for (var i = 0; i < oldItemCount; i++)
                 {
-                    if (old[i].Key == newItem.Key)
+                    if (oldValue[i].Key == newItem.Key)
                     {
                         var updatedItems = new KeyValuePair<Type, string>[oldItemCount];
-                        Array.Copy(old, updatedItems, updatedItems.Length);
+                        Array.Copy(oldValue, updatedItems, updatedItems.Length);
                         updatedItems[i] = newItem;
                         return updatedItems;
                     }
                 }
 
                 var addedItems = new KeyValuePair<Type, string>[oldItemCount + 1];
-                Array.Copy(old, addedItems, addedItems.Length);
+                Array.Copy(oldValue, addedItems, addedItems.Length);
                 addedItems[oldItemCount] = newItem;
                 return addedItems;
             };

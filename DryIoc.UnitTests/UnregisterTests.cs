@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(container.IsRegistered<IService>());
 
             container.Unregister(typeof(IService));
-            
+
             Assert.IsFalse(container.IsRegistered<IService>());
         }
 
@@ -35,7 +35,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
 
-            container.Unregister(typeof (IService), condition: factory => factory.Reuse is Reuse.SingletonReuse);
+            container.Unregister(typeof(IService), condition: factory => factory.Reuse is Reuse.SingletonReuse);
 
             Assert.IsTrue(container.IsRegistered<IService>());
         }
@@ -115,5 +115,40 @@ namespace DryIoc.UnitTests
             Assert.That(container.IsRegistered<IService>(named: 'a'), Is.False);
             Assert.That(container.IsRegistered<IService>(DefaultKey.Default), Is.True);
         }
+
+        [Test]
+        public void Unregister_decorator_should_keep_decorated_service()
+        {
+            var container = new Container();
+            container.Register<IHandler, FastHandler>();
+            container.Register<IHandler, LoggingHandlerDecorator>(setup: DecoratorSetup.Default);
+            //container.Register<IHandler, NullHandlerDecorator>(setup: DecoratorSetup.Default);
+
+            container.Unregister<IHandler>(factoryType: FactoryType.Decorator);
+
+            Assert.IsFalse(container.IsRegistered<IHandler>(factoryType: FactoryType.Decorator));
+            Assert.IsTrue(container.IsRegistered<IHandler>());
+        }
+
+        [Test]
+        public void Unregister_decorator_with_condition_should_keep_decorator_for_which_condition_is_failed()
+        {
+            var container = new Container();
+            container.Register<IHandler, FastHandler>();
+            container.Register<IHandler, LoggingHandlerDecorator>(setup: DecoratorSetup.Default);
+            container.Register<IHandler, NullHandlerDecorator>(setup: DecoratorSetup.Default);
+
+            container.Unregister<IHandler>(factoryType: FactoryType.Decorator,
+                condition: f => f.ImplementationType == typeof(NullHandlerDecorator));
+
+            Assert.IsFalse(container.IsRegistered<IHandler>(factoryType: FactoryType.Decorator,
+                condition: f => f.ImplementationType == typeof(NullHandlerDecorator)));
+            Assert.IsTrue(container.IsRegistered<IHandler>(factoryType: FactoryType.Decorator,
+                condition: f => f.ImplementationType == typeof(LoggingHandlerDecorator)));
+            Assert.IsTrue(container.IsRegistered<IHandler>());
+        }
+
     }
+
+    public class NullHandlerDecorator : IHandler { }
 }

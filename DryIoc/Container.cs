@@ -193,13 +193,21 @@ namespace DryIoc
                     _genericWrappers.Swap(_ => _.RemoveOrUpdate(serviceType));
                     break;
                 case FactoryType.Decorator:
-                    _decorators.Swap(_ => _.RemoveOrUpdate(serviceType));
+                    _decorators.Swap(_ => _.RemoveOrUpdate(serviceType,
+                        condition == null ? (ShouldUpdateValue<Factory[]>)null : 
+                        (Factory[] oldFactories, out Factory[] newFactories) =>
+                        {
+                            newFactories = oldFactories;
+                            for (var index = 0; index < oldFactories.Length; index++)
+                                if (condition(oldFactories[index]))
+                                    newFactories = newFactories.RemoveAt(index);
+                            return newFactories.Length != 0;
+                        }));
                     break;
                 default:
-                    if (serviceKey == null && condition == null)
-                        _factories.Swap(_ => _.RemoveOrUpdate(serviceType));
-                    else
-                        _factories.Swap(_ => _.RemoveOrUpdate(serviceType, (object oldEntry, out object newEntry) =>
+                    _factories.Swap(_ => _.RemoveOrUpdate(serviceType,
+                        serviceKey == null && condition == null ? (ShouldUpdateValue<object>)null : 
+                        (object oldEntry, out object newEntry) =>
                         {
                             newEntry = oldEntry; // by default hold old entry
                             
@@ -1422,12 +1430,24 @@ namespace DryIoc
             return registrator.IsRegistered(typeof(TService), named, factoryType, condition);
         }
 
+        /// <summary> Removes specified registration from container.</summary>
+        /// <param name="registrator">Usually <see cref="Container"/> to explore or any other <see cref="IRegistrator"/> implementation.</param>
+        /// <param name="serviceType">Type of service to remove.</param>
+        /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        /// <param name="factoryType">Optional factory type to lookup, <see cref="FactoryType.Service"/> by default.</param>
+        /// <param name="condition">Optional condition for Factory to be removed.</param>
         public static void Unregister(this IRegistrator registrator, Type serviceType,
             object named = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null)
         {
             registrator.Unregister(serviceType, named, factoryType, condition);
         }
 
+        /// <summary> Removes specified registration from container.</summary>
+        /// <typeparam name="TService">The type of service to remove.</typeparam>
+        /// <param name="registrator">Usually <see cref="Container"/> to explore or any other <see cref="IRegistrator"/> implementation.</param>
+        /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        /// <param name="factoryType">Optional factory type to lookup, <see cref="FactoryType.Service"/> by default.</param>
+        /// <param name="condition">Optional condition for Factory to be removed.</param>
         public static void Unregister<TService>(this IRegistrator registrator,
             object named = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null)
         {
@@ -2301,23 +2321,6 @@ namespace DryIoc
 
                 return request.ResolutionState.GetExpression(singleton, factoryExpr.Type);
             }
-
-            public FactoryDelegate Of2(Request request, IRegistry registry, int factoryID, FactoryDelegate factoryDelegate)
-            {
-                // Create lazy singleton if we have Func somewhere in dependency chain.
-                var parent = request.Parent;
-                if (parent != null && parent.Enumerate().Any(p =>
-                {
-                    var openGenericServiceType = p.OpenGenericServiceType;
-                    return openGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(openGenericServiceType);
-                }))
-                {
-                    return null;
-                }
-
-                // Create singleton object now and put it into store.
-                return null;
-            }
         }
     }
 
@@ -2582,21 +2585,23 @@ namespace DryIoc
             return -1;
         }
 
-        public static T[] Remove<T>(this T[] source, T value)
+        public static T[] RemoveAt<T>(this T[] source, int index)
         {
-            if (source == null || source.Length == 0)
+            if (source == null || source.Length == 0 || index < 0 || index >= source.Length)
                 return source;
-            var valueIndex = source.IndexOf(x => Equals(x, value));
-            if (valueIndex == -1)
-                return source;
-            if (source.Length == 1)
+            if (index == 0 && source.Length == 1)
                 return new T[0];
             var result = new T[source.Length - 1];
-            if (valueIndex != 0)
-                Array.Copy(source, 0, result, 0, valueIndex);
-            if (valueIndex != result.Length)
-                Array.Copy(source, valueIndex + 1, result, valueIndex, result.Length - valueIndex);
+            if (index != 0)
+                Array.Copy(source, 0, result, 0, index);
+            if (index != result.Length)
+                Array.Copy(source, index + 1, result, index, result.Length - index);
             return result;
+        }
+
+        public static T[] Remove<T>(this T[] source, T value)
+        {
+            return source.RemoveAt(source.IndexOf(x => Equals(x, value)));
         }
 
         public static R GetFirstNonDefault<T, R>(this T[] source, Func<T, R> selector)
@@ -2611,13 +2616,16 @@ namespace DryIoc
 
     public static class PrintTools
     {
-        public static string Print(object x)
+        public static string NULL_OR_EMPTY_STR = "''";
+        public static string ITEM_SEPARATOR_STR = ";" + Environment.NewLine;
+
+        public static string Print(this object x)
         {
             return x is string ? (string)x
-                : (x is Type ? ((Type)x).Print()
-                : (x is IEnumerable<Type> ? ((IEnumerable)x).Print(";" + Environment.NewLine, ifEmpty: "''")
-                : (x is IEnumerable ? ((IEnumerable)x).Print(";" + Environment.NewLine, ifEmpty: "''")
-                : (string.Empty + x))));
+                 : x is Type ? ((Type)x).Print()
+                 : x is IEnumerable<Type> ? ((IEnumerable)x).Print(ITEM_SEPARATOR_STR, ifEmpty: NULL_OR_EMPTY_STR)
+                 : x is IEnumerable ? ((IEnumerable)x).Print(ITEM_SEPARATOR_STR, ifEmpty: NULL_OR_EMPTY_STR)
+                 : string.Empty + x;
         }
 
         public static string Print(this IEnumerable items,
@@ -2644,8 +2652,16 @@ namespace DryIoc
             Value = value;
         }
 
-        // TODO: Add ToString
+        public override string ToString()
+        {
+            return new StringBuilder().Append("[")
+                .Append(Key.Print()).Append(", ")
+                .Append(Value.Print()).Append("]").ToString();
+        }
     }
+
+    public delegate V UpdateValue<V>(V oldValue, V newValue);
+    public delegate bool ShouldUpdateValue<V>(V oldValue, out V updatedValue);
 
     /// <summary>
     /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.
@@ -2664,9 +2680,7 @@ namespace DryIoc
 
         public bool IsEmpty { get { return Height == 0; } }
 
-        public delegate V UpdateValue(V oldValue, V value);
-
-        public HashTree<K, V> AddOrUpdate(K key, V value, UpdateValue updateValue = null)
+        public HashTree<K, V> AddOrUpdate(K key, V value, UpdateValue<V> updateValue = null)
         {
             return AddOrUpdate(key.GetHashCode(), key, value, updateValue);
         }
@@ -2717,12 +2731,10 @@ namespace DryIoc
             }
         }
 
-        public delegate bool ShouldUpdateValue(V oldValue, out V updatedValue);
-
         /// <remarks>
         /// Based on Eric Lippert's http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
         /// </remarks>
-        public HashTree<K, V> RemoveOrUpdate(K key, ShouldUpdateValue updateValueInstead = null)
+        public HashTree<K, V> RemoveOrUpdate(K key, ShouldUpdateValue<V> updateValueInstead = null)
         {
             return RemoveOrUpdate(key.GetHashCode(), key, updateValueInstead);
         }
@@ -2751,7 +2763,7 @@ namespace DryIoc
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private HashTree<K, V> AddOrUpdate(int hash, K key, V value, UpdateValue updateValue)
+        private HashTree<K, V> AddOrUpdate(int hash, K key, V value, UpdateValue<V> updateValue)
         {
             return Height == 0 ? new HashTree<K, V>(hash, key, value, null, Empty, Empty)
                 : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, updateValue)
@@ -2761,7 +2773,7 @@ namespace DryIoc
                         .KeepBalanced());
         }
 
-        private HashTree<K, V> UpdateValueAndResolveConflicts(K key, V value, UpdateValue updateValue)
+        private HashTree<K, V> UpdateValueAndResolveConflicts(K key, V value, UpdateValue<V> updateValue)
         {
             if (ReferenceEquals(Key, key) || Key.Equals(key))
                 return new HashTree<K, V>(Hash, key, updateValue == null ? value : updateValue(Value, value), Conflicts, Left, Right);
@@ -2787,7 +2799,7 @@ namespace DryIoc
             return defaultValue;
         }
 
-        private HashTree<K, V> RemoveOrUpdate(int hash, K key, ShouldUpdateValue updateValueInstead = null, bool ignoreKey = false)
+        private HashTree<K, V> RemoveOrUpdate(int hash, K key, ShouldUpdateValue<V> updateValueInstead = null, bool ignoreKey = false)
         {
             if (Height == 0)
                 return this;
