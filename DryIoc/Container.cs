@@ -193,9 +193,10 @@ namespace DryIoc
                     _genericWrappers.Swap(_ => _.RemoveOrUpdate(serviceType));
                     break;
                 case FactoryType.Decorator:
-                    _decorators.Swap(_ => _.RemoveOrUpdate(serviceType,
-                        condition == null ? (ShouldUpdateValue<Factory[]>)null : 
-                        (Factory[] oldFactories, out Factory[] newFactories) =>
+                    if (condition == null)
+                        _decorators.Swap(_ => _.RemoveOrUpdate(serviceType));
+                    else
+                        _decorators.Swap(_ => _.RemoveOrUpdate(serviceType, (Factory[] oldFactories, out Factory[] newFactories) =>
                         {
                             newFactories = oldFactories;
                             for (var index = 0; index < oldFactories.Length; index++)
@@ -205,9 +206,10 @@ namespace DryIoc
                         }));
                     break;
                 default:
-                    _factories.Swap(_ => _.RemoveOrUpdate(serviceType,
-                        serviceKey == null && condition == null ? (ShouldUpdateValue<object>)null : 
-                        (object oldEntry, out object newEntry) =>
+                    if (serviceKey == null && condition == null)
+                        _factories.Swap(_ => _.RemoveOrUpdate(serviceType));
+                    else
+                        _factories.Swap(_ => _.RemoveOrUpdate(serviceType, (object oldEntry, out object newEntry) =>
                         {
                             newEntry = oldEntry; // by default hold old entry
                             
@@ -666,6 +668,11 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    public sealed class NewResolutionState
+    {
+            
     }
 
     public sealed class ResolutionState
@@ -2654,14 +2661,12 @@ namespace DryIoc
 
         public override string ToString()
         {
-            return new StringBuilder().Append("[")
-                .Append(Key.Print()).Append(", ")
-                .Append(Value.Print()).Append("]").ToString();
+            return new StringBuilder("[").Append(Key.Print()).Append(", ").Append(Value.Print()).Append("]").ToString();
         }
     }
 
-    public delegate V UpdateValue<V>(V oldValue, V newValue);
-    public delegate bool ShouldUpdateValue<V>(V oldValue, out V updatedValue);
+    public delegate V Update<V>(V oldValue, V newValue);
+    public delegate bool ShouldUpdate<V>(V oldValue, out V updatedValue);
 
     /// <summary>
     /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.
@@ -2680,9 +2685,9 @@ namespace DryIoc
 
         public bool IsEmpty { get { return Height == 0; } }
 
-        public HashTree<K, V> AddOrUpdate(K key, V value, UpdateValue<V> updateValue = null)
+        public HashTree<K, V> AddOrUpdate(K key, V value, Update<V> update = null)
         {
-            return AddOrUpdate(key.GetHashCode(), key, value, updateValue);
+            return AddOrUpdate(key.GetHashCode(), key, value, update);
         }
 
         public V GetValueOrDefault(K key, V defaultValue = default(V))
@@ -2734,9 +2739,9 @@ namespace DryIoc
         /// <remarks>
         /// Based on Eric Lippert's http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
         /// </remarks>
-        public HashTree<K, V> RemoveOrUpdate(K key, ShouldUpdateValue<V> updateValueInstead = null)
+        public HashTree<K, V> RemoveOrUpdate(K key, ShouldUpdate<V> updateInstead = null)
         {
-            return RemoveOrUpdate(key.GetHashCode(), key, updateValueInstead);
+            return RemoveOrUpdate(key.GetHashCode(), key, updateInstead);
         }
 
         public HashTree<K, V> Update(K key, V value)
@@ -2763,20 +2768,20 @@ namespace DryIoc
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private HashTree<K, V> AddOrUpdate(int hash, K key, V value, UpdateValue<V> updateValue)
+        private HashTree<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update)
         {
             return Height == 0 ? new HashTree<K, V>(hash, key, value, null, Empty, Empty)
-                : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, updateValue)
+                : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, update)
                 : (hash < Hash
-                    ? With(Left.AddOrUpdate(hash, key, value, updateValue), Right)
-                    : With(Left, Right.AddOrUpdate(hash, key, value, updateValue)))
+                    ? With(Left.AddOrUpdate(hash, key, value, update), Right)
+                    : With(Left, Right.AddOrUpdate(hash, key, value, update)))
                         .KeepBalanced());
         }
 
-        private HashTree<K, V> UpdateValueAndResolveConflicts(K key, V value, UpdateValue<V> updateValue)
+        private HashTree<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update)
         {
             if (ReferenceEquals(Key, key) || Key.Equals(key))
-                return new HashTree<K, V>(Hash, key, updateValue == null ? value : updateValue(Value, value), Conflicts, Left, Right);
+                return new HashTree<K, V>(Hash, key, update == null ? value : update(Value, value), Conflicts, Left, Right);
 
             if (Conflicts == null)
                 return new HashTree<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
@@ -2786,7 +2791,7 @@ namespace DryIoc
             var conflicts = new KV<K, V>[i != -1 ? Conflicts.Length : Conflicts.Length + 1];
             Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
             conflicts[i != -1 ? i : Conflicts.Length] =
-                new KV<K, V>(key, i != -1 && updateValue != null ? updateValue(Conflicts[i].Value, value) : value);
+                new KV<K, V>(key, i != -1 && update != null ? update(Conflicts[i].Value, value) : value);
             return new HashTree<K, V>(Hash, Key, Value, conflicts, Left, Right);
         }
 
@@ -2799,7 +2804,7 @@ namespace DryIoc
             return defaultValue;
         }
 
-        private HashTree<K, V> RemoveOrUpdate(int hash, K key, ShouldUpdateValue<V> updateValueInstead = null, bool ignoreKey = false)
+        private HashTree<K, V> RemoveOrUpdate(int hash, K key, ShouldUpdate<V> updateInstead = null, bool ignoreKey = false)
         {
             if (Height == 0)
                 return this;
@@ -2812,7 +2817,7 @@ namespace DryIoc
                     if (!ignoreKey)
                     {
                         V updatedValue;
-                        if (updateValueInstead != null && updateValueInstead(Value, out updatedValue))
+                        if (updateInstead != null && updateInstead(Value, out updatedValue))
                             return new HashTree<K, V>(Hash, Key, updatedValue, Conflicts, Left, Right);
 
                         if (Conflicts != null)
@@ -2849,7 +2854,7 @@ namespace DryIoc
 
                     V updatedValue;
                     var conflict = Conflicts[index];
-                    if (updateValueInstead != null && updateValueInstead(conflict.Value, out updatedValue))
+                    if (updateInstead != null && updateInstead(conflict.Value, out updatedValue))
                     {
                         var updatedConflicts = new KV<K, V>[Conflicts.Length];
                         Array.Copy(Conflicts, 0, updatedConflicts, 0, updatedConflicts.Length);
@@ -2868,9 +2873,9 @@ namespace DryIoc
                 else return this; // if key is not matching and no conflicts to lookup - just return
             }
             else if (hash < Hash)
-                result = With(Left.RemoveOrUpdate(hash, key, updateValueInstead, ignoreKey), Right);
+                result = With(Left.RemoveOrUpdate(hash, key, updateInstead, ignoreKey), Right);
             else
-                result = With(Left, Right.RemoveOrUpdate(hash, key, updateValueInstead, ignoreKey));
+                result = With(Left, Right.RemoveOrUpdate(hash, key, updateInstead, ignoreKey));
             return result.KeepBalanced();
         }
 

@@ -208,7 +208,7 @@ namespace DryIoc.UnitTests
             var keyHash = key.GetHashCode();
             var value = "test";
 
-            UpdateValue<KeyValuePair<Type, string>[]> updateValue = (oldValue, newValue) =>
+            Update<KeyValuePair<Type, string>[]> update = (oldValue, newValue) =>
             {
                 var newItem = newValue[0];
                 var oldItemCount = oldValue.Length;
@@ -229,8 +229,8 @@ namespace DryIoc.UnitTests
                 return addedItems;
             };
 
-            tree = tree.AddOrUpdate(keyHash, new[] { new KeyValuePair<Type, string>(key, value) }, updateValue);
-            tree = tree.AddOrUpdate(keyHash, new[] { new KeyValuePair<Type, string>(key, value) }, updateValue);
+            tree = tree.AddOrUpdate(keyHash, new[] { new KeyValuePair<Type, string>(key, value) }, update);
+            tree = tree.AddOrUpdate(keyHash, new[] { new KeyValuePair<Type, string>(key, value) }, update);
 
             string result = null;
 
