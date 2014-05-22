@@ -74,6 +74,7 @@
     <Compile Include="ThrowTests.cs" />
     <Compile Include="TypeCSharpNameFormattingTests.cs" />
     <Compile Include="UnregisterTests.cs" />
+    <Compile Include="WipeResolutionCacheTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">

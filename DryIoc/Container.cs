@@ -130,9 +130,15 @@ namespace DryIoc
             return new Container(rules);
         }
 
-        public Container WithWipedCache()
+        public Container WipeResolutionCache()
         {
-            return this; // TODO Add body.
+            return new Container(
+                _resolutionRules.Value,
+                _factories.Value,
+                _decorators.Value,
+                _genericWrappers.Value,
+                _singletonScope,
+                _currentScope);
         }
 
         public void Dispose()
