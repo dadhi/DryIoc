@@ -37,17 +37,18 @@ namespace DryIoc
     /// <summary>
     /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
     /// TODO:
-    /// - finish: Unregister.
+    /// + finish: Unregister.
+    /// - add: CreateContainerWithWipedCache.
+    /// - change: FactoryDelegate to have single ResolutionState parameter with Scopes and Registry available from it.
     /// - add: Resolution condition to Factory.Setup
     /// - change: Add Container.FactoryCompiler and optional compiler to dynamic Assembly in .NET 4
     /// - change: Minimize Expression use by wrapping helper expression constructs into methods.
-    /// - change: FactoryDelegate to have single ResolutionState parameter with Scopes and Registry available from it.
     /// - change: Simplify Reuse by switching from Expression to direct Scope use.
-    /// - add: CreateContainerWithWipedCache.
     /// - finish: CreateChildContainer and CreateScopedContainer.
     /// - add: Auto-select constructor with all resolvable parameters.
-    /// - add: Rule to resolve mocks of unregistered services.
+    /// - add: Universal app support.
     /// - add: Mono support.
+    /// + add: Rule to resolve mocks of unregistered services.
     /// + add: Performance increase by using user provided delegate for resolution root. Modify DelegateFactory to support that.
     /// + add: metadata to Resolve method.
     /// </summary>
@@ -178,10 +179,9 @@ namespace DryIoc
                     return decorators != null && (condition == null || decorators.Any(condition));
 
                 default:
-                    var getSingleFactory = condition == null ? (ResolutionRules.FactorySelectorRule)
-                        (factories => factories.Select(x => x.Value).First()) :
-                        (factories => factories.Select(x => x.Value).FirstOrDefault(condition));
-                    return GetFactoryOrDefault(serviceType, serviceKey, getSingleFactory, retryForOpenGenericServiceType: true) != null;
+                    return GetFactoryOrDefault(serviceType, serviceKey,
+                        factories => factories.Select(x => x.Value).FirstOrDefault(condition ?? (factory => true)),
+                        retryForOpenGenericServiceType: true) != null;
             }
         }
 
@@ -217,7 +217,7 @@ namespace DryIoc
                         _factories.Swap(_ => _.RemoveOrUpdate(serviceType, (object oldEntry, out object newEntry) =>
                         {
                             newEntry = oldEntry; // by default hold old entry
-                            
+
                             if (oldEntry is Factory) // return false to remove entry
                                 return serviceKey != null && !DefaultKey.Default.Equals(serviceKey) ||
                                        condition != null && !condition((Factory)oldEntry);
@@ -240,9 +240,9 @@ namespace DryIoc
 
                             if (newFactories != oldFactories) // if we deleted something then make a cleanup
                             {
-                                if (newFactories.IsEmpty) 
+                                if (newFactories.IsEmpty)
                                     return false; // if no more remaining factories, then delete the whole entry
-                                
+
                                 if (newFactories.Height == 1 && newFactories.Key.Equals(DefaultKey.Default))
                                     newEntry = newFactories.Value; // replace entry with single remaining default factory
                                 else
@@ -251,7 +251,7 @@ namespace DryIoc
                                     if (newDefaultKey != null && newFactories.GetValueOrDefault(newDefaultKey) == null)
                                         newDefaultKey = newFactories.Enumerate().Select(x => x.Key).OfType<DefaultKey>()
                                             .OrderByDescending(key => key.RegistrationOrder).FirstOrDefault();
-                                    newEntry = new FactoriesEntry(newDefaultKey, newFactories);                                    
+                                    newEntry = new FactoriesEntry(newDefaultKey, newFactories);
                                 }
                             }
 
@@ -677,7 +677,7 @@ namespace DryIoc
 
     public sealed class NewResolutionState
     {
-            
+
     }
 
     public sealed class ResolutionState
