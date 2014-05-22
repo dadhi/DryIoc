@@ -190,7 +190,15 @@ namespace DryIoc
             switch (factoryType)
             {
                 case FactoryType.GenericWrapper:
-                    _genericWrappers.Swap(_ => _.RemoveOrUpdate(serviceType));
+                    if (condition == null)
+                        _genericWrappers.Swap(_ => _.RemoveOrUpdate(serviceType));
+                    else
+                        _genericWrappers.Swap(_ => _.RemoveOrUpdate(serviceType,
+                            (Factory oldFactory, out Factory newFactory) =>
+                            {
+                                newFactory = oldFactory;
+                                return !condition(oldFactory);
+                            }));
                     break;
                 case FactoryType.Decorator:
                     if (condition == null)
@@ -198,10 +206,7 @@ namespace DryIoc
                     else
                         _decorators.Swap(_ => _.RemoveOrUpdate(serviceType, (Factory[] oldFactories, out Factory[] newFactories) =>
                         {
-                            newFactories = oldFactories;
-                            for (var index = 0; index < oldFactories.Length; index++)
-                                if (condition(oldFactories[index]))
-                                    newFactories = newFactories.RemoveAt(index);
+                            newFactories = oldFactories.Where(factory => !condition(factory)).ToArray();
                             return newFactories.Length != 0;
                         }));
                     break;

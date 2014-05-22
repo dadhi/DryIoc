@@ -1,4 +1,5 @@
-﻿using DryIoc.UnitTests.CUT;
+﻿using System;
+using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -122,7 +123,6 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IHandler, FastHandler>();
             container.Register<IHandler, LoggingHandlerDecorator>(setup: DecoratorSetup.Default);
-            //container.Register<IHandler, NullHandlerDecorator>(setup: DecoratorSetup.Default);
 
             container.Unregister<IHandler>(factoryType: FactoryType.Decorator);
 
@@ -148,6 +148,27 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(container.IsRegistered<IHandler>());
         }
 
+        [Test]
+        public void Unregister_generic_wrapper_is_possible()
+        {
+            var container = new Container();
+            Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper));
+            
+            container.Unregister(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper);
+            Assert.IsFalse(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper));
+        }
+
+        [Test]
+        public void Unregister_generic_wrapper_with_condition_is_possible()
+        {
+            var container = new Container();
+            Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper));
+
+            container.Unregister(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper,
+                condition: f => f.ImplementationType == typeof(Func<>));
+
+            Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper));
+        }
     }
 
     public class NullHandlerDecorator : IHandler { }
