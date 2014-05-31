@@ -23,22 +23,22 @@ DryIoc is fast, small and capable IoC Container
 * On par with fastest containers listed in [IoC Container Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
 * General use-cases optimized for max speed.
 * Callstack depth preserved as shallow as possible.
-* Memory footprint preserved as low as possible.
+* Memory footprint preserved as small as possible.
 
 #### Small
 * Minimal setup requires single source file: *Container.cs*. 
 * No more than 2500 lines of code including comments.
-* Code written to be readable.
-* Uses [Caliburn.Micro](http://caliburnmicro.codeplex.com/) alike approach for customization.
+* Readable code.
+* Uses [Caliburn.Micro](http://caliburnmicro.codeplex.com/) a-like approach for customization.
 
 #### Reliable
 * Unit-tested with 100% coverage.
-* Thread-safe: registrations and resolutions could be done in parallel without corrupting container state. 
+* Thread-safe in sense that registrations and resolutions could be done in parallel without corrupting container state. 
 * Recursive dependency detection (cycle in object graph).
 * Error handling with `ContainerException` inherited from `InvalidOperationException` to filter container related exceptions.
 * Throws exceptions as early as possible. 
 * Meaningful error messages with all available information about problem Cause and Context.
-* Resolving as `DebugExpression<T>` to find underlying expression used for instance creation.
+* Resolve as `DebugExpression<TService>` to see underlying factory expression.
 
 #### Features
 * Constructor, property and field injection. *You can select What and Where to inject.*
@@ -53,7 +53,7 @@ DryIoc is fast, small and capable IoC Container
 * Resolution of multiple implementations as:
     * `IEnumerable<T>` or `T[]`. *Static view - next resolution woN't see new registrations.*
     * `Many<T>`. *Dynamic view - next resolution Will see new registrations.*
-    *  [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern). Composite implementation will be exlcuded from itself.
+    *  [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern).
 * Generic wrappers:
     * `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>`.
     * Func with parameters to specify constructor arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
@@ -64,7 +64,7 @@ DryIoc is fast, small and capable IoC Container
     * Custom reuse by implementing `IReuse`. Check `DryIoc.UnitTests.ThreadReuse` for example.
     * Nested disposable scopes of reuse.
     * Disposing of `Singleton` on Container dispose.
-* [Decorators](http://en.wikipedia.org/wiki/Decorator_pattern). 
+* [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern). 
 * Context-based implementation selection.
 * Unregistered service resolution via `ResolutionRules`.
 * Toggling features On/Off via `ContanerSetup`.
