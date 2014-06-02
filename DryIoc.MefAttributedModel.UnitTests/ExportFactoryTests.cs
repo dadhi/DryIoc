@@ -180,7 +180,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
     [ExportAll]
     public class TransientOrangeFactory : IFactory<Orange>
     {
-        [Export, CreationPolicy(CreationPolicy.NonShared)]
+        [Export, TransientReuse]
         public Orange Create()
         {
             return new Orange();

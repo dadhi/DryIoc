@@ -17,8 +17,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.That(service, Is.Not.SameAs(otherService));
         }
+
+        //[Test]
+        //public void If_reuse_type_does_not_implement_IReuse_it_should_Throw()
+        //{
+        //    var container = new Container().WithAttributedModel();
+        //    container.RegisterExports(typeof(ServiceWithBadReuseAttribute));
+        //}
     }
 
     [Export, TransientReuse]
     public class ServiceWithReuseAttribute {}
+
+    //[Export, Reuse(typeof(ServiceWithReuseAttribute))]
+    //public class ServiceWithBadReuseAttribute {}
 }

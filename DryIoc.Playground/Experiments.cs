@@ -120,7 +120,6 @@ namespace DryIoc.Playground
         public class MyClass<T> : Base<T>, IFace<T>, IFace { }
 
         [Test]
-        [Ignore]
         public void Func_vs_Expr_vs_Delegate()
         {
             const int times = 1000 * 1000;

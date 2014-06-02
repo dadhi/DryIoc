@@ -41,7 +41,7 @@ namespace DryIoc.MefAttributedModel
     public static class AttributedModel
     {
         ///<remarks>Default reuse policy is Singleton, the same as in MEF.</remarks>
-        public static CreationPolicy DefaultCreationPolicy = CreationPolicy.Shared;
+        public static Type DefaultReuseType = typeof(SingletonReuse);
 
         public static Container WithAttributedModel(this Container container)
         {
@@ -105,7 +105,7 @@ namespace DryIoc.MefAttributedModel
                 attributes.IndexOf(a => a is PartNotDiscoverableAttribute) != -1)
                 return null;
 
-            var info = new RegistrationInfo { ImplementationType = implementationType };
+            var info = new RegistrationInfo { ImplementationType = implementationType, ReuseType = DefaultReuseType };
 
             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
             {
@@ -151,16 +151,13 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is PartCreationPolicyAttribute)
                 {
-                    info.IsSingleton = ((PartCreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
+                    var creationPolicy = ((PartCreationPolicyAttribute)attribute).CreationPolicy;
+                    info.ReuseType = creationPolicy == CreationPolicy.Shared ? typeof(SingletonReuse) : null;
                 }
                 else if (attribute is ReuseAttribute)
                 {
                     info.ReuseType = ((ReuseAttribute)attribute).ReuseType;
                 }
-                //else if (attribute is CreationPolicyAttribute)
-                //{
-                //    info.IsSingleton = ((CreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
-                //}
                 else if (attribute is ExportAsGenericWrapperAttribute)
                 {
                     Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
@@ -187,7 +184,7 @@ namespace DryIoc.MefAttributedModel
             }
 
             if (info.FactoryType == FactoryType.Decorator)
-                info.IsSingleton = false;
+                info.ReuseType = null;
 
             info.Exports.ThrowIfNull(Error.EXPORT_IS_REQUIRED, implementationType);
             return info;
@@ -390,6 +387,9 @@ namespace DryIoc.MefAttributedModel
 
         public static readonly string EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES =
             "Unable to get contract types for implementation {0} cause all of its implemented types where filtered out: {1}";
+
+        public static readonly string REUSE_TYPE_DOES_NOT_IMPLEMENT_IREUSE_INTERFACE = 
+            "ReuseType does not implement {0} interface.";
     }
 
     public static class PrintCode
@@ -449,7 +449,6 @@ namespace DryIoc.MefAttributedModel
         public string ImplementationTypeFullName;
 
         public Type ReuseType;
-        public bool IsSingleton = AttributedModel.DefaultCreationPolicy == CreationPolicy.Shared;
         public bool HasMetadataAttribute;
         public FactoryType FactoryType;
         public GenericWrapperInfo GenericWrapper;
@@ -463,7 +462,7 @@ namespace DryIoc.MefAttributedModel
 
         public IReuse GetReuse()
         {
-            return IsSingleton ? Reuse.Singleton : Reuse.Transient;
+            return ReuseType == null ? null : (IReuse)Activator.CreateInstance(ReuseType);
         }
 
         public FactorySetup GetSetup(object[] attributes = null)
@@ -487,7 +486,7 @@ namespace DryIoc.MefAttributedModel
             var other = obj as RegistrationInfo;
             return other != null
                 && other.ImplementationType == ImplementationType
-                && other.IsSingleton == IsSingleton
+                && other.ReuseType == ReuseType
                 && other.FactoryType == FactoryType
                 && Equals(other.GenericWrapper, GenericWrapper)
                 && Equals(other.Decorator, Decorator)
@@ -504,7 +503,7 @@ namespace DryIoc.MefAttributedModel
         "); for (var i = 0; i < Exports.Length; i++)
                 code = Exports[i].AppendCode(code).Append(@",
         "); code.Append(@"},
-    IsSingleton = ").AppendBool(IsSingleton).Append(@",
+    ReuseType = ").AppendType(ReuseType).Append(@",
     HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
     FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
             if (GenericWrapper != null) code.Append(@",
@@ -644,27 +643,22 @@ namespace DryIoc.MefAttributedModel
 
     #region Additional Export/Import attributes
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
     public class ReuseAttribute : Attribute
     {
         public Type ReuseType;
 
         public ReuseAttribute(Type reuseType)
         {
+            if (reuseType != null && !typeof(IReuse).IsAssignableFrom(reuseType))
+                throw Error.REUSE_TYPE_DOES_NOT_IMPLEMENT_IREUSE_INTERFACE.Of(typeof(IReuse));
             ReuseType = reuseType;
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class TransientReuseAttribute : ReuseAttribute
     {
         public TransientReuseAttribute() : base(null) { }
-    }
-
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public class NoReuseAttribute : ReuseAttribute
-    {
-        public NoReuseAttribute() : base(null) { }
     }
 
     [MetadataAttribute]
@@ -783,21 +777,6 @@ namespace DryIoc.MefAttributedModel
     public interface IFactory<T>
     {
         T Create();
-    }
-
-    /// <summary>
-    /// You may use this attribute to specify CreationPolicy for <see cref="IFactory{T}"/> Create method.
-    /// Or in place of <see cref="PartCreationPolicyAttribute"/> for exported classes.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
-    public class CreationPolicyAttribute : Attribute
-    {
-        public CreationPolicy CreationPolicy { get; private set; }
-
-        public CreationPolicyAttribute(CreationPolicy policy)
-        {
-            CreationPolicy = policy;
-        }
     }
 
     #endregion

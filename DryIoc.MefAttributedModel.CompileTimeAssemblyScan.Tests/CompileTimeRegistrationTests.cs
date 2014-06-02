@@ -16,7 +16,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(AnotherService),
                     Exports = new[] { new ExportInfo(typeof(IService), "another") },
-                    IsSingleton = true,
+                    ReuseType = typeof(SingletonReuse),
                     HasMetadataAttribute = false,
                 }
             });
@@ -36,7 +36,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(Service),
                     Exports = new[] { new ExportInfo(typeof(IService), "some") },
-                    IsSingleton = true,
+                    ReuseType = typeof(SingletonReuse),
                     HasMetadataAttribute = false
                 },
 
@@ -44,7 +44,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(AnotherService),
                     Exports = new[] { new ExportInfo(typeof(IService), null) },
-                    IsSingleton = false,
+                    ReuseType = null,
                     HasMetadataAttribute = false,
                     FactoryType = FactoryType.Decorator,
                 },
@@ -53,7 +53,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(Wrap<>),
                     Exports = new[] { new ExportInfo(typeof(Wrap<>), null) }, 
-                    IsSingleton = false,
+                    ReuseType = null,
                     HasMetadataAttribute = false,
                     FactoryType = FactoryType.GenericWrapper
                 },

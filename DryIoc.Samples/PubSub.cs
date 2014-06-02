@@ -4,6 +4,7 @@ using NUnit.Framework;
 namespace DryIoc.Samples
 {
     [TestFixture]
+    [Ignore]
     public class PubSub
     {
         [Test]
