@@ -40,7 +40,7 @@ namespace DryIoc.MefAttributedModel
     /// </summary>
     public static class AttributedModel
     {
-        // NOTE: Default reuse policy is Singleton, the same as in MEF.
+        ///<remarks>Default reuse policy is Singleton, the same as in MEF.</remarks>
         public static CreationPolicy DefaultCreationPolicy = CreationPolicy.Shared;
 
         public static Container WithAttributedModel(this Container container)
@@ -153,10 +153,14 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.IsSingleton = ((PartCreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
                 }
-                else if (attribute is CreationPolicyAttribute)
+                else if (attribute is ReuseAttribute)
                 {
-                    info.IsSingleton = ((CreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
+                    info.ReuseType = ((ReuseAttribute)attribute).ReuseType;
                 }
+                //else if (attribute is CreationPolicyAttribute)
+                //{
+                //    info.IsSingleton = ((CreationPolicyAttribute)attribute).CreationPolicy == CreationPolicy.Shared;
+                //}
                 else if (attribute is ExportAsGenericWrapperAttribute)
                 {
                     Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
@@ -175,7 +179,7 @@ namespace DryIoc.MefAttributedModel
                     info.Decorator = new DecoratorInfo(decorator.ConditionType, decorator.ContractName ?? decorator.ContractKey);
                 }
 
-                if (Attribute.IsDefined(attribute.GetType(), typeof (MetadataAttributeAttribute), true))
+                if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), true))
                 {
                     Throw.If(info.HasMetadataAttribute, Error.UNSUPPORTED_MULTIPLE_METADATA, implementationType);
                     info.HasMetadataAttribute = true;
@@ -345,8 +349,8 @@ namespace DryIoc.MefAttributedModel
                 var getConstructor = export.ConstructorSignature != null
                     ? new GetConstructor(t => t.GetConstructor(export.ConstructorSignature)) : null;
 
-                registry.Register(serviceType, implementationType, 
-                    reuse, getConstructor, ServiceSetup.WithMetadata(export.Metadata), 
+                registry.Register(serviceType, implementationType,
+                    reuse, getConstructor, ServiceSetup.WithMetadata(export.Metadata),
                     serviceName);
             }
 
@@ -444,6 +448,7 @@ namespace DryIoc.MefAttributedModel
         public Type ImplementationType;
         public string ImplementationTypeFullName;
 
+        public Type ReuseType;
         public bool IsSingleton = AttributedModel.DefaultCreationPolicy == CreationPolicy.Shared;
         public bool HasMetadataAttribute;
         public FactoryType FactoryType;
@@ -471,9 +476,9 @@ namespace DryIoc.MefAttributedModel
                     : HasMetadataAttribute ? Decorator.GetSetup(() => GetMetadata(attributes))
                     : Decorator.GetSetup();
 
-            if (HasMetadataAttribute) 
+            if (HasMetadataAttribute)
                 return ServiceSetup.WithMetadata(() => GetMetadata(attributes));
-            
+
             return ServiceSetup.Default;
         }
 
@@ -638,6 +643,29 @@ namespace DryIoc.MefAttributedModel
     #endregion
 
     #region Additional Export/Import attributes
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public class ReuseAttribute : Attribute
+    {
+        public Type ReuseType;
+
+        public ReuseAttribute(Type reuseType)
+        {
+            ReuseType = reuseType;
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public class TransientReuseAttribute : ReuseAttribute
+    {
+        public TransientReuseAttribute() : base(null) { }
+    }
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public class NoReuseAttribute : ReuseAttribute
+    {
+        public NoReuseAttribute() : base(null) { }
+    }
 
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]

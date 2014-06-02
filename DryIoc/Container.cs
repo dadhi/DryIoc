@@ -47,7 +47,9 @@ namespace DryIoc
     /// - finish: CreateChildContainer and CreateScopedContainer.
     /// - add: Auto-select constructor with all resolvable parameters.
     /// - add: Universal app support.
+    /// - add: Symbolsource.org support.
     /// - add: Mono support.
+    /// - add: Interception/AOP support either with RealProxy or other AOP framework.
     /// + add: Rule to resolve mocks of unregistered services.
     /// + add: Performance increase by using user provided delegate for resolution root. Modify DelegateFactory to support that.
     /// + add: metadata to Resolve method.
@@ -273,9 +275,9 @@ namespace DryIoc
 
         object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var compiledFactory = _resolvedDefaultDelegates.GetValueOrDefault(serviceType)
+            var factoryDelegate = _resolvedDefaultDelegates.GetValueOrDefault(serviceType)
                 ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved);
-            return compiledFactory(_resolutionState.State.Value, _currentScope, resolutionScope: null);
+            return factoryDelegate(_resolutionState.State.Value, _currentScope, resolutionScope: null);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -683,6 +685,18 @@ namespace DryIoc
 
     public sealed class NewResolutionState
     {
+        public readonly AppendableArray<object> State = AppendableArray<object>.Empty;
+
+        public readonly Scope ContainerScope;
+        public readonly Scope ResolutionScope;
+
+        public IRegistry Registry
+        {
+            get { return (_registryWeakRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
+        }
+
+        private readonly WeakReference _registryWeakRef;
+
 
     }
 
@@ -2280,65 +2294,65 @@ namespace DryIoc
     public static class Reuse
     {
         public static readonly IReuse Transient = null; // no reuse.
-        public static readonly IReuse Singleton, InCurrentScope, InResolutionScope;
-
-        static Reuse()
-        {
-            Singleton = new SingletonReuse();
-            InCurrentScope = new ScopedReuse(ResolutionState.CurrentScopeParameter);
-            InResolutionScope = new ScopedReuse(Expression.Call(GetScopeMethod, ResolutionState.ResolutionScopeParameter));
-        }
+        public static readonly IReuse Singleton = new SingletonReuse();
+        public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
+        public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
 
         public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
         {
-            return Expression.Call(scope, Scope.GetOrAddMethod.MakeGenericMethod(factoryExpr.Type),
-                Expression.Constant(factoryID), Expression.Lambda(factoryExpr, null));
+            return Expression.Call(scope,
+                Scope.GetOrAddMethod.MakeGenericMethod(factoryExpr.Type),
+                Expression.Constant(factoryID),
+                Expression.Lambda(factoryExpr, null));
+        }
+    }
+
+    public sealed class SingletonReuse : IReuse
+    {
+        public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+        {
+            // Create lazy singleton if we have Func somewhere in dependency chain.
+            var parent = request.Parent;
+            if (parent != null && parent.Enumerate().Any(p =>
+            {
+                var openGenericServiceType = p.OpenGenericServiceType;
+                return openGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(openGenericServiceType);
+            }))
+            {
+                var singletonScopeExpr = request.ResolutionState.GetExpression(registry.SingletonScope);
+                return Reuse.GetScopedServiceExpression(singletonScopeExpr, factoryID, factoryExpr);
+            }
+
+            // Create singleton object now and put it into store.
+            var currentScope = registry.CurrentScope;
+            var singleton = registry.SingletonScope.GetOrAdd(factoryID,
+                () => factoryExpr.CompileToDelegate().Invoke(request.ResolutionState.State.Value, currentScope, null));
+
+            return request.ResolutionState.GetExpression(singleton, factoryExpr.Type);
+        }
+    }
+
+    public sealed class CurrentScopeReuse : IReuse
+    {
+        public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+        {
+            return Reuse.GetScopedServiceExpression(ResolutionState.CurrentScopeParameter, factoryID, factoryExpr);
+        }
+    }
+
+    public sealed class ResolutionScopeReuse : IReuse
+    {
+        public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+        {
+            return Reuse.GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
         }
 
-        public static readonly MethodInfo GetScopeMethod = typeof(Reuse).GetMethod("GetScope");
+        private readonly Expression _scopeExpr = Expression.Call(GetScopeMethod, ResolutionState.ResolutionScopeParameter);
+
+        public static readonly MethodInfo GetScopeMethod = typeof(ResolutionScopeReuse).GetMethod("GetScope");
         public static Scope GetScope(ref Scope scope)
         {
             return scope = scope ?? new Scope();
-        }
-
-        public sealed class ScopedReuse : IReuse
-        {
-            public ScopedReuse(Expression scopeExpr)
-            {
-                _scopeExpr = scopeExpr;
-            }
-
-            public Expression Of(Request _, IRegistry __, int factoryID, Expression factoryExpr)
-            {
-                return GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
-            }
-
-            private readonly Expression _scopeExpr;
-        }
-
-        public sealed class SingletonReuse : IReuse
-        {
-            public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
-            {
-                // Create lazy singleton if we have Func somewhere in dependency chain.
-                var parent = request.Parent;
-                if (parent != null && parent.Enumerate().Any(p =>
-                {
-                    var openGenericServiceType = p.OpenGenericServiceType;
-                    return openGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(openGenericServiceType);
-                }))
-                {
-                    var singletonScopeExpr = request.ResolutionState.GetExpression(registry.SingletonScope);
-                    return GetScopedServiceExpression(singletonScopeExpr, factoryID, factoryExpr);
-                }
-
-                // Create singleton object now and put it into store.
-                var currentScope = registry.CurrentScope;
-                var singleton = registry.SingletonScope.GetOrAdd(factoryID,
-                    () => factoryExpr.CompileToDelegate().Invoke(request.ResolutionState.State.Value, currentScope, null));
-
-                return request.ResolutionState.GetExpression(singleton, factoryExpr.Type);
-            }
         }
     }
 
@@ -2921,11 +2935,6 @@ namespace DryIoc
         public static Ref<T> Of<T>(T value) where T : class
         {
             return new Ref<T>(value);
-        }
-
-        public static Ref<T> Copy<T>(Ref<T> source) where T : class
-        {
-            return new Ref<T>(source.Value);
         }
     }
 

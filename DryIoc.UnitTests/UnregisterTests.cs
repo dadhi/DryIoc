@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
 
-            container.Unregister(typeof(IService), condition: factory => factory.Reuse is Reuse.SingletonReuse);
+            container.Unregister(typeof(IService), condition: f => f.Reuse is SingletonReuse);
 
             Assert.IsTrue(container.IsRegistered<IService>());
         }

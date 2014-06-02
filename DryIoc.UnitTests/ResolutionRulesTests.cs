@@ -145,7 +145,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.ResolutionRules.Swap(r => r.WithFactorySelector(
-                factories => factories.Select(f => f.Value).FirstOrDefault(f => !(f.Reuse is Reuse.SingletonReuse))));
+                factories => factories.Select(f => f.Value).FirstOrDefault(f => !(f.Reuse is SingletonReuse))));
 
             container.Register<IService, Service>(Reuse.Singleton);
             var service = container.Resolve(typeof(IService), IfUnresolved.ReturnNull);

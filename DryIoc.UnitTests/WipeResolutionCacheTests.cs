@@ -34,6 +34,5 @@ namespace DryIoc.UnitTests
             service = container.Resolve<ServiceWithDependency>();
             Assert.That(service.Dependency, Is.InstanceOf<Foo1>());
         }
-
     }
 }
