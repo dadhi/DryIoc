@@ -43,6 +43,13 @@ namespace DryIoc.MefAttributedModel
         ///<remarks>Default reuse policy is Singleton, the same as in MEF.</remarks>
         public static Type DefaultReuseType = typeof(SingletonReuse);
 
+        public readonly static Dictionary<Type, IReuse> SupportedReuseTypes = new Dictionary<Type, IReuse>
+        {
+            { typeof(SingletonReuse), Reuse.Singleton},
+            { typeof(CurrentScopeReuse), Reuse.InCurrentScope },
+            { typeof(ResolutionScopeReuse), Reuse.InResolutionScope }
+        };
+
         public static Container WithAttributedModel(this Container container)
         {
             container.ResolutionRules.Swap(rules => rules
@@ -65,10 +72,10 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<RegistrationInfo> infos)
         {
             foreach (var info in infos)
-                RegisterExport(registrator, info);
+                RegisterInfo(registrator, info);
         }
 
-        public static void RegisterExport(this IRegistrator registrator, RegistrationInfo info)
+        public static void RegisterInfo(this IRegistrator registrator, RegistrationInfo info)
         {
             var factory = info.CreateFactory();
 
@@ -237,8 +244,8 @@ namespace DryIoc.MefAttributedModel
 
             var attributes = factoryMethod.GetCustomAttributes(false);
 
-            var registrationInfo = GetRegistrationInfoOrDefault(serviceType, attributes);
-            if (registrationInfo == null)
+            var info = GetRegistrationInfoOrDefault(serviceType, attributes);
+            if (info == null)
                 return;
 
             // Result expression is {container.Resolve<IFactory<TService>>(factoryName).Create()} 
@@ -250,12 +257,12 @@ namespace DryIoc.MefAttributedModel
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     _factoryMethodName, null);
 
-            var factory = new ExpressionFactory(factoryCreateExpr,
-                registrationInfo.GetReuse(), registrationInfo.GetSetup(attributes));
+            var factory = new ExpressionFactory(factoryCreateExpr, 
+                AttributedModel.GetReuseByType(info.ReuseType), info.GetSetup(attributes));
 
-            for (var i = 0; i < registrationInfo.Exports.Length; i++)
+            for (var i = 0; i < info.Exports.Length; i++)
             {
-                var export = registrationInfo.Exports[i];
+                var export = info.Exports[i];
                 registrator.Register(factory,
                     export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
             }
@@ -271,6 +278,17 @@ namespace DryIoc.MefAttributedModel
             return constructors.Length == 1 ? constructors[0]
                 : constructors.SingleOrDefault(x => Attribute.IsDefined(x, typeof(ImportingConstructorAttribute)))
                     .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, implementationType);
+        }
+
+        public static IReuse GetReuseByType(Type reuseType)
+        {
+            if (reuseType == null)
+                return null;
+
+            IReuse reuse;
+            if (!AttributedModel.SupportedReuseTypes.TryGetValue(reuseType, out reuse))
+                throw Error.UNSUPPORTED_REUSE_TYPE.Of(reuseType);
+            return reuse;
         }
 
         #endregion
@@ -333,25 +351,30 @@ namespace DryIoc.MefAttributedModel
         public static bool TryGetServiceKeyFromExportOnceAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
             key = null;
-            var export = GetSingleAttributeOrDefault<ExportOnceAttribute>(attributes);
-            if (export == null)
+            var exportAttr = GetSingleAttributeOrDefault<ExportOnceAttribute>(attributes);
+            if (exportAttr == null)
                 return false;
 
             var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
-            var serviceName = export.ContractName;
-            if (!registry.IsRegistered(serviceType, serviceName))
-            {
-                var implementationType = export.ImplementationType ?? serviceType;
-                var reuse = export.CreationPolicy == CreationPolicy.Shared ? Reuse.Singleton : null;
-                var getConstructor = export.ConstructorSignature != null
-                    ? new GetConstructor(t => t.GetConstructor(export.ConstructorSignature)) : null;
+            var serviceKey = exportAttr.ContractKey;
 
-                registry.Register(serviceType, implementationType,
-                    reuse, getConstructor, ServiceSetup.WithMetadata(export.Metadata),
-                    serviceName);
+            if (!registry.IsRegistered(serviceType, serviceKey))
+            {
+                var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
+                var reuseType = reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType;
+                var reuse = GetReuseByType(reuseType);
+
+                var implementationType = exportAttr.ImplementationType ?? serviceType;
+
+                var getConstructor = exportAttr.ConstructorArgTypes != null
+                    ? new GetConstructor(t => t.GetConstructor(exportAttr.ConstructorArgTypes)) : null;
+
+                registry.Register(serviceType,
+                    implementationType, reuse, getConstructor, ServiceSetup.WithMetadata(exportAttr.Metadata),
+                    serviceKey, IfAlreadyRegistered.KeepRegistered);
             }
 
-            key = serviceName;
+            key = serviceKey;
             return true;
         }
 
@@ -388,8 +411,8 @@ namespace DryIoc.MefAttributedModel
         public static readonly string EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES =
             "Unable to get contract types for implementation {0} cause all of its implemented types where filtered out: {1}";
 
-        public static readonly string REUSE_TYPE_DOES_NOT_IMPLEMENT_IREUSE_INTERFACE = 
-            "ReuseType does not implement {0} interface.";
+        public static readonly string UNSUPPORTED_REUSE_TYPE =
+            "Attributed model does not support reuse type {0}. ";
     }
 
     public static class PrintCode
@@ -456,13 +479,16 @@ namespace DryIoc.MefAttributedModel
 
         public Factory CreateFactory()
         {
-            return new ReflectionFactory(ImplementationType,
-                GetReuse(), AttributedModel.FindSingleImportingConstructor, GetSetup());
+            return new ReflectionFactory(
+                ImplementationType,
+                AttributedModel.GetReuseByType(ReuseType), 
+                AttributedModel.FindSingleImportingConstructor, 
+                GetSetup());
         }
 
         public IReuse GetReuse()
         {
-            return ReuseType == null ? null : (IReuse)Activator.CreateInstance(ReuseType);
+            return ReuseType == null ? null : AttributedModel.SupportedReuseTypes[ReuseType];
         }
 
         public FactorySetup GetSetup(object[] attributes = null)
@@ -643,15 +669,15 @@ namespace DryIoc.MefAttributedModel
 
     #region Additional Export/Import attributes
 
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(
+        AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property,
+        AllowMultiple = false, Inherited = false)]
     public class ReuseAttribute : Attribute
     {
-        public Type ReuseType;
+        public readonly Type ReuseType;
 
         public ReuseAttribute(Type reuseType)
         {
-            if (reuseType != null && !typeof(IReuse).IsAssignableFrom(reuseType))
-                throw Error.REUSE_TYPE_DOES_NOT_IMPLEMENT_IREUSE_INTERFACE.Of(typeof(IReuse));
             ReuseType = reuseType;
         }
     }
@@ -763,15 +789,18 @@ namespace DryIoc.MefAttributedModel
     [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
     public class ExportOnceAttribute : Attribute
     {
-        public string ContractName { get; set; }
-
+        public object ContractKey { get; set; }
         public Type ImplementationType { get; set; }
-
-        public CreationPolicy CreationPolicy { get; set; }
-
         public object Metadata { get; set; }
+        public Type[] ConstructorArgTypes { get; set; }
 
-        public Type[] ConstructorSignature { get; set; }
+        public ExportOnceAttribute(object contractKey = null, Type implementationType = null, Type[] constructorArgTypes = null, object metadata = null)
+        {
+            ContractKey = contractKey;
+            ImplementationType = implementationType;
+            Metadata = metadata;
+            ConstructorArgTypes = constructorArgTypes;
+        }
     }
 
     public interface IFactory<T>

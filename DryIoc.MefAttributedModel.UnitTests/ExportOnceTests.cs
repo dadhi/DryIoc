@@ -19,6 +19,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
+        public void I_can_specify_Reuse_for_export_ctor_param_service_on_resolve()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(NativeUser));
+
+            var one = container.Resolve<NativeUser>();
+            var another = container.Resolve<NativeUser>();
+
+            Assert.That(one.Tool, Is.Not.SameAs(another.Tool));
+        }
+
+        [Test]
         public void I_can_specify_constructor_while_exporting_once_a_ctor_param_service()
         {
             var container = new Container().WithAttributedModel();
@@ -54,7 +66,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void When_something_else_than_Import_specified_It_should_throw()
+        public void When_non_Import_attribute_used_It_should_throw()
         {
             var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(WithUnregisteredExternalEdependency));
@@ -62,20 +74,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.Throws<ContainerException>(() => 
                 container.Resolve<WithUnregisteredExternalEdependency>());
         }
-    }
 
-    [ExportAll]
-    public class WithUnregisteredExternalEdependency
-    {
-        public ExternalTool Tool { get; set; }
-
-        public WithUnregisteredExternalEdependency([SomeOther]ExternalTool tool)
+        [Test]
+        public void Can_use_arbitrary_contract_key_type_for_ExportOnce_same_as_for_Export()
         {
-            Tool = tool;
-        }
-    }
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(OneDependsOnExternalTool), typeof(OtherDependsOnExternalTool));
 
-    public class SomeOtherAttribute : Attribute
-    {
+            var one = container.Resolve<OneDependsOnExternalTool>();
+            var other = container.Resolve<OtherDependsOnExternalTool>();
+
+            Assert.That(one.Tool, Is.InstanceOf<ExternalTool>().And.SameAs(other.Tool));
+        }
     }
 }

@@ -12,7 +12,7 @@ namespace DryIoc.Samples
             var container = new Container(ResolutionRules.Default.With((request, registry) =>
             {
                 if (!request.ServiceType.IsAbstract)
-                    return null;
+                    return null; // Mock interface or abstract class only.
                 return new DelegateFactory(_ => Substitute.For(new[] { request.ServiceType }, null));
             }));
 
@@ -27,7 +27,7 @@ namespace DryIoc.Samples
             var container = new Container(ResolutionRules.Default.With((request, registry) =>
             {
                 if (!request.ServiceType.IsAbstract)
-                    return null;
+                    return null; // Mock interface or abstract class only.
                 return new DelegateFactory(_ => Substitute.For(new[] { request.ServiceType }, null));
             }));
 

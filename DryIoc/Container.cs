@@ -1641,7 +1641,7 @@ namespace DryIoc
                 str.Append("'");
             }
 
-            if (ImplementationType != null)
+            if (ImplementationType != null && ImplementationType != ServiceType)
                 str.Append(" of ").Append(ImplementationType.Print());
 
             return str.ToString();
