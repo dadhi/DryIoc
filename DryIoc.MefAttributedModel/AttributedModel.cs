@@ -687,6 +687,21 @@ namespace DryIoc.MefAttributedModel
         public TransientReuseAttribute() : base(null) { }
     }
 
+    public class SingletonReuseAttribute : ReuseAttribute
+    {
+        public SingletonReuseAttribute() : base(typeof(SingletonReuse)) { }
+    }
+
+    public class CurrentScopeReuseAttribute : ReuseAttribute
+    {
+        public CurrentScopeReuseAttribute() : base(typeof(CurrentScopeReuse)) { }
+    }
+
+    public class ResolutionScopeReuseAttribute : ReuseAttribute
+    {
+        public ResolutionScopeReuseAttribute() : base(typeof(ResolutionScopeReuse)) { }
+    }
+
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportWithMetadataAttribute : Attribute

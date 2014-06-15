@@ -37,19 +37,17 @@ namespace DryIoc
     /// <summary>
     /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
     /// TODO:
-    /// + finish: Unregister.
+    /// - change: Simplify Reuse by switching from Expression to direct Scope use.
+    /// - change: Minimize Expression use by wrapping helper expression constructs into methods.
     /// - add: CreateContainerWithWipedCache.
     /// - change: FactoryDelegate to have single ResolutionState parameter with Scopes and Registry available from it.
     /// - add: Resolution condition to Factory.Setup
     /// - change: Add Container.FactoryCompiler and optional compiler to dynamic Assembly in .NET 4
-    /// - change: Minimize Expression use by wrapping helper expression constructs into methods.
-    /// - change: Simplify Reuse by switching from Expression to direct Scope use.
     /// - finish: CreateChildContainer and CreateScopedContainer.
     /// - add: Auto-select constructor with all resolvable parameters.
-    /// - add: Universal app support.
-    /// - add: Symbolsource.org support.
-    /// - add: Mono support.
+    /// - add: Universal Application support.
     /// - add: Interception/AOP support either with RealProxy or other AOP framework.
+    /// + finish: Unregister.
     /// + add: Rule to resolve mocks of unregistered services.
     /// + add: Performance increase by using user provided delegate for resolution root. Modify DelegateFactory to support that.
     /// + add: metadata to Resolve method.
