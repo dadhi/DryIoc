@@ -272,7 +272,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Tools
 
-        public static ConstructorInfo FindSingleImportingConstructor(Type implementationType)
+        public static ConstructorInfo FindSingleImportingConstructor(Type implementationType, Request req, IRegistry reg)
         {
             var constructors = implementationType.GetConstructors();
             return constructors.Length == 1 ? constructors[0]
@@ -367,7 +367,7 @@ namespace DryIoc.MefAttributedModel
                 var implementationType = exportAttr.ImplementationType ?? serviceType;
 
                 var getConstructor = exportAttr.ConstructorArgTypes != null
-                    ? new GetConstructor(t => t.GetConstructor(exportAttr.ConstructorArgTypes)) : null;
+                    ? (GetConstructor)((t, _, __) => t.GetConstructor(exportAttr.ConstructorArgTypes)) : null;
 
                 registry.Register(serviceType,
                     implementationType, reuse, getConstructor, ServiceSetup.WithMetadata(exportAttr.Metadata),

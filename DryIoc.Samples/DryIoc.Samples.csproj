@@ -49,6 +49,7 @@
     <Compile Include="GettingStarted.cs" />
     <Compile Include="PubSub.cs" />
     <Compile Include="ResolveMocksForNonRegisteredServices.cs" />
+    <Compile Include="SelectConstructorWithAllResolvableArguments.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
