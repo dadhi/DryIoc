@@ -48,10 +48,7 @@ namespace DryIoc
     /// - add: Auto-select constructor with all resolvable parameters.
     /// - add: Universal Application support.
     /// - add: Interception/AOP support either with RealProxy or other AOP framework.
-    /// + finish: Unregister.
-    /// + add: Rule to resolve mocks of unregistered services.
-    /// + add: Performance increase by using user provided delegate for resolution root. Modify DelegateFactory to support that.
-    /// + add: metadata to Resolve method.
+    /// - add: ReflectionFactoryProvider to configure default value for ConstructorSelector.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -1780,6 +1777,11 @@ namespace DryIoc
         public readonly int ID;
         public readonly IReuse Reuse;
 
+        public IReuseNew ReuseNew
+        {
+            get { return new SingletonReuseNew(); }
+        }
+
         public FactorySetup Setup
         {
             get { return _setup; }
@@ -1828,6 +1830,42 @@ namespace DryIoc
             if (expression == null)
             {
                 expression = CreateExpression(request, registry);
+
+                if (ReuseNew != null)
+                {
+                    var reuseExpr = request.ResolutionState.GetExpression(ReuseNew);
+                    var reuseMethod = typeof(IReuseNew).GetMethod("Of").MakeGenericMethod(expression.Type);
+                    var singletonScopeID = request.ResolutionState.GetOrAddToState(registry.SingletonScope);
+
+                    var parent = request.Parent;
+                    if (parent != null && parent.Enumerate().Any(p =>
+                    {
+                        var openGenericServiceType = p.OpenGenericServiceType;
+                        return openGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(openGenericServiceType);
+                    }))
+                    {
+                        var expressionReused = Expression.Call(reuseExpr, reuseMethod,
+                            Expression.Constant(singletonScopeID),
+                            Expression.Constant(ID),
+                            expression.ToFactoryExpression(),
+                            ResolutionState.ResolutionStateParameter,
+                            ResolutionState.CurrentScopeParameter,
+                            ResolutionState.ResolutionScopeParameter);
+                        Console.WriteLine(expressionReused);
+                    }
+                    else
+                    {
+                        var singleton = ReuseNew.Of<object>(
+                            singletonScopeID, ID,
+                            expression.CompileToDelegate(),
+                            request.ResolutionState.State.Value,
+                            registry.CurrentScope,
+                            null);
+                        var expressionReused = request.ResolutionState.GetExpression(singleton, expression.Type);
+                        Console.WriteLine(expressionReused);
+                    }
+                }
+
                 if (Reuse != null)
                     expression = Reuse.Of(request, registry, ID, expression);
 
@@ -1910,7 +1948,7 @@ namespace DryIoc
             if (ctors.Length == 1)
                 return ctors[0];
 
-            var ctor = ctors.Select(c => new {Ctor = c, Params = c.GetParameters()})
+            var ctor = ctors.Select(c => new { Ctor = c, Params = c.GetParameters() })
                 .OrderByDescending(x => x.Params.Length)
                 .FirstOrDefault(x =>
                     x.Params.All(
@@ -2301,6 +2339,28 @@ namespace DryIoc
         private readonly object _syncRoot = new object();
 
         #endregion
+    }
+
+    public interface IReuseNew
+    {
+        T Of<T>(
+            int singletonScopeID,
+            int factoryID, FactoryDelegate factoryDelegate,
+            AppendableArray<object> resolutionState, Scope currentScope, Scope resolutionScope);
+    }
+
+    public class SingletonReuseNew : IReuseNew
+    {
+        public T Of<T>(
+            int singletonScopeID,
+            int factoryID, FactoryDelegate factoryDelegate,
+            AppendableArray<object> resolutionState, Scope currentScope, Scope resolutionScope)
+        {
+            var singletonScope = (Scope)resolutionState.Get(singletonScopeID);
+            var singleton = singletonScope.GetOrAdd(factoryID,
+                () => (T)factoryDelegate(resolutionState, currentScope, resolutionScope));
+            return singleton;
+        }
     }
 
     public interface IReuse
