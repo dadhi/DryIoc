@@ -367,7 +367,7 @@ namespace DryIoc.MefAttributedModel
                 var implementationType = exportAttr.ImplementationType ?? serviceType;
 
                 var getConstructor = exportAttr.ConstructorArgTypes != null
-                    ? (GetConstructor)((t, _, __) => t.GetConstructor(exportAttr.ConstructorArgTypes)) : null;
+                    ? (ConstructorSelector)((t, _, __) => t.GetConstructor(exportAttr.ConstructorArgTypes)) : null;
 
                 registry.Register(serviceType,
                     implementationType, reuse, getConstructor, ServiceSetup.WithMetadata(exportAttr.Metadata),

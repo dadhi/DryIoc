@@ -38,10 +38,11 @@ namespace DryIoc
     /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
     /// TODO:
     /// - change: Simplify Reuse by switching from Expression to direct Scope use.
+    /// - add: Resolution condition to Factory.Setup
     /// - change: Minimize Expression use by wrapping helper expression constructs into methods.
+    /// - change: Remove Ref from API where possible.
     /// - add: CreateContainerWithWipedCache.
     /// - change: FactoryDelegate to have single ResolutionState parameter with Scopes and Registry available from it.
-    /// - add: Resolution condition to Factory.Setup
     /// - change: Add Container.FactoryCompiler and optional compiler to dynamic Assembly in .NET 4
     /// - finish: CreateChildContainer and CreateScopedContainer.
     /// - add: Auto-select constructor with all resolvable parameters.
@@ -849,7 +850,7 @@ namespace DryIoc
 
             GenericWrappers = GenericWrappers.AddOrUpdate(typeof(Lazy<>),
                 new ReflectionFactory(typeof(Lazy<>),
-                    getConstructor: (t, req, reg) => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }),
+                    constructorSelector: (t, req, reg) => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }),
                     setup: GenericWrapperSetup.Default));
 
             GenericWrappers = GenericWrappers.AddOrUpdate(typeof(KeyValuePair<,>),
@@ -1156,7 +1157,7 @@ namespace DryIoc
             "There is no public constructor defined for {0}.";
 
         public static readonly string UNSPECIFIED_HOWTO_GET_CONSTRUCTOR_FOR_IMPLTYPE_WITH_NO_OR_MANY_CONSTRUCTORS =
-            "It is not specified how to get single constructor for implementation type with no Or many public constructors: {0}.";
+            "It is not specified how to get single constructor from implementation type with No or Many public constructors: {0}.";
 
         public static readonly string CONSTRUCTOR_MISSES_SOME_PARAMETERS =
             "Constructor [{0}] of {1} misses some arguments required for {2} dependency.";
@@ -1213,6 +1214,9 @@ namespace DryIoc
 
         public static readonly string UNABLE_TO_GET_CTOR_USING_CTOR_SELECTOR =
             "Unable to get constructor of {0} using provided constructor selector.";
+
+        public static readonly string UNABLE_TO_SELECT_CTOR_WITH_ALL_RESOLVABLE_ARGS =
+            "Unable to select constructor with all resolvable arguments when resolving {0}.";
     }
 
     public static class Registrator
@@ -1257,7 +1261,7 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType,
-            Type implementationType, IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var factory = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
@@ -1275,7 +1279,7 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var factory = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
@@ -1294,7 +1298,7 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
             where TImplementation : TService
         {
@@ -1313,7 +1317,7 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var factory = new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup);
@@ -1334,7 +1338,7 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterAll(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             Func<Type, bool> types = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var registration = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
@@ -1371,7 +1375,7 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterAll<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, GetConstructor withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             registrator.RegisterAll(typeof(TImplementation), reuse, withConstructor, setup, null, named, ifAlreadyRegistered);
@@ -1884,24 +1888,54 @@ namespace DryIoc
         #endregion
     }
 
-    public delegate ConstructorInfo GetConstructor(Type implementationType, Request request, IRegistry registry);
+    public delegate ConstructorInfo ConstructorSelector(Type implementationType, Request request, IRegistry registry);
 
     public sealed class ReflectionFactory : Factory
     {
+        /// <remarks>
+        /// By default it will use <c>constructorSelector</c> parameter if it is specified in <see cref="ReflectionFactory"/> constructor.
+        /// Or otherwise expects <see cref="ReflectionFactory.ImplementationType"/> to have single constructor.
+        /// </remarks>
+        public static ConstructorSelector DefaultConstructorSelector;
+
+        #region Other constructor selection strategies..
+
+        public static ConstructorInfo SelectConstructorWithAllResolvableArguments(Type implementationType,
+            Request request, IRegistry registry)
+        {
+            var ctors = implementationType.GetConstructors();
+            if (ctors.Length == 0)
+                return null;
+
+            if (ctors.Length == 1)
+                return ctors[0];
+
+            var ctor = ctors.Select(c => new {Ctor = c, Params = c.GetParameters()})
+                .OrderByDescending(x => x.Params.Length)
+                .FirstOrDefault(x =>
+                    x.Params.All(
+                        p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null));
+
+            return ctor.ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
+        }
+
+        #endregion
+
         public override Type ImplementationType { get { return _implementationType; } }
         public override bool ProvidesFactoryForRequest { get { return _implementationType.IsGenericTypeDefinition; } }
 
         public ReflectionFactory(Type implementationType,
-            IReuse reuse = null, GetConstructor getConstructor = null, FactorySetup setup = null)
+            IReuse reuse = null, ConstructorSelector constructorSelector = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
             if (implementationType.ThrowIfNull().IsAbstract)
                 throw Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE.Of(implementationType);
-            if (getConstructor == null && implementationType.GetConstructors().Length != 1)
+            constructorSelector = constructorSelector ?? DefaultConstructorSelector;
+            if (constructorSelector == null && implementationType.GetConstructors().Length != 1)
                 throw Error.UNSPECIFIED_HOWTO_GET_CONSTRUCTOR_FOR_IMPLTYPE_WITH_NO_OR_MANY_CONSTRUCTORS.Of(implementationType);
 
             _implementationType = implementationType;
-            _getConstructor = getConstructor;
+            _constructorSelector = constructorSelector;
         }
 
         public override void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType)
@@ -1948,7 +1982,7 @@ namespace DryIoc
 
             var closedImplType = _implementationType.MakeGenericType(closedTypeArgs);
 
-            return new ReflectionFactory(closedImplType, Reuse, _getConstructor, Setup);
+            return new ReflectionFactory(closedImplType, Reuse, _constructorSelector, Setup);
         }
 
         public override Expression CreateExpression(Request request, IRegistry registry)
@@ -2023,18 +2057,18 @@ namespace DryIoc
         #region Implementation
 
         private readonly Type _implementationType;
-        private readonly GetConstructor _getConstructor;
+        private readonly ConstructorSelector _constructorSelector;
 
         public ConstructorInfo GetConstructor(Type implementationType, Request request, IRegistry registry)
         {
-            if (_getConstructor != null)
-                return _getConstructor(implementationType, request, registry)
+            if (_constructorSelector != null)
+                return _constructorSelector(implementationType, request, registry)
                     .ThrowIfNull(Error.UNABLE_TO_GET_CTOR_USING_CTOR_SELECTOR, implementationType);
 
-            var constructors = implementationType.GetConstructors();
-            Throw.If(constructors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implementationType);
-            Throw.If(constructors.Length > 1, Error.UNABLE_TO_SELECT_CONSTRUCTOR, constructors.Length, implementationType);
-            return constructors[0];
+            var ctors = implementationType.GetConstructors();
+            Throw.If(ctors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implementationType);
+            Throw.If(ctors.Length > 1, Error.UNABLE_TO_SELECT_CONSTRUCTOR, ctors.Length, implementationType);
+            return ctors[0];
         }
 
         private static Expression InitMembersIfRequired(Type implementationType, NewExpression newService, Request request, IRegistry registry)
