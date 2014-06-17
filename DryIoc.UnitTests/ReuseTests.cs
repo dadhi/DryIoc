@@ -156,6 +156,19 @@ namespace DryIoc.UnitTests
             threadOne.Join();
             Assert.That(one.Dependency, Is.Not.SameAs(another.Dependency));
         }
+
+        [Test]
+        public void It_ok_to_use_both_resolution_scope_and_singleton_reuse_in_same_resolution_root()
+        {
+            var container = new Container();
+            container.Register<ServiceWithResolutionAndSingletonDependencies>();
+            container.Register<SingletonDep>(Reuse.Singleton);
+            container.Register<ResolutionScopeDep>(Reuse.InResolutionScope);
+
+            var service = container.Resolve<ServiceWithResolutionAndSingletonDependencies>();
+
+            Assert.That(service.ResolutionScopeDep, Is.SameAs(service.SingletonDep.ResolutionScopeDep));
+        }
     }
 
     public class ThreadReuse : IReuse
@@ -247,6 +260,30 @@ namespace DryIoc.UnitTests
 
     public class Log
     {
+    }
+
+    class ServiceWithResolutionAndSingletonDependencies
+    {
+        public SingletonDep SingletonDep { get; set; }
+        public ResolutionScopeDep ResolutionScopeDep { get; set; }
+
+        public ServiceWithResolutionAndSingletonDependencies(SingletonDep singletonDep, ResolutionScopeDep resolutionScopeDep)
+        {
+            SingletonDep = singletonDep;
+            ResolutionScopeDep = resolutionScopeDep;
+        }
+    }
+
+    internal class ResolutionScopeDep {}
+
+    internal class SingletonDep
+    {
+        public ResolutionScopeDep ResolutionScopeDep { get; set; }
+
+        public SingletonDep(ResolutionScopeDep resolutionScopeDep)
+        {
+            ResolutionScopeDep = resolutionScopeDep;
+        }
     }
 
     #endregion
