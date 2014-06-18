@@ -35,7 +35,7 @@ namespace DryIoc.MefAttributedModel
     /// <summary>
     /// Implements MEF Attributed Programming Model. Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel.
     /// TODO:
-    /// - add: Support for DryIoc Reuse, currently only Transient and Singleton is supported. Maybe add ReuseAttribute.
+    /// + add: Support for DryIoc Reuse, currently only Transient and Singleton is supported. Maybe add ReuseAttribute.
     /// - add: ImportAttribute.ContractType and AllowDefault support.
     /// </summary>
     public static class AttributedModel

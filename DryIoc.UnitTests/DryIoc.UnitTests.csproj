@@ -40,6 +40,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AppendableArrayTests.cs" />
+    <Compile Include="SelectConstructorWithAllResolvableArguments.cs" />
     <Compile Include="CompositePatternTests.cs" />
     <Compile Include="IfAlreadyRegisteredTests.cs" />
     <Compile Include="KeyValuePairResolutionTests.cs" />

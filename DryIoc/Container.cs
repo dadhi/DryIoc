@@ -273,6 +273,8 @@ namespace DryIoc
         {
             var factoryDelegate = _resolvedDefaultDelegates.GetValueOrDefault(serviceType)
                 ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved);
+
+            // factoryDelegate(_resolutionState.Value)
             return factoryDelegate(_resolutionState.State.Value, _currentScope, resolutionScope: null);
         }
 
@@ -1033,6 +1035,17 @@ namespace DryIoc
                 return metaExpr;
             });
         }
+
+        #region Tools
+
+        public static bool IsFunc(this Request request, bool withArgsOnly = false)
+        {
+            return request != null && request.OpenGenericServiceType != null 
+                && FuncTypes.Contains(request.OpenGenericServiceType)
+                && (!withArgsOnly || request.OpenGenericServiceType != typeof(Func<>));
+        }
+
+        #endregion
 
         #region Implementation
 
@@ -1838,11 +1851,7 @@ namespace DryIoc
                     var singletonScopeID = request.ResolutionState.GetOrAddToState(registry.SingletonScope);
 
                     var parent = request.Parent;
-                    if (parent != null && parent.Enumerate().Any(p =>
-                    {
-                        var openGenericServiceType = p.OpenGenericServiceType;
-                        return openGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(openGenericServiceType);
-                    }))
+                    if (parent != null && parent.Enumerate().Any(p => p.IsFunc()))
                     {
                         var expressionReused = Expression.Call(reuseExpr, reuseMethod,
                             Expression.Constant(singletonScopeID),
@@ -1851,7 +1860,6 @@ namespace DryIoc
                             ResolutionState.ResolutionStateParameter,
                             ResolutionState.CurrentScopeParameter,
                             ResolutionState.ResolutionScopeParameter);
-                        Console.WriteLine(expressionReused);
                     }
                     else
                     {
@@ -1862,7 +1870,6 @@ namespace DryIoc
                             registry.CurrentScope,
                             null);
                         var expressionReused = request.ResolutionState.GetExpression(singleton, expression.Type);
-                        Console.WriteLine(expressionReused);
                     }
                 }
 
@@ -1938,23 +1945,32 @@ namespace DryIoc
 
         #region Other constructor selection strategies..
 
-        public static ConstructorInfo SelectConstructorWithAllResolvableArguments(Type implementationType,
-            Request request, IRegistry registry)
+        public static ConstructorInfo SelectConstructorWithAllResolvableArguments(Type type, Request request, IRegistry registry)
         {
-            var ctors = implementationType.GetConstructors();
+            var ctors = type.GetConstructors();
             if (ctors.Length == 0)
                 return null;
+
+            // For Func with arguments select constructor which contain all input Func arguments.
+            if (request.Parent.IsFunc(withArgsOnly: true))
+            {
+                var funcTypeArgs = request.Parent.ServiceType.GetGenericArguments();
+                var inputTypeArgs = funcTypeArgs.RemoveAt(funcTypeArgs.Length - 1);
+                var ctorWithAllInputArgs = ctors.FirstOrDefault(
+                    c => inputTypeArgs.All(t => c.GetParameters().Any(p => p.ParameterType == t)));
+                return ctorWithAllInputArgs;
+            }
 
             if (ctors.Length == 1)
                 return ctors[0];
 
-            var ctor = ctors.Select(c => new { Ctor = c, Params = c.GetParameters() })
+            var ctorWithResolvableArgs = ctors.Select(c => new { Ctor = c, Params = c.GetParameters() })
                 .OrderByDescending(x => x.Params.Length)
                 .FirstOrDefault(x =>
-                    x.Params.All(
-                        p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null));
+                    x.Params.All(p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null));
 
-            return ctor.ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
+            return ctorWithResolvableArgs
+                .ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
         }
 
         #endregion
@@ -2044,52 +2060,53 @@ namespace DryIoc
 
         public override LambdaExpression CreateFuncWithArgsOrDefault(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncArgs)
         {
-            var funcParamTypes = funcType.GetGenericArguments();
-            funcParamTypes.ThrowIf(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
+            var funcTypeArgs = funcType.GetGenericArguments();
+            funcTypeArgs.ThrowIf(funcTypeArgs.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
 
             var ctor = GetConstructor(_implementationType, request, registry);
-            var ctorParams = ctor.GetParameters();
-            var ctorParamExprs = new Expression[ctorParams.Length];
-            var funcInputParamExprs = new ParameterExpression[funcParamTypes.Length - 1]; // (minus Func return parameter).
+            var ctorArgs = ctor.GetParameters();
+            var ctorArgExprs = new Expression[ctorArgs.Length];
+            var inputTypeArgExprs = new ParameterExpression[funcTypeArgs.Length - 1]; // (minus Func return parameter).
 
-            for (var cp = 0; cp < ctorParams.Length; cp++)
+            for (var cp = 0; cp < ctorArgs.Length; cp++)
             {
-                var ctorParam = ctorParams[cp];
-                for (var fp = 0; fp < funcParamTypes.Length - 1; fp++)
+                var ctorArg = ctorArgs[cp];
+                for (var fa = 0; fa < funcTypeArgs.Length - 1; fa++)
                 {
-                    var funcParamType = funcParamTypes[fp];
-                    if (ctorParam.ParameterType == funcParamType &&
-                        funcInputParamExprs[fp] == null) // Skip if Func parameter was already used for constructor.
+                    var funcTypeArg = funcTypeArgs[fa];
+                    if (ctorArg.ParameterType == funcTypeArg &&
+                        inputTypeArgExprs[fa] == null) // Skip if Func parameter was already used for constructor.
                     {
-                        ctorParamExprs[cp] = funcInputParamExprs[fp] = Expression.Parameter(funcParamType, ctorParam.Name);
+                        ctorArgExprs[cp] = inputTypeArgExprs[fa] = Expression.Parameter(funcTypeArg, ctorArg.Name);
                         break;
                     }
                 }
 
-                if (ctorParamExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
+                if (ctorArgExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
-                    var paramRequest = request.Push(ctorParam, registry);
-                    ctorParamExprs[cp] = registry.ResolveFactory(paramRequest, IfUnresolved.Throw).GetExpression(paramRequest, registry);
+                    var argRequest = request.Push(ctorArg, registry);
+                    ctorArgExprs[cp] = registry.ResolveFactory(argRequest, IfUnresolved.Throw).GetExpression(argRequest, registry);
                 }
             }
 
             // Find unused Func parameters (present in Func but not in constructor) and create "_" (ignored) Parameter expressions for them.
             // In addition store unused parameter in output list for client review.
             unusedFuncArgs = null;
-            for (var fp = 0; fp < funcInputParamExprs.Length; fp++)
+            for (var fp = 0; fp < inputTypeArgExprs.Length; fp++)
             {
-                if (funcInputParamExprs[fp] == null) // unused parameter
+                if (inputTypeArgExprs[fp] == null) // unused parameter
                 {
-                    if (unusedFuncArgs == null) unusedFuncArgs = new List<Type>(2);
-                    var funcParamType = funcParamTypes[fp];
-                    unusedFuncArgs.Add(funcParamType);
-                    funcInputParamExprs[fp] = Expression.Parameter(funcParamType, "_");
+                    if (unusedFuncArgs == null) 
+                        unusedFuncArgs = new List<Type>(2);
+                    var funcArgType = funcTypeArgs[fp];
+                    unusedFuncArgs.Add(funcArgType);
+                    inputTypeArgExprs[fp] = Expression.Parameter(funcArgType, "_");
                 }
             }
 
-            var newExpr = Expression.New(ctor, ctorParamExprs);
+            var newExpr = Expression.New(ctor, ctorArgExprs);
             var newExprInitialized = InitMembersIfRequired(_implementationType, newExpr, request, registry);
-            return Expression.Lambda(funcType, newExprInitialized, funcInputParamExprs);
+            return Expression.Lambda(funcType, newExprInitialized, inputTypeArgExprs);
         }
 
         #region Implementation
@@ -2349,6 +2366,22 @@ namespace DryIoc
             AppendableArray<object> resolutionState, Scope currentScope, Scope resolutionScope);
     }
 
+    public class ResolutionScopeReuseNew : IReuseNew 
+    {
+        public T Of<T>(int singletonScopeID, int factoryID, FactoryDelegate factoryDelegate, 
+            AppendableArray<object> resolutionState, Scope currentScope, Scope _)
+        {
+            // get resolution scope from resolutionState
+
+            // let assume that resolution state does not contain Resolution Scope yet
+            // so we need to create it first
+            var resolutionScope = new Scope();
+
+
+            return default(T);
+        }
+    }
+
     public class SingletonReuseNew : IReuseNew
     {
         public T Of<T>(
@@ -2390,11 +2423,7 @@ namespace DryIoc
         {
             // Create lazy singleton if we have Func somewhere in dependency chain.
             var parent = request.Parent;
-            if (parent != null && parent.Enumerate().Any(p =>
-            {
-                var openGenericServiceType = p.OpenGenericServiceType;
-                return openGenericServiceType != null && OpenGenericsSupport.FuncTypes.Contains(openGenericServiceType);
-            }))
+            if (parent != null && parent.Enumerate().Any(p => p.IsFunc()))
             {
                 var singletonScopeExpr = request.ResolutionState.GetExpression(registry.SingletonScope);
                 return Reuse.GetScopedServiceExpression(singletonScopeExpr, factoryID, factoryExpr);
