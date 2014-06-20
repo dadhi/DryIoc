@@ -770,7 +770,7 @@ namespace DryIoc
         /// <remarks>Method relies on underlying array for index range checking.</remarks>
         public T Get(int index)
         {
-            return Length <= NODE_ARRAY_LENGTH ? _tree.Value[index]
+            return _treeHasSingleNode ? _tree.Value[index]
                 : _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BIT_MASK];
         }
 
@@ -785,6 +785,7 @@ namespace DryIoc
         private const int NODE_ARRAY_BIT_COUNT = 5;                    // number of set bits in NODE_ARRAY_BIT_MASK.
 
         private readonly HashTree<int, T[]> _tree;
+        private readonly bool _treeHasSingleNode;
 
         private AppendableArray() : this(0, HashTree<int, T[]>.Empty) { }
 
@@ -792,6 +793,7 @@ namespace DryIoc
         {
             Length = length;
             _tree = tree;
+            _treeHasSingleNode = length <= NODE_ARRAY_LENGTH;
         }
 
         #endregion
