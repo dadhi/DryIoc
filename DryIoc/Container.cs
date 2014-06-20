@@ -675,24 +675,19 @@ namespace DryIoc
 
     public sealed class FactoryDelegateParameter
     {
-        public static FactoryDelegateParameter WithNewResolutionScope(ref FactoryDelegateParameter param)
-        {
-            if (param.ResolutionScope == null)
-            {
-                var oldParam = param;
-                var newParam = new FactoryDelegateParameter(param.State, param.SingletonScope, param.CurrentScope, new Scope());
-                if (Interlocked.CompareExchange(ref param, newParam, oldParam) == oldParam)
-                    return param;
-            }
-            return param;
-        }
-
         public readonly AppendableArray<object> State;
         public readonly Scope SingletonScope, CurrentScope, ResolutionScope;
 
         public FactoryDelegateParameter New(Scope singletonScope, Scope currentScope)
         {
             return new FactoryDelegateParameter(AppendableArray<object>.Empty, singletonScope, currentScope, null);
+        }
+
+        public static FactoryDelegateParameter WithNewResolutionScope(ref FactoryDelegateParameter param)
+        {
+            if (param.ResolutionScope == null)
+                Ref.Swap(ref param, p => new FactoryDelegateParameter(p.State, p.SingletonScope, p.CurrentScope, new Scope()));
+            return param;
         }
 
         public FactoryDelegateParameter(AppendableArray<object> state, 
@@ -3088,6 +3083,11 @@ namespace DryIoc
             return new Ref<T>(value);
         }
 
+        /// <remarks>
+        /// First, it evaluates new value using <paramref name="update"/> function. 
+        /// Second, it checks that original value is not changed. 
+        /// If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="update"/>).
+        /// </remarks>
         public static T Swap<T>(ref T value, Func<T, T> update) where T : class
         {
             var retryCount = 0;
@@ -3098,12 +3098,12 @@ namespace DryIoc
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > RETRY_COUNT_UNTIL_THROW)
-                    throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_COUNT);
+                    throw new InvalidOperationException(ERROR_RETRY_COUNT_EXCEEDED);
             }
         }
 
         private const int RETRY_COUNT_UNTIL_THROW = 10;
-        private static readonly string ERROR_EXCEEDED_RETRY_COUNT =
+        private static readonly string ERROR_RETRY_COUNT_EXCEEDED =
             "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
     }
 
@@ -3118,16 +3118,7 @@ namespace DryIoc
 
         public T Swap(Func<T, T> update)
         {
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = _value;
-                var newValue = update(oldValue);
-                if (Interlocked.CompareExchange(ref _value, newValue, oldValue) == oldValue)
-                    return oldValue;
-                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
-                    throw new InvalidOperationException(ERROR_EXCEEDED_RETRY_COUNT);
-            }
+            return Ref.Swap(ref _value, update);
         }
 
         public T Set(T value)
@@ -3136,9 +3127,5 @@ namespace DryIoc
         }
 
         private T _value;
-
-        private const int RETRY_COUNT_UNTIL_THROW = 10;
-        private static readonly string ERROR_EXCEEDED_RETRY_COUNT =
-            "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
     }
 }
