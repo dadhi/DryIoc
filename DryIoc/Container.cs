@@ -799,16 +799,22 @@ namespace DryIoc
             return -1;
         }
 
+        /// <remarks>Method relies on underlying array for index range checking.</remarks>
         public T Get(int index)
         {
-            return index <= NODE_ARRAY_BITS ? _tree.Value[index]
-                : _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BITS];
+            return Length <= NODE_ARRAY_LENGTH ? _tree.Value[index]
+                : _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BIT_MASK];
         }
 
         #region Implementation
 
-        private const int NODE_ARRAY_BITS = 31;     // (11111 binary). So the array would be size of 32. Make it 15 (1111) and BIT_COUNT=4 for array of size 16
-        private const int NODE_ARRAY_BIT_COUNT = 5; // number of bits in NODE_ARRAY_BITS.
+        // Node array length is number of items stored per tree node. 
+        // When the item added to same node, array will be copied. So if array is too long performance will degrade.
+        // Should be power of two: e.g. 2, 4, 8, 16, 32...
+        internal const int NODE_ARRAY_LENGTH = 32;
+
+        private const int NODE_ARRAY_BIT_MASK = NODE_ARRAY_LENGTH - 1; // for length 32 will be 11111 binary.
+        private const int NODE_ARRAY_BIT_COUNT = 5;                    // number of set bits in NODE_ARRAY_BIT_MASK.
 
         private readonly HashTree<int, T[]> _tree;
 
@@ -1064,7 +1070,7 @@ namespace DryIoc
 
         public static bool IsFunc(this Request request)
         {
-            return request != null && request.OpenGenericServiceType != null 
+            return request != null && request.OpenGenericServiceType != null
                 && FuncTypes.Contains(request.OpenGenericServiceType);
         }
 

@@ -40,6 +40,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AvlTree.cs" />
+    <Compile Include="BitCountTests.cs" />
     <Compile Include="BitOpVsIsOpSpeedTests.cs" />
     <Compile Include="CreateEnumerableWithExpressionTests.cs" />
     <Compile Include="DirectVsIndirectArrayAccessSpeedTests.cs" />

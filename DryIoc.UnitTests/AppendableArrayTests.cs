@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -66,6 +67,49 @@ namespace DryIoc.UnitTests
                 .Append("c");
 
             Assert.AreEqual(1, store.IndexOf("b"));
+        }
+
+        [Test]
+        public void Append_for_full_node_and_get_node_last_item()
+        {
+            var nodeArrayLength = AppendableArray<int>.NODE_ARRAY_LENGTH;
+            var array = AppendableArray<int>.Empty;
+            for (var i = 0; i <= nodeArrayLength; i++)
+                array = array.Append(i);
+
+            var item = array.Get(nodeArrayLength);
+
+            Assert.That(item, Is.EqualTo(nodeArrayLength));
+        }
+
+        /// <remarks>Issue #17 AppendableArray stops to work over 64 elements. (dev. branch)</remarks>
+        [Test]
+        public void Append_and_get_items_in_multiple_node_array()
+        {
+            var list = new List<Foo>();
+            var array = AppendableArray<Foo>.Empty;
+
+            for (var index = 0; index < 129; ++index)
+            {
+                var item = new Foo { Index = index };
+
+                list.Add(item);
+                array = array.Append(item);
+            }
+
+            for (var index = 0; index < list.Count; ++index)
+            {
+                var listItem = list[index];
+                var arrayItem = array.Get(index);
+
+                Assert.AreEqual(index, listItem.Index);
+                Assert.AreEqual(index, arrayItem.Index);
+            }
+        }
+
+        class Foo
+        {
+            public int Index;
         }
     }
 }
