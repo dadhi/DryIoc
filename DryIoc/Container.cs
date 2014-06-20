@@ -673,14 +673,6 @@ namespace DryIoc
         #endregion
     }
 
-    public sealed class FactoryDelegateParameter
-    {
-        public readonly Scope SingletonScope;
-        public readonly Scope CurrentScope;
-        public readonly Scope ResolutionScope;
-        public readonly AppendableArray<object> State = AppendableArray<object>.Empty;
-    }
-
     public sealed class ResolutionState
     {
         public static readonly ParameterExpression ResolutionStateParameter = Expression.Parameter(typeof(AppendableArray<object>), "state");
@@ -1801,11 +1793,6 @@ namespace DryIoc
         public readonly int ID;
         public readonly IReuse Reuse;
 
-        public IReuseNew ReuseNew
-        {
-            get { return new ResolutionScopeReuseNew(); }
-        }
-
         public FactorySetup Setup
         {
             get { return _setup; }
@@ -1854,36 +1841,6 @@ namespace DryIoc
             if (expression == null)
             {
                 expression = CreateExpression(request, registry);
-
-                if (ReuseNew != null)
-                {
-                    ReuseNew.Prepare(request, registry);
-
-                    var reuseExpr = request.ResolutionState.GetExpression(ReuseNew);
-                    var reuseMethod = typeof(IReuseNew).GetMethod("Of").MakeGenericMethod(expression.Type);
-                    
-                    var parent = request.Parent;
-                    if (parent != null && parent.Enumerate().Any(OpenGenericsSupport.IsFunc))
-                    {
-                        var expressionReused = Expression.Call(reuseExpr, reuseMethod,
-                            Expression.Constant(ID),
-                            expression.ToFactoryExpression(),
-                            ResolutionState.ResolutionStateParameter,
-                            ResolutionState.CurrentScopeParameter,
-                            ResolutionState.ResolutionScopeParameter);
-                    }
-                    else
-                    {
-                        var instance = ReuseNew.Of<object>(
-                            ID,
-                            expression.CompileToDelegate(),
-                            request.ResolutionState.State.Value,
-                            registry.CurrentScope,
-                            request.Scope.Value);
-                        var expressionReused = request.ResolutionState.GetExpression(instance, expression.Type);
-                    }
-                }
-
                 if (Reuse != null)
                     expression = Reuse.Of(request, registry, ID, expression);
 
@@ -2366,49 +2323,6 @@ namespace DryIoc
         private readonly object _syncRoot = new object();
 
         #endregion
-    }
-
-    public interface IReuseNew
-    {
-        void Prepare(Request request, IRegistry registry);
-
-        T Of<T>(int factoryID, FactoryDelegate factoryDelegate,
-            AppendableArray<object> resolutionState, Scope currentScope, Scope resolutionScope);
-    }
-
-    public class ResolutionScopeReuseNew : IReuseNew 
-    {
-        public void Prepare(Request request, IRegistry registry)
-        {
-            request.AddScope();
-        }
-
-        public T Of<T>(int factoryID, FactoryDelegate factoryDelegate, 
-            AppendableArray<object> resolutionState, Scope currentScope, Scope resolutionScope)
-        {
-            var instance = resolutionScope.GetOrAdd(factoryID,
-                () => (T)factoryDelegate(resolutionState, currentScope, resolutionScope));
-            return instance;
-        }
-    }
-
-    public class SingletonReuseNew : IReuseNew
-    {
-        private int _singletonScopeID;
-
-        public void Prepare(Request request, IRegistry registry)
-        {
-            _singletonScopeID = request.ResolutionState.GetOrAddToState(registry.SingletonScope);
-        }
-
-        public T Of<T>(int factoryID, FactoryDelegate factoryDelegate,
-            AppendableArray<object> resolutionState, Scope currentScope, Scope resolutionScope)
-        {
-            var singletonScope = (Scope)resolutionState.Get(_singletonScopeID);
-            var instance = singletonScope.GetOrAdd(factoryID,
-                () => (T)factoryDelegate(resolutionState, currentScope, resolutionScope));
-            return instance;
-        }
     }
 
     public interface IReuse
