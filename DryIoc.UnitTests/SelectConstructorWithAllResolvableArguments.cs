@@ -81,34 +81,36 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<SomeClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
 
-            var func = container.Resolve<Func<int, IService, SomeClient>>();
+            var func = container.Resolve<Func<int, Service, SomeClient>>();
 
             Assert.That(func(3, null).Seed, Is.EqualTo(3));
         }
 
-        [Test][Ignore("Not supported yet")]
+        [Test]
         public void Skip_constructor_selection_for_Func_resolution_test_2()
         {
             var container = new Container();
             container.Register<SomeClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
+            container.Register<Service>();
 
             container.Resolve<Func<int, SomeClient>>();
         }
 
         public interface IDependency { }
-        public interface IService { }
+
+        public class Service { }
 
         public class SomeClient
         {
             public readonly int Seed = 1;
-            public readonly IService Service;
+            public readonly Service Service;
             public readonly IDependency Dependency;
 
             // Won't be selected because constructor with IDependency will be selected first.
             public SomeClient() { }
 
             // Won't be selected because nor Int32 nor IService is registered in Container.
-            public SomeClient(int seed, IService service)
+            public SomeClient(int seed, Service service)
             {
                 Service = service;
                 Seed = seed;

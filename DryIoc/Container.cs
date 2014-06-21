@@ -686,11 +686,12 @@ namespace DryIoc
         public static FactoryDelegateParameter WithNewResolutionScope(ref FactoryDelegateParameter param)
         {
             if (param.ResolutionScope == null)
-                Ref.Swap(ref param, p => new FactoryDelegateParameter(p.State, p.SingletonScope, p.CurrentScope, new Scope()));
+                Ref.Swap(ref param, p => p.ResolutionScope != null ? p 
+                    : new FactoryDelegateParameter(p.State, p.SingletonScope, p.CurrentScope, new Scope()));
             return param;
         }
 
-        public FactoryDelegateParameter(AppendableArray<object> state, 
+        public FactoryDelegateParameter(AppendableArray<object> state,
             Scope singletonScope, Scope currentScope, Scope resolutionScope)
         {
             State = state;
@@ -1886,7 +1887,7 @@ namespace DryIoc
 
                     var reuseExpr = request.ResolutionState.GetExpression(ReuseNew);
                     var reuseMethod = typeof(IReuseNew).GetMethod("Of").MakeGenericMethod(expression.Type);
-                    
+
                     var parent = request.Parent;
                     if (parent != null && parent.Enumerate().Any(OpenGenericsSupport.IsFunc))
                     {
@@ -1994,19 +1995,65 @@ namespace DryIoc
             if (request.Parent.IsFuncWithArgs())
             {
                 var funcTypeArgs = request.Parent.ServiceType.GetGenericArguments();
-                var inputTypeArgs = funcTypeArgs.RemoveAt(funcTypeArgs.Length - 1);
-                var ctorWithAllInputArgs = ctors.FirstOrDefault(
-                    c => inputTypeArgs.All(t => c.GetParameters().Any(p => p.ParameterType == t)));
-                return ctorWithAllInputArgs;
+                var inputArgCount = funcTypeArgs.Length - 1;
+                var inputArgs = funcTypeArgs.RemoveAt(inputArgCount);
+
+                for (var c = 0; c < ctors.Length; c++)
+                {
+                    var ctor = ctors[c];
+                    var ctorParams = ctor.GetParameters();
+                    if (ctorParams.Length < inputArgCount)
+                        continue;
+
+                    // Restore input arguments if search is failed with previous ctor halfway.
+                    if (inputArgCount < funcTypeArgs.Length - 1)
+                    {
+                        inputArgCount = funcTypeArgs.Length - 1;
+                        for (var i = 0; i < inputArgCount; i++)
+                            inputArgs[i] = funcTypeArgs[i];
+                    }
+
+                    // Optimistically mark ctor as matched, and check each parameter to see if we are right.
+                    var ctorMatched = true;
+                    for (var p = 0; ctorMatched && p < ctorParams.Length; p++)
+                    {
+                        var ctorParam = ctorParams[p];
+                        var inputArgMatched = false;
+                        if (inputArgCount > 0)
+                        {
+                            var inputArgIndex = Array.IndexOf(inputArgs, ctorParam.ParameterType);
+                            if (inputArgIndex != -1)
+                            {
+                                inputArgCount--;
+                                inputArgs[inputArgIndex] = null;
+                                    // mark argument as matched to skip it for next ctor param.
+                                inputArgMatched = true;
+                            }
+                        }
+
+                        // Matches only if input argument is matches or it is resolvable. Otherwise it is not.
+                        ctorMatched = inputArgMatched ||
+                                      registry.ResolveFactory(request.Push(ctorParam, registry), IfUnresolved.ReturnNull) !=
+                                      null;
+                    }
+
+                    if (ctorMatched)
+                        return ctor;
+                }
+            }
+            else
+            {
+                var ctorWithResolvableArgs = ctors.Select(c => new {Ctor = c, Params = c.GetParameters()})
+                    .OrderByDescending(x => x.Params.Length)
+                    .FirstOrDefault(x =>
+                        x.Params.All(
+                            p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null));
+
+                return ctorWithResolvableArgs
+                    .ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
             }
 
-            var ctorWithResolvableArgs = ctors.Select(c => new { Ctor = c, Params = c.GetParameters() })
-                .OrderByDescending(x => x.Params.Length)
-                .FirstOrDefault(x =>
-                    x.Params.All(p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null));
-
-            return ctorWithResolvableArgs
-                .ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
+            return null;
         }
 
         #endregion
@@ -2401,14 +2448,14 @@ namespace DryIoc
             AppendableArray<object> resolutionState, Scope currentScope, Scope resolutionScope);
     }
 
-    public class ResolutionScopeReuseNew : IReuseNew 
+    public class ResolutionScopeReuseNew : IReuseNew
     {
         public void Prepare(Request request, IRegistry registry)
         {
             request.AddScope();
         }
 
-        public T Of<T>(int factoryID, FactoryDelegate factoryDelegate, 
+        public T Of<T>(int factoryID, FactoryDelegate factoryDelegate,
             AppendableArray<object> resolutionState, Scope currentScope, Scope resolutionScope)
         {
             var instance = resolutionScope.GetOrAdd(factoryID,

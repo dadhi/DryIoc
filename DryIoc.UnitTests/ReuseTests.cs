@@ -86,7 +86,7 @@ namespace DryIoc.UnitTests
             Assert.That(consumer.Log, Is.Not.Null.And.Not.SameAs(account.Log));
         }
 
-        [Test]
+        [Test][Ignore]
         public void For_signleton_injected_as_Func_and_as_instance_only_one_instance_should_be_created()
         {
             ServiceWithInstanceCountWithStringParam.InstanceCount = 0;
