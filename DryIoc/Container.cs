@@ -63,33 +63,32 @@ namespace DryIoc
         }
 
         public Container(
-            ResolutionRules resolutionRules,
-            HashTree<Type, object> factories,
-            HashTree<Type, Factory[]> decorators,
-            HashTree<Type, Factory> genericWrappers,
+            Ref<ResolutionRules> resolutionRules,
+            Ref<HashTree<Type, object>> factories,
+            Ref<HashTree<Type, Factory[]>> decorators,
+            Ref<HashTree<Type, Factory>> genericWrappers,
             Scope singletonScope,
             Scope currentScope)
         {
-            _resolutionRules = Ref.Of(resolutionRules);
+            _resolutionRules = resolutionRules;
 
-            _factories = Ref.Of(factories);
-            _decorators = Ref.Of(decorators);
-            _genericWrappers = Ref.Of(genericWrappers);
+            _factories = factories;
+            _decorators = decorators;
+            _genericWrappers = genericWrappers;
 
             _singletonScope = singletonScope;
             _currentScope = currentScope;
 
             _resolutionState = new ResolutionState(FactoryDelegateParam.New(singletonScope, currentScope));
-
             _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
             _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
         }
 
         public Container CreateReuseScope()
         {
-            return new Container(ResolutionRules.Value,
-                _factories.Value, _decorators.Value, _genericWrappers.Value,
-                _singletonScope, currentScope: new Scope());
+            return new Container(ResolutionRules, 
+                _factories, _decorators, _genericWrappers, _singletonScope,
+                currentScope: new Scope());
         }
 
         public Container CreateChildContainer()
@@ -108,10 +107,8 @@ namespace DryIoc
 
         public Container WipeResolutionCache()
         {
-            return new Container(
-                _resolutionRules.Value,
-                _factories.Value, _decorators.Value, _genericWrappers.Value,
-                _singletonScope, _currentScope);
+            return new Container(_resolutionRules, 
+                _factories, _decorators, _genericWrappers, _singletonScope, _currentScope);
         }
 
         public void Dispose()
