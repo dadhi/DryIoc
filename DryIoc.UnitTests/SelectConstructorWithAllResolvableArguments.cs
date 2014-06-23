@@ -37,10 +37,9 @@ namespace DryIoc.UnitTests
 
             container.Register<YetAnotherClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
 
-            var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<YetAnotherClient>());
+            var ex = Assert.Throws<ContainerException>(() => container.Resolve<YetAnotherClient>());
 
-            Assert.That(ex.Message, Is.StringStarting("Unable to select constructor with all resolvable arguments "));
+            Assert.That(ex.Message, Is.StringStarting("Unable to find constructor with all resolvable parameters"));
         }
 
         [Test]
@@ -76,41 +75,58 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Skip_constructor_selection_for_Func_resolution()
+        public void For_func_with_arguments_Constructor_containing_all_func_args_should_be_selected()
         {
             var container = new Container();
             container.Register<SomeClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
 
-            var func = container.Resolve<Func<int, Service, SomeClient>>();
+            var func = container.Resolve<Func<int, SomeService, SomeClient>>();
 
             Assert.That(func(3, null).Seed, Is.EqualTo(3));
         }
 
         [Test]
-        public void Skip_constructor_selection_for_Func_resolution_test_2()
+        public void For_func_with_arguments_Constructor_with_more_resolvable_arguments_should_be_preferred_over_less_or_no_args()
         {
             var container = new Container();
             container.Register<SomeClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
-            container.Register<Service>();
+            container.Register<IDependency, SomeDependency>();
 
-            container.Resolve<Func<int, SomeClient>>();
+            var func = container.Resolve<Func<int, SomeClient>>();
+
+            Assert.That(func(4).Dependency, Is.InstanceOf<SomeDependency>());
         }
 
-        public interface IDependency { }
+        [Test]
+        public void For_func_with_arguments_When_no_matching_constructor_found_Then_it_should_throw()
+        {
+            var container = new Container();
+            container.Register<SomeClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
 
-        public class Service { }
+            var ex = Assert.Throws<ContainerException>(() => container.Resolve<Func<string, SomeClient>>());
+
+            Assert.That(ex.Message, Is.StringStarting("Unable to find constructor with all parameters matching Func signature"));
+        }
+
+        #region CUT
+
+        public interface IDependency {}
+
+        internal class SomeDependency : IDependency {}
+
+        public class SomeService {}
 
         public class SomeClient
         {
             public readonly int Seed = 1;
-            public readonly Service Service;
+            public readonly SomeService Service;
             public readonly IDependency Dependency;
 
             // Won't be selected because constructor with IDependency will be selected first.
-            public SomeClient() { }
+            public SomeClient() {}
 
             // Won't be selected because nor Int32 nor IService is registered in Container.
-            public SomeClient(int seed, Service service)
+            public SomeClient(int seed, SomeService service)
             {
                 Service = service;
                 Seed = seed;
@@ -122,13 +138,17 @@ namespace DryIoc.UnitTests
                 Dependency = dependency;
             }
 
+            public SomeClient(int seed)
+            {
+                Seed = seed;
+            }
+
             public SomeClient(IDependency dependency, int seed)
             {
                 Dependency = dependency;
                 Seed = seed;
             }
         }
-
 
         public class AnotherClient
         {
@@ -158,7 +178,9 @@ namespace DryIoc.UnitTests
 
         public class InternalClient
         {
-            internal InternalClient() { }
+            internal InternalClient() {}
         }
+
+        #endregion
     }
 }

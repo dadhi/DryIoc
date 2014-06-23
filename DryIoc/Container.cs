@@ -37,14 +37,12 @@ namespace DryIoc
     /// <summary>
     /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
     /// TODO:
-    /// - add: Resolution condition to Factory.Setup
     /// - change: Minimize Expression use by wrapping helper expression constructs into methods.
     /// - add: CreateContainerWithWipedCache.
     /// - change: FactoryDelegate to have single ResolutionState parameter with Scopes and Registry available from it.
     /// - change: Add Container.FactoryCompiler and optional compiler to dynamic Assembly in .NET 4
     /// - finish: CreateChildContainer and CreateScopedContainer.
-    /// - add: Interception/AOP support either with RealProxy or other AOP framework.
-    /// - add: ReflectionFactoryProvider to configure default value for ConstructorSelector.
+    /// - add: ReflectionFactory setup to configure default value for ConstructorSelector.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
@@ -686,7 +684,7 @@ namespace DryIoc
         public static FactoryDelegateParameter WithNewResolutionScope(ref FactoryDelegateParameter param)
         {
             if (param.ResolutionScope == null)
-                Ref.Swap(ref param, p => p.ResolutionScope != null ? p 
+                Ref.Swap(ref param, p => p.ResolutionScope != null ? p
                     : new FactoryDelegateParameter(p.State, p.SingletonScope, p.CurrentScope, new Scope()));
             return param;
         }
@@ -1255,8 +1253,12 @@ namespace DryIoc
         public static readonly string UNABLE_TO_GET_CTOR_USING_CTOR_SELECTOR =
             "Unable to get constructor of {0} using provided constructor selector.";
 
-        public static readonly string UNABLE_TO_SELECT_CTOR_WITH_ALL_RESOLVABLE_ARGS =
-            "Unable to select constructor with all resolvable arguments when resolving {0}.";
+        public static readonly string UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS =
+            "Unable to find constructor with all resolvable parameters when resolving {0}.";
+
+        public static readonly string UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS =
+            "Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine +
+            "and the rest of parameters resolvable from Container when resolving: {1}.";
     }
 
     public static class Registrator
@@ -1986,74 +1988,46 @@ namespace DryIoc
         {
             var ctors = type.GetConstructors();
             if (ctors.Length == 0)
-                return null;
-
+                return null; // Delegate handling of constructor absence to caller code.
+                                
             if (ctors.Length == 1)
                 return ctors[0];
 
-            // For Func with arguments select constructor which contain all input Func arguments.
+            var ctorsWithMoreParamsFirst = ctors
+                .Select(c => new { Ctor = c, Params = c.GetParameters() })
+                .OrderByDescending(x => x.Params.Length);
+
             if (request.Parent.IsFuncWithArgs())
             {
-                var funcTypeArgs = request.Parent.ServiceType.GetGenericArguments();
-                var inputArgCount = funcTypeArgs.Length - 1;
-                var inputArgs = funcTypeArgs.RemoveAt(inputArgCount);
+                // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
+                var funcType = request.Parent.ServiceType;
+                var funcArgs = funcType.GetGenericArguments();
+                var inputArgCount = funcArgs.Length - 1;
 
-                for (var c = 0; c < ctors.Length; c++)
-                {
-                    var ctor = ctors[c];
-                    var ctorParams = ctor.GetParameters();
-                    if (ctorParams.Length < inputArgCount)
-                        continue;
-
-                    // Restore input arguments if search is failed with previous ctor halfway.
-                    if (inputArgCount < funcTypeArgs.Length - 1)
+                var matchedCtor = ctorsWithMoreParamsFirst
+                    .Where(x => x.Params.Length >= inputArgCount)
+                    .FirstOrDefault(x =>
                     {
-                        inputArgCount = funcTypeArgs.Length - 1;
-                        for (var i = 0; i < inputArgCount; i++)
-                            inputArgs[i] = funcTypeArgs[i];
-                    }
-
-                    // Optimistically mark ctor as matched, and check each parameter to see if we are right.
-                    var ctorMatched = true;
-                    for (var p = 0; ctorMatched && p < ctorParams.Length; p++)
-                    {
-                        var ctorParam = ctorParams[p];
-                        var inputArgMatched = false;
-                        if (inputArgCount > 0)
+                        var matchedIndecesMask = 0;
+                        return x.Params.Except(x.Params.Where(p =>
                         {
-                            var inputArgIndex = Array.IndexOf(inputArgs, ctorParam.ParameterType);
-                            if (inputArgIndex != -1)
-                            {
-                                inputArgCount--;
-                                inputArgs[inputArgIndex] = null;
-                                    // mark argument as matched to skip it for next ctor param.
-                                inputArgMatched = true;
-                            }
-                        }
+                            var inputArgIndex = funcArgs.IndexOf(t => t == p.ParameterType);
+                            if (inputArgIndex == -1 || inputArgIndex == inputArgCount ||
+                                (matchedIndecesMask & inputArgIndex << 1) != 0) // input argument was already matched by another parameter
+                                return false;
+                            matchedIndecesMask |= inputArgIndex << 1;
+                            return true;
+                        })).All(p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null);
+                    });
 
-                        // Matches only if input argument is matches or it is resolvable. Otherwise it is not.
-                        ctorMatched = inputArgMatched ||
-                                      registry.ResolveFactory(request.Push(ctorParam, registry), IfUnresolved.ReturnNull) !=
-                                      null;
-                    }
-
-                    if (ctorMatched)
-                        return ctor;
-                }
+                return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS, funcType, request).Ctor;
             }
             else
             {
-                var ctorWithResolvableArgs = ctors.Select(c => new {Ctor = c, Params = c.GetParameters()})
-                    .OrderByDescending(x => x.Params.Length)
-                    .FirstOrDefault(x =>
-                        x.Params.All(
-                            p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null));
-
-                return ctorWithResolvableArgs
-                    .ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
+                var matchedCtor = ctorsWithMoreParamsFirst
+                    .FirstOrDefault(x => x.Params.All(p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null));
+                return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
             }
-
-            return null;
         }
 
         #endregion
@@ -2179,7 +2153,8 @@ namespace DryIoc
             {
                 if (funcInputParamExprs[fp] == null) // unused parameter
                 {
-                    if (unusedFuncArgs == null) unusedFuncArgs = new List<Type>(2);
+                    if (unusedFuncArgs == null)
+                        unusedFuncArgs = new List<Type>(2);
                     var funcParamType = funcParamTypes[fp];
                     unusedFuncArgs.Add(funcParamType);
                     funcInputParamExprs[fp] = Expression.Parameter(funcParamType, "_");
