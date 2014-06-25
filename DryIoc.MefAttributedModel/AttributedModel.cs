@@ -35,7 +35,6 @@ namespace DryIoc.MefAttributedModel
     /// <summary>
     /// Implements MEF Attributed Programming Model. Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel.
     /// TODO:
-    /// + add: Support for DryIoc Reuse, currently only Transient and Singleton is supported. Maybe add ReuseAttribute.
     /// - add: ImportAttribute.ContractType and AllowDefault support.
     /// </summary>
     public static class AttributedModel
@@ -52,10 +51,9 @@ namespace DryIoc.MefAttributedModel
 
         public static Container WithAttributedModel(this Container container)
         {
-            container.ResolutionRules.Swap(rules => rules
-                .With(rules.ForConstructorParameterServiceKey.Append(GetConstructorParameterServiceKeyOrDefault))
-                .With(rules.ForPropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
-            return container;
+            return container.WithNewRules(container.ResolutionRules
+                .With(GetConstructorParameterServiceKeyOrDefault)
+                .With(TryGetPropertyOrFieldServiceKey));
         }
 
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)

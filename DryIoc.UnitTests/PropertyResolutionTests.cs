@@ -90,18 +90,16 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_property_marked_with_Import()
         {
-            var container = new Container();
+            var container = new Container(ResolutionRules.Default.With(
+                (out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
+                {
+                    resultKey = null;
+                    return propertyOrField.GetCustomAttributes(typeof(ImportAttribute), false).Length != 0;
+                }));
+
             container.Register<FunnyChicken>();
             container.Register<Guts>();
             container.Register<Brain>();
-
-            container.ResolutionRules.Swap(rules => 
-                rules.With(rules.ForPropertyOrFieldWithServiceKey.Append(
-                    (out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
-                    {
-                        resultKey = null;
-                        return propertyOrField.GetCustomAttributes(typeof(ImportAttribute), false).Length != 0;
-                    })));
 
             var chicken = container.Resolve<FunnyChicken>();
 
@@ -111,14 +109,12 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_field_marked_with_Import()
         {
-            var container = new Container();
+            var container = new Container(ResolutionRules.Default.With(TryGetPropertyOrFieldServiceKey));
+
             container.Register<FunnyChicken>();
             container.Register<Guts>();
             container.Register<Brain>();
-
-            container.ResolutionRules.Swap(rules =>
-                rules.With(rules.ForPropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
-            
+           
             var chicken = container.Resolve<FunnyChicken>();
 
             Assert.That(chicken.SomeBrain, Is.Not.Null);
@@ -127,11 +123,9 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_not_throw_on_resolving_readonly_field_marked_with_Import()
         {
-            var container = new Container();
-            container.Register<FunnyDuckling>();
+            var container = new Container(ResolutionRules.Default.With(TryGetPropertyOrFieldServiceKey));
 
-            container.ResolutionRules.Swap(rules =>
-                rules.With(rules.ForPropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
+            container.Register<FunnyDuckling>();
 
             Assert.DoesNotThrow(() =>
                 container.Resolve<FunnyDuckling>());
@@ -140,12 +134,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_Func_of_field_marked_with_Import()
         {
-            var container = new Container();
+            var container = new Container(ResolutionRules.Default.With(TryGetPropertyOrFieldServiceKey));
+
             container.Register<FunkyChicken>();
             container.Register<Guts>();
-
-            container.ResolutionRules.Swap(rules =>
-                rules.With(rules.ForPropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
 
             var chicken = container.Resolve<FunkyChicken>();
 
@@ -155,12 +147,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_named_Lazy_of_property_marked_with_Import()
         {
-            var container = new Container();
+            var container = new Container(ResolutionRules.Default.With(TryGetPropertyOrFieldServiceKey));
+
             container.Register<LazyChicken>();
             container.Register<Guts>(named: "lazy-me");
-
-            container.ResolutionRules.Swap(rules =>
-                rules.With(rules.ForPropertyOrFieldWithServiceKey.Append(TryGetPropertyOrFieldServiceKey)));
 
             var chicken = container.Resolve<LazyChicken>();
 

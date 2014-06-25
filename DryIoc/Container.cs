@@ -43,13 +43,12 @@ namespace DryIoc
     /// - change: Add Container.FactoryCompiler and optional compiler to dynamic Assembly in .NET 4
     /// - finish: CreateChildContainer and CreateScopedContainer.
     /// - add: ReflectionFactory setup to configure default value for ConstructorSelector.
-    /// - change: Add reuse to Setup, as it is not supported by decorators.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
         public Container(ResolutionRules resolutionRules = null)
         {
-            _resolutionRules = Ref.Of(resolutionRules ?? DryIoc.ResolutionRules.Default);
+            ResolutionRules = resolutionRules ?? ResolutionRules.Default;
 
             _factories = Ref.Of(HashTree<Type, object>.Empty);
             _decorators = Ref.Of(HashTree<Type, Factory[]>.Empty);
@@ -63,14 +62,13 @@ namespace DryIoc
             _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
         }
 
-        public Container(
-            Ref<ResolutionRules> resolutionRules,
+        public Container(ResolutionRules resolutionRules,
             Ref<HashTree<Type, object>> factories,
             Ref<HashTree<Type, Factory[]>> decorators,
             Ref<HashTree<Type, Factory>> genericWrappers,
             Scope singletonScope, Scope currentScope)
         {
-            _resolutionRules = resolutionRules;
+            ResolutionRules = resolutionRules;
 
             _factories = factories;
             _decorators = decorators;
@@ -84,31 +82,30 @@ namespace DryIoc
             _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
         }
 
+        public Container WithNewRules(ResolutionRules newRules)
+        {
+            return new Container(newRules, _factories, _decorators, _genericWrappers, _singletonScope, _currentScope);
+        }
+
         public Container CreateReuseScope()
         {
-            return new Container(ResolutionRules,
-                _factories, _decorators, _genericWrappers, _singletonScope,
-                currentScope: new Scope());
+            return new Container(ResolutionRules, _factories, _decorators, _genericWrappers, _singletonScope, new Scope());
         }
 
         public Container CreateChildContainer()
         {
-            var rules = ResolutionRules.Value;
-            rules = rules.With((request, _) =>
+            return new Container(ResolutionRules.With((request, _) =>
             {
                 var parentRegistry = (IRegistry)this;
                 var factory = parentRegistry.ResolveFactory(request, IfUnresolved.ReturnNull);
-                if (factory == null)
-                    return null;
-                return new ExpressionFactory((req, __) => factory.GetExpression(req, parentRegistry));
-            });
-            return new Container(rules);
+                return factory == null ? null 
+                    : new ExpressionFactory((req, __) => factory.GetExpression(req, parentRegistry));
+            }));
         }
 
         public Container WipeResolutionCache()
         {
-            return new Container(_resolutionRules,
-                _factories, _decorators, _genericWrappers, _singletonScope, _currentScope);
+            return new Container(ResolutionRules, _factories, _decorators, _genericWrappers, _singletonScope, _currentScope);
         }
 
         public void Dispose()
@@ -288,19 +285,19 @@ namespace DryIoc
 
         #region IRegistry
 
-        public Ref<ResolutionRules> ResolutionRules { get { return _resolutionRules; } }
-
         RegistryWeakRef IRegistry.SelfWeakRef
         {
             get { return _selfWeakRef ?? (_selfWeakRef = new RegistryWeakRef(this)); }
         }
+
+        public ResolutionRules ResolutionRules { get; private set; }
 
         Scope IRegistry.SingletonScope { get { return _singletonScope; } }
         Scope IRegistry.CurrentScope { get { return _currentScope; } }
 
         Factory IRegistry.ResolveFactory(Request request, IfUnresolved ifUnresolved)
         {
-            var rules = ResolutionRules.Value;
+            var rules = ResolutionRules;
             var factory = GetFactoryOrDefault(request.ServiceType, request.ServiceKey, rules.FactorySelector);
             if (factory != null && factory.ProvidesFactoryForRequest)
                 factory = factory.GetFactoryForRequestOrDefault(request, this);
@@ -321,8 +318,8 @@ namespace DryIoc
 
         Factory IRegistry.GetFactoryOrDefault(Type serviceType, object serviceKey)
         {
-            return GetFactoryOrDefault(serviceType.ThrowIfNull(), serviceKey,
-                ResolutionRules.Value.FactorySelector, retryForOpenGenericServiceType: true);
+            return GetFactoryOrDefault(serviceType.ThrowIfNull(), serviceKey, ResolutionRules.FactorySelector, 
+                retryForOpenGenericServiceType: true);
         }
 
         IEnumerable<KV<object, Factory>> IRegistry.GetAllFactories(Type serviceType)
@@ -589,7 +586,6 @@ namespace DryIoc
         #region Internal State
 
         private RegistryWeakRef _selfWeakRef;
-        private readonly Ref<ResolutionRules> _resolutionRules;
 
         private readonly Ref<HashTree<Type, object>> _factories; // where object is Factory or KeyedFactoriesEntry
         private readonly Ref<HashTree<Type, Factory[]>> _decorators;
@@ -720,7 +716,7 @@ namespace DryIoc
             var itemExpr = _stateItemsExpressions.GetFirstValueByHashOrDefault(index);
             if (itemExpr == null)
             {
-                var indexExpr = Expression.Constant(index.ThrowIf(-1), typeof (int));
+                var indexExpr = Expression.Constant(index.ThrowIf(-1), typeof(int));
                 var itemObjExpr = Expression.Call(_stateExpr, _stateGetMethod, indexExpr);
                 itemExpr = Expression.Convert(itemObjExpr, itemType);
                 Interlocked.Exchange(ref _stateItemsExpressions, _stateItemsExpressions.AddOrUpdate(index, itemExpr));
@@ -749,11 +745,15 @@ namespace DryIoc
             Interlocked.Exchange(ref _factoryExpressions, _factoryExpressions.AddOrUpdate(factoryID, factoryExpression));
         }
 
-        private static readonly MethodInfo _stateGetMethod = typeof(AppendableArray<object>).GetMethod("Get");
+        #region Implementation
+
+        private static readonly MethodInfo _stateGetMethod = typeof (AppendableArray<object>).GetMethod("Get");
         private static readonly Expression _stateExpr = Expression.PropertyOrField(FactoryDelegateParamExpr, "State");
 
         private HashTree<int, Expression> _factoryExpressions = HashTree<int, Expression>.Empty;
         private HashTree<int, Expression> _stateItemsExpressions = HashTree<int, Expression>.Empty;
+
+        #endregion
     }
 
     public sealed class RegistryWeakRef
@@ -1642,7 +1642,7 @@ namespace DryIoc
         {
             var paramKey = ResolvedFactory.Setup.Type != FactoryType.Service
                 ? ServiceKey // propagate parent key for wrapper or decorator.
-                : registry.ResolutionRules.Value.ForConstructorParameterServiceKey.GetFirstNonDefault(r => r(ctorParam, this, registry));
+                : registry.ResolutionRules.ForConstructorParameterServiceKey.GetFirstNonDefault(r => r(ctorParam, this, registry));
             return Push(ctorParam.ParameterType, paramKey, ctorParam);
         }
 
@@ -1891,20 +1891,23 @@ namespace DryIoc
                     var reuseMethod = typeof(IReuseNew).GetMethod("Of").MakeGenericMethod(expression.Type);
 
                     var parent = request.Parent;
-
-                    if (parent == null || !parent.Enumerate().Any(OpenGenericsSupport.IsFunc))
-                    {
-                        var factoryDelegate = expression.CompileToDelegate();
-                        var p = request.ResolutionState.FactoryDelegateParam.Value;
-                        var instance = ReuseNew.Of<object>(ID, factoryDelegate, ref p);
-                        var expressionReused = request.ResolutionState.GetExpression(instance, expression.Type);
-                    }
-                    else
+                    if (parent != null && parent.Enumerate().Any(OpenGenericsSupport.IsFunc))
                     {
                         var factoryExpr = expression.ToFactoryExpression();
 
                         var expressionReused = Expression.Call(reuseExpr, reuseMethod,
                             Expression.Constant(ID), factoryExpr, ResolutionState.FactoryDelegateParamExpr);
+                    }
+                    else
+                    {
+                        // We need to create ResolutionScope on demand, and then use it when invoking factory delegate for resolution root.
+
+                        var factoryDelegate = expression.CompileToDelegate();
+
+                        var p = request.ResolutionState.FactoryDelegateParam.Value;
+                        
+                        var instance = ReuseNew.Of<object>(ID, factoryDelegate, ref p);
+                        var expressionReused = request.ResolutionState.GetExpression(instance, expression.Type);
                     }
                 }
 
@@ -2181,7 +2184,7 @@ namespace DryIoc
 
         private static Expression InitMembersIfRequired(Type implementationType, NewExpression newService, Request request, IRegistry registry)
         {
-            var rules = registry.ResolutionRules.Value;
+            var rules = registry.ResolutionRules;
             if (rules.ForPropertyOrFieldWithServiceKey.IsNullOrEmpty())
                 return newService;
 
@@ -2526,7 +2529,7 @@ namespace DryIoc
     {
         RegistryWeakRef SelfWeakRef { get; }
 
-        Ref<ResolutionRules> ResolutionRules { get; }
+        ResolutionRules ResolutionRules { get; }
 
         Scope CurrentScope { get; }
         Scope SingletonScope { get; }
@@ -2916,7 +2919,7 @@ namespace DryIoc
         }
 
         /// <remarks>
-        /// Based on Eric Lippert's http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
+        /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
         /// </remarks>
         public HashTree<K, V> RemoveOrUpdate(K key, ShouldUpdate<V> updateInstead = null)
         {
