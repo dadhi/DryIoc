@@ -57,7 +57,6 @@ namespace DryIoc
             _singletonScope = _currentScope = new Scope();
 
             _resolutionState = ResolutionState.New(_singletonScope, _currentScope);
-
             _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
             _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
         }
@@ -94,12 +93,12 @@ namespace DryIoc
 
         public Container CreateChildContainer()
         {
+            IRegistry parent = this;
             return new Container(ResolutionRules.With((request, _) =>
             {
-                var parentRegistry = (IRegistry)this;
-                var factory = parentRegistry.ResolveFactory(request, IfUnresolved.ReturnNull);
-                return factory == null ? null
-                    : new ExpressionFactory((req, __) => factory.GetExpression(req, parentRegistry));
+                var factory = parent.ResolveFactory(request, IfUnresolved.ReturnNull);
+                return factory == null ? null // unable to resolve from parent, proceed.
+                    : new ExpressionFactory((childRequest, ignoredChild) => factory.GetExpression(childRequest, parent));
             }));
         }
 
@@ -657,7 +656,6 @@ namespace DryIoc
 
         #endregion
 
-        public readonly Ref<AppendableArray<object>> Items;
         public readonly Scope SingletonScope, CurrentScope;
 
         public static ResolutionState New(Scope singletonScope, Scope currentScope)
@@ -670,17 +668,21 @@ namespace DryIoc
         public static Scope GetOrAddResolutionScope(ref ResolutionState state)
         {
             if (state._resolutionScope == null)
-                Ref.Swap(ref state, s => s._resolutionScope != null ? s
-                    : new ResolutionState(s.SingletonScope, s.CurrentScope, new Scope(),
-                        s.Items, s._itemsExpressions, s._factoryExpressions));
+                Ref.Swap(ref state, st => st.WithNewResolutionScope());
             return state._resolutionScope;
+        }
+
+        public ResolutionState WithNewResolutionScope()
+        {
+            return _resolutionScope != null ? this :
+                new ResolutionState(SingletonScope, CurrentScope, new Scope(), _items, _itemsExpressions, _factoryExpressions);
         }
 
         public int GetOrAddItem(object item)
         {
-            var index = Items.Value.IndexOf(item);
+            var index = _items.Value.IndexOf(item);
             if (index == -1)
-                Items.Swap(items =>
+                _items.Swap(items =>
                 {
                     index = items.IndexOf(item);
                     if (index == -1)
@@ -692,7 +694,7 @@ namespace DryIoc
 
         public object GetItem(int index)
         {
-            return Items.Value.Get(index);
+            return _items.Value.Get(index);
         }
 
         public Expression GetItemExpression(object item, Type itemType)
@@ -738,12 +740,13 @@ namespace DryIoc
             SingletonScope = singletonScope;
             CurrentScope = currentScope;
             _resolutionScope = resolutionScope;
-            Items = items;
+            _items = items;
             _itemsExpressions = itemsExpressions;
             _factoryExpressions = factoryExpressions;
         }
 
         private readonly Scope _resolutionScope;
+        private readonly Ref<AppendableArray<object>> _items;        
         private readonly Ref<HashTree<int, Expression>> _itemsExpressions, _factoryExpressions;
 
         #endregion
@@ -1602,11 +1605,7 @@ namespace DryIoc
         public ResolutionState ResolutionState
         {
             get { return _resolutionState.Value; }
-        }
-
-        public void SetResolutionState(ResolutionState state)
-        {
-            _resolutionState.Set(_ => state);
+            set { _resolutionState.Set(value); }
         }
 
         public Type OpenGenericServiceType
@@ -1891,8 +1890,7 @@ namespace DryIoc
                         var factoryDelegate = expression.CompileToDelegate();
                         var state = request.ResolutionState;
                         var reusedInstance = Reuse.Of(ID, factoryDelegate, ref state);
-                        if (state != request.ResolutionState)
-                            request.SetResolutionState(state);
+                        request.ResolutionState = state;
                         expression = request.ResolutionState.GetItemExpression(reusedInstance, expression.Type);
                     }
                 }
@@ -2321,8 +2319,7 @@ namespace DryIoc
                     var reusedInstance = Reuse.Of(ID,
                         s => _factoryDelegate(((RegistryWeakRef)s.GetItem(registryRefID)).Target),
                         ref state);
-                    if (state != request.ResolutionState)
-                        request.SetResolutionState(state);
+                    request.ResolutionState = state;
                     return _ => reusedInstance;
                 }
 
@@ -2448,6 +2445,10 @@ namespace DryIoc
         public object Of(int factoryID, FactoryDelegate factoryDelegate, ref ResolutionState state)
         {
             var s = state;
+            // container.SingletonScope.GetOrAdd(factoryID, () => factoryDelegate(container, state));
+            // container.CurrentScope.GetOrAdd(factoryID, () => factoryDelegate(container, state));
+            // ResolutionState.GetOrAddResolutionScope(ref state).GetOrAdd(factoryID, () => factoryDelegate(container, state));
+
             return state.CurrentScope.GetOrAdd(factoryID, () => factoryDelegate(s));
         }
     }
@@ -3157,7 +3158,12 @@ namespace DryIoc
 
         public T Set(Func<T, T> getValue)
         {
-            return Interlocked.Exchange(ref _value, getValue(_value));
+            return Set(getValue(_value));
+        }
+
+        public T Set(T value)
+        {
+            return Interlocked.Exchange(ref _value, value);
         }
 
         private T _value;

@@ -162,8 +162,8 @@ namespace DryIoc.UnitTests
             Assert.That(one.Dependency, Is.Not.SameAs(another.Dependency));
         }
 
-        [Test][Ignore]
-        public void It_ok_to_use_both_resolution_scope_and_singleton_reuse_in_same_resolution_root()
+        [Test]
+        public void Can_use_both_resolution_scope_and_singleton_reuse_in_same_resolution_root()
         {
             var container = new Container();
             container.Register<ServiceWithResolutionAndSingletonDependencies>();
