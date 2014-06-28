@@ -127,6 +127,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\ReuseTests.cs">
       <Link>ReuseTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\SelectConstructorWithAllResolvableArguments.cs">
+      <Link>SelectConstructorWithAllResolvableArguments.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\ThrowTests.cs">
       <Link>ThrowTests.cs</Link>
     </Compile>
@@ -135,6 +138,12 @@
     </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\TypeToolsTests.cs">
       <Link>TypeToolsTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\UnregisterTests.cs">
+      <Link>UnregisterTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\WipeResolutionCacheTests.cs">
+      <Link>WipeResolutionCacheTests.cs</Link>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

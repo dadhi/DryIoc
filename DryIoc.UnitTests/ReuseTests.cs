@@ -84,7 +84,8 @@ namespace DryIoc.UnitTests
             Assert.That(consumer.Log, Is.Not.Null.And.Not.SameAs(account.Log));
         }
 
-        [Test][Ignore]
+        [Test]
+        [Ignore]
         public void For_signleton_injected_as_Func_and_as_instance_only_one_instance_should_be_created()
         {
             ServiceWithInstanceCountWithStringParam.InstanceCount = 0;
@@ -203,20 +204,18 @@ namespace DryIoc.UnitTests
 
     public class HttpContextReuse : IReuse
     {
+        public static readonly string ReuseItemKey = typeof(HttpContextReuse).Name;
+
         public bool IsEager { get { return false; } }
 
         public object Of(int factoryID, FactoryDelegate factoryDelegate, ref ResolutionState state)
         {
+            var items = HttpContext.Current.Items;
+            if (!items.Contains(ReuseItemKey)) 
+                items[ReuseItemKey] = new Scope();
+            var scope = (Scope)items[ReuseItemKey];
             var s = state;
-            return GetOrAddToContext(factoryID, () => factoryDelegate(s));
-        }
-
-        public static T GetOrAddToContext<T>(int factoryID, Func<T> factory)
-        {
-            var key = "IoC." + factoryID;
-            if (HttpContext.Current.Items[key] == null)
-                HttpContext.Current.Items[key] = factory();
-            return (T)HttpContext.Current.Items[key];
+            return scope.GetOrAdd(factoryID, () => factoryDelegate(s));
         }
     }
 
@@ -280,7 +279,7 @@ namespace DryIoc.UnitTests
         }
     }
 
-    internal class ResolutionScopeDep {}
+    internal class ResolutionScopeDep { }
 
     internal class SingletonDep
     {

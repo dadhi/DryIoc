@@ -112,7 +112,7 @@ namespace DryIoc.UnitTests
 
         public interface IDependency {}
 
-        internal class SomeDependency : IDependency {}
+        public class SomeDependency : IDependency {}
 
         public class SomeService {}
 

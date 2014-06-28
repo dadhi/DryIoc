@@ -2382,10 +2382,10 @@ namespace DryIoc
 
     public sealed class Scope : IDisposable
     {
-        public static readonly MethodInfo GetOrAddMethod = typeof(Scope).GetMethod("GetOrAdd");
         public T GetOrAdd<T>(int id, Func<T> factory)
         {
-            Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
+            if (_disposed == 1)
+                throw Error.SCOPE_IS_DISPOSED.Of();
             lock (_syncRoot)
             {
                 var item = _items.GetFirstValueByHashOrDefault(id);
@@ -2414,7 +2414,7 @@ namespace DryIoc
         private HashTree<int, object> _items = HashTree<int, object>.Empty;
         private int _disposed;
 
-        // Sync root is required to call factory once. The same as for Lazy<T>
+        // Sync root is required to create object once only. The same reason as for Lazy<T>.
         private readonly object _syncRoot = new object();
 
         #endregion
@@ -2476,14 +2476,6 @@ namespace DryIoc
         public static readonly IReuse Singleton = new SingletonReuse();
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
-
-        public static Expression GetScopedServiceExpression(Expression scope, int factoryID, Expression factoryExpr)
-        {
-            return Expression.Call(scope,
-                Scope.GetOrAddMethod.MakeGenericMethod(factoryExpr.Type),
-                Expression.Constant(factoryID),
-                Expression.Lambda(factoryExpr, null));
-        }
     }
 
     //public sealed class SingletonReuse : IReuse
