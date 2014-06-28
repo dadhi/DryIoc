@@ -179,15 +179,7 @@ namespace DryIoc.UnitTests
 
     public class ThreadReuse : IReuse
     {
-        public bool IsEager { get { return false; } }
-
-        public object Of(int factoryID, FactoryDelegate factoryDelegate, ref ResolutionState state)
-        {
-            var s = state;
-            return GetScope().GetOrAdd(factoryID, () => factoryDelegate(s));
-        }
-
-        private static Scope GetScope()
+        public Scope Of(Request request, IRegistry registry)
         {
             return _scope ?? (_scope = new Scope());
         }
@@ -206,16 +198,12 @@ namespace DryIoc.UnitTests
     {
         public static readonly string ReuseItemKey = typeof(HttpContextReuse).Name;
 
-        public bool IsEager { get { return false; } }
-
-        public object Of(int factoryID, FactoryDelegate factoryDelegate, ref ResolutionState state)
+        public Scope Of(Request request, IRegistry registry)
         {
             var items = HttpContext.Current.Items;
-            if (!items.Contains(ReuseItemKey)) 
+            if (!items.Contains(ReuseItemKey))
                 items[ReuseItemKey] = new Scope();
-            var scope = (Scope)items[ReuseItemKey];
-            var s = state;
-            return scope.GetOrAdd(factoryID, () => factoryDelegate(s));
+            return (Scope)items[ReuseItemKey];
         }
     }
 
