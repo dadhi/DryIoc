@@ -145,6 +145,7 @@
     <Compile Include="..\..\DryIoc.UnitTests\WipeResolutionCacheTests.cs">
       <Link>WipeResolutionCacheTests.cs</Link>
     </Compile>
+    <Compile Include="FactoryCompilerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
