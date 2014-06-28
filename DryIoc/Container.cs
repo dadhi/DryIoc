@@ -240,7 +240,7 @@ namespace DryIoc
         object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
             var factoryDelegate = _resolvedDefaultDelegates.GetValueOrDefault(serviceType);
-            return factoryDelegate != null ? factoryDelegate(_resolutionState)
+            return factoryDelegate != null ? factoryDelegate(_resolutionState, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved);
         }
 
@@ -254,7 +254,7 @@ namespace DryIoc
             var factoryDelegate = factory.GetDelegate(request, this);
             Interlocked.Exchange(ref _resolvedDefaultDelegates,
                 _resolvedDefaultDelegates.AddOrUpdate(serviceType, factoryDelegate));
-            return factoryDelegate(request.ResolutionState);
+            return factoryDelegate(request.ResolutionState, request.ResolutionScope);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
@@ -264,7 +264,7 @@ namespace DryIoc
             {
                 var factoryDelegate = factoryDelegates.GetValueOrDefault(serviceKey);
                 if (factoryDelegate != null)
-                    return factoryDelegate(_resolutionState);
+                    return factoryDelegate(_resolutionState, null);
             }
 
             var request = CreateRequest(serviceType, serviceKey);
@@ -276,7 +276,7 @@ namespace DryIoc
             Interlocked.Exchange(ref _resolvedKeyedDelegates,
                 _resolvedKeyedDelegates.AddOrUpdate(serviceType,
                 (factoryDelegates ?? HashTree<object, FactoryDelegate>.Empty).AddOrUpdate(serviceKey, newFactoryDelegate)));
-            return newFactoryDelegate(request.ResolutionState);
+            return newFactoryDelegate(request.ResolutionState, request.ResolutionScope);
         }
 
         #endregion
@@ -821,28 +821,23 @@ namespace DryIoc
         #endregion
     }
 
-    public delegate object FactoryDelegate(ResolutionState state);
+    public delegate object FactoryDelegate(ResolutionState state, Scope resolutionScope);
 
     public static partial class FactoryCompiler
     {
-        public static Expression<FactoryDelegate> ToFactoryExpression(this Expression expression, Request request)
+        public static Expression<FactoryDelegate> ToFactoryExpression(this Expression expression)
         {
             // Removing not required Convert from expression root, because CompiledFactory result still be converted at the end.
             if (expression.NodeType == ExpressionType.Convert)
                 expression = ((UnaryExpression)expression).Operand;
             if (expression.Type.IsValueType)
                 expression = Expression.Convert(expression, typeof(object));
-            if (request.ResolutionScope != null)
-            {
-                var funcWithScopeParam = Expression.Lambda<Func<Scope, object>>(expression, Request.RESOLUTION_SCOPE_PARAM_EXPR);
-                expression = Expression.Invoke(funcWithScopeParam, Expression.New(typeof(Scope)));
-            }
-            return Expression.Lambda<FactoryDelegate>(expression, ResolutionState.ParamExpr);
+            return Expression.Lambda<FactoryDelegate>(expression, ResolutionState.ParamExpr, Request.ResolutionScopeParamExpr);
         }
 
-        public static FactoryDelegate CompileToDelegate(this Expression expression, Request request)
+        public static FactoryDelegate CompileToDelegate(this Expression expression)
         {
-            var factoryExpression = expression.ToFactoryExpression(request);
+            var factoryExpression = expression.ToFactoryExpression();
             FactoryDelegate factoryDelegate = null;
             CompileToMethod(factoryExpression, ref factoryDelegate);
             // ReSharper disable ConstantNullCoalescingCondition
@@ -995,7 +990,7 @@ namespace DryIoc
             var serviceType = request.ServiceType.GetGenericArguments()[0];
             var serviceRequest = request.Push(serviceType, request.ServiceKey);
             var factory = registry.ResolveFactory(serviceRequest, IfUnresolved.Throw);
-            var factoryExpr = factory.GetExpression(serviceRequest, registry).ToFactoryExpression(serviceRequest);
+            var factoryExpr = factory.GetExpression(serviceRequest, registry).ToFactoryExpression();
             return Expression.New(ctor, request.ResolutionState.GetItemExpression(factoryExpr));
         }
 
@@ -1599,21 +1594,23 @@ namespace DryIoc
         }
     }
 
+    public enum FactoryType { Service, Decorator, GenericWrapper };
+
+    public enum FactoryCachePolicy { ShouldNotCacheExpression, CouldCacheExpression };
+
     public sealed class Request
     {
-        public static readonly ParameterExpression RESOLUTION_SCOPE_PARAM_EXPR = Expression.Parameter(typeof(Scope), "rs");
+        #region ResolutionScope
 
-        public readonly Request Parent;             // null for resolution root
-        public readonly Type ServiceType;
-        public readonly object ServiceKey;          // null by default, string for named or integer index for multiple defaults
-        public readonly object DependencyInfo;      // either Reflection.ParameterInfo, PropertyInfo or FieldInfo. Used for Print only
-        public readonly Factory ResolvedFactory;
+        public static readonly ParameterExpression ResolutionScopeParamExpr = Expression.Parameter(typeof (Scope), "rs");
 
-        public ResolutionState ResolutionState
+        public static Scope GetScope(ref Scope scope)
         {
-            get { return _resolutionState.Value; }
-            set { _resolutionState.Set(value); }
+            return scope = scope ?? new Scope();
         }
+
+        public static readonly MethodInfo GetScopeMethod = typeof (Request).GetMethod("GetScope");
+        public static readonly Expression ResolutionScopeExpr = Expression.Call(GetScopeMethod, ResolutionScopeParamExpr);
 
         public Scope ResolutionScope
         {
@@ -1625,6 +1622,20 @@ namespace DryIoc
             if (_resolutionScope.Value == null)
                 _resolutionScope.Swap(scope => scope ?? new Scope());
             return _resolutionScope.Value;
+        }
+
+        #endregion
+
+        public readonly Request Parent;             // null for resolution root
+        public readonly Type ServiceType;
+        public readonly object ServiceKey;          // null by default, string for named or integer index for multiple defaults
+        public readonly object DependencyInfo;      // either Reflection.ParameterInfo, PropertyInfo or FieldInfo. Used for Print only
+        public readonly Factory ResolvedFactory;
+
+        public ResolutionState ResolutionState
+        {
+            get { return _resolutionState.Value; }
+            set { _resolutionState.Set(value); }
         }
 
         public Type OpenGenericServiceType
@@ -1710,7 +1721,7 @@ namespace DryIoc
         {
             var message = new StringBuilder().Append(Print());
             return Parent == null ? message.ToString()
-                 : Parent.Enumerate().Aggregate(message,
+                : Parent.Enumerate().Aggregate(message,
                     (m, r) => m.AppendLine().Append("in ").Append(r.Print())).ToString();
         }
 
@@ -1735,10 +1746,6 @@ namespace DryIoc
 
         #endregion
     }
-
-    public enum FactoryType { Service, Decorator, GenericWrapper };
-
-    public enum FactoryCachePolicy { ShouldNotCacheExpression, CouldCacheExpression };
 
     public abstract class FactorySetup
     {
@@ -1908,8 +1915,8 @@ namespace DryIoc
                     if (scope == registry.SingletonScope &&
                         (request.Parent == null || !request.Parent.Enumerate().Any(OpenGenericsSupport.IsFunc)))
                     {
-                        var factoryDelegate = expression.CompileToDelegate(request);
-                        var reusedInstance = scope.GetOrAdd(ID, () => factoryDelegate(request.ResolutionState));
+                        var factoryDelegate = expression.CompileToDelegate();
+                        var reusedInstance = scope.GetOrAdd(ID, () => factoryDelegate(request.ResolutionState, request.ResolutionScope));
                         expression = request.ResolutionState.GetItemExpression(reusedInstance, expression.Type);
                     }
                     else
@@ -1954,7 +1961,7 @@ namespace DryIoc
 
         public virtual FactoryDelegate GetDelegate(Request request, IRegistry registry)
         {
-            return GetExpression(request, registry).CompileToDelegate(request);
+            return GetExpression(request, registry).CompileToDelegate();
         }
 
         public override string ToString()
@@ -1978,7 +1985,7 @@ namespace DryIoc
 
         protected Expression GetReusedItemExpression(Request request, Scope scope, Expression expression)
         {
-            var scopeExpr = scope == request.ResolutionScope ? Request.RESOLUTION_SCOPE_PARAM_EXPR
+            var scopeExpr = scope == request.ResolutionScope ? Request.ResolutionScopeExpr
                 : request.ResolutionState.GetItemExpression(scope, typeof(Scope));
 
             var getScopedItemMethod = typeof(Scope).GetMethod("GetOrAdd").MakeGenericMethod(expression.Type);
@@ -2323,12 +2330,12 @@ namespace DryIoc
         public DelegateFactory(Func<IResolver, object> userFactoryDelegate, IReuse reuse = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            _factoryDelegate = userFactoryDelegate.ThrowIfNull();
+            _customDelegate = userFactoryDelegate.ThrowIfNull();
         }
 
         public override Expression CreateExpression(Request request, IRegistry registry)
         {
-            var factoryDelegateExpr = request.ResolutionState.GetItemExpression(_factoryDelegate);
+            var factoryDelegateExpr = request.ResolutionState.GetItemExpression(_customDelegate);
             var registryExpr = request.ResolutionState.GetItemExpression(registry);
             return Expression.Convert(Expression.Invoke(factoryDelegateExpr, registryExpr), request.ServiceType);
         }
@@ -2343,16 +2350,16 @@ namespace DryIoc
                 if (Reuse != null)
                 {
                     var scope = Reuse.Of(request, registry);
-                    return state => scope.GetOrAdd(ID,
-                        () => _factoryDelegate(((RegistryWeakRef)state.GetItem(registryRefID)).Target));
+                    return (state, rs) => scope.GetOrAdd(ID,
+                        () => _customDelegate(((RegistryWeakRef)state.GetItem(registryRefID)).Target));
                 }
 
-                return state => _factoryDelegate(((RegistryWeakRef)state.GetItem(registryRefID)).Target);
+                return (state, rs) => _customDelegate(((RegistryWeakRef)state.GetItem(registryRefID)).Target);
             }
 
             // If decorator replaces decorated completely, just return it
             if (!(decorator is LambdaExpression))
-                return decorator.CompileToDelegate(request);
+                return decorator.CompileToDelegate();
 
             Expression expression = null;
             if (Setup.CachePolicy == FactoryCachePolicy.CouldCacheExpression)
@@ -2369,10 +2376,10 @@ namespace DryIoc
             }
 
             expression = Expression.Invoke(decorator, expression);
-            return expression.CompileToDelegate(request);
+            return expression.CompileToDelegate();
         }
 
-        private readonly Func<IResolver, object> _factoryDelegate;
+        private readonly Func<IResolver, object> _customDelegate;
     }
 
     public sealed class FactoryProvider : Factory
