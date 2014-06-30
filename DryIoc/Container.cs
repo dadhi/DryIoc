@@ -39,9 +39,7 @@ namespace DryIoc
     /// TODO:
     /// - add: CreateContainerWithWipedCache.
     /// - change: FactoryDelegate to have single ResolutionState parameter with Scopes and Registry available from it.
-    /// - change: Add Container.FactoryCompiler and optional compiler to dynamic Assembly in .NET 4
     /// - finish: CreateChildContainer and CreateScopedContainer.
-    /// - add: ReflectionFactory setup to configure default value for ConstructorSelector.
     /// </summary>
     public class Container : IRegistry, IDisposable
     {
