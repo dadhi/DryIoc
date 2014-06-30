@@ -44,6 +44,7 @@ namespace DryIoc
             _syncRoot = new object();
             _factories = new Dictionary<Type, FactoriesEntry>();
             _decorators = HashTree<Type, DecoratorEntry[]>.Empty;
+            _factoredExpressionCache = HashTree<int, Expression>.Empty;
             _defaultResolutionCache = HashTree<Type, CompiledFactory>.Empty;
             _keyedResolutionCache = HashTree<Type, HashTree<object, CompiledFactory>>.Empty;
 
@@ -226,6 +227,17 @@ namespace DryIoc
             var constantIndexExpr = Expression.Constant(constantIndex, typeof(int));
             var constantsAccesssExpr = Expression.ArrayIndex(ConstantsParameter, constantIndexExpr);
             return Expression.Convert(constantsAccesssExpr, constantType);
+        }
+
+        Expression IRegistry.GetCachedFactoryExpressionOrDefault(int factoryID)
+        {
+            return _factoredExpressionCache.GetValueOrDefault(factoryID);
+        }
+
+        void IRegistry.CacheFactoryExpression(int factoryID, Expression expression)
+        {
+            Interlocked.Exchange(ref _factoredExpressionCache,
+                _factoredExpressionCache.AddOrUpdate(factoryID, expression));
         }
 
         Factory IRegistry.GetOrAddFactory(Request request, IfUnresolved ifUnresolved)
@@ -440,9 +452,10 @@ namespace DryIoc
         private HashTree<Type, DecoratorEntry[]> _decorators;
 
         private object[] _constants;
+        private HashTree<int, Expression> _factoredExpressionCache;
         private HashTree<Type, CompiledFactory> _defaultResolutionCache;
         private HashTree<Type, HashTree<object, CompiledFactory>> _keyedResolutionCache;
-
+        
         #endregion
 
         #region Implementation
@@ -461,6 +474,7 @@ namespace DryIoc
             _syncRoot = parent._syncRoot;
             _factories = parent._factories;
             _decorators = parent._decorators;
+            _factoredExpressionCache = parent._factoredExpressionCache;
             _defaultResolutionCache = parent._defaultResolutionCache;
             _keyedResolutionCache = parent._keyedResolutionCache;
         }
@@ -1440,14 +1454,14 @@ when resolving {1}.";
             if (decorator != null && !(decorator is LambdaExpression))
                 return decorator;
 
-            var result = _cachedExpression;
+            var result = registry.GetCachedFactoryExpressionOrDefault(ID);
             if (result == null)
             {
                 result = CreateExpression(request, registry);
                 if (Reuse != null)
                     result = Reuse.Apply(request, registry, ID, result);
                 if (Setup.CachePolicy == FactoryCachePolicy.CouldCacheExpression)
-                    Interlocked.Exchange(ref _cachedExpression, result);
+                    registry.CacheFactoryExpression(ID, result);
             }
 
             if (decorator != null)
@@ -1489,7 +1503,6 @@ when resolving {1}.";
 
         private static int _idSeedAndCount;
         private FactorySetup _setup;
-        private Expression _cachedExpression;
 
         #endregion
     }
@@ -1945,6 +1958,9 @@ when resolving {1}.";
         Type GetWrappedServiceTypeOrSelf(Type serviceType);
 
         Expression GetConstantExpression(object constant, Type constantType);
+
+        Expression GetCachedFactoryExpressionOrDefault(int factoryID);
+        void CacheFactoryExpression(int factoryID, Expression expression);
     }
 
     public sealed class Many<TService>

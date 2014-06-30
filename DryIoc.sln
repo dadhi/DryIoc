@@ -49,6 +49,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Samples.CUT", "DryIo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Playground", "DryIoc.Playground\DryIoc.Playground.csproj", "{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Issues", "Issues", "{A880D1F3-3F36-4BBD-B51F-1DA57DF7F067}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.IssuesTests", "Issues\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj", "{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -239,6 +243,16 @@ Global
 		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{BDC14568-D0DD-4058-AA8D-175DC98BB5F9}.Release|x86.ActiveCfg = Release|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -252,5 +266,6 @@ Global
 		{4F120D18-ABE6-4C79-B49F-8099F01E2F7F} = {84205448-1773-45D6-8D42-548A7997A7E1}
 		{2C709B4B-4076-4C36-AF42-E6E49C32F0A6} = {34781A51-76A9-479E-8FF2-66C903C5856E}
 		{CD8A9FB5-5902-4E49-93A5-C29D148BBAF4} = {34781A51-76A9-479E-8FF2-66C903C5856E}
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB} = {A880D1F3-3F36-4BBD-B51F-1DA57DF7F067}
 	EndGlobalSection
 EndGlobal
