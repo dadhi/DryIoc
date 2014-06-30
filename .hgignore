@@ -116,7 +116,7 @@ publish/
 ## TODO: If you have NuGet Package Restore enabled, uncomment the next line
 packages/
 *.nupkg
-apikey.*
+apikey[.-]*
 nuget/**/DryIoc/*
 
 # Windows Azure Build Output
