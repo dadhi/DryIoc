@@ -179,13 +179,28 @@ namespace DryIoc.UnitTests
 
     public class ThreadReuse : IReuse
     {
-        public Scope Of(Request request, IRegistry registry)
+        public IScope GetScope(Request request, IRegistry registry)
         {
-            return _scope ?? (_scope = new Scope());
+            return _scope;
         }
 
-        [ThreadStatic]
-        private static Scope _scope;
+        private readonly ThreadScope _scope = new ThreadScope();
+
+        class ThreadScope : IScope
+        {
+            public T GetOrAdd<T>(int id, Func<T> factory)
+            {
+                var threadId = Thread.CurrentThread.ManagedThreadId;
+                var threadScope = _threadScopes.Value.GetFirstValueByHashOrDefault(threadId);
+                if (threadScope == null)
+                    _threadScopes.Swap(
+                        s => s.AddOrUpdate(threadId, threadScope = new Scope(),
+                            (oldValue, newValue) => threadScope = oldValue));
+                return threadScope.GetOrAdd(id, factory);
+            }
+
+            private readonly Ref<HashTree<int, Scope>> _threadScopes = Ref.Of(HashTree<int, Scope>.Empty);
+        }
     }
 
     public static class CustomReuse
@@ -198,7 +213,7 @@ namespace DryIoc.UnitTests
     {
         public static readonly string ReuseItemKey = typeof(HttpContextReuse).Name;
 
-        public Scope Of(Request request, IRegistry registry)
+        public IScope GetScope(Request request, IRegistry registry)
         {
             var items = HttpContext.Current.Items;
             if (!items.Contains(ReuseItemKey))
@@ -255,7 +270,7 @@ namespace DryIoc.UnitTests
     {
     }
 
-    class ServiceWithResolutionAndSingletonDependencies
+    public class ServiceWithResolutionAndSingletonDependencies
     {
         public SingletonDep SingletonDep { get; set; }
         public ResolutionScopeDep ResolutionScopeDep { get; set; }
@@ -267,9 +282,9 @@ namespace DryIoc.UnitTests
         }
     }
 
-    internal class ResolutionScopeDep { }
+    public class ResolutionScopeDep { }
 
-    internal class SingletonDep
+    public class SingletonDep
     {
         public ResolutionScopeDep ResolutionScopeDep { get; set; }
 
