@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Linq.Expressions;
-using System.Reflection;
 using System.Threading;
 using System.Web;
 using DryIoc.UnitTests.CUT;
@@ -87,6 +85,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        [Ignore]
         public void For_signleton_injected_as_Func_and_as_instance_only_one_instance_should_be_created()
         {
             ServiceWithInstanceCountWithStringParam.InstanceCount = 0;
@@ -164,8 +163,8 @@ namespace DryIoc.UnitTests
             Assert.That(one.Dependency, Is.Not.SameAs(another.Dependency));
         }
 
-        [Test][Ignore]
-        public void It_ok_to_use_both_resolution_scope_and_singleton_reuse_in_same_resolution_root()
+        [Test]
+        public void Can_use_both_resolution_scope_and_singleton_reuse_in_same_resolution_root()
         {
             var container = new Container();
             container.Register<ServiceWithResolutionAndSingletonDependencies>();
@@ -180,20 +179,28 @@ namespace DryIoc.UnitTests
 
     public class ThreadReuse : IReuse
     {
-        public Expression Of(Request _, IRegistry __, int factoryID, Expression factoryExpr)
+        public IScope GetScope(Request request, IRegistry registry)
         {
-            return Reuse.GetScopedServiceExpression(_scopeExpr, factoryID, factoryExpr);
+            return _scope;
         }
 
-        public static Scope GetScope()
+        private readonly ThreadScope _scope = new ThreadScope();
+
+        class ThreadScope : IScope
         {
-            return _scope ?? (_scope = new Scope());
+            public T GetOrAdd<T>(int id, Func<T> factory)
+            {
+                var threadId = Thread.CurrentThread.ManagedThreadId;
+
+                var threadScope = _threadScopes.Value.GetValueOrDefault(threadId);
+                if (threadScope == null)
+                    _threadScopes.Swap(s => s.AddOrUpdate(threadId, threadScope = new Scope(), 
+                        (oldValue, newValue) => threadScope = oldValue)); // if Scope is already added in between then use it.
+                return threadScope.GetOrAdd(id, factory);
+            }
+
+            private readonly Ref<HashTree<int, Scope>> _threadScopes = Ref.Of(HashTree<int, Scope>.Empty);
         }
-
-        [ThreadStatic]
-        private static Scope _scope;
-
-        private static readonly Expression _scopeExpr = Expression.Call(typeof(ThreadReuse), "GetScope", null);
     }
 
     public static class CustomReuse
@@ -204,20 +211,14 @@ namespace DryIoc.UnitTests
 
     public class HttpContextReuse : IReuse
     {
-        private readonly MethodInfo _getOrAddToContextMethod = typeof(HttpContextReuse).GetMethod("GetOrAddToContext");
-        public static T GetOrAddToContext<T>(int factoryID, Func<T> factory)
-        {
-            var key = "IoC." + factoryID;
-            if (HttpContext.Current.Items[key] == null)
-                HttpContext.Current.Items[key] = factory();
-            return (T)HttpContext.Current.Items[key];
-        }
+        public static readonly string ReuseItemKey = typeof(HttpContextReuse).Name;
 
-        public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+        public IScope GetScope(Request request, IRegistry registry)
         {
-            return Expression.Call(_getOrAddToContextMethod.MakeGenericMethod(factoryExpr.Type), 
-                Expression.Constant(factoryID),        // use factoryID (unique per Container) as service ID.
-                Expression.Lambda(factoryExpr, null)); // pass Func<TService> to create service only when not found in context.
+            var items = HttpContext.Current.Items;
+            if (!items.Contains(ReuseItemKey))
+                items[ReuseItemKey] = new Scope();
+            return (Scope)items[ReuseItemKey];
         }
     }
 
@@ -269,7 +270,7 @@ namespace DryIoc.UnitTests
     {
     }
 
-    class ServiceWithResolutionAndSingletonDependencies
+    public class ServiceWithResolutionAndSingletonDependencies
     {
         public SingletonDep SingletonDep { get; set; }
         public ResolutionScopeDep ResolutionScopeDep { get; set; }
@@ -281,9 +282,9 @@ namespace DryIoc.UnitTests
         }
     }
 
-    internal class ResolutionScopeDep {}
+    public class ResolutionScopeDep { }
 
-    internal class SingletonDep
+    public class SingletonDep
     {
         public ResolutionScopeDep ResolutionScopeDep { get; set; }
 

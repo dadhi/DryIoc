@@ -1,7 +1,7 @@
 ﻿/*
  * Unobtrusive Validator for model/view-model designed to work with nested models hierarchy. 
  * Only requirement for models is implementing IValidated interface which should create Validator.
- * Supports enabling/disabling of validation and automatic tracking of nested model reassignements.
+ * Supports enabling/disabling of validation and automatic tracking of nested model reassignment.
  * 
  *  v4.2.1
  * - fixed: Enabled property changed raised only when Enabled value changed.

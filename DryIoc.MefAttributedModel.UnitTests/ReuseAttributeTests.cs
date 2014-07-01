@@ -45,7 +45,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.RegisterExports(typeof(ServiceWithCurrentScopeReuse));
 
             var one = container.Resolve<ServiceWithCurrentScopeReuse>();
-            using (var scope = container.CreateReuseScope())
+            using (var scope = container.OpenScope())
             {
                 var oneInScope = scope.Resolve<ServiceWithCurrentScopeReuse>();
                 var anotherInScope = scope.Resolve<ServiceWithCurrentScopeReuse>();
