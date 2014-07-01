@@ -90,22 +90,15 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Could_specify_constructor_selection_as_default_strategy_for_all_registrations()
+        public void Could_specify_constructor_selection_as_default_strategy_for_all_Container_registrations()
         {
-            ReflectionFactory.DefaultConstructorSelector = ReflectionFactory.SelectConstructorWithAllResolvableArguments;
-            try
-            {
-                var container = new Container();
+            var container = new Container(ResolutionRules.Default.WithConstructorSelector(
+                ReflectionFactory.SelectConstructorWithAllResolvableArguments));
 
-                container.Register<SomeClient>();
+            container.Register<SomeClient>();
 
-                var client = container.Resolve<SomeClient>();
-                Assert.That(client.Seed, Is.EqualTo(1));
-            }
-            finally
-            {
-                ReflectionFactory.DefaultConstructorSelector = null;
-            }
+            var client = container.Resolve<SomeClient>();
+            Assert.That(client.Seed, Is.EqualTo(1));
         }
 
         #region CUT

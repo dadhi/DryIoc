@@ -126,7 +126,7 @@ namespace DryIoc
 
         public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
-            factory.ThrowIfNull().ThrowIfCannotBeRegisteredWithServiceType(serviceType.ThrowIfNull());
+            factory.ThrowIfNull().VerifyBeforeRegistration(serviceType.ThrowIfNull(), this);
             switch (factory.Setup.Type)
             {
                 case FactoryType.Decorator:
@@ -1094,6 +1094,12 @@ namespace DryIoc
             return new ResolutionRules(this) { FactorySelector = rule };
         }
 
+        public ConstructorSelector ConstructorSelector { get; private set; }
+        public ResolutionRules WithConstructorSelector(ConstructorSelector rule)
+        {
+            return new ResolutionRules(this) { ConstructorSelector = rule };
+        }
+
         public delegate Factory ResolveUnregisteredServiceRule(Request request, IRegistry registry);
         public ResolveUnregisteredServiceRule[] ForUnregisteredService { get; private set; }
         public ResolutionRules With(params ResolveUnregisteredServiceRule[] rules)
@@ -1112,6 +1118,7 @@ namespace DryIoc
 
         public delegate bool ResolvePropertyOrFieldWithServiceKeyRule(out object key, MemberInfo member, Request parent, IRegistry registry);
         public ResolvePropertyOrFieldWithServiceKeyRule[] ForPropertyOrFieldWithServiceKey { get; private set; }
+
         public ResolutionRules With(params ResolvePropertyOrFieldWithServiceKeyRule[] rules)
         {
             return new ResolutionRules(this) { ForPropertyOrFieldWithServiceKey = rules };
@@ -1227,7 +1234,7 @@ namespace DryIoc
         public static readonly string IS_REGISTERED_FOR_GENERIC_WRAPPER_CALLED_WITH_NONGENERIC_SERVICE_TYPE =
             "IsRegistered for GenericWrapper called with non generic service type {0}.";
 
-        public static readonly string UNABLE_TO_GET_CTOR_USING_CTOR_SELECTOR =
+        public static readonly string UNABLE_TO_SELECT_CTOR_USING_SELECTOR =
             "Unable to get constructor of {0} using provided constructor selector.";
 
         public static readonly string UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS =
@@ -1848,7 +1855,7 @@ namespace DryIoc
             Setup = setup;
         }
 
-        public virtual void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType)
+        public virtual void VerifyBeforeRegistration(Type serviceType, IRegistry registry)
         {
             if (serviceType.IsGenericTypeDefinition && !ProvidesFactoryForRequest)
                 throw Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE.Of(serviceType);
@@ -1979,13 +1986,7 @@ namespace DryIoc
 
     public sealed class ReflectionFactory : Factory
     {
-        /// <remarks>
-        /// By default it will use <c>constructorSelector</c> parameter if it is specified in <see cref="ReflectionFactory"/> constructor.
-        /// Or otherwise expects <see cref="ReflectionFactory.ImplementationType"/> to have single constructor.
-        /// </remarks>
-        public static ConstructorSelector DefaultConstructorSelector;
-
-        #region Other constructor selection strategies..
+        #region Constructor selection strategies..
 
         public static ConstructorInfo SelectConstructorWithAllResolvableArguments(Type type, Request request, IRegistry registry)
         {
@@ -2035,31 +2036,31 @@ namespace DryIoc
 
         #endregion
 
-        public override Type ImplementationType { get { return _implementationType; } }
-        public override bool ProvidesFactoryForRequest { get { return _implementationType.IsGenericTypeDefinition; } }
+        public override Type ImplementationType
+        {
+            get { return _implementationType; }
+        }
+
+        public override bool ProvidesFactoryForRequest
+        {
+            get { return _implementationType.IsGenericTypeDefinition; }
+        }
 
         public ReflectionFactory(Type implementationType,
             IReuse reuse = null, ConstructorSelector constructorSelector = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            if (implementationType.ThrowIfNull().IsAbstract)
-                throw Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE.Of(implementationType);
-
-            constructorSelector = constructorSelector ?? DefaultConstructorSelector;
-            if (constructorSelector == null)
-            {
-                var publicCtorCount = implementationType.GetConstructors().Length;
-                if (publicCtorCount != 1)
-                    throw Error.UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE.Of(implementationType, publicCtorCount);
-            }
-
-            _implementationType = implementationType;
+            _implementationType = implementationType.ThrowIfNull()
+                .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
             _constructorSelector = constructorSelector;
         }
 
-        public override void ThrowIfCannotBeRegisteredWithServiceType(Type serviceType)
+        /// <remarks>Before registering factory checks that ImplementationType (if exists) is assignable Or
+        /// in case of open generics, compatible with <paramref name="serviceType"/>. 
+        /// Then checks that there is defined constructor selector for implementation type with multiple/no constructors.</remarks>
+        public override void VerifyBeforeRegistration(Type serviceType, IRegistry registry)
         {
-            base.ThrowIfCannotBeRegisteredWithServiceType(serviceType);
+            base.VerifyBeforeRegistration(serviceType, registry);
 
             var implType = _implementationType;
             if (!implType.IsGenericTypeDefinition)
@@ -2091,6 +2092,14 @@ namespace DryIoc
                 else
                     throw Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE.Of(implType, serviceType);
             }
+
+            if (_constructorSelector == null && 
+                registry.ResolutionRules.ConstructorSelector == null)
+            {
+                var publicCtorCount = implType.GetConstructors().Length;
+                if (publicCtorCount != 1)
+                    throw Error.UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE.Of(implType, publicCtorCount);
+            }
         }
 
         public override Factory GetFactoryForRequestOrDefault(Request request, IRegistry _)
@@ -2106,7 +2115,7 @@ namespace DryIoc
 
         public override Expression CreateExpression(Request request, IRegistry registry)
         {
-            var ctor = GetConstructor(_implementationType, request, registry);
+            var ctor = SelectConstructor(_implementationType, request, registry);
             var ctorParams = ctor.GetParameters();
             Expression[] paramExprs = null;
             if (ctorParams.Length != 0)
@@ -2128,7 +2137,7 @@ namespace DryIoc
             var funcParamTypes = funcType.GetGenericArguments();
             Throw.If(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
 
-            var ctor = GetConstructor(_implementationType, request, registry);
+            var ctor = SelectConstructor(_implementationType, request, registry);
             var ctorParams = ctor.GetParameters();
             var ctorParamExprs = new Expression[ctorParams.Length];
             var funcInputParamExprs = new ParameterExpression[funcParamTypes.Length - 1]; // (minus Func return parameter).
@@ -2179,15 +2188,16 @@ namespace DryIoc
         private readonly Type _implementationType;
         private readonly ConstructorSelector _constructorSelector;
 
-        public ConstructorInfo GetConstructor(Type implementationType, Request request, IRegistry registry)
+        private ConstructorInfo SelectConstructor(Type implType, Request request, IRegistry registry)
         {
-            if (_constructorSelector != null)
-                return _constructorSelector(implementationType, request, registry)
-                    .ThrowIfNull(Error.UNABLE_TO_GET_CTOR_USING_CTOR_SELECTOR, implementationType);
+            var selector = _constructorSelector ?? registry.ResolutionRules.ConstructorSelector;
+            if (selector != null)
+                return selector(implType, request, registry)
+                    .ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_USING_SELECTOR, implType);
 
-            var ctors = implementationType.GetConstructors();
-            Throw.If(ctors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implementationType);
-            Throw.If(ctors.Length > 1, Error.UNABLE_TO_SELECT_CONSTRUCTOR, ctors.Length, implementationType);
+            var ctors = implType.GetConstructors();
+            Throw.If(ctors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implType);
+            Throw.If(ctors.Length > 1, Error.UNABLE_TO_SELECT_CONSTRUCTOR, ctors.Length, implType);
             return ctors[0];
         }
 
@@ -2429,7 +2439,7 @@ namespace DryIoc
 
     public sealed class SingletonReuse : IReuse
     {
-        public IScope GetScope(Request request, IRegistry registry)
+        public IScope GetScope(Request _, IRegistry registry)
         {
             return registry.SingletonScope;
         }
@@ -2437,7 +2447,7 @@ namespace DryIoc
 
     public sealed class CurrentScopeReuse : IReuse
     {
-        public IScope GetScope(Request request, IRegistry registry)
+        public IScope GetScope(Request _, IRegistry registry)
         {
             return registry.CurrentScope;
         }
@@ -2445,7 +2455,7 @@ namespace DryIoc
 
     public sealed class ResolutionScopeReuse : IReuse
     {
-        public IScope GetScope(Request request, IRegistry registry)
+        public IScope GetScope(Request request, IRegistry _)
         {
             return request.CreateResolutionScope();
         }

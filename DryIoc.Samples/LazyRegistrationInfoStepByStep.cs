@@ -35,38 +35,38 @@ namespace DryIoc.Samples
         [Test]
         public void Register_interface_with_implementation_as_unregistered_type_resolution_rule()
         {
-            const string asmLocation = "DryIoc.Samples.CUT.dll";
+            const string assemblyFile = "DryIoc.Samples.CUT.dll";
 
             // In compile time prepare registrations for Serialization
             //========================================================
 
-            var asm = Assembly.LoadFrom(asmLocation);
+            var assembly = Assembly.LoadFrom(assemblyFile);
 
             // Step 1 - Scan assembly and find exported type, create DTOs for them.
-            var registrations = AttributedModel.Scan(new[] { asm });
+            var registrations = AttributedModel.Scan(new[] { assembly });
 
             // Step 2 - Make DTOs lazy.
             var lazyRegistrations = registrations.Select(info =>
             {
                 info.ImplementationTypeFullName = info.ImplementationType.FullName;
-                info.ImplementationType = null; // replace type with its name
+                info.ImplementationType = null; // replace implementation type with its name
 
                 for (var i = 0; i < info.Exports.Length; i++)
                 {
                     var export = info.Exports[i];
                     export.ServiceTypeFullName = export.ServiceType.FullName;
-                    export.ServiceType = null; // replace type with its name
+                    export.ServiceType = null; // replace service type with its name
                 }
 
                 return info;
             });
 
-            // In run time Deserialize registrations and register them as rule for unresolved services
-            //========================================================================================
+            // In run time De-serialize registrations and register them as rule for unresolved services
+            //=========================================================================================
 
-            var lazyLoadedAsm = new Lazy<Assembly>(() => Assembly.LoadFrom(asmLocation));
+            var lazyLoadedAssembly = new Lazy<Assembly>(() => Assembly.LoadFrom(assemblyFile));
 
-            // Step 1 - Enable fast search by ExportInfo.ServiceTypeFullName.
+            // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
             var lazyRegIndex = new Dictionary<string, List<KeyValuePair<object, RegistrationInfo>>>();
             foreach (var lazyRegistration in lazyRegistrations)
             {
@@ -83,7 +83,7 @@ namespace DryIoc.Samples
                 }
             }
 
-            // Step 2 - Add resolution rule for creating factory for type on resolve.
+            // Step 2 - Add resolution rule for creating factory on resolve.
             var rules = ResolutionRules.Default.With((request, registry) =>
             {
                 List<KeyValuePair<object, RegistrationInfo>> regs;
@@ -96,7 +96,7 @@ namespace DryIoc.Samples
 
                 var info = regs[regIndex].Value;
                 if (info.ImplementationType == null)
-                    info.ImplementationType = lazyLoadedAsm.Value.GetType(info.ImplementationTypeFullName);
+                    info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
 
                 return info.CreateFactory();
             });
