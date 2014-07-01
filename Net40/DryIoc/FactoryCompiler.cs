@@ -34,8 +34,11 @@ namespace DryIoc
     {
         public const string DYNAMIC_ASSEMBLY_NAME = "DryIoc.CompiledFactoryProvider.DynamicAssembly";
 
-        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, ref FactoryDelegate result)
+        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, IRegistry registry, ref FactoryDelegate result)
         {
+            if (!registry.ResolutionRules.CompilationToDynamicAssemblyEnabled) 
+                return;
+
             result.ThrowIf(result != null);
 
             Interlocked.CompareExchange(ref _moduleBuilder, DefineDynamicModuleBuilder(), null);
@@ -68,5 +71,19 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    /// <remarks>Resolution rules to enable/disable compiling to Dynamic Assembly.</remarks>
+    public sealed partial class ResolutionRules
+    {
+        public bool CompilationToDynamicAssemblyEnabled
+        {
+            get { return _compilationToDynamicAssemblyEnabled; }
+        }
+
+        public ResolutionRules EnableCompilationToDynamicAssembly(bool enable)
+        {
+            return new ResolutionRules(this) { _compilationToDynamicAssemblyEnabled = enable };
+        }
     }
 }

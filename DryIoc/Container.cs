@@ -814,11 +814,11 @@ namespace DryIoc
             return Expression.Lambda<FactoryDelegate>(expression, ResolutionState.ItemsParamExpr, Request.ResolutionScopeParamExpr);
         }
 
-        public static FactoryDelegate CompileToDelegate(this Expression expression)
+        public static FactoryDelegate CompileToDelegate(this Expression expression, IRegistry registry)
         {
             var factoryExpression = expression.ToFactoryExpression();
             FactoryDelegate factoryDelegate = null;
-            CompileToMethod(factoryExpression, ref factoryDelegate);
+            CompileToMethod(factoryExpression, registry, ref factoryDelegate);
             // ReSharper disable ConstantNullCoalescingCondition
             return factoryDelegate ?? factoryExpression.Compile();
             // ReSharper restore ConstantNullCoalescingCondition
@@ -826,7 +826,7 @@ namespace DryIoc
 
         // Partial method definition to be implemented in .NET40 version of Container.
         // It is optional and fine to be not implemented.
-        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, ref FactoryDelegate result);
+        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, IRegistry registry, ref FactoryDelegate result);
     }
 
     public static class OpenGenericsSupport
@@ -1079,7 +1079,7 @@ namespace DryIoc
         #endregion
     }
 
-    public sealed class ResolutionRules
+    public sealed partial class ResolutionRules
     {
         public static readonly ResolutionRules Empty = new ResolutionRules();
 
@@ -1131,10 +1131,15 @@ namespace DryIoc
         private ResolutionRules(ResolutionRules rules)
         {
             FactorySelector = rules.FactorySelector;
+            ConstructorSelector = rules.ConstructorSelector;
             ForUnregisteredService = rules.ForUnregisteredService;
             ForConstructorParameterServiceKey = rules.ForConstructorParameterServiceKey;
             ForPropertyOrFieldWithServiceKey = rules.ForPropertyOrFieldWithServiceKey;
+
+            _compilationToDynamicAssemblyEnabled = rules._compilationToDynamicAssemblyEnabled;
         }
+
+        private bool _compilationToDynamicAssemblyEnabled; // used by .NET 4 and higher versions.
 
         #endregion
     }
@@ -1943,7 +1948,7 @@ namespace DryIoc
 
         public virtual FactoryDelegate GetDelegate(Request request, IRegistry registry)
         {
-            return GetExpression(request, registry).CompileToDelegate();
+            return GetExpression(request, registry).CompileToDelegate(registry);
         }
 
         public override string ToString()
@@ -2055,7 +2060,7 @@ namespace DryIoc
             _constructorSelector = constructorSelector;
         }
 
-        /// <remarks>Before registering factory checks that ImplementationType (if exists) is assignable Or
+        /// <remarks>Before registering factory checks that ImplementationType is assignable Or
         /// in case of open generics, compatible with <paramref name="serviceType"/>. 
         /// Then checks that there is defined constructor selector for implementation type with multiple/no constructors.</remarks>
         public override void VerifyBeforeRegistration(Type serviceType, IRegistry registry)
