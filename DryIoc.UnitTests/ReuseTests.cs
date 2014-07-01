@@ -191,11 +191,11 @@ namespace DryIoc.UnitTests
             public T GetOrAdd<T>(int id, Func<T> factory)
             {
                 var threadId = Thread.CurrentThread.ManagedThreadId;
-                var threadScope = _threadScopes.Value.GetFirstValueByHashOrDefault(threadId);
+
+                var threadScope = _threadScopes.Value.GetValueOrDefault(threadId);
                 if (threadScope == null)
-                    _threadScopes.Swap(
-                        s => s.AddOrUpdate(threadId, threadScope = new Scope(),
-                            (oldValue, newValue) => threadScope = oldValue));
+                    _threadScopes.Swap(s => s.AddOrUpdate(threadId, threadScope = new Scope(), 
+                        (oldValue, newValue) => threadScope = oldValue)); // if Scope is already added in between then use it.
                 return threadScope.GetOrAdd(id, factory);
             }
 

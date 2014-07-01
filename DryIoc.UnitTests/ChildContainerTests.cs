@@ -54,7 +54,7 @@ namespace DryIoc.UnitTests
         {
             var parent = new Container();
             parent.Register(typeof(IFruit), typeof(Melon), Reuse.InCurrentScope);
-            parent = parent.CreateReuseScope();
+            parent = parent.OpenScope();
 
             var child = parent.CreateChildContainer();
             child.Register(typeof(IJuice), typeof(FruitJuice));
