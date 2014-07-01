@@ -57,7 +57,8 @@ namespace DryIoc
             _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
         }
 
-        /// <remarks>Use <paramref name="registerBatch"/> to register some services right after constructor creation. Just for "nicer" syntax.</remarks>
+        /// <remarks>Use <paramref name="registerBatch"/> to register some services right after constructor creation. 
+        /// For some who prefer lambda syntax.</remarks>
         public Container(Action<IRegistrator> registerBatch, ResolutionRules resolutionRules = null) 
             : this(resolutionRules)
         {

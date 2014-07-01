@@ -53,6 +53,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc", "PCL\DryIoc\DryIoc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel", "PCL\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj", "{A4810DAB-2E12-4582-AAD5-2321AD333EC6}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Issues", "Issues", "{AF897FBD-C3CD-4A20-9BB1-37B2539FFFB5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.IssuesTests", "Issues\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj", "{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -128,6 +132,10 @@ Global
 		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A4810DAB-2E12-4582-AAD5-2321AD333EC6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -141,5 +149,6 @@ Global
 		{4F120D18-ABE6-4C79-B49F-8099F01E2F7F} = {84205448-1773-45D6-8D42-548A7997A7E1}
 		{878E401E-474B-4AAB-AE20-122051755C81} = {B3DBB091-2C7D-4E5E-82CC-0B73D69FF159}
 		{A4810DAB-2E12-4582-AAD5-2321AD333EC6} = {B3DBB091-2C7D-4E5E-82CC-0B73D69FF159}
+		{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB} = {AF897FBD-C3CD-4A20-9BB1-37B2539FFFB5}
 	EndGlobalSection
 EndGlobal
