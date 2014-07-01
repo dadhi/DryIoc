@@ -59,7 +59,7 @@ namespace DryIoc
 
         /// <remarks>Use <paramref name="registerBatch"/> to register some services right after constructor creation. 
         /// For some who prefer lambda syntax.</remarks>
-        public Container(Action<IRegistrator> registerBatch, ResolutionRules resolutionRules = null) 
+        public Container(Action<IRegistrator> registerBatch, ResolutionRules resolutionRules = null)
             : this(resolutionRules)
         {
             registerBatch.ThrowIfNull().Invoke(this);
@@ -92,7 +92,7 @@ namespace DryIoc
 
         public Container OpenScope()
         {
-            return new Container(ResolutionRules, _factories, _decorators, _genericWrappers, _singletonScope, 
+            return new Container(ResolutionRules, _factories, _decorators, _genericWrappers, _singletonScope,
                 new Scope());
         }
 
@@ -655,9 +655,11 @@ namespace DryIoc
     public sealed class ResolutionState
     {
         public static readonly ParameterExpression ItemsParamExpr = Expression.Parameter(typeof(AppendableArray<object>), "items");
-        private static readonly MethodInfo _getItemMethod = typeof(AppendableArray<object>).GetMethod("Get");
 
-        public AppendableArray<object> Items { get { return _items; }}
+        public AppendableArray<object> Items
+        {
+            get { return _items; }
+        }
 
         public int GetOrAddItem(object item)
         {
@@ -672,28 +674,37 @@ namespace DryIoc
             return index;
         }
 
-        public Expression GetItemExpression(object item, Type itemType)
+        public int GetOrAddItem(IRegistry registry)
         {
-            var index = GetOrAddItem(item);
-            var itemExpr = _itemsExpressions.GetFirstValueByHashOrDefault(index);
+            return _registryWeakRefID != -1 ? _registryWeakRefID
+                : (_registryWeakRefID = GetOrAddItem(registry.SelfWeakRef));
+        }
+
+        public Expression GetItemExpression(int itemIndex, Type itemType)
+        {
+            var itemExpr = _itemsExpressions.GetFirstValueByHashOrDefault(itemIndex);
             if (itemExpr == null)
             {
-                var indexExpr = Expression.Constant(index.ThrowIf(index == - 1), typeof(int));
+                var indexExpr = Expression.Constant(itemIndex, typeof(int));
                 itemExpr = Expression.Convert(Expression.Call(ItemsParamExpr, _getItemMethod, indexExpr), itemType);
-                Interlocked.Exchange(ref _itemsExpressions, _itemsExpressions.AddOrUpdate(index, itemExpr));
+                Interlocked.Exchange(ref _itemsExpressions, _itemsExpressions.AddOrUpdate(itemIndex, itemExpr));
             }
-
             return itemExpr;
+        }
+
+        public Expression GetItemExpression(object item, Type itemType)
+        {
+            return GetItemExpression(GetOrAddItem(item), itemType);
         }
 
         public Expression GetItemExpression<T>(T item)
         {
-            return GetItemExpression(item, typeof(T));
+            return GetItemExpression(GetOrAddItem(item), typeof(T));
         }
 
         public Expression GetItemExpression(IRegistry registry)
         {
-            return Expression.Property(GetItemExpression(registry.SelfWeakRef), "Target");
+            return Expression.Property(GetItemExpression(GetOrAddItem(registry), typeof(RegistryWeakRef)), "Target");
         }
 
         public Expression GetCachedFactoryExpressionOrDefault(int factoryID)
@@ -708,9 +719,12 @@ namespace DryIoc
 
         #region Implementation
 
+        private static readonly MethodInfo _getItemMethod = typeof(AppendableArray<object>).GetMethod("Get");
+
         private AppendableArray<object> _items = AppendableArray<object>.Empty;
         private HashTree<int, Expression> _itemsExpressions = HashTree<int, Expression>.Empty;
         private HashTree<int, Expression> _factoryExpressions = HashTree<int, Expression>.Empty;
+        private int _registryWeakRefID = -1;
 
         #endregion
     }
@@ -1157,8 +1171,8 @@ namespace DryIoc
         public static readonly string NO_PUBLIC_CONSTRUCTOR_DEFINED =
             "There is no public constructor defined for {0}.";
 
-        public static readonly string UNSPECIFIED_HOWTO_GET_CONSTRUCTOR_FOR_IMPLTYPE_WITH_NO_OR_MANY_CONSTRUCTORS =
-            "It is not specified how to get single constructor from implementation type with No or Many public constructors: {0}.";
+        public static readonly string UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE =
+            "Unspecified how to select single constructor for implementation type {0} with {1} public constructors.";
 
         public static readonly string CONSTRUCTOR_MISSES_SOME_PARAMETERS =
             "Constructor [{0}] of {1} misses some arguments required for {2} dependency.";
@@ -1944,18 +1958,18 @@ namespace DryIoc
         private static int _idSeedAndCount;
         private FactorySetup _setup;
 
+        private static readonly MethodInfo _scopeGetOrAddMethod = typeof(IScope).GetMethod("GetOrAdd");
+
         protected Expression GetReusedItemExpression(Request request, IScope scope, Expression expression)
         {
             var scopeExpr = scope == request.ResolutionScope ? Request.ResolutionScopeExpr
-                : request.ResolutionState.GetItemExpression(scope, typeof(IScope));
+                : request.ResolutionState.GetItemExpression(scope);
 
-            var getScopedItemMethod = typeof(IScope).GetMethod("GetOrAdd").MakeGenericMethod(expression.Type);
+            var getScopedItemMethod = _scopeGetOrAddMethod.MakeGenericMethod(expression.Type);
 
             var factoryIDExpr = Expression.Constant(ID);
             var factoryExpr = Expression.Lambda(expression, null);
-
-            expression = Expression.Call(scopeExpr, getScopedItemMethod, factoryIDExpr, factoryExpr);
-            return expression;
+            return Expression.Call(scopeExpr, getScopedItemMethod, factoryIDExpr, factoryExpr);
         }
 
         #endregion
@@ -2030,9 +2044,14 @@ namespace DryIoc
         {
             if (implementationType.ThrowIfNull().IsAbstract)
                 throw Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE.Of(implementationType);
+
             constructorSelector = constructorSelector ?? DefaultConstructorSelector;
-            if (constructorSelector == null && implementationType.GetConstructors().Length != 1)
-                throw Error.UNSPECIFIED_HOWTO_GET_CONSTRUCTOR_FOR_IMPLTYPE_WITH_NO_OR_MANY_CONSTRUCTORS.Of(implementationType);
+            if (constructorSelector == null)
+            {
+                var publicCtorCount = implementationType.GetConstructors().Length;
+                if (publicCtorCount != 1)
+                    throw Error.UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE.Of(implementationType, publicCtorCount);
+            }
 
             _implementationType = implementationType;
             _constructorSelector = constructorSelector;
@@ -2288,10 +2307,10 @@ namespace DryIoc
     /// and where possible will use delegate directly - without converting it to expression.</remarks>
     public sealed class DelegateFactory : Factory
     {
-        public DelegateFactory(Func<IResolver, object> userFactoryDelegate, IReuse reuse = null, FactorySetup setup = null)
+        public DelegateFactory(Func<IResolver, object> customDelegate, IReuse reuse = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            _customDelegate = userFactoryDelegate.ThrowIfNull();
+            _customDelegate = customDelegate.ThrowIfNull();
         }
 
         public override Expression CreateExpression(Request request, IRegistry registry)
@@ -2303,44 +2322,30 @@ namespace DryIoc
 
         public override FactoryDelegate GetDelegate(Request request, IRegistry registry)
         {
-            request = request.ResolveWith(this);
-            var decorator = registry.GetDecoratorExpressionOrDefault(request);
-            if (decorator == null)
-            {
-                var registryRefID = request.ResolutionState.GetOrAddItem(registry.SelfWeakRef);
-                if (Reuse != null)
-                {
-                    var reuseScope = Reuse.GetScope(request, registry);
-                    return (items, _) => reuseScope.GetOrAdd(ID,
-                        () => _customDelegate(((RegistryWeakRef)items.Get(registryRefID)).Target));
-                }
+            if (registry.GetDecoratorExpressionOrDefault(request.ResolveWith(this)) != null)
+                return base.GetDelegate(request, registry);
 
-                return (items, _) => _customDelegate(((RegistryWeakRef)items.Get(registryRefID)).Target);
+            var registryRefIndex = request.ResolutionState.GetOrAddItem(registry);
+            if (Reuse != null)
+            {
+                var scope = Reuse.GetScope(request, registry);
+                var scopeIndex = scope == request.ResolutionScope ? -1
+                    : request.ResolutionState.GetOrAddItem(scope);
+
+                return (items, resolutionScope) => 
+                    (scopeIndex == -1 ? resolutionScope : (Scope)items.Get(scopeIndex))
+                    .GetOrAdd(ID, () => _customDelegate(GetRegistry(items, registryRefIndex)));
             }
 
-            // If decorator replaces decorated completely, just return it
-            if (!(decorator is LambdaExpression))
-                return decorator.CompileToDelegate();
-
-            Expression expression = null;
-            if (Setup.CachePolicy == FactoryCachePolicy.CouldCacheExpression)
-                expression = request.ResolutionState.GetCachedFactoryExpressionOrDefault(ID);
-
-            if (expression == null)
-            {
-                expression = CreateExpression(request, registry);
-                if (Reuse != null)
-                    expression = GetReusedItemExpression(request, Reuse.GetScope(request, registry), expression);
-
-                if (Setup.CachePolicy == FactoryCachePolicy.CouldCacheExpression)
-                    request.ResolutionState.CacheFactoryExpression(ID, expression);
-            }
-
-            expression = Expression.Invoke(decorator, expression);
-            return expression.CompileToDelegate();
+            return (items, _) => _customDelegate(GetRegistry(items, registryRefIndex));
         }
 
         private readonly Func<IResolver, object> _customDelegate;
+
+        private static IRegistry GetRegistry(AppendableArray<object> items, int registryWeakRefIndex)
+        {
+            return ((RegistryWeakRef)items.Get(registryWeakRefIndex)).Target;
+        }
     }
 
     public sealed class FactoryProvider : Factory
@@ -2372,7 +2377,7 @@ namespace DryIoc
 
     public enum DependencyKind { CtorParam, Property, Field }
 
-    public interface IScope 
+    public interface IScope
     {
         T GetOrAdd<T>(int id, Func<T> factory);
     }
@@ -2487,6 +2492,7 @@ namespace DryIoc
 
         Factory GetFactoryOrDefault(Type serviceType, object serviceKey);
         Factory GetGenericWrapperOrDefault(Type openGenericServiceType);
+
         Expression GetDecoratorExpressionOrDefault(Request request);
 
         IEnumerable<KV<object, Factory>> GetAllFactories(Type serviceType);
