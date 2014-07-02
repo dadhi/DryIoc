@@ -1,5 +1,5 @@
 set /p apikey=<apikey.txt
-set dryiocv=1.2.1
+set dryiocv=1.2.2
 call nuget push ..\bin\nuget\DryIoc.%dryiocv%.nupkg -Source https://nuget.org -ApiKey %apikey%
 call nuget push ..\bin\nuget\DryIoc.dll.%dryiocv%.nupkg -Source https://nuget.org -ApiKey %apikey%
 

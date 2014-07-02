@@ -31,9 +31,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="DryIoc, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\DryIoc.dll.1.2.0\lib\net35\DryIoc.dll</HintPath>
+    <Reference Include="DryIoc">
+      <HintPath>..\..\packages\DryIoc.dll.1.2.2\lib\net35\DryIoc.dll</HintPath>
     </Reference>
     <Reference Include="DryIoc.MefAttributedModel, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
