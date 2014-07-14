@@ -45,6 +45,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Class1.cs" />
+    <Compile Include="DryIoc.MefAttributedModel\AttributedModel.cs" />
+    <Compile Include="DryIoc.MefAttributedModel\ExportImportAttributes.cs" />
     <Compile Include="DryIoc\Container.cs" />
     <Compile Include="DryIoc\Lazy.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
