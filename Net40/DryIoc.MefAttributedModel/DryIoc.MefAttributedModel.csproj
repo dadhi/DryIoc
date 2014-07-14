@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
+    <OutputPath>..\..\bin\Debug\net40\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -25,7 +25,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
+    <OutputPath>..\..\bin\Release\net40\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -38,7 +38,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
-      <Name>DryIoc %28Net40\DryIoc%29</Name>
+      <Name>DryIoc</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
@@ -48,6 +48,9 @@
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel\Properties\Version.cs">
+      <Link>Properties\Version.cs</Link>
     </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

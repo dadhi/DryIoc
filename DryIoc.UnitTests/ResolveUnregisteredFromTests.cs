@@ -36,22 +36,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent()
-        {
-            var parent = new Container();
-            parent.Register(typeof(IFruit), typeof(Melon), Reuse.Singleton);
-
-            var child = new Container();
-            child.ResolveUnregisteredFrom(parent);
-            child.Register(typeof(IJuice), typeof(FruitJuice));
-
-            var parentFruit = parent.Resolve<IFruit>();
-            var snd = child.Resolve<IJuice>();
-
-            Assert.That(parentFruit, Is.SameAs(snd.Fruit));
-        }
-
-        [Test]
         public void Once_resolved_I_can_NOT_stop_resolving_services_from_parent_container()
         {
             var parentContainer = new Container();

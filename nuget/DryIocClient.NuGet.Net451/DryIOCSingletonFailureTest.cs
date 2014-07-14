@@ -1,7 +1,8 @@
 ﻿using System;
 using NUnit.Framework;
+using DryIoc;
 
-namespace DryIoc.IssuesTests
+namespace DryIocClient.NuGet.Net451
 {
     /// <summary>
     /// Issue #26: Singleton creation from new scope fails

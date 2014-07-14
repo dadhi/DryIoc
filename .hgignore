@@ -114,10 +114,13 @@ publish/
 
 # NuGet Packages Directory
 ## TODO: If you have NuGet Package Restore enabled, uncomment the next line
-packages/
+# packages/
 *.nupkg
 apikey[.-]*
-nuget/**/DryIoc/*
+# nuget/**/DryIoc/*
+
+# OpenCover
+OpenCover/coverage.xml
 
 # Windows Azure Build Output
 csx
