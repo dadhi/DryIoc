@@ -33,6 +33,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="DryIoc">
+      <HintPath>..\..\packages\DryIoc.dll.1.3.0\lib\net35\DryIoc.dll</HintPath>
+    </Reference>
+    <Reference Include="DryIoc.MefAttributedModel">
+      <HintPath>..\..\packages\DryIoc.MefAttributedModel.dll.1.3.0\lib\net35\DryIoc.MefAttributedModel.dll</HintPath>
+    </Reference>
     <Reference Include="nunit.framework">
       <HintPath>..\..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
     </Reference>
@@ -45,10 +51,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Class1.cs" />
-    <Compile Include="DryIoc.MefAttributedModel\AttributedModel.cs" />
-    <Compile Include="DryIoc.MefAttributedModel\ExportImportAttributes.cs" />
-    <Compile Include="DryIoc\Container.cs" />
-    <Compile Include="DryIoc\Lazy.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

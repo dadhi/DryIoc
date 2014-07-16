@@ -56,7 +56,6 @@
   <ItemGroup>
     <Reference Include="DryIoc">
       <HintPath>..\..\packages\DryIoc.dll.1.3.0\lib\net40\DryIoc.dll</HintPath>
-      <Private>True</Private>
     </Reference>
     <Reference Include="DryIoc.MefAttributedModel">
       <HintPath>..\..\packages\DryIoc.MefAttributedModel.dll.1.3.0\lib\net40\DryIoc.MefAttributedModel.dll</HintPath>
