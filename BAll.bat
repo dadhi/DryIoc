@@ -11,8 +11,8 @@ call :Check
 call Build -nopause
 call :Check
 
-rem call RunTests -nopause
-rem call :Check
+call RunTests -nopause
+call :Check
 
 call NuGetPack -nopause
 call :Check
@@ -28,4 +28,5 @@ goto:eof
 if ERRORLEVEL 1 (
 echo:Failed with ERRORLEVEL==%ERRORLEVEL%!
 if not "%1"=="-nopause" pause
+exit
 ) else exit /b
