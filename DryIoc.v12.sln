@@ -58,6 +58,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocClient.NuGet.Net451",
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{3726FC4E-B3F4-4E54-BDA3-A45346396AB4}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B6A9C3F2-C50A-447F-9523-3E864C698D0F}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

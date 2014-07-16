@@ -12,3 +12,4 @@ for %%P in ("..\bin\NuGetPackages\*.nupkg") do (
 )
 
 pause
+endlocal
