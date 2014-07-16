@@ -17,7 +17,7 @@ echo:
 echo:Using MSBuild from "%%T"
 echo:
 
-"%%T\MSBuild.exe" DryIoc.v12.sln /t:Rebuild /p:OutDir=%OUTDIR% /p:Configuration=Release /m:4 /p:BuildInParallel=true
+"%%T\MSBuild.exe" DryIoc.v12.sln /t:Rebuild /p:OutDir=%OUTDIR% /p:Configuration=Release /p:RestorePackages=false /m /p:BuildInParallel=true
 ))
 
 if not "%1"=="-nopause" pause

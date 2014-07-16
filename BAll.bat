@@ -27,5 +27,5 @@ goto:eof
 :Check
 if ERRORLEVEL 1 (
 echo:Failed with ERRORLEVEL==%ERRORLEVEL%!
-pause
+if not "%1"=="-nopause" pause
 ) else exit /b
