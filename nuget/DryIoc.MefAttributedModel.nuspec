@@ -24,14 +24,13 @@
         </frameworkAssemblies>
     </metadata>
     <files>
+        <file src="..\LICENSE.txt" />
+
         <!-- net35 -->
         <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net35\DryIoc.MefAttributedModel" />
         <file src="..\DryIoc.MefAttributedModel\net40\ExportImportAttributes.cs" target="content\net35\DryIoc.MefAttributedModel" />
 
         <!-- net40 -->
         <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net40\DryIoc.MefAttributedModel" />
-
-        <!-- Additional files related to package itself -->
-        <file src="..\LICENSE.txt" />
     </files>
 </package>

@@ -28,14 +28,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.UnitTests", "Net40\D
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51-76A9-479E-8FF2-66C903C5856E}"
 	ProjectSection(SolutionItems) = preProject
-		NuGet\BuildPackages.bat = NuGet\BuildPackages.bat
 		nuget\DryIoc.dll.nuspec = nuget\DryIoc.dll.nuspec
 		NuGet\DryIoc.MefAttributedModel.dll.nuspec = NuGet\DryIoc.MefAttributedModel.dll.nuspec
 		NuGet\DryIoc.MefAttributedModel.nuspec = NuGet\DryIoc.MefAttributedModel.nuspec
 		nuget\DryIoc.nuspec = nuget\DryIoc.nuspec
-		NuGet\PublishPackages.bat = NuGet\PublishPackages.bat
+		NuGet\DryIoc.snk = NuGet\DryIoc.snk
 		NuGet\SignPackageAssemblies.ps1 = NuGet\SignPackageAssemblies.ps1
-		NuGet\StagePackages.bat = NuGet\StagePackages.bat
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocClient.NuGet.Net35", "NuGet\DryIocClient.NuGet.Net35\DryIocClient.NuGet.Net35.csproj", "{2C709B4B-4076-4C36-AF42-E6E49C32F0A6}"
@@ -58,13 +56,16 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.IssuesTests", "Issue
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocClient.NuGet.Net451", "NuGet\DryIocClient.NuGet.Net451\DryIocClient.NuGet.Net451.csproj", "{EACFFE31-252D-4542-A1F4-396AC431B38F}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{3726FC4E-B3F4-4E54-BDA3-A45346396AB4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{A9C4E2CC-3CA9-4F04-8544-A2837B045643}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{A9C4E2CC-3CA9-4F04-8544-A2837B045643}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9C4E2CC-3CA9-4F04-8544-A2837B045643}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A9C4E2CC-3CA9-4F04-8544-A2837B045643}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A9C4E2CC-3CA9-4F04-8544-A2837B045643}.Release|Any CPU.Build.0 = Release|Any CPU
 		{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -87,7 +88,8 @@ Global
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{626B701A-8C0D-4DBF-934C-F00FBB331931}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{626B701A-8C0D-4DBF-934C-F00FBB331931}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{626B701A-8C0D-4DBF-934C-F00FBB331931}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{626B701A-8C0D-4DBF-934C-F00FBB331931}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{626B701A-8C0D-4DBF-934C-F00FBB331931}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1A7C2E33-4076-492B-A82D-D3B875F18A2A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU

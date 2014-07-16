@@ -18,6 +18,8 @@
         </releaseNotes>
     </metadata>
     <files>
+        <file src="..\LICENSE.txt" />
+
         <!--net35-->
         <file src="..\DryIoc\Container.cs;..\DryIoc\net40\Lazy.cs" target="content\net35\DryIoc" />
 
@@ -25,8 +27,5 @@
         <file src="..\DryIoc\Container.cs" target="content\net40\DryIoc" />
         <file src="..\Net40\DryIoc\FactoryCompiler.cs" target="content\net40\DryIoc" />
         <file src="..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs" target="content\net40\DryIoc" />
-
-        <!-- Additional files related to package itself -->
-        <file src="..\LICENSE.txt" />
     </files>
 </package>

@@ -18,18 +18,19 @@
         </releaseNotes>
     </metadata>
     <files>
+        <file src="..\LICENSE.txt" />
+
         <!-- net35 -->
         <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />
         <file src="..\bin\Release\DryIoc.pdb" target="lib\net35" />
         
         <!-- net40 -->
-        <file src="..\bin\Release\net40\DryIoc.dll" target="lib\net40" />
-        <file src="..\bin\Release\net40\DryIoc.pdb" target="lib\net40" />
+        <file src="..\Net40\bin\Release\DryIoc.dll" target="lib\net40" />
+        <file src="..\Net40\bin\Release\DryIoc.pdb" target="lib\net40" />
         <file src="..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs" target="content\net40\Properties" />
         
-        <!-- Additional files related to package itself -->
-        <file src="..\DryIoc.snk" />
-        <file src="..\LICENSE.txt" />
-        <file src="..\Nuget\SignPackageAssemblies.ps1" />
+        <!-- tools -->
+        <file src="..\NuGet\DryIoc.snk" target="tools" />
+        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>
 </package>
