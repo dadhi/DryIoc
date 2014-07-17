@@ -2,7 +2,7 @@
 
 namespace DryIoc.IssuesTests
 {
-    [TestFixture][Ignore("Fixed in v2.0.0")]
+    [TestFixture]
     public class IssueNo2_Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent
     {
         [Test]
@@ -11,8 +11,7 @@ namespace DryIoc.IssuesTests
             var parent = new Container();
             parent.Register(typeof(IFruit), typeof(Melon), Reuse.Singleton);
 
-            var child = new Container();
-            child.ResolveUnregisteredFrom(parent);
+            var child = parent.CreateChildContainer();
             child.Register(typeof(IJuice), typeof(FruitJuice));
 
             var parentFruit = parent.Resolve<IFruit>();

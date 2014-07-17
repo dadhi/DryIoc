@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using DryIoc.Properties;
 
 [assembly: AssemblyTitle("DryIoc")]
@@ -8,7 +7,7 @@ using DryIoc.Properties;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc")]
-[assembly: AssemblyCopyright("Copyright © 2014 Maksim Volkau")]
+[assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

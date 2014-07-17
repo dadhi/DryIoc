@@ -1,6 +1,6 @@
 @echo off
 
-set SLN="DryIoc.v12.sln"
+set SLN="DryIoc.sln"
 set OUTDIR="..\bin\Release"
 
 echo:
@@ -17,7 +17,7 @@ echo:
 echo:Using MSBuild from "%%T"
 echo:
 
-"%%T\MSBuild.exe" DryIoc.v12.sln /t:Rebuild /p:OutDir=%OUTDIR% /p:Configuration=Release /p:RestorePackages=false /m /p:BuildInParallel=true
+"%%T\MSBuild.exe" %SLN% /t:Rebuild /p:OutDir=%OUTDIR% /p:Configuration=Release /p:RestorePackages=false /m /p:BuildInParallel=true
 ))
 
 if not "%1"=="-nopause" pause

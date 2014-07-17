@@ -71,7 +71,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj">
-      <Project>{E9D09703-354F-4BEB-A4A9-F614485BEC61}</Project>
+      <Project>{e9d09703-354f-4beb-a4a9-f614485bec61}</Project>
       <Name>DryIoc.UnitTests</Name>
       <Private>False</Private>
     </ProjectReference>
