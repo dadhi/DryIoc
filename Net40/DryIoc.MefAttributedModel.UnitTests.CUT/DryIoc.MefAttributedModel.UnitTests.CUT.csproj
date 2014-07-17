@@ -65,12 +65,12 @@
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
       <Project>{4F120D18-ABE6-4C79-B49F-8099F01E2F7F}</Project>
-      <Name>DryIoc.MefAttributedModel %28Net40\DryIoc.MefAttributedModel%29</Name>
+      <Name>DryIoc.MefAttributedModel</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
-      <Name>DryIoc %28Net40\DryIoc%29</Name>
+      <Name>DryIoc</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>

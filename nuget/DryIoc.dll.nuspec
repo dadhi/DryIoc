@@ -2,18 +2,35 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.dll</id>
-        <version>1.2.1</version>
+        <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIoc assembly. DryIoc is fast, small and rich IoC container. Project is available at https://bitbucket.org/dadhi/dryioc. </description>
+        <description>DryIoc is small, fast, capable IoC container.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
+        <releaseNotes>
+          fixed: #5: Friend assembly reference 'DryIoC.CompiledFactoryProvider.DynamicAssembly' is invalid. Strong-name signed assemblies must specify a public key in their InternalsVisibleTo declarations.
+          fixed: #4: DryIoC\InternalsVisibleToFactoryCompilerDynamic.cs.
+          fixed: #37: Support symbol packages for SymbolSource.org.
+          fixed: #38: Add optional script to Sign NuGet package assemblies with Strong Name
+        </releaseNotes>
     </metadata>
     <files>
+        <file src="..\LICENSE.txt" />
+
+        <!-- net35 -->
         <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />
+        <file src="..\bin\Release\DryIoc.pdb" target="lib\net35" />
+        
+        <!-- net40 -->
         <file src="..\Net40\bin\Release\DryIoc.dll" target="lib\net40" />
-        <file src="..\Net40\DryIoc\InternalsVisibleToFactoryCompilerDynamicAssembly.cs" target="content\net40\DryIoc" />
+        <file src="..\Net40\bin\Release\DryIoc.pdb" target="lib\net40" />
+        <file src="..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs" target="content\net40\Properties" />
+        
+        <!-- tools -->
+        <file src="..\NuGet\DryIoc.snk" target="tools" />
+        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>
 </package>

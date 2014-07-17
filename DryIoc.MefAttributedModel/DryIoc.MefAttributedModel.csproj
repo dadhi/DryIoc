@@ -36,10 +36,8 @@
   <ItemGroup>
     <Compile Include="AttributedModel.cs" />
     <Compile Include="net40\ExportImportAttributes.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs">
-      <SubType>
-      </SubType>
-    </Compile>
+    <Compile Include="Properties\Version.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs"/>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">

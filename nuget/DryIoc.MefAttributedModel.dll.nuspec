@@ -2,17 +2,21 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.MefAttributedModel.dll</id>
-        <version>1.2.0</version>
+        <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIoc.MefAttributedModel assembly. Mef attributed programming model for DryIoc IoC container. Project is available at https://bitbucket.org/dadhi/dryioc. </description>
+        <description>DryIoc.MefAttributedModel extension for DryIoc IoC container.</description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
+        <releaseNotes>
+          fixed: #37: Support symbol packages for SymbolSource.org.
+          fixed: #38: Add optional script to Sign NuGet package assemblies with Strong Name
+        </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc.dll" />
+                <dependency id="DryIoc.dll" version="[1.3.0,2.0.0)" />
             </group>
         </dependencies>
         <frameworkAssemblies>
@@ -20,7 +24,18 @@
         </frameworkAssemblies>
     </metadata>
     <files>
+        <file src="..\LICENSE.txt" />
+      
+        <!-- net35 -->
         <file src="..\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net35" />
+        <file src="..\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net35" />
+
+        <!-- net40 -->
         <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net40" />
+        <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net40" />
+
+        <!-- tools -->
+        <file src="..\NuGet\DryIoc.snk" target="tools" />
+        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>
 </package>
