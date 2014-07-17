@@ -1248,6 +1248,9 @@ namespace DryIoc
         public static readonly string UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS =
             "Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine +
             "and the rest of parameters resolvable from Container when resolving: {1}.";
+
+        public static readonly string REGISTERED_FACTORY_DELEGATE_RETURNS_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
+            "Registered factory delegate returns object of type {0}, which is not assignable to serviceType {1}.";
     }
 
     public static class Registrator
@@ -1410,6 +1413,32 @@ namespace DryIoc
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             registrator.RegisterAll(typeof(TImplementation), reuse, withConstructor, setup, null, named, ifAlreadyRegistered);
+        }
+
+        /// <summary>
+        /// Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
+        /// Delegate can use <see cref="IResolver"/> parameter to resolve any required dependencies, e.g.:
+        /// <code>RegisterDelegate&lt;ICar&gt;(r => new Car(r.Resolve&lt;IEngine&gt;()))</code>
+        /// </summary>
+        /// <param name="serviceType">Service type to register.</param>
+        /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
+        /// <param name="factoryDelegate">The delegate used to create a instance of <paramref name="serviceType"/>.</param>
+        /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
+        /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
+        public static void RegisterDelegate(this IRegistrator registrator, Type serviceType,
+            Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+        {
+            var factory = new DelegateFactory(r =>
+            {
+                var service = factoryDelegate(r);
+                return service.ThrowIf(!serviceType.IsInstanceOfType(service),
+                    Error.REGISTERED_FACTORY_DELEGATE_RETURNS_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE, service.GetType(), serviceType);
+            }, 
+                reuse, setup);
+            registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
