@@ -10,7 +10,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void When_class_public_types_exported_as_singleton_Then_resolving_types_will_return_the_same_instance()
         {
-            var container = new Container();
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(ISomeDb).Assembly);
 
             var someDb = container.Resolve<ISomeDb>();

@@ -50,6 +50,7 @@ namespace DryIoc.MefAttributedModel
         public static Container WithAttributedModel(this Container container)
         {
             return container.WithNewRules(container.ResolutionRules
+                .WithConstructorSelector(SelectImportingConstructor)
                 .With(GetConstructorParameterServiceKeyOrDefault)
                 .With(TryGetPropertyOrFieldServiceKey));
         }
@@ -268,7 +269,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Tools
 
-        public static ConstructorInfo FindSingleImportingConstructor(Type implementationType, Request req, IRegistry reg)
+        public static ConstructorInfo SelectImportingConstructor(Type implementationType, Request req, IRegistry reg)
         {
             var constructors = implementationType.GetConstructors();
             return constructors.Length == 1 ? constructors[0]
@@ -475,11 +476,7 @@ namespace DryIoc.MefAttributedModel
 
         public Factory CreateFactory()
         {
-            return new ReflectionFactory(
-                ImplementationType,
-                AttributedModel.GetReuseByType(ReuseType), 
-                AttributedModel.FindSingleImportingConstructor, 
-                GetSetup());
+            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), setup: GetSetup());
         }
 
         public IReuse GetReuse()
