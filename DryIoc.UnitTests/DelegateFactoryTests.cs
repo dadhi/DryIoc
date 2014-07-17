@@ -89,7 +89,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void It_is_possible_to_Register_delegate_with_runtime_type_of_service()
+        public void Possible_to_Register_delegate_with_runtime_type_of_service()
         {
             var container = new Container();
 
@@ -100,7 +100,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_delegate_with_service_type_not_compatible_with_created_object_type_should_Throw_ContainerException()
+        public void Resolving_delegate_with_service_type_not_assignable_to_created_object_type_should_Throw()
         {
             var container = new Container();
 
@@ -108,6 +108,26 @@ namespace DryIoc.UnitTests
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
+        }
+
+        [Test]
+        public void Possible_to_Register_pre_created_instance_of_runtime_serive_type()
+        {
+            var container = new Container();
+
+            container.RegisterInstance(typeof(string), "ring", named: "MyPrecious");
+
+            var ring = container.Resolve<string>("MyPrecious");
+            Assert.That(ring, Is.EqualTo("ring"));
+        }
+
+        [Test]
+        public void Registering_pre_created_instance_not_assignable_to_runtime_serive_type_should_Throw()
+        {
+            var container = new Container();
+
+            Assert.Throws<ContainerException>(() =>
+                container.RegisterInstance(typeof(IService), "ring", named: "MyPrecious"));
         }
     }
 }

@@ -1250,7 +1250,10 @@ namespace DryIoc
             "and the rest of parameters resolvable from Container when resolving: {1}.";
 
         public static readonly string REGISTERED_FACTORY_DELEGATE_RETURNS_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
-            "Registered factory delegate returns object of type {0}, which is not assignable to serviceType {1}.";
+            "Registered factory delegate returns object [{0}] of type {1}, which is not assignable to serviceType {2}.";
+
+        public static readonly string REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
+            "Registered instance [{0}] of type {1} is not assignable to serviceType {2}.";
     }
 
     public static class Registrator
@@ -1416,32 +1419,6 @@ namespace DryIoc
         }
 
         /// <summary>
-        /// Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
-        /// Delegate can use <see cref="IResolver"/> parameter to resolve any required dependencies, e.g.:
-        /// <code>RegisterDelegate&lt;ICar&gt;(r => new Car(r.Resolve&lt;IEngine&gt;()))</code>
-        /// </summary>
-        /// <param name="serviceType">Service type to register.</param>
-        /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="factoryDelegate">The delegate used to create a instance of <paramref name="serviceType"/>.</param>
-        /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
-        /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
-        public static void RegisterDelegate(this IRegistrator registrator, Type serviceType,
-            Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
-        {
-            var factory = new DelegateFactory(r =>
-            {
-                var service = factoryDelegate(r);
-                return service.ThrowIf(!serviceType.IsInstanceOfType(service),
-                    Error.REGISTERED_FACTORY_DELEGATE_RETURNS_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE, service.GetType(), serviceType);
-            }, 
-                reuse, setup);
-            registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
-        }
-
-        /// <summary>
         /// Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
         /// Delegate can use <see cref="IResolver"/> parameter to resolve any required dependencies, e.g.:
         /// <code>RegisterDelegate&lt;ICar&gt;(r => new Car(r.Resolve&lt;IEngine&gt;()))</code>
@@ -1457,12 +1434,35 @@ namespace DryIoc
             Func<IResolver, TService> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            var factory = new DelegateFactory(resolver => factoryDelegate(resolver), reuse, setup);
+            var factory = new DelegateFactory(r => factoryDelegate(r), reuse, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
 
         /// <summary>
-        /// Registers a pre-created service instance of <typeparamref name="TService"/> 
+        /// Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
+        /// Delegate can use <see cref="IResolver"/> parameter to resolve any required dependencies, e.g.:
+        /// <code>RegisterDelegate&lt;ICar&gt;(r => new Car(r.Resolve&lt;IEngine&gt;()))</code>
+        /// </summary>
+        /// <param name="serviceType">Service type to register.</param>
+        /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
+        /// <param name="factoryDelegate">The delegate used to create a instance of <paramref name="serviceType"/>.</param>
+        /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
+        /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
+        public static void RegisterDelegate(this IRegistrator registrator, Type serviceType,
+            Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+        {
+            var factory = new DelegateFactory(r => factoryDelegate(r).ThrowIf(x => serviceType.IsInstanceOfType(x) ? null :
+                Error.REGISTERED_FACTORY_DELEGATE_RETURNS_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE.Of(x, x.GetType(), serviceType)),
+                reuse, setup);
+            registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
+        }
+
+        /// <summary>
+        /// Registers a pre-created object of <typeparamref name="TService"/>.
+        /// It is just a sugar on top of <see cref="RegisterDelegate{TService}"/> method.
         /// </summary>
         /// <typeparam name="TService">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
@@ -1470,11 +1470,27 @@ namespace DryIoc
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
-        public static void RegisterInstance<TService>(this IRegistrator registrator,
-            TService instance, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+        public static void RegisterInstance<TService>(this IRegistrator registrator, TService instance,
+            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             registrator.RegisterDelegate(_ => instance, Reuse.Transient, setup, named, ifAlreadyRegistered);
+        }
+
+        /// <summary>
+        /// Registers a pre-created object assignable to <paramref name="serviceType"/>. 
+        /// </summary>
+        /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
+        /// <param name="serviceType">Service type to register.</param>
+        /// <param name="instance">The pre-created instance of <paramref name="serviceType"/>.</param>
+        /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
+        /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
+        public static void RegisterInstance(this IRegistrator registrator, Type serviceType, object instance,
+            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+        {
+            Throw.If(!serviceType.IsInstanceOfType(instance),
+                Error.REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE, instance, instance.GetType(), serviceType);
+            registrator.Register(new DelegateFactory(_ => instance, Reuse.Transient, setup), serviceType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -2127,7 +2143,7 @@ namespace DryIoc
                     throw Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE.Of(implType, serviceType);
             }
 
-            if (_constructorSelector == null && 
+            if (_constructorSelector == null &&
                 registry.ResolutionRules.ConstructorSelector == null)
             {
                 var publicCtorCount = implType.GetConstructors().Length;
@@ -2376,7 +2392,7 @@ namespace DryIoc
                 var scopeIndex = scope == request.ResolutionScope ? -1
                     : request.ResolutionState.GetOrAddItem(scope);
 
-                return (items, resolutionScope) => 
+                return (items, resolutionScope) =>
                     (scopeIndex == -1 ? resolutionScope : (Scope)items.Get(scopeIndex))
                     .GetOrAdd(ID, () => _customDelegate(GetRegistry(items, registryRefIndex)));
             }
@@ -2601,6 +2617,13 @@ namespace DryIoc
             throw GetException(message == null ? Format(ERROR_ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
         }
 
+        public static T ThrowIf<T>(this T arg, Func<T, Exception> getErrorOrNull)
+        {
+            var error = getErrorOrNull(arg);
+            if (error == null) return arg;
+            throw error;
+        }
+
         public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             if (!throwCondition) return;
@@ -2612,7 +2635,7 @@ namespace DryIoc
             return GetException(Format(message, arg0, arg1, arg2));
         }
 
-        private static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        public static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             return string.Format(message, PrintArg(arg0), PrintArg(arg1), PrintArg(arg2));
         }
@@ -2798,15 +2821,15 @@ namespace DryIoc
 
     public static class PrintTools
     {
-        public static string NULL_OR_EMPTY_STR = "''";
-        public static string ITEM_SEPARATOR_STR = ";" + Environment.NewLine;
+        public static string NullOrEmptyStr = "\"\"";
+        public static string ItemSeparatorStr = ";" + Environment.NewLine;
 
         public static string Print(this object x)
         {
-            return x is string ? (string)x
+            return x is string ? string.Concat("\"", (string)x, "\"")
                  : x is Type ? ((Type)x).Print()
-                 : x is IEnumerable<Type> ? ((IEnumerable)x).Print(ITEM_SEPARATOR_STR, ifEmpty: NULL_OR_EMPTY_STR)
-                 : x is IEnumerable ? ((IEnumerable)x).Print(ITEM_SEPARATOR_STR, ifEmpty: NULL_OR_EMPTY_STR)
+                 : x is IEnumerable<Type> ? ((IEnumerable)x).Print(ItemSeparatorStr, ifEmpty: NullOrEmptyStr)
+                 : x is IEnumerable ? ((IEnumerable)x).Print(ItemSeparatorStr, ifEmpty: NullOrEmptyStr)
                  : string.Empty + x;
         }
 
