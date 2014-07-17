@@ -1473,7 +1473,7 @@ namespace DryIoc
         public static void RegisterInstance<TService>(this IRegistrator registrator, TService instance,
             FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            registrator.RegisterDelegate(_ => instance, Reuse.Transient, setup, named, ifAlreadyRegistered);
+            registrator.Register(new InstanceFactory(instance, setup), typeof(TService), named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1488,9 +1488,7 @@ namespace DryIoc
         public static void RegisterInstance(this IRegistrator registrator, Type serviceType, object instance,
             FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            Throw.If(!serviceType.IsInstanceOfType(instance),
-                Error.REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE, instance, instance.GetType(), serviceType);
-            registrator.Register(new DelegateFactory(_ => instance, Reuse.Transient, setup), serviceType, named, ifAlreadyRegistered);
+            registrator.Register(new InstanceFactory(instance, setup), serviceType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -2030,6 +2028,32 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    public sealed class InstanceFactory : Factory 
+    {
+        public InstanceFactory(object instance, FactorySetup setup = null) : base(null, setup)
+        {
+            _instance = instance;
+        }
+
+        public override void VerifyBeforeRegistration(Type serviceType, IRegistry _)
+        {
+            if (!serviceType.IsInstanceOfType(_instance))
+                throw Error.REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE.Of(_instance, _instance.GetType(), serviceType);
+        }
+
+        public override Expression CreateExpression(Request request, IRegistry _)
+        {
+            return request.ResolutionState.GetItemExpression(_instance, _instance.GetType());
+        }
+
+        public override FactoryDelegate GetDelegate(Request _, IRegistry __)
+        {
+            return (i, s) => _instance;
+        }
+
+        private readonly object _instance;
     }
 
     public delegate ConstructorInfo ConstructorSelector(Type implementationType, Request request, IRegistry registry);
