@@ -49,6 +49,7 @@
     <Compile Include="ExportAsGenericWrapperTests.cs" />
     <Compile Include="ExportImportWithKeyTests.cs" />
     <Compile Include="ExportOnceTests.cs" />
+    <Compile Include="ImportAttributeTests.cs" />
     <Compile Include="ImportWithMetadataTests.cs" />
     <Compile Include="InheritedExportTests.cs" />
     <Compile Include="Performance\PerformanceTests.cs" />
