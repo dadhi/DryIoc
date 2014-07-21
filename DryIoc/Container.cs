@@ -1628,9 +1628,38 @@ namespace DryIoc
         }
     }
 
-    public enum FactoryType { Service, Decorator, GenericWrapper };
+    public enum DependencyResolutionAction { Resolve, TryResolve, Skip };
 
-    public enum FactoryCachePolicy { ShouldNotCacheExpression, CouldCacheExpression };
+    public sealed class DependencyResolutionInfo
+    {
+        public readonly DependencyResolutionAction Action;
+        public readonly Type ServiceType;
+        public readonly object ServiceKey;
+
+        public static DependencyResolutionInfo Resolve(Type serviceType, object serviceKey = null)
+        {
+            return new DependencyResolutionInfo(DependencyResolutionAction.Resolve, serviceType, serviceKey);
+        }
+
+        public static DependencyResolutionInfo TryResolve(Type serviceType, object serviceKey = null)
+        {
+            return new DependencyResolutionInfo(DependencyResolutionAction.TryResolve, serviceType, serviceKey);
+        }
+
+        public static DependencyResolutionInfo Skip()
+        {
+            return _skipDependency;
+        }
+
+        private DependencyResolutionInfo(DependencyResolutionAction action, Type serviceType, object serviceKey)
+        {
+            Action = action;
+            ServiceType = serviceType;
+            ServiceKey = serviceKey;
+        }
+
+        private static readonly DependencyResolutionInfo _skipDependency = new DependencyResolutionInfo(DependencyResolutionAction.Skip, null, null);
+    }
 
     public sealed class Request
     {
@@ -1695,12 +1724,9 @@ namespace DryIoc
             return new Request(ResolutionState, _resolutionScope, Parent, serviceType, ServiceKey, DependencyInfo, factory);
         }
 
-        public Request Push(ParameterInfo ctorParam, IRegistry registry)
+        public Request Push(DependencyResolutionInfo resolutionInfo, object dependency)
         {
-            var paramKey = ResolvedFactory.Setup.Type != FactoryType.Service
-                ? ServiceKey // propagate parent key for wrapper or decorator.
-                : registry.ResolutionRules.ForConstructorParameterServiceKey.GetFirstNonDefault(r => r(ctorParam, this, registry));
-            return Push(ctorParam.ParameterType, paramKey, ctorParam);
+            return Push(resolutionInfo.ServiceType, resolutionInfo.ServiceKey, dependency);
         }
 
         public Request GetNonWrapperParentOrDefault()
@@ -1776,6 +1802,10 @@ namespace DryIoc
 
         #endregion
     }
+
+    public enum FactoryType { Service, Decorator, GenericWrapper };
+
+    public enum FactoryCachePolicy { ShouldNotCacheExpression, CouldCacheExpression };
 
     public abstract class FactorySetup
     {
@@ -2030,9 +2060,10 @@ namespace DryIoc
         #endregion
     }
 
-    public sealed class InstanceFactory : Factory 
+    public sealed class InstanceFactory : Factory
     {
-        public InstanceFactory(object instance, FactorySetup setup = null) : base(null, setup)
+        public InstanceFactory(object instance, FactorySetup setup = null)
+            : base(null, setup)
         {
             _instance = instance;
         }
@@ -2095,7 +2126,7 @@ namespace DryIoc
                                 return false;
                             matchedIndecesMask |= inputArgIndex << 1;
                             return true;
-                        })).All(p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null);
+                        })).All(p => registry.ResolveFactory(request.Push(GetCtorParamResolutionInfo(p, request, registry), p), IfUnresolved.ReturnNull) != null);
                     });
 
                 return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS, funcType, request).Ctor;
@@ -2103,7 +2134,7 @@ namespace DryIoc
             else
             {
                 var matchedCtor = ctorsWithMoreParamsFirst
-                    .FirstOrDefault(x => x.Params.All(p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null));
+                    .FirstOrDefault(x => x.Params.All(p => registry.ResolveFactory(request.Push(GetCtorParamResolutionInfo(p, request, registry), p), IfUnresolved.ReturnNull) != null));
                 return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
             }
         }
@@ -2127,6 +2158,13 @@ namespace DryIoc
             _implementationType = implementationType.ThrowIfNull()
                 .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
             _constructorSelector = constructorSelector;
+        }
+
+        public static DependencyResolutionInfo GetCtorParamResolutionInfo(ParameterInfo ctorParam, Request parent, IRegistry registry)
+        {
+            var serviceKey = parent.ResolvedFactory.Setup.Type != FactoryType.Service ? parent.ServiceKey :
+                registry.ResolutionRules.ForConstructorParameterServiceKey.GetFirstNonDefault(r => r(ctorParam, parent, registry));
+            return DependencyResolutionInfo.Resolve(ctorParam.ParameterType, serviceKey);
         }
 
         /// <remarks>Before registering factory checks that ImplementationType is assignable Or
@@ -2191,14 +2229,27 @@ namespace DryIoc
         {
             var ctor = SelectConstructor(_implementationType, request, registry);
             var ctorParams = ctor.GetParameters();
+
             Expression[] paramExprs = null;
             if (ctorParams.Length != 0)
             {
                 paramExprs = new Expression[ctorParams.Length];
                 for (var i = 0; i < ctorParams.Length; i++)
                 {
-                    var paramRequest = request.Push(ctorParams[i], registry);
-                    paramExprs[i] = registry.ResolveFactory(paramRequest, IfUnresolved.Throw).GetExpression(paramRequest, registry);
+                    var param = ctorParams[i];
+                    var paramInfo = GetCtorParamResolutionInfo(param, request, registry);
+                    if (paramInfo.Action == DependencyResolutionAction.Skip)
+                        paramExprs[i] = param.ParameterType.DefaultExpression();
+                    else
+                    {
+                        var paramRequest = request.Push(paramInfo, param);
+                        var ifUnresolved = paramInfo.Action == DependencyResolutionAction.Resolve ? IfUnresolved.Throw : IfUnresolved.ReturnNull;
+                        var paramFactory = registry.ResolveFactory(paramRequest, ifUnresolved);
+
+                        paramExprs[i] = paramFactory == null
+                            ? paramRequest.ServiceType.DefaultExpression()
+                            : paramFactory.GetExpression(paramRequest, registry);
+                    }
                 }
             }
 
@@ -2232,7 +2283,8 @@ namespace DryIoc
 
                 if (ctorParamExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
-                    var paramRequest = request.Push(ctorParam, registry);
+                    var resolutionInfo = GetCtorParamResolutionInfo(ctorParam, request, registry);
+                    var paramRequest = request.Push(resolutionInfo, ctorParam);
                     ctorParamExprs[cp] = registry.ResolveFactory(paramRequest, IfUnresolved.Throw).GetExpression(paramRequest, registry);
                 }
             }
@@ -2458,8 +2510,6 @@ namespace DryIoc
 
         private readonly Func<Request, IRegistry, Factory> _getFactoryOrDefault;
     }
-
-    public enum DependencyKind { CtorParam, Property, Field }
 
     public interface IScope
     {
@@ -2868,6 +2918,17 @@ namespace DryIoc
             var result = builder.ToString();
             return result != string.Empty ? result : (ifEmpty ?? string.Empty);
         }
+    }
+
+    public static class ExpressionTools
+    {
+        public static Expression DefaultExpression(this Type type)
+        {
+            return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), Expression.Constant(type, typeof(Type)));
+        }
+
+        private static readonly MethodInfo _getDefaultMethod = typeof(ReflectionFactory).GetMethod("GetDefault");
+        public static T GetDefault<T>() { return default(T); }
     }
 
     public class KV<K, V>
