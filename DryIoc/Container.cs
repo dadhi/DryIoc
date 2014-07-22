@@ -1628,37 +1628,37 @@ namespace DryIoc
         }
     }
 
-    public enum DependencyResolutionAction { Resolve, TryResolve, Skip };
+    public enum DependencyResolution { Resolve, TryResolve, Skip };
 
-    public sealed class DependencyResolutionInfo
+    public sealed class DependencyServiceInfo
     {
-        public readonly DependencyResolutionAction Action;
+        public readonly DependencyResolution Resolution;
         public readonly Type ServiceType;
         public readonly object ServiceKey;
 
-        public static DependencyResolutionInfo Resolve(Type serviceType, object serviceKey = null)
+        public static DependencyServiceInfo Resolve(Type serviceType, object serviceKey = null)
         {
-            return new DependencyResolutionInfo(DependencyResolutionAction.Resolve, serviceType, serviceKey);
+            return new DependencyServiceInfo(DependencyResolution.Resolve, serviceType, serviceKey);
         }
 
-        public static DependencyResolutionInfo TryResolve(Type serviceType, object serviceKey = null)
+        public static DependencyServiceInfo TryResolve(Type serviceType, object serviceKey = null)
         {
-            return new DependencyResolutionInfo(DependencyResolutionAction.TryResolve, serviceType, serviceKey);
+            return new DependencyServiceInfo(DependencyResolution.TryResolve, serviceType, serviceKey);
         }
 
-        public static DependencyResolutionInfo Skip()
+        public static DependencyServiceInfo Skip()
         {
             return _skipDependency;
         }
 
-        private DependencyResolutionInfo(DependencyResolutionAction action, Type serviceType, object serviceKey)
+        private DependencyServiceInfo(DependencyResolution resolution, Type serviceType, object serviceKey)
         {
-            Action = action;
+            Resolution = resolution;
             ServiceType = serviceType;
             ServiceKey = serviceKey;
         }
 
-        private static readonly DependencyResolutionInfo _skipDependency = new DependencyResolutionInfo(DependencyResolutionAction.Skip, null, null);
+        private static readonly DependencyServiceInfo _skipDependency = new DependencyServiceInfo(DependencyResolution.Skip, null, null);
     }
 
     public sealed class Request
@@ -1724,9 +1724,9 @@ namespace DryIoc
             return new Request(ResolutionState, _resolutionScope, Parent, serviceType, ServiceKey, DependencyInfo, factory);
         }
 
-        public Request Push(DependencyResolutionInfo resolutionInfo, object dependency)
+        public Request Push(DependencyServiceInfo serviceInfo, object dependency)
         {
-            return Push(resolutionInfo.ServiceType, resolutionInfo.ServiceKey, dependency);
+            return Push(serviceInfo.ServiceType, serviceInfo.ServiceKey, dependency);
         }
 
         public Request GetNonWrapperParentOrDefault()
@@ -2091,7 +2091,7 @@ namespace DryIoc
 
     public sealed class ReflectionFactory : Factory
     {
-        #region Constructor selection strategies..
+        #region Customization..
 
         public static ConstructorInfo SelectConstructorWithAllResolvableArguments(Type type, Request request, IRegistry registry)
         {
@@ -2139,6 +2139,13 @@ namespace DryIoc
             }
         }
 
+        public static DependencyServiceInfo GetCtorParamResolutionInfo(ParameterInfo ctorParam, Request parent, IRegistry registry)
+        {
+            var serviceKey = parent.ResolvedFactory.Setup.Type != FactoryType.Service ? parent.ServiceKey :
+                registry.ResolutionRules.ForConstructorParameterServiceKey.GetFirstNonDefault(r => r(ctorParam, parent, registry));
+            return DependencyServiceInfo.Resolve(ctorParam.ParameterType, serviceKey);
+        }
+
         #endregion
 
         public override Type ImplementationType
@@ -2158,13 +2165,6 @@ namespace DryIoc
             _implementationType = implementationType.ThrowIfNull()
                 .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
             _constructorSelector = constructorSelector;
-        }
-
-        public static DependencyResolutionInfo GetCtorParamResolutionInfo(ParameterInfo ctorParam, Request parent, IRegistry registry)
-        {
-            var serviceKey = parent.ResolvedFactory.Setup.Type != FactoryType.Service ? parent.ServiceKey :
-                registry.ResolutionRules.ForConstructorParameterServiceKey.GetFirstNonDefault(r => r(ctorParam, parent, registry));
-            return DependencyResolutionInfo.Resolve(ctorParam.ParameterType, serviceKey);
         }
 
         /// <remarks>Before registering factory checks that ImplementationType is assignable Or
@@ -2238,12 +2238,12 @@ namespace DryIoc
                 {
                     var param = ctorParams[i];
                     var paramInfo = GetCtorParamResolutionInfo(param, request, registry);
-                    if (paramInfo.Action == DependencyResolutionAction.Skip)
+                    if (paramInfo.Resolution == DependencyResolution.Skip)
                         paramExprs[i] = param.ParameterType.DefaultExpression();
                     else
                     {
                         var paramRequest = request.Push(paramInfo, param);
-                        var ifUnresolved = paramInfo.Action == DependencyResolutionAction.Resolve ? IfUnresolved.Throw : IfUnresolved.ReturnNull;
+                        var ifUnresolved = paramInfo.Resolution == DependencyResolution.Resolve ? IfUnresolved.Throw : IfUnresolved.ReturnNull;
                         var paramFactory = registry.ResolveFactory(paramRequest, ifUnresolved);
 
                         paramExprs[i] = paramFactory == null
@@ -2265,7 +2265,7 @@ namespace DryIoc
             var ctor = SelectConstructor(_implementationType, request, registry);
             var ctorParams = ctor.GetParameters();
             var ctorParamExprs = new Expression[ctorParams.Length];
-            var funcInputParamExprs = new ParameterExpression[funcParamTypes.Length - 1]; // (minus Func return parameter).
+            var funcParamExprs = new ParameterExpression[funcParamTypes.Length - 1]; // (minus Func return parameter).
 
             for (var cp = 0; cp < ctorParams.Length; cp++)
             {
@@ -2274,39 +2274,45 @@ namespace DryIoc
                 {
                     var funcParamType = funcParamTypes[fp];
                     if (ctorParam.ParameterType == funcParamType &&
-                        funcInputParamExprs[fp] == null) // Skip if Func parameter was already used for constructor.
+                        funcParamExprs[fp] == null) // Skip if Func parameter was already used for constructor.
                     {
-                        ctorParamExprs[cp] = funcInputParamExprs[fp] = Expression.Parameter(funcParamType, ctorParam.Name);
+                        ctorParamExprs[cp] = funcParamExprs[fp] = Expression.Parameter(funcParamType, ctorParam.Name);
                         break;
                     }
                 }
 
                 if (ctorParamExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
-                    var resolutionInfo = GetCtorParamResolutionInfo(ctorParam, request, registry);
-                    var paramRequest = request.Push(resolutionInfo, ctorParam);
-                    ctorParamExprs[cp] = registry.ResolveFactory(paramRequest, IfUnresolved.Throw).GetExpression(paramRequest, registry);
+                    var paramInfo = GetCtorParamResolutionInfo(ctorParam, request, registry);
+                    if (paramInfo.Resolution == DependencyResolution.Skip)
+                        ctorParamExprs[cp] = ctorParam.ParameterType.DefaultExpression();
+                    else
+                    {
+                        var paramRequest = request.Push(paramInfo, ctorParam);
+                        var ifUnresolved = paramInfo.Resolution == DependencyResolution.Resolve ? IfUnresolved.Throw : IfUnresolved.ReturnNull;
+                        ctorParamExprs[cp] = registry.ResolveFactory(paramRequest, ifUnresolved).GetExpression(paramRequest, registry);                        
+                    }
                 }
             }
 
             // Find unused Func parameters (present in Func but not in constructor) and create "_" (ignored) Parameter expressions for them.
             // In addition store unused parameter in output list for client review.
             unusedFuncArgs = null;
-            for (var fp = 0; fp < funcInputParamExprs.Length; fp++)
+            for (var fp = 0; fp < funcParamExprs.Length; fp++)
             {
-                if (funcInputParamExprs[fp] == null) // unused parameter
+                if (funcParamExprs[fp] == null) // unused parameter
                 {
                     if (unusedFuncArgs == null)
                         unusedFuncArgs = new List<Type>(2);
                     var funcParamType = funcParamTypes[fp];
                     unusedFuncArgs.Add(funcParamType);
-                    funcInputParamExprs[fp] = Expression.Parameter(funcParamType, "_");
+                    funcParamExprs[fp] = Expression.Parameter(funcParamType, "_");
                 }
             }
 
             var newExpr = Expression.New(ctor, ctorParamExprs);
             var newExprInitialized = InitMembersIfRequired(_implementationType, newExpr, request, registry);
-            return Expression.Lambda(funcType, newExprInitialized, funcInputParamExprs);
+            return Expression.Lambda(funcType, newExprInitialized, funcParamExprs);
         }
 
         #region Implementation
