@@ -1553,7 +1553,7 @@ namespace DryIoc
         /// </summary>
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="ifUnresolved">Optional, say to how to handle unresolved service case.</param>
+        /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
         /// <returns>The requested service instance.</returns>
         public static object Resolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
@@ -1565,7 +1565,7 @@ namespace DryIoc
         /// </summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="ifUnresolved">Optional, say to how to handle unresolved service case.</param>
+        /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
         /// <returns>The requested service instance.</returns>
         public static TService Resolve<TService>(this IResolver resolver, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
@@ -1578,7 +1578,7 @@ namespace DryIoc
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceKey">Service key (any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/> defined).</param>
-        /// <param name="ifUnresolved">Optional, say to how to handle unresolved service case.</param>
+        /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
         /// <returns>The requested service instance.</returns>
         public static object Resolve(this IResolver resolver, Type serviceType, object serviceKey, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
@@ -1593,7 +1593,7 @@ namespace DryIoc
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceKey">Service key (any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/> defined).</param>
-        /// <param name="ifUnresolved">Optional, say to how to handle unresolved service case.</param>
+        /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
         /// <returns>The requested service instance.</returns>
         public static TService Resolve<TService>(this IResolver resolver, object serviceKey, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
@@ -2062,10 +2062,15 @@ namespace DryIoc
 
     public sealed class InstanceFactory : Factory
     {
+        public override Type ImplementationType
+        {
+            get { return _instance.GetType(); }
+        }
+
         public InstanceFactory(object instance, FactorySetup setup = null)
             : base(null, setup)
         {
-            _instance = instance;
+            _instance = instance.ThrowIfNull();
         }
 
         public override void VerifyBeforeRegistration(Type serviceType, IRegistry _)
