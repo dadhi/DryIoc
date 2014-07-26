@@ -253,7 +253,7 @@ namespace DryIoc.UnitTests
             container.Register<IOperation, SomeOperation>();
             container.Register<IMeasurer, Measurer>();
             container.RegisterDelegate<Func<IOperation, IOperation>>(
-                r => (service => MeasureExecutionTimeOperationDecorator.MeasureWith(service, r.Resolve<IMeasurer>())),
+                r => decorated => MeasureExecutionTimeOperationDecorator.MeasureWith(decorated, r.Resolve<IMeasurer>()),
                 setup: DecoratorSetup.Default);
 
             var operation = container.Resolve<IOperation>();

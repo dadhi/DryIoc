@@ -37,7 +37,7 @@ namespace DryIoc.UnitTests
         {
             string arg = null;
 
-            var ex = Assert.Throws<InvalidOperationException>(() =>
+            var ex = Assert.Throws<InvalidOperationException>(() => 
                 arg.ThrowIf(arg == null));
 
             Assert.That(ex.Message, Is.StringContaining("Argument of type System.String"));

@@ -254,7 +254,7 @@ namespace DryIoc.MefAttributedModel
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     _factoryMethodName, null);
 
-            var factory = new ExpressionFactory(factoryCreateExpr, 
+            var factory = new ExpressionFactory(factoryCreateExpr,
                 AttributedModel.GetReuseByType(info.ReuseType), info.GetSetup(attributes));
 
             for (var i = 0; i < info.Exports.Length; i++)
@@ -421,17 +421,17 @@ namespace DryIoc.MefAttributedModel
 
         public static StringBuilder AppendString(this StringBuilder code, string x)
         {
-            return code.Append(x == null ? "null" : ("\"" + x + "\""));
+            return x == null ? code.Append("null") : code.Print(x, quote: '"');
         }
 
         public static StringBuilder AppendType(this StringBuilder code, Type x)
         {
-            return code.Append(x == null ? "null" : "typeof(" + x.Print() + ")");
+            return x == null ? code.Append("null") : code.Append("typeof(").Print(x).Append(')');
         }
 
         public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object enumValue)
         {
-            return code.Append(enumType.Print() + "." + Enum.GetName(enumType, enumValue));
+            return code.Print(enumType).Append('.').Append(Enum.GetName(enumType, enumValue));
         }
 
         public static StringBuilder AppendObject(this StringBuilder code, object x, Action<StringBuilder, object> ifNotRecognized = null)
