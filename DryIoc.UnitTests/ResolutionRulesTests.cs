@@ -55,7 +55,8 @@ namespace DryIoc.UnitTests
             var container = new Container(ResolutionRules.Default.With((parameter, _, __) =>
             {
                 object key;
-                return TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false)) ? key : null;
+                return TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false)) ? 
+                    new CtorParameterServiceInfo(parameter, serviceKey:key) : null;
             }));
 
             container.Register(typeof(INamedService), typeof(NamedService));
@@ -75,7 +76,7 @@ namespace DryIoc.UnitTests
                 object key;
                 var attributes = parameter.GetCustomAttributes(false);
                 return TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes)
-                    ? key : null;
+                    ? new CtorParameterServiceInfo(parameter, serviceKey:key) : null;
             }));
 
             container.Register(typeof(IFooService), typeof(FooHey), setup: ServiceSetup.WithMetadata(FooMetadata.Hey));

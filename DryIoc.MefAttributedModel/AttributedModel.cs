@@ -47,12 +47,17 @@ namespace DryIoc.MefAttributedModel
             { typeof(ResolutionScopeReuse), Reuse.InResolutionScope }
         };
 
-        public static Container WithAttributedModel(this Container container)
+        public static ResolutionRules WithAttributedModel(this ResolutionRules rules)
         {
-            return container.WithNewRules(container.ResolutionRules
+            return rules
                 .WithConstructorSelector(SelectImportingConstructor)
                 .With(GetConstructorParameterServiceKeyOrDefault)
-                .With(TryGetPropertyOrFieldServiceKey));
+                .With(TryGetPropertyOrFieldServiceKey);
+        }
+
+        public static Container WithAttributedModel(this Container container)
+        {
+            return container.WithNewRules(container.ResolutionRules.WithAttributedModel());
         }
 
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
@@ -249,7 +254,7 @@ namespace DryIoc.MefAttributedModel
             Func<Request, IRegistry, Expression> factoryCreateExpr = (request, registry) =>
                 Expression.Call(
                     Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
-                        request.ResolutionState.GetItemExpression(registry),
+                        request.State.GetItemExpression(registry),
                         Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     _factoryMethodName, null);
@@ -292,7 +297,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        public static object GetConstructorParameterServiceKeyOrDefault(ParameterInfo parameter, Request parent, IRegistry registry)
+        public static CtorParameterServiceInfo GetConstructorParameterServiceKeyOrDefault(ParameterInfo parameter, Request parent, IRegistry registry)
         {
             var attributes = parameter.GetCustomAttributes(false);
             if (attributes.Length == 0)
@@ -302,7 +307,8 @@ namespace DryIoc.MefAttributedModel
             if (TryGetServiceKeyFromImportAttribute(out key, attributes) ||
                 TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes) ||
                 TryGetServiceKeyFromExportOnceAttribute(out key, parameter.ParameterType, registry, attributes))
-                return key;
+                return new CtorParameterServiceInfo(parameter, serviceKey: key);
+            
             return null;
         }
 
