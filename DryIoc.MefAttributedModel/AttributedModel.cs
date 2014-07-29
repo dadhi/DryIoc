@@ -52,6 +52,8 @@ namespace DryIoc.MefAttributedModel
             return rules
                 .WithConstructorSelector(SelectImportingConstructor)
                 .With(GetConstructorParameterServiceKeyOrDefault)
+                .WithPropertySelector(ReflectionFactory.SelectPublicAssignableProperties)
+                .WithFieldSelector(ReflectionFactory.SelectPublicNonReadonlyFields)
                 .With(TryGetPropertyOrFieldServiceKey);
         }
 

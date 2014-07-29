@@ -90,8 +90,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_property_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.With(
-                (out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
+            var container = new Container(ResolutionRules.Default
+                .WithPropertySelector(ReflectionFactory.SelectPublicAssignableProperties)
+                .WithFieldSelector(ReflectionFactory.SelectPublicNonReadonlyFields)  
+                .With((out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
                 {
                     resultKey = null;
                     return propertyOrField.GetCustomAttributes(typeof(ImportAttribute), false).Length != 0;
@@ -109,7 +111,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.With(TryGetPropertyOrFieldServiceKey));
+            var container = new Container(ResolutionRules.Default
+                .WithPropertySelector(ReflectionFactory.SelectPublicAssignableProperties)
+                .WithFieldSelector(ReflectionFactory.SelectPublicNonReadonlyFields)  
+                .With(TryGetPropertyOrFieldServiceKey));
 
             container.Register<FunnyChicken>();
             container.Register<Guts>();
@@ -134,7 +139,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_Func_of_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.With(TryGetPropertyOrFieldServiceKey));
+            var container = new Container(ResolutionRules.Default
+                .WithPropertySelector(ReflectionFactory.SelectPublicAssignableProperties)  
+                .WithFieldSelector(ReflectionFactory.SelectPublicNonReadonlyFields)  
+                .With(TryGetPropertyOrFieldServiceKey));
 
             container.Register<FunkyChicken>();
             container.Register<Guts>();
@@ -147,7 +155,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_named_Lazy_of_property_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.With(TryGetPropertyOrFieldServiceKey));
+            var container = new Container(ResolutionRules.Default
+                .WithPropertySelector(ReflectionFactory.SelectPublicAssignableProperties)
+                .WithFieldSelector(ReflectionFactory.SelectPublicNonReadonlyFields)  
+                .With(TryGetPropertyOrFieldServiceKey));
 
             container.Register<LazyChicken>();
             container.Register<Guts>(named: "lazy-me");
