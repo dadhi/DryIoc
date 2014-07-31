@@ -49,12 +49,9 @@ namespace DryIoc.MefAttributedModel
 
         public static ResolutionRules WithAttributedModel(this ResolutionRules rules)
         {
-            return rules
-                .WithConstructorSelector(SelectImportingConstructor)
+            return rules.WithConstructorSelector(SelectImportingConstructor)
                 .With(GetConstructorParameterServiceKeyOrDefault)
-                .WithPropertySelector(ReflectionFactory.SelectPublicAssignableProperties)
-                .WithFieldSelector(ReflectionFactory.SelectPublicNonReadonlyFields)
-                .With(TryGetPropertyOrFieldServiceKey);
+                .WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute);
         }
 
         public static Container WithAttributedModel(this Container container)
@@ -299,7 +296,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        public static CtorParameterServiceInfo GetConstructorParameterServiceKeyOrDefault(ParameterInfo parameter, Request parent, IRegistry registry)
+        public static ServiceInfo GetConstructorParameterServiceKeyOrDefault(ParameterInfo parameter, Request parent, IRegistry registry)
         {
             var attributes = parameter.GetCustomAttributes(false);
             if (attributes.Length == 0)
@@ -309,9 +306,26 @@ namespace DryIoc.MefAttributedModel
             if (TryGetServiceKeyFromImportAttribute(out key, attributes) ||
                 TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes) ||
                 TryGetServiceKeyFromExportOnceAttribute(out key, parameter.ParameterType, registry, attributes))
-                return new CtorParameterServiceInfo(parameter, serviceKey: key);
+                return ServiceInfo.Of(parameter, serviceKey: key);
             
             return null;
+        }
+
+        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null);
+            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly);
+            var members = properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>());
+            return members.Select(GetServiceInfoFromMemberImportAttribute);
+        }
+
+        private static ServiceInfo GetServiceInfoFromMemberImportAttribute(MemberInfo member)
+        {
+            var attributes = member.GetCustomAttributes(false);
+            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
+            return import == null ? null : ServiceInfo.Of(member, import.ContractType,
+                import.ContractName ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null));
         }
 
         public static bool TryGetPropertyOrFieldServiceKey(out object key, MemberInfo member, Request _, IRegistry registry)
@@ -781,13 +795,20 @@ namespace DryIoc.MefAttributedModel
     {
         public object ContractKey { get; set; }
 
-        public ImportWithKeyAttribute(object contractKey, Type contractType)
+        public ImportWithKeyAttribute(object contractKey, Type contractType = null)
             : base(contractType)
         {
             ContractKey = contractKey;
         }
 
-        public ImportWithKeyAttribute(object contractKey) : this(contractKey, null) { }
+        public ImportWithKeyAttribute(string contractKey, Type contractType = null)
+            : base(contractKey, contractType)
+        {
+            ContractKey = contractKey;
+        }
+
+        public ImportWithKeyAttribute(Type contractType)
+            : this(null, contractType) {}
     }
 
     [MetadataAttribute]

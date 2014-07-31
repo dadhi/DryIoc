@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -91,13 +93,19 @@ namespace DryIoc.UnitTests
         public void Can_resolve_property_marked_with_Import()
         {
             var container = new Container(ResolutionRules.Default
-                .WithPropertySelector(ReflectionFactory.SelectPublicAssignableProperties)
-                .WithFieldSelector(ReflectionFactory.SelectPublicNonReadonlyFields)  
-                .With((out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
-                {
-                    resultKey = null;
-                    return propertyOrField.GetCustomAttributes(typeof(ImportAttribute), false).Length != 0;
-                }));
+                .WithPropertyAndFieldSelector(type =>
+                        type.GetProperties(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                    .Where(p => p.GetSetMethod() != null).Cast<MemberInfo>().Concat(
+                        type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                            .Where(f => !f.IsInitOnly).Cast<MemberInfo>())
+                    .Select(m =>
+                    {
+                        var attributes = m.GetCustomAttributes(typeof(ImportAttribute), false);
+                        if (attributes.Length == 0)
+                            return null;
+                        var importAttr = (ImportAttribute)attributes[0];
+                        return ServiceInfo.Of(m, importAttr.ContractType, importAttr.ContractName);
+                    })));
 
             container.Register<FunnyChicken>();
             container.Register<Guts>();
@@ -111,15 +119,12 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default
-                .WithPropertySelector(ReflectionFactory.SelectPublicAssignableProperties)
-                .WithFieldSelector(ReflectionFactory.SelectPublicNonReadonlyFields)  
-                .With(TryGetPropertyOrFieldServiceKey));
+            var container = new Container(ResolutionRules.Default.WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunnyChicken>();
             container.Register<Guts>();
             container.Register<Brain>();
-           
+
             var chicken = container.Resolve<FunnyChicken>();
 
             Assert.That(chicken.SomeBrain, Is.Not.Null);
@@ -128,7 +133,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_not_throw_on_resolving_readonly_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.With(TryGetPropertyOrFieldServiceKey));
+            var container = new Container(ResolutionRules.Default.WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunnyDuckling>();
 
@@ -139,10 +144,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_Func_of_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default
-                .WithPropertySelector(ReflectionFactory.SelectPublicAssignableProperties)  
-                .WithFieldSelector(ReflectionFactory.SelectPublicNonReadonlyFields)  
-                .With(TryGetPropertyOrFieldServiceKey));
+            var container = new Container(ResolutionRules.Default.WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunkyChicken>();
             container.Register<Guts>();
@@ -155,10 +157,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_named_Lazy_of_property_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default
-                .WithPropertySelector(ReflectionFactory.SelectPublicAssignableProperties)
-                .WithFieldSelector(ReflectionFactory.SelectPublicNonReadonlyFields)  
-                .With(TryGetPropertyOrFieldServiceKey));
+            var container = new Container(ResolutionRules.Default.WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<LazyChicken>();
             container.Register<Guts>(named: "lazy-me");
@@ -168,16 +167,17 @@ namespace DryIoc.UnitTests
             Assert.That(chicken.SomeGuts, Is.Not.Null);
         }
 
-        public static bool TryGetPropertyOrFieldServiceKey(out object key, MemberInfo member, Request _, IRegistry registry)
+        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type)
         {
-            key = null;
-            var attributes = member.GetCustomAttributes(false);
-            if (attributes.Length == 0)
-                return false;
-
-            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
-            key = import == null ? null : import.ContractName;
-            return import != null;
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null);
+            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly);
+            var members = properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>());
+            return members.Select(m =>
+            {
+                var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
+                return import == null ? null : ServiceInfo.Of(m, import.ContractType, import.ContractName);
+            });
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
@@ -196,11 +196,13 @@ namespace DryIoc.UnitTests
     {
         public ImportAttribute() { }
 
-        public ImportAttribute(string contractName)
+        public ImportAttribute(string contractName, Type contractType = null)
         {
             ContractName = contractName;
+            ContractType = contractType;
         }
 
+        public Type ContractType { get; set; }
         public string ContractName { get; set; }
     }
 
@@ -228,17 +230,20 @@ namespace DryIoc.UnitTests
         [Import]
         public Guts SomeGuts { get; set; }
 
-        [Import] public Brain SomeBrain;
+        [Import]
+        public Brain SomeBrain;
     }
 
     public class FunnyDuckling
     {
-        [Import] public readonly Brain Brains;
+        [Import]
+        public readonly Brain Brains;
     }
 
     public class FunkyChicken
     {
-        [Import] public Func<Guts> SomeGuts;
+        [Import]
+        public Func<Guts> SomeGuts;
     }
 
     public class LazyChicken

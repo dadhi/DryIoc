@@ -56,7 +56,7 @@ namespace DryIoc.UnitTests
             {
                 object key;
                 return TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false)) ? 
-                    new CtorParameterServiceInfo(parameter, serviceKey:key) : null;
+                    ServiceInfo.Of(parameter, serviceKey:key) : null;
             }));
 
             container.Register(typeof(INamedService), typeof(NamedService));
@@ -76,7 +76,7 @@ namespace DryIoc.UnitTests
                 object key;
                 var attributes = parameter.GetCustomAttributes(false);
                 return TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes)
-                    ? new CtorParameterServiceInfo(parameter, serviceKey:key) : null;
+                    ? ServiceInfo.Of(parameter, serviceKey:key) : null;
             }));
 
             container.Register(typeof(IFooService), typeof(FooHey), setup: ServiceSetup.WithMetadata(FooMetadata.Hey));
