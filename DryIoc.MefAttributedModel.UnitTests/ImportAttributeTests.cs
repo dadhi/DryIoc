@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.Composition;
+﻿using System;
+using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -16,6 +17,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Resolve<Client>();
         }
 
+        [Test]
+        public void Inject_service_as_Func_of_Service_with_Import_contract_type()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(LazyClient), typeof(Service));
+
+            container.Resolve<LazyClient>();
+        }
+
+        [Export]
+        public class Service : IService { }
+
         [Export]
         public class Client
         {
@@ -26,8 +39,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 Some = service;
             }
         }
-
+        
         [Export]
-        public class Service : IService { }
+        public class LazyClient
+        {
+            public IService Some { get; set; }
+
+            public LazyClient([Import(typeof(Service))]Func<IService> getService)
+            {
+                Some = getService();
+            }
+        }
     }
 }

@@ -8,8 +8,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public IForeignTool Tool { get; set; }
 
-        public NativeUser(
-            [ExportOnce(ImplementationType = typeof(ForeignTool)), TransientReuse] IForeignTool tool)
+        public NativeUser([ImportExternal(typeof(ForeignTool), contractType: typeof(ForeignTool)), TransientReuse] IForeignTool tool)
         {
             Tool = tool;
         }
@@ -28,7 +27,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public ExternalTool Tool { get; set; }
 
-        public HomeUser([ExportOnce(constructorArgTypes: new[] { typeof(string) })] Func<string, ExternalTool> getTool)
+        public HomeUser([ImportExternal(withConstructor: new[] { typeof(string) })] Func<string, ExternalTool> getTool)
         {
             Tool = getTool("blah");
         }
@@ -61,7 +60,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public MineMeta ToolMeta { get; set; }
 
         public MyCode(
-            [ExportOnce(Metadata = MineMeta.Green, ConstructorArgTypes = new Type[0])] 
+            [ImportExternal(Metadata = MineMeta.Green, WithConstructor = new Type[0])] 
             Meta<Lazy<ExternalTool>, MineMeta> tool)
         {
             Tool = tool.Value.Value;
@@ -72,10 +71,10 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [ExportAll]
     public class ServiceWithFieldAndProperty
     {
-        [ExportOnce("blah", typeof(AnotherService))]
+        [ImportExternal(typeof(AnotherService), contractKey: "blah")]
         public IService Field;
 
-        [ExportOnce(ImplementationType = typeof(AnotherService), ContractKey = "blah")]
+        [ImportExternal(ImplementationType = typeof(AnotherService), ContractKey = "blah")]
         public IService Property { get; set; }
     }
 
@@ -84,12 +83,11 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public readonly ExternalTool Tool;
 
-        public OneDependsOnExternalTool([ExportOnce(13, constructorArgTypes: new Type[0])]ExternalTool tool)
+        public OneDependsOnExternalTool([ImportExternal(withConstructor: new Type[0], contractKey: 13)]ExternalTool tool)
         {
             Tool = tool;
         }
     }
-
 
     [Export]
     public class OtherDependsOnExternalTool

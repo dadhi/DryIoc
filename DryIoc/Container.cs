@@ -119,7 +119,7 @@ namespace DryIoc
 
         public Request CreateRequest(Type serviceType, object serviceKey = null)
         {
-            return new Request(null, _resolutionState, Ref.Of<IScope>(), ServiceInfo.Of(serviceType, serviceKey));
+            return new Request(null, _resolutionState, Ref.Of<IScope>(), ServiceInfo.Of(serviceType, serviceKey: serviceKey));
         }
 
         #region IRegistrator
@@ -957,7 +957,7 @@ namespace DryIoc
 
             IList<Type> unusedFuncArgs;
             var funcExpr = serviceFactory.GetFuncWithArgsOrDefault(funcType, serviceRequest, registry, out unusedFuncArgs)
-                .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, funcType, serviceRequest)
+                .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, serviceType, request)
                 .ThrowIf(unusedFuncArgs != null, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs, request);
             return funcExpr;
         }
@@ -1105,10 +1105,10 @@ namespace DryIoc
             return new ResolutionRules(this) { PropertiesAndFieldsSelector = rule };
         }
 
-        public Func<ParameterInfo, Request, IRegistry, ServiceInfo>[] ForConstructorParameterServiceInfo { get; private set; }
-        public ResolutionRules With(params Func<ParameterInfo, Request, IRegistry, ServiceInfo>[] rules)
+        public Func<ParameterInfo, Request, IRegistry, ServiceInfo> ForConstructorParameterServiceInfo { get; private set; }
+        public ResolutionRules With(Func<ParameterInfo, Request, IRegistry, ServiceInfo> rule)
         {
-            return new ResolutionRules(this) { ForConstructorParameterServiceInfo = rules };
+            return new ResolutionRules(this) { ForConstructorParameterServiceInfo = rule };
         }
 
         public delegate Factory ResolveUnregisteredServiceRule(Request request, IRegistry registry);
@@ -1144,7 +1144,7 @@ namespace DryIoc
             "Please register service OR adjust container resolution rules.";
 
         public static readonly string UNSUPPORTED_FUNC_WITH_ARGS =
-            "Unsupported resolution as {0} of {1}.";
+            "Unsupported resolution of {0} as function with arguments: {1}.";
 
         public static readonly string EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE =
             "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
@@ -1544,12 +1544,14 @@ namespace DryIoc
     public class ServiceInfo
     {
         public readonly Type ServiceType;
+        public readonly Type UnwrappedServiceType;
         public readonly object ServiceKey;
         public readonly IfUnresolved IfUnresolved;
 
-        public static ServiceInfo Of(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        public static ServiceInfo Of(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, 
+            Type unwrappedServiceType = null)
         {
-            return new ServiceInfo(null, serviceType, serviceKey, ifUnresolved);
+            return new ServiceInfo(null, serviceType, serviceKey, ifUnresolved, unwrappedServiceType);
         }
 
         public static ServiceInfo Of(ParameterInfo parameter,
@@ -1602,13 +1604,17 @@ namespace DryIoc
 
         private readonly object _reflectedInfo;
 
-        private ServiceInfo(object reflectedInfo, Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
+        private ServiceInfo(object reflectedInfo, Type serviceType, object serviceKey, IfUnresolved ifUnresolved, 
+            Type unwrappedServiceType = null)
         {
             _reflectedInfo = reflectedInfo;
             ServiceType = _reflectedInfo == null
                 ? serviceType.ThrowIfNull()
                 : ThrowIfReflectedTypeIsNotAssignableFromServiceType(serviceType);
             Throw.If(ServiceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
+
+            UnwrappedServiceType = unwrappedServiceType;
+            
             ServiceKey = serviceKey;
             IfUnresolved = ifUnresolved;
         }
@@ -1770,7 +1776,7 @@ namespace DryIoc
 
         public Request Chain(Type serviceType, object serviceKey)
         {
-            return Chain(ServiceInfo.Of(serviceType, serviceKey));
+            return Chain(ServiceInfo.Of(serviceType, serviceKey: serviceKey));
         }
 
         public Request ReplaceWith(ServiceInfo serviceInfo)
@@ -2184,19 +2190,16 @@ namespace DryIoc
 
         public ServiceInfo GetCtorParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
         {
-            if (!_getCtorParameterServiceInfo.IsNullOrEmpty())
+            var getParamServiceInfo = _getCtorParameterServiceInfo 
+                ?? registry.ResolutionRules.ForConstructorParameterServiceInfo;
+
+            if (getParamServiceInfo != null)
             {
-                var info = _getCtorParameterServiceInfo.GetFirstNonDefault(r => r(parameter, request, registry));
+                var info = getParamServiceInfo(parameter, request, registry);
                 if (info != null) return info;
             }
 
-            var getCtorParameterServiceInfo = registry.ResolutionRules.ForConstructorParameterServiceInfo;
-            if (!getCtorParameterServiceInfo.IsNullOrEmpty())
-            {
-                var info = getCtorParameterServiceInfo.GetFirstNonDefault(r => r(parameter, request, registry));
-                if (info != null) return info;
-            }
-
+            // NOTE: Now  we are resolving all parameters, there is no way to skip one.
             var serviceKey = request.ResolvedFactory.Setup.Type != FactoryType.Service ? request.ServiceKey : null;
             return ServiceInfo.Of(parameter, serviceKey: serviceKey);
         }
@@ -2362,7 +2365,7 @@ namespace DryIoc
 
         private readonly Type _implementationType;
         private readonly ConstructorSelector _constructorSelector;
-        private readonly Func<ParameterInfo, Request, IRegistry, ServiceInfo>[] _getCtorParameterServiceInfo;
+        private readonly Func<ParameterInfo, Request, IRegistry, ServiceInfo> _getCtorParameterServiceInfo;
 
         private ConstructorInfo SelectConstructor(Type implType, Request request, IRegistry registry)
         {

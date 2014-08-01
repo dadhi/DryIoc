@@ -1,11 +1,10 @@
-﻿using System;
-using DryIoc.MefAttributedModel.UnitTests.CUT;
+﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ExportOnceTests
+    public class ImportExternalTests
     {
         [Test]
         public void I_can_export_ctor_param_service_on_resolve()
