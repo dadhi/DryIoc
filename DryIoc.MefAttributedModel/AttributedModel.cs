@@ -49,7 +49,8 @@ namespace DryIoc.MefAttributedModel
 
         public static ResolutionRules WithAttributedModel(this ResolutionRules rules)
         {
-            return rules.WithConstructorSelector(SelectImportingConstructor)
+            return rules
+                .WithConstructorSelector(SelectImportingConstructor) // hello, Max!!! we are Martians.
                 .With(GetConstructorParameterServiceKeyOrDefault)
                 .WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute);
         }
@@ -302,6 +303,12 @@ namespace DryIoc.MefAttributedModel
             if (attributes.Length == 0)
                 return null;
 
+            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
+            if (import != null)
+                return ServiceInfo.Of(
+                    import.ContractType ?? parameter.ParameterType,
+                    import.ContractName ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null));
+
             object key;
             if (TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes) ||
                 TryGetServiceKeyFromExportOnceAttribute(out key, parameter.ParameterType, registry, attributes))
@@ -310,24 +317,17 @@ namespace DryIoc.MefAttributedModel
             return null;
         }
 
-        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type)
+        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, IRegistry registry)
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
             var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null);
             var fields = type.GetFields(flags).Where(f => !f.IsInitOnly);
             var members = properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>());
             
-            return members.Select(GetServiceInfoFromMember);
+            return members.Select(member => GetServiceInfoFromMember(member, registry));
         }
 
-        //private static ServiceInfo GetServiceInfoFromImportAttribute<T>(T member, Attribute[] attributes)
-        //{
-        //    var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
-        //    return import == null ? null : ServiceInfo.Of(member, import.ContractType,
-        //        import.ContractName ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null));
-        //}
-
-        private static ServiceInfo GetServiceInfoFromMember(MemberInfo member)
+        private static ServiceInfo GetServiceInfoFromMember(MemberInfo member, IRegistry registry)
         {
             var attributes = member.GetCustomAttributes(false);
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
@@ -335,8 +335,10 @@ namespace DryIoc.MefAttributedModel
                 return ServiceInfo.Of(member, import.ContractType,
                     import.ContractName ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null));
 
-            var serviceInfo = ServiceInfo.Of(member);
-            //GetServiceInfoFromImportExternalAttribute(serviceInfo.ServiceType, )
+            var memberInfo = ServiceInfo.Of(member);
+            var customInfo = GetServiceInfoFromImportExternalAttribute(memberInfo, registry, attributes);
+            if (customInfo != null)
+                return customInfo;
 
             return null;
         }
@@ -358,13 +360,13 @@ namespace DryIoc.MefAttributedModel
             return true;
         }
 
-        public static ServiceInfo GetServiceInfoFromImportExternalAttribute(Type reflectedType, IRegistry registry, object[] attributes)
+        public static ServiceInfo GetServiceInfoFromImportExternalAttribute(ServiceInfo serviceInfo, IRegistry registry, object[] attributes)
         {
             var exportAttr = GetSingleAttributeOrDefault<ImportExternalAttribute>(attributes);
             if (exportAttr == null)
                 return null;
 
-            var serviceType = registry.GetWrappedServiceTypeOrSelf(reflectedType);
+            var serviceType = exportAttr.ContractType ?? registry.GetWrappedServiceTypeOrSelf(serviceInfo.ServiceType);
             var serviceKey = exportAttr.ContractKey;
 
             if (!registry.IsRegistered(serviceType, serviceKey))
@@ -382,7 +384,7 @@ namespace DryIoc.MefAttributedModel
                     serviceKey, IfAlreadyRegistered.KeepRegistered);
             }
 
-            return ServiceInfo.Of(serviceType, serviceKey: serviceKey);
+            return serviceInfo.With(serviceType, serviceKey);
         }
 
         public static bool TryGetServiceKeyFromExportOnceAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)

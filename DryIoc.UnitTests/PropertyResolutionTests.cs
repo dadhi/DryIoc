@@ -93,7 +93,7 @@ namespace DryIoc.UnitTests
         public void Can_resolve_property_marked_with_Import()
         {
             var container = new Container(ResolutionRules.Default
-                .WithPropertyAndFieldSelector(type =>
+                .WithPropertyAndFieldSelector((type, _) =>
                         type.GetProperties(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                     .Where(p => p.GetSetMethod() != null).Cast<MemberInfo>().Concat(
                         type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
@@ -167,7 +167,7 @@ namespace DryIoc.UnitTests
             Assert.That(chicken.SomeGuts, Is.Not.Null);
         }
 
-        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type)
+        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, IRegistry _)
         {
             var flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
             var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null);
@@ -210,7 +210,9 @@ namespace DryIoc.UnitTests
     {
         public IDependency Dependency { get; set; }
 
+// ReSharper disable UnusedAutoPropertyAccessor.Local
         public IBar Bar { get; private set; }
+// ReSharper restore UnusedAutoPropertyAccessor.Local
 
         public IBar BarWithoutSet
         {
@@ -238,6 +240,11 @@ namespace DryIoc.UnitTests
     {
         [Import]
         public readonly Brain Brains;
+
+        public FunnyDuckling()
+        {
+            Brains = null;
+        }
     }
 
     public class FunkyChicken

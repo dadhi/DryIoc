@@ -23,7 +23,9 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(LazyClient), typeof(Service));
 
-            container.Resolve<LazyClient>();
+            var client = container.Resolve<LazyClient>();
+
+            Assert.That(client.Some, Is.InstanceOf<Service>());
         }
 
         [Export]
