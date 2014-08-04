@@ -895,7 +895,9 @@ namespace DryIoc
                 ? collectionType.GetElementType()
                 : collectionType.GetGenericArguments()[0];
 
-            var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
+            var wrappedItemType = request.ServiceInfo.WrappedTypeInfo != null
+                ? request.ServiceInfo.WrappedTypeInfo.Value.Value.ServiceType
+                : registry.GetWrappedServiceTypeOrSelf(itemType);
 
             // Composite pattern support: filter out composite root from available keys.
             var items = registry.GetAllFactories(wrappedItemType);

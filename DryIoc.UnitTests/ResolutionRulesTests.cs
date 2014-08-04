@@ -20,6 +20,7 @@ namespace DryIoc.UnitTests
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service[]>());
         }
+
         [Test]
         public void Given_service_with_two_ctors_I_can_specify_what_ctor_to_choose_for_resolve()
         {
@@ -54,8 +55,8 @@ namespace DryIoc.UnitTests
             var container = new Container(ResolutionRules.Default.With((parameter, _, __) =>
             {
                 object key;
-                return TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false)) ? 
-                    ServiceInfo.Of(parameter, serviceKey:key) : null;
+                return TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false)) ?
+                    ServiceInfo.Of(parameter, serviceKey: key) : null;
             }));
 
             container.Register(typeof(INamedService), typeof(NamedService));
@@ -75,7 +76,7 @@ namespace DryIoc.UnitTests
                 object key;
                 var attributes = parameter.GetCustomAttributes(false);
                 return TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes)
-                    ? ServiceInfo.Of(parameter, serviceKey:key) : null;
+                    ? ServiceInfo.Of(parameter, serviceKey: key) : null;
             }));
 
             container.Register(typeof(IFooService), typeof(FooHey), setup: ServiceSetup.WithMetadata(FooMetadata.Hey));
@@ -179,7 +180,7 @@ namespace DryIoc.UnitTests
 
     #region CUT
 
-    public class SomeService {}
+    public class SomeService { }
 
     public class Bla<T>
     {
