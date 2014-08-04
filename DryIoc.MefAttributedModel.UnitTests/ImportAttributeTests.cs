@@ -48,6 +48,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var client = container.Resolve<LazyMetaClient>();
 
             Assert.That(client.Some, Is.InstanceOf<Service>());
+            Assert.That(client.Metadata, Is.EqualTo("blah"));
+        }
+
+        [Test]
+        public void Inject_service_as_Func_Array_of_Service_with_Import_contract_type()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(FuncArrayClient), typeof(Service));
+
+            var client = container.Resolve<FuncArrayClient>();
+
+            Assert.That(client.Some, Is.InstanceOf<Service>());
         }
 
         [Export][ExportWithMetadata("blah")]
@@ -96,6 +108,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
             {
                 Some = getService.Value.Value;
                 Metadata = getService.Value.Metadata;
+            }
+        }
+
+        [Export]
+        public class FuncArrayClient
+        {
+            public IService Some { get; set; }
+
+            public FuncArrayClient([Import(typeof(Service))]Func<IService>[] getService)
+            {
+                Some = getService[0]();
             }
         }
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -9,18 +10,16 @@ namespace DryIoc.UnitTests
     public class ResolutionRulesTests
     {
         [Test]
-        public void I_should_be_able_to_turn_off_Enumerable_support_for_container_instance()
+        public void It_is_possible_to_remove_Enumerable_support_per_container()
         {
-            var container = new Container(
-                ResolutionRules.Default.With(
-                    ResolutionRules.Default.ForUnregisteredService.Remove(OpenGenericsSupport.ResolveEnumerableOrArray)));
+            var container = new Container();
+            container.Unregister(typeof(IEnumerable<>), factoryType: FactoryType.GenericWrapper);
 
             container.Register<Service>();
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service[]>());
         }
-
         [Test]
         public void Given_service_with_two_ctors_I_can_specify_what_ctor_to_choose_for_resolve()
         {

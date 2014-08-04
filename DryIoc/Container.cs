@@ -443,11 +443,14 @@ namespace DryIoc
 
         Type IRegistry.GetWrappedServiceTypeOrSelf(Type serviceType)
         {
-            if (!serviceType.IsGenericType)
+            if (!serviceType.IsGenericType && !serviceType.IsArray)
                 return serviceType;
 
+            if (serviceType.IsArray)
+                return ((IRegistry)this).GetWrappedServiceTypeOrSelf(serviceType.GetElementType());
+
             var factory = _genericWrappers.Value.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
-            if (factory == null || factory.Setup.Type != FactoryType.GenericWrapper)
+            if (factory == null)
                 return serviceType;
 
             var wrapperSetup = ((GenericWrapperSetup)factory.Setup);
@@ -837,6 +840,12 @@ namespace DryIoc
         static OpenGenericsSupport()
         {
             GenericWrappers = HashTree<Type, Factory>.Empty;
+
+            GenericWrappers = GenericWrappers.AddOrUpdate(typeof(IEnumerable<>),
+                new FactoryProvider(
+                    (_, __) => new ExpressionFactory(GetEnumerableOrArrayExpression),
+                    GenericWrapperSetup.Default));
+
             GenericWrappers = GenericWrappers.AddOrUpdate(typeof(Many<>),
                 new FactoryProvider(
                     (_, __) => new ExpressionFactory(GetManyExpression),
@@ -863,14 +872,14 @@ namespace DryIoc
                 new FactoryProvider((_, __) => new ExpressionFactory(GetDebugExpression), GenericWrapperSetup.Default));
         }
 
-        public static readonly ResolutionRules.ResolveUnregisteredServiceRule ResolveOpenGenerics = (request, registry) =>
+        public static readonly ResolutionRules.ResolveUnregisteredServiceRule ResolveOpenGenericsAndArrays = (request, registry) =>
         {
-            var openGenericServiceType = request.OpenGenericServiceType;
-            if (openGenericServiceType == null)
+            var genericTypeDef = request.ServiceType.IsArray ? typeof(IEnumerable<>) : request.OpenGenericServiceType;
+            if (genericTypeDef == null)
                 return null;
 
-            var factory = registry.GetFactoryOrDefault(openGenericServiceType, request.ServiceKey)
-                ?? registry.GetGenericWrapperOrDefault(openGenericServiceType);
+            var factory = registry.GetFactoryOrDefault(genericTypeDef, request.ServiceKey)
+                ?? registry.GetGenericWrapperOrDefault(genericTypeDef);
 
             if (factory != null && factory.ProvidesFactoryForRequest)
                 factory = factory.GetFactoryForRequestOrDefault(request, registry);
@@ -878,50 +887,42 @@ namespace DryIoc
             return factory;
         };
 
-        public static readonly ResolutionRules.ResolveUnregisteredServiceRule ResolveEnumerableOrArray = (request, registry) =>
+        public static Expression GetEnumerableOrArrayExpression(Request request, IRegistry registry)
         {
-            if (!request.ServiceType.IsArray && request.OpenGenericServiceType != typeof(IEnumerable<>))
-                return null;
+            var collectionType = request.ServiceType;
 
-            return new ExpressionFactory(
-                setup: GenericWrapperSetup.Default,
-                expressionFactory: (req, reg) =>
-                {
-                    var collectionType = req.ServiceType;
+            var itemType = collectionType.IsArray
+                ? collectionType.GetElementType()
+                : collectionType.GetGenericArguments()[0];
 
-                    var itemType = collectionType.IsArray
-                        ? collectionType.GetElementType()
-                        : collectionType.GetGenericArguments()[0];
+            var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
 
-                    var wrappedItemType = reg.GetWrappedServiceTypeOrSelf(itemType);
+            // Composite pattern support: filter out composite root from available keys.
+            var items = registry.GetAllFactories(wrappedItemType);
+            var parent = request.GetNonWrapperParentOrDefault();
+            if (parent != null && parent.ServiceType == wrappedItemType)
+            {
+                var parentFactoryID = parent.ResolvedFactory.ID;
+                items = items.Where(x => x.Value.ID != parentFactoryID);
+            }
 
-                    // Composite pattern support: filter out composite root from available keys.
-                    var items = reg.GetAllFactories(wrappedItemType);
-                    var parent = req.GetNonWrapperParentOrDefault();
-                    if (parent != null && parent.ServiceType == wrappedItemType)
-                    {
-                        var parentFactoryID = parent.ResolvedFactory.ID;
-                        items = items.Where(x => x.Value.ID != parentFactoryID);
-                    }
+            var itemArray = items.ToArray();
+            Throw.If(itemArray.Length == 0, Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS, wrappedItemType, request);
 
-                    var itemArray = items.ToArray();
-                    Throw.If(itemArray.Length == 0, Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS, wrappedItemType, req);
+            var itemExpressions = new List<Expression>(itemArray.Length);
+            for (var i = 0; i < itemArray.Length; i++)
+            {
+                var item = itemArray[i];
+                var itemRequest = request.Chain(itemType, item.Key);
+                var itemFactory = registry.ResolveFactory(itemRequest, IfUnresolved.ReturnNull);
+                if (itemFactory != null)
+                    itemExpressions.Add(itemFactory.GetExpression(itemRequest, registry));
+            }
 
-                    var itemExpressions = new List<Expression>(itemArray.Length);
-                    for (var i = 0; i < itemArray.Length; i++)
-                    {
-                        var item = itemArray[i];
-                        var itemRequest = req.Chain(itemType, item.Key);
-                        var itemFactory = reg.ResolveFactory(itemRequest, IfUnresolved.ReturnNull);
-                        if (itemFactory != null)
-                            itemExpressions.Add(itemFactory.GetExpression(itemRequest, registry));
-                    }
-
-                    Throw.If(itemExpressions.Count == 0, Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS, itemType, req);
-                    var newArrayExpr = Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
-                    return newArrayExpr;
-                });
-        };
+            Throw.If(itemExpressions.Count == 0, Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS, itemType, request);
+            var newArrayExpr = Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
+            return newArrayExpr;
+        }
 
         public static Expression GetManyExpression(Request request, IRegistry registry)
         {
@@ -949,10 +950,8 @@ namespace DryIoc
             var funcType = request.ServiceType;
             var funcTypeArgs = funcType.GetGenericArguments();
             var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
+            var serviceRequest = request.Chain(serviceType, request.ServiceKey);
 
-            var serviceInfo = ServiceInfo.Of(serviceType, request.ServiceKey);
-            
-            var serviceRequest = request.Chain(serviceInfo);
             var serviceFactory = registry.ResolveFactory(serviceRequest, IfUnresolved.Throw);
 
             if (funcTypeArgs.Length == 1)
@@ -1002,8 +1001,8 @@ namespace DryIoc
             var serviceType = typeArgs[0];
             var metadataType = typeArgs[1];
 
-            var wrappedServiceType = request.ServiceInfo.InfoForWrappedTypeIfExists != null 
-                ? request.ServiceInfo.InfoForWrappedTypeIfExists.Value.Value
+            var wrappedServiceType = request.ServiceInfo.WrappedTypeInfo != null
+                ? request.ServiceInfo.WrappedTypeInfo.Value.Value.ServiceType
                 : registry.GetWrappedServiceTypeOrSelf(serviceType);
 
             object resultMetadata = null;
@@ -1088,9 +1087,7 @@ namespace DryIoc
     {
         public static readonly ResolutionRules Empty = new ResolutionRules();
 
-        public static ResolutionRules Default = Empty.With(
-            OpenGenericsSupport.ResolveOpenGenerics,
-            OpenGenericsSupport.ResolveEnumerableOrArray);
+        public static ResolutionRules Default = Empty.With(OpenGenericsSupport.ResolveOpenGenericsAndArrays);
 
         public delegate Factory FactorySelectorRule(IEnumerable<KeyValuePair<object, Factory>> factories);
         public FactorySelectorRule FactorySelector { get; private set; }
@@ -1552,21 +1549,22 @@ namespace DryIoc
         public readonly Type ServiceType;
         public readonly object ServiceKey;
         public readonly IfUnresolved IfUnresolved;
-        public readonly KeyValuePair<Type, Type>? InfoForWrappedTypeIfExists;
+        public readonly KeyValuePair<Type, ServiceInfo>? WrappedTypeInfo;
 
         public static ServiceInfo Of(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
             return new ServiceInfo(null, serviceType, serviceKey, ifUnresolved);
         }
 
-        public ServiceInfo WithWrappedTypeInfo(KeyValuePair<Type, Type> wrappedTypeInfo)
+        public ServiceInfo WithWrappedTypeInfo(KeyValuePair<Type, ServiceInfo> wrappedTypeInfo)
         {
             return new ServiceInfo(_reflectedInfo, ServiceType, ServiceKey, IfUnresolved, wrappedTypeInfo);
         }
 
         public ServiceInfo With(Type serviceType = null, object serviceKey = null)
         {
-            return new ServiceInfo(_reflectedInfo, serviceType ?? ServiceType, serviceKey ?? ServiceKey, IfUnresolved, InfoForWrappedTypeIfExists);
+            return new ServiceInfo(_reflectedInfo, serviceType ?? ServiceType, serviceKey ?? ServiceKey,
+                IfUnresolved, WrappedTypeInfo);
         }
 
         public static ServiceInfo Of(ParameterInfo parameter,
@@ -1620,7 +1618,7 @@ namespace DryIoc
         private readonly object _reflectedInfo;
 
         private ServiceInfo(object reflectedInfo, Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
-            KeyValuePair<Type, Type>? infoForWrappedTypeIfExists = null)
+            KeyValuePair<Type, ServiceInfo>? wrappedTypeInfo = null)
         {
             _reflectedInfo = reflectedInfo;
 
@@ -1631,7 +1629,7 @@ namespace DryIoc
 
             ServiceKey = serviceKey;
             IfUnresolved = ifUnresolved;
-            InfoForWrappedTypeIfExists = infoForWrappedTypeIfExists;
+            WrappedTypeInfo = wrappedTypeInfo;
         }
 
         private Type ThrowIfReflectedTypeIsNotAssignableFromServiceType(Type serviceType)
@@ -1723,8 +1721,8 @@ namespace DryIoc
         {
             var implementationType = instance.ThrowIfNull().GetType();
             var selector = selectPropertiesAndFields
-                ?? (resolver.ResolutionRules.PropertiesAndFieldsSelector != null 
-                    ? type => resolver.ResolutionRules.PropertiesAndFieldsSelector(type, (IRegistry)resolver) 
+                ?? (resolver.ResolutionRules.PropertiesAndFieldsSelector != null
+                    ? type => resolver.ResolutionRules.PropertiesAndFieldsSelector(type, (IRegistry)resolver)
                     : (Func<Type, IEnumerable<ServiceInfo>>)SelectPublicAssignablePropertiesAndFields);
 
             foreach (var serviceInfo in selector(implementationType).Where(info => info != null))
@@ -1787,18 +1785,16 @@ namespace DryIoc
 
         public Request Chain(ServiceInfo info)
         {
-            if (ServiceInfo.InfoForWrappedTypeIfExists != null)
+            if (ServiceInfo.WrappedTypeInfo != null)
             {
-                var wrappedTypePair = ServiceInfo.InfoForWrappedTypeIfExists.Value;
-                info = info.ServiceType == wrappedTypePair.Key 
-                    ? ServiceInfo.Of(wrappedTypePair.Value, info.ServiceKey, info.IfUnresolved) 
-                    : info.WithWrappedTypeInfo(wrappedTypePair);
+                var wrappedTypeInfo = ServiceInfo.WrappedTypeInfo.Value;
+                info = info.ServiceType == wrappedTypeInfo.Key ? wrappedTypeInfo.Value : info.WithWrappedTypeInfo(wrappedTypeInfo);
             }
 
             return new Request(this, State, _scope, info);
         }
 
-        public Request Chain(Type serviceType, object serviceKey)
+        public Request Chain(Type serviceType, object serviceKey = null)
         {
             return Chain(ServiceInfo.Of(serviceType, serviceKey));
         }
@@ -2226,11 +2222,9 @@ namespace DryIoc
                 if (parameterType != info.ServiceType)
                 {
                     var wrappedParameterType = registry.GetWrappedServiceTypeOrSelf(parameterType);
-                    if (wrappedParameterType != parameterType &&
-                        wrappedParameterType != info.ServiceType &&
+                    if (wrappedParameterType != parameterType && wrappedParameterType != info.ServiceType &&
                         wrappedParameterType.IsAssignableFrom(info.ServiceType))
-                        info = ServiceInfo.Of(parameterType, info.ServiceKey, info.IfUnresolved)
-                            .WithWrappedTypeInfo(new KeyValuePair<Type, Type>(wrappedParameterType, info.ServiceType));
+                        info = ServiceInfo.Of(parameterType).WithWrappedTypeInfo(new KeyValuePair<Type, ServiceInfo>(wrappedParameterType, info));
                 }
 
                 return info;
@@ -2997,6 +2991,11 @@ namespace DryIoc
 
             getTypeName = getTypeName ?? GetDefaultTypeName;
             var typeName = getTypeName(type);
+
+            var isArray = type.IsArray;
+            if (isArray)
+                type = type.GetElementType();
+
             if (!type.IsGenericType)
                 return str.Append(typeName.Replace('+', '.'));
 
@@ -3009,6 +3008,9 @@ namespace DryIoc
                 str.Print(genericArgs, ", ", (s, t) => s.Print((Type)t, getTypeName));
 
             str.Append('>');
+
+            if (isArray)
+                str.Append("[]");
 
             return str;
         }
