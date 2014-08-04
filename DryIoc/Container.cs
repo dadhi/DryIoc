@@ -950,20 +950,10 @@ namespace DryIoc
             var funcTypeArgs = funcType.GetGenericArguments();
             var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
 
-            var info = request.ServiceInfo;
-            if (info.WrappedServiceType != null)
-            {
-                var wrappedServiceType = registry.GetWrappedServiceTypeOrSelf(serviceType);
-                if (wrappedServiceType == serviceType) // service is not a generic wrapper
-                    serviceType = info.WrappedServiceType;
-            }
-
-            info = ServiceInfo.Of(serviceType, info.ServiceKey, info.IfUnresolved, info.WrappedServiceType);
-
-            var serviceRequest = request.Chain(info);
-            var serviceFactory = registry.ResolveFactory(serviceRequest, info.IfUnresolved);
-            if (serviceFactory == null)
-                return null;
+            var serviceInfo = ServiceInfo.Of(serviceType, request.ServiceKey);
+            
+            var serviceRequest = request.Chain(serviceInfo);
+            var serviceFactory = registry.ResolveFactory(serviceRequest, IfUnresolved.Throw);
 
             if (funcTypeArgs.Length == 1)
                 return Expression.Lambda(funcType, serviceFactory.GetExpression(serviceRequest, registry), null);
@@ -1012,7 +1002,10 @@ namespace DryIoc
             var serviceType = typeArgs[0];
             var metadataType = typeArgs[1];
 
-            var wrappedServiceType = registry.GetWrappedServiceTypeOrSelf(serviceType);
+            var wrappedServiceType = request.ServiceInfo.InfoForWrappedTypeIfExists != null 
+                ? request.ServiceInfo.InfoForWrappedTypeIfExists.Value.Value
+                : registry.GetWrappedServiceTypeOrSelf(serviceType);
+
             object resultMetadata = null;
             var serviceKey = request.ServiceKey;
             if (serviceKey == null)
@@ -1557,19 +1550,23 @@ namespace DryIoc
     public class ServiceInfo
     {
         public readonly Type ServiceType;
-        public readonly Type WrappedServiceType;
         public readonly object ServiceKey;
         public readonly IfUnresolved IfUnresolved;
+        public readonly KeyValuePair<Type, Type>? InfoForWrappedTypeIfExists;
 
-        public static ServiceInfo Of(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw,
-            Type wrappedServiceType = null)
+        public static ServiceInfo Of(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return new ServiceInfo(null, serviceType, serviceKey, ifUnresolved, wrappedServiceType);
+            return new ServiceInfo(null, serviceType, serviceKey, ifUnresolved);
+        }
+
+        public ServiceInfo WithWrappedTypeInfo(KeyValuePair<Type, Type> wrappedTypeInfo)
+        {
+            return new ServiceInfo(_reflectedInfo, ServiceType, ServiceKey, IfUnresolved, wrappedTypeInfo);
         }
 
         public ServiceInfo With(Type serviceType = null, object serviceKey = null)
         {
-            return new ServiceInfo(_reflectedInfo, serviceType ?? ServiceType, serviceKey ?? ServiceKey, IfUnresolved, WrappedServiceType);
+            return new ServiceInfo(_reflectedInfo, serviceType ?? ServiceType, serviceKey ?? ServiceKey, IfUnresolved, InfoForWrappedTypeIfExists);
         }
 
         public static ServiceInfo Of(ParameterInfo parameter,
@@ -1623,18 +1620,18 @@ namespace DryIoc
         private readonly object _reflectedInfo;
 
         private ServiceInfo(object reflectedInfo, Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
-            Type wrappedServiceType = null)
+            KeyValuePair<Type, Type>? infoForWrappedTypeIfExists = null)
         {
             _reflectedInfo = reflectedInfo;
+
             ServiceType = _reflectedInfo == null
                 ? serviceType.ThrowIfNull()
                 : ThrowIfReflectedTypeIsNotAssignableFromServiceType(serviceType);
             Throw.If(ServiceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
 
-            WrappedServiceType = wrappedServiceType;
-
             ServiceKey = serviceKey;
             IfUnresolved = ifUnresolved;
+            InfoForWrappedTypeIfExists = infoForWrappedTypeIfExists;
         }
 
         private Type ThrowIfReflectedTypeIsNotAssignableFromServiceType(Type serviceType)
@@ -1788,14 +1785,22 @@ namespace DryIoc
             get { return ResolvedFactory == null ? null : ResolvedFactory.ImplementationType; }
         }
 
-        public Request Chain(ServiceInfo serviceInfo)
+        public Request Chain(ServiceInfo info)
         {
-            return new Request(this, State, _scope, serviceInfo);
+            if (ServiceInfo.InfoForWrappedTypeIfExists != null)
+            {
+                var wrappedTypePair = ServiceInfo.InfoForWrappedTypeIfExists.Value;
+                info = info.ServiceType == wrappedTypePair.Key 
+                    ? ServiceInfo.Of(wrappedTypePair.Value, info.ServiceKey, info.IfUnresolved) 
+                    : info.WithWrappedTypeInfo(wrappedTypePair);
+            }
+
+            return new Request(this, State, _scope, info);
         }
 
         public Request Chain(Type serviceType, object serviceKey)
         {
-            return Chain(ServiceInfo.Of(serviceType, serviceKey: serviceKey));
+            return Chain(ServiceInfo.Of(serviceType, serviceKey));
         }
 
         public Request ReplaceWith(ServiceInfo serviceInfo)
@@ -2218,10 +2223,16 @@ namespace DryIoc
             if (info != null)
             {
                 var parameterType = parameter.ParameterType;
-                var wrappedServiceType = registry.GetWrappedServiceTypeOrSelf(parameterType);
-                if (wrappedServiceType != parameterType &&
-                    wrappedServiceType.IsAssignableFrom(info.ServiceType))
-                    info = ServiceInfo.Of(parameterType, info.ServiceKey, info.IfUnresolved, info.ServiceType);
+                if (parameterType != info.ServiceType)
+                {
+                    var wrappedParameterType = registry.GetWrappedServiceTypeOrSelf(parameterType);
+                    if (wrappedParameterType != parameterType &&
+                        wrappedParameterType != info.ServiceType &&
+                        wrappedParameterType.IsAssignableFrom(info.ServiceType))
+                        info = ServiceInfo.Of(parameterType, info.ServiceKey, info.IfUnresolved)
+                            .WithWrappedTypeInfo(new KeyValuePair<Type, Type>(wrappedParameterType, info.ServiceType));
+                }
+
                 return info;
             }
 
