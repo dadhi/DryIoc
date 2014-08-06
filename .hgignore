@@ -87,6 +87,9 @@ _TeamCity*
 # DotCover is a Code Coverage Tool
 *.dotCover
 
+# OpenCover
+OpenCover/*
+
 # NCrunch
 *[_.][Nn][Cc]runch*
 
@@ -112,10 +115,10 @@ publish/
 
 # NuGet Packages Directory
 ## TODO: If you have NuGet Package Restore enabled, uncomment the next line
-packages/
+# packages/
 *.nupkg
 apikey[-.]*
-nuget/**/DryIoc/*
+# nuget/**/DryIoc/*
 
 # Windows Azure Build Output
 csx

@@ -1,8 +1,9 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
+using DryIoc.MefAttributedModel.Properties;
 
 [assembly: AssemblyTitle("DryIoc.MefAttributedModel")]
-[assembly: AssemblyDescription("Fast, rich, small IoC container for your application or framework.")]
+[assembly: AssemblyDescription("DryIoc is small, fast, capable IoC container.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc.MefAttributedModel")]
@@ -10,7 +11,7 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
-[assembly: AssemblyVersion("1.2.0")]
-[assembly: AssemblyFileVersion("1.2.0")]
+[assembly: AssemblyVersion(Version.SEMANTIC_VERSION)]
+[assembly: AssemblyFileVersion(Version.SEMANTIC_VERSION)]
 
 [assembly: InternalsVisibleTo("DryIoc.UnitTests")]

@@ -47,11 +47,17 @@ namespace DryIoc.MefAttributedModel
             { typeof(ResolutionScopeReuse), Reuse.InResolutionScope }
         };
 
+        public static ResolutionRules WithAttributedModel(this ResolutionRules rules)
+        {
+            return rules
+                .WithConstructorSelector(SelectImportingConstructor) // hello, Max!!! we are Martians.
+                .With(GetConstructorParameterServiceKeyOrDefault)
+                .WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute);
+        }
+
         public static Container WithAttributedModel(this Container container)
         {
-            return container.WithNewRules(container.ResolutionRules
-                .With(GetConstructorParameterServiceKeyOrDefault)
-                .With(TryGetPropertyOrFieldServiceKey));
+            return container.WithNewRules(container.ResolutionRules.WithAttributedModel());
         }
 
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
@@ -248,12 +254,12 @@ namespace DryIoc.MefAttributedModel
             Func<Request, IRegistry, Expression> factoryCreateExpr = (request, registry) =>
                 Expression.Call(
                     Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
-                        request.ResolutionState.GetItemExpression(registry),
+                        request.State.GetItemExpression(registry),
                         Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
                     _factoryMethodName, null);
 
-            var factory = new ExpressionFactory(factoryCreateExpr, 
+            var factory = new ExpressionFactory(factoryCreateExpr,
                 AttributedModel.GetReuseByType(info.ReuseType), info.GetSetup(attributes));
 
             for (var i = 0; i < info.Exports.Length; i++)
@@ -268,7 +274,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Tools
 
-        public static ConstructorInfo FindSingleImportingConstructor(Type implementationType, Request req, IRegistry reg)
+        public static ConstructorInfo SelectImportingConstructor(Type implementationType, Request req, IRegistry reg)
         {
             var constructors = implementationType.GetConstructors();
             return constructors.Length == 1 ? constructors[0]
@@ -291,40 +297,50 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        public static object GetConstructorParameterServiceKeyOrDefault(ParameterInfo parameter, Request parent, IRegistry registry)
+        public static ServiceInfo GetConstructorParameterServiceKeyOrDefault(ParameterInfo parameter, Request parent, IRegistry registry)
         {
             var attributes = parameter.GetCustomAttributes(false);
             if (attributes.Length == 0)
                 return null;
 
+            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
+            if (import != null)
+                return ServiceInfo.Of(
+                    import.ContractType ?? parameter.ParameterType,
+                    import.ContractName ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null));
+
             object key;
-            if (TryGetServiceKeyFromImportAttribute(out key, attributes) ||
-                TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes) ||
+            if (TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes) ||
                 TryGetServiceKeyFromExportOnceAttribute(out key, parameter.ParameterType, registry, attributes))
-                return key;
+                return ServiceInfo.Of(parameter, serviceKey: key);
+            
             return null;
         }
 
-        public static bool TryGetPropertyOrFieldServiceKey(out object key, MemberInfo member, Request _, IRegistry registry)
+        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, IRegistry registry)
         {
-            key = null;
-            var attributes = member.GetCustomAttributes(false);
-            if (attributes.Length == 0)
-                return false;
-
-            return TryGetServiceKeyFromImportAttribute(out key, attributes) ||
-                TryGetServiceKeyFromExportOnceAttribute(out key,
-                    member is PropertyInfo ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType,
-                    registry, attributes);
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null);
+            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly);
+            var members = properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>());
+            
+            return members.Select(member => GetServiceInfoFromMember(member, registry));
         }
 
-        public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
+        private static ServiceInfo GetServiceInfoFromMember(MemberInfo member, IRegistry registry)
         {
+            var attributes = member.GetCustomAttributes(false);
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
-            key = import == null ? null
-                : import.ContractName ??
-                (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null);
-            return import != null;
+            if (import != null)
+                return ServiceInfo.Of(member, import.ContractType,
+                    import.ContractName ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null));
+
+            var memberInfo = ServiceInfo.Of(member);
+            var customInfo = GetServiceInfoFromImportExternalAttribute(memberInfo, registry, attributes);
+            if (customInfo != null)
+                return customInfo;
+
+            return null;
         }
 
         public static bool TryGetServiceKeyWithMetadataAttribute(out object key, Type contractType, Request parent, IRegistry registry, object[] attributes)
@@ -337,17 +353,44 @@ namespace DryIoc.MefAttributedModel
             var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
             var metadata = import.Metadata;
             var item = registry.GetAllFactories(serviceType)
-                .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
+                .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
                 .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, serviceType, metadata, parent);
 
             key = item.Key;
             return true;
         }
 
+        public static ServiceInfo GetServiceInfoFromImportExternalAttribute(ServiceInfo serviceInfo, IRegistry registry, object[] attributes)
+        {
+            var exportAttr = GetSingleAttributeOrDefault<ImportExternalAttribute>(attributes);
+            if (exportAttr == null)
+                return null;
+
+            var serviceType = exportAttr.ContractType ?? registry.GetWrappedServiceTypeOrSelf(serviceInfo.ServiceType);
+            var serviceKey = exportAttr.ContractKey;
+
+            if (!registry.IsRegistered(serviceType, serviceKey))
+            {
+                var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
+                var reuse = GetReuseByType(reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType);
+
+                var implementationType = exportAttr.ImplementationType ?? serviceType;
+
+                var getConstructor = exportAttr.WithConstructor != null
+                    ? (ConstructorSelector)((t, _, __) => t.GetConstructor(exportAttr.WithConstructor)) : null;
+
+                registry.Register(serviceType,
+                    implementationType, reuse, getConstructor, ServiceSetup.WithMetadata(exportAttr.Metadata),
+                    serviceKey, IfAlreadyRegistered.KeepRegistered);
+            }
+
+            return serviceInfo.With(serviceType, serviceKey);
+        }
+
         public static bool TryGetServiceKeyFromExportOnceAttribute(out object key, Type contractType, IRegistry registry, object[] attributes)
         {
             key = null;
-            var exportAttr = GetSingleAttributeOrDefault<ExportOnceAttribute>(attributes);
+            var exportAttr = GetSingleAttributeOrDefault<ImportExternalAttribute>(attributes);
             if (exportAttr == null)
                 return false;
 
@@ -362,8 +405,8 @@ namespace DryIoc.MefAttributedModel
 
                 var implementationType = exportAttr.ImplementationType ?? serviceType;
 
-                var getConstructor = exportAttr.ConstructorArgTypes != null
-                    ? (ConstructorSelector)((t, _, __) => t.GetConstructor(exportAttr.ConstructorArgTypes)) : null;
+                var getConstructor = exportAttr.WithConstructor != null
+                    ? (ConstructorSelector)((t, _, __) => t.GetConstructor(exportAttr.WithConstructor)) : null;
 
                 registry.Register(serviceType,
                     implementationType, reuse, getConstructor, ServiceSetup.WithMetadata(exportAttr.Metadata),
@@ -420,17 +463,17 @@ namespace DryIoc.MefAttributedModel
 
         public static StringBuilder AppendString(this StringBuilder code, string x)
         {
-            return code.Append(x == null ? "null" : ("\"" + x + "\""));
+            return x == null ? code.Append("null") : code.Append('"').Append(x).Append('"');
         }
 
         public static StringBuilder AppendType(this StringBuilder code, Type x)
         {
-            return code.Append(x == null ? "null" : "typeof(" + x.Print() + ")");
+            return x == null ? code.Append("null") : code.Append("typeof(").Print(x).Append(')');
         }
 
         public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object enumValue)
         {
-            return code.Append(enumType.Print() + "." + Enum.GetName(enumType, enumValue));
+            return code.Print(enumType).Append('.').Append(Enum.GetName(enumType, enumValue));
         }
 
         public static StringBuilder AppendObject(this StringBuilder code, object x, Action<StringBuilder, object> ifNotRecognized = null)
@@ -475,11 +518,7 @@ namespace DryIoc.MefAttributedModel
 
         public Factory CreateFactory()
         {
-            return new ReflectionFactory(
-                ImplementationType,
-                AttributedModel.GetReuseByType(ReuseType), 
-                AttributedModel.FindSingleImportingConstructor, 
-                GetSetup());
+            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), setup: GetSetup());
         }
 
         public IReuse GetReuse()
@@ -776,13 +815,20 @@ namespace DryIoc.MefAttributedModel
     {
         public object ContractKey { get; set; }
 
-        public ImportWithKeyAttribute(object contractKey, Type contractType)
+        public ImportWithKeyAttribute(object contractKey, Type contractType = null)
             : base(contractType)
         {
             ContractKey = contractKey;
         }
 
-        public ImportWithKeyAttribute(object contractKey) : this(contractKey, null) { }
+        public ImportWithKeyAttribute(string contractKey, Type contractType = null)
+            : base(contractKey, contractType)
+        {
+            ContractKey = contractKey;
+        }
+
+        public ImportWithKeyAttribute(Type contractType)
+            : this(null, contractType) {}
     }
 
     [MetadataAttribute]
@@ -797,20 +843,24 @@ namespace DryIoc.MefAttributedModel
         public readonly object Metadata;
     }
 
-    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
-    public class ExportOnceAttribute : Attribute
+    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, 
+        AllowMultiple = false, Inherited = false)]
+    public class ImportExternalAttribute : Attribute
     {
-        public object ContractKey { get; set; }
         public Type ImplementationType { get; set; }
+        public Type[] WithConstructor { get; set; }
         public object Metadata { get; set; }
-        public Type[] ConstructorArgTypes { get; set; }
+        public object ContractKey { get; set; }
+        public Type ContractType { get; set; }
 
-        public ExportOnceAttribute(object contractKey = null, Type implementationType = null, Type[] constructorArgTypes = null, object metadata = null)
+        public ImportExternalAttribute(Type implementationType = null, Type[] withConstructor = null, object metadata = null, 
+            object contractKey = null, Type contractType = null)
         {
-            ContractKey = contractKey;
+            ContractType = contractType;
             ImplementationType = implementationType;
+            WithConstructor = withConstructor;
             Metadata = metadata;
-            ConstructorArgTypes = constructorArgTypes;
+            ContractKey = contractKey;
         }
     }
 

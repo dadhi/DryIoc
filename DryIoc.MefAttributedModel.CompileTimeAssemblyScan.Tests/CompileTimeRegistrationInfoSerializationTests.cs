@@ -80,7 +80,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 infos = (RegistrationInfo[])loadedModel.Deserialize(file, null, typeof(RegistrationInfo[]));
 
             // When
-            var container = new Container();
+            var container = new Container().WithAttributedModel();
             container.RegisterExports(infos);
 
             // Then

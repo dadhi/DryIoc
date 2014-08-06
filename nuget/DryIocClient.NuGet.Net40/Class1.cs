@@ -12,7 +12,7 @@ namespace DryIocClient.NuGet.Net40
         public void Test()
         {
             var container = new Container();
-            container.RegisterExports(typeof (ExportedClass));
+            container.RegisterExports(typeof(ExportedClass));
 
             container.Resolve<ExportedClass>();
         }

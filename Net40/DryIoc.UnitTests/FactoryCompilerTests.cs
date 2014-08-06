@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq.Expressions;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -8,15 +7,27 @@ namespace DryIoc.UnitTests
     public class FactoryCompilerTests
     {
         [Test]
-        public void Compile_delegate_with_nested_lambda()
+        public void Container_with_enabled_compilation_to_DynamicAssembly()
         {
-            Expression<FactoryDelegate> factory = 
-                (_, __) => new Func<Scope, object>(x => x.GetOrAdd(0, () => "a")).Invoke(new Scope());
+            var container = new Container(ResolutionRules.Default.EnableCompilationToDynamicAssembly(true));
+            container.Register<InternalService>();
 
-            var factoryDelegate = factory.Body.CompileToDelegate();
-            var result = (string)factoryDelegate.Invoke(null, null);
-
-            Assert.That(result, Is.EqualTo("a"));
+            // Exception is here because internal ServiceConsumer is not visible to created Dynamic Assembly.
+            Assert.Throws<MethodAccessException>(() =>
+                container.Resolve<InternalService>());
         }
+
+        [Test]
+        public void Container_with_disabled_compilation_to_DynamicAssembly()
+        {
+            var container = new Container(ResolutionRules.Default.EnableCompilationToDynamicAssembly(false));
+            container.Register<InternalService>();
+
+            var service = container.Resolve<InternalService>();
+
+            Assert.That(service, Is.Not.Null);
+        }
+
+        internal class InternalService { }
     }
 }

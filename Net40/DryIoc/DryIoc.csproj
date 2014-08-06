@@ -41,8 +41,11 @@
     <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc\Properties\Version.cs">
+      <Link>Properties\Version.cs</Link>
+    </Compile>
     <Compile Include="FactoryCompiler.cs" />
-    <Compile Include="InternalsVisibleToFactoryCompilerDynamicAssembly.cs" />
+    <Compile Include="InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

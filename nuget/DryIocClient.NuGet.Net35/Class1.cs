@@ -3,7 +3,7 @@ using DryIoc;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
-namespace DryIocClient.NuGet.Net40
+namespace DryIocClient.NuGet.Net35
 {
     [TestFixture]
     public class Class1

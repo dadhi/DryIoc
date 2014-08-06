@@ -1,5 +1,5 @@
-DryIoc is fast, small and capable IoC Container
-===============================================
+DryIoc is small, fast, capable IoC Container
+============================================
 
 [Autofac]: https://code.google.com/p/autofac/
 [MEF]: http://mef.codeplex.com/
@@ -17,28 +17,29 @@ DryIoc is fast, small and capable IoC Container
 * Supports .NET 3.5, 4.0, 4.5 _([PCL] planned for v2)_
 * Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
 * Extensions: [MefAttributedModel] as [code][DryIoc.MefAttributedModel] or [dll][DryIoc.MefAttributedModel.dll].
-* [Docs are here][Wiki].
+* [Docs in a Wiki][Wiki].
+* [![Build status](https://ci.appveyor.com/api/projects/status/jfq01d9wcs4vcwpf)](https://ci.appveyor.com/project/MaksimVolkau/dryioc)
 
 #### Fast
 * On par with fastest containers listed in [IoC Container Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
 * General use-cases optimized for max speed.
 * Callstack depth preserved as shallow as possible.
-* Memory footprint preserved as small as possible.
+* Memory footprint preserved as low as possible.
 
 #### Small
 * Minimal setup requires single source file: *Container.cs*. 
 * No more than 2500 lines of code including comments.
-* Readable code.
-* Uses [Caliburn.Micro](http://caliburnmicro.codeplex.com/) a-like approach for customization.
+* Code written to be readable.
+* Uses [Caliburn.Micro](http://caliburnmicro.codeplex.com/) alike approach for customization.
 
 #### Reliable
 * Unit-tested with 100% coverage.
-* Thread-safe in sense that registrations and resolutions could be done in parallel without corrupting container state. 
+* Thread-safe: registrations and resolutions could be done in parallel without corrupting container state. 
 * Recursive dependency detection (cycle in object graph).
 * Error handling with `ContainerException` inherited from `InvalidOperationException` to filter container related exceptions.
 * Throws exceptions as early as possible. 
 * Meaningful error messages with all available information about problem Cause and Context.
-* Resolve as `DebugExpression<TService>` to see underlying factory expression.
+* Resolving as `DebugExpression<T>` to find underlying expression used for instance creation.
 
 #### Features
 * Constructor, property and field injection. *You can select What and Where to inject.*
@@ -53,7 +54,7 @@ DryIoc is fast, small and capable IoC Container
 * Resolution of multiple implementations as:
     * `IEnumerable<T>` or `T[]`. *Static view - next resolution woN't see new registrations.*
     * `Many<T>`. *Dynamic view - next resolution Will see new registrations.*
-    *  [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern).
+    *  [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern). Composite implementation will be exlcuded from itself.
 * Generic wrappers:
     * `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>`.
     * Func with parameters to specify constructor arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
@@ -64,7 +65,7 @@ DryIoc is fast, small and capable IoC Container
     * Custom reuse by implementing `IReuse`. Check `DryIoc.UnitTests.ThreadReuse` for example.
     * Nested disposable scopes of reuse.
     * Disposing of `Singleton` on Container dispose.
-* [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern). 
+* [Decorators](http://en.wikipedia.org/wiki/Decorator_pattern). 
 * Context-based implementation selection.
 * Unregistered service resolution via `ResolutionRules`.
 * Toggling features On/Off via `ContanerSetup`.

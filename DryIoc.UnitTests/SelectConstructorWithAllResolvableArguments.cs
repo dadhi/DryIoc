@@ -43,25 +43,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Could_specify_constructor_selection_as_default_strategy_for_all_registrations()
-        {
-            ReflectionFactory.DefaultConstructorSelector = ReflectionFactory.SelectConstructorWithAllResolvableArguments;
-            try
-            {
-                var container = new Container();
-
-                container.Register<SomeClient>();
-
-                var client = container.Resolve<SomeClient>();
-                Assert.That(client.Seed, Is.EqualTo(1));
-            }
-            finally
-            {
-                ReflectionFactory.DefaultConstructorSelector = null;
-            }
-        }
-
-        [Test]
         public void What_if_no_public_constructors()
         {
             var container = new Container();
@@ -106,6 +87,18 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Func<string, SomeClient>>());
 
             Assert.That(ex.Message, Is.StringStarting("Unable to find constructor with all parameters matching Func signature"));
+        }
+
+        [Test]
+        public void Could_specify_constructor_selection_as_default_strategy_for_all_Container_registrations()
+        {
+            var container = new Container(ResolutionRules.Default.WithConstructorSelector(
+                ReflectionFactory.SelectConstructorWithAllResolvableArguments));
+
+            container.Register<SomeClient>();
+
+            var client = container.Resolve<SomeClient>();
+            Assert.That(client.Seed, Is.EqualTo(1));
         }
 
         #region CUT
