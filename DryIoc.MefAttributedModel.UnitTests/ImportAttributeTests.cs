@@ -62,6 +62,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.That(client.Some, Is.InstanceOf<Service>());
         }
 
+        [Test]
+        public void Inject_service_as_Func_Array_of_Service_with_Import_contract_key_no_type_specified()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(FuncArrayKeyClient), typeof(KeyService));
+
+            var client = container.Resolve<FuncArrayKeyClient>(IfUnresolved.ReturnNull);
+
+            Assert.That(client, Is.Null);
+        }
+
         [Export][ExportWithMetadata("blah")]
         public class Service : IService { }
 
@@ -117,6 +128,20 @@ namespace DryIoc.MefAttributedModel.UnitTests
             public IService Some { get; set; }
 
             public FuncArrayClient([Import(typeof(Service))]Func<IService>[] getService)
+            {
+                Some = getService[0]();
+            }
+        }
+
+        [Export(typeof(IService))]
+        public class KeyService : IService { }
+
+        [Export]
+        public class FuncArrayKeyClient
+        {
+            public IService Some { get; set; }
+
+            public FuncArrayKeyClient([Import("k")]Func<IService>[] getService)
             {
                 Some = getService[0]();
             }

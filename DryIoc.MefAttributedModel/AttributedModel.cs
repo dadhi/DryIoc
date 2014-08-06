@@ -463,7 +463,7 @@ namespace DryIoc.MefAttributedModel
 
         public static StringBuilder AppendString(this StringBuilder code, string x)
         {
-            return x == null ? code.Append("null") : code.Print(x, quote: '"');
+            return x == null ? code.Append("null") : code.Append('"').Append(x).Append('"');
         }
 
         public static StringBuilder AppendType(this StringBuilder code, Type x)

@@ -1253,7 +1253,8 @@ namespace DryIoc
         public static readonly string REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
             "Registered instance [{0}] of type {1} is not assignable to serviceType {2}.";
 
-        public static readonly string SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_REFLECTED_TYPE = "Service type {0} is not assignable to {1} of type {2}.";
+        public static readonly string SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_REFLECTED_TYPE = 
+            "Service type {0} is not assignable to {1} of type {2}.";
     }
 
     public static class Registrator
@@ -1602,14 +1603,15 @@ namespace DryIoc
         public string ReflectedInfoToString()
         {
             return new StringBuilder(Get(p => "property ", f => "field ", p => "parameter "))
-                .Print(Get(p => p.Name, f => f.Name, p => p.Name)).ToString();
+                .Append('"').Print(Get(p => p.Name, f => f.Name, p => p.Name)).Append('"').ToString();
         }
 
         public override string ToString()
         {
-            var str = new StringBuilder().Print(ServiceType);
+            var str = new StringBuilder();
             if (ServiceKey != null)
-                str.Append(' ').Print(ServiceKey);
+                str.Append('"').Print(ServiceKey).Append('"').Append(' ');
+            str.Print(ServiceType);
             if (_reflectedInfo != null)
                 str.Append(" as ").Append(ReflectedInfoToString());
             return str.ToString();
@@ -2221,12 +2223,20 @@ namespace DryIoc
             if (info != null)
             {
                 var parameterType = parameter.ParameterType;
-                if (parameterType != info.ServiceType)
+                if (parameterType != info.ServiceType || info.ServiceKey != null) // Custom info is provided.
                 {
                     var wrappedParameterType = registry.GetWrappedServiceTypeOrSelf(parameterType);
-                    if (wrappedParameterType != parameterType && wrappedParameterType != info.ServiceType &&
-                        wrappedParameterType.IsAssignableFrom(info.ServiceType))
+                    if (wrappedParameterType != parameterType) // there is wrapped service present
+                    {
+                        if (parameterType == info.ServiceType)
+                            info = info.With(wrappedParameterType);
+                        else
+                            Throw.If(!wrappedParameterType.IsAssignableFrom(info.ServiceType),
+                                Error.SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_REFLECTED_TYPE, info.ServiceType,
+                                "unwrapped " + info.ReflectedInfoToString(), wrappedParameterType);
+
                         info = ServiceInfo.Of(parameterType).WithWrappedTypeInfo(new KeyValuePair<Type, ServiceInfo>(wrappedParameterType, info));
+                    }
                 }
 
                 return info;
@@ -2962,16 +2972,16 @@ namespace DryIoc
 
         public static StringBuilder Print(this StringBuilder str, object x)
         {
-            return x == null ? str.Append("[null]")
-                : x is string ? str.Print(((string)x))
+            return x == null ? str.Append("null")
+                : x is string ? str.Print((string)x)
                 : x is Type ? str.Print((Type)x)
                 : x is IEnumerable<Type> || x is IEnumerable ? str.Print((IEnumerable)x, ItemSeparatorStr)
                 : str.Append(x);
         }
 
-        public static StringBuilder Print(this StringBuilder str, string s, char quote = '"')
+        public static StringBuilder Print(this StringBuilder str, string s)
         {
-            return str.Append(quote).Append(s).Append(quote);
+            return str.Append(s);
         }
 
         public static StringBuilder Print(this StringBuilder str, IEnumerable items,
