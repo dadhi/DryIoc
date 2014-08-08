@@ -94,17 +94,17 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(ResolutionRules.Default
                 .WithPropertyAndFieldSelector((type, req, reg) =>
-                        type.GetProperties(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                    .Where(p => p.GetSetMethod() != null).Cast<MemberInfo>().Concat(
-                        type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                            .Where(f => !f.IsInitOnly).Cast<MemberInfo>())
+                     type.GetProperties(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                        .Where(p => p.GetSetMethod() != null).Cast<MemberInfo>().Concat(
+                     type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                        .Where(f => !f.IsInitOnly).Cast<MemberInfo>())
                     .Select(m =>
                     {
                         var attributes = m.GetCustomAttributes(typeof(ImportAttribute), false);
                         if (attributes.Length == 0)
                             return null;
                         var importAttr = (ImportAttribute)attributes[0];
-                        return ServiceInfo.Of(m).Apply(importAttr.ContractType, importAttr.ContractName);
+                        return ServiceInfo.Of(m).ApplyCustom(importAttr.ContractType, importAttr.ContractName);
                     })));
 
             container.Register<FunnyChicken>();
@@ -178,7 +178,7 @@ namespace DryIoc.UnitTests
             return members.Select(m =>
             {
                 var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
-                return import == null ? null : ServiceInfo.Of(m).Apply(import.ContractType, import.ContractName);
+                return import == null ? null : ServiceInfo.Of(m).ApplyCustom(import.ContractType, import.ContractName);
             });
         }
 

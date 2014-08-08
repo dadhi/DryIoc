@@ -245,7 +245,7 @@ namespace DryIoc.UnitTests
         public void Registering_all_of_implemented_services_should_register_only_those_containing_all_impl_generic_args()
         {
             var container = new Container();
-            container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
+            container.RegisterManyServicesWithOneImplementation(typeof(IceCreamSource<>), Reuse.Singleton);
 
             container.Resolve<IceCreamSource<bool>>();
             container.Resolve<IceCream<bool>>();
@@ -258,7 +258,7 @@ namespace DryIoc.UnitTests
         public void Given_singleton_registered_Then_resolving_non_generic_service_as_Many_should_succeed()
         {
             var container = new Container();
-            container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
+            container.RegisterManyServicesWithOneImplementation(typeof(IceCreamSource<>), Reuse.Singleton);
 
             var disposable = container.Resolve<Many<IDisposable>>().Items.ToArray();
 

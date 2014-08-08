@@ -75,6 +75,52 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Resolve<FuncArrayKeyClient>();
         }
 
+        [Test]
+        public void Inject_property_with_default_Import_should_work()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(PropertyClient), typeof(Service));
+
+            var client = container.Resolve<PropertyClient>();
+
+            Assert.That(client.Some, Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void Resolve_property_for_already_resolved_instance()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(Service));
+
+            var client = new PropertyClient();
+            container.ResolvePropertiesAndFields(client);
+
+            Assert.That(client.Some, Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void Resolving_unregistred_property_should_not_throw_so_the_property_stays_null()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(Service));
+
+            var client = new PropertyClient2();
+            container.ResolvePropertiesAndFields(client);
+
+            Assert.That(client.Some, Is.Null);
+        }
+
+        [Test]
+        public void Resolve_custom_generic_wrapper_marked_with_Import()
+        {
+            var container = new Container().WithAttributedModel();
+            container.Register(typeof(MyWrapper<>), setup: GenericWrapperSetup.Default);
+
+            container.RegisterExports(typeof(Service), typeof(CustomWrapperClient));
+
+            var client = container.Resolve<CustomWrapperClient>();
+        }
+
         [Export][ExportWithMetadata("blah")]
         public class Service : IService { }
 
@@ -146,6 +192,42 @@ namespace DryIoc.MefAttributedModel.UnitTests
             public FuncArrayKeyClient([Import("k")]Func<IService>[] getService)
             {
                 Some = getService[0]();
+            }
+        }
+
+        [Export]
+        public class PropertyClient
+        {
+            [Import(typeof(Service))]
+            public IService Some { get; set; }
+        }
+
+        [Export]
+        public class PropertyClient2
+        {
+            [Import("k", typeof(Service))]
+            public IService Some { get; set; }
+        }
+
+        [Export]
+        public class CustomWrapperClient
+        {
+            [Import(typeof(Service))]
+            public MyWrapper<IService> Some { get; set; }
+
+            //public CustomWrapperClient([Import(typeof(Service))]MyWrapper<IService> some)
+            //{
+            //    Some = some;
+            //}
+        }
+
+        public class MyWrapper<T>
+        {
+            public T Value { get; set; }
+
+            public MyWrapper(T value)
+            {
+                Value = value;
             }
         }
     }

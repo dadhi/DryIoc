@@ -317,13 +317,13 @@ namespace DryIoc.MefAttributedModel
         public static ServiceInfo GetPropertyServiceInfo(PropertyInfo property, Request parent, IRegistry registry)
         {
             var customInfo = GetCustomServiceInfo(property.PropertyType, property.GetCustomAttributes(false), parent, registry);
-            return customInfo == null ? null : ServiceInfo.Of(property).Apply(customInfo);
+            return customInfo == null ? null : ServiceInfo.Of(property).ApplyCustom(customInfo);
         }
 
         public static ServiceInfo GetFieldServiceInfo(FieldInfo field, Request parent, IRegistry registry)
         {
             var customInfo = GetCustomServiceInfo(field.FieldType, field.GetCustomAttributes(false), parent, registry);
-            return customInfo == null ? null : ServiceInfo.Of(field).Apply(customInfo);
+            return customInfo == null ? null : ServiceInfo.Of(field).ApplyCustom(customInfo);
         }
 
         public static CustomServiceInfo GetCustomServiceInfo(Type serviceType, object[] attributes, Request parent, IRegistry registry)

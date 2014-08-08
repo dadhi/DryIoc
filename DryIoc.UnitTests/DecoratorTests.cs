@@ -224,7 +224,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: ServiceSetup.WithMetadata("blah"));
             container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: DecoratorSetup.Default);
-            container.RegisterAll(typeof(OperationUser<>));
+            container.RegisterManyServicesWithOneImplementation(typeof(OperationUser<>));
 
             var user = container.Resolve<OperationUser<object>>();
 

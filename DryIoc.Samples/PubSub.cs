@@ -11,8 +11,8 @@ namespace DryIoc.Samples
         public void Test()
         {
             var container = new Container();
-            container.RegisterAll<SomeHandler>();
-            container.RegisterAll<PubSubHub>(Reuse.Singleton);
+            container.RegisterManyServicesWithOneImplementation<SomeHandler>();
+            container.RegisterManyServicesWithOneImplementation<PubSubHub>(Reuse.Singleton);
 
             var sub = container.Resolve<ISub>();
             var handler = container.Resolve<SomeHandler>();
