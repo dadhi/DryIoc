@@ -93,7 +93,7 @@ namespace DryIoc.UnitTests
         public void Can_resolve_property_marked_with_Import()
         {
             var container = new Container(ResolutionRules.Default
-                .WithPropertyAndFieldSelector((type, _) =>
+                .WithPropertyAndFieldSelector((type, req, reg) =>
                         type.GetProperties(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                     .Where(p => p.GetSetMethod() != null).Cast<MemberInfo>().Concat(
                         type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
@@ -104,7 +104,7 @@ namespace DryIoc.UnitTests
                         if (attributes.Length == 0)
                             return null;
                         var importAttr = (ImportAttribute)attributes[0];
-                        return ServiceInfo.Of(m, importAttr.ContractType, importAttr.ContractName);
+                        return ServiceInfo.Of(m).Apply(importAttr.ContractType, importAttr.ContractName);
                     })));
 
             container.Register<FunnyChicken>();
@@ -167,16 +167,18 @@ namespace DryIoc.UnitTests
             Assert.That(chicken.SomeGuts, Is.Not.Null);
         }
 
-        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, IRegistry _)
+        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, Request req, IRegistry reg)
         {
-            var flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+            
             var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null);
             var fields = type.GetFields(flags).Where(f => !f.IsInitOnly);
             var members = properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>());
+            
             return members.Select(m =>
             {
                 var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
-                return import == null ? null : ServiceInfo.Of(m, import.ContractType, import.ContractName);
+                return import == null ? null : ServiceInfo.Of(m).Apply(import.ContractType, import.ContractName);
             });
         }
 

@@ -48,7 +48,7 @@ namespace DryIoc
 
             _factories = Ref.Of(HashTree<Type, object>.Empty);
             _decorators = Ref.Of(HashTree<Type, Factory[]>.Empty);
-            _genericWrappers = Ref.Of(OpenGenericsSupport.GenericWrappers);
+            _genericWrappers = Ref.Of(GenericsSupport.GenericWrappers);
 
             _singletonScope = _currentScope = new Scope();
 
@@ -285,6 +285,41 @@ namespace DryIoc
             return newFactoryDelegate(request.State.Items, request.ResolutionScope);
         }
 
+        public static IEnumerable<ServiceInfo> SelectPublicAssignablePropertiesAndFields(Type type)
+        {
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
+            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Cast<MemberInfo>();
+            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly).Cast<MemberInfo>();
+            return properties.Concat(fields).Select(ServiceInfo.Of);
+        }
+
+        /// <summary>
+        /// For given instance resolves and sets non-initialized (null) properties from container.
+        /// It does not throw if property is not resolved, so you might need to check member value afterwards.
+        /// </summary>
+        /// <param name="instance">Service instance with properties to resolve and initialize.</param>
+        /// <param name="selectPropertiesAndFields">Optional function to select properties and fields, 
+        /// otherwise <see cref="ResolutionRules.PropertiesAndFieldsSelector"/> used if defined,
+        /// otherwise <see cref="SelectPublicAssignablePropertiesAndFields"/> used.</param>
+        public void ResolvePropertiesAndFields(object instance, Func<Type, IEnumerable<ServiceInfo>> selectPropertiesAndFields)
+        {
+            var instanceType = instance.ThrowIfNull().GetType();
+            var selector = selectPropertiesAndFields
+                ?? (ResolutionRules.PropertiesAndFieldsSelector == null
+                    ? (Func<Type, IEnumerable<ServiceInfo>>)SelectPublicAssignablePropertiesAndFields
+                    : type => ResolutionRules.PropertiesAndFieldsSelector(type,
+                        CreateRequest(instanceType).ResolveWith(new InstanceFactory(instance)),
+                        this));
+
+            foreach (var info in selector(instanceType))
+                if (info != null)
+                {
+                    var value = this.Resolve(info.ServiceType, info.ServiceKey, info.IfUnresolved);
+                    if (value != null)
+                        info.Do(p => p.SetValue(instance, value, null), f => f.SetValue(instance, value));
+                }
+        }
+
         #endregion
 
         #region IRegistry
@@ -441,13 +476,13 @@ namespace DryIoc
             return _genericWrappers.Value.GetValueOrDefault(openGenericServiceType);
         }
 
-        Type IRegistry.GetWrappedServiceTypeOrSelf(Type serviceType)
+        Type IRegistry.UnwrapServiceType(Type serviceType)
         {
             if (!serviceType.IsGenericType && !serviceType.IsArray)
                 return serviceType;
 
             if (serviceType.IsArray)
-                return ((IRegistry)this).GetWrappedServiceTypeOrSelf(serviceType.GetElementType());
+                return ((IRegistry)this).UnwrapServiceType(serviceType.GetElementType());
 
             var factory = _genericWrappers.Value.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
             if (factory == null)
@@ -455,7 +490,7 @@ namespace DryIoc
 
             var wrapperSetup = ((GenericWrapperSetup)factory.Setup);
             var wrappedType = wrapperSetup.GetWrappedServiceType(serviceType.GetGenericArguments());
-            return ((IRegistry)this).GetWrappedServiceTypeOrSelf(wrappedType);
+            return ((IRegistry)this).UnwrapServiceType(wrappedType);
         }
 
         #endregion
@@ -832,12 +867,12 @@ namespace DryIoc
         static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, IRegistry registry, ref FactoryDelegate result);
     }
 
-    public static class OpenGenericsSupport
+    public static class GenericsSupport
     {
         public static readonly Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
         public static readonly HashTree<Type, Factory> GenericWrappers;
 
-        static OpenGenericsSupport()
+        static GenericsSupport()
         {
             GenericWrappers = HashTree<Type, Factory>.Empty;
 
@@ -872,7 +907,7 @@ namespace DryIoc
                 new FactoryProvider((_, __) => new ExpressionFactory(GetDebugExpression), GenericWrapperSetup.Default));
         }
 
-        public static readonly ResolutionRules.ResolveUnregisteredServiceRule ResolveOpenGenericsAndArrays = (request, registry) =>
+        public static readonly ResolutionRules.ResolveUnregisteredServiceRule ResolveGenericsAndArrays = (request, registry) =>
         {
             var genericTypeDef = request.ServiceType.IsArray ? typeof(IEnumerable<>) : request.OpenGenericServiceType;
             if (genericTypeDef == null)
@@ -895,9 +930,10 @@ namespace DryIoc
                 ? collectionType.GetElementType()
                 : collectionType.GetGenericArguments()[0];
 
-            var wrappedItemType = request.ServiceInfo.WrappedTypeInfo != null
-                ? request.ServiceInfo.WrappedTypeInfo.Value.Value.ServiceType
-                : registry.GetWrappedServiceTypeOrSelf(itemType);
+            var customWrappedInfo = request.ServiceInfo.CustomWrappedInfo;
+            var wrappedItemType = customWrappedInfo != null
+                ? customWrappedInfo.Value.Value.ServiceType ?? customWrappedInfo.Value.Key
+                : registry.UnwrapServiceType(itemType);
 
             // Composite pattern support: filter out composite root from available keys.
             var items = registry.GetAllFactories(wrappedItemType);
@@ -931,7 +967,7 @@ namespace DryIoc
             var dynamicEnumerableType = request.ServiceType;
             var itemType = dynamicEnumerableType.GetGenericArguments()[0];
 
-            var wrappedItemType = registry.GetWrappedServiceTypeOrSelf(itemType);
+            var wrappedItemType = registry.UnwrapServiceType(itemType);
 
             // Composite pattern support: filter out composite root from available keys.
             var parentFactoryID = 0;
@@ -1003,9 +1039,9 @@ namespace DryIoc
             var serviceType = typeArgs[0];
             var metadataType = typeArgs[1];
 
-            var wrappedServiceType = request.ServiceInfo.WrappedTypeInfo != null
-                ? request.ServiceInfo.WrappedTypeInfo.Value.Value.ServiceType
-                : registry.GetWrappedServiceTypeOrSelf(serviceType);
+            var wrappedServiceType = request.ServiceInfo.CustomWrappedInfo != null
+                ? request.ServiceInfo.CustomWrappedInfo.Value.Value.ServiceType
+                : registry.UnwrapServiceType(serviceType);
 
             object resultMetadata = null;
             var serviceKey = request.ServiceKey;
@@ -1061,7 +1097,7 @@ namespace DryIoc
         #region Implementation
 
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
-            typeof(OpenGenericsSupport).GetMethod("ResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
+            typeof(GenericsSupport).GetMethod("ResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
 
         internal static IEnumerable<TService> ResolveManyDynamically<TService, TWrappedService>(
             RegistryWeakRef registryWeakRef, int parentFactoryID)
@@ -1088,8 +1124,7 @@ namespace DryIoc
     public sealed partial class ResolutionRules
     {
         public static readonly ResolutionRules Empty = new ResolutionRules();
-
-        public static ResolutionRules Default = Empty.With(OpenGenericsSupport.ResolveOpenGenericsAndArrays);
+        public static readonly ResolutionRules Default = Empty.With(GenericsSupport.ResolveGenericsAndArrays);
 
         public delegate Factory FactorySelectorRule(IEnumerable<KeyValuePair<object, Factory>> factories);
         public FactorySelectorRule FactorySelector { get; private set; }
@@ -1104,14 +1139,14 @@ namespace DryIoc
             return new ResolutionRules(this) { ConstructorSelector = rule };
         }
 
-        public Func<Type, IRegistry, IEnumerable<ServiceInfo>> PropertiesAndFieldsSelector { get; private set; }
-        public ResolutionRules WithPropertyAndFieldSelector(Func<Type, IRegistry, IEnumerable<ServiceInfo>> rule)
+        public Func<Type, Request, IRegistry, IEnumerable<ServiceInfo>> PropertiesAndFieldsSelector { get; private set; }
+        public ResolutionRules WithPropertyAndFieldSelector(Func<Type, Request, IRegistry, IEnumerable<ServiceInfo>> rule)
         {
             return new ResolutionRules(this) { PropertiesAndFieldsSelector = rule };
         }
 
-        public Func<ParameterInfo, Request, IRegistry, ServiceInfo> ForConstructorParameterServiceInfo { get; private set; }
-        public ResolutionRules With(Func<ParameterInfo, Request, IRegistry, ServiceInfo> rule)
+        public Func<ParameterInfo, Request, IRegistry, CustomServiceInfo> ForConstructorParameterServiceInfo { get; private set; }
+        public ResolutionRules With(Func<ParameterInfo, Request, IRegistry, CustomServiceInfo> rule)
         {
             return new ResolutionRules(this) { ForConstructorParameterServiceInfo = rule };
         }
@@ -1253,7 +1288,7 @@ namespace DryIoc
         public static readonly string REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
             "Registered instance [{0}] of type {1} is not assignable to serviceType {2}.";
 
-        public static readonly string SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_REFLECTED_TYPE = 
+        public static readonly string SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_REFLECTED_TYPE =
             "Service type {0} is not assignable to {1} of type {2}.";
     }
 
@@ -1547,63 +1582,87 @@ namespace DryIoc
         }
     }
 
-    public class ServiceInfo
+    public sealed class CustomServiceInfo
+    {
+        public static CustomServiceInfo Of(Type serviceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        {
+            return new CustomServiceInfo(serviceType, serviceKey, ifUnresolved);
+        }
+
+        public readonly Type ServiceType;
+        public readonly object ServiceKey;
+        public readonly IfUnresolved IfUnresolved;
+
+        private CustomServiceInfo(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
+        {
+            ServiceType = serviceType;
+            IfUnresolved = ifUnresolved;
+            ServiceKey = serviceKey;
+        }
+    }
+
+    public sealed class ServiceInfo
     {
         public readonly Type ServiceType;
         public readonly object ServiceKey;
         public readonly IfUnresolved IfUnresolved;
-        public readonly KeyValuePair<Type, ServiceInfo>? WrappedTypeInfo;
+        public readonly KeyValuePair<Type, CustomServiceInfo>? CustomWrappedInfo;
+
+        public T Get<T>(Func<PropertyInfo, T> property = null, Func<FieldInfo, T> field = null,
+            Func<ParameterInfo, T> parameter = null, Func<object, T> otherOrNull = null)
+        {
+            if (_reflectedInfo is ParameterInfo && parameter != null) return parameter((ParameterInfo)_reflectedInfo);
+            if (_reflectedInfo is PropertyInfo && property != null) return property((PropertyInfo)_reflectedInfo);
+            if (_reflectedInfo is FieldInfo && field != null) return field((FieldInfo)_reflectedInfo);
+            return otherOrNull != null ? otherOrNull(_reflectedInfo) : default(T);
+        }
+
+        public void Do(Action<PropertyInfo> property = null, Action<FieldInfo> field = null,
+            Action<ParameterInfo> parameter = null, Action<object> otherOrNull = null)
+        {
+            Get(NoResult(property), NoResult(field), NoResult(parameter), NoResult(otherOrNull));
+        }
+
+        public string GetReflectedInfoString()
+        {
+            return Get(p => "property \"" + p.Name + "\"", f => "field \"" + f.Name + "\"", p => "parameter \"" + p.Name + "\"");
+        }
+
+        public ServiceInfo WithWrapped(KeyValuePair<Type, CustomServiceInfo> wrappedInfo)
+        {
+            return new ServiceInfo(_reflectedInfo, ServiceType, ServiceKey, IfUnresolved, wrappedInfo);
+        }
+
+        public ServiceInfo WithWrapped(Type wrappedServiceType, CustomServiceInfo wrappedInfo)
+        {
+            return WithWrapped(new KeyValuePair<Type, CustomServiceInfo>(wrappedServiceType, wrappedInfo));
+        }
+
+        public ServiceInfo Apply(Type serviceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        {
+            return serviceType == null && serviceKey == null ? this
+                : new ServiceInfo(_reflectedInfo, serviceType ?? ServiceType, serviceKey ?? ServiceKey, ifUnresolved, CustomWrappedInfo);
+        }
+
+        public ServiceInfo Apply(CustomServiceInfo custom)
+        {
+            return custom == null ? this : Apply(custom.ServiceType, custom.ServiceKey, custom.IfUnresolved);
+        }
 
         public static ServiceInfo Of(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
             return new ServiceInfo(null, serviceType, serviceKey, ifUnresolved);
         }
 
-        public ServiceInfo WithWrappedTypeInfo(KeyValuePair<Type, ServiceInfo> wrappedTypeInfo)
+        public static ServiceInfo Of(ParameterInfo parameter)
         {
-            return new ServiceInfo(_reflectedInfo, ServiceType, ServiceKey, IfUnresolved, wrappedTypeInfo);
+            return new ServiceInfo(parameter, parameter.ParameterType, null, IfUnresolved.Throw);
         }
 
-        public ServiceInfo With(Type serviceType = null, object serviceKey = null)
+        public static ServiceInfo Of(MemberInfo member)
         {
-            return new ServiceInfo(_reflectedInfo, serviceType ?? ServiceType, serviceKey ?? ServiceKey,
-                IfUnresolved, WrappedTypeInfo);
-        }
-
-        public static ServiceInfo Of(ParameterInfo parameter,
-            Type serviceTypeIfDifferent = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
-        {
-            return new ServiceInfo(parameter, serviceTypeIfDifferent, serviceKey, ifUnresolved);
-        }
-
-        public static ServiceInfo Of(MemberInfo member,
-            Type serviceTypeIfDifferent = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.ReturnNull)
-        {
-            return new ServiceInfo(member, serviceTypeIfDifferent, serviceKey, ifUnresolved);
-        }
-
-        public void Do(Action<PropertyInfo> property = null, Action<FieldInfo> field = null,
-            Action<ParameterInfo> parameter = null, Action undefined = null)
-        {
-            if (_reflectedInfo is ParameterInfo && parameter != null) parameter((ParameterInfo)_reflectedInfo);
-            else if (_reflectedInfo is PropertyInfo && property != null) property((PropertyInfo)_reflectedInfo);
-            else if (_reflectedInfo is FieldInfo && field != null) field((FieldInfo)_reflectedInfo);
-            else if (undefined != null) undefined();
-        }
-
-        public T Get<T>(Func<PropertyInfo, T> property = null, Func<FieldInfo, T> field = null,
-            Func<ParameterInfo, T> parameter = null, Func<T> undefined = null)
-        {
-            if (_reflectedInfo is ParameterInfo && parameter != null) return parameter((ParameterInfo)_reflectedInfo);
-            if (_reflectedInfo is PropertyInfo && property != null) return property((PropertyInfo)_reflectedInfo);
-            if (_reflectedInfo is FieldInfo && field != null) return field((FieldInfo)_reflectedInfo);
-            return undefined != null ? undefined() : default(T);
-        }
-
-        public string ReflectedInfoToString()
-        {
-            return new StringBuilder(Get(p => "property ", f => "field ", p => "parameter "))
-                .Append('"').Print(Get(p => p.Name, f => f.Name, p => p.Name)).Append('"').ToString();
+            var serviceType = member is PropertyInfo ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType;
+            return new ServiceInfo(member, serviceType, null, IfUnresolved.ReturnNull);
         }
 
         public override string ToString()
@@ -1613,7 +1672,7 @@ namespace DryIoc
                 str.Append('"').Print(ServiceKey).Append('"').Append(' ');
             str.Print(ServiceType);
             if (_reflectedInfo != null)
-                str.Append(" as ").Append(ReflectedInfoToString());
+                str.Append(" as ").Append(GetReflectedInfoString());
             return str.ToString();
         }
 
@@ -1622,28 +1681,21 @@ namespace DryIoc
         private readonly object _reflectedInfo;
 
         private ServiceInfo(object reflectedInfo, Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
-            KeyValuePair<Type, ServiceInfo>? wrappedTypeInfo = null)
+            KeyValuePair<Type, CustomServiceInfo>? customWrappedInfo = null)
         {
             _reflectedInfo = reflectedInfo;
 
-            ServiceType = _reflectedInfo == null
-                ? serviceType.ThrowIfNull()
-                : ThrowIfReflectedTypeIsNotAssignableFromServiceType(serviceType);
+            ServiceType = serviceType.ThrowIfNull();
             Throw.If(ServiceType.IsGenericTypeDefinition, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
 
             ServiceKey = serviceKey;
             IfUnresolved = ifUnresolved;
-            WrappedTypeInfo = wrappedTypeInfo;
+            CustomWrappedInfo = customWrappedInfo;
         }
 
-        private Type ThrowIfReflectedTypeIsNotAssignableFromServiceType(Type serviceType)
+        private static Func<T, bool> NoResult<T>(Action<T> action)
         {
-            var reflectedType = Get(p => p.PropertyType, f => f.FieldType, p => p.ParameterType).ThrowIfNull();
-            if (serviceType == null)
-                return reflectedType;
-            if (reflectedType.IsAssignableFrom(serviceType))
-                return serviceType;
-            throw Error.SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_REFLECTED_TYPE.Of(serviceType, ReflectedInfoToString(), reflectedType);
+            return arg => { action(arg); return true; };
         }
 
         #endregion
@@ -1703,14 +1755,6 @@ namespace DryIoc
             return (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved);
         }
 
-        public static IEnumerable<ServiceInfo> SelectPublicAssignablePropertiesAndFields(Type type)
-        {
-            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Cast<MemberInfo>();
-            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly).Cast<MemberInfo>();
-            return properties.Concat(fields).Select(m => ServiceInfo.Of(m));
-        }
-
         /// <summary>
         /// For given instance resolves and sets non-initialized (null) properties from container.
         /// It does not throw if property is not resolved, so you might need to check member value afterwards.
@@ -1719,22 +1763,11 @@ namespace DryIoc
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">Optional function to select properties and fields, 
         /// otherwise <see cref="ResolutionRules.PropertiesAndFieldsSelector"/> used if defined,
-        /// otherwise <see cref="SelectPublicAssignablePropertiesAndFields"/> used.</param>
+        /// otherwise <see cref="Container.SelectPublicAssignablePropertiesAndFields"/> used.</param>
         public static void ResolvePropertiesAndFields(this IResolver resolver, object instance,
             Func<Type, IEnumerable<ServiceInfo>> selectPropertiesAndFields = null)
         {
-            var implementationType = instance.ThrowIfNull().GetType();
-            var selector = selectPropertiesAndFields
-                ?? (resolver.ResolutionRules.PropertiesAndFieldsSelector != null
-                    ? type => resolver.ResolutionRules.PropertiesAndFieldsSelector(type, (IRegistry)resolver)
-                    : (Func<Type, IEnumerable<ServiceInfo>>)SelectPublicAssignablePropertiesAndFields);
-
-            foreach (var serviceInfo in selector(implementationType).Where(info => info != null))
-            {
-                var value = resolver.Resolve(serviceInfo.ServiceType, serviceInfo.ServiceKey, serviceInfo.IfUnresolved);
-                if (value != null)
-                    serviceInfo.Do(p => p.SetValue(instance, value, null), f => f.SetValue(instance, value));
-            }
+            resolver.ResolvePropertiesAndFields(instance, selectPropertiesAndFields);
         }
     }
 
@@ -1789,10 +1822,10 @@ namespace DryIoc
 
         public Request Chain(ServiceInfo info)
         {
-            if (ServiceInfo.WrappedTypeInfo != null)
+            if (ServiceInfo.CustomWrappedInfo != null) // if parent (current) info for wrapped type is exist, then apply it.
             {
-                var wrappedTypeInfo = ServiceInfo.WrappedTypeInfo.Value;
-                info = info.ServiceType == wrappedTypeInfo.Key ? wrappedTypeInfo.Value : info.WithWrappedTypeInfo(wrappedTypeInfo);
+                var customInfo = ServiceInfo.CustomWrappedInfo.Value;
+                info = info.ServiceType == customInfo.Key ? info.Apply(customInfo.Value) : info.WithWrapped(customInfo);
             }
 
             return new Request(this, State, _scope, info);
@@ -2039,7 +2072,7 @@ namespace DryIoc
                     // When singleton scope and no Func in request chain 
                     // then reused instance should can be inserted directly instead of calling Scope method.
                     if (scope == registry.SingletonScope &&
-                        (request.Parent == null || !request.Parent.Enumerate().Any(OpenGenericsSupport.IsFunc)))
+                        (request.Parent == null || !request.Parent.Enumerate().Any(GenericsSupport.IsFunc)))
                     {
                         var factoryDelegate = expression.ToFactoryExpression().Compile();
                         var reusedInstance = scope.GetOrAdd(ID, () => factoryDelegate(request.State.Items, request.ResolutionScope));
@@ -2214,36 +2247,24 @@ namespace DryIoc
 
         public ServiceInfo GetCtorParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
         {
-            ServiceInfo info = null;
+            var getCustomServiceInfo = _getCtorParameterServiceInfo
+                ?? registry.ResolutionRules.ForConstructorParameterServiceInfo;
 
-            var getParamServiceInfo = _getCtorParameterServiceInfo ?? registry.ResolutionRules.ForConstructorParameterServiceInfo;
-            if (getParamServiceInfo != null)
-                info = getParamServiceInfo(parameter, request, registry);
-
-            if (info != null)
+            var serviceInfo = ServiceInfo.Of(parameter);
+            if (getCustomServiceInfo != null)
             {
-                var parameterType = parameter.ParameterType;
-                if (parameterType != info.ServiceType || info.ServiceKey != null) // Custom info is provided.
+                var customInfo = getCustomServiceInfo(parameter, request, registry);
+                if (customInfo != null)
                 {
-                    var wrappedParameterType = registry.GetWrappedServiceTypeOrSelf(parameterType);
-                    if (wrappedParameterType != parameterType) // there is wrapped service present
-                    {
-                        if (parameterType == info.ServiceType)
-                            info = info.With(wrappedParameterType);
-                        else
-                            Throw.If(!wrappedParameterType.IsAssignableFrom(info.ServiceType),
-                                Error.SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_REFLECTED_TYPE, info.ServiceType,
-                                "unwrapped " + info.ReflectedInfoToString(), wrappedParameterType);
-
-                        info = ServiceInfo.Of(parameterType).WithWrappedTypeInfo(new KeyValuePair<Type, ServiceInfo>(wrappedParameterType, info));
-                    }
+                    var wrappedServiceType = registry.UnwrapServiceType(serviceInfo.ServiceType);
+                    return wrappedServiceType == serviceInfo.ServiceType
+                        ? serviceInfo.Apply(customInfo) 
+                        : serviceInfo.WithWrapped(wrappedServiceType, customInfo);
                 }
-
-                return info;
             }
 
             var serviceKey = Setup.Type != FactoryType.Service ? request.ServiceKey : null;
-            return ServiceInfo.Of(parameter, serviceKey: serviceKey);
+            return serviceInfo.Apply(serviceKey: serviceKey);
         }
 
         #endregion
@@ -2407,8 +2428,8 @@ namespace DryIoc
 
         private readonly Type _implementationType;
         private readonly ConstructorSelector _constructorSelector;
-        private readonly Func<ParameterInfo, Request, IRegistry, ServiceInfo> _getCtorParameterServiceInfo;
-        private readonly Func<Type, IRegistry, IEnumerable<ServiceInfo>> _propertiesAndFieldSelector;
+        private readonly Func<ParameterInfo, Request, IRegistry, CustomServiceInfo> _getCtorParameterServiceInfo;
+        private readonly Func<Type, Request, IRegistry, IEnumerable<ServiceInfo>> _propertiesAndFieldSelector;
 
         private ConstructorInfo SelectConstructor(Request request, IRegistry registry)
         {
@@ -2431,14 +2452,14 @@ namespace DryIoc
                 return newService;
 
             var bindings = new List<MemberBinding>();
-            foreach (var serviceInfo in selector(_implementationType, registry).Where(info => info != null))
+            foreach (var info in selector(_implementationType, request, registry)) if (info != null)
             {
-                var memberRequest = request.Chain(serviceInfo);
-                var memberFactory = registry.ResolveFactory(memberRequest, serviceInfo.IfUnresolved);
+                var memberRequest = request.Chain(info);
+                var memberFactory = registry.ResolveFactory(memberRequest, info.IfUnresolved);
                 if (memberFactory != null)
                 {
                     var memberExpr = memberFactory.GetExpression(memberRequest, registry);
-                    var member = serviceInfo.Get<MemberInfo>(property => property, field => field);
+                    var member = info.Get<MemberInfo>(property => property, field => field);
                     bindings.Add(Expression.Bind(member, memberExpr));
                 }
             }
@@ -2695,6 +2716,16 @@ namespace DryIoc
         object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved);
 
         object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved);
+
+        /// <summary>
+        /// For given instance resolves and sets non-initialized (null) properties from container.
+        /// It does not throw if property is not resolved, so you might need to check member value afterwards.
+        /// </summary>
+        /// <param name="instance">Service instance with properties to resolve and initialize.</param>
+        /// <param name="selectPropertiesAndFields">Optional function to select properties and fields, 
+        /// otherwise <see cref="Container.ResolutionRules.PropertiesAndFieldsSelector"/> used if defined,
+        /// otherwise <see cref="Container.SelectPublicAssignablePropertiesAndFields"/> used.</param>
+        void ResolvePropertiesAndFields(object instance, Func<Type, IEnumerable<ServiceInfo>> selectPropertiesAndFields);
     }
 
     public enum IfAlreadyRegistered { ThrowIfDuplicateKey, KeepRegistered, UpdateRegistered }
@@ -2724,7 +2755,7 @@ namespace DryIoc
 
         IEnumerable<KV<object, Factory>> GetAllFactories(Type serviceType);
 
-        Type GetWrappedServiceTypeOrSelf(Type serviceType);
+        Type UnwrapServiceType(Type serviceType);
     }
 
     public sealed class Many<TService>

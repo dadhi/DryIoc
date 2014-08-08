@@ -66,11 +66,13 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Inject_service_as_Func_Array_of_Service_with_Import_contract_key_no_type_specified()
         {
             var container = new Container().WithAttributedModel();
-            container.RegisterExports(typeof(FuncArrayKeyClient), typeof(KeyService));
+            container.RegisterExports(typeof(FuncArrayKeyClient), typeof(Service));
 
-            var client = container.Resolve<FuncArrayKeyClient>(IfUnresolved.ReturnNull);
+            Assert.Throws<ContainerException>(
+                () => container.Resolve<FuncArrayKeyClient>());
 
-            Assert.That(client, Is.Null);
+            container.RegisterExports(typeof(KeyService));
+            container.Resolve<FuncArrayKeyClient>();
         }
 
         [Export][ExportWithMetadata("blah")]
@@ -133,7 +135,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             }
         }
 
-        [Export(typeof(IService))]
+        [Export("k", typeof(IService))]
         public class KeyService : IService { }
 
         [Export]
