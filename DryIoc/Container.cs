@@ -298,9 +298,7 @@ namespace DryIoc
         /// It does not throw if property is not resolved, so you might need to check member value afterwards.
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
-        /// <param name="selectPropertiesAndFields">Optional function to select properties and fields, 
-        /// otherwise <see cref="ResolutionRules.PropertiesAndFieldsSelector"/> used if defined,
-        /// otherwise <see cref="SelectPublicAssignablePropertiesAndFields"/> used.</param>
+        /// <param name="selectPropertiesAndFields">Function to select properties and fields.</param>
         void IResolver.ResolvePropertiesAndFields(object instance, Func<Type, IEnumerable<ServiceInfo>> selectPropertiesAndFields)
         {
             var instanceType = instance.ThrowIfNull().GetType();
@@ -1587,12 +1585,12 @@ namespace DryIoc
 
     public sealed class CustomServiceInfo
     {
-        public static readonly CustomServiceInfo Default = new CustomServiceInfo();
+        public static readonly CustomServiceInfo Empty = new CustomServiceInfo();
 
         public static CustomServiceInfo Of(Type serviceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
             return serviceType == null && serviceKey == null && ifUnresolved == IfUnresolved.Throw
-                ? Default : new CustomServiceInfo(serviceType, serviceKey, ifUnresolved);
+                ? Empty : new CustomServiceInfo(serviceType, serviceKey, ifUnresolved);
         }
 
         public readonly Type ServiceType;
@@ -1662,7 +1660,7 @@ namespace DryIoc
 
         public ServiceInfo ApplyCustom(CustomServiceInfo custom)
         {
-            return custom == null || custom == CustomServiceInfo.Default ? this 
+            return custom == null || custom == CustomServiceInfo.Empty ? this 
                 : ApplyCustom(custom.ServiceType, custom.ServiceKey, custom.IfUnresolved);
         }
 
@@ -1851,7 +1849,9 @@ namespace DryIoc
             if (ServiceInfo.CustomWrappedInfo != null) // if parent (current) info for wrapped type is exist, then apply it.
             {
                 var customInfo = ServiceInfo.CustomWrappedInfo.Value;
-                info = info.ServiceType == customInfo.Key ? info.ApplyCustom(customInfo.Value) : info.WithWrapped(customInfo);
+                info = info.ServiceType == customInfo.Key 
+                    ? info.ApplyCustom(customInfo.Value) 
+                    : info.WithWrapped(customInfo);
             }
 
             return new Request(this, State, _scope, info);
@@ -2474,24 +2474,33 @@ namespace DryIoc
 
         private Expression InitMembersIfRequired(NewExpression newService, Request request, IRegistry registry)
         {
-            var selector = _propertiesAndFieldSelector ?? registry.ResolutionRules.PropertiesAndFieldsSelector;
-            if (selector == null)
+            var propertiesAndFields = SelectPropertiesAndFields(request, registry);
+            if (propertiesAndFields == null)
                 return newService;
 
             var bindings = new List<MemberBinding>();
-            foreach (var info in selector(_implementationType, request, registry)) if (info != null)
+            foreach (var info in propertiesAndFields) if (info != null)
+            {
+                var memberRequest = request.Chain(info);
+                var memberFactory = registry.ResolveFactory(memberRequest, info.IfUnresolved);
+                if (memberFactory != null)
                 {
-                    var memberRequest = request.Chain(info);
-                    var memberFactory = registry.ResolveFactory(memberRequest, info.IfUnresolved);
-                    if (memberFactory != null)
-                    {
-                        var memberExpr = memberFactory.GetExpression(memberRequest, registry);
-                        var member = info.Get<MemberInfo>(property => property, field => field);
-                        bindings.Add(Expression.Bind(member, memberExpr));
-                    }
+                    var memberExpr = memberFactory.GetExpression(memberRequest, registry);
+                    var member = info.Get<MemberInfo>(property => property, field => field);
+                    bindings.Add(Expression.Bind(member, memberExpr));
                 }
+            }
 
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
+        }
+
+        private IEnumerable<ServiceInfo> SelectPropertiesAndFields(Request request, IRegistry registry)
+        {
+            var selector = _propertiesAndFieldSelector ?? registry.ResolutionRules.PropertiesAndFieldsSelector;
+            if (selector == null)
+                return null;
+
+            return selector(_implementationType, request, registry);
         }
 
         private static Type[] GetClosedTypeArgsForGenericImplementationType(Type implType, Request request)
