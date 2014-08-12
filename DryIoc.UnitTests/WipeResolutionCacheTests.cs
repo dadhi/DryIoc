@@ -29,7 +29,7 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<ServiceWithDependency>();
             Assert.That(service.Dependency, Is.InstanceOf<Dependency>());
 
-            container = container.WipeResolutionCache();
+            container = container.WithResetResolutionCache();
             container.Register<IDependency, Foo1>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateRegistered);
             service = container.Resolve<ServiceWithDependency>();
             Assert.That(service.Dependency, Is.InstanceOf<Foo1>());

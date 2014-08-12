@@ -121,6 +121,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var client = container.Resolve<CustomWrapperClient>();
         }
 
+        //[Test]
+        //public void Resolving_with_IfUnresolved_ReturnNull_When_dependency_is_not_resolved_Should_return_null()
+        //{
+        //    var container = new Container();
+        //    container.Register<Client>();
+
+        //    var client = container.Resolve<Client>(IfUnresolved.ReturnNull);
+
+        //    Assert.IsNull(client);
+        //}
+
         [Export][ExportWithMetadata("blah")]
         public class Service : IService { }
 
