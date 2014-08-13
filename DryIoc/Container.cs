@@ -1632,19 +1632,17 @@ namespace DryIoc
             return Get(p => "property \"" + p.Name + "\"", f => "field \"" + f.Name + "\"", p => "parameter \"" + p.Name + "\"");
         }
 
+        public ServiceInfo WithCustom(CustomServiceInfo customInfo, IRegistry registry)
+        {
+            var wrappedServiceType = registry.UnwrapServiceType(ServiceType);
+            return wrappedServiceType == ServiceType 
+                ? ApplyCustom(customInfo) 
+                : WithCustom(new KeyValuePair<Type, CustomServiceInfo>(wrappedServiceType, customInfo));
+        }
+
         public ServiceInfo WithCustom(KeyValuePair<Type, CustomServiceInfo> customInfo)
         {
             return new ServiceInfo(_reflectedInfo, ServiceType, ServiceKey, IfUnresolved, customInfo);
-        }
-
-        public ServiceInfo WithCustom(Type wrappedServiceType, CustomServiceInfo customInfo)
-        {
-            if (wrappedServiceType == ServiceType)
-            {
-                return ApplyCustom(customInfo);
-            }
-
-            return WithCustom(new KeyValuePair<Type, CustomServiceInfo>(wrappedServiceType, customInfo));
         }
 
         public ServiceInfo ApplyCustom(Type customType = null, object customKey = null, IfUnresolved customIfUnresolved = IfUnresolved.Throw)
@@ -1852,40 +1850,28 @@ namespace DryIoc
             get { return ResolvedFactory == null ? null : ResolvedFactory.ImplementationType; }
         }
 
-        public Request Chain(ServiceInfo info)
+        public Request Chain(ServiceInfo chainedInfo)
         {
             // if parent (current) info for wrapped type is exist, then apply it.
-            if (ServiceInfo.CustomWrappedInfo == null)
+            if (ServiceInfo.CustomWrappedInfo != null)
             {
-                if (info.CustomWrappedInfo != null &&
-                    info.ServiceType == info.CustomWrappedInfo.Value.Key)
-                    info = info.ApplyCustom(info.CustomWrappedInfo.Value.Value);
-
-                // propagate key from generic wrapper parent
-                else if (ResolvedFactory.Setup.Type != FactoryType.Service)
-                    info = info.ApplyCustom(customKey: ServiceKey);
-            }
-            else
-            {
-                if (info.CustomWrappedInfo != null)
-                {
-                    ;
-                }
-                else
-                {
-                    ;
-                }
-
                 var customInfo = ServiceInfo.CustomWrappedInfo.Value;
-                info = info.ServiceType == customInfo.Key 
-                    ? info.ApplyCustom(customInfo.Value) 
-                    : info.WithCustom(customInfo);
+                chainedInfo = chainedInfo.ServiceType == customInfo.Key
+                    ? chainedInfo.ApplyCustom(customInfo.Value)
+                    : chainedInfo.WithCustom(customInfo);
             }
+            else if (ResolvedFactory.Setup.Type != FactoryType.Service)
+                    chainedInfo = chainedInfo.ApplyCustom(customKey: ServiceKey);
 
-            return new Request(this, State, _scope, info);
+            return new Request(this, State, _scope, chainedInfo);
         }
 
-        public Request Chain(Type serviceType, object serviceKey = null)
+        public Request Chain(Type serviceType)
+        {
+            return Chain(ServiceInfo.Of(serviceType));
+        }
+
+        public Request Chain(Type serviceType, object serviceKey)
         {
             return Chain(ServiceInfo.Of(serviceType, serviceKey));
         }
@@ -2306,9 +2292,9 @@ namespace DryIoc
             var serviceInfo = ServiceInfo.Of(parameter);
             if (getCustomServiceInfo != null)
             {
-                var customServiceInfo = getCustomServiceInfo(parameter, request, registry);
-                if (customServiceInfo != null && customServiceInfo != CustomServiceInfo.Empty)
-                    return serviceInfo.WithCustom(registry.UnwrapServiceType(parameter.ParameterType), customServiceInfo);
+                var customInfo = getCustomServiceInfo(parameter, request, registry);
+                if (customInfo != null && customInfo != CustomServiceInfo.Empty)
+                    return serviceInfo.WithCustom(customInfo, registry);
             }
             return serviceInfo;
         }
