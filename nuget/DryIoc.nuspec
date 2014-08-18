@@ -8,13 +8,10 @@
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIoc is small, fast, capable IoC container.</description>
+        <description>DryIoc is small, fast, capable IoC container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          fixed: #5: Friend assembly reference 'DryIoC.CompiledFactoryProvider.DynamicAssembly' is invalid. Strong-name signed assemblies must specify a public key in their InternalsVisibleTo declarations.
-          fixed: #4: DryIoC\InternalsVisibleToFactoryCompilerDynamic.cs.
-          fixed: #37: Support symbol packages for SymbolSource.org.
-          fixed: #38: Add optional script to Sign NuGet package assemblies with Strong Name
+          fixed: #46: Reuse.InCurrentScope for nested dependencies is not working
         </releaseNotes>
     </metadata>
     <files>
