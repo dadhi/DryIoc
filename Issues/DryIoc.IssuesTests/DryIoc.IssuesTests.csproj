@@ -43,6 +43,7 @@
   <ItemGroup>
     <Compile Include="Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
+    <Compile Include="Issue46.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -1830,7 +1830,7 @@ when resolving {1}.";
             {
                 var item = _items.GetValueOrDefault(id);
                 if (item == null)
-                    _items = _items.AddOrUpdate(id, item = factory());
+                    Ref.Swap(ref _items, x => x.AddOrUpdate(id, item = factory()));
                 return (T)item;
             }
         }
@@ -1852,6 +1852,32 @@ when resolving {1}.";
         private int _disposed;
 
         #endregion
+    }
+
+    public static class Ref
+    {
+        /// <remarks>
+        /// First, it evaluates new value using <paramref name="getValue"/> function. 
+        /// Second, it checks that original value is not changed. 
+        /// If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getValue"/>).
+        /// </remarks>
+        public static T Swap<T>(ref T value, Func<T, T> getValue) where T : class
+        {
+            var retryCount = 0;
+            while (true)
+            {
+                var oldValue = value;
+                var newValue = getValue(oldValue);
+                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                    return oldValue;
+                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
+                    throw new InvalidOperationException(ERROR_RETRY_COUNT_EXCEEDED);
+            }
+        }
+
+        private const int RETRY_COUNT_UNTIL_THROW = 50;
+        private static readonly string ERROR_RETRY_COUNT_EXCEEDED =
+            "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
     }
 
     public interface IReuse
