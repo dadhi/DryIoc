@@ -1,5 +1,5 @@
-DryIoc is small, fast, capable IoC Container
-============================================
+DryIoc is small, fast, capable IoC Container for .NET
+=====================================================
 
 [Autofac]: https://code.google.com/p/autofac/
 [MEF]: http://mef.codeplex.com/
