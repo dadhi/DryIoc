@@ -125,25 +125,19 @@ namespace DryIoc.Playground
                 if (item.Hash < LeftItem.Hash)
                 {
                     var newLeft = Left.AddOrUpdate(item);
-                    if (IsEmerged(newLeft, Left))
-                    {
-                        var emergedLeft = (OneItemTree)newLeft;
-                        return new TwoItemsTree(emergedLeft.LeftItem, LeftItem, emergedLeft.Left, emergedLeft.Right, Right);
-                    }
+                    if (!IsEmerged(newLeft, Left)) 
+                        return new OneItemTree(LeftItem, newLeft, Right);
+                    var emergedLeft = (OneItemTree)newLeft;
+                    return new TwoItemsTree(emergedLeft.LeftItem, LeftItem, emergedLeft.Left, emergedLeft.Right, Right);
                     // otherwise just reattach new left
-                    return new OneItemTree(LeftItem, newLeft, Right);
-
                 }
                 //else if (item.Hash > LeftItem.Hash)
                 {
                     var newRight = Right.AddOrUpdate(item);
-                    if (IsEmerged(newRight, Right))
-                    {
-                        var emergedRight = (OneItemTree)newRight;
-                        return new TwoItemsTree(LeftItem, emergedRight.LeftItem, Left, emergedRight.Left, emergedRight.Right);
-                    }
-
-                    return new OneItemTree(LeftItem, Left, newRight);
+                    if (!IsEmerged(newRight, Right)) 
+                        return new OneItemTree(LeftItem, Left, newRight);
+                    var emergedRight = (OneItemTree)newRight;
+                    return new TwoItemsTree(LeftItem, emergedRight.LeftItem, Left, emergedRight.Left, emergedRight.Right);
                 }
             }
         }
@@ -188,38 +182,28 @@ namespace DryIoc.Playground
                 if (item.Hash < LeftItem.Hash)
                 {
                     var newLeft = Left.AddOrUpdate(item);
-                    if (IsEmerged(newLeft, Left))
-                    {
-                        var emergedLeft = (OneItemTree)newLeft;
-                        return new OneItemTree(LeftItem, emergedLeft, new OneItemTree(RightItem, Middle, Right));
-                    }
-
-                    return new TwoItemsTree(LeftItem, RightItem, newLeft, Middle, Right);
+                    return !IsEmerged(newLeft, Left)
+                        ? new TwoItemsTree(LeftItem, RightItem, newLeft, Middle, Right)
+                        : (INode)new OneItemTree(LeftItem, newLeft, new OneItemTree(RightItem, Middle, Right));
                 }
                 // if (item.Hash == LeftItem.Hash)
                 if (item.Hash < RightItem.Hash)
                 {
                     var newMiddle = Middle.AddOrUpdate(item);
-                    if (IsEmerged(newMiddle, Middle))
-                    {
-                        var emergedMiddle = (OneItemTree) newMiddle;
-                        return new OneItemTree(emergedMiddle.LeftItem,
-                            new OneItemTree(LeftItem, Left, emergedMiddle.Right),
-                            new OneItemTree(RightItem, emergedMiddle.Left, Right));
-                    }
-
-                    return new TwoItemsTree(LeftItem, RightItem, Left, newMiddle, Right);
+                    if (!IsEmerged(newMiddle, Middle))
+                        return new TwoItemsTree(LeftItem, RightItem, Left, newMiddle, Right);
+                    var emergedMiddle = (OneItemTree)newMiddle;
+                    return new OneItemTree(emergedMiddle.LeftItem,
+                        new OneItemTree(LeftItem, Left, emergedMiddle.Right),
+                        new OneItemTree(RightItem, emergedMiddle.Left, Right));
                 }
                 // for now skip if (item.Hash == RightItem.Hash)
                 // else if (item.Hash > RightItem.Hash)
                 {
                     var newRight = Right.AddOrUpdate(item);
-                    if (IsEmerged(newRight, Right))
-                    {
-                        var emergedRight = (OneItemTree)newRight;
-                        return new OneItemTree(RightItem, new OneItemTree(LeftItem, Left, Middle), emergedRight);
-                    }
-                    return new TwoItemsTree(LeftItem, RightItem, Left, Middle, newRight);
+                    return !IsEmerged(newRight, Right)
+                        ? new TwoItemsTree(LeftItem, RightItem, Left, Middle, newRight)
+                        : (INode) new OneItemTree(RightItem, new OneItemTree(LeftItem, Left, Middle), newRight);
                 }
             }
         }
