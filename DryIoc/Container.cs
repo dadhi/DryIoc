@@ -287,9 +287,9 @@ namespace DryIoc
         public static IEnumerable<ServiceInfo> SelectPublicAssignablePropertiesAndFields(Type type)
         {
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Cast<MemberInfo>();
-            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly).Cast<MemberInfo>();
-            return properties.Concat(fields).Select(ServiceInfo.Of);
+            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Select(ServiceInfo.Of);
+            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly).Select(ServiceInfo.Of);
+            return properties.Concat(fields);
         }
 
         /// <summary>
@@ -312,7 +312,7 @@ namespace DryIoc
                 {
                     var value = this.Resolve(info.ServiceType, info.ServiceKey, info.IfUnresolved);
                     if (value != null)
-                        info.MatchReflected<object>(
+                        info.MatchReflectedInfo<object>(
                             p => { p.SetValue(instance, value, null); return null; },
                             f => { f.SetValue(instance, value); return null; });
                 }
@@ -1934,9 +1934,14 @@ namespace DryIoc
             return new Parameter(parameter.ThrowIfNull());
         }
 
-        public static ServiceInfo Of(MemberInfo member)
+        public static ServiceInfo Of(PropertyInfo property)
         {
-            return new Member(member.ThrowIfNull().ThrowIf(!(member is PropertyInfo || member is FieldInfo)));
+            return new Property(property.ThrowIfNull());
+        }
+
+        public static ServiceInfo Of(FieldInfo field)
+        {
+            return new Field(field.ThrowIfNull());
         }
 
         public ServiceInfo With(CustomServiceInfo customInfo)
@@ -1955,8 +1960,8 @@ namespace DryIoc
         public virtual IfUnresolved IfUnresolved { get { return CustomInfo.IfUnresolved ?? IfUnresolved.Throw; } }
         public virtual Type CustomServiceType { get { return CustomInfo.ServiceType; } }
         public virtual CustomServiceInfo CustomInfo { get { return CustomServiceInfo.Empty; } }
-
-        public virtual T MatchReflected<T>(
+        public virtual Type ReflectedInfoType { get { return null; }}
+        public virtual T MatchReflectedInfo<T>(
             Func<PropertyInfo, T> property = null, Func<FieldInfo, T> field = null,
             Func<ParameterInfo, T> parameter = null, Func<object, T> otherOrNull = null)
         {
@@ -1969,15 +1974,13 @@ namespace DryIoc
             if (CustomInfo.ServiceKey != null)
                 s.Append('"').Print(CustomInfo.ServiceKey).Append('"').Append(' ');
             s.Print(ServiceType);
-            if (ReflectedSource != null)
-                s.Append(" as ").Append(MatchReflected(
+            if (ReflectedInfoType != null)
+                s.Append(" as ").Append(MatchReflectedInfo(
                     p => "property \"" + p.Name + "\"", f => "field \"" + f.Name + "\"", p => "parameter \"" + p.Name + "\""));
             return s.ToString();
         }
 
         #region Implementation
-
-        protected virtual object ReflectedSource { get { return null; } }
 
         private class DefaultInfo : ServiceInfo
         {
@@ -1994,9 +1997,9 @@ namespace DryIoc
         private sealed class Parameter : ServiceInfo
         {
             public override Type ServiceType { get { return _parameter.ParameterType; } }
-            protected override object ReflectedSource { get { return _parameter; } }
+            public override Type ReflectedInfoType { get { return typeof(ParameterInfo); } }
 
-            public override T MatchReflected<T>(
+            public override T MatchReflectedInfo<T>(
                 Func<PropertyInfo, T> property = null, Func<FieldInfo, T> field = null,
                 Func<ParameterInfo, T> parameter = null, Func<object, T> otherOrNull = null)
             {
@@ -2011,40 +2014,59 @@ namespace DryIoc
             private readonly ParameterInfo _parameter;
         }
 
-        private sealed class Member : ServiceInfo
+        private sealed class Property : ServiceInfo
         {
-            public override Type ServiceType { get { return MatchReflected(p => p.PropertyType, f => f.FieldType); } }
-            public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnNull; } }
-            protected override object ReflectedSource { get { return _member; } }
+            public override Type ServiceType { get { return _property.PropertyType; } }
+            public override IfUnresolved IfUnresolved { get { return CustomInfo.IfUnresolved ?? IfUnresolved.ReturnNull; } }
+            public override Type ReflectedInfoType { get { return typeof(PropertyInfo); } }
 
-            public override T MatchReflected<T>(
+            public override T MatchReflectedInfo<T>(
                 Func<PropertyInfo, T> property = null, Func<FieldInfo, T> field = null,
                 Func<ParameterInfo, T> parameter = null, Func<object, T> otherOrNull = null)
             {
-                return _member is PropertyInfo
-                    ? (property != null ? property((PropertyInfo)_member) : default(T))
-                    : (field != null ? field((FieldInfo)_member) : default(T));
+                return property != null ? property(_property) : default(T);
             }
 
-            public Member(MemberInfo member)
+            public Property(PropertyInfo property)
             {
-                _member = member;
+                _property = property;
             }
 
-            private readonly MemberInfo _member;
+            private readonly PropertyInfo _property;
+        }
+
+        private sealed class Field : ServiceInfo
+        {
+            public override Type ServiceType { get { return _field.FieldType; } }
+            public override IfUnresolved IfUnresolved { get { return CustomInfo.IfUnresolved ?? IfUnresolved.ReturnNull; } }
+            public override Type ReflectedInfoType { get { return typeof(FieldInfo); } }
+
+            public override T MatchReflectedInfo<T>(
+                Func<PropertyInfo, T> property = null, Func<FieldInfo, T> field = null,
+                Func<ParameterInfo, T> parameter = null, Func<object, T> otherOrNull = null)
+            {
+                return field != null ? field(_field) : default(T);
+            }
+
+            public Field(FieldInfo field)
+            {
+                _field = field;
+            }
+
+            private readonly FieldInfo _field;
         }
 
         private sealed class Custom : ServiceInfo
         {
             public override Type ServiceType { get { return _serviceType; } }
-            protected override object ReflectedSource { get { return _source.ReflectedSource; } }
+            public override Type ReflectedInfoType { get { return _source.ReflectedInfoType; } }
             public override CustomServiceInfo CustomInfo { get { return _customInfo; } }
 
-            public override T MatchReflected<T>(
+            public override T MatchReflectedInfo<T>(
                 Func<PropertyInfo, T> property = null, Func<FieldInfo, T> field = null,
                 Func<ParameterInfo, T> parameter = null, Func<object, T> otherOrNull = null)
             {
-                return _source.MatchReflected(property, field, parameter, otherOrNull);
+                return _source.MatchReflectedInfo(property, field, parameter, otherOrNull);
             }
 
             public Custom(ServiceInfo source, CustomServiceInfo customInfo)
@@ -2746,7 +2768,7 @@ namespace DryIoc
                     if (memberFactory != null)
                     {
                         var memberExpr = memberFactory.GetExpression(memberRequest, registry);
-                        bindings.Add(Expression.Bind(serviceInfo.MatchReflected<MemberInfo>(p => p, f => f), memberExpr));
+                        bindings.Add(Expression.Bind(serviceInfo.MatchReflectedInfo<MemberInfo>(p => p, f => f), memberExpr));
                     }
                 }
 

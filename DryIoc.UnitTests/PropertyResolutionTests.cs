@@ -94,18 +94,21 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(ResolutionRules.Default.With(DependencyDiscoveryRules.Empty
                 .WithPropertiesAndFields((type, req, reg) =>
-                     type.GetProperties(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                        .Where(p => p.GetSetMethod() != null).Cast<MemberInfo>().Concat(
-                     type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                        .Where(f => !f.IsInitOnly).Cast<MemberInfo>())
-                    .Select(m =>
+                {
+                    const BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+                    var properties = type.GetProperties(bindingFlags).Where(p => p.GetSetMethod() != null).Select(p =>
                     {
-                        var attributes = m.GetCustomAttributes(typeof(ImportAttribute), false);
-                        if (attributes.Length == 0)
-                            return null;
-                        var import = (ImportAttribute)attributes[0];
-                        return ServiceInfo.Of(m).With(import.ContractType, import.ContractName);
-                    }))));
+                        var import = (ImportAttribute)p.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
+                        return import == null ? null : ServiceInfo.Of(p).With(import.ContractType, import.ContractName);
+                    });
+                    var fields = type.GetFields(bindingFlags).Where(f => !f.IsInitOnly).Select(f =>
+                    {
+                        var import = (ImportAttribute)f.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
+                        return import == null ? null : ServiceInfo.Of(f).With(import.ContractType, import.ContractName);
+                    });
+
+                    return properties.Concat(fields);
+                })));
 
             container.Register<FunnyChicken>();
             container.Register<Guts>();
@@ -175,13 +178,19 @@ namespace DryIoc.UnitTests
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
             
-            return type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Cast<MemberInfo>().Concat(
-                type.GetFields(flags).Where(f => !f.IsInitOnly).Cast<MemberInfo>())
-                .Select(m =>
-                {
-                    var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
-                    return import == null ? null : ServiceInfo.Of(m).With(import.ContractType, import.ContractName);
-                });
+            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Select(m =>
+            {
+                var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
+                return import == null ? null : ServiceInfo.Of(m).With(import.ContractType, import.ContractName);
+            });
+
+            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly)
+            .Select(m =>
+            {
+                var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
+                return import == null ? null : ServiceInfo.Of(m).With(import.ContractType, import.ContractName);
+            });
+            return properties.Concat(fields);
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute

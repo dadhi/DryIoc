@@ -299,31 +299,35 @@ namespace DryIoc.MefAttributedModel
 
         public static ServiceInfo GetImportedParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
         {
-            var customInfo = GetCustomServiceInfo(parameter.ParameterType, parameter.GetCustomAttributes(false), request, registry);
-            return ServiceInfo.Of(parameter).With(customInfo);
+            return ServiceInfo.Of(parameter)
+                .With(GetCustomServiceInfo(parameter.ParameterType, parameter.GetCustomAttributes(false), request, registry));
         }
 
         public static IEnumerable<ServiceInfo> GetImportedOnlyPropertiesAndFields(Type type, Request request, IRegistry registry)
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Cast<MemberInfo>();
-            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly).Cast<MemberInfo>();
-            return properties.Concat(fields).Select(x => GetMemberServiceInfo(x, request, registry));
+
+            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Select(p =>
+            {
+                var customInfo = GetCustomServiceInfo(p.PropertyType, p.GetCustomAttributes(false), request, registry);
+                return customInfo == null ? null : ServiceInfo.Of(p).With(customInfo);
+            });
+
+            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly).Select(f =>
+            {
+                var customInfo = GetCustomServiceInfo(f.FieldType, f.GetCustomAttributes(false), request, registry);
+                return customInfo == null ? null : ServiceInfo.Of(f).With(customInfo);
+            });
+
+            return properties.Concat(fields);
         }
 
-        public static ServiceInfo GetMemberServiceInfo(MemberInfo member, Request request, IRegistry registry)
-        {
-            var serviceType = member is PropertyInfo  ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType;
-            var customInfo = GetCustomServiceInfo(serviceType, member.GetCustomAttributes(false), request, registry);
-            return customInfo == null ? null : ServiceInfo.Of(member).With(customInfo);
-        }
-
-        public static CustomServiceInfo GetCustomServiceInfo(Type reflectedType, object[] attributes, Request request, IRegistry registry)
+        public static CustomServiceInfo GetCustomServiceInfo(Type type, object[] attributes, Request request, IRegistry registry)
         {
             return attributes.Length == 0 ? null
-                : (GetServiceFromImportAttribute(reflectedType, attributes) ??
-                   GetServiceInfoWithMetadataAttribute(reflectedType, attributes, request, registry) ??
-                   GetServiceInfoFromImportExternalAttribute(reflectedType, attributes, registry));
+                : (GetServiceFromImportAttribute(type, attributes) ??
+                   GetServiceInfoWithMetadataAttribute(type, attributes, request, registry) ??
+                   GetServiceInfoFromImportExternalAttribute(type, attributes, registry));
         }
 
         public static CustomServiceInfo GetServiceFromImportAttribute(Type reflectedType, object[] attributes)
