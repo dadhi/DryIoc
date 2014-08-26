@@ -35,7 +35,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Lazy<IService>>(
-                withConstructor: (t, _, __) => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }));
+                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }));
             container.Register<IService, Service>();
 
             var service = container.Resolve<Lazy<IService>>();
@@ -48,7 +48,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Lazy<IService>>(
-                withConstructor: (t, _, __) => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }));
+                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }));
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(named: "named");
 

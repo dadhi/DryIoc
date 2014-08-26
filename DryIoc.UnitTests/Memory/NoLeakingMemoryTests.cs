@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests.Memory
 {
     [TestFixture]
-    [Ignore(@"
+    [Explicit(@"
         Tests are passing, verified on .NET 3.5, 4.0. 
         If tests are passes at least once, then it is enough to prove that Container is GC collected.")]
     public class MemoryLeaksTests

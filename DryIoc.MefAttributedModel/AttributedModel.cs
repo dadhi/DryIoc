@@ -49,10 +49,10 @@ namespace DryIoc.MefAttributedModel
 
         public static ResolutionRules WithAttributedModel(this ResolutionRules rules)
         {
-            return rules
-                .WithConstructorSelector(SelectImportingConstructor) // hello, Max!!! we are Martians.
-                .WithParameterCustomInfoProvider(GetConstructorParameterServiceInfo)
-                .WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute);
+            return rules.With(DependencyDiscoveryRules.Empty
+                .WithConstructor(GetImportingConstructor) // hello, Max!!! we are Martians.
+                .WithParameters(GetImportedParameterServiceInfo)
+                .WithPropertiesAndFields(GetImportedOnlyPropertiesAndFields));
         }
 
         public static Container WithAttributedModel(this Container container)
@@ -274,7 +274,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Tools
 
-        public static ConstructorInfo SelectImportingConstructor(Type implementationType, Request req, IRegistry reg)
+        public static ConstructorInfo GetImportingConstructor(Type implementationType, Request req, IRegistry reg)
         {
             var constructors = implementationType.GetConstructors();
             return constructors.Length == 1 ? constructors[0]
@@ -297,13 +297,13 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        public static ServiceInfo GetConstructorParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
+        public static ServiceInfo GetImportedParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
         {
             var customInfo = GetCustomServiceInfo(parameter.ParameterType, parameter.GetCustomAttributes(false), request, registry);
             return ServiceInfo.Of(parameter).With(customInfo);
         }
 
-        public static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, Request request, IRegistry registry)
+        public static IEnumerable<ServiceInfo> GetImportedOnlyPropertiesAndFields(Type type, Request request, IRegistry registry)
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
             var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Cast<MemberInfo>();
@@ -365,12 +365,12 @@ namespace DryIoc.MefAttributedModel
 
                 var implementationType = import.ImplementationType ?? serviceType;
 
-                var getConstructor = import.WithConstructor != null
-                    ? (ConstructorSelector)((t, _, __) => t.GetConstructor(import.WithConstructor)) : null;
+                var withConstructor = import.WithConstructor == null ? null 
+                    : (Func<Type, ConstructorInfo>)(t => t.GetConstructor(import.WithConstructor));
 
                 registry.Register(serviceType,
-                    implementationType, reuse, getConstructor, ServiceSetup.WithMetadata(import.Metadata),
-                    serviceKey, IfAlreadyRegistered.KeepRegistered);
+                    implementationType, reuse, withConstructor, ServiceSetup.WithMetadata(import.Metadata),
+                    named: serviceKey, ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
             }
 
             return CustomServiceInfo.Of(serviceType, serviceKey);

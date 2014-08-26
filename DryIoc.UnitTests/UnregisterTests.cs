@@ -169,37 +169,6 @@ namespace DryIoc.UnitTests
 
             Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper));
         }
-
-        [Test]
-        public void Unregister_wrapper_after_it_was_resolved_once()
-        {
-            var container = new Container();
-            container.Register<Service>();
-            var lazyService = container.Resolve<Lazy<Service>>();
-            Assert.NotNull(lazyService.Value);
-
-            container.Unregister(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper);
-            container = container.WithResetResolutionCache();
-            
-            Assert.Throws<ContainerException>(() => 
-                container.Resolve<Lazy<Service>>());
-        }
-
-        [Test]
-        [Ignore]// TODO: Tests fails because Service<int> factory is registered after resolve and not unregistered with its generic provider.
-        public void Unregister_open_generic_after_it_was_resolved_once()
-        {
-            var container = new Container();
-            container.Register(typeof(Service<>));
-            var service = container.Resolve<Service<int>>();
-            Assert.NotNull(service);
-
-            container.Unregister(typeof(Service<>));
-            container = container.WithResetResolutionCache();
-
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<Service<int>>());
-        }
     }
 
     public class NullHandlerDecorator : IHandler { }

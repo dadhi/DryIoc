@@ -303,10 +303,10 @@ namespace DryIoc
             var instanceType = instance.ThrowIfNull().GetType();
 
             var selector = selectPropertiesAndFields
-                ?? (ResolutionRules.PropertiesAndFieldsSelector == null
+                ?? (ResolutionRules.DependencyDiscovery.PropertiesAndFieldsSelector == null
                     ? (Func<Type, IEnumerable<ServiceInfo>>)SelectPublicAssignablePropertiesAndFields
-                    : type => ResolutionRules.PropertiesAndFieldsSelector(type,
-                        CreateRequest(type).ResolveWith(new InstanceFactory(instance)), this));
+                    : type => ResolutionRules.DependencyDiscovery.PropertiesAndFieldsSelector(
+                        type, CreateRequest(type).ResolveWith(new InstanceFactory(instance)), this));
 
             foreach (var info in selector(instanceType)) if (info != null)
                 {
@@ -890,7 +890,8 @@ namespace DryIoc
 
             .AddOrUpdate(typeof(Lazy<>),
                 new ReflectionFactory(typeof(Lazy<>),
-                    constructorSelector: (t, req, reg) => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }),
+                    dependencyDiscovery: DependencyDiscoveryRules.Empty.WithConstructor(
+                        t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) })),
                     setup: GenericWrapperSetup.Default))
 
             .AddOrUpdate(typeof(KeyValuePair<,>),
@@ -1123,29 +1124,17 @@ namespace DryIoc
         public static readonly ResolutionRules Empty = new ResolutionRules();
         public static readonly ResolutionRules Default = Empty.With(GenericsSupport.ResolveGenericsAndArrays);
 
+        public DependencyDiscoveryRules DependencyDiscovery { get; private set; }
+        public ResolutionRules With(DependencyDiscoveryRules rules)
+        {
+            return new ResolutionRules(this) { DependencyDiscovery = rules };
+        }
+
         public delegate Factory FactorySelectorRule(IEnumerable<KeyValuePair<object, Factory>> factories);
         public FactorySelectorRule FactorySelector { get; private set; }
-        public ResolutionRules WithFactorySelector(FactorySelectorRule rule)
+        public ResolutionRules With(FactorySelectorRule rule)
         {
             return new ResolutionRules(this) { FactorySelector = rule };
-        }
-
-        public ConstructorSelector ConstructorSelector { get; private set; }
-        public ResolutionRules WithConstructorSelector(ConstructorSelector rule)
-        {
-            return new ResolutionRules(this) { ConstructorSelector = rule };
-        }
-
-        public Func<Type, Request, IRegistry, IEnumerable<ServiceInfo>> PropertiesAndFieldsSelector { get; private set; }
-        public ResolutionRules WithPropertyAndFieldSelector(Func<Type, Request, IRegistry, IEnumerable<ServiceInfo>> rule)
-        {
-            return new ResolutionRules(this) { PropertiesAndFieldsSelector = rule };
-        }
-
-        public Func<ParameterInfo, Request, IRegistry, ServiceInfo> ForConstructorParameterServiceInfo { get; private set; }
-        public ResolutionRules WithParameterCustomInfoProvider(Func<ParameterInfo, Request, IRegistry, ServiceInfo> rule)
-        {
-            return new ResolutionRules(this) { ForConstructorParameterServiceInfo = rule };
         }
 
         public delegate Factory ResolveUnregisteredServiceRule(Request request, IRegistry registry);
@@ -1157,21 +1146,63 @@ namespace DryIoc
 
         #region Implementation
 
-        private ResolutionRules() { }
-
-        private ResolutionRules(ResolutionRules rules)
+        private ResolutionRules()
         {
-            FactorySelector = rules.FactorySelector;
-            ConstructorSelector = rules.ConstructorSelector;
-            ForUnregisteredService = rules.ForUnregisteredService;
-            ForConstructorParameterServiceInfo = rules.ForConstructorParameterServiceInfo;
-            _compilationToDynamicAssemblyEnabled = rules._compilationToDynamicAssemblyEnabled;
+            DependencyDiscovery = DependencyDiscoveryRules.Empty;
+        }
+
+        private ResolutionRules(ResolutionRules copy)
+        {
+            DependencyDiscovery = copy.DependencyDiscovery ?? DependencyDiscoveryRules.Empty;
+            FactorySelector = copy.FactorySelector;
+            ForUnregisteredService = copy.ForUnregisteredService;
+            _compilationToDynamicAssemblyEnabled = copy._compilationToDynamicAssemblyEnabled;
         }
 
         private bool _compilationToDynamicAssemblyEnabled; // used by .NET 4 and higher versions.
 
         #endregion
+    }
 
+    public class DependencyDiscoveryRules
+    {
+        public static readonly DependencyDiscoveryRules Empty = new DependencyDiscoveryRules();
+
+        public ConstructorSelector ConstructorSelector { get; private set; }
+        public DependencyDiscoveryRules WithConstructor(ConstructorSelector rule)
+        {
+            return new DependencyDiscoveryRules(this) { ConstructorSelector = rule };
+        }
+
+        public DependencyDiscoveryRules WithConstructor(Func<Type, ConstructorInfo> simpleRule)
+        {
+            return new DependencyDiscoveryRules(this) { ConstructorSelector = (type, req, reg) => simpleRule(type) };
+        }
+
+        public ConstructorParameterServiceInfoProvider ConstructorParameterServiceInfoProvider { get; private set; }
+        public DependencyDiscoveryRules WithParameters(ConstructorParameterServiceInfoProvider rule)
+        {
+            return new DependencyDiscoveryRules(this) { ConstructorParameterServiceInfoProvider = rule };
+        }
+
+        public PropertyOrFieldSelector PropertiesAndFieldsSelector { get; private set; }
+        public DependencyDiscoveryRules WithPropertiesAndFields(PropertyOrFieldSelector rule)
+        {
+            return new DependencyDiscoveryRules(this) { PropertiesAndFieldsSelector = rule };
+        }
+
+        #region Implementation
+
+        private DependencyDiscoveryRules() { }
+
+        private DependencyDiscoveryRules(DependencyDiscoveryRules copy)
+        {
+            ConstructorSelector = copy.ConstructorSelector;
+            ConstructorParameterServiceInfoProvider = copy.ConstructorParameterServiceInfoProvider;
+            PropertiesAndFieldsSelector = copy.PropertiesAndFieldsSelector;
+        }
+
+        #endregion
     }
 
     public static class Error
@@ -1331,29 +1362,35 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType,
-            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+            Type implementationType, IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
+            FactorySetup setup = null, DependencyDiscoveryRules dependencyDiscovery = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            var factory = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
+            if (withConstructor != null)
+                dependencyDiscovery = (dependencyDiscovery ?? DependencyDiscoveryRules.Empty).WithConstructor(withConstructor);
+            var factory = new ReflectionFactory(implementationType, reuse, dependencyDiscovery, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
-        /// Registers service of <paramref name="implementationType"/>. ServiceType will be the same as <paramref name="implementationType"/>.
+        /// Registers service of <paramref name="implementationAndServiceType"/>. ServiceType will be the same as <paramref name="implementationAndServiceType"/>.
         /// </summary>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
+        /// <param name="implementationAndServiceType">Implementation type. Concrete and open-generic class are supported.</param>
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+            Type implementationAndServiceType, IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
+            FactorySetup setup = null, DependencyDiscoveryRules dependencyDiscovery = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            var factory = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
-            registrator.Register(factory, implementationType, named, ifAlreadyRegistered);
+            if (withConstructor != null)
+                dependencyDiscovery = (dependencyDiscovery ?? DependencyDiscoveryRules.Empty).WithConstructor(withConstructor);
+            var factory = new ReflectionFactory(implementationAndServiceType, reuse, dependencyDiscovery, setup);
+            registrator.Register(factory, implementationAndServiceType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1368,30 +1405,36 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
+            FactorySetup setup = null, DependencyDiscoveryRules dependencyDiscovery = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
             where TImplementation : TService
         {
-            var factory = new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup);
+            if (withConstructor != null)
+                dependencyDiscovery = (dependencyDiscovery ?? DependencyDiscoveryRules.Empty).WithConstructor(withConstructor);
+            var factory = new ReflectionFactory(typeof(TImplementation), reuse, dependencyDiscovery, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
 
         /// <summary>
-        /// Registers implementation type <typeparamref name="TImplementation"/> with itself as service type.
+        /// Registers implementation type <typeparamref name="TServiceAndImplementation"/> with itself as service type.
         /// </summary>
-        /// <typeparam name="TImplementation">The type of service.</typeparam>
+        /// <typeparam name="TServiceAndImplementation">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
-        public static void Register<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+        public static void Register<TServiceAndImplementation>(this IRegistrator registrator,
+            IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
+            FactorySetup setup = null, DependencyDiscoveryRules dependencyDiscovery = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            var factory = new ReflectionFactory(typeof(TImplementation), reuse, withConstructor, setup);
-            registrator.Register(factory, typeof(TImplementation), named, ifAlreadyRegistered);
+            if (withConstructor != null)
+                dependencyDiscovery = (dependencyDiscovery ?? DependencyDiscoveryRules.Empty).WithConstructor(withConstructor);
+            var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, dependencyDiscovery, setup);
+            registrator.Register(factory, typeof(TServiceAndImplementation), named, ifAlreadyRegistered);
         }
 
         // TODO: Move to ResolutionRules.
@@ -1409,10 +1452,13 @@ namespace DryIoc
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterManyServicesWithOneImplementation(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
-            Func<Type, bool> types = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            Type implementationType, IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
+            FactorySetup setup = null, DependencyDiscoveryRules dependencyDiscovery = null, Func<Type, bool> types = null, 
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            var factory = new ReflectionFactory(implementationType, reuse, withConstructor, setup);
+            if (withConstructor != null)
+                dependencyDiscovery = (dependencyDiscovery ?? DependencyDiscoveryRules.Empty).WithConstructor(withConstructor);
+            var factory = new ReflectionFactory(implementationType, reuse, dependencyDiscovery, setup);
 
             var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeItself.AsFirst);
             var implementedServiceTypes = implementedTypes.Where(types ?? RegisterAllDefaultTypes);
@@ -1443,13 +1489,16 @@ namespace DryIoc
         /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">Optional strategy to select constructor when multiple available.</param>
         /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
+        /// <param name="types">Optional condition to include selected types only. Default value is <see cref="RegisterAllDefaultTypes"/></param>
         /// <param name="named">Optional service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">Optional policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterManyServicesWithOneImplementation<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, ConstructorSelector withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
+            FactorySetup setup = null, DependencyDiscoveryRules dependencyDiscovery = null, Func<Type, bool> types = null, 
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            registrator.RegisterManyServicesWithOneImplementation(typeof(TImplementation), reuse, withConstructor, setup, null, named, ifAlreadyRegistered);
+            registrator.RegisterManyServicesWithOneImplementation(typeof(TImplementation), 
+                reuse, withConstructor, setup, dependencyDiscovery, types, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1780,82 +1829,96 @@ namespace DryIoc
     //    #endregion
     //}
 
-    public sealed class CustomServiceInfo
+    //public class CustomServiceInfo
+    //{
+    //    public static readonly CustomServiceInfo Empty = new CustomServiceInfo();
+
+    //    public static CustomServiceInfo Of(Type serviceType = null, object serviceKey = null, IfUnresolved? ifUnresolved = null)
+    //    {
+    //        return serviceType == null && serviceKey == null && ifUnresolved == null ? Empty
+    //            : new CustomServiceInfo(
+    //                serviceType.ThrowIf(serviceType != null && serviceType.ContainsGenericParameters,
+    //                    Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType),
+    //                serviceKey, ifUnresolved);
+    //    }
+
+    //    public CustomServiceInfo MergeWith(CustomServiceInfo other)
+    //    {
+    //        return this == Empty ? other
+    //            : new CustomServiceInfo(
+    //                ServiceType ?? other.ServiceType,
+    //                ServiceKey ?? other.ServiceKey,
+    //                IfUnresolved ?? IfUnresolved);
+    //    }
+
+    //    public readonly object ServiceKey;
+    //    public readonly IfUnresolved? IfUnresolved;
+    //    public readonly Type ServiceType;
+
+    //    #region Implementation
+
+    //    private CustomServiceInfo() {}
+
+    //    private CustomServiceInfo(Type serviceType, object serviceKey, IfUnresolved? ifUnresolved)
+    //    {
+    //        ServiceType = serviceType;
+    //        ServiceKey = serviceKey;
+    //        IfUnresolved = ifUnresolved;
+    //    }
+
+    //    #endregion
+    //}
+
+    public class CustomServiceInfo
     {
         public static readonly CustomServiceInfo Empty = new CustomServiceInfo();
 
-        public static CustomServiceInfo Of(Type serviceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        public static CustomServiceInfo Of(Type serviceType = null, object serviceKey = null, IfUnresolved? ifUnresolved = null)
         {
-            return serviceType == null && serviceKey == null && ifUnresolved == IfUnresolved.Throw
-                ? Empty : new CustomServiceInfo(
-                    serviceType.ThrowIf(serviceType != null && serviceType.ContainsGenericParameters,
-                        Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType),
-                    serviceKey, ifUnresolved);
+            return serviceType == null && serviceKey == null && ifUnresolved == null ? Empty
+                : serviceType != null || ifUnresolved != null ? new Full(serviceKey, ThrowIfOpenGeneric(serviceType), ifUnresolved)
+                : new CustomServiceInfo(serviceKey);
         }
 
-        public readonly Type ServiceType;
+        public CustomServiceInfo MergeWith(CustomServiceInfo other)
+        {
+            return this == Empty ? other : Of(ServiceType ?? other.ServiceType, ServiceKey ?? other.ServiceKey, IfUnresolved ?? IfUnresolved);
+        }
+
         public readonly object ServiceKey;
-        public readonly IfUnresolved IfUnresolved;
-
-        private CustomServiceInfo() { }
-
-        private CustomServiceInfo(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
-        {
-            ServiceType = serviceType;
-            ServiceKey = serviceKey;
-            IfUnresolved = ifUnresolved;
-        }
-    }
-
-    public class ServiceInfoUsedInRequest
-    {
-        public static ServiceInfoUsedInRequest Of(Type serviceType)
-        {
-            return new ServiceInfoUsedInRequest(serviceType.ThrowIfNull()
-                .ThrowIf(serviceType.ContainsGenericParameters, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType));
-        }
-
-        public virtual Type ServiceType { get { return _serviceType; } }
-        public virtual object ServiceKey { get { return null; } }
-        public virtual IfUnresolved IfUnresolved { get { return IfUnresolved.Throw; } }
-        public virtual Type UserSpecifiedUnwrappedServiceType { get { return null; } }
-
-        private ServiceInfoUsedInRequest(Type serviceType)
-        {
-            _serviceType = serviceType;
-        }
+        public virtual Type ServiceType { get { return null; } }
+        public virtual IfUnresolved? IfUnresolved { get { return null; } }
 
         #region Implementation
 
-        private readonly Type _serviceType;
-
-        private class WithKey : ServiceInfoUsedInRequest
+        private CustomServiceInfo(object serviceKey = null)
         {
-            public override object ServiceKey
-            {
-                get { return _serviceKey; }
-            }
-
-            public WithKey(Type serviceType, object serviceKey) : base(serviceType)
-            {
-                _serviceKey = serviceKey;
-            }
-
-            private readonly object _serviceKey;
+            ServiceKey = serviceKey;
         }
 
-        private class WithKeyIfUnresolvedReturnNull : WithKey
+        private class Full : CustomServiceInfo
         {
-            public override IfUnresolved IfUnresolved
+            public override IfUnresolved? IfUnresolved { get { return _ifUnresolved; } }
+            public override Type ServiceType { get { return _serviceType; } }
+
+            public Full(object serviceKey = null, Type serviceType = null, IfUnresolved? ifUnresolved = null)
+                : base(serviceKey)
             {
-                get { return IfUnresolved.ReturnNull; }
+                _ifUnresolved = ifUnresolved;
+                _serviceType = serviceType;
             }
 
-            public WithKeyIfUnresolvedReturnNull(Type serviceType, object serviceKey) : base(serviceType, serviceKey) {}
+            private readonly IfUnresolved? _ifUnresolved;
+            private readonly Type _serviceType;
+        }
+
+        private static Type ThrowIfOpenGeneric(Type serviceType)
+        {
+            return serviceType.ThrowIf(serviceType != null && serviceType.ContainsGenericParameters,
+                 Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
         }
 
         #endregion
-
     }
 
     public abstract class ServiceInfo
@@ -1878,26 +1941,18 @@ namespace DryIoc
 
         public ServiceInfo With(CustomServiceInfo customInfo)
         {
-            return customInfo == null || customInfo == CustomServiceInfo.Empty
-                ? this
-                : With(customInfo.ServiceType, customInfo.ServiceKey, customInfo.IfUnresolved);
+            return customInfo == null || customInfo == CustomServiceInfo.Empty ? this
+                : new Custom(this, CustomInfo.MergeWith(customInfo));
         }
 
-        public ServiceInfo With(Type customServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        public ServiceInfo With(Type customServiceType = null, object serviceKey = null, IfUnresolved? ifUnresolved = null)
         {
-            return customServiceType == CustomServiceType
-                && serviceKey == ServiceKey
-                && ifUnresolved == IfUnresolved
-                ? this
-                : new Custom(this, CustomInfo == CustomServiceInfo.Empty
-                    ? CustomServiceInfo.Of(customServiceType, serviceKey, ifUnresolved)
-                    : CustomServiceInfo.Of(customServiceType ?? CustomServiceType, serviceKey ?? ServiceKey,
-                        ifUnresolved == IfUnresolved.ReturnNull ? ifUnresolved : IfUnresolved));
+            return With(CustomServiceInfo.Of(customServiceType, serviceKey, ifUnresolved));
         }
 
         public abstract Type ServiceType { get; }
         public virtual object ServiceKey { get { return CustomInfo.ServiceKey; } }
-        public virtual IfUnresolved IfUnresolved { get { return CustomInfo.IfUnresolved; } }
+        public virtual IfUnresolved IfUnresolved { get { return CustomInfo.IfUnresolved ?? IfUnresolved.Throw; } }
         public virtual Type CustomServiceType { get { return CustomInfo.ServiceType; } }
         public virtual CustomServiceInfo CustomInfo { get { return CustomServiceInfo.Empty; } }
 
@@ -2435,6 +2490,8 @@ namespace DryIoc
     }
 
     public delegate ConstructorInfo ConstructorSelector(Type implementationType, Request request, IRegistry registry);
+    public delegate ServiceInfo ConstructorParameterServiceInfoProvider(ParameterInfo parameter, Request request, IRegistry registry);
+    public delegate IEnumerable<ServiceInfo> PropertyOrFieldSelector(Type implementationType, Request request, IRegistry registry);
 
     public sealed class ReflectionFactory : Factory
     {
@@ -2490,7 +2547,10 @@ namespace DryIoc
 
         public ServiceInfo GetCtorParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
         {
-            var getServiceInfo = _getCtorParameterServiceInfo ?? registry.ResolutionRules.ForConstructorParameterServiceInfo;
+            var getServiceInfo = _dependencyDiscovery.ConstructorParameterServiceInfoProvider
+                ?? registry.ResolutionRules.DependencyDiscovery.ConstructorParameterServiceInfoProvider;
+
+            // Always provides default info for parameter.
             return getServiceInfo == null ? ServiceInfo.Of(parameter)
                  : getServiceInfo(parameter, request, registry) ?? ServiceInfo.Of(parameter);
         }
@@ -2508,12 +2568,12 @@ namespace DryIoc
         }
 
         public ReflectionFactory(Type implementationType,
-            IReuse reuse = null, ConstructorSelector constructorSelector = null, FactorySetup setup = null)
+            IReuse reuse = null, DependencyDiscoveryRules dependencyDiscovery = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
             _implementationType = implementationType.ThrowIfNull()
                 .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
-            _constructorSelector = constructorSelector;
+            _dependencyDiscovery = dependencyDiscovery ?? DependencyDiscoveryRules.Empty;
         }
 
         /// <remarks>Before registering factory checks that ImplementationType is assignable Or
@@ -2554,8 +2614,9 @@ namespace DryIoc
                     throw Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE.Of(implType, serviceType);
             }
 
-            if (_constructorSelector == null &&
-                registry.ResolutionRules.ConstructorSelector == null)
+
+            if (_dependencyDiscovery.ConstructorSelector == null &&
+                registry.ResolutionRules.DependencyDiscovery.ConstructorSelector == null)
             {
                 var publicCtorCount = implType.GetConstructors().Length;
                 if (publicCtorCount != 1)
@@ -2571,7 +2632,7 @@ namespace DryIoc
 
             var closedImplType = _implementationType.MakeGenericType(closedTypeArgs);
 
-            return new ReflectionFactory(closedImplType, Reuse, _constructorSelector, Setup);
+            return new ReflectionFactory(closedImplType, Reuse, _dependencyDiscovery, Setup);
         }
 
         public override Expression CreateExpression(Request request, IRegistry registry)
@@ -2655,17 +2716,15 @@ namespace DryIoc
         #region Implementation
 
         private readonly Type _implementationType;
-        private readonly ConstructorSelector _constructorSelector;
-        private readonly Func<ParameterInfo, Request, IRegistry, ServiceInfo> _getCtorParameterServiceInfo;
-        private readonly Func<Type, Request, IRegistry, IEnumerable<ServiceInfo>> _propertiesAndFieldSelector;
+        private readonly DependencyDiscoveryRules _dependencyDiscovery;
 
         private ConstructorInfo SelectConstructor(Request request, IRegistry registry)
         {
             var implType = _implementationType;
-            var selector = _constructorSelector ?? registry.ResolutionRules.ConstructorSelector;
+            var selector = _dependencyDiscovery.ConstructorSelector
+                ?? registry.ResolutionRules.DependencyDiscovery.ConstructorSelector;
             if (selector != null)
-                return selector(implType, request, registry)
-                    .ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_USING_SELECTOR, implType);
+                return selector(implType, request, registry).ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_USING_SELECTOR, implType);
 
             var ctors = implType.GetConstructors();
             Throw.If(ctors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implType);
@@ -2696,7 +2755,8 @@ namespace DryIoc
 
         private IEnumerable<ServiceInfo> SelectPropertiesAndFields(Request request, IRegistry registry)
         {
-            var selector = _propertiesAndFieldSelector ?? registry.ResolutionRules.PropertiesAndFieldsSelector;
+            var selector = _dependencyDiscovery.PropertiesAndFieldsSelector
+                ?? registry.ResolutionRules.DependencyDiscovery.PropertiesAndFieldsSelector;
             return selector == null ? null : selector(_implementationType, request, registry);
         }
 

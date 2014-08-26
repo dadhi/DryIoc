@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
 namespace DryIoc.Samples
 {
@@ -39,7 +38,8 @@ namespace DryIoc.Samples
             var container = new Container();
             container.Register<IDependency, SomeDependency>();
 
-            container.Register<SomeClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
+            container.Register<SomeClient>(dependencyDiscovery: DependencyDiscoveryRules.Empty.WithConstructor(
+                ReflectionFactory.SelectConstructorWithAllResolvableArguments));
 
             var client = container.Resolve<SomeClient>();
             Assert.That(client.Dependency, Is.Not.Null);

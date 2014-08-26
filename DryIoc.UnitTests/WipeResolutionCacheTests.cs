@@ -1,5 +1,6 @@
-﻿using DryIoc.UnitTests.CUT;
+﻿using System;
 using NUnit.Framework;
+using DryIoc.UnitTests.CUT;
 
 namespace DryIoc.UnitTests
 {
@@ -33,6 +34,37 @@ namespace DryIoc.UnitTests
             container.Register<IDependency, Foo1>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateRegistered);
             service = container.Resolve<ServiceWithDependency>();
             Assert.That(service.Dependency, Is.InstanceOf<Foo1>());
+        }
+
+        [Test]
+        public void Unregister_wrapper_after_it_was_resolved_once()
+        {
+            var container = new Container();
+            container.Register<Service>();
+            var lazyService = container.Resolve<Lazy<Service>>();
+            Assert.NotNull(lazyService.Value);
+
+            container.Unregister(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper);
+            container = container.WithResetResolutionCache();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<Lazy<Service>>());
+        }
+
+        [Test]
+        [Ignore]// TODO: Tests fails because Service<int> factory is registered after resolve and not unregistered with its generic provider.
+        public void Unregister_open_generic_after_it_was_resolved_once()
+        {
+            var container = new Container();
+            container.Register(typeof(Service<>));
+            var service = container.Resolve<Service<int>>();
+            Assert.NotNull(service);
+
+            container.Unregister(typeof(Service<>));
+            container = container.WithResetResolutionCache();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<Service<int>>());
         }
     }
 }
