@@ -9,7 +9,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
     public class ImportAttributeTests
     {
         [Test]
-        public void Inject_service_as_parameter_of_service_implemented_type_using_Import_ContractType()
+        public void Inject_service_as_parameter_of_required_service_type_specified_by_Import_ContractType()
         {
             var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(Client), typeof(Service));
@@ -99,10 +99,23 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Resolving_unregistred_property_should_not_throw_so_the_property_stays_null()
+        public void Resolving_unregistered_property_marked_by_Import_should_throw()
         {
             var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(Service));
+
+            var client = new PropertyClient2();
+            Assert.Throws<ContainerException>(() => 
+                container.ResolvePropertiesAndFields(client));
+
+            Assert.That(client.Some, Is.Null);
+        }
+
+        [Test]
+        public void Resolving_unregistered_property_without_attribute_model_should_not_throw_so_the_property_stays_null()
+        {
+            var container = new Container();
+            container.Register(typeof(Service));
 
             var client = new PropertyClient2();
             container.ResolvePropertiesAndFields(client);

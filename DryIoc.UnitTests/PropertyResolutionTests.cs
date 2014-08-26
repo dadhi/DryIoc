@@ -103,8 +103,8 @@ namespace DryIoc.UnitTests
                         var attributes = m.GetCustomAttributes(typeof(ImportAttribute), false);
                         if (attributes.Length == 0)
                             return null;
-                        var importAttr = (ImportAttribute)attributes[0];
-                        return ServiceInfo.Of(m).ApplyCustom(importAttr.ContractType, importAttr.ContractName);
+                        var import = (ImportAttribute)attributes[0];
+                        return ServiceInfo.Of(m).With(import.ContractType, import.ContractName);
                     })));
 
             container.Register<FunnyChicken>();
@@ -171,15 +171,13 @@ namespace DryIoc.UnitTests
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
             
-            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null);
-            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly);
-            var members = properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>());
-            
-            return members.Select(m =>
-            {
-                var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
-                return import == null ? null : ServiceInfo.Of(m).ApplyCustom(import.ContractType, import.ContractName);
-            });
+            return type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Cast<MemberInfo>().Concat(
+                type.GetFields(flags).Where(f => !f.IsInitOnly).Cast<MemberInfo>())
+                .Select(m =>
+                {
+                    var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
+                    return import == null ? null : ServiceInfo.Of(m).With(import.ContractType, import.ContractName);
+                });
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute

@@ -2,6 +2,7 @@
 
 namespace DryIoc.Playground
 {
+    [TestFixture, Explicit]
     public class TwoThreeTreeTests
     {
         [Test]
@@ -92,6 +93,41 @@ namespace DryIoc.Playground
         }
 
         public V GetValueOrDefault(K key, V defaultValue = default(V))
+        {
+            //if (Root == null) return defaultValue;
+            var node = Root;
+            var hash = key.GetHashCode();
+            while (node.Type != NodeType.OneItemLeaf)
+            {
+                switch (node.Type)
+                {
+                    case NodeType.TwoItemsLeaf:
+                        var x = (TwoItemsLeaf)node;
+                        node = hash == x.LeftItem.Hash ? x.LeftItem : x.RightItem;
+                        break;
+
+                    case NodeType.OneItemTree:
+                        var y = (OneItemTree)node;
+                        node = hash == y.Item.Hash ? y.Item : hash < y.Item.Hash ? y.Left : y.Right;
+                        break;
+
+                    case NodeType.TwoItemsTree:
+                        var z = (TwoItemsTree)node;
+                        node = hash == z.LeftItem.Hash ? z.LeftItem
+                             : hash == z.RightItem.Hash ? z.RightItem
+                             : hash < z.LeftItem.Hash ? z.Left
+                             : hash > z.RightItem.Hash ? z.Right
+                             : z.Middle;
+                        break;
+                }
+            }
+            
+            var item = (OneItemLeaf)node;
+            return hash == item.Hash && (ReferenceEquals(key, item.Key) || key.Equals(item.Key))
+                ? item.Value : item.GetConflictedValueOrDefault(key, defaultValue);
+        }
+
+        public V GetValueOrDefault_OLD(K key, V defaultValue = default(V))
         {
             if (Root == null) return defaultValue;
             var node = Root;

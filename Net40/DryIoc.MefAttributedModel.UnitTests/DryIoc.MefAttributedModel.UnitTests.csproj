@@ -57,8 +57,11 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportFactoryTests.cs">
       <Link>ExportFactoryTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportOnceTests.cs">
-      <Link>ExportOnceTests.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportAttributeTests.cs">
+      <Link>ImportAttributeTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportExternalTests.cs">
+      <Link>ImportExternalTests.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportWithMetadataTests.cs">
       <Link>ImportWithMetadataTests.cs</Link>

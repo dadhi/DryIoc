@@ -13,10 +13,10 @@ namespace DryIoc.SpeedTestApp
 		static void Main()
 		{
             //Thread.CurrentThread.Priority = ThreadPriority.Highest;
-		    CompareIlEmitDynamicMethodVsExpressionCompileSpeed();
+            //CompareIlEmitDynamicMethodVsExpressionCompileSpeed();
             //CompareBitOpVsIsOpSpeed();
             //CompareDirectVsIndirectArrayAccessSpeed();
-            //CompareTreeGet();
+            CompareTreeGet();
             //CompareClosureFieldAccess();
             //DoCompareTryGetVsGetOrDefault();
 		    //CompareHashTreeEnumeration();
@@ -27,13 +27,14 @@ namespace DryIoc.SpeedTestApp
 
         private static void CompareTreeGet()
         {
+            GetHashTreeVs23Tree(20);
+            Console.WriteLine();
+            GetHashTreeVs23Tree(2000);
             //GetDictVsHashTrieOfInt(25);
             //GetHashTreeVsHashTrie(itemCount: 20);
             //GetDictVsHashTrie2OfInt(25);
             //GetHashTreeVsHashTrie2OfInt(25);
-            GetHashTreeVsIndexedStore(25);
-            Console.WriteLine();
-            GetHashTreeVsIndexedStore(2005);
+            //GetHashTreeVsIndexedStore(25);
         }
 
         private static void CompareDirectVsIndirectArrayAccessSpeed()
@@ -145,6 +146,34 @@ namespace DryIoc.SpeedTestApp
             GC.KeepAlive(result);
 	    }
 
+        public static void GetHashTreeVs23Tree(int itemCount)
+        {
+            var key = typeof(IntTreeTests.DictVsMap);
+            var value = "hey";
+
+            var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
+
+            var tree = HashTree<Type, string>.Empty;
+            var tree23 = TwoThreeTree<Type, string>.Empty;
+
+            var treeAddTime = TreeAdd(ref tree, keys, key, value);
+            var trieAddTime = Tree23Add(ref tree23, keys, key, value);
+
+            Console.WriteLine("Adding {0} items (ms):", itemCount);
+            Console.WriteLine("Tree - " + treeAddTime);
+            Console.WriteLine("2-3 - " + trieAddTime);
+            Console.WriteLine();
+
+            var getTimes = 1 * 1000 * 1000;
+
+            var treeGetTime = TreeGet(tree, key, getTimes);
+            var tree23GetTime = Tree23Get(tree23, key, getTimes);
+
+            Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
+            Console.WriteLine("Tree - " + treeGetTime);
+            Console.WriteLine("2-3 - " + tree23GetTime);
+        }
+
         public static void GetHashTreeVsHashTrie(int itemCount)
         {
             var key = typeof(IntTreeTests.DictVsMap);
@@ -152,7 +181,7 @@ namespace DryIoc.SpeedTestApp
 
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
-            var tree = Playground.HashTree<Type, string>.Empty;
+            var tree = HashTree<Type, string>.Empty;
             var trie = HashTrie<Type, string>.Empty;
 
             var treeAddTime = TreeAdd(ref tree, keys, key, value);
@@ -181,10 +210,10 @@ namespace DryIoc.SpeedTestApp
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
             var avlTree = Playground.HashTree<Type, string>.Empty;
-            var hashTree = Playground.HashTree<Type, string>.Empty;
+            var hashTree = HashTree<Type, string>.Empty;
 
-            var avlTreeAddTime = TreeAdd(ref avlTree, keys, key, value);
-            var hashTreeAddTime = HashTree4Add(ref hashTree, keys, key, value);
+            var avlTreeAddTime = HashTree4Add(ref avlTree, keys, key, value);
+            var hashTreeAddTime = TreeAdd(ref hashTree, keys, key, value);
 
             Console.WriteLine("Adding {0} items (ms):", itemCount);
             Console.WriteLine("AvlTree - " + avlTreeAddTime);
@@ -193,8 +222,8 @@ namespace DryIoc.SpeedTestApp
 
             var getTimes = 1 * 1000 * 1000;
 
-            var avlTreeGetTime = TreeGet(avlTree, key, getTimes);
-            var hashTreeGetTime = HashTree4Get(hashTree, key, getTimes);
+            var avlTreeGetTime = HashTree4Get(avlTree, key, getTimes);
+            var hashTreeGetTime = TreeGet(hashTree, key, getTimes);
 
             Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
             Console.WriteLine("AvlTree - " + avlTreeGetTime);
@@ -737,7 +766,26 @@ namespace DryIoc.SpeedTestApp
             return treeTime.ElapsedMilliseconds;
         }
 
-        private static long TreeAdd<V>(ref Playground.HashTree<Type, V> tree, Type[] keys, Type key, V value)
+        private static long TreeAdd<V>(ref HashTree<Type, V> tree, Type[] keys, Type key, V value)
+        {
+            var ignored = default(V);
+            var treeTime = Stopwatch.StartNew();
+
+            for (var i = 0; i < keys.Length; i++)
+            {
+                var k = keys[i];
+                Interlocked.Exchange(ref tree, tree.AddOrUpdate(k, ignored));
+            }
+
+            Interlocked.Exchange(ref tree, tree.AddOrUpdate(key, value));
+
+            treeTime.Stop();
+            GC.KeepAlive(ignored);
+            GC.Collect();
+            return treeTime.ElapsedMilliseconds;
+        }
+
+        private static long Tree23Add<V>(ref TwoThreeTree<Type, V> tree, Type[] keys, Type key, V value)
         {
             var ignored = default(V);
             var treeTime = Stopwatch.StartNew();
@@ -830,7 +878,24 @@ namespace DryIoc.SpeedTestApp
             return treeWatch.ElapsedMilliseconds;
         }
 
-        private static long TreeGet<T>(Playground.HashTree<Type, T> tree, Type key, int times)
+        private static long TreeGet<T>(HashTree<Type, T> tree, Type key, int times)
+        {
+            T ignored = default(T);
+
+            var treeWatch = Stopwatch.StartNew();
+
+            for (int i = 0; i < times; i++)
+            {
+                ignored = tree.GetValueOrDefault(key);
+            }
+
+            treeWatch.Stop();
+            GC.KeepAlive(ignored);
+            GC.Collect();
+            return treeWatch.ElapsedMilliseconds;
+        }
+
+        private static long Tree23Get<T>(TwoThreeTree<Type, T> tree, Type key, int times)
         {
             T ignored = default(T);
 

@@ -2,8 +2,13 @@
 setlocal
 
 echo:
-echo:Clean, build, pack nuget packages..
-echo:-----------------------------------
+echo:Clean, build, run tests, etc. . .
+echo:---------------------------------
+
+set SCRIPT_DIR="%~dp0"
+echo:
+echo:Switching to %SCRIPT_DIR% . . .
+cd /d %SCRIPT_DIR%  
 
 call Clean -nopause
 call :Check
@@ -19,14 +24,15 @@ call :Check
 
 echo:------------
 echo:All Success.
-echo:
 
 if not "%1"=="-nopause" pause 
 goto:eof
 
 :Check
 if ERRORLEVEL 1 (
-echo:Failed with ERRORLEVEL==%ERRORLEVEL%!
-if not "%1"=="-nopause" pause
-exit
-) else exit /b
+	echo:
+	echo:ERROR: One of steps is failed with ERRORLEVEL==%ERRORLEVEL%!
+	exit 1
+) else ( 
+	exit /b
+)

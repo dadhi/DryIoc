@@ -1,11 +1,10 @@
 @echo off
 
-set SLN="DryIoc.sln"
-set OUTDIR="..\bin\Release"
+set SLN="..\DryIoc.sln"
+set PROJECT_OUTDIR_SETTING="..\bin\Release"
 
 echo:
-echo:Building %SLN% into %OUTDIR% ..
-echo:
+echo:Building %SLN% into %PROJECT_OUTDIR_SETTING% . . .
 
 rem MSBuild 32-bit operating systems:
 rem HKLM\SOFTWARE\Microsoft\MSBuild\ToolsVersions\12.0
@@ -15,9 +14,8 @@ if exist "%%T" (
 
 echo:
 echo:Using MSBuild from "%%T"
-echo:
 
-"%%T\MSBuild.exe" %SLN% /t:Rebuild /p:OutDir=%OUTDIR% /p:Configuration=Release /p:RestorePackages=false /m /p:BuildInParallel=true
+"%%T\MSBuild.exe" %SLN% /t:Rebuild /p:OutDir=%PROJECT_OUTDIR_SETTING% /p:Configuration=Release /p:RestorePackages=false /m /p:BuildInParallel=true
 ))
 
 if not "%1"=="-nopause" pause
