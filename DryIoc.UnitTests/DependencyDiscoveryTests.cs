@@ -13,7 +13,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<SomeBlah>(dependencyDiscovery: DependencyDiscoveryRules.Empty.WithPropertiesAndFields(
-                (type, request, registry) => type.GetProperties().Select(ServiceInfo.Of)));
+                (type, request, registry) => type.GetProperties().Select(PropertyOrFieldServiceInfo.Of)));
             container.Register<IService, Service>();
 
             var blah = container.Resolve<SomeBlah>();
@@ -26,8 +26,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<SomeBlah>(dependencyDiscovery: DependencyDiscoveryRules.Empty.WithPropertiesAndFields(
-                (type, request, registry) => type.GetProperties().Select(p => 
-                    p.Name.Equals("Uses") ? ServiceInfo.Of(p).With(typeof(Service)) : null)));
+                (type, request, registry) => type.GetProperties().Select(p =>
+                    p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).With(ServiceInfoDetails.Of(typeof(Service)), request, registry) : null)));
             container.Register<Service>();
 
             var blah = container.Resolve<SomeBlah>();

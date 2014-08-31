@@ -33,13 +33,11 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="NSubstitute, Version=1.7.2.0, Culture=neutral, PublicKeyToken=92dd2e9066daa5ca, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\NSubstitute.1.7.2.0\lib\NET35\NSubstitute.dll</HintPath>
+    <Reference Include="NSubstitute">
+      <HintPath>..\..\packages\NSubstitute.1.7.2.0\lib\NET35\NSubstitute.dll</HintPath>
     </Reference>
-    <Reference Include="nunit.framework, Version=2.6.3.13283, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
+    <Reference Include="nunit.framework">
+      <HintPath>..\..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -57,12 +55,12 @@
     <Compile Include="SelectConstructorWithAllResolvableArguments.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
+    <ProjectReference Include="..\..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
       <Project>{13516F3C-E48D-43DC-89D4-5FE00DE3C7D2}</Project>
       <Name>DryIoc.MefAttributedModel</Name>
       <Private>False</Private>
     </ProjectReference>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
+    <ProjectReference Include="..\..\DryIoc\DryIoc.csproj">
       <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
       <Name>DryIoc</Name>
       <Private>False</Private>

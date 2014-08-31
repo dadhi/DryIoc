@@ -110,7 +110,7 @@ namespace DryIoc.UnitTests
         public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same()
         {
             var container = new Container();
-            container.Register<Service>(CustomReuse.InThreadScope);
+            container.Register<Service>(ReuseIt.InThread);
 
             var one = container.Resolve<Service>();
             var another = container.Resolve<Service>();
@@ -123,7 +123,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ServiceWithDependency>();
-            container.Register<IDependency, Dependency>(CustomReuse.InThreadScope);
+            container.Register<IDependency, Dependency>(ReuseIt.InThread);
 
             var one = container.Resolve<ServiceWithDependency>();
             var another = container.Resolve<ServiceWithDependency>();
@@ -134,7 +134,7 @@ namespace DryIoc.UnitTests
         public void Given_Thread_reuse_Services_resolved_in_different_thread_should_be_the_different()
         {
             var container = new Container();
-            container.Register<Service>(CustomReuse.InThreadScope);
+            container.Register<Service>(ReuseIt.InThread);
 
             Service one = null;
             var threadOne = new Thread(() => one = container.Resolve<Service>()) { IsBackground = true };
@@ -151,7 +151,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ServiceWithDependency>();
-            container.Register<IDependency, Dependency>(CustomReuse.InThreadScope);
+            container.Register<IDependency, Dependency>(ReuseIt.InThread);
 
             ServiceWithDependency one = null;
             var threadOne = new Thread(() => one = container.Resolve<ServiceWithDependency>());
@@ -203,24 +203,57 @@ namespace DryIoc.UnitTests
         }
     }
 
-    public static class CustomReuse
+    public static partial class ReuseIt
     {
-        public static ThreadReuse InThreadScope = new ThreadReuse();
-        public static HttpContextReuse InHttpContext = new HttpContextReuse();
+        public static ThreadReuse InThread = new ThreadReuse();
+        public static HttpContextReuse InRequest = new HttpContextReuse();
     }
 
-    public class HttpContextReuse : IReuse
+    public sealed class HttpContextReuse : IReuse
     {
-        public static readonly string ReuseItemKey = typeof(HttpContextReuse).Name;
+        public static readonly HttpContextReuse Instance = new HttpContextReuse();
 
         public IScope GetScope(Request request, IRegistry registry)
         {
+            if (HttpContext.Current == null)
+                return new Scope();
+
             var items = HttpContext.Current.Items;
-            if (!items.Contains(ReuseItemKey))
-                items[ReuseItemKey] = new Scope();
-            return (Scope)items[ReuseItemKey];
+            //lock (_yourLockObject)
+            if (!items.Contains(_reuseScopeKey))
+                items[_reuseScopeKey] = new Scope();
+            return (Scope)items[_reuseScopeKey];
         }
+
+        private static readonly string _reuseScopeKey = typeof(HttpContextReuse).Name;
     }
+
+    // Old example v1.3.1 
+    //public sealed class HttpContextReuse : IReuse
+    //{
+    //    public static readonly HttpContextReuse Instance = new HttpContextReuse();
+
+    //    public static T GetOrAddToContext<T>(int factoryID, Func<T> factory)
+    //    {
+    //        var key = KEY_UNIQUE_PREFIX + factoryID;
+    //        var items = HttpContext.Current.Items;
+    //        lock (_locker)
+    //            if (!items.Contains(key))
+    //                items[key] = factory();
+    //        return (T)items[key];
+    //    }
+
+    //    public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+    //    {
+    //        return Expression.Call(_getOrAddToContextMethod.MakeGenericMethod(factoryExpr.Type),
+    //            Expression.Constant(factoryID),        // use factoryID (unique per Container) as service ID.
+    //            Expression.Lambda(factoryExpr, null)); // pass Func<TService> to create service only when not found in context.
+    //    }
+
+    //    private static readonly object _locker = new object();
+    //    private readonly MethodInfo _getOrAddToContextMethod = typeof(HttpContextReuse).GetMethod("GetOrAddToContext");
+    //    private const string KEY_UNIQUE_PREFIX = "DryIocHCR#";
+    //}
 
     #region CUT
 

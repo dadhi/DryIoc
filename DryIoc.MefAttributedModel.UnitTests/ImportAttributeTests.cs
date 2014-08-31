@@ -104,7 +104,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(Service));
 
-            var client = new PropertyClient2();
+            var client = new NamedPropertyClient();
             Assert.Throws<ContainerException>(() => 
                 container.ResolvePropertiesAndFields(client));
 
@@ -115,12 +115,25 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Resolving_unregistered_property_without_attribute_model_should_not_throw_so_the_property_stays_null()
         {
             var container = new Container();
-            container.Register(typeof(Service));
+            container.Register<Service>();
 
-            var client = new PropertyClient2();
+            var client = new NamedPropertyClient();
             container.ResolvePropertiesAndFields(client);
 
             Assert.That(client.Some, Is.Null);
+        }
+
+        [Test]
+        public void Resolving_registered_property_with_not_assignable_type_should_Throw()
+        {
+            var container = new Container().WithAttributedModel();
+            container.Register<Service>();
+            container.Register<BadTypePropertyClient>();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<BadTypePropertyClient>());
+
+            Assert.That(ex.Message, Is.StringStarting("Provided service type").And.StringContaining("is not assignable"));
         }
 
         [Test]
@@ -132,6 +145,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.RegisterExports(typeof(Service), typeof(CustomWrapperClient));
 
             var client = container.Resolve<CustomWrapperClient>();
+            Assert.NotNull(client);
         }
 
         //[Test]
@@ -227,10 +241,19 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Export]
-        public class PropertyClient2
+        public class NamedPropertyClient
         {
             [Import("k", typeof(Service))]
             public IService Some { get; set; }
+        }
+
+        [Export]
+        public class BadTypePropertyClient
+        {
+            [Import(typeof(BadType))]
+            public IService Some { get; set; }
+
+            public class BadType { }
         }
 
         [Export]

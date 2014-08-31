@@ -93,22 +93,7 @@ namespace DryIoc.UnitTests
         public void Can_resolve_property_marked_with_Import()
         {
             var container = new Container(ResolutionRules.Default.With(DependencyDiscoveryRules.Empty
-                .WithPropertiesAndFields((type, req, reg) =>
-                {
-                    const BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-                    var properties = type.GetProperties(bindingFlags).Where(p => p.GetSetMethod() != null).Select(p =>
-                    {
-                        var import = (ImportAttribute)p.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
-                        return import == null ? null : ServiceInfo.Of(p).With(import.ContractType, import.ContractName);
-                    });
-                    var fields = type.GetFields(bindingFlags).Where(f => !f.IsInitOnly).Select(f =>
-                    {
-                        var import = (ImportAttribute)f.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
-                        return import == null ? null : ServiceInfo.Of(f).With(import.ContractType, import.ContractName);
-                    });
-
-                    return properties.Concat(fields);
-                })));
+                .WithPropertiesAndFields(SelectPropertiesAndFieldsWithImportAttribute)));
 
             container.Register<FunnyChicken>();
             container.Register<Guts>();
@@ -174,31 +159,24 @@ namespace DryIoc.UnitTests
             Assert.That(chicken.SomeGuts, Is.Not.Null);
         }
 
-        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, Request req, IRegistry reg)
+        private static IEnumerable<PropertyOrFieldServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, Request req, IRegistry reg)
         {
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-            
-            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Select(m =>
+            const BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+
+            var properties = type.GetProperties(bindingFlags).Where(p => p.GetSetMethod() != null).Select(p =>
             {
-                var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
-                return import == null ? null : ServiceInfo.Of(m).With(import.ContractType, import.ContractName);
+                var import = (ImportAttribute)p.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
+                return import == null ? null : PropertyOrFieldServiceInfo.Of(p)
+                    .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req, reg);
+            });
+            var fields = type.GetFields(bindingFlags).Where(f => !f.IsInitOnly).Select(f =>
+            {
+                var import = (ImportAttribute)f.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
+                return import == null ? null : PropertyOrFieldServiceInfo.Of(f)
+                    .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req, reg);
             });
 
-            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly)
-            .Select(m =>
-            {
-                var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
-                return import == null ? null : ServiceInfo.Of(m).With(import.ContractType, import.ContractName);
-            });
             return properties.Concat(fields);
-        }
-
-        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
-        {
-            TAttribute attr = null;
-            for (var i = 0; i < attributes.Length && attr == null; i++)
-                attr = attributes[i] as TAttribute;
-            return attr;
         }
     }
 

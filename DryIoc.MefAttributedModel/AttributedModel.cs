@@ -51,8 +51,8 @@ namespace DryIoc.MefAttributedModel
         {
             return rules.With(DependencyDiscoveryRules.Empty
                 .WithConstructor(GetImportingConstructor) // hello, Max!!! we are Martians.
-                .WithParameters(GetImportedParameterServiceInfo)
-                .WithPropertiesAndFields(GetImportedOnlyPropertiesAndFields));
+                .WithParameters(GetImportedParameter)
+                .WithPropertiesAndFields(GetImportedPropertiesAndFields));
         }
 
         public static Container WithAttributedModel(this Container container)
@@ -297,69 +297,72 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        public static ServiceInfo GetImportedParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
+        public static ParameterServiceInfo GetImportedParameter(ParameterInfo parameter, Request request, IRegistry registry)
         {
-            return ServiceInfo.Of(parameter)
-                .With(GetCustomServiceInfo(parameter.ParameterType, parameter.GetCustomAttributes(false), request, registry));
+            var details = GetFirstImportDetailsOrNull(parameter.ParameterType, parameter.GetCustomAttributes(false), request, registry);
+            return ParameterServiceInfo.Of(parameter).With(details, request, registry);
         }
 
-        public static IEnumerable<ServiceInfo> GetImportedOnlyPropertiesAndFields(Type type, Request request, IRegistry registry)
+        public static IEnumerable<PropertyOrFieldServiceInfo> 
+            GetImportedPropertiesAndFields(Type type, Request request, IRegistry registry)
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
-            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null).Select(p =>
+            var properties = type.GetProperties(flags)
+                .Where(p => p.GetSetMethod() != null && !p.GetSetMethod().IsPrivate).Select(property =>
             {
-                var customInfo = GetCustomServiceInfo(p.PropertyType, p.GetCustomAttributes(false), request, registry);
-                return customInfo == null ? null : ServiceInfo.Of(p).With(customInfo);
+                var details = GetFirstImportDetailsOrNull(property.PropertyType, property.GetCustomAttributes(false), request, registry);
+                return details == null ? null : PropertyOrFieldServiceInfo.Of(property).With(details, request, registry);
             });
 
-            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly).Select(f =>
+            var fields = type.GetFields(flags)
+                .Where(f => !f.IsInitOnly).Select(field =>
             {
-                var customInfo = GetCustomServiceInfo(f.FieldType, f.GetCustomAttributes(false), request, registry);
-                return customInfo == null ? null : ServiceInfo.Of(f).With(customInfo);
+                var details = GetFirstImportDetailsOrNull(field.FieldType, field.GetCustomAttributes(false), request, registry);
+                return details == null ? null : PropertyOrFieldServiceInfo.Of(field).With(details, request, registry);
             });
 
             return properties.Concat(fields);
         }
 
-        public static CustomServiceInfo GetCustomServiceInfo(Type type, object[] attributes, Request request, IRegistry registry)
+        public static ServiceInfoDetails GetFirstImportDetailsOrNull(Type type, object[] attributes, Request request, IRegistry registry)
         {
             return attributes.Length == 0 ? null
-                : (GetServiceFromImportAttribute(type, attributes) ??
-                   GetServiceInfoWithMetadataAttribute(type, attributes, request, registry) ??
-                   GetServiceInfoFromImportExternalAttribute(type, attributes, registry));
+                : (GetImportDetails(type, attributes) ??
+                   GetImportWithMetadataDetails(type, attributes, request, registry) ??
+                   GetImportExternalDetails(type, attributes, registry));
         }
 
-        public static CustomServiceInfo GetServiceFromImportAttribute(Type reflectedType, object[] attributes)
+        public static ServiceInfoDetails GetImportDetails(Type reflectedType, object[] attributes)
         {
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
             if (import == null) return null;
             var serviceKey = import.ContractName ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null);
-            return CustomServiceInfo.Of(import.ContractType, serviceKey);
+            return ServiceInfoDetails.Of(import.ContractType, serviceKey);
         }
 
-        public static CustomServiceInfo GetServiceInfoWithMetadataAttribute(Type reflectedType, object[] attributes, Request request, IRegistry registry)
+        public static ServiceInfoDetails GetImportWithMetadataDetails(Type reflectedType, object[] attributes, Request request, IRegistry registry)
         {
             var import = GetSingleAttributeOrDefault<ImportWithMetadataAttribute>(attributes);
             if (import == null)
                 return null;
 
-            reflectedType = registry.UnwrapServiceType(reflectedType);
+            reflectedType = registry.GetWrappedServiceType(reflectedType);
             var metadata = import.Metadata;
             var factory = registry.GetAllFactories(reflectedType)
                 .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
                 .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, reflectedType, metadata, request);
 
-            return CustomServiceInfo.Of(reflectedType, factory.Key);
+            return ServiceInfoDetails.Of(reflectedType, factory.Key);
         }
 
-        public static CustomServiceInfo GetServiceInfoFromImportExternalAttribute(Type serviceType, object[] attributes, IRegistry registry)
+        public static ServiceInfoDetails GetImportExternalDetails(Type serviceType, object[] attributes, IRegistry registry)
         {
             var import = GetSingleAttributeOrDefault<ImportExternalAttribute>(attributes);
             if (import == null)
                 return null;
 
-            serviceType = import.ContractType ?? registry.UnwrapServiceType(serviceType);
+            serviceType = import.ContractType ?? registry.GetWrappedServiceType(serviceType);
             var serviceKey = import.ContractKey;
 
             if (!registry.IsRegistered(serviceType, serviceKey))
@@ -377,7 +380,7 @@ namespace DryIoc.MefAttributedModel
                     named: serviceKey, ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
             }
 
-            return CustomServiceInfo.Of(serviceType, serviceKey);
+            return ServiceInfoDetails.Of(serviceType, serviceKey);
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute

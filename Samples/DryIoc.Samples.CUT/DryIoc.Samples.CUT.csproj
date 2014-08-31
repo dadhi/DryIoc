@@ -40,15 +40,14 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
+    <ProjectReference Include="..\..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
       <Project>{13516F3C-E48D-43DC-89D4-5FE00DE3C7D2}</Project>
       <Name>DryIoc.MefAttributedModel</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc.Samples\DryIoc.Samples.csproj">
-      <Project>{022FD983-8D10-493F-B9D5-7D5593736D58}</Project>
+      <Project>{022fd983-8d10-493f-b9d5-7d5593736d58}</Project>
       <Name>DryIoc.Samples</Name>
-      <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

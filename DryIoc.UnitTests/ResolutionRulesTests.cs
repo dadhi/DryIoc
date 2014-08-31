@@ -54,8 +54,7 @@ namespace DryIoc.UnitTests
         public void When_service_registered_with_name_Then_it_could_be_resolved_with_ctor_parameter_ImportAttribute()
         {
             var container = new Container(ResolutionRules.Default.With(
-                DependencyDiscoveryRules.Empty.WithParameters(
-                    (parameter, req, reg) => GetServiceInfoFromImportAttribute(parameter))));
+                DependencyDiscoveryRules.Empty.WithParameters(GetServiceInfoFromImportAttribute)));
 
             container.Register(typeof(INamedService), typeof(NamedService));
             container.Register(typeof(INamedService), typeof(AnotherNamedService), named: "blah");
@@ -139,28 +138,29 @@ namespace DryIoc.UnitTests
             Assert.That(service, Is.Null);
         }
 
-        public static ServiceInfo GetServiceInfoFromImportAttribute(ParameterInfo parameter)
+        public static ParameterServiceInfo GetServiceInfoFromImportAttribute(ParameterInfo parameter, Request request, IRegistry registry)
         {
             var import = (ImportAttribute)parameter.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
-            var customInfo = import == null ? CustomServiceInfo.Empty
-                : CustomServiceInfo.Of(import.ContractType, import.ContractName);
-            return ServiceInfo.Of(parameter).With(customInfo);
+            var details = import == null ? ServiceInfoDetails.Default
+                : ServiceInfoDetails.Of(import.ContractType, import.ContractName);
+            return ParameterServiceInfo.Of(parameter).With(details, request, registry);
         }
 
-        public static ServiceInfo GetServiceFromWithMetadataAttribute(ParameterInfo parameter, Request request, IRegistry registry)
+        public static ParameterServiceInfo GetServiceFromWithMetadataAttribute(ParameterInfo parameter, Request request, IRegistry registry)
         {
             var import = GetSingleAttributeOrDefault<ImportWithMetadataAttribute>(parameter.GetCustomAttributes(false));
             if (import == null)
                 return null;
 
             var serviceType = parameter.ParameterType;
-            serviceType = registry.UnwrapServiceType(serviceType);
+            serviceType = registry.GetWrappedServiceType(serviceType);
             var metadata = import.Metadata;
             var factory = registry.GetAllFactories(serviceType)
                 .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
                 .ThrowIfNull("Unable to resolve", serviceType, metadata, request);
-            
-            return ServiceInfo.Of(parameter).With(serviceType, factory.Key);
+
+            var details = ServiceInfoDetails.Of(serviceType, factory.Key);
+            return ParameterServiceInfo.Of(parameter).With(details, request, registry);
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
