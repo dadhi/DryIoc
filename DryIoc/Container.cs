@@ -122,9 +122,10 @@ namespace DryIoc
             ((IDisposable)_currentScope).Dispose();
         }
 
-        public Request CreateRequest(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        public Request CreateRequest(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw,
+            Type providedType = null)
         {
-            var serviceInfo = ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(null, serviceKey, ifUnresolved), null, this);
+            var serviceInfo = ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(providedType, serviceKey, ifUnresolved), null, this);
             return new Request(null, _resolutionState, Ref.Of<IScope>(), serviceInfo);
         }
 
@@ -251,13 +252,14 @@ namespace DryIoc
         object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
             var factoryDelegate = _resolvedDefaultDelegates.GetValueOrDefault(serviceType);
-            return factoryDelegate != null ? factoryDelegate(_resolutionState.Items, null)
+            return factoryDelegate != null
+                ? factoryDelegate(_resolutionState.Items, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved);
         }
 
         private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var request = CreateRequest(serviceType, null, ifUnresolved);
+            var request = CreateRequest(serviceType, ifUnresolved: ifUnresolved);
             var factory = ((IRegistry)this).ResolveFactory(request);
             if (factory == null)
                 return null;
@@ -271,17 +273,31 @@ namespace DryIoc
             return factoryDelegate(request.State.Items, request.ResolutionScope);
         }
 
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type providedServiceType)
         {
+            var cacheServiceKey = serviceKey;
+            if (providedServiceType != null)
+            {
+                var wrappedServiceType = ((IRegistry)this).GetWrappedServiceType(serviceType);
+                if (!wrappedServiceType.IsAssignableFrom(providedServiceType))
+                    throw Error.PROVIDED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE
+                        .Of(providedServiceType, wrappedServiceType, serviceType);
+                if (serviceType == wrappedServiceType)
+                    serviceType = providedServiceType;
+                else
+                    cacheServiceKey = serviceKey == null ? providedServiceType
+                        : (object)new KV<Type, object>(providedServiceType, serviceKey);
+            }
+
             var factoryDelegates = _resolvedKeyedDelegates.GetValueOrDefault(serviceType);
             if (factoryDelegates != null)
             {
-                var factoryDelegate = factoryDelegates.GetValueOrDefault(serviceKey);
+                var factoryDelegate = factoryDelegates.GetValueOrDefault(cacheServiceKey);
                 if (factoryDelegate != null)
                     return factoryDelegate(_resolutionState.Items, null);
             }
 
-            var request = CreateRequest(serviceType, serviceKey, ifUnresolved);
+            var request = CreateRequest(serviceType, serviceKey, ifUnresolved, providedServiceType);
             var factory = ((IRegistry)this).ResolveFactory(request);
             if (factory == null)
                 return null;
@@ -289,15 +305,16 @@ namespace DryIoc
             var newFactoryDelegate = factory.GetDelegateOrDefault(request, this);
             Interlocked.Exchange(ref _resolvedKeyedDelegates,
                 _resolvedKeyedDelegates.AddOrUpdate(serviceType,
-                (factoryDelegates ?? HashTree<object, FactoryDelegate>.Empty).AddOrUpdate(serviceKey, newFactoryDelegate)));
+                (factoryDelegates ?? HashTree<object, FactoryDelegate>.Empty).AddOrUpdate(cacheServiceKey, newFactoryDelegate)));
+
             return newFactoryDelegate(request.State.Items, request.ResolutionScope);
         }
 
         public static IEnumerable<PropertyOrFieldServiceInfo> SelectPublicAssignablePropertiesAndFields(Type type)
         {
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null && !p.GetSetMethod().IsPrivate).Select(PropertyOrFieldServiceInfo.Of);
-            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly).Select(PropertyOrFieldServiceInfo.Of);
+            var properties = type.GetProperties(flags).Where(ReflectionTools.IsWritableProperty).Select(PropertyOrFieldServiceInfo.Of);
+            var fields = type.GetFields(flags).Where(ReflectionTools.IsWritableField).Select(PropertyOrFieldServiceInfo.Of);
             return properties.Concat(fields);
         }
 
@@ -355,7 +372,7 @@ namespace DryIoc
                 return ruleFactory;
             }
 
-            Throw.If(request.ServiceInfo.Details.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
+            Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
             return null;
         }
 
@@ -935,24 +952,26 @@ namespace DryIoc
                 ? collectionType.GetElementType()
                 : collectionType.GetGenericArguments()[0];
 
-            var wrappedItemType = GetWrappedOrProvidedType(ref itemType, request, registry);
-            var items = registry.GetAllFactories(wrappedItemType);
+            var wrappedItemType = registry.GetWrappedServiceType(itemType);
+            var providedItemType = request.ServiceInfo.Details.ProvidedType ?? wrappedItemType;
+            if (itemType == wrappedItemType)
+                itemType = providedItemType;
+
+            var items = registry.GetAllFactories(providedItemType);
 
             // Composite pattern support: filter out composite root from available keys.
             var parent = request.GetNonWrapperParentOrDefault();
-            if (parent != null && parent.ServiceType == wrappedItemType)
+            if (parent != null && parent.ServiceType == providedItemType)
             {
                 var parentFactoryID = parent.ResolvedFactory.ID;
                 items = items.Where(x => x.Value.ID != parentFactoryID);
             }
 
             var itemArray = items.ToArray();
-            List<Expression> itemExpressions = null;
+            List<Expression> itemExprList = null;
             if (itemArray.Length != 0)
             {
-                //if (request.ServiceInfo.Details.IfUnresolved == IfUnresolved.Throw)
-                //throw Error.UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS.Of(wrappedItemType, request);
-                itemExpressions = new List<Expression>(itemArray.Length);
+                itemExprList = new List<Expression>(itemArray.Length);
                 for (var i = 0; i < itemArray.Length; i++)
                 {
                     var item = itemArray[i];
@@ -962,39 +981,36 @@ namespace DryIoc
                     {
                         var itemExpr = itemFactory.GetExpressionOrDefault(itemRequest, registry);
                         if (itemExpr != null)
-                            itemExpressions.Add(itemExpr);
+                            itemExprList.Add(itemExpr);
                     }
                 }
             }
 
-            if (itemExpressions ==null || itemExpressions.Count == 0)
-            {
-                if (request.ServiceInfo.Details.IfUnresolved == IfUnresolved.Throw)
-                    throw Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS.Of(itemType, request);
-                itemExpressions = itemExpressions ?? new List<Expression>(0);
-            }
+            if ((itemExprList == null || itemExprList.Count == 0) && request.IfUnresolved == IfUnresolved.Throw)
+                throw Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS.Of(itemType, request);
 
-            return Expression.NewArrayInit(itemType.ThrowIfNull(), itemExpressions);
+            return Expression.NewArrayInit(itemType.ThrowIfNull(), itemExprList ?? Enumerable.Empty<Expression>());
         }
 
         public static Expression GetManyExpression(Request request, IRegistry registry)
         {
-            var dynamicEnumerableType = request.ServiceType;
-            var itemType = dynamicEnumerableType.GetGenericArguments()[0];
-            var wrappedItemType = GetWrappedOrProvidedType(ref itemType, request, registry);
+            var manyType = request.ServiceType;
+            var itemType = manyType.GetGenericArguments()[0];
+            var wrappedItemType = registry.GetWrappedServiceType(itemType);
+            var providedItemType = request.ServiceInfo.Details.ProvidedType ?? wrappedItemType;
 
             // Composite pattern support: filter out composite root from available keys.
             var parentFactoryID = 0;
             var parent = request.GetNonWrapperParentOrDefault();
-            if (parent != null && parent.ServiceType == wrappedItemType)
+            if (parent != null && parent.ServiceType == providedItemType)
                 parentFactoryID = parent.ResolvedFactory.ID;
 
-            var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, wrappedItemType);
+            var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, providedItemType);
 
             var registryRefExpr = request.State.GetItemExpression(registry.SelfWeakRef);
             var resolveCallExpr = Expression.Call(resolveMethod, registryRefExpr, Expression.Constant(parentFactoryID));
 
-            return Expression.New(dynamicEnumerableType.GetConstructors()[0], resolveCallExpr);
+            return Expression.New(manyType.GetConstructors()[0], resolveCallExpr);
         }
 
         public static Expression GetFuncExpression(Request request, IRegistry registry)
@@ -1065,13 +1081,17 @@ namespace DryIoc
             var typeArgs = request.ServiceType.GetGenericArguments();
             var metadataType = typeArgs[1];
             var serviceType = typeArgs[0];
-            var wrappedServiceType = GetWrappedOrProvidedType(ref serviceType, request, registry);
+
+            var wrappedServiceType = registry.GetWrappedServiceType(serviceType);
+            var providedServiceType = request.ServiceInfo.Details.ProvidedType ?? wrappedServiceType;
+            if (serviceType == wrappedServiceType)
+                serviceType = providedServiceType;
 
             object resultMetadata = null;
             var serviceKey = request.ServiceKey;
             if (serviceKey == null)
             {
-                var result = registry.GetAllFactories(wrappedServiceType).FirstOrDefault(kv =>
+                var result = registry.GetAllFactories(providedServiceType).FirstOrDefault(kv =>
                     kv.Value.Setup.Metadata != null && metadataType.IsInstanceOfType(kv.Value.Setup.Metadata));
                 if (result != null)
                 {
@@ -1081,7 +1101,7 @@ namespace DryIoc
             }
             else
             {
-                var factory = registry.GetServiceFactoryOrDefault(wrappedServiceType, serviceKey);
+                var factory = registry.GetServiceFactoryOrDefault(providedServiceType, serviceKey);
                 if (factory != null)
                 {
                     var metadata = factory.Setup.Metadata;
@@ -1106,17 +1126,6 @@ namespace DryIoc
                 var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
                 return metaExpr;
             });
-        }
-
-        public static Type GetWrappedOrProvidedType(ref Type serviceType, Request request, IRegistry registry)
-        {
-            var wrappedServiceType = registry.GetWrappedServiceType(serviceType);
-            var providedType = request.ServiceInfo.Details.ProvidedType;
-            if (providedType == null)
-                return wrappedServiceType;
-            if (wrappedServiceType == serviceType)
-                serviceType = providedType;
-            return providedType;
         }
 
         #region Tools
@@ -1152,7 +1161,7 @@ namespace DryIoc
 
             foreach (var item in items)
             {
-                var service = registry.ResolveKeyed(itemType, item.Key, IfUnresolved.ReturnNull);
+                var service = registry.ResolveKeyed(itemType, item.Key, IfUnresolved.ReturnNull, wrappedItemType);
                 if (service != null) // skip unresolved items
                     yield return (TService)service;
             }
@@ -1324,9 +1333,6 @@ namespace DryIoc
         public static readonly string DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION =
             "Decorator factory should support resolution as {0}, but it does not.";
 
-        public static readonly string UNABLE_TO_FIND_REGISTERED_ENUMERABLE_ITEMS =
-            "Unable to find registered services of wrapped item type {0} when resolving {1}.";
-
         public static readonly string UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS =
             "Unable to resolve any service of item type {0} when resolving {1}.";
 
@@ -1358,8 +1364,8 @@ namespace DryIoc
         public static readonly string REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
             "Registered instance [{0}] of type {1} is not assignable to serviceType {2}.";
 
-        public static readonly string PROVIDED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_DEPENDENCY_TYPE =
-            "Provided service type {0} is not assignable to dependency type {1} when resolving: {2}.";
+        public static readonly string PROVIDED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE =
+            "Provided service type {0} is not assignable to (wrapped) type {1} when resolving {2}.";
     }
 
     public static class Registrator
@@ -1674,7 +1680,7 @@ namespace DryIoc
     public static class Resolver
     {
         /// <summary>
-        /// Returns an instance of statically known <typepsaramref name="TService"/> type.
+        /// Returns instance of statically known <typepsaramref name="TService"/> type.
         /// </summary>
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
@@ -1686,7 +1692,7 @@ namespace DryIoc
         }
 
         /// <summary>
-        /// Returns an instance of statically known <typepsaramref name="TService"/> type.
+        /// Returns instance of <typepsaramref name="TService"/> type.
         /// </summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
@@ -1698,31 +1704,65 @@ namespace DryIoc
         }
 
         /// <summary>
-        /// Returns an instance of statically known <typepsaramref name="TService"/> type.
+        /// Returns instance of <typeparamref name="TService"/> searching for provided service type <paramref name="providedServiceType"/>.
+        /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc., <paramref name="providedServiceType"/>
+        /// could specify wrapped service type.
+        /// </summary>
+        /// <typeparam name="TService">The type of the requested service.</typeparam>
+        /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
+        /// <param name="providedServiceType">Service or wrapped type assignable to <typeparamref name="TService"/>.</param>
+        /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
+        /// <returns>The requested service instance.</returns>
+        /// <remarks>Using <paramref name="providedServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
+        /// <example>
+        /// <code lang="cs"><![CDATA[
+        ///     container.Register<IService, Service>();
+        ///     var services = container.Resolve<IEnumerable<object>>(typeof(IService));
+        /// ]]></code>
+        /// </example>
+        public static TService Resolve<TService>(this IResolver resolver, Type providedServiceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        {
+            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved, providedServiceType.ThrowIfNull());
+        }
+
+        /// <summary>
+        /// Returns instance of <paramref name="serviceType"/> searching for provided service type <paramref name="providedServiceType"/>.
+        /// In case of <paramref name="serviceType"/> being generic wrapper like Func, Lazy, IEnumerable, etc., <paramref name="providedServiceType"/>
+        /// could specify wrapped service type.
         /// </summary>
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceKey">Service key (any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/> defined).</param>
-        /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
+        /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
+        /// <param name="providedServiceType">(optional) Service or wrapped type assignable to <paramref name="serviceType"/>.</param>
         /// <returns>The requested service instance.</returns>
-        public static object Resolve(this IResolver resolver, Type serviceType, object serviceKey, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        /// <remarks>Using <paramref name="providedServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
+        /// <example>
+        /// <code lang="cs"><![CDATA[
+        ///     container.Register<IService, Service>();
+        ///     var services = container.Resolve(typeof(Lazy<object>), "named", providedServiceType: typeof(IService));
+        /// ]]></code>
+        /// </example>
+        public static object Resolve(this IResolver resolver, Type serviceType, object serviceKey,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type providedServiceType = null)
         {
             return serviceKey == null
                 ? resolver.ResolveDefault(serviceType, ifUnresolved)
-                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved);
+                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, providedServiceType);
         }
 
         /// <summary>
-        /// Returns an instance of statically known <typepsaramref name="TService"/> type.
+        /// Returns instance of <typepsaramref name="TService"/> type.
         /// </summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceKey">Service key (any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/> defined).</param>
         /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
         /// <returns>The requested service instance.</returns>
-        public static TService Resolve<TService>(this IResolver resolver, object serviceKey, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        public static TService Resolve<TService>(this IResolver resolver, object serviceKey,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type providedServiceType = null)
         {
-            return (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved);
+            return (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, providedServiceType);
         }
 
         /// <summary>
@@ -1827,7 +1867,7 @@ namespace DryIoc
             {
                 var wrappedServiceType = registry.GetWrappedServiceType(serviceType);
                 if (!wrappedServiceType.IsAssignableFrom(providedType))
-                    throw Error.PROVIDED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_DEPENDENCY_TYPE.Of(
+                    throw Error.PROVIDED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE.Of(
                         providedType, wrappedServiceType, request);
 
                 if (wrappedServiceType == serviceType)
@@ -1848,14 +1888,14 @@ namespace DryIoc
 
             var dependencyDetails = dependency.Details;
 
-            var ifUnresolved = holderDetails.IfUnresolved == IfUnresolved.Throw 
+            var ifUnresolved = holderDetails.IfUnresolved == IfUnresolved.Throw
                 ? dependencyDetails.IfUnresolved
                 : holderDetails.IfUnresolved;
 
-            var serviceKey = holderType == FactoryType.Service 
+            var serviceKey = holderType == FactoryType.Service
                 ? dependencyDetails.ServiceKey
                 // use non default holder key, otherwise use dependency own key
-                : holderDetails.ServiceKey ?? dependencyDetails.ServiceKey; 
+                : holderDetails.ServiceKey ?? dependencyDetails.ServiceKey;
 
             var serviceType = dependency.ServiceType;
             var providedType = dependencyDetails.ProvidedType;
@@ -2111,6 +2151,7 @@ namespace DryIoc
 
         public Type ServiceType { get { return ServiceInfo.ServiceType; } }
         public object ServiceKey { get { return ServiceInfo.Details.ServiceKey; } }
+        public IfUnresolved IfUnresolved { get { return ServiceInfo.Details.IfUnresolved; } }
 
         public Type OpenGenericServiceType
         {
@@ -2657,7 +2698,7 @@ namespace DryIoc
                     }
 
                     // If parent required to return null, then ensure it does it as soon as first parameter returns null.
-                    if (request.ServiceInfo.Details.IfUnresolved == IfUnresolved.ReturnNull)
+                    if (request.IfUnresolved == IfUnresolved.ReturnNull)
                         return null;
 
                     // Otherwise proceed with default(T) value expression.
@@ -2710,7 +2751,7 @@ namespace DryIoc
                     }
 
                     // If parent required to return null, then ensure it does it as soon as first parameter returns null.
-                    if (request.ServiceInfo.Details.IfUnresolved == IfUnresolved.ReturnNull)
+                    if (request.IfUnresolved == IfUnresolved.ReturnNull)
                         return null;
 
                     // Otherwise proceed with default(T) value expression.
@@ -2778,7 +2819,7 @@ namespace DryIoc
                     }
 
                     // If parent required to return null, then ensure it does it as soon as first parameter returns null.
-                    if (request.ServiceInfo.Details.IfUnresolved == IfUnresolved.ReturnNull)
+                    if (request.IfUnresolved == IfUnresolved.ReturnNull)
                         return null;
 
                     // Otherwise proceed with default(T) value expression.
@@ -3040,7 +3081,7 @@ namespace DryIoc
 
         object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved);
 
-        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved);
+        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type wrappedType);
 
         /// <summary>
         /// For given instance resolves and sets non-initialized (null) properties from container.
@@ -3387,6 +3428,17 @@ namespace DryIoc
 
     public static class ReflectionTools
     {
+        public static bool IsWritableProperty(PropertyInfo property)
+        {
+            var setMethod = property.GetSetMethod();
+            return setMethod != null && !setMethod.IsPrivate;
+        }
+
+        public static bool IsWritableField(FieldInfo field)
+        {
+            return !field.IsInitOnly;
+        }
+
         public static Expression DefaultValueExpression(this Type type)
         {
             return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), Expression.Constant(type, typeof(Type)));
@@ -3396,7 +3448,7 @@ namespace DryIoc
         public static T GetDefault<T>() { return default(T); }
     }
 
-    public class KV<K, V>
+    public sealed class KV<K, V>
     {
         public readonly K Key;
         public readonly V Value;
@@ -3410,6 +3462,23 @@ namespace DryIoc
         public override string ToString()
         {
             return new StringBuilder("[").Print(Key).Append(", ").Print(Value).Append("]").ToString();
+        }
+
+        public override bool Equals(object obj)
+        {
+            var other = obj as KV<K, V>;
+            return other != null 
+                && (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key))
+                && (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return ((object)Key == null ? 0 : Key.GetHashCode() * 397) 
+                     ^ ((object)Value == null ? 0 : Value.GetHashCode());
+            }
         }
     }
 

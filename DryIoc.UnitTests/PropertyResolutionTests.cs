@@ -163,13 +163,13 @@ namespace DryIoc.UnitTests
         {
             const BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
-            var properties = type.GetProperties(bindingFlags).Where(p => p.GetSetMethod() != null).Select(p =>
+            var properties = type.GetProperties(bindingFlags).Where(ReflectionTools.IsWritableProperty).Select(p =>
             {
                 var import = (ImportAttribute)p.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
                 return import == null ? null : PropertyOrFieldServiceInfo.Of(p)
                     .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req, reg);
             });
-            var fields = type.GetFields(bindingFlags).Where(f => !f.IsInitOnly).Select(f =>
+            var fields = type.GetFields(bindingFlags).Where(ReflectionTools.IsWritableField).Select(f =>
             {
                 var import = (ImportAttribute)f.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
                 return import == null ? null : PropertyOrFieldServiceInfo.Of(f)

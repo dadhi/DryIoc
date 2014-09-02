@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -148,15 +150,78 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.NotNull(client);
         }
 
-        [Export][ExportWithMetadata("blah")]
-        public class Service : IService { }
+        [Test]
+        public void Resolve_array_of_specified_type_should_work()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+
+            var services = container.Resolve<object[]>(typeof(IService));
+
+            Assert.That(services.Length, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Resolve_Enumerable_of_specified_type_should_work()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+
+            var services = container.Resolve<IEnumerable<Func<object>>>(typeof(IService));
+
+            Assert.That(services.Count(), Is.EqualTo(1));
+            Assert.That(services.First().Invoke(), Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void Resolve_Many_of_provided_type_should_work()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+
+            var services = container.Resolve<Many<object>>(typeof(IService));
+
+            Assert.That(services.Items.Count(), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Resolve_Many_services_twice_with_different_provided_types_should_work()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(Reuse.InCurrentScope);
+
+            var objects = container.Resolve<Many<object>>(typeof(IService));
+            var services = container.Resolve<Many<IService>>(typeof(IService));
+
+            CollectionAssert.AreEqual(objects.Items.Cast<IService>().ToArray(), services.Items.ToArray());
+        }
+
+        [Test]
+        public void Resolve_Meta_of_provided_type_should_work()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(setup: ServiceSetup.WithMetadata("a"));
+            container.Register<IService, AnotherService>(setup: ServiceSetup.WithMetadata("b"));
+
+            var services = container.Resolve<Meta<Func<object>, string>[]>(typeof(IService));
+
+            Assert.That(services[0].Metadata, Is.EqualTo("a"));
+            Assert.That(services[0].Value(), Is.InstanceOf<Service>());
+            Assert.That(services[1].Metadata, Is.EqualTo("b"));
+        }
+
+        #region CUT
+
+        [Export]
+        [ExportWithMetadata("blah")]
+        public class Service : IService {}
 
         [Export]
         public class Client
         {
             public IService Some { get; set; }
 
-            public Client([Import(typeof(Service))]IService service)
+            public Client([Import(typeof(Service))] IService service)
             {
                 Some = service;
             }
@@ -167,7 +232,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             public IService Some { get; set; }
 
-            public FuncClient([Import(typeof(Service))]Func<IService> getService)
+            public FuncClient([Import(typeof (Service))] Func<IService> getService)
             {
                 Some = getService();
             }
@@ -178,7 +243,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             public IService Some { get; set; }
 
-            public LazyClient([Import(typeof(Service))]Lazy<IService> getService)
+            public LazyClient([Import(typeof (Service))] Lazy<IService> getService)
             {
                 Some = getService.Value;
             }
@@ -190,7 +255,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             public IService Some { get; set; }
             public string Metadata { get; set; }
 
-            public LazyMetaClient([Import(typeof(Service))]Lazy<Meta<IService, string>> getService)
+            public LazyMetaClient([Import(typeof (Service))] Lazy<Meta<IService, string>> getService)
             {
                 Some = getService.Value.Value;
                 Metadata = getService.Value.Metadata;
@@ -202,21 +267,21 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             public IService Some { get; set; }
 
-            public FuncArrayClient([Import(typeof(Service))]Func<IService>[] getService)
+            public FuncArrayClient([Import(typeof (Service))] Func<IService>[] getService)
             {
                 Some = getService[0]();
             }
         }
 
-        [Export("k", typeof(IService))]
-        public class KeyService : IService { }
+        [Export("k", typeof (IService))]
+        public class KeyService : IService {}
 
         [Export]
         public class FuncArrayKeyClient
         {
             public IService Some { get; set; }
 
-            public FuncArrayKeyClient([Import("k")]Func<IService>[] getService)
+            public FuncArrayKeyClient([Import("k")] Func<IService>[] getService)
             {
                 Some = getService[0]();
             }
@@ -225,24 +290,24 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Export]
         public class PropertyClient
         {
-            [Import(typeof(Service))]
+            [Import(typeof (Service))]
             public IService Some { get; set; }
         }
 
         [Export]
         public class NamedPropertyClient
         {
-            [Import("k", typeof(Service))]
+            [Import("k", typeof (Service))]
             public IService Some { get; set; }
         }
 
         [Export]
         public class BadTypePropertyClient
         {
-            [Import(typeof(BadType))]
+            [Import(typeof (BadType))]
             public IService Some { get; set; }
 
-            public class BadType { }
+            public class BadType {}
         }
 
         [Export]
@@ -250,11 +315,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             [Import(typeof(Service))]
             public MyWrapper<IService> Some { get; set; }
-
-            //public CustomWrapperClient([Import(typeof(Service))]MyWrapper<IService> some)
-            //{
-            //    Some = some;
-            //}
         }
 
         public class MyWrapper<T>
@@ -266,5 +326,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 Value = value;
             }
         }
+
+        #endregion
     }
 }

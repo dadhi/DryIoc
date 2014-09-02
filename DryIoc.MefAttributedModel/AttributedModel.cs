@@ -230,7 +230,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly MethodInfo _resolveMethod =
-            typeof(Resolver).GetMethod("Resolve", new[] { typeof(IResolver), typeof(string), typeof(IfUnresolved) });
+            typeof(Resolver).GetMethod("Resolve", new[] { typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type) });
 
         private static readonly string _factoryMethodName = "Create";
         private static readonly string _dotFactoryMethodName = "." + _factoryMethodName;
@@ -256,7 +256,8 @@ namespace DryIoc.MefAttributedModel
                     Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
                         request.State.GetItemExpression(registry),
                         Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
-                        Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved))),
+                        Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved)),
+                        Expression.Constant(null, typeof(Type))),
                     _factoryMethodName, null);
 
             var factory = new ExpressionFactory(factoryCreateExpr,
@@ -308,15 +309,13 @@ namespace DryIoc.MefAttributedModel
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
-            var properties = type.GetProperties(flags)
-                .Where(p => p.GetSetMethod() != null && !p.GetSetMethod().IsPrivate).Select(property =>
+            var properties = type.GetProperties(flags).Where(ReflectionTools.IsWritableProperty).Select(property =>
             {
                 var details = GetFirstImportDetailsOrNull(property.PropertyType, property.GetCustomAttributes(false), request, registry);
                 return details == null ? null : PropertyOrFieldServiceInfo.Of(property).With(details, request, registry);
             });
 
-            var fields = type.GetFields(flags)
-                .Where(f => !f.IsInitOnly).Select(field =>
+            var fields = type.GetFields(flags).Where(ReflectionTools.IsWritableField).Select(field =>
             {
                 var details = GetFirstImportDetailsOrNull(field.FieldType, field.GetCustomAttributes(false), request, registry);
                 return details == null ? null : PropertyOrFieldServiceInfo.Of(field).With(details, request, registry);
