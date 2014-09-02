@@ -327,33 +327,38 @@ namespace DryIoc.MefAttributedModel
         public static ServiceInfoDetails GetFirstImportDetailsOrNull(Type type, object[] attributes, Request request, IRegistry registry)
         {
             return attributes.Length == 0 ? null
-                : (GetImportDetails(type, attributes) ??
-                   GetImportWithMetadataDetails(type, attributes, request, registry) ??
+                : (GetImportDetails(type, attributes, request, registry) ??
                    GetImportExternalDetails(type, attributes, registry));
         }
 
-        public static ServiceInfoDetails GetImportDetails(Type reflectedType, object[] attributes)
+        public static ServiceInfoDetails GetImportDetails(Type reflectedType, object[] attributes, Request request, IRegistry registry)
         {
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
-            if (import == null) return null;
-            var serviceKey = import.ContractName ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null);
+            if (import == null) 
+                return null;
+
+            var serviceKey = import.ContractName
+                ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null)
+                ?? GetServiceKeyWithMetadataAttribute(reflectedType, attributes, request, registry);
+            
             var ifUnresolved = import.AllowDefault ? IfUnresolved.ReturnNull : IfUnresolved.Throw;
+            
             return ServiceInfoDetails.Of(import.ContractType, serviceKey, ifUnresolved);
         }
 
-        public static ServiceInfoDetails GetImportWithMetadataDetails(Type reflectedType, object[] attributes, Request request, IRegistry registry)
+        public static object GetServiceKeyWithMetadataAttribute(Type reflectedType, object[] attributes, Request request, IRegistry registry)
         {
-            var import = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
-            if (import == null)
+            var meta = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
+            if (meta == null)
                 return null;
 
             reflectedType = registry.GetWrappedServiceType(reflectedType);
-            var metadata = import.Metadata;
+            var metadata = meta.Metadata;
             var factory = registry.GetAllFactories(reflectedType)
                 .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
                 .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, reflectedType, metadata, request);
 
-            return ServiceInfoDetails.Of(reflectedType, factory.Key);
+            return factory.Key;
         }
 
         public static ServiceInfoDetails GetImportExternalDetails(Type serviceType, object[] attributes, IRegistry registry)

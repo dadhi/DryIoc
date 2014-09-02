@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel.Composition;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
@@ -19,7 +20,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public Lazy<IFooService> Foo { get; set; }
 
-        public FooConsumer([WithMetadata(FooMetadata.Blah)] Lazy<IFooService> foo)
+        public FooConsumer([Import, WithMetadata(FooMetadata.Blah)] Lazy<IFooService> foo)
         {
             Foo = foo;
         }
@@ -30,7 +31,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public IFooService Foo { get; set; }
 
-        public FooConsumerNotFound([WithMetadata(FooMetadata.NotFound)]IFooService foo)
+        public FooConsumerNotFound([Import,WithMetadata(FooMetadata.NotFound)]IFooService foo)
         {
             Foo = foo;
         }
