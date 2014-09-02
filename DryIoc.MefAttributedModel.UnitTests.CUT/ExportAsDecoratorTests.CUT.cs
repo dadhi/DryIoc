@@ -6,17 +6,17 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportAll(ContractName = "fast"), ExportWithMetadata(2)]
+    [ExportAll(ContractName = "fast"), WithMetadata(2)]
     public class FastHandler : IHandler
     {
     }
 
-    [ExportAll(ContractName = "slow"), ExportWithMetadata(1)]
+    [ExportAll(ContractName = "slow"), WithMetadata(1)]
     public class SlowHandler : IHandler
     {
     }
 
-    [ExportAll(ContractName = "transact"), ExportWithMetadata(1)]
+    [ExportAll(ContractName = "transact"), WithMetadata(1)]
     public class TransactHandler : IHandler
     {
     }
@@ -32,7 +32,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, ExportAsDecorator, ExportWithMetadata(2)]
+    [ExportAll, ExportAsDecorator, WithMetadata(2)]
     public class RetryHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -43,7 +43,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, ExportAsDecorator(ContractName = "transact"), ExportWithMetadata(1)]
+    [ExportAll, ExportAsDecorator(ContractName = "transact"), WithMetadata(1)]
     public class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }

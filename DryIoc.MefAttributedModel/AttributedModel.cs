@@ -261,7 +261,7 @@ namespace DryIoc.MefAttributedModel
                     _factoryMethodName, null);
 
             var factory = new ExpressionFactory(factoryCreateExpr,
-                AttributedModel.GetReuseByType(info.ReuseType), info.GetSetup(attributes));
+                GetReuseByType(info.ReuseType), info.GetSetup(attributes));
 
             for (var i = 0; i < info.Exports.Length; i++)
             {
@@ -304,7 +304,7 @@ namespace DryIoc.MefAttributedModel
             return ParameterServiceInfo.Of(parameter).With(details, request, registry);
         }
 
-        public static IEnumerable<PropertyOrFieldServiceInfo> 
+        public static IEnumerable<PropertyOrFieldServiceInfo>
             GetImportedPropertiesAndFields(Type type, Request request, IRegistry registry)
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
@@ -337,12 +337,13 @@ namespace DryIoc.MefAttributedModel
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
             if (import == null) return null;
             var serviceKey = import.ContractName ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null);
-            return ServiceInfoDetails.Of(import.ContractType, serviceKey);
+            var ifUnresolved = import.AllowDefault ? IfUnresolved.ReturnNull : IfUnresolved.Throw;
+            return ServiceInfoDetails.Of(import.ContractType, serviceKey, ifUnresolved);
         }
 
         public static ServiceInfoDetails GetImportWithMetadataDetails(Type reflectedType, object[] attributes, Request request, IRegistry registry)
         {
-            var import = GetSingleAttributeOrDefault<ImportWithMetadataAttribute>(attributes);
+            var import = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
             if (import == null)
                 return null;
 
@@ -371,7 +372,7 @@ namespace DryIoc.MefAttributedModel
 
                 var implementationType = import.ImplementationType ?? serviceType;
 
-                var withConstructor = import.WithConstructor == null ? null 
+                var withConstructor = import.WithConstructor == null ? null
                     : (Func<Type, ConstructorInfo>)(t => t.GetConstructor(import.WithConstructor));
 
                 registry.Register(serviceType,
@@ -550,10 +551,9 @@ namespace DryIoc.MefAttributedModel
             var metadataAttr = attributes.FirstOrDefault(
                 a => Attribute.IsDefined(a.GetType(), typeof(MetadataAttributeAttribute), true));
 
-            if (metadataAttr is ExportWithMetadataAttribute)
-                return ((ExportWithMetadataAttribute)metadataAttr).Metadata;
-
-            return metadataAttr;
+            return metadataAttr is WithMetadataAttribute
+                ? ((WithMetadataAttribute)metadataAttr).Metadata
+                : metadataAttr;
         }
     }
 
@@ -702,18 +702,6 @@ namespace DryIoc.MefAttributedModel
         public ResolutionScopeReuseAttribute() : base(typeof(ResolutionScopeReuse)) { }
     }
 
-    [MetadataAttribute]
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public class ExportWithMetadataAttribute : Attribute
-    {
-        public object Metadata { get; set; }
-
-        public ExportWithMetadataAttribute(object metadata)
-        {
-            Metadata = metadata.ThrowIfNull();
-        }
-    }
-
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
     public class ExportWithKeyAttribute : ExportAttribute
     {
@@ -793,14 +781,16 @@ namespace DryIoc.MefAttributedModel
         }
 
         public ImportWithKeyAttribute(Type contractType)
-            : this(null, contractType) {}
+            : this(null, contractType) { }
     }
 
     [MetadataAttribute]
-    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
-    public class ImportWithMetadataAttribute : Attribute
+    [AttributeUsage(AttributeTargets.Class | // for Export 
+        AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, // for Import
+        AllowMultiple = false, Inherited = false)]
+    public class WithMetadataAttribute : Attribute
     {
-        public ImportWithMetadataAttribute(object metadata)
+        public WithMetadataAttribute(object metadata)
         {
             Metadata = metadata.ThrowIfNull();
         }
@@ -808,7 +798,7 @@ namespace DryIoc.MefAttributedModel
         public readonly object Metadata;
     }
 
-    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, 
+    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property,
         AllowMultiple = false, Inherited = false)]
     public class ImportExternalAttribute : Attribute
     {
@@ -818,7 +808,7 @@ namespace DryIoc.MefAttributedModel
         public object ContractKey { get; set; }
         public Type ContractType { get; set; }
 
-        public ImportExternalAttribute(Type implementationType = null, Type[] withConstructor = null, object metadata = null, 
+        public ImportExternalAttribute(Type implementationType = null, Type[] withConstructor = null, object metadata = null,
             object contractKey = null, Type contractType = null)
         {
             ContractType = contractType;

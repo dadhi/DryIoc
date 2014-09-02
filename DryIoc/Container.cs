@@ -1680,11 +1680,11 @@ namespace DryIoc
     public static class Resolver
     {
         /// <summary>
-        /// Returns instance of statically known <typepsaramref name="TService"/> type.
+        /// Returns instance of <typepsaramref name="TService"/> type.
         /// </summary>
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
+        /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
         /// <returns>The requested service instance.</returns>
         public static object Resolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
@@ -1696,7 +1696,7 @@ namespace DryIoc
         /// </summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
+        /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
         /// <returns>The requested service instance.</returns>
         public static TService Resolve<TService>(this IResolver resolver, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
@@ -1710,8 +1710,8 @@ namespace DryIoc
         /// </summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="providedServiceType">Service or wrapped type assignable to <typeparamref name="TService"/>.</param>
-        /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
+        /// <param name="providedServiceType">(optional) Service or wrapped type assignable to <typeparamref name="TService"/>.</param>
+        /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
         /// <returns>The requested service instance.</returns>
         /// <remarks>Using <paramref name="providedServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
         /// <example>
@@ -1757,8 +1757,10 @@ namespace DryIoc
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceKey">Service key (any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/> defined).</param>
-        /// <param name="ifUnresolved">Optional, says how to handle unresolved service.</param>
+        /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
+        /// <param name="providedServiceType">(optional) Service or wrapped type assignable to <typeparamref name="TService"/>.</param>
         /// <returns>The requested service instance.</returns>
+        /// <remarks>Using <paramref name="providedServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
         public static TService Resolve<TService>(this IResolver resolver, object serviceKey,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type providedServiceType = null)
         {
@@ -3441,10 +3443,10 @@ namespace DryIoc
 
         public static Expression DefaultValueExpression(this Type type)
         {
-            return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), Expression.Constant(type, typeof(Type)));
+            return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), (Expression[])null);
         }
 
-        private static readonly MethodInfo _getDefaultMethod = typeof(ReflectionFactory).GetMethod("GetDefault");
+        private static readonly MethodInfo _getDefaultMethod = typeof(ReflectionTools).GetMethod("GetDefault");
         public static T GetDefault<T>() { return default(T); }
     }
 
