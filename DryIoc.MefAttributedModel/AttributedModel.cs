@@ -167,20 +167,20 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.ReuseType = ((ReuseAttribute)attribute).ReuseType;
                 }
-                else if (attribute is ExportAsGenericWrapperAttribute)
+                else if (attribute is AsGenericWrapperAttribute)
                 {
                     Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
                     info.FactoryType = FactoryType.GenericWrapper;
-                    var genericWrapperAttribute = ((ExportAsGenericWrapperAttribute)attribute);
+                    var genericWrapperAttribute = ((AsGenericWrapperAttribute)attribute);
                     info.GenericWrapper = new GenericWrapperInfo
                     {
                         ServiceTypeIndex = genericWrapperAttribute.ContractTypeArgIndex
                     };
                 }
-                else if (attribute is ExportAsDecoratorAttribute)
+                else if (attribute is AsDecoratorForAttribute)
                 {
                     Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
-                    var decorator = ((ExportAsDecoratorAttribute)attribute);
+                    var decorator = ((AsDecoratorForAttribute)attribute);
                     info.FactoryType = FactoryType.Decorator;
                     info.Decorator = new DecoratorInfo(decorator.ConditionType, decorator.ContractName ?? decorator.ContractKey);
                 }
@@ -630,7 +630,7 @@ namespace DryIoc.MefAttributedModel
         public DecoratorSetup GetSetup(Func<object> getMetadata = null)
         {
             if (ConditionType != null)
-                return DecoratorSetup.With(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).Check);
+                return DecoratorSetup.With(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).CanApply);
 
             if (ServiceKeyInfo != ServiceKeyInfo.Default || getMetadata != null)
                 return DecoratorSetup.With(request =>
@@ -744,20 +744,22 @@ namespace DryIoc.MefAttributedModel
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public class ExportAsGenericWrapperAttribute : Attribute
+    public class AsGenericWrapperAttribute : Attribute
     {
         public int ContractTypeArgIndex { get; set; }
 
-        public ExportAsGenericWrapperAttribute(int contractTypeArgIndex = 0)
+        public AsGenericWrapperAttribute(int contractTypeArgIndex = 0)
         {
             ContractTypeArgIndex = contractTypeArgIndex.ThrowIf(contractTypeArgIndex < 0);
         }
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public class ExportAsDecoratorAttribute : Attribute
+    public class AsDecoratorForAttribute : Attribute
     {
-        /// <remarks>If specified has more priority over <see cref="ContractKey"/>.</remarks>
+        /// <remarks>
+        /// If <see cref="ContractName"/> specified, it has more priority over <see cref="ContractKey"/>.
+        /// </remarks>
         public string ContractName { get; set; }
         public object ContractKey { get; set; }
         public Type ConditionType { get; set; }
@@ -765,7 +767,7 @@ namespace DryIoc.MefAttributedModel
 
     public interface IDecoratorCondition
     {
-        bool Check(Request request);
+        bool CanApply(Request request);
     }
 
     [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]

@@ -69,6 +69,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\DelegateFactoryTests.cs">
       <Link>DelegateFactoryTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\DependencyDiscoveryTests.cs">
+      <Link>DependencyDiscoveryTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\DiagnosticsTests.cs">
       <Link>DiagnosticsTests.cs</Link>
     </Compile>
@@ -89,6 +92,9 @@
     </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\IfAlreadyRegisteredTests.cs">
       <Link>IfAlreadyRegisteredTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\IfUnresolvedTests.cs">
+      <Link>IfUnresolvedTests.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\KeyValuePairResolutionTests.cs">
       <Link>KeyValuePairResolutionTests.cs</Link>

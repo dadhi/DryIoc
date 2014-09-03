@@ -1,7 +1,7 @@
-﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
+﻿using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
-namespace DryIoc.MefAttributedModel.UnitTests
+namespace DryIoc.UnitTests
 {
     public class IfUnresolvedTests
     {

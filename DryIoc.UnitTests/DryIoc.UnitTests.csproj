@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AppendableArrayTests.cs" />
+    <Compile Include="IfUnresolvedTests.cs" />
     <Compile Include="ProvidedServiceTypeTests.cs" />
     <Compile Include="SelectConstructorWithAllResolvableArguments.cs" />
     <Compile Include="CompositePatternTests.cs" />

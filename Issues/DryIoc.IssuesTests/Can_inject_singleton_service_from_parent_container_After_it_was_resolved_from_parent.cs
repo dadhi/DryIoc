@@ -2,7 +2,7 @@
 
 namespace DryIoc.IssuesTests
 {
-    [TestFixture][Ignore("Fixed in v2.0.0")]
+    [TestFixture]
     public class IssueNo2_Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent
     {
         [Test]
