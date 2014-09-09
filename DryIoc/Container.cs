@@ -1190,20 +1190,42 @@ when resolving {1}.";
         public static void ResolvePropertiesAndFields(this IResolver resolver, object instance, Func<MemberInfo, string> getServiceName = null)
         {
             var implType = instance.ThrowIfNull().GetType();
-            getServiceName = getServiceName ?? (_ => null);
-
-            foreach (var property in implType.GetProperties(MembersToResolve).Where(p => p.GetSetMethod() != null))
+            ResolutionRules.ResolveMemberServiceKey tryGetMemberKey = null;
+            if (getServiceName != null)
+                tryGetMemberKey = ((out object key, MemberInfo member, Request _, IRegistry __) =>
+                {
+                    key = getServiceName(member);
+                    return true;
+                });
+            else
             {
-                var value = resolver.Resolve(property.PropertyType, getServiceName(property), IfUnresolved.ReturnNull);
-                if (value != null)
-                    property.SetValue(instance, value, null);
+                var rules = ((IRegistry)resolver).ResolutionRules;
+                if (rules.ShouldResolvePropertiesAndFields)
+                    tryGetMemberKey = rules.TryGetPropertyOrFieldServiceKey;
             }
 
-            foreach (var field in implType.GetFields(MembersToResolve).Where(f => !f.IsInitOnly))
+            var request = Request.Create(implType);
+            var registry = (IRegistry)resolver;
+            foreach (var property in implType.GetProperties(MembersToResolve).Where(Sugar.IsWritableProperty))
             {
-                var value = resolver.Resolve(field.FieldType, getServiceName(field), IfUnresolved.ReturnNull);
-                if (value != null)
-                    field.SetValue(instance, value);
+                object key = null;
+                if (tryGetMemberKey == null || tryGetMemberKey(out key, property, request, registry))
+                {
+                    var value = resolver.Resolve(property.PropertyType, key as string, IfUnresolved.ReturnNull);
+                    if (value != null)
+                        property.SetValue(instance, value, null);
+                }
+            }
+            
+            foreach (var field in implType.GetFields(MembersToResolve).Where(Sugar.IsWritableField))
+            {
+                object key = null;
+                if (tryGetMemberKey == null || tryGetMemberKey(out key, field, request, registry))
+                {
+                    var value = resolver.Resolve(field.FieldType, key as string, IfUnresolved.ReturnNull);
+                    if (value != null)
+                        field.SetValue(instance, value);
+                }
             }
         }
     }
@@ -1665,8 +1687,8 @@ when resolving {1}.";
             if (!registry.ResolutionRules.ShouldResolvePropertiesAndFields)
                 return newService;
 
-            var properties = implementationType.GetProperties(Resolver.MembersToResolve).Where(p => p.GetSetMethod() != null);
-            var fields = implementationType.GetFields(Resolver.MembersToResolve).Where(f => !f.IsInitOnly);
+            var properties = implementationType.GetProperties(Resolver.MembersToResolve).Where(Sugar.IsWritableProperty);
+            var fields = implementationType.GetFields(Resolver.MembersToResolve).Where(Sugar.IsWritableField);
 
             var bindings = new List<MemberBinding>();
             foreach (var member in properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>()))
@@ -2229,6 +2251,17 @@ when resolving {1}.";
             Array.Copy(source, result, sourceLength);
             result[index] = value;
             return result;
+        }
+
+        public static bool IsWritableProperty(PropertyInfo property)
+        {
+            var setMethod = property.GetSetMethod();
+            return setMethod != null && !setMethod.IsPrivate;
+        }
+
+        public static bool IsWritableField(FieldInfo field)
+        {
+            return !field.IsInitOnly;
         }
     }
 

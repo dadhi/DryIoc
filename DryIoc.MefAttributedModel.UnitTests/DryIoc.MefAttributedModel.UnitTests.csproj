@@ -48,6 +48,7 @@
     <Compile Include="ExportAsDecoratorTests.cs" />
     <Compile Include="ExportAsGenericWrapperTests.cs" />
     <Compile Include="ExportOnceTests.cs" />
+    <Compile Include="ImportPropertiesAndFieldsTests.cs" />
     <Compile Include="ImportWithMetadataTests.cs" />
     <Compile Include="InheritedExportTests.cs" />
     <Compile Include="Performance\PerformanceTests.cs" />
