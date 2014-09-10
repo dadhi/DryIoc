@@ -44,6 +44,20 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.That(client.Some, Is.Null);
         }
 
+        [Test]
+        public void Internal_properties_could_not_be_imported_by_default()
+        {
+            var container = new Container(AttributedModel.DefaultSetup);
+            container.Register<ClientWithProtectedProperty>();
+            container.Register<IService, Service>();
+
+            var client = container.Resolve<ClientWithProtectedProperty>();
+
+            Assert.That(client.GetSome(), Is.Null);
+        }
+
+        #region CUT
+
         [Export]
         public class PropertyClient
         {
@@ -61,5 +75,19 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             public IService Other { get; set; }
         }
+
+        [Export]
+        public class ClientWithProtectedProperty
+        {
+            [Import]
+            internal IService Some { get; set; }
+
+            public IService GetSome()
+            {
+                return Some;
+            }
+        }
+
+        #endregion
     }
 }
