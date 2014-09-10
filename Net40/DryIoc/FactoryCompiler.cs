@@ -75,7 +75,7 @@ namespace DryIoc
 
         static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, IRegistry registry, ref FactoryDelegate result)
         {
-            if (!registry.ResolutionRules.CompilationToDynamicAssemblyEnabled) 
+            if (!registry.Rules.CompilationToDynamicAssemblyEnabled) 
                 return;
 
             result.ThrowIf(result != null);
@@ -115,16 +115,16 @@ namespace DryIoc
     }
 
     /// <remarks>Resolution rules to enable/disable compiling to Dynamic Assembly.</remarks>
-    public sealed partial class ResolutionRules
+    public sealed partial class Rules
     {
         public bool CompilationToDynamicAssemblyEnabled
         {
             get { return _compilationToDynamicAssemblyEnabled; }
         }
 
-        public ResolutionRules EnableCompilationToDynamicAssembly(bool enable)
+        public Rules EnableCompilationToDynamicAssembly(bool enable)
         {
-            return new ResolutionRules(this) { _compilationToDynamicAssemblyEnabled = enable };
+            return new Rules(this) { _compilationToDynamicAssemblyEnabled = enable };
         }
     }
 }

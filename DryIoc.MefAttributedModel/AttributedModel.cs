@@ -47,17 +47,15 @@ namespace DryIoc.MefAttributedModel
             { typeof(ResolutionScopeReuse), Reuse.InResolutionScope }
         };
 
-        public static ResolutionRules WithAttributedModel(this ResolutionRules rules)
+        public static Rules WithAttributedModel(this Rules rules)
         {
-            return rules.With(DependencyDiscoveryRules.Empty
-                .WithConstructor(GetImportingConstructor) // hello, Max!!! we are Martians.
-                .WithParameters(GetImportedParameter)
-                .WithPropertiesAndFields(GetImportedPropertiesAndFields));
+            // hello, Max!!! we are Martians.
+            return rules.With(GetImportingConstructor, GetImportedParameter, GetImportedPropertiesAndFields);
         }
 
         public static Container WithAttributedModel(this Container container)
         {
-            return container.WithNewRules(container.ResolutionRules.WithAttributedModel());
+            return container.WithNewRules(container.Rules.WithAttributedModel());
         }
 
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
@@ -304,8 +302,7 @@ namespace DryIoc.MefAttributedModel
             return ParameterServiceInfo.Of(parameter).With(details, request, registry);
         }
 
-        public static IEnumerable<PropertyOrFieldServiceInfo>
-            GetImportedPropertiesAndFields(Type type, Request request, IRegistry registry)
+        public static IEnumerable<PropertyOrFieldServiceInfo>GetImportedPropertiesAndFields(Type type, Request request, IRegistry registry)
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
@@ -372,17 +369,16 @@ namespace DryIoc.MefAttributedModel
 
             if (!registry.IsRegistered(serviceType, serviceKey))
             {
+                var implementationType = import.ImplementationType ?? serviceType;
+
                 var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
                 var reuse = GetReuseByType(reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType);
-
-                var implementationType = import.ImplementationType ?? serviceType;
 
                 var withConstructor = import.WithConstructor == null ? null
                     : (Func<Type, ConstructorInfo>)(t => t.GetConstructor(import.WithConstructor));
 
-                registry.Register(serviceType,
-                    implementationType, reuse, withConstructor, ServiceSetup.WithMetadata(import.Metadata),
-                    named: serviceKey, ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
+                registry.Register(serviceType, implementationType, 
+                    reuse, withConstructor, Setup.WithMetadata(import.Metadata), serviceKey, IfAlreadyRegistered.KeepRegistered);
             }
 
             return ServiceInfoDetails.Of(serviceType, serviceKey);
@@ -489,7 +485,7 @@ namespace DryIoc.MefAttributedModel
 
         public Factory CreateFactory()
         {
-            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), setup: GetSetup());
+            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), GetSetup());
         }
 
         public IReuse GetReuse()
@@ -508,9 +504,9 @@ namespace DryIoc.MefAttributedModel
                     : Decorator.GetSetup();
 
             if (HasMetadataAttribute)
-                return ServiceSetup.WithMetadata(() => GetMetadata(attributes));
+                return Setup.WithMetadata(() => GetMetadata(attributes));
 
-            return ServiceSetup.Default;
+            return Setup.Default;
         }
 
         public override bool Equals(object obj)

@@ -38,8 +38,8 @@ namespace DryIoc.Samples
             var container = new Container();
             container.Register<IDependency, SomeDependency>();
 
-            container.Register<SomeClient>(dependencyDiscovery: DependencyDiscoveryRules.Empty.WithConstructor(
-                ReflectionFactory.SelectConstructorWithAllResolvableArguments));
+            container.Register<SomeClient>(setup: Setup.With(
+                ReflectionFactory.ConstructorWithAllResolvableArguments));
 
             var client = container.Resolve<SomeClient>();
             Assert.That(client.Dependency, Is.Not.Null);

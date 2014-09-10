@@ -54,7 +54,7 @@
     <Compile Include="PrintTests.cs" />
     <Compile Include="RefTests.cs" />
     <Compile Include="RegisterWithNonStringServiceKeyTests.cs" />
-    <Compile Include="ResolutionRulesTests.cs" />
+    <Compile Include="RulesTests.cs" />
     <Compile Include="ContainerTests.cs" />
     <Compile Include="ContextDependentResolutionTests.cs" />
     <Compile Include="CUT\ContainerTests.CUT.cs" />

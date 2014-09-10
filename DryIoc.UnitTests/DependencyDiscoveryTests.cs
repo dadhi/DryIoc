@@ -5,14 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class DependencyDiscoveryTests
+    public class DependencyResolutionTests
     {
         [Test]
         public void Specify_property_selector_when_registering_service()
         {
             var container = new Container();
 
-            container.Register<SomeBlah>(dependencyDiscovery: DependencyDiscoveryRules.Empty.WithPropertiesAndFields(
+            container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
                 (type, request, registry) => type.GetProperties().Select(PropertyOrFieldServiceInfo.Of)));
             container.Register<IService, Service>();
 
@@ -25,7 +25,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<SomeBlah>(dependencyDiscovery: DependencyDiscoveryRules.Empty.WithPropertiesAndFields(
+            container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
                 (type, request, registry) => type.GetProperties().Select(p =>
                     p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).With(ServiceInfoDetails.Of(typeof(Service)), request, registry) : null)));
             container.Register<Service>();

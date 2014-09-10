@@ -92,8 +92,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_property_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.With(DependencyDiscoveryRules.Empty
-                .WithPropertiesAndFields(SelectPropertiesAndFieldsWithImportAttribute)));
+            var container = new Container(Rules.Default.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunnyChicken>();
             container.Register<Guts>();
@@ -107,8 +106,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.With(
-                DependencyDiscoveryRules.Empty.WithPropertiesAndFields(SelectPropertiesAndFieldsWithImportAttribute)));
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunnyChicken>();
             container.Register<Guts>();
@@ -122,8 +120,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_not_throw_on_resolving_readonly_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.With(
-                DependencyDiscoveryRules.Empty.WithPropertiesAndFields(SelectPropertiesAndFieldsWithImportAttribute)));
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunnyDuckling>();
 
@@ -134,8 +131,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_Func_of_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.With(
-                DependencyDiscoveryRules.Empty.WithPropertiesAndFields(SelectPropertiesAndFieldsWithImportAttribute)));
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunkyChicken>();
             container.Register<Guts>();
@@ -148,8 +144,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_named_Lazy_of_property_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.With(
-                DependencyDiscoveryRules.Empty.WithPropertiesAndFields(SelectPropertiesAndFieldsWithImportAttribute)));
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<LazyChicken>();
             container.Register<Guts>(named: "lazy-me");

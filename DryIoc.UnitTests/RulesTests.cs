@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ResolutionRulesTests
+    public class RulesTests
     {
         [Test]
         public void It_is_possible_to_remove_Enumerable_support_per_container()
@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_should_be_able_to_add_rule_to_resolve_not_registered_service()
         {
-            var container = new Container(ResolutionRules.Default.With((request, registry) =>
+            var container = new Container(Rules.Default.With((request, registry) =>
                 request.ServiceType.IsClass && !request.ServiceType.IsAbstract
                     ? new ReflectionFactory(request.ServiceType)
                     : null));
@@ -53,8 +53,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void When_service_registered_with_name_Then_it_could_be_resolved_with_ctor_parameter_ImportAttribute()
         {
-            var container = new Container(ResolutionRules.Default.With(
-                DependencyDiscoveryRules.Empty.WithParameters(GetServiceInfoFromImportAttribute)));
+            var container = new Container(rules => rules.With(parameters: GetServiceInfoFromImportAttribute));
 
             container.Register(typeof(INamedService), typeof(NamedService));
             container.Register(typeof(INamedService), typeof(AnotherNamedService), named: "blah");
@@ -68,11 +67,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_should_be_able_to_import_single_service_based_on_specified_metadata()
         {
-            var container = new Container(ResolutionRules.Default.With(DependencyDiscoveryRules.Empty.WithParameters(
-                GetServiceFromWithMetadataAttribute)));
+            var container = new Container(rules => rules.With(parameters: GetServiceFromWithMetadataAttribute));
 
-            container.Register(typeof(IFooService), typeof(FooHey), setup: ServiceSetup.WithMetadata(FooMetadata.Hey));
-            container.Register(typeof(IFooService), typeof(FooBlah), setup: ServiceSetup.WithMetadata(FooMetadata.Blah));
+            container.Register(typeof(IFooService), typeof(FooHey), setup: Setup.WithMetadata(FooMetadata.Hey));
+            container.Register(typeof(IFooService), typeof(FooBlah), setup: Setup.WithMetadata(FooMetadata.Blah));
             container.Register(typeof(FooConsumer));
 
             var service = container.Resolve<FooConsumer>();
@@ -117,7 +115,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void You_can_specify_rules_to_resolve_last_registration_from_multiple_available()
         {
-            var container = new Container(ResolutionRules.Default.With(factories => factories.Last().Value));
+            var container = new Container(Rules.Default.With(factories => factories.Last().Value));
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));
@@ -129,7 +127,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void You_can_specify_rules_to_disable_registration_based_on_reuse_type()
         {
-            var container = new Container(ResolutionRules.Default.With(
+            var container = new Container(Rules.Default.With(
                 factories => factories.Select(f => f.Value).FirstOrDefault(f => !(f.Reuse is SingletonReuse))));
 
             container.Register<IService, Service>(Reuse.Singleton);

@@ -10,7 +10,7 @@ namespace DryIoc.UnitTests
 		{
 			// Arrange
 			var container = new Container();
-			container.RegisterManyServicesWithOneImplementation<Someberry>();
+			container.RegisterAll<Someberry>();
 
 			Assert.That(container.IsRegistered<IBerry>(), Is.False);
 			Assert.That(container.IsRegistered<IProduct>(), Is.True);
@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
 		{
 			// Arrange
 			var container = new Container();
-            container.RegisterManyServicesWithOneImplementation<Someberry>(Reuse.Singleton);
+            container.RegisterAll<Someberry>(Reuse.Singleton);
 
 			// Act
 			var product = container.Resolve<IProduct>();

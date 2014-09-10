@@ -200,8 +200,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Resolve_Meta_of_provided_type_should_work()
         {
             var container = new Container();
-            container.Register<IService, Service>(setup: ServiceSetup.WithMetadata("a"));
-            container.Register<IService, AnotherService>(setup: ServiceSetup.WithMetadata("b"));
+            container.Register<IService, Service>(setup: Setup.WithMetadata("a"));
+            container.Register<IService, AnotherService>(setup: Setup.WithMetadata("b"));
 
             var services = container.Resolve<Meta<Func<object>, string>[]>(typeof(IService));
 
