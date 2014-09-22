@@ -5,33 +5,6 @@ namespace DryIoc.Samples
     [TestFixture]
     public class SelectConstructorWithAllResolvableArguments
     {
-        //[Test]
-        //public void Can_do_that_manually()
-        //{
-        //    var container = new Container();
-        //    container.Register<IDependency, SomeDependency>();
-
-        //    container.Register<SomeClient>(withConstructor: (type, request, registry) =>
-        //    {
-        //        var ctors = type.GetConstructors();
-        //        if (ctors.Length == 0)
-        //            return null;
-
-        //        if (ctors.Length == 1)
-        //            return ctors[0];
-
-        //        var ctor = ctors
-        //            .Select(c => new { Ctor = c, Params = c.GetParameters() })
-        //            .OrderByDescending(x => x.Params.Length)
-        //            .FirstOrDefault(x => x.Params.All(p => registry.ResolveFactory(request.Push(p, registry), IfUnresolved.ReturnNull) != null));
-
-        //        return ctor.ThrowIfNull("Unable to select constructor with all resolvable arguments when resolving {0}", request).Ctor;
-        //    });
-
-        //    var client = container.Resolve<SomeClient>();
-        //    Assert.That(client.Dependency, Is.Not.Null);
-        //}
-
         [Test]
         public void Container_is_providing_method_for_that()
         {

@@ -131,7 +131,7 @@ namespace DryIoc.UnitTests
                 factories => factories.Select(f => f.Value).FirstOrDefault(f => !(f.Reuse is SingletonReuse))));
 
             container.Register<IService, Service>(Reuse.Singleton);
-            var service = container.Resolve(typeof(IService), IfUnresolved.ReturnNull);
+            var service = container.Resolve(typeof(IService), IfUnresolved.ReturnDefault);
 
             Assert.That(service, Is.Null);
         }

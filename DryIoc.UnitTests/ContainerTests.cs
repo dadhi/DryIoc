@@ -267,7 +267,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var service = container.Resolve<IService>(IfUnresolved.ReturnNull);
+            var service = container.Resolve<IService>(IfUnresolved.ReturnDefault);
 
             Assert.Null(service);
         }

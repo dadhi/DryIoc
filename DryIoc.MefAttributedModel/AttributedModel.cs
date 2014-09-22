@@ -175,10 +175,10 @@ namespace DryIoc.MefAttributedModel
                         ServiceTypeIndex = genericWrapperAttribute.ContractTypeArgIndex
                     };
                 }
-                else if (attribute is AsDecoratorForAttribute)
+                else if (attribute is AsDecoratorAttribute)
                 {
                     Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
-                    var decorator = ((AsDecoratorForAttribute)attribute);
+                    var decorator = ((AsDecoratorAttribute)attribute);
                     info.FactoryType = FactoryType.Decorator;
                     info.Decorator = new DecoratorInfo(decorator.ConditionType, decorator.ContractName ?? decorator.ContractKey);
                 }
@@ -338,7 +338,7 @@ namespace DryIoc.MefAttributedModel
                 ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null)
                 ?? GetServiceKeyWithMetadataAttribute(reflectedType, attributes, request, registry);
             
-            var ifUnresolved = import.AllowDefault ? IfUnresolved.ReturnNull : IfUnresolved.Throw;
+            var ifUnresolved = import.AllowDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
             
             return ServiceInfoDetails.Of(import.ContractType, serviceKey, ifUnresolved);
         }
@@ -751,7 +751,7 @@ namespace DryIoc.MefAttributedModel
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public class AsDecoratorForAttribute : Attribute
+    public class AsDecoratorAttribute : Attribute
     {
         /// <remarks>
         /// If <see cref="ContractName"/> specified, it has more priority over <see cref="ContractKey"/>.

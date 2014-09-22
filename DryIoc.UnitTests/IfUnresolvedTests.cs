@@ -11,7 +11,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Client>();
 
-            var client = container.Resolve<Client>(IfUnresolved.ReturnNull);
+            var client = container.Resolve<Client>(IfUnresolved.ReturnDefault);
 
             Assert.IsNull(client);
         }
@@ -21,7 +21,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var services = container.Resolve<Service[]>(IfUnresolved.ReturnNull);
+            var services = container.Resolve<Service[]>(IfUnresolved.ReturnDefault);
 
             CollectionAssert.IsEmpty(services);
         }
@@ -32,7 +32,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Client>();
 
-            container.Resolve<Client>(IfUnresolved.ReturnNull);
+            container.Resolve<Client>(IfUnresolved.ReturnDefault);
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Client>());
@@ -47,7 +47,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var service = container.Resolve<Client>(IfUnresolved.ReturnNull);
+            var service = container.Resolve<Client>(IfUnresolved.ReturnDefault);
             Assert.IsNull(service);
 
             Assert.Throws<ContainerException>(() => 

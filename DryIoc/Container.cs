@@ -1009,7 +1009,7 @@ namespace DryIoc
                 for (var i = 0; i < itemArray.Length; i++)
                 {
                     var item = itemArray[i];
-                    var itemRequest = request.Push(ServiceInfo.Of(itemType, item.Key, IfUnresolved.ReturnNull));
+                    var itemRequest = request.Push(ServiceInfo.Of(itemType, item.Key, IfUnresolved.ReturnDefault));
                     var itemFactory = registry.ResolveFactory(itemRequest);
                     if (itemFactory != null)
                     {
@@ -1195,7 +1195,7 @@ namespace DryIoc
 
             foreach (var item in items)
             {
-                var service = registry.ResolveKeyed(itemType, item.Key, IfUnresolved.ReturnNull, wrappedItemType);
+                var service = registry.ResolveKeyed(itemType, item.Key, IfUnresolved.ReturnDefault, wrappedItemType);
                 if (service != null) // skip unresolved items
                     yield return (TService)service;
             }
@@ -1890,7 +1890,7 @@ namespace DryIoc
 
         private sealed class IfUnresolvedReturnNull : ServiceInfoDetails
         {
-            public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnNull; } }
+            public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnDefault; } }
         }
 
         private class WithKey : ServiceInfoDetails
@@ -1902,7 +1902,7 @@ namespace DryIoc
 
         private sealed class WithKeyReturnNull : WithKey
         {
-            public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnNull; } }
+            public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnDefault; } }
             public WithKeyReturnNull(object serviceKey) : base(serviceKey) { }
         }
 
@@ -1915,7 +1915,7 @@ namespace DryIoc
 
         private sealed class WithTypeReturnNull : WithType
         {
-            public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnNull; } }
+            public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnDefault; } }
             public WithTypeReturnNull(Type providedType, object serviceKey) : base(providedType, serviceKey) { }
         }
     }
@@ -2806,7 +2806,7 @@ namespace DryIoc
                     var paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
                     if (paramExpr != null)
                         paramExprs[i] = paramExpr;
-                    else if (request.IfUnresolved != IfUnresolved.ReturnNull) 
+                    else if (request.IfUnresolved != IfUnresolved.ReturnDefault) 
                         paramExprs[i] = paramRequest.ServiceType.DefaultValueExpression();
                     else return null; // If holder request required to return null, then ensure it does it as soon as first parameter returns null
                 }
@@ -2849,7 +2849,7 @@ namespace DryIoc
                     var paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
                     if (paramExpr != null)
                         paramExprs[cp] = paramExpr;
-                    else if (request.IfUnresolved != IfUnresolved.ReturnNull)
+                    else if (request.IfUnresolved != IfUnresolved.ReturnDefault)
                         paramExprs[cp] = paramRequest.ServiceType.DefaultValueExpression();
                     else return null; // If holder request required to return null, then ensure it does it as soon as first parameter returns null
                 }
@@ -2913,7 +2913,7 @@ namespace DryIoc
                     }
 
                     // If parent required to return null, then ensure it does it as soon as first parameter returns null.
-                    if (request.IfUnresolved == IfUnresolved.ReturnNull)
+                    if (request.IfUnresolved == IfUnresolved.ReturnDefault)
                         return null;
 
                     // Otherwise proceed with default(T) value expression.
@@ -3166,7 +3166,7 @@ namespace DryIoc
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
     }
 
-    public enum IfUnresolved { Throw, ReturnNull }
+    public enum IfUnresolved { Throw, ReturnDefault }
 
     public interface IResolver
     {
