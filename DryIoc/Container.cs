@@ -2438,7 +2438,7 @@ namespace DryIoc
 
         public static DecoratorSetup With(Func<Request, bool> condition = null)
         {
-            return condition == null ? Default : new DecoratorSetup(condition);
+            return condition == null ? Default : new DecoratorSetup(InjectionRules.Empty, condition);
         }
 
         public override FactorySetup With(InjectionRules rules)
@@ -2803,22 +2803,12 @@ namespace DryIoc
                     var paramInfo = GetParameterServiceInfo(param, request, registry);
                     var paramRequest = request.Push(paramInfo);
                     var paramFactory = registry.ResolveFactory(paramRequest);
-                    if (paramFactory != null)
-                    {
-                        var paramExpr = paramFactory.GetExpressionOrDefault(paramRequest, registry);
-                        if (paramExpr != null)
-                        {
-                            paramExprs[i] = paramExpr;
-                            continue;
-                        }
-                    }
-
-                    // If parent required to return null, then ensure it does it as soon as first parameter returns null.
-                    if (request.IfUnresolved == IfUnresolved.ReturnNull)
-                        return null;
-
-                    // Otherwise proceed with default(T) value expression.
-                    paramExprs[i] = paramRequest.ServiceType.DefaultValueExpression();
+                    var paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
+                    if (paramExpr != null)
+                        paramExprs[i] = paramExpr;
+                    else if (request.IfUnresolved != IfUnresolved.ReturnNull) 
+                        paramExprs[i] = paramRequest.ServiceType.DefaultValueExpression();
+                    else return null; // If holder request required to return null, then ensure it does it as soon as first parameter returns null
                 }
             }
 
@@ -2856,22 +2846,12 @@ namespace DryIoc
                     var paramInfo = GetParameterServiceInfo(ctorParam, request, registry);
                     var paramRequest = request.Push(paramInfo);
                     var paramFactory = registry.ResolveFactory(paramRequest);
-                    if (paramFactory != null)
-                    {
-                        var paramExpr = paramFactory.GetExpressionOrDefault(paramRequest, registry);
-                        if (paramExpr != null)
-                        {
-                            paramExprs[cp] = paramExpr;
-                            continue;
-                        }
-                    }
-
-                    // If parent required to return null, then ensure it does it as soon as first parameter returns null.
-                    if (request.IfUnresolved == IfUnresolved.ReturnNull)
-                        return null;
-
-                    // Otherwise proceed with default(T) value expression.
-                    paramExprs[cp] = paramRequest.ServiceType.DefaultValueExpression();
+                    var paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
+                    if (paramExpr != null)
+                        paramExprs[cp] = paramExpr;
+                    else if (request.IfUnresolved != IfUnresolved.ReturnNull)
+                        paramExprs[cp] = paramRequest.ServiceType.DefaultValueExpression();
+                    else return null; // If holder request required to return null, then ensure it does it as soon as first parameter returns null
                 }
             }
 
@@ -3190,8 +3170,6 @@ namespace DryIoc
 
     public interface IResolver
     {
-        Rules Rules { get; }
-
         object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved);
 
         object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type wrappedType);
@@ -3221,6 +3199,8 @@ namespace DryIoc
     public interface IRegistry : IResolver, IRegistrator
     {
         RegistryWeakRef SelfWeakRef { get; }
+
+        Rules Rules { get; }
 
         IScope CurrentScope { get; }
         IScope SingletonScope { get; }
