@@ -11,7 +11,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<SomeClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
+            container.Register<SomeClient>(setup: Setup.With(ReflectionFactory.ConstructorWithAllResolvableArguments));
 
             var client = container.Resolve<SomeClient>();
             Assert.That(client.Seed, Is.EqualTo(1));
@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<AnotherClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
+            container.Register<AnotherClient>(setup: Setup.With(ReflectionFactory.ConstructorWithAllResolvableArguments));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<AnotherClient>());
@@ -35,7 +35,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<YetAnotherClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
+            container.Register<YetAnotherClient>(setup: Setup.With(ReflectionFactory.ConstructorWithAllResolvableArguments));
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<YetAnotherClient>());
 
@@ -47,7 +47,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<InternalClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
+            container.Register<InternalClient>(setup: Setup.With(ReflectionFactory.ConstructorWithAllResolvableArguments));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<InternalClient>());
@@ -59,7 +59,7 @@ namespace DryIoc.UnitTests
         public void For_func_with_arguments_Constructor_containing_all_func_args_should_be_selected()
         {
             var container = new Container();
-            container.Register<SomeClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
+            container.Register<SomeClient>(setup: Setup.With(ReflectionFactory.ConstructorWithAllResolvableArguments));
 
             var func = container.Resolve<Func<int, SomeService, SomeClient>>();
 
@@ -70,7 +70,7 @@ namespace DryIoc.UnitTests
         public void For_func_with_arguments_Constructor_with_more_resolvable_arguments_should_be_preferred_over_less_or_no_args()
         {
             var container = new Container();
-            container.Register<SomeClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
+            container.Register<SomeClient>(setup: Setup.With(ReflectionFactory.ConstructorWithAllResolvableArguments));
             container.Register<IDependency, SomeDependency>();
 
             var func = container.Resolve<Func<int, SomeClient>>();
@@ -82,7 +82,7 @@ namespace DryIoc.UnitTests
         public void For_func_with_arguments_When_no_matching_constructor_found_Then_it_should_throw()
         {
             var container = new Container();
-            container.Register<SomeClient>(withConstructor: ReflectionFactory.SelectConstructorWithAllResolvableArguments);
+            container.Register<SomeClient>(setup: Setup.With(ReflectionFactory.ConstructorWithAllResolvableArguments));
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Func<string, SomeClient>>());
 
@@ -92,8 +92,8 @@ namespace DryIoc.UnitTests
         [Test]
         public void Could_specify_constructor_selection_as_default_strategy_for_all_Container_registrations()
         {
-            var container = new Container(ResolutionRules.Default.WithConstructorSelector(
-                ReflectionFactory.SelectConstructorWithAllResolvableArguments));
+            var container = new Container(rules => 
+                rules.With(ReflectionFactory.ConstructorWithAllResolvableArguments));
 
             container.Register<SomeClient>();
 
@@ -103,11 +103,11 @@ namespace DryIoc.UnitTests
 
         #region CUT
 
-        public interface IDependency {}
+        public interface IDependency { }
 
-        public class SomeDependency : IDependency {}
+        public class SomeDependency : IDependency { }
 
-        public class SomeService {}
+        public class SomeService { }
 
         public class SomeClient
         {
@@ -116,7 +116,7 @@ namespace DryIoc.UnitTests
             public readonly IDependency Dependency;
 
             // Won't be selected because constructor with IDependency will be selected first.
-            public SomeClient() {}
+            public SomeClient() { }
 
             // Won't be selected because nor Int32 nor IService is registered in Container.
             public SomeClient(int seed, SomeService service)
@@ -171,7 +171,7 @@ namespace DryIoc.UnitTests
 
         public class InternalClient
         {
-            internal InternalClient() {}
+            internal InternalClient() { }
         }
 
         #endregion

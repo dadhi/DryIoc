@@ -60,6 +60,7 @@
     {
         public string ContractName { get; set; }
         public Type ContractType { get; set; }
+        public bool AllowDefault { get; set; }
 
         public ImportAttribute() { }
 

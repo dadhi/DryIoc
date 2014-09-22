@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests.Memory
 {
     [TestFixture]
-    [Ignore(@"
+    [Explicit(@"
         Tests are passing, verified on .NET 3.5, 4.0. 
         If tests are passes at least once, then it is enough to prove that Container is GC collected.")]
     public class MemoryLeaksTests
@@ -35,7 +35,7 @@ namespace DryIoc.UnitTests.Memory
         {
             var container = new Container();
 
-            container.Register(typeof(IService), typeof(Service), setup: ServiceSetup.WithMetadata("007"));
+            container.Register(typeof(IService), typeof(Service), setup: Setup.WithMetadata("007"));
             var services = container.Resolve<IEnumerable<Meta<Lazy<IService>, string>>>();
 
             var containerWeakRef = new WeakReference(container);

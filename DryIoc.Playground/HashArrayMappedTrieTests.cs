@@ -198,12 +198,12 @@ namespace DryIoc.Playground
 
     public sealed class HashTrie<K, V>
     {
-        public static readonly HashTrie<K, V> Empty = new HashTrie<K, V>(HashTrie<DryIoc.KV<K, V>>.Empty, null);
+        public static readonly HashTrie<K, V> Empty = new HashTrie<K, V>(HashTrie<KV<K, V>>.Empty, null);
 
         public HashTrie<K, V> AddOrUpdate(K key, V value)
         {
             return new HashTrie<K, V>(
-                _root.AddOrUpdate(key.GetHashCode(), new DryIoc.KV<K, V>(key, value), UpdateConflicts),
+                _root.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateConflicts),
                 _updateValue);
         }
 
@@ -214,7 +214,7 @@ namespace DryIoc.Playground
                 ? kv.Value : GetConflictedOrDefault(kv, key, defaultValue);
         }
 
-        public IEnumerable<DryIoc.KV<K, V>> Enumerate()
+        public IEnumerable<KV<K, V>> Enumerate()
         {
             foreach (var kv in _root.Enumerate())
             {
@@ -227,16 +227,16 @@ namespace DryIoc.Playground
 
         #region Implementation
 
-        private readonly HashTrie<DryIoc.KV<K, V>> _root;
+        private readonly HashTrie<KV<K, V>> _root;
         private readonly UpdateMethod<V> _updateValue;
 
-        private HashTrie(HashTrie<DryIoc.KV<K, V>> root, UpdateMethod<V> updateValue)
+        private HashTrie(HashTrie<KV<K, V>> root, UpdateMethod<V> updateValue)
         {
             _root = root;
             _updateValue = updateValue;
         }
 
-        private DryIoc.KV<K, V> UpdateConflicts(DryIoc.KV<K, V> old, DryIoc.KV<K, V> newOne)
+        private KV<K, V> UpdateConflicts(KV<K, V> old, KV<K, V> newOne)
         {
             var conflicts = old is KVWithConflicts ? ((KVWithConflicts)old).Conflicts : null;
             if (ReferenceEquals(old.Key, newOne.Key) || old.Key.Equals(newOne.Key))
@@ -253,14 +253,14 @@ namespace DryIoc.Playground
             return new KVWithConflicts(old, conflicts.AppendOrUpdate(newOne, i));
         }
 
-        private DryIoc.KV<K, V> UpdateValue(DryIoc.KV<K, V> existing, DryIoc.KV<K, V> added)
+        private KV<K, V> UpdateValue(KV<K, V> existing, KV<K, V> added)
         {
             return _updateValue == null
                 ? added
-                : new DryIoc.KV<K, V>(existing.Key, _updateValue(existing.Value, added.Value));
+                : new KV<K, V>(existing.Key, _updateValue(existing.Value, added.Value));
         }
 
-        private static V GetConflictedOrDefault(DryIoc.KV<K, V> item, K key, V defaultValue = default(V))
+        private static V GetConflictedOrDefault(KV<K, V> item, K key, V defaultValue = default(V))
         {
             var conflicts = item is KVWithConflicts ? ((KVWithConflicts)item).Conflicts : null;
             if (conflicts != null)
@@ -270,11 +270,11 @@ namespace DryIoc.Playground
             return defaultValue;
         }
 
-        private sealed class KVWithConflicts : DryIoc.KV<K, V>
+        private sealed class KVWithConflicts : KV<K, V>
         {
-            public readonly DryIoc.KV<K, V>[] Conflicts;
+            public readonly KV<K, V>[] Conflicts;
 
-            public KVWithConflicts(DryIoc.KV<K, V> kv, DryIoc.KV<K, V>[] conflicts)
+            public KVWithConflicts(KV<K, V> kv, KV<K, V>[] conflicts)
                 : base(kv.Key, kv.Value)
             {
                 Conflicts = conflicts;

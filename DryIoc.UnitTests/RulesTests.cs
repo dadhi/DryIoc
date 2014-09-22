@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ResolutionRulesTests
+    public class RulesTests
     {
         [Test]
         public void It_is_possible_to_remove_Enumerable_support_per_container()
@@ -27,7 +28,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(Bla<>),
-                withConstructor: (t, _, __) => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()[0]) }));
+                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()[0]) }));
 
             container.Register(typeof(SomeService), typeof(SomeService));
 
@@ -39,7 +40,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_should_be_able_to_add_rule_to_resolve_not_registered_service()
         {
-            var container = new Container(ResolutionRules.Default.With((request, registry) =>
+            var container = new Container(Rules.Default.With((request, registry) =>
                 request.ServiceType.IsClass && !request.ServiceType.IsAbstract
                     ? new ReflectionFactory(request.ServiceType)
                     : null));
@@ -52,12 +53,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void When_service_registered_with_name_Then_it_could_be_resolved_with_ctor_parameter_ImportAttribute()
         {
-            var container = new Container(ResolutionRules.Default.With((parameter, _, __) =>
-            {
-                object key;
-                return TryGetServiceKeyFromImportAttribute(out key, parameter.GetCustomAttributes(false)) ?
-                    ServiceInfo.Of(parameter, serviceKey: key) : null;
-            }));
+            var container = new Container(rules => rules.With(parameters: GetServiceInfoFromImportAttribute));
 
             container.Register(typeof(INamedService), typeof(NamedService));
             container.Register(typeof(INamedService), typeof(AnotherNamedService), named: "blah");
@@ -71,16 +67,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_should_be_able_to_import_single_service_based_on_specified_metadata()
         {
-            var container = new Container(ResolutionRules.Default.With((parameter, parent, registry) =>
-            {
-                object key;
-                var attributes = parameter.GetCustomAttributes(false);
-                return TryGetServiceKeyWithMetadataAttribute(out key, parameter.ParameterType, parent, registry, attributes)
-                    ? ServiceInfo.Of(parameter, serviceKey: key) : null;
-            }));
+            var container = new Container(rules => rules.With(parameters: GetServiceFromWithMetadataAttribute));
 
-            container.Register(typeof(IFooService), typeof(FooHey), setup: ServiceSetup.WithMetadata(FooMetadata.Hey));
-            container.Register(typeof(IFooService), typeof(FooBlah), setup: ServiceSetup.WithMetadata(FooMetadata.Blah));
+            container.Register(typeof(IFooService), typeof(FooHey), setup: Setup.WithMetadata(FooMetadata.Hey));
+            container.Register(typeof(IFooService), typeof(FooBlah), setup: Setup.WithMetadata(FooMetadata.Blah));
             container.Register(typeof(FooConsumer));
 
             var service = container.Resolve<FooConsumer>();
@@ -125,7 +115,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void You_can_specify_rules_to_resolve_last_registration_from_multiple_available()
         {
-            var container = new Container(ResolutionRules.Default.WithFactorySelector(factories => factories.Last().Value));
+            var container = new Container(Rules.Default.With(factories => factories.Last().Value));
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));
@@ -137,7 +127,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void You_can_specify_rules_to_disable_registration_based_on_reuse_type()
         {
-            var container = new Container(ResolutionRules.Default.WithFactorySelector(
+            var container = new Container(Rules.Default.With(
                 factories => factories.Select(f => f.Value).FirstOrDefault(f => !(f.Reuse is SingletonReuse))));
 
             container.Register<IService, Service>(Reuse.Singleton);
@@ -146,27 +136,29 @@ namespace DryIoc.UnitTests
             Assert.That(service, Is.Null);
         }
 
-        public static bool TryGetServiceKeyFromImportAttribute(out object key, object[] attributes)
+        public static ParameterServiceInfo GetServiceInfoFromImportAttribute(ParameterInfo parameter, Request request, IRegistry registry)
         {
-            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
-            key = import == null ? null : import.ContractName;
-            return import != null;
+            var import = (ImportAttribute)parameter.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
+            var details = import == null ? ServiceInfoDetails.Default
+                : ServiceInfoDetails.Of(import.ContractType, import.ContractName);
+            return ParameterServiceInfo.Of(parameter).With(details, request, registry);
         }
 
-        public static bool TryGetServiceKeyWithMetadataAttribute(out object key, Type contractType, Request parent, IRegistry registry, object[] attributes)
+        public static ParameterServiceInfo GetServiceFromWithMetadataAttribute(ParameterInfo parameter, Request request, IRegistry registry)
         {
-            key = null;
-            var import = GetSingleAttributeOrDefault<ImportWithMetadataAttribute>(attributes);
+            var import = GetSingleAttributeOrDefault<ImportWithMetadataAttribute>(parameter.GetCustomAttributes(false));
             if (import == null)
-                return false;
+                return null;
 
-            var serviceType = registry.GetWrappedServiceTypeOrSelf(contractType);
+            var serviceType = parameter.ParameterType;
+            serviceType = registry.GetWrappedServiceType(serviceType);
             var metadata = import.Metadata;
-            key = registry.GetAllFactories(serviceType)
+            var factory = registry.GetAllFactories(serviceType)
                 .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
-                .ThrowIfNull("Unable to resolve", serviceType, metadata, parent)
-                .Key;
-            return true;
+                .ThrowIfNull("Unable to resolve", serviceType, metadata, request);
+
+            var details = ServiceInfoDetails.Of(serviceType, factory.Key);
+            return ParameterServiceInfo.Of(parameter).With(details, request, registry);
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute

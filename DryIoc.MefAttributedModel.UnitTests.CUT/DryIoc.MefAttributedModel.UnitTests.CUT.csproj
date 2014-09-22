@@ -40,7 +40,7 @@
     <Compile Include="ExportAsDecoratorTests.CUT.cs" />
     <Compile Include="ExportAsGenericWrapperTests.CUT.cs" />
     <Compile Include="ExportImportWithKeyTests.CUT.cs" />
-    <Compile Include="ImportExternal.CUT.cs" />
+    <Compile Include="ImportExternalTests.CUT.cs" />
     <Compile Include="ImportWithMetadataTests.CUT.cs" />
     <Compile Include="InheritedExportTests.CUT.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

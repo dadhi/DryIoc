@@ -194,7 +194,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export, ExportWithMetadata(1)]
+    [Export, WithMetadata(1)]
     public class SingleServiceWithMetadata
     {
     }

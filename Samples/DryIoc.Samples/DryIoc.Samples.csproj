@@ -5,14 +5,14 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{20EDEF46-C5F7-4B7B-A4A9-0C10E1274ECB}</ProjectGuid>
+    <ProjectGuid>{022FD983-8D10-493F-B9D5-7D5593736D58}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.IssuesTests</RootNamespace>
-    <AssemblyName>DryIoc.IssuesTests</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <RootNamespace>DryIoc.Samples</RootNamespace>
+    <AssemblyName>DryIoc.Samples</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <RestorePackages>true</RestorePackages>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -33,28 +33,52 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="nunit.framework, Version=2.6.3.13283, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="NSubstitute">
+      <HintPath>..\..\packages\NSubstitute.1.7.2.0\lib\NET35\NSubstitute.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.framework">
       <HintPath>..\..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent.cs" />
-    <Compile Include="DryIOCSingletonFailureTest.cs" />
+    <Compile Include="AutoWiring.cs" />
+    <Compile Include="ConstructorSelectionTests.cs" />
+    <Compile Include="LazyImplementationTypeLoading.cs" />
+    <Compile Include="LazyRegistrationInfoStepByStep.cs" />
+    <Compile Include="OpenScopeTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="GettingStarted.cs" />
+    <Compile Include="PubSub.cs" />
+    <Compile Include="ResolveMocksForNonRegisteredServices.cs" />
+    <Compile Include="SelectConstructorWithAllResolvableArguments.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
+      <Project>{13516F3C-E48D-43DC-89D4-5FE00DE3C7D2}</Project>
+      <Name>DryIoc.MefAttributedModel</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\DryIoc\DryIoc.csproj">
+      <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
+      <Name>DryIoc</Name>
+      <Private>False</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="DryIoc.Samples.CUT.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{fed12e6e-8c44-4fb2-98bb-3a82ccfd20a2}</Project>
-      <Name>DryIoc</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+  </PropertyGroup>
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>

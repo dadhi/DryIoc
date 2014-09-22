@@ -3,11 +3,10 @@ using NUnit.Framework;
 
 namespace DryIoc.Samples
 {
-    [TestFixture]
-    [Ignore]
+    //[TestFixture][Ignore]
     public class PubSub
     {
-        [Test]
+        //[Test]
         public void Test()
         {
             var container = new Container();

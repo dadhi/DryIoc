@@ -6,22 +6,22 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportAll(ContractName = "fast"), ExportWithMetadata(2)]
+    [ExportAll(ContractName = "fast"), WithMetadata(2)]
     public class FastHandler : IHandler
     {
     }
 
-    [ExportAll(ContractName = "slow"), ExportWithMetadata(1)]
+    [ExportAll(ContractName = "slow"), WithMetadata(1)]
     public class SlowHandler : IHandler
     {
     }
 
-    [ExportAll(ContractName = "transact"), ExportWithMetadata(1)]
+    [ExportAll(ContractName = "transact"), WithMetadata(1)]
     public class TransactHandler : IHandler
     {
     }
 
-    [ExportAll, ExportAsDecorator(ContractName = "slow")]
+    [ExportAll, AsDecoratorFor(ContractName = "slow")]
     public class LoggingHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -32,7 +32,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, ExportAsDecorator, ExportWithMetadata(2)]
+    [ExportAll, AsDecoratorFor, WithMetadata(2)]
     public class RetryHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -43,7 +43,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, ExportAsDecorator(ContractName = "transact"), ExportWithMetadata(1)]
+    [ExportAll, AsDecoratorFor(ContractName = "transact"), WithMetadata(1)]
     public class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -54,7 +54,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export(typeof(IHandler)), ExportAsDecorator(ConditionType = typeof(Condition))]
+    [Export(typeof(IHandler)), AsDecoratorFor(ConditionType = typeof(Condition))]
     public class CustomHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -66,14 +66,14 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
         public class Condition : IDecoratorCondition
         {
-            public bool Check(Request request)
+            public bool CanApply(Request request)
             {
                 return request.ImplementationType == typeof(SlowHandler);
             }
         }
     }
 
-    [ExportAll, ExportAsDecorator]
+    [ExportAll, AsDecoratorFor]
     public class DecoratorWithFastHandlerImport : IHandler
     {
         public IHandler Handler { get; set; }
@@ -92,7 +92,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     public enum BlahFooh { Blah, Fooh }
 
-    [ExportAll, ExportAsDecorator(ContractKey = BlahFooh.Fooh)]
+    [ExportAll, AsDecoratorFor(ContractKey = BlahFooh.Fooh)]
     public class FoohDecorator : IHandler
     {
         public IHandler Handler { get; set; }

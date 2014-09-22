@@ -25,7 +25,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         TService Create();
     }
 
-    [ExportAll, ExportAsGenericWrapper]
+    [ExportAll, AsGenericWrapper]
     public class DryFactory<TService> : IFactory<TService>
     {
         public DryFactory(Func<TService> create)
@@ -68,7 +68,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         TService Create(TArg0 arg0);
     }
 
-    [ExportAll, ExportAsGenericWrapper(1)]
+    [ExportAll, AsGenericWrapper(1)]
     public class DryFactory<TArg0, TService> : IFactory<TArg0, TService>
     {
         public DryFactory(Func<TArg0, TService> create)

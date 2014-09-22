@@ -92,20 +92,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_property_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default
-                .WithPropertyAndFieldSelector((type, _) =>
-                        type.GetProperties(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                    .Where(p => p.GetSetMethod() != null).Cast<MemberInfo>().Concat(
-                        type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                            .Where(f => !f.IsInitOnly).Cast<MemberInfo>())
-                    .Select(m =>
-                    {
-                        var attributes = m.GetCustomAttributes(typeof(ImportAttribute), false);
-                        if (attributes.Length == 0)
-                            return null;
-                        var importAttr = (ImportAttribute)attributes[0];
-                        return ServiceInfo.Of(m, importAttr.ContractType, importAttr.ContractName);
-                    })));
+            var container = new Container(Rules.Default.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunnyChicken>();
             container.Register<Guts>();
@@ -119,7 +106,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute));
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunnyChicken>();
             container.Register<Guts>();
@@ -133,7 +120,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_not_throw_on_resolving_readonly_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute));
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunnyDuckling>();
 
@@ -144,7 +131,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_Func_of_field_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute));
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<FunkyChicken>();
             container.Register<Guts>();
@@ -157,7 +144,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_named_Lazy_of_property_marked_with_Import()
         {
-            var container = new Container(ResolutionRules.Default.WithPropertyAndFieldSelector(SelectPropertiesAndFieldsWithImportAttribute));
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<LazyChicken>();
             container.Register<Guts>(named: "lazy-me");
@@ -167,25 +154,24 @@ namespace DryIoc.UnitTests
             Assert.That(chicken.SomeGuts, Is.Not.Null);
         }
 
-        private static IEnumerable<ServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, IRegistry _)
+        private static IEnumerable<PropertyOrFieldServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, Request req, IRegistry reg)
         {
-            var flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-            var properties = type.GetProperties(flags).Where(p => p.GetSetMethod() != null);
-            var fields = type.GetFields(flags).Where(f => !f.IsInitOnly);
-            var members = properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>());
-            return members.Select(m =>
-            {
-                var import = GetSingleAttributeOrDefault<ImportAttribute>(m.GetCustomAttributes(false));
-                return import == null ? null : ServiceInfo.Of(m, import.ContractType, import.ContractName);
-            });
-        }
+            const BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
-        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
-        {
-            TAttribute attr = null;
-            for (var i = 0; i < attributes.Length && attr == null; i++)
-                attr = attributes[i] as TAttribute;
-            return attr;
+            var properties = type.GetProperties(bindingFlags).Where(ReflectionTools.IsWritableProperty).Select(p =>
+            {
+                var import = (ImportAttribute)p.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
+                return import == null ? null : PropertyOrFieldServiceInfo.Of(p)
+                    .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req, reg);
+            });
+            var fields = type.GetFields(bindingFlags).Where(ReflectionTools.IsWritableField).Select(f =>
+            {
+                var import = (ImportAttribute)f.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
+                return import == null ? null : PropertyOrFieldServiceInfo.Of(f)
+                    .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req, reg);
+            });
+
+            return properties.Concat(fields);
         }
     }
 

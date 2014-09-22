@@ -175,7 +175,7 @@ namespace DryIoc.UnitTests
         public void If_some_item_is_not_resolved_then_it_would_throw()
         {
             var container = new Container();
-            container.Register<Service>(setup: ServiceSetup.WithMetadata(1));
+            container.Register<Service>(setup: Setup.WithMetadata(1));
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IEnumerable<Meta<Service, bool>>>());

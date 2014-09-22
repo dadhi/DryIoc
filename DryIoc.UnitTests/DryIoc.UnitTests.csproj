@@ -43,6 +43,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AppendableArrayTests.cs" />
+    <Compile Include="IfUnresolvedTests.cs" />
+    <Compile Include="ProvidedServiceTypeTests.cs" />
     <Compile Include="SelectConstructorWithAllResolvableArguments.cs" />
     <Compile Include="CompositePatternTests.cs" />
     <Compile Include="IfAlreadyRegisteredTests.cs" />
@@ -52,7 +54,7 @@
     <Compile Include="PrintTests.cs" />
     <Compile Include="RefTests.cs" />
     <Compile Include="RegisterWithNonStringServiceKeyTests.cs" />
-    <Compile Include="ResolutionRulesTests.cs" />
+    <Compile Include="RulesTests.cs" />
     <Compile Include="ContainerTests.cs" />
     <Compile Include="ContextDependentResolutionTests.cs" />
     <Compile Include="CUT\ContainerTests.CUT.cs" />
@@ -74,6 +76,7 @@
     <Compile Include="ChildContainerTests.cs" />
     <Compile Include="ReuseInCurrentScopeTests.cs" />
     <Compile Include="ReuseTests.cs" />
+    <Compile Include="DependencyDiscoveryTests.cs" />
     <Compile Include="TypeToolsTests.cs" />
     <Compile Include="ThrowTests.cs" />
     <Compile Include="TypeCSharpNameFormattingTests.cs" />

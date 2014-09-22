@@ -190,8 +190,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
     #region CUT
 
-    [ExportWithDisplayName("blah")]
-    [ExportWithMetadata("hey")]
+    [ExportWithDisplayName("blah"), WithMetadata("hey")]
     public class OneWithManyMeta { }
 
     #endregion

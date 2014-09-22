@@ -116,7 +116,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(LazyOne<>),
-                withConstructor: (t, _, __) => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }));
+                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }));
             container.Register<Service>();
 
             var service = container.Resolve<LazyOne<Service>>();

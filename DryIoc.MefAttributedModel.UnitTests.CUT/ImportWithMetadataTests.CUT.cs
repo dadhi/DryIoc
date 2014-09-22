@@ -1,15 +1,16 @@
 ﻿using System;
+using System.ComponentModel.Composition;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
     public enum FooMetadata { Hey, Blah, NotFound }
 
-    [ExportAll, ExportWithMetadata(FooMetadata.Hey)]
+    [ExportAll, WithMetadata(FooMetadata.Hey)]
     public class FooHey : IFooService
     {
     }
 
-    [ExportAll, ExportWithMetadata(FooMetadata.Blah)]
+    [ExportAll, WithMetadata(FooMetadata.Blah)]
     public class FooBlah : IFooService
     {
     }
@@ -19,7 +20,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public Lazy<IFooService> Foo { get; set; }
 
-        public FooConsumer([ImportWithMetadata(FooMetadata.Blah)] Lazy<IFooService> foo)
+        public FooConsumer([Import, WithMetadata(FooMetadata.Blah)] Lazy<IFooService> foo)
         {
             Foo = foo;
         }
@@ -30,7 +31,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public IFooService Foo { get; set; }
 
-        public FooConsumerNotFound([ImportWithMetadata(FooMetadata.NotFound)]IFooService foo)
+        public FooConsumerNotFound([Import,WithMetadata(FooMetadata.NotFound)]IFooService foo)
         {
             Foo = foo;
         }
