@@ -252,7 +252,7 @@ namespace DryIoc.MefAttributedModel
             Func<Request, IRegistry, Expression> factoryCreateExpr = (request, registry) =>
                 Expression.Call(
                     Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
-                        request.State.GetItemExpression(registry),
+                        request.State.GetOrAddItemExpression(registry),
                         Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved)),
                         Expression.Constant(null, typeof(Type))),
@@ -626,10 +626,10 @@ namespace DryIoc.MefAttributedModel
         public DecoratorSetup GetSetup(Func<object> getMetadata = null)
         {
             if (ConditionType != null)
-                return DecoratorSetup.With(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).CanApply);
+                return DecoratorSetup.WithCondition(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).CanApply);
 
             if (ServiceKeyInfo != ServiceKeyInfo.Default || getMetadata != null)
-                return DecoratorSetup.With(request =>
+                return DecoratorSetup.WithCondition(request =>
                     (ServiceKeyInfo.Key == null || Equals(ServiceKeyInfo.Key, request.ServiceKey)) &&
                     (getMetadata == null || Equals(getMetadata(), request.ResolvedFactory.Setup.Metadata)));
 

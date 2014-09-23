@@ -12,7 +12,7 @@ namespace DryIoc.Samples
             container.Register<IDependency, SomeDependency>();
 
             container.Register<SomeClient>(setup: Setup.With(
-                ReflectionFactory.ConstructorWithAllResolvableArguments));
+                Constructor.WithAllResolvableArguments));
 
             var client = container.Resolve<SomeClient>();
             Assert.That(client.Dependency, Is.Not.Null);
