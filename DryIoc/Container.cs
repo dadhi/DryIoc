@@ -1486,7 +1486,7 @@ namespace DryIoc
         public static readonly string PROVIDED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE =
             "Provided service type {0} is not assignable to (wrapped) type {1} when resolving {2}.";
 
-        public static readonly string INJECTED_VALUE_IS_OF_DIFFERENT_TYPE = 
+        public static readonly string INJECTED_VALUE_IS_OF_DIFFERENT_TYPE =
             "Injected value {0} is not assignable to {1} when resolving: {2}.";
     }
 
@@ -1953,7 +1953,7 @@ namespace DryIoc
 
         private class WithValue : ServiceInfoDetails
         {
-            public override Func<object> GetValue { get { return _getValue; } } 
+            public override Func<object> GetValue { get { return _getValue; } }
             public WithValue(Func<object> getValue) { _getValue = getValue; }
             private readonly Func<object> _getValue;
         }
@@ -2714,34 +2714,6 @@ namespace DryIoc
     public delegate IEnumerable<PropertyOrFieldServiceInfo> PropertiesAndFieldsSelector(Type implementationType, Request request, IRegistry registry);
 
     /// <summary>
-    /// Fluent DSL for specifying <see cref="ParameterSelector"/> injection rules.
-    /// </summary>
-    public static class Parameters
-    {
-        public static ParameterSelector Default = (parameter, request, registry) => null;
-
-        public static ParameterSelector Combine(ParameterSelector perRegistration, ParameterSelector perRegistry)
-        {
-            return perRegistry == null || perRegistry == Default ? perRegistration ?? Default
-                :  perRegistration == null || perRegistration == Default ? perRegistry
-                : (p, req, reg) => perRegistration(p, req, reg) ?? perRegistry(p, req, reg);
-        }
-
-        public static ParameterSelector With(IfUnresolved ifUnresolved)
-        {
-            return ifUnresolved == IfUnresolved.Throw ? Default
-                : ((parameter, req, reg) => ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(ifUnresolved: ifUnresolved), req, reg));
-        }
-
-        public static ParameterSelector With<T>(this ParameterSelector source, string name, T value)
-        {
-            name.ThrowIfNull();
-            return (parameter, req, reg) => !parameter.Name.Equals(name) ? source(parameter, req, reg)
-                : ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(() => value), req, reg);
-        }
-    }
-
-    /// <summary>
     /// Contains alternative rules to select constructor in implementation type registered with <see cref="ReflectionFactory"/>
     /// </summary>
     public static class Constructor
@@ -2810,6 +2782,73 @@ namespace DryIoc
             var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.DefaultIfUnresolvedReturnNull, request, registry));
             var paramFactory = registry.ResolveFactory(paramRequest);
             return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
+        }
+    }
+
+    /// <summary>
+    /// Fluent DSL for specifying <see cref="ParameterSelector"/> injection rules.
+    /// </summary>
+    public static class Parameters
+    {
+        public static ParameterSelector Default = (parameter, request, registry) => null;
+
+        public static ParameterSelector Combine(ParameterSelector perRegistration, ParameterSelector perRegistry)
+        {
+            return perRegistry == null || perRegistry == Default ? perRegistration ?? Default
+                : perRegistration == null || perRegistration == Default ? perRegistry
+                : (p, req, reg) => perRegistration(p, req, reg) ?? perRegistry(p, req, reg);
+        }
+
+        public static ParameterSelector With(IfUnresolved ifUnresolved)
+        {
+            return ifUnresolved == IfUnresolved.Throw ? Default
+                : ((parameter, req, reg) => ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(ifUnresolved: ifUnresolved), req, reg));
+        }
+
+        public static ParameterSelector With<T>(this ParameterSelector source, string name, T value)
+        {
+            name.ThrowIfNull();
+            return (parameter, req, reg) => !parameter.Name.Equals(name) ? source(parameter, req, reg)
+                : ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(() => value), req, reg);
+        }
+    }
+
+    public static class PropertiesAndFields
+    {
+        public static PropertiesAndFieldsSelector Default = (type, request, registry) => null;
+
+        public static PropertiesAndFieldsSelector Combine(PropertiesAndFieldsSelector perRegistration, PropertiesAndFieldsSelector perRegistry)
+        {
+            if (perRegistry == null || perRegistry == Default)
+                return perRegistration ?? Default;
+            if (perRegistration == null || perRegistration == Default)
+                return perRegistry;
+            return (t, req, reg) =>
+            {
+                var pfsPerRegistry = perRegistry(t, req, reg);
+                var pfsPerRegistration = perRegistration(t, req, reg);
+                if (pfsPerRegistry == null)
+                    return pfsPerRegistration;
+
+                if (pfsPerRegistration == null)
+                    return pfsPerRegistry;
+
+                return pfsPerRegistration
+                    .Where(x => pfsPerRegistration.All(y => x.Member != y.Member))
+                    .Concat(pfsPerRegistration);
+            };
+        }
+
+        public static PropertiesAndFieldsSelector With<T>(this PropertiesAndFieldsSelector source, string name, T value)
+        {
+            name.ThrowIfNull();
+            return (type, req, reg) =>
+            {
+                var property = type.GetProperty(name);
+                if (property == null)
+                    return null;
+                return new[] { PropertyOrFieldServiceInfo.Of(property).With(ServiceInfoDetails.Of(() => value), req, reg) };
+            };
         }
     }
 
@@ -2902,23 +2941,10 @@ namespace DryIoc
                 paramExprs = new Expression[ctorParams.Length];
                 for (var i = 0; i < ctorParams.Length; i++)
                 {
-                    var param = ctorParams[i];
-                    var paramInfo = GetParameterServiceInfo(param, request, registry);
-                    if (paramInfo.Details.GetValue != null)
-                    {
-                        paramExprs[i] = GetParamValueExpr(request, paramInfo);
-                    }
-                    else
-                    {
-                        var paramRequest = request.Push(paramInfo);
-                        var paramFactory = registry.ResolveFactory(paramRequest);
-                        var paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
-                        if (paramExpr != null)
-                            paramExprs[i] = paramExpr;
-                        else if (request.IfUnresolved != IfUnresolved.ReturnDefault)
-                            paramExprs[i] = paramRequest.ServiceType.GetDefaultValueExpression();
-                        else return null; // If holder request required to return null, then ensure it does it as soon as first parameter returns null                      
-                    }
+                    var info = GetParameterServiceInfo(ctorParams[i], request, registry);
+                    var expr = ResolveServiceInfoOrGetNullIfFailed(info, request, registry);
+                    if (expr == null) return null;
+                    paramExprs[i] = expr; 
                 }
             }
 
@@ -2937,31 +2963,26 @@ namespace DryIoc
             var paramExprs = new Expression[ctorParams.Length];
             var funcParamExprs = new ParameterExpression[funcParamTypes.Length - 1]; // (minus Func return parameter).
 
-            for (var cp = 0; cp < ctorParams.Length; cp++)
+            for (var i = 0; i < ctorParams.Length; i++)
             {
-                var ctorParam = ctorParams[cp];
+                var ctorParam = ctorParams[i];
                 for (var fp = 0; fp < funcParamTypes.Length - 1; fp++)
                 {
                     var funcParamType = funcParamTypes[fp];
                     if (ctorParam.ParameterType == funcParamType &&
                         funcParamExprs[fp] == null) // Skip if Func parameter was already used for constructor.
                     {
-                        paramExprs[cp] = funcParamExprs[fp] = Expression.Parameter(funcParamType, ctorParam.Name);
+                        paramExprs[i] = funcParamExprs[fp] = Expression.Parameter(funcParamType, ctorParam.Name);
                         break;
                     }
                 }
 
-                if (paramExprs[cp] == null) // If no matching constructor parameter found in Func, resolve it from Container.
+                if (paramExprs[i] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
-                    var paramInfo = GetParameterServiceInfo(ctorParam, request, registry);
-                    var paramRequest = request.Push(paramInfo);
-                    var paramFactory = registry.ResolveFactory(paramRequest);
-                    var paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
-                    if (paramExpr != null)
-                        paramExprs[cp] = paramExpr;
-                    else if (request.IfUnresolved != IfUnresolved.ReturnDefault)
-                        paramExprs[cp] = paramRequest.ServiceType.GetDefaultValueExpression();
-                    else return null; // If holder request required to return null, then ensure it does it as soon as first parameter returns null
+                    var info = GetParameterServiceInfo(ctorParam, request, registry);
+                    var expr = ResolveServiceInfoOrGetNullIfFailed(info, request, registry);
+                    if (expr == null) return null;
+                    paramExprs[i] = expr;
                 }
             }
 
@@ -3018,34 +3039,19 @@ namespace DryIoc
                 return newService;
 
             var bindings = new List<MemberBinding>();
-            foreach (var member in members) if (member != null)
-                {
-                    var memberRequest = request.Push(member);
-                    var memberFactory = registry.ResolveFactory(memberRequest);
-                    if (memberFactory != null)
-                    {
-                        var memberExpr = memberFactory.GetExpressionOrDefault(memberRequest, registry);
-                        if (memberExpr != null)
-                        {
-                            bindings.Add(Expression.Bind(member.Member, memberExpr));
-                            continue;
-                        }
-                    }
-
-                    // If parent required to return null, then ensure it does it as soon as first parameter returns null.
-                    if (request.IfUnresolved == IfUnresolved.ReturnDefault)
-                        return null;
-
-                    // Otherwise proceed with default(T) value expression.
-                    bindings.Add(Expression.Bind(member.Member, memberRequest.ServiceType.GetDefaultValueExpression()));
-                }
+            foreach (var info in members) if (info != null)
+            {
+                var expr = ResolveServiceInfoOrGetNullIfFailed(info, request, registry);
+                if (expr == null) return null;
+                bindings.Add(Expression.Bind(info.Member, expr));
+            }
 
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
         }
 
         private IEnumerable<PropertyOrFieldServiceInfo> SelectPropertiesAndFields(Request request, IRegistry registry)
         {
-            var selector = Setup.Rules.PropertiesAndFields ?? registry.Rules.PropertiesAndFields;
+            var selector = PropertiesAndFields.Combine(Setup.Rules.PropertiesAndFields, registry.Rules.PropertiesAndFields);
             return selector == null ? null : selector(_implementationType, request, registry);
         }
 
@@ -3116,14 +3122,25 @@ namespace DryIoc
             return true;
         }
 
-        private static Expression GetParamValueExpr(Request request, IServiceInfo serviceInfo)
+        private static Expression ResolveServiceInfoOrGetNullIfFailed(IServiceInfo info, Request request, IRegistry registry)
         {
-            var value = serviceInfo.Details.GetValue();
-            return value == null
-                ? serviceInfo.ServiceType.GetDefaultValueExpression()
-                : request.State.GetOrAddItemExpression(value, value.GetType().ThrowIf(
-                    valueType => serviceInfo.ServiceType.IsAssignableFrom(valueType)
-                        ? null : Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE.Of(value, serviceInfo, request)));
+            if (info.Details.GetValue != null) 
+            {
+                var value = info.Details.GetValue();
+                return value == null
+                    ? info.ServiceType.GetDefaultValueExpression()
+                    : request.State.GetOrAddItemExpression(value, value.GetType().ThrowIf(
+                        valueType => info.ServiceType.IsAssignableFrom(valueType)
+                            ? null : Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE.Of(value, info, request)));
+            }
+
+            var infoRequest = request.Push(info);
+            var factory = registry.ResolveFactory(infoRequest);
+            var expr = factory == null ? null : factory.GetExpressionOrDefault(infoRequest, registry);
+
+            return expr ?? 
+                (request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                : infoRequest.ServiceType.GetDefaultValueExpression());
         }
 
         #endregion

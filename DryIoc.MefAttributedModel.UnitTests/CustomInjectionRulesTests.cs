@@ -12,10 +12,25 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             var container = new Container().WithAttributedModel();
             container.Register<ClientWithPrimitiveParameter>(setup: Setup.With(parameters: Parameters.Default.With("message", "hell")));
-            //container.RegisterExports(typeof(ClientWithPrimitiveParameter));
             container.RegisterExports(typeof(KeyService));
 
             var client = container.Resolve<ClientWithPrimitiveParameter>();
+
+            Assert.That(client.Message, Is.EqualTo("hell"));
+        }
+
+        [Test]
+        public void Can_combine_MEF_Imports_with_custom_Injection_rules_for_properties()
+        {
+            var container = new Container().WithAttributedModel();
+            container.Register<ClientWithPrimitiveProperty>(
+                setup: Setup.With(propertiesAndFields: PropertiesAndFields.Default.With("Message", "hell")));
+
+            container.RegisterExports(typeof(KeyService));
+
+            var client = container.Resolve<ClientWithPrimitiveProperty>();
+
+            Assert.That(client.Message, Is.EqualTo("hell"));
         }
 
         [Export]
@@ -29,6 +44,15 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 Service = service;
                 Message = message;
             }
-        }    
+        }
+
+        [Export]
+        public class ClientWithPrimitiveProperty
+        {
+            [ImportWithKey(ServiceKey.One)]
+            public IService Service { get; set; }
+
+            public string Message { get; set; }
+        } 
     }
 }
