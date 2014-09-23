@@ -2713,6 +2713,106 @@ namespace DryIoc
     public delegate ParameterServiceInfo ParameterSelector(ParameterInfo parameter, Request request, IRegistry registry);
     public delegate IEnumerable<PropertyOrFieldServiceInfo> PropertiesAndFieldsSelector(Type implementationType, Request request, IRegistry registry);
 
+    /// <summary>
+    /// Fluent DSL for specifying <see cref="ParameterSelector"/> injection rules.
+    /// </summary>
+    public static class Parameters
+    {
+        public static ParameterSelector Default = (parameter, request, registry) => null;
+
+        public static ParameterSelector Combine(ParameterSelector perRegistration, ParameterSelector perRegistry)
+        {
+            return perRegistry == null || perRegistry == Default ? perRegistration ?? Default
+                :  perRegistration == null || perRegistration == Default ? perRegistry
+                : (p, req, reg) => perRegistration(p, req, reg) ?? perRegistry(p, req, reg);
+        }
+
+        public static ParameterSelector With(IfUnresolved ifUnresolved)
+        {
+            return ifUnresolved == IfUnresolved.Throw ? Default
+                : ((parameter, req, reg) => ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(ifUnresolved: ifUnresolved), req, reg));
+        }
+
+        public static ParameterSelector With<T>(this ParameterSelector source, string name, T value)
+        {
+            name.ThrowIfNull();
+            return (parameter, req, reg) => !parameter.Name.Equals(name) ? source(parameter, req, reg)
+                : ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(() => value), req, reg);
+        }
+    }
+
+    /// <summary>
+    /// Contains alternative rules to select constructor in implementation type registered with <see cref="ReflectionFactory"/>
+    /// </summary>
+    public static class Constructor
+    {
+        /// <summary>
+        /// Searches for constructor with all resolvable parameters or throws <see cref="ContainerException"/> if not found.
+        /// Works both for resolving as service and as Func&lt;TArgs..., TService&gt;.
+        /// </summary>
+        /// <param name="implementationType">Type to instantiate with found constructor.</param>
+        /// <param name="request"><see cref="Request"/> object leading to resolve this type.</param>
+        /// <param name="registry"><see cref="Container"/> used for resolution.</param>
+        /// <returns>Found constructor or throws exception.</returns>
+        public static ConstructorInfo WithAllResolvableArguments(Type implementationType, Request request, IRegistry registry)
+        {
+            var ctors = implementationType.GetConstructors();
+            if (ctors.Length == 0)
+                return null; // Delegate handling of constructor absence to caller code.
+
+            if (ctors.Length == 1)
+                return ctors[0];
+
+            var factory = (request.ResolvedFactory as ReflectionFactory).ThrowIfNull();
+
+            var ctorsWithMoreParamsFirst = ctors
+                .Select(c => new { Ctor = c, Params = c.GetParameters() })
+                .OrderByDescending(x => x.Params.Length);
+
+            if (request.Parent.IsFuncWithArgs())
+            {
+                // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
+                var funcType = request.Parent.ServiceType;
+                var funcArgs = funcType.GetGenericArguments();
+                var inputArgCount = funcArgs.Length - 1;
+
+                var matchedCtor = ctorsWithMoreParamsFirst
+                    .Where(x => x.Params.Length >= inputArgCount)
+                    .FirstOrDefault(x =>
+                    {
+                        var matchedIndecesMask = 0;
+                        return x.Params.Except(
+                            x.Params.Where(p =>
+                            {
+                                var inputArgIndex = funcArgs.IndexOf(t => t == p.ParameterType);
+                                if (inputArgIndex == -1 || inputArgIndex == inputArgCount ||
+                                    (matchedIndecesMask & inputArgIndex << 1) != 0) // input argument was already matched by another parameter
+                                    return false;
+                                matchedIndecesMask |= inputArgIndex << 1;
+                                return true;
+                            }))
+                            .All(p => ResolveParameter(p, factory, request, registry) != null);
+                    });
+
+                return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS, funcType, request).Ctor;
+            }
+            else
+            {
+                var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(
+                    x => x.Params.All(p => ResolveParameter(p, factory, request, registry) != null));
+                return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
+            }
+        }
+
+        public static Expression ResolveParameter(ParameterInfo p, ReflectionFactory factory, Request request, IRegistry registry)
+        {
+            var paramInfo = factory.GetParameterServiceInfo(p, request, registry);
+            var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.DefaultIfUnresolvedReturnNull, request, registry));
+            var paramFactory = registry.ResolveFactory(paramRequest);
+            return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
+        }
+    }
+
     public sealed class ReflectionFactory : Factory
     {
         public override Type ImplementationType { get { return _implementationType; } }
@@ -2725,9 +2825,11 @@ namespace DryIoc
                 .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
         }
 
-        /// <remarks>Before registering factory checks that ImplementationType is assignable Or
+        /// <remarks>
+        /// Before registering factory checks that ImplementationType is assignable Or
         /// in case of open generics, compatible with <paramref name="serviceType"/>. 
-        /// Then checks that there is defined constructor selector for implementation type with multiple/no constructors.</remarks>
+        /// Then checks that there is defined constructor selector for implementation type with multiple/no constructors.
+        /// </remarks>
         public override void VerifyBeforeRegistration(Type serviceType, IRegistry registry)
         {
             base.VerifyBeforeRegistration(serviceType, registry);
@@ -2772,6 +2874,12 @@ namespace DryIoc
             }
         }
 
+        /// <summary>
+        /// Given factory with open-generic implementation type creates factory with closed type with type arguments provided by service type.
+        /// </summary>
+        /// <param name="request"><see cref="Request"/> with service type which provides concrete type arguments.</param>
+        /// <param name="_"><see cref="IRegistry"/> object is not used by this method.</param>
+        /// <returns>Factory with the same setup and reuse but with closed concrete implementation type.</returns>
         public override Factory GetFactoryForRequestOrDefault(Request request, IRegistry _)
         {
             var closedTypeArgs = _implementationType == request.OpenGenericServiceType
@@ -2817,7 +2925,6 @@ namespace DryIoc
             var newExpr = Expression.New(ctor, paramExprs);
             return InitMembersIfRequired(newExpr, request, registry);
         }
-
 
         public override LambdaExpression CreateFuncWithArgsOrDefault(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncArgs)
         {
@@ -2881,9 +2988,8 @@ namespace DryIoc
 
         internal ParameterServiceInfo GetParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
         {
-            var getInfo = Setup.Rules.Parameters ?? registry.Rules.Parameters;
-            return getInfo == null ? ParameterServiceInfo.Of(parameter) // Always provides default info for parameter.
-                 : getInfo(parameter, request, registry) ?? ParameterServiceInfo.Of(parameter);
+            var getInfo = Parameters.Combine(Setup.Rules.Parameters, registry.Rules.Parameters);
+            return getInfo(parameter, request, registry) ?? ParameterServiceInfo.Of(parameter);
         }
 
         #endregion
@@ -3021,67 +3127,6 @@ namespace DryIoc
         }
 
         #endregion
-    }
-
-    public static class Constructor
-    {
-        public static ConstructorInfo WithAllResolvableArguments(Type type, Request request, IRegistry registry)
-        {
-            var ctors = type.GetConstructors();
-            if (ctors.Length == 0)
-                return null; // Delegate handling of constructor absence to caller code.
-
-            if (ctors.Length == 1)
-                return ctors[0];
-
-            var factory = (request.ResolvedFactory as ReflectionFactory).ThrowIfNull();
-
-            var ctorsWithMoreParamsFirst = ctors
-                .Select(c => new { Ctor = c, Params = c.GetParameters() })
-                .OrderByDescending(x => x.Params.Length);
-
-            if (request.Parent.IsFuncWithArgs())
-            {
-                // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
-                var funcType = request.Parent.ServiceType;
-                var funcArgs = funcType.GetGenericArguments();
-                var inputArgCount = funcArgs.Length - 1;
-
-                var matchedCtor = ctorsWithMoreParamsFirst
-                    .Where(x => x.Params.Length >= inputArgCount)
-                    .FirstOrDefault(x =>
-                    {
-                        var matchedIndecesMask = 0;
-                        return x.Params.Except(
-                            x.Params.Where(p =>
-                            {
-                                var inputArgIndex = funcArgs.IndexOf(t => t == p.ParameterType);
-                                if (inputArgIndex == -1 || inputArgIndex == inputArgCount ||
-                                    (matchedIndecesMask & inputArgIndex << 1) != 0) // input argument was already matched by another parameter
-                                    return false;
-                                matchedIndecesMask |= inputArgIndex << 1;
-                                return true;
-                            }))
-                            .All(p => ResolveParameter(p, factory, request, registry) != null);
-                    });
-
-                return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS, funcType, request).Ctor;
-            }
-            else
-            {
-                var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(
-                    x => x.Params.All(p => ResolveParameter(p, factory, request, registry) != null));
-                return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
-            }
-        }
-
-        public static Expression ResolveParameter(ParameterInfo p, ReflectionFactory factory, Request request, IRegistry registry)
-        {
-            var paramInfo = factory.GetParameterServiceInfo(p, request, registry);
-            var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.DefaultIfUnresolvedReturnNull, request, registry));
-            var paramFactory = registry.ResolveFactory(paramRequest);
-            return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
-        }
     }
 
     public sealed class ExpressionFactory : Factory

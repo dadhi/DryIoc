@@ -44,6 +44,7 @@
     <Compile Include="AllowDefaultTests.cs" />
     <Compile Include="AttributedModelTests.cs" />
     <Compile Include="CodeGenerationTests.cs" />
+    <Compile Include="CustomInjectionRulesTests.cs" />
     <Compile Include="ExportFactoryTests.cs" />
     <Compile Include="ExportAllTests.cs" />
     <Compile Include="ExportAsDecoratorTests.cs" />

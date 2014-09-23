@@ -110,22 +110,4 @@ namespace DryIoc.UnitTests
             }
         }
     }
-
-    public static class Parameters
-    {
-        public static ParameterSelector Default = (parameter, request, registry) => ParameterServiceInfo.Of(parameter);
-
-        public static ParameterSelector With(IfUnresolved ifUnresolved)
-        {
-            return ifUnresolved == IfUnresolved.Throw ? Default
-                : ((parameter, req, reg) => ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(ifUnresolved: ifUnresolved), req, reg));
-        }
-
-        public static ParameterSelector With<T>(this ParameterSelector source, string name, T value)
-        {
-            name.ThrowIfNull();
-            return (parameter, req, reg) => !parameter.Name.Equals(name) ? source(parameter, req, reg)
-                : ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(() => value), req, reg);
-        }
-    }
 }
