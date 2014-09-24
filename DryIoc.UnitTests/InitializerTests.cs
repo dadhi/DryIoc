@@ -41,7 +41,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<InitializableService>();
-            container.RegisterInitializer<IInitializable>(x => x.Initialize("yeah"));
+            container.RegisterInitializer<IInitializable>((x, _) => x.Initialize("yeah"));
 
             var service = container.Resolve<InitializableService>();
 
@@ -54,7 +54,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ClientOfInitializableService>();
             container.Register<InitializableService>();
-            container.RegisterInitializer<IInitializable>(x => x.Initialize("yeah"));
+            container.RegisterInitializer<IInitializable>((x, _) => x.Initialize("yeah"));
 
             var client = container.Resolve<ClientOfInitializableService>();
 
@@ -67,8 +67,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ClientOfInitializableService>();
             container.Register<InitializableService>();
-            container.RegisterInitializer<IInitializable>(x => x.Initialize("yeah"));
-            container.RegisterInitializer<IInitializable<InitializableService>>(x => x.Initialize("blah"));
+            container.RegisterInitializer<IInitializable>((x, _) => x.Initialize("yeah"));
+            container.RegisterInitializer<IInitializable<InitializableService>>((x, _) => x.Initialize("blah"));
 
             var client = container.Resolve<ClientOfInitializableService>();
 
@@ -82,8 +82,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ClientOfInitializableService>();
             container.Register<InitializableService>();
-            container.RegisterInitializer<IInitializable>(x => x.Initialize("green"));
-            container.RegisterInitializer<IInitializable>(x => x.Initialize("-blah"));
+            container.RegisterInitializer<IInitializable>((x, _) => x.Initialize("green"));
+            container.RegisterInitializer<IInitializable>((x, _) => x.Initialize("-blah"));
 
             var client = container.Resolve<ClientOfInitializableService>();
 
@@ -124,14 +124,6 @@ namespace DryIoc.UnitTests
             {
                 Service = service;
             }
-        }
-    }
-
-    public static class DecoratorContainerExt 
-    {
-        public static void RegisterInitializer<T>(this IRegistrator registrator, Action<T> decorate)
-        {
-            registrator.RegisterDelegate(r => decorate, setup: DecoratorSetup.Default);
         }
     }
 }

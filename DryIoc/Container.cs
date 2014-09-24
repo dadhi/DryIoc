@@ -410,22 +410,6 @@ namespace DryIoc
                 : ((FactoriesEntry)entry).Factories.Enumerate();
         }
 
-        private static readonly MethodInfo _doMethod = typeof(Container).GetMethod("Do");
-        public static Func<T, R> Do<T, R>(Action<T> action) where R : T
-        {
-            return x =>
-            {
-                action(x);
-                return (R)x;
-            };
-        }
-
-        public static object Do2<T>(T source, Action<T> action)
-        {
-            action(source);
-            return source;
-        }
-
         Expression IRegistry.GetDecoratorExpressionOrDefault(Request request)
         {
             // Stop if no decorators registered.
@@ -447,7 +431,8 @@ namespace DryIoc
             var serviceType = request.ServiceType;
 
             var implementationType = request.ImplementationType ?? request.ServiceType;
-            var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeItself.AsFirst);
+            var implementedTypes = implementationType.GetImplementedTypes(
+                TypeTools.IncludeFlags.SourceType | TypeTools.IncludeFlags.ObjectType);
 
             // Look for Action<ImplementedType> initializer-decorator
             for (var i = 0; i < implementedTypes.Length; i++)
@@ -544,20 +529,6 @@ namespace DryIoc
             return resultDecorator;
         }
 
-        private static void ComposeDecoratorFuncExpression(ref LambdaExpression result, Type serviceType, Expression decoratorFuncExpr)
-        {
-            if (result == null)
-            {
-                var decorated = Expression.Parameter(serviceType, "decorated");
-                result = Expression.Lambda(Expression.Invoke(decoratorFuncExpr, decorated), decorated);
-            }
-            else
-            {
-                var decorateDecorator = Expression.Invoke(decoratorFuncExpr, result.Body);
-                result = Expression.Lambda(decorateDecorator, result.Parameters[0]);
-            }
-        }
-
         Factory IRegistry.GetGenericWrapperOrDefault(Type openGenericServiceType)
         {
             return _genericWrappers.Value.GetValueOrDefault(openGenericServiceType);
@@ -579,6 +550,31 @@ namespace DryIoc
             var wrappedServiceType = setup.SelectWrappedServiceTypeArg(serviceType.GetGenericArguments());
 
             return ((IRegistry)this).GetWrappedServiceType(wrappedServiceType); // unwrap further
+        }
+
+        #endregion
+
+        #region Decorators supporting cast
+
+        private static void ComposeDecoratorFuncExpression(ref LambdaExpression result, Type serviceType, Expression decoratorFuncExpr)
+        {
+            if (result == null)
+            {
+                var decorated = Expression.Parameter(serviceType, "decorated");
+                result = Expression.Lambda(Expression.Invoke(decoratorFuncExpr, decorated), decorated);
+            }
+            else
+            {
+                var decorateDecorator = Expression.Invoke(decoratorFuncExpr, result.Body);
+                result = Expression.Lambda(decorateDecorator, result.Parameters[0]);
+            }
+        }
+
+        private static readonly MethodInfo _doMethod = typeof(Container).GetMethod("Do", BindingFlags.Static | BindingFlags.NonPublic);
+
+        protected static Func<T, R> Do<T, R>(Action<T> action) where R : T
+        {
+            return x => { action(x); return (R)x; };
         }
 
         #endregion
@@ -1492,7 +1488,7 @@ namespace DryIoc
         public static readonly string INJECTED_VALUE_IS_OF_DIFFERENT_TYPE =
             "Injected value {0} is not assignable to {1} when resolving: {2}.";
 
-        public static readonly string UNABLE_TO_FIND_PROPERTY_WITH_NAME_IN_TYPE = 
+        public static readonly string UNABLE_TO_FIND_PROPERTY_WITH_NAME_IN_TYPE =
             "Unable to find property \"{0}\" when resolving: {1}.";
     }
 
@@ -1631,7 +1627,7 @@ namespace DryIoc
             setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
             var factory = new ReflectionFactory(implementationType, reuse, setup);
 
-            var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeItself.AsFirst);
+            var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeFlags.SourceType);
             var implementedServiceTypes = implementedTypes.Where(types ?? RegisterAllDefaultTypes);
             if (implementationType.IsGenericTypeDefinition)
             {
@@ -1743,6 +1739,36 @@ namespace DryIoc
             FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             registrator.Register(new InstanceFactory(instance, setup), serviceType, named, ifAlreadyRegistered);
+        }
+
+        /// <summary>
+        /// Registers initializing action that will be called after service is resolved just before returning it to caller.
+        /// Check example below for using initializer to automatically subscribe to singleton event aggregator.
+        /// You can register multiple initializers for single service. 
+        /// Or you can register initializer for <see cref="Object"/> type to be applied for all services and use <see cref="condition"/> 
+        /// to filter target services.
+        /// </summary>
+        /// <remarks>Initializer internally implemented as decorator registered as Action delegate, so all decorators behavior is applied.</remarks>
+        /// <typeparam name="TTarget">Any type implemented by requested service type including service type itself and object type.</typeparam>
+        /// <param name="registrator">Usually is <see cref="Container"/> object.</param>
+        /// <param name="initialize">Delegate with <typeparamref name="TTarget"/> object and 
+        /// <see cref="IResolver"/> to resolve additional services required by initializer.</param>
+        /// <param name="condition">(optional) Condition to select required target.</param>
+        /// <example>
+        /// <code lang="cs"><![CDATA[
+        ///     container.Register<EventAggregator>(Reuse.Singleton);
+        ///     container.Register<ISubscriber, SomeSubscriber>();
+        /// 
+        ///     // Registers initializer for all subscribers implementing ISubscriber.
+        ///     container.RegisterInitiliazer<ISubscriber>((s, r) => r.Resolve<EventAggregator>().Subscribe(s));
+        /// ]]></code>
+        /// </example>
+        public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
+            Action<TTarget, IResolver> initialize, Func<Request, bool> condition = null)
+        {
+            registrator.RegisterDelegate<Action<TTarget>>(
+                r => target => initialize(target, r),
+                setup: DecoratorSetup.WithCondition(condition));
         }
 
         /// <summary>
@@ -2820,7 +2846,7 @@ namespace DryIoc
         {
             name.ThrowIfNull();
             details.ThrowIfNull();
-            return (parameter, req, reg) => parameter.Name.Equals(name) 
+            return (parameter, req, reg) => parameter.Name.Equals(name)
                 ? ParameterServiceInfo.Of(parameter).With(details, req, reg)
                 : source(parameter, req, reg);
         }
@@ -3065,7 +3091,7 @@ namespace DryIoc
                 return newService;
 
             var bindings = new List<MemberBinding>();
-            foreach (var info in infos) 
+            foreach (var info in infos)
                 if (info != null)
                 {
                     var expr = ResolveServiceInfoOrGetNullIfFailed(info, request, registry);
@@ -3480,22 +3506,30 @@ namespace DryIoc
     /// </summary>
     public static class TypeTools
     {
-        public enum IncludeItself { No, AsFirst }
+        /// <summary> Flags for <see cref="GetImplementedTypes"/> method.</summary>
+        [Flags]
+        public enum IncludeFlags { None = 0, SourceType = 1, ObjectType = 2 }
 
         /// <summary>
-        /// Returns all type interfaces and base types except object.
+        /// Returns all interfaces and all base types (in that order) implemented by <paramref name="sourceType"/>.
+        /// Specify <paramref name="includeFlags"/> to include <paramref name="sourceType"/> itself as first item and 
+        /// <see cref="object"/> type as the last item.
         /// </summary>
-        public static Type[] GetImplementedTypes(this Type type, IncludeItself includeItself = IncludeItself.No)
+        /// <param name="sourceType">Source type for discovery.</param>
+        /// <param name="includeFlags">Additional types to include into result collection.</param>
+        /// <returns>Collection of found types.</returns>
+        public static Type[] GetImplementedTypes(this Type sourceType, IncludeFlags includeFlags = IncludeFlags.None)
         {
             Type[] results;
 
-            var interfaces = type.GetInterfaces();
-            var interfaceStartIndex = includeItself == IncludeItself.AsFirst ? 1 : 0;
-            var selfPlusInterfaceCount = interfaceStartIndex + interfaces.Length;
+            var interfaces = sourceType.GetInterfaces();
+            var interfaceStartIndex = (includeFlags & IncludeFlags.SourceType) == 0 ? 0 : 1;
+            var includingObjectType = (includeFlags & IncludeFlags.ObjectType) == 0 ? 0 : 1;
+            var sourcePlusInterfaceCount = interfaceStartIndex + interfaces.Length;
 
-            var baseType = type.BaseType;
+            var baseType = sourceType.BaseType;
             if (baseType == null || baseType == typeof(object))
-                results = new Type[selfPlusInterfaceCount];
+                results = new Type[sourcePlusInterfaceCount + includingObjectType];
             else
             {
                 List<Type> baseBaseTypes = null;
@@ -3503,23 +3537,25 @@ namespace DryIoc
                     (baseBaseTypes ?? (baseBaseTypes = new List<Type>(2))).Add(bb);
 
                 if (baseBaseTypes == null)
-                    results = new Type[selfPlusInterfaceCount + 1];
+                    results = new Type[sourcePlusInterfaceCount + includingObjectType + 1];
                 else
                 {
-                    results = new Type[selfPlusInterfaceCount + 1 + baseBaseTypes.Count];
-                    baseBaseTypes.CopyTo(results, selfPlusInterfaceCount + 1);
+                    results = new Type[sourcePlusInterfaceCount + baseBaseTypes.Count + includingObjectType + 1];
+                    baseBaseTypes.CopyTo(results, sourcePlusInterfaceCount + 1);
                 }
 
-                results[selfPlusInterfaceCount] = baseType;
+                results[sourcePlusInterfaceCount] = baseType;
             }
-
-            if (includeItself == IncludeItself.AsFirst)
-                results[0] = type;
 
             if (interfaces.Length == 1)
                 results[interfaceStartIndex] = interfaces[0];
             else if (interfaces.Length > 1)
                 Array.Copy(interfaces, 0, results, interfaceStartIndex, interfaces.Length);
+
+            if (interfaceStartIndex == 1)
+                results[0] = sourceType;
+            if (includingObjectType == 1)
+                results[results.Length - 1] = typeof(object);
 
             return results;
         }

@@ -733,8 +733,7 @@ namespace DryIoc.MefAttributedModel
 
         public IEnumerable<Type> GetAllContractTypes(Type implementationType)
         {
-            var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeItself.AsFirst)
-                .Where(ExportedTypes);
+            var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeFlags.SourceType).Where(ExportedTypes);
             return Except == null || Except.Length == 0 ? contractTypes : contractTypes.Except(Except);
         }
     }
