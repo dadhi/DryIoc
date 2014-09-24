@@ -135,7 +135,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<BadTypePropertyClient>());
 
-            Assert.That(ex.Message, Is.StringStarting("Provided service type").And.StringContaining("is not assignable"));
+            Assert.That(ex.Message, Is.StringStarting("Required service type").And.StringContaining("is not assignable"));
         }
 
         [Test]
@@ -174,7 +174,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Resolve_Many_of_provided_type_should_work()
+        public void Resolve_Many_of_required_type_should_work()
         {
             var container = new Container();
             container.Register<IService, Service>();
@@ -185,7 +185,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Resolve_Many_services_twice_with_different_provided_types_should_work()
+        public void Resolve_Many_services_twice_with_different_required_types_should_work()
         {
             var container = new Container();
             container.Register<IService, Service>(Reuse.InCurrentScope);
@@ -197,7 +197,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Resolve_Meta_of_provided_type_should_work()
+        public void Resolve_Meta_of_required_type_should_work()
         {
             var container = new Container();
             container.Register<IService, Service>(setup: Setup.WithMetadata("a"));

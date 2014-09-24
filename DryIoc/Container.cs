@@ -139,9 +139,9 @@ namespace DryIoc
         }
 
         public Request CreateRequest(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw,
-            Type providedType = null)
+            Type requiredServiceType = null)
         {
-            var serviceInfo = ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(providedType, serviceKey, ifUnresolved), null, this);
+            var serviceInfo = ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), null, this);
             return new Request(null, _resolutionState, Ref.Of<IScope>(), serviceInfo);
         }
 
@@ -289,20 +289,20 @@ namespace DryIoc
             return factoryDelegate(request.State.Items, request.ResolutionScope);
         }
 
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type providedServiceType)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
         {
             var cacheServiceKey = serviceKey;
-            if (providedServiceType != null)
+            if (requiredServiceType != null)
             {
                 var wrappedServiceType = ((IRegistry)this).GetWrappedServiceType(serviceType);
-                if (!wrappedServiceType.IsAssignableFrom(providedServiceType))
-                    throw Error.PROVIDED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE
-                        .Of(providedServiceType, wrappedServiceType, serviceType);
+                if (!wrappedServiceType.IsAssignableFrom(requiredServiceType))
+                    throw Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE
+                        .Of(requiredServiceType, wrappedServiceType, serviceType);
                 if (serviceType == wrappedServiceType)
-                    serviceType = providedServiceType;
+                    serviceType = requiredServiceType;
                 else
-                    cacheServiceKey = serviceKey == null ? providedServiceType
-                        : (object)new KV<Type, object>(providedServiceType, serviceKey);
+                    cacheServiceKey = serviceKey == null ? requiredServiceType
+                        : (object)new KV<Type, object>(requiredServiceType, serviceKey);
             }
 
             var factoryDelegates = _resolvedKeyedDelegates.GetValueOrDefault(serviceType);
@@ -313,7 +313,7 @@ namespace DryIoc
                     return factoryDelegate(_resolutionState.Items, null);
             }
 
-            var request = CreateRequest(serviceType, serviceKey, ifUnresolved, providedServiceType);
+            var request = CreateRequest(serviceType, serviceKey, ifUnresolved, requiredServiceType);
             var factory = ((IRegistry)this).ResolveFactory(request);
             if (factory == null)
                 return null;
@@ -1036,15 +1036,15 @@ namespace DryIoc
                 : collectionType.GetGenericArguments()[0];
 
             var wrappedItemType = registry.GetWrappedServiceType(itemType);
-            var providedItemType = request.ServiceInfo.Details.ProvidedType ?? wrappedItemType;
+            var requiredItemType = request.ServiceInfo.Details.RequiredServiceType ?? wrappedItemType;
             if (itemType == wrappedItemType)
-                itemType = providedItemType;
+                itemType = requiredItemType;
 
-            var items = registry.GetAllFactories(providedItemType);
+            var items = registry.GetAllFactories(requiredItemType);
 
             // Composite pattern support: filter out composite root from available keys.
             var parent = request.GetNonWrapperParentOrDefault();
-            if (parent != null && parent.ServiceType == providedItemType)
+            if (parent != null && parent.ServiceType == requiredItemType)
             {
                 var parentFactoryID = parent.ResolvedFactory.ID;
                 items = items.Where(x => x.Value.ID != parentFactoryID);
@@ -1080,15 +1080,18 @@ namespace DryIoc
             var manyType = request.ServiceType;
             var itemType = manyType.GetGenericArguments()[0];
             var wrappedItemType = registry.GetWrappedServiceType(itemType);
-            var providedItemType = request.ServiceInfo.Details.ProvidedType ?? wrappedItemType;
+            var requiredItemType = request.ServiceInfo.Details.RequiredServiceType ?? wrappedItemType;
+            // TODO: Check the tests with this uncommented
+            //if (itemType == wrappedItemType)
+            //    itemType = requiredItemType;
 
             // Composite pattern support: filter out composite root from available keys.
             var parentFactoryID = 0;
             var parent = request.GetNonWrapperParentOrDefault();
-            if (parent != null && parent.ServiceType == providedItemType)
+            if (parent != null && parent.ServiceType == requiredItemType)
                 parentFactoryID = parent.ResolvedFactory.ID;
 
-            var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, providedItemType);
+            var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, requiredItemType);
 
             var registryRefExpr = request.State.GetOrAddItemExpression(registry.SelfWeakRef);
             var resolveCallExpr = Expression.Call(resolveMethod, registryRefExpr, Expression.Constant(parentFactoryID));
@@ -1166,15 +1169,15 @@ namespace DryIoc
             var serviceType = typeArgs[0];
 
             var wrappedServiceType = registry.GetWrappedServiceType(serviceType);
-            var providedServiceType = request.ServiceInfo.Details.ProvidedType ?? wrappedServiceType;
+            var requiredServiceType = request.ServiceInfo.Details.RequiredServiceType ?? wrappedServiceType;
             if (serviceType == wrappedServiceType)
-                serviceType = providedServiceType;
+                serviceType = requiredServiceType;
 
             object resultMetadata = null;
             var serviceKey = request.ServiceKey;
             if (serviceKey == null)
             {
-                var result = registry.GetAllFactories(providedServiceType).FirstOrDefault(kv =>
+                var result = registry.GetAllFactories(requiredServiceType).FirstOrDefault(kv =>
                     kv.Value.Setup.Metadata != null && metadataType.IsInstanceOfType(kv.Value.Setup.Metadata));
                 if (result != null)
                 {
@@ -1184,7 +1187,7 @@ namespace DryIoc
             }
             else
             {
-                var factory = registry.GetServiceFactoryOrDefault(providedServiceType, serviceKey);
+                var factory = registry.GetServiceFactoryOrDefault(requiredServiceType, serviceKey);
                 if (factory != null)
                 {
                     var metadata = factory.Setup.Metadata;
@@ -1483,11 +1486,14 @@ namespace DryIoc
         public static readonly string REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
             "Registered instance [{0}] of type {1} is not assignable to serviceType {2}.";
 
-        public static readonly string PROVIDED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE =
-            "Provided service type {0} is not assignable to (wrapped) type {1} when resolving {2}.";
+        public static readonly string REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE =
+            "Required service type {0} is not assignable to (wrapped) type {1} when resolving {2}.";
 
         public static readonly string INJECTED_VALUE_IS_OF_DIFFERENT_TYPE =
             "Injected value {0} is not assignable to {1} when resolving: {2}.";
+
+        public static readonly string UNABLE_TO_FIND_PROPERTY_WITH_NAME_IN_TYPE = 
+            "Unable to find property \"{0}\" when resolving: {1}.";
     }
 
     public static class Registrator
@@ -1821,51 +1827,51 @@ namespace DryIoc
         }
 
         /// <summary>
-        /// Returns instance of <typeparamref name="TService"/> searching for provided service type <paramref name="providedServiceType"/>.
-        /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc., <paramref name="providedServiceType"/>
+        /// Returns instance of <typeparamref name="TService"/> searching for <paramref name="requiredServiceType"/>.
+        /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc., <paramref name="requiredServiceType"/>
         /// could specify wrapped service type.
         /// </summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="providedServiceType">(optional) Service or wrapped type assignable to <typeparamref name="TService"/>.</param>
+        /// <param name="requiredServiceType">(optional) Service or wrapped type assignable to <typeparamref name="TService"/>.</param>
         /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
         /// <returns>The requested service instance.</returns>
-        /// <remarks>Using <paramref name="providedServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
+        /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
         /// <example>
         /// <code lang="cs"><![CDATA[
         ///     container.Register<IService, Service>();
         ///     var services = container.Resolve<IEnumerable<object>>(typeof(IService));
         /// ]]></code>
         /// </example>
-        public static TService Resolve<TService>(this IResolver resolver, Type providedServiceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved, providedServiceType.ThrowIfNull());
+            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved, requiredServiceType.ThrowIfNull());
         }
 
         /// <summary>
-        /// Returns instance of <paramref name="serviceType"/> searching for provided service type <paramref name="providedServiceType"/>.
-        /// In case of <paramref name="serviceType"/> being generic wrapper like Func, Lazy, IEnumerable, etc., <paramref name="providedServiceType"/>
+        /// Returns instance of <paramref name="serviceType"/> searching for <paramref name="requiredServiceType"/>.
+        /// In case of <paramref name="serviceType"/> being generic wrapper like Func, Lazy, IEnumerable, etc., <paramref name="requiredServiceType"/>
         /// could specify wrapped service type.
         /// </summary>
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceKey">Service key (any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/> defined).</param>
         /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
-        /// <param name="providedServiceType">(optional) Service or wrapped type assignable to <paramref name="serviceType"/>.</param>
+        /// <param name="requiredServiceType">(optional) Service or wrapped type assignable to <paramref name="serviceType"/>.</param>
         /// <returns>The requested service instance.</returns>
-        /// <remarks>Using <paramref name="providedServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
+        /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
         /// <example>
         /// <code lang="cs"><![CDATA[
         ///     container.Register<IService, Service>();
-        ///     var services = container.Resolve(typeof(Lazy<object>), "named", providedServiceType: typeof(IService));
+        ///     var services = container.Resolve(typeof(Lazy<object>), "named", requiredServiceType: typeof(IService));
         /// ]]></code>
         /// </example>
         public static object Resolve(this IResolver resolver, Type serviceType, object serviceKey,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type providedServiceType = null)
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
             return serviceKey == null
                 ? resolver.ResolveDefault(serviceType, ifUnresolved)
-                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, providedServiceType);
+                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType);
         }
 
         /// <summary>
@@ -1875,13 +1881,13 @@ namespace DryIoc
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceKey">Service key (any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/> defined).</param>
         /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
-        /// <param name="providedServiceType">(optional) Service or wrapped type assignable to <typeparamref name="TService"/>.</param>
+        /// <param name="requiredServiceType">(optional) Service or wrapped type assignable to <typeparamref name="TService"/>.</param>
         /// <returns>The requested service instance.</returns>
-        /// <remarks>Using <paramref name="providedServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
+        /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
         public static TService Resolve<TService>(this IResolver resolver, object serviceKey,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type providedServiceType = null)
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
-            return (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, providedServiceType);
+            return (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType);
         }
 
         /// <summary>
@@ -1904,41 +1910,49 @@ namespace DryIoc
     {
         Type ServiceType { get; }
         ServiceInfoDetails Details { get; }
-        IServiceInfo Create(Type serviceType, ServiceInfoDetails provided);
+        IServiceInfo Create(Type serviceType, ServiceInfoDetails details);
     }
 
     public class ServiceInfoDetails
     {
         public static readonly ServiceInfoDetails Default = new ServiceInfoDetails();
-        public static readonly ServiceInfoDetails DefaultIfUnresolvedReturnNull = new IfUnresolvedReturnNull();
+        public static readonly ServiceInfoDetails DefaultIfUnresolvedReturnDefault = new IfUnresolvedReturnNull();
 
-        public static ServiceInfoDetails Of(Type providedType = null,
+        public static ServiceInfoDetails Of(Type requiredServiceType = null,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
             return ifUnresolved == IfUnresolved.Throw
-                ? (providedType == null
+                ? (requiredServiceType == null
                     ? (serviceKey == null ? Default : new WithKey(serviceKey))
-                    : new WithType(providedType, serviceKey))
-                : (providedType == null
-                    ? (serviceKey == null ? DefaultIfUnresolvedReturnNull : new WithKeyReturnNull(serviceKey))
-                    : new WithTypeReturnNull(providedType, serviceKey));
+                    : new WithType(requiredServiceType, serviceKey))
+                : (requiredServiceType == null
+                    ? (serviceKey == null ? DefaultIfUnresolvedReturnDefault : new WithKeyReturnDefault(serviceKey))
+                    : new WithTypeReturnDefault(requiredServiceType, serviceKey));
         }
 
-        public static ServiceInfoDetails Of(Func<object> getValue)
+        public static ServiceInfoDetails Of(Func<Request, IRegistry, object> getValue)
         {
             return new WithValue(getValue.ThrowIfNull());
         }
 
-        public virtual Type ProvidedType { get { return null; } }
+        /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
+        public virtual Type RequiredServiceType { get { return null; } }
+
+        /// <summary>Service key provided with registration.</summary>
         public virtual object ServiceKey { get { return null; } }
+
+        /// <summary>Policy to deal with unresolved request.</summary>
         public virtual IfUnresolved IfUnresolved { get { return IfUnresolved.Throw; } }
-        public virtual Func<object> GetValue { get { return null; } }
+
+        /// <summary>Allows to get or resolve value using passed registry and request for dependency.</summary>
+        public virtual Func<Request, IRegistry, object> GetValue { get { return null; } }
 
         public override string ToString()
         {
+            if (GetValue != null) return string.Empty;
             var s = new StringBuilder();
-            if (ProvidedType != null)
-                s.Print(ProvidedType);
+            if (RequiredServiceType != null)
+                s.Print(RequiredServiceType);
             if (ServiceKey != null)
                 (s.Length == 0 ? s : s.Append(',')).Append('"').Append(ServiceKey).Append('"');
             if (IfUnresolved != IfUnresolved.Throw)
@@ -1953,9 +1967,9 @@ namespace DryIoc
 
         private class WithValue : ServiceInfoDetails
         {
-            public override Func<object> GetValue { get { return _getValue; } }
-            public WithValue(Func<object> getValue) { _getValue = getValue; }
-            private readonly Func<object> _getValue;
+            public override Func<Request, IRegistry, object> GetValue { get { return _getValue; } }
+            public WithValue(Func<Request, IRegistry, object> getValue) { _getValue = getValue; }
+            private readonly Func<Request, IRegistry, object> _getValue;
         }
 
         private class WithKey : ServiceInfoDetails
@@ -1965,23 +1979,23 @@ namespace DryIoc
             private readonly object _serviceKey;
         }
 
-        private sealed class WithKeyReturnNull : WithKey
+        private sealed class WithKeyReturnDefault : WithKey
         {
             public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnDefault; } }
-            public WithKeyReturnNull(object serviceKey) : base(serviceKey) { }
+            public WithKeyReturnDefault(object serviceKey) : base(serviceKey) { }
         }
 
         private class WithType : WithKey
         {
-            public override Type ProvidedType { get { return _providedType; } }
-            public WithType(Type providedType, object serviceKey) : base(serviceKey) { _providedType = providedType; }
-            private readonly Type _providedType;
+            public override Type RequiredServiceType { get { return _requiredServiceType; } }
+            public WithType(Type requiredServiceType, object serviceKey) : base(serviceKey) { _requiredServiceType = requiredServiceType; }
+            private readonly Type _requiredServiceType;
         }
 
-        private sealed class WithTypeReturnNull : WithType
+        private sealed class WithTypeReturnDefault : WithType
         {
             public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnDefault; } }
-            public WithTypeReturnNull(Type providedType, object serviceKey) : base(providedType, serviceKey) { }
+            public WithTypeReturnDefault(Type requiredServiceType, object serviceKey) : base(requiredServiceType, serviceKey) { }
         }
     }
 
@@ -1994,17 +2008,17 @@ namespace DryIoc
                 return source;
 
             var serviceType = source.ServiceType;
-            var providedType = details.ProvidedType;
-            if (providedType != null)
+            var requiredServiceType = details.RequiredServiceType;
+            if (requiredServiceType != null)
             {
                 var wrappedServiceType = registry.GetWrappedServiceType(serviceType);
-                if (!wrappedServiceType.IsAssignableFrom(providedType))
-                    throw Error.PROVIDED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE.Of(
-                        providedType, wrappedServiceType, request);
+                if (!wrappedServiceType.IsAssignableFrom(requiredServiceType))
+                    throw Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE.Of(
+                        requiredServiceType, wrappedServiceType, request);
 
                 if (wrappedServiceType == serviceType)
                 {
-                    serviceType = providedType;
+                    serviceType = requiredServiceType;
                     details = ServiceInfoDetails.Of(null, details.ServiceKey, details.IfUnresolved);
                 }
             }
@@ -2030,21 +2044,21 @@ namespace DryIoc
                 : holderDetails.ServiceKey ?? dependencyDetails.ServiceKey;
 
             var serviceType = dependency.ServiceType;
-            var providedType = dependencyDetails.ProvidedType;
-            if (holderDetails.ProvidedType != null)
+            var requiredServiceType = dependencyDetails.RequiredServiceType;
+            if (holderDetails.RequiredServiceType != null)
             {
-                providedType = null;
-                if (serviceType.IsAssignableFrom(holderDetails.ProvidedType))
-                    serviceType = holderDetails.ProvidedType;
+                requiredServiceType = null;
+                if (serviceType.IsAssignableFrom(holderDetails.RequiredServiceType))
+                    serviceType = holderDetails.RequiredServiceType;
                 else
-                    providedType = holderDetails.ProvidedType;
+                    requiredServiceType = holderDetails.RequiredServiceType;
             }
 
             if (serviceType == dependency.ServiceType && serviceKey == dependencyDetails.ServiceKey &&
-                ifUnresolved == dependencyDetails.IfUnresolved && providedType == dependencyDetails.ProvidedType)
+                ifUnresolved == dependencyDetails.IfUnresolved && requiredServiceType == dependencyDetails.RequiredServiceType)
                 return dependency;
 
-            return dependency.Create(serviceType, ServiceInfoDetails.Of(providedType, serviceKey, ifUnresolved));
+            return dependency.Create(serviceType, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
         }
 
         public static StringBuilder Print(this StringBuilder s, IServiceInfo info)
@@ -2066,11 +2080,11 @@ namespace DryIoc
         public Type ServiceType { get; private set; }
         public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.Default; } }
 
-        IServiceInfo IServiceInfo.Create(Type serviceType, ServiceInfoDetails provided)
+        IServiceInfo IServiceInfo.Create(Type serviceType, ServiceInfoDetails details)
         {
-            return provided == ServiceInfoDetails.Default
+            return details == ServiceInfoDetails.Default
                 ? new ServiceInfo(serviceType)
-                : new WithDetails(serviceType, provided);
+                : new WithDetails(serviceType, details);
         }
 
         public override string ToString()
@@ -2105,11 +2119,11 @@ namespace DryIoc
         public virtual Type ServiceType { get { return _parameter.ParameterType; } }
         public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.Default; } }
 
-        IServiceInfo IServiceInfo.Create(Type serviceType, ServiceInfoDetails provided)
+        IServiceInfo IServiceInfo.Create(Type serviceType, ServiceInfoDetails details)
         {
             return serviceType == ServiceType
-                ? new WithDetails(_parameter, provided)
-                : new TypeWithDetails(_parameter, serviceType, provided);
+                ? new WithDetails(_parameter, details)
+                : new TypeWithDetails(_parameter, serviceType, details);
         }
 
         public override string ToString()
@@ -2150,8 +2164,8 @@ namespace DryIoc
         }
 
         public abstract Type ServiceType { get; }
-        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.DefaultIfUnresolvedReturnNull; } }
-        public abstract IServiceInfo Create(Type serviceType, ServiceInfoDetails provided);
+        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.DefaultIfUnresolvedReturnDefault; } }
+        public abstract IServiceInfo Create(Type serviceType, ServiceInfoDetails details);
 
         public abstract MemberInfo Member { get; }
         public abstract void SetValue(object holder, object value);
@@ -2159,11 +2173,11 @@ namespace DryIoc
         private class Property : PropertyOrFieldServiceInfo
         {
             public override Type ServiceType { get { return _property.PropertyType; } }
-            public override IServiceInfo Create(Type serviceType, ServiceInfoDetails provided)
+            public override IServiceInfo Create(Type serviceType, ServiceInfoDetails details)
             {
                 return serviceType == ServiceType
-                    ? new WithDetails(_property, provided)
-                    : new TypeWithDetails(_property, serviceType, provided);
+                    ? new WithDetails(_property, details)
+                    : new TypeWithDetails(_property, serviceType, details);
             }
 
             public override MemberInfo Member { get { return _property; } }
@@ -2203,11 +2217,11 @@ namespace DryIoc
         private class Field : PropertyOrFieldServiceInfo
         {
             public override Type ServiceType { get { return _field.FieldType; } }
-            public override IServiceInfo Create(Type serviceType, ServiceInfoDetails provided)
+            public override IServiceInfo Create(Type serviceType, ServiceInfoDetails details)
             {
                 return serviceType == null
-                    ? new WithDetails(_field, provided)
-                    : new TypeWithDetails(_field, serviceType, provided);
+                    ? new WithDetails(_field, details)
+                    : new TypeWithDetails(_field, serviceType, details);
             }
 
             public override MemberInfo Member { get { return _field; } }
@@ -2779,7 +2793,7 @@ namespace DryIoc
         public static Expression ResolveParameter(ParameterInfo p, ReflectionFactory factory, Request request, IRegistry registry)
         {
             var paramInfo = factory.GetParameterServiceInfo(p, request, registry);
-            var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.DefaultIfUnresolvedReturnNull, request, registry));
+            var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.DefaultIfUnresolvedReturnDefault, request, registry));
             var paramFactory = registry.ResolveFactory(paramRequest);
             return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
         }
@@ -2790,65 +2804,77 @@ namespace DryIoc
     /// </summary>
     public static class Parameters
     {
-        public static ParameterSelector Default = (parameter, request, registry) => null;
+        public static ParameterSelector Of = (p, req, reg) => null;
 
-        public static ParameterSelector Combine(ParameterSelector perRegistration, ParameterSelector perRegistry)
+        public static ParameterSelector AllowDefault = ((p, req, reg) =>
+            ParameterServiceInfo.Of(p).With(ServiceInfoDetails.DefaultIfUnresolvedReturnDefault, req, reg));
+
+        public static ParameterSelector Integrate(this ParameterSelector source, ParameterSelector other)
         {
-            return perRegistry == null || perRegistry == Default ? perRegistration ?? Default
-                : perRegistration == null || perRegistration == Default ? perRegistry
-                : (p, req, reg) => perRegistration(p, req, reg) ?? perRegistry(p, req, reg);
+            return source == null || source == Of ? other ?? Of
+                : other == null || other == Of ? source
+                : (parameter, req, reg) => other(parameter, req, reg) ?? source(parameter, req, reg);
         }
 
-        public static ParameterSelector With(IfUnresolved ifUnresolved)
-        {
-            return ifUnresolved == IfUnresolved.Throw ? Default
-                : ((parameter, req, reg) => ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(ifUnresolved: ifUnresolved), req, reg));
-        }
-
-        public static ParameterSelector With<T>(this ParameterSelector source, string name, T value)
+        public static ParameterSelector Name(this ParameterSelector source, string name, ServiceInfoDetails details)
         {
             name.ThrowIfNull();
-            return (parameter, req, reg) => !parameter.Name.Equals(name) ? source(parameter, req, reg)
-                : ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(() => value), req, reg);
+            details.ThrowIfNull();
+            return (parameter, req, reg) => parameter.Name.Equals(name) 
+                ? ParameterServiceInfo.Of(parameter).With(details, req, reg)
+                : source(parameter, req, reg);
+        }
+
+        public static ParameterSelector Name<T>(this ParameterSelector source, string name, T value)
+        {
+            return source.Name(name, ServiceInfoDetails.Of((_, r) => value));
         }
     }
 
     public static class PropertiesAndFields
     {
-        public static PropertiesAndFieldsSelector Default = (type, request, registry) => null;
+        public static PropertiesAndFieldsSelector Of = (type, request, registry) => null;
 
-        public static PropertiesAndFieldsSelector Combine(PropertiesAndFieldsSelector perRegistration, PropertiesAndFieldsSelector perRegistry)
+        public static PropertiesAndFieldsSelector Integrate(this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
         {
-            if (perRegistry == null || perRegistry == Default)
-                return perRegistration ?? Default;
-            if (perRegistration == null || perRegistration == Default)
-                return perRegistry;
-            return (t, req, reg) =>
+            if (source == null || source == Of)
+                return other ?? Of;
+            if (other == null || other == Of)
+                return source;
+
+            return (type, req, reg) =>
             {
-                var pfsPerRegistry = perRegistry(t, req, reg);
-                var pfsPerRegistration = perRegistration(t, req, reg);
-                if (pfsPerRegistry == null)
-                    return pfsPerRegistration;
+                var sourceMembers = source(type, req, reg);
+                var otherMembers = other(type, req, reg);
+                if (sourceMembers == null)
+                    return otherMembers;
+                if (otherMembers == null)
+                    return sourceMembers;
 
-                if (pfsPerRegistration == null)
-                    return pfsPerRegistry;
-
-                return pfsPerRegistration
-                    .Where(x => pfsPerRegistration.All(y => x.Member != y.Member))
-                    .Concat(pfsPerRegistration);
+                return sourceMembers
+                    .Where(s => s != null && otherMembers.All(o => o == null || s.Member != o.Member))
+                    .Concat(otherMembers);
             };
         }
 
-        public static PropertiesAndFieldsSelector With<T>(this PropertiesAndFieldsSelector source, string name, T value)
+        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name, ServiceInfoDetails details)
         {
             name.ThrowIfNull();
-            return (type, req, reg) =>
-            {
-                var property = type.GetProperty(name);
-                if (property == null)
-                    return null;
-                return new[] { PropertyOrFieldServiceInfo.Of(property).With(ServiceInfoDetails.Of(() => value), req, reg) };
-            };
+            details.ThrowIfNull();
+            return source.Integrate((type, req, reg) => new[] { PropertyOrFieldServiceInfo.Of(
+                type.GetProperty(name)
+                    .ThrowIfNull(Error.UNABLE_TO_FIND_PROPERTY_WITH_NAME_IN_TYPE, name, req))
+                    .With(details, req, reg) });
+        }
+
+        public static PropertiesAndFieldsSelector Name<T>(this PropertiesAndFieldsSelector source, string name, T value)
+        {
+            return source.Name(name, ServiceInfoDetails.Of((_, r) => value));
+        }
+
+        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name, Func<IRegistry, object> getValue)
+        {
+            return source.Name(name, ServiceInfoDetails.Of((_, r) => getValue(r)));
         }
     }
 
@@ -2944,7 +2970,7 @@ namespace DryIoc
                     var info = GetParameterServiceInfo(ctorParams[i], request, registry);
                     var expr = ResolveServiceInfoOrGetNullIfFailed(info, request, registry);
                     if (expr == null) return null;
-                    paramExprs[i] = expr; 
+                    paramExprs[i] = expr;
                 }
             }
 
@@ -3009,7 +3035,7 @@ namespace DryIoc
 
         internal ParameterServiceInfo GetParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
         {
-            var getInfo = Parameters.Combine(Setup.Rules.Parameters, registry.Rules.Parameters);
+            var getInfo = registry.Rules.Parameters.Integrate(Setup.Rules.Parameters);
             return getInfo(parameter, request, registry) ?? ParameterServiceInfo.Of(parameter);
         }
 
@@ -3034,25 +3060,26 @@ namespace DryIoc
 
         private Expression InitMembersIfRequired(NewExpression newService, Request request, IRegistry registry)
         {
-            var members = SelectPropertiesAndFields(request, registry);
-            if (members == null)
+            var infos = GetPropertiesAndFieldsInfo(request, registry);
+            if (infos == null)
                 return newService;
 
             var bindings = new List<MemberBinding>();
-            foreach (var info in members) if (info != null)
-            {
-                var expr = ResolveServiceInfoOrGetNullIfFailed(info, request, registry);
-                if (expr == null) return null;
-                bindings.Add(Expression.Bind(info.Member, expr));
-            }
+            foreach (var info in infos) 
+                if (info != null)
+                {
+                    var expr = ResolveServiceInfoOrGetNullIfFailed(info, request, registry);
+                    if (expr == null) return null;
+                    bindings.Add(Expression.Bind(info.Member, expr));
+                }
 
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
         }
 
-        private IEnumerable<PropertyOrFieldServiceInfo> SelectPropertiesAndFields(Request request, IRegistry registry)
+        private IEnumerable<PropertyOrFieldServiceInfo> GetPropertiesAndFieldsInfo(Request request, IRegistry registry)
         {
-            var selector = PropertiesAndFields.Combine(Setup.Rules.PropertiesAndFields, registry.Rules.PropertiesAndFields);
-            return selector == null ? null : selector(_implementationType, request, registry);
+            var getInfo = registry.Rules.PropertiesAndFields.Integrate(Setup.Rules.PropertiesAndFields);
+            return getInfo == null ? null : getInfo(_implementationType, request, registry);
         }
 
         private static Type[] GetClosedTypeArgsForGenericImplementationType(Type implType, Request request)
@@ -3124,9 +3151,9 @@ namespace DryIoc
 
         private static Expression ResolveServiceInfoOrGetNullIfFailed(IServiceInfo info, Request request, IRegistry registry)
         {
-            if (info.Details.GetValue != null) 
+            if (info.Details.GetValue != null)
             {
-                var value = info.Details.GetValue();
+                var value = info.Details.GetValue(request, registry);
                 return value == null
                     ? info.ServiceType.GetDefaultValueExpression()
                     : request.State.GetOrAddItemExpression(value, value.GetType().ThrowIf(
@@ -3138,7 +3165,7 @@ namespace DryIoc
             var factory = registry.ResolveFactory(infoRequest);
             var expr = factory == null ? null : factory.GetExpressionOrDefault(infoRequest, registry);
 
-            return expr ?? 
+            return expr ??
                 (request.IfUnresolved == IfUnresolved.ReturnDefault ? null
                 : infoRequest.ServiceType.GetDefaultValueExpression());
         }

@@ -4,10 +4,10 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ProvidedServiceTypeTests
+    public class RequiredServiceTypeTests
     {
         [Test]
-        public void Resolving_service_with_not_assignable_provided_type_should_Throw()
+        public void Resolving_service_with_not_assignable_required_type_should_Throw()
         {
             var container = new Container();
             container.Register<Service>();
@@ -21,12 +21,12 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_Lazy_service_with_provided_type_and_key_should_work()
+        public void Resolving_Lazy_service_with_required_type_and_key_should_work()
         {
             var container = new Container();
             container.Register<Service>(named: 1);
 
-            var service = container.Resolve<IService>(1, providedServiceType: typeof(Service));
+            var service = container.Resolve<IService>(1, requiredServiceType: typeof(Service));
 
             Assert.That(service, Is.Not.Null);
         }

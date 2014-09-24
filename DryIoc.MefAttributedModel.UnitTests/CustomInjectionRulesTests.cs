@@ -11,7 +11,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Can_combine_MEF_Imports_with_custom_Injection_rules_for_parameters()
         {
             var container = new Container().WithAttributedModel();
-            container.Register<ClientWithPrimitiveParameter>(setup: Setup.With(parameters: Parameters.Default.With("message", "hell")));
+            container.Register<ClientWithPrimitiveParameter>(setup: Setup.With(parameters: Parameters.Of.Name("message", "hell")));
             container.RegisterExports(typeof(KeyService));
 
             var client = container.Resolve<ClientWithPrimitiveParameter>();
@@ -23,12 +23,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Can_combine_MEF_Imports_with_custom_Injection_rules_for_properties()
         {
             var container = new Container().WithAttributedModel();
-            container.Register<ClientWithPrimitiveProperty>(
-                setup: Setup.With(propertiesAndFields: PropertiesAndFields.Default.With("Message", "hell")));
+            container.Register<ClientWithServiceAndPrimitiveProperty>(
+                setup: Setup.With(propertiesAndFields: PropertiesAndFields.Of.Name("Message", "hell")));
 
             container.RegisterExports(typeof(KeyService));
 
-            var client = container.Resolve<ClientWithPrimitiveProperty>();
+            var client = container.Resolve<ClientWithServiceAndPrimitiveProperty>();
 
             Assert.That(client.Message, Is.EqualTo("hell"));
         }
@@ -47,7 +47,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Export]
-        public class ClientWithPrimitiveProperty
+        public class ClientWithServiceAndPrimitiveProperty
         {
             [ImportWithKey(ServiceKey.One)]
             public IService Service { get; set; }
