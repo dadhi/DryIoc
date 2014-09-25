@@ -721,7 +721,7 @@ namespace DryIoc.MefAttributedModel
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ExportAllAttribute : Attribute
     {
-        public static Func<Type, bool> ExportedTypes = Registrator.RegisterAllDefaultTypes;
+        public static Func<Type, bool> ExportedTypes = Registrator.DefaultImplementedTypesForRegisterAll;
 
         /// <remarks>Specifies service key if <see cref="ContractName"/> is not specified.</remarks>
         public object ContractKey { get; set; }

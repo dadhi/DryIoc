@@ -62,14 +62,15 @@ namespace DryIoc
         }
 
         /// <summary>
-        /// Creates new container instance with possibility to update default rules.
+        /// Creates container specifying all of it state Except cache.
+        /// Useful to create fresh copy of existing container deciding what will be propagated to the copy.
         /// </summary>
-        /// <param name="updateRules">
-        /// Delegate gets <see cref="DryIoc.Rules.Default"/> as parameter and may return updated rules as result.
-        /// </param>
-        public Container(Func<Rules, Rules> updateRules)
-            : this(updateRules.ThrowIfNull().Invoke(Rules.Default)) { }
-
+        /// <param name="rules">Container-wide registration and resolution rules.</param>
+        /// <param name="factories">Registered factories of Service <see cref="FactoryType"/>.</param>
+        /// <param name="decorators">Registered factories of Decorator <see cref="FactoryType"/>.</param>
+        /// <param name="genericWrappers">Registered factories of GenericWrapper <see cref="FactoryType"/>.</param>
+        /// <param name="singletonScope">Singleton scope possibly containing some resolved singletons.</param>
+        /// <param name="currentScope">Current open scope possibly containing some resolved services.</param>
         public Container(Rules rules,
             Ref<HashTree<Type, object>> factories,
             Ref<HashTree<Type, Factory[]>> decorators,
@@ -90,6 +91,11 @@ namespace DryIoc
             _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
         }
 
+        /// <summary>Creates new container instance with possibility to update default rules.</summary>
+        /// <param name="updateRules"> Delegate gets <see cref="DryIoc.Rules.Default"/> as parameter and may return updated rules as result.</param>
+        public Container(Func<Rules, Rules> updateRules)
+            : this(updateRules.ThrowIfNull().Invoke(Rules.Default)) { }
+
         /// <remarks>Use <paramref name="registerBatch"/> to register some services right after constructor creation. 
         /// For some who prefer lambda syntax.</remarks>
         public Container(Action<IRegistrator> registerBatch, Rules rules = null)
@@ -98,6 +104,9 @@ namespace DryIoc
             registerBatch.ThrowIfNull().Invoke(this);
         }
 
+        /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
+        /// <param name="newRules">New rules. Its could be based on <see cref="DryIoc.Rules.Default"/> or copied container rules.</param>
+        /// <returns></returns>
         public Container WithNewRules(Rules newRules)
         {
             return new Container(newRules, _factories, _decorators, _genericWrappers, _singletonScope, _currentScope);
@@ -329,18 +338,19 @@ namespace DryIoc
         /// <summary>
         /// For given instance resolves and sets properties and fields.
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllWriteableAndResolvable"/>, 
+        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllWriteable"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>
         void IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
         {
             var instanceType = instance.ThrowIfNull().GetType();
 
-            selectPropertiesAndFields = selectPropertiesAndFields 
+            selectPropertiesAndFields = selectPropertiesAndFields
                 ?? Rules.PropertiesAndFields
-                ?? PropertiesAndFields.AllWriteableAndResolvable;
+                ?? PropertiesAndFields.AllWriteable;
 
             var request = CreateRequest(instanceType).ResolveWith(new InstanceFactory(instance));
             foreach (var info in selectPropertiesAndFields(instanceType, request, this))
@@ -1483,6 +1493,9 @@ namespace DryIoc
 
         public static readonly string UNABLE_TO_FIND_PROPERTY_WITH_NAME_IN_TYPE =
             "Unable to find property \"{0}\" when resolving: {1}.";
+
+        public static readonly string UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE = 
+            "Unable to register any of implementation {0} implemented services {1}.";
     }
 
     public static class Registrator
@@ -1598,8 +1611,16 @@ namespace DryIoc
             registrator.Register(factory, typeof(TServiceAndImplementation), named, ifAlreadyRegistered);
         }
 
-        // TODO: Move to Rules.
-        public static Func<Type, bool> RegisterAllDefaultTypes = t => (t.IsPublic || t.IsNestedPublic) && t != typeof(object);
+        /// <summary>
+        /// Returns true if type is public and not an object type. 
+        /// Provides default setting for <see cref="RegisterAll"/> "types" parameter.
+        /// </summary>
+        /// <param name="type">Type to check.</param>
+        /// <returns>True for matched type, false otherwise.</returns>
+        public static bool DefaultImplementedTypesForRegisterAll(Type type)
+        {
+            return (type.IsPublic || type.IsNestedPublic) && type != typeof(object);
+        }
 
         /// <summary>
         /// Registers single registration for all implemented public interfaces and base classes.
@@ -1612,8 +1633,8 @@ namespace DryIoc
         /// <param name="types">(optional) condition to include selected types only. Default value is <see cref="RegisterAllDefaultTypes"/></param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        public static void RegisterAll(this IRegistrator registrator,
-            Type implementationType, IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
+        public static void RegisterAll(this IRegistrator registrator, Type implementationType, 
+            IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             FactorySetup setup = null, Func<Type, bool> types = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
@@ -1621,7 +1642,7 @@ namespace DryIoc
             var factory = new ReflectionFactory(implementationType, reuse, setup);
 
             var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeFlags.SourceType);
-            var implementedServiceTypes = implementedTypes.Where(types ?? RegisterAllDefaultTypes);
+            var implementedServiceTypes = implementedTypes.Where(types ?? DefaultImplementedTypesForRegisterAll);
             if (implementationType.IsGenericTypeDefinition)
             {
                 var implTypeArgs = implementationType.GetGenericArguments();
@@ -1637,8 +1658,7 @@ namespace DryIoc
                 atLeastOneRegistered = true;
             }
 
-            Throw.If(!atLeastOneRegistered, "Unable to register any of implementation {0} implemented services {1}.",
-                implementationType, implementedTypes);
+            Throw.If(!atLeastOneRegistered, Error.UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE, implementationType, implementedTypes);
         }
 
         /// <summary>
@@ -1912,12 +1932,13 @@ namespace DryIoc
         /// <summary>
         /// For given instance resolves and sets properties and fields.
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllWriteableAndResolvable"/>, 
+        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllWriteable"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
         /// <param name="resolver">Usually a container instance, cause <see cref="Container"/> implements <see cref="IResolver"/></param>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
         public static void ResolvePropertiesAndFields(this IResolver resolver, object instance,
             PropertiesAndFieldsSelector selectPropertiesAndFields = null)
         {
@@ -2809,9 +2830,10 @@ namespace DryIoc
             }
         }
 
-        public static Expression ResolveParameter(ParameterInfo p, ReflectionFactory factory, Request request, IRegistry registry)
+        private static Expression ResolveParameter(ParameterInfo p, Factory factory, Request request, IRegistry registry)
         {
-            var paramInfo = factory.GetParameterServiceInfo(p, request, registry);
+            var getParamInfo = registry.Rules.Parameters.OverrideWith(factory.Setup.Rules.Parameters);
+            var paramInfo = getParamInfo(p, request, registry) ?? ParameterServiceInfo.Of(p);
             var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.DefaultIfUnresolvedReturnDefault, request, registry));
             var paramFactory = registry.ResolveFactory(paramRequest);
             return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
@@ -2859,7 +2881,7 @@ namespace DryIoc
     {
         public static PropertiesAndFieldsSelector Of = (type, request, registry) => null;
 
-        public static PropertiesAndFieldsSelector AllWriteableAndResolvable = (type, req, reg) =>
+        public static PropertiesAndFieldsSelector AllWriteable = (type, req, reg) =>
         {
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
             var properties = type.GetProperties(flags).Where(ReflectionTools.IsWritableProperty).Select(PropertyOrFieldServiceInfo.Of);
@@ -3063,16 +3085,6 @@ namespace DryIoc
             return Expression.Lambda(funcType, newExprInitialized, funcParamExprs);
         }
 
-        #region Tools
-
-        internal ParameterServiceInfo GetParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
-        {
-            var getInfo = registry.Rules.Parameters.OverrideWith(Setup.Rules.Parameters);
-            return getInfo(parameter, request, registry) ?? ParameterServiceInfo.Of(parameter);
-        }
-
-        #endregion
-
         #region Implementation
 
         private readonly Type _implementationType;
@@ -3107,6 +3119,12 @@ namespace DryIoc
                 }
 
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
+        }
+
+        private ParameterServiceInfo GetParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
+        {
+            return registry.Rules.Parameters.OverrideWith(Setup.Rules.Parameters)(parameter, request, registry)
+                ?? ParameterServiceInfo.Of(parameter);
         }
 
         private static Type[] GetClosedTypeArgsForGenericImplementationType(Type implType, Request request)
@@ -3276,7 +3294,6 @@ namespace DryIoc
             return factory;
         }
 
-        // TODO: Test by using in Unresolved Resolution Rules.
         public override Expression CreateExpressionOrDefault(Request request, IRegistry registry)
         {
             throw new NotSupportedException();
@@ -3378,11 +3395,12 @@ namespace DryIoc
         /// <summary>
         /// For given instance resolves and sets properties and fields.
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses default rule <see cref="PropertiesAndFields.AllWriteableAndResolvable"/>, 
+        /// or if rules are not set it uses default rule <see cref="PropertiesAndFields.AllWriteable"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
         void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields);
     }
 
@@ -3561,36 +3579,41 @@ namespace DryIoc
             return results;
         }
 
-        public static bool ContainsAllGenericParameters(this Type similarType, Type[] genericParameters)
+        /// <summary>
+        /// Returns true if <paramref name="sourceType"/> contains all generic parameters from <paramref name="genericParameters"/>.
+        /// </summary>
+        /// <param name="sourceType">Expected to be open-generic type.</param>
+        /// <param name="genericParameters">Generic parameter type to look in.</param>
+        /// <returns></returns>
+        public static bool ContainsAllGenericParameters(this Type sourceType, Type[] genericParameters)
         {
-            var argNames = new string[genericParameters.Length];
+            var paramNames = new string[genericParameters.Length];
             for (var i = 0; i < genericParameters.Length; i++)
-                argNames[i] = genericParameters[i].Name;
+                paramNames[i] = genericParameters[i].Name;
 
-            MarkTargetGenericParameters(similarType.GetGenericArguments(), ref argNames);
+            NullifyNamesFoundInGenericParameters(paramNames, sourceType.GetGenericArguments());
 
-            for (var i = 0; i < argNames.Length; i++)
-                if (argNames[i] != null)
+            for (var i = 0; i < paramNames.Length; i++)
+                if (paramNames[i] != null)
                     return false;
-
             return true;
         }
 
         #region Implementation
 
-        private static void MarkTargetGenericParameters(Type[] sourceTypeArgs, ref string[] targetArgNames)
+        private static void NullifyNamesFoundInGenericParameters(string[] names, Type[] genericParameters)
         {
-            for (var i = 0; i < sourceTypeArgs.Length; i++)
+            for (var i = 0; i < genericParameters.Length; i++)
             {
-                var sourceTypeArg = sourceTypeArgs[i];
+                var sourceTypeArg = genericParameters[i];
                 if (sourceTypeArg.IsGenericParameter)
                 {
-                    var matchingTargetArgIndex = Array.IndexOf(targetArgNames, sourceTypeArg.Name);
+                    var matchingTargetArgIndex = Array.IndexOf(names, sourceTypeArg.Name);
                     if (matchingTargetArgIndex != -1)
-                        targetArgNames[matchingTargetArgIndex] = null;
+                        names[matchingTargetArgIndex] = null;
                 }
                 else if (sourceTypeArg.IsGenericType && sourceTypeArg.ContainsGenericParameters)
-                    MarkTargetGenericParameters(sourceTypeArg.GetGenericArguments(), ref targetArgNames);
+                    NullifyNamesFoundInGenericParameters(names, sourceTypeArg.GetGenericArguments());
             }
         }
 

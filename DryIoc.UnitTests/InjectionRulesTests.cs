@@ -146,7 +146,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.AllWriteableAndResolvable));
+                propertiesAndFields: PropertiesAndFields.AllWriteable));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -154,6 +154,21 @@ namespace DryIoc.UnitTests
             Assert.That(client.P, Is.InstanceOf<Service>());
             Assert.That(client.PNonResolvable, Is.Null);
         }
+
+        //[Test]
+        //public void Can_say_for_properties_to_throw_if_unresolved()
+        //{
+        //    var container = new Container();
+        //    container.Register<IService, Service>();
+        //    container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
+        //        propertiesAndFields: PropertiesAndFields.Of.Name("a", ServiceInfoDetails.Of()). Name("b"), Name("c")));
+
+        //    var client = container.Resolve<ClientWithPropsAndFields>();
+
+        //    Assert.That(client.F, Is.InstanceOf<Service>());
+        //    Assert.That(client.P, Is.InstanceOf<Service>());
+        //    Assert.That(client.PNonResolvable, Is.Null);
+        //}
 
         #region CUT
 
