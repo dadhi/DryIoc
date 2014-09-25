@@ -53,7 +53,7 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<ClientWithStringParam>());
-            
+
             Assert.That(ex.Message, Is.StringContaining("Injected value 500 is not assignable to String parameter \"x\""));
         }
 
@@ -81,6 +81,20 @@ namespace DryIoc.UnitTests
 
             Assert.That(client.X, Is.EqualTo("hola"));
             Assert.That(client.Service, Is.Null);
+        }
+
+        [Test]
+        public void Can_inject_resolved_value_per_parameter()
+        {
+            var container = new Container();
+            container.Register<Service>(named: "service");
+            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(parameters: 
+                Parameters.Of.Name("x", "hola").Name("service", r => r.Resolve<IService>("service", requiredServiceType: typeof(Service)))));
+
+            var client = container.Resolve<ClientWithServiceAndStringParam>();
+
+            Assert.That(client.X, Is.EqualTo("hola"));
+            Assert.That(client.Service, Is.InstanceOf<Service>());
         }
 
         [Test]
@@ -126,6 +140,21 @@ namespace DryIoc.UnitTests
             Assert.That(ex.Message, Is.StringContaining("Unable to find property \"WrongName\" when resolving"));
         }
 
+        [Test]
+        public void Should_simply_specify_that_all_assignable_properties_and_fiels_should_be_resolved()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
+                propertiesAndFields: PropertiesAndFields.AllWriteableAndResolvable));
+
+            var client = container.Resolve<ClientWithPropsAndFields>();
+
+            Assert.That(client.F, Is.InstanceOf<Service>());
+            Assert.That(client.P, Is.InstanceOf<Service>());
+            Assert.That(client.PNonResolvable, Is.Null);
+        }
+
         #region CUT
 
         public class SomeBlah
@@ -160,6 +189,22 @@ namespace DryIoc.UnitTests
             public IService Service { get; set; }
             public string Message { get; set; }
         }
+
+        public class ClientWithPropsAndFields
+        {
+            public IService F;
+            // ReSharper disable UnassignedReadonlyField
+            public readonly IService FReadonly;
+            // ReSharper restore UnassignedReadonlyField
+
+            public IService P { get; set; }
+            // ReSharper disable UnusedAutoPropertyAccessor.Local
+            public IService PPrivate { get; private set; }
+            // ReSharper restore UnusedAutoPropertyAccessor.Local
+
+            public AnotherService PNonResolvable { get; set; }
+        }
+
 
         #endregion
     }

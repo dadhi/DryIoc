@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -88,6 +89,20 @@ namespace DryIoc.UnitTests
             var client = container.Resolve<ClientOfInitializableService>();
 
             Assert.That(client.Service.Data, Is.EqualTo("green-blah"));
+        }
+
+        [Test]
+        public void Can_register_initializer_for_object_For_example_to_log_all_resolutions()
+        {
+            var container = new Container();
+            container.Register<InitializableService>();
+
+            var log = new List<string>();
+            container.RegisterInitializer<object>((x, _) => log.Add(x.GetType().Name));
+
+            container.Resolve<InitializableService>();
+
+            CollectionAssert.AreEqual(new[] { "InitializableService" }, log);
         }
 
         public interface IInitializable<T>

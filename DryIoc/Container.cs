@@ -326,31 +326,24 @@ namespace DryIoc
             return newFactoryDelegate(request.State.Items, request.ResolutionScope);
         }
 
-        public static readonly Func<Type, IEnumerable<PropertyOrFieldServiceInfo>> SelectPublicAssignablePropertiesAndFields = type =>
-        {
-            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-            var properties = type.GetProperties(flags).Where(ReflectionTools.IsWritableProperty).Select(PropertyOrFieldServiceInfo.Of);
-            var fields = type.GetFields(flags).Where(ReflectionTools.IsWritableField).Select(PropertyOrFieldServiceInfo.Of);
-            return properties.Concat(fields);
-        };
-
         /// <summary>
         /// For given instance resolves and sets properties and fields.
-        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, or if rules are not set it uses
-        /// <see cref="Container.SelectPublicAssignablePropertiesAndFields"/>, 
+        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
+        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllWriteableAndResolvable"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
-        void IResolver.ResolvePropertiesAndFields(object instance, Func<Type, IEnumerable<PropertyOrFieldServiceInfo>> selectPropertiesAndFields)
+        void IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
         {
             var instanceType = instance.ThrowIfNull().GetType();
 
-            selectPropertiesAndFields = selectPropertiesAndFields
-                ?? (Rules.PropertiesAndFields == null ? SelectPublicAssignablePropertiesAndFields
-                    : type => Rules.PropertiesAndFields(type, CreateRequest(type).ResolveWith(new InstanceFactory(instance)), this));
+            selectPropertiesAndFields = selectPropertiesAndFields 
+                ?? Rules.PropertiesAndFields
+                ?? PropertiesAndFields.AllWriteableAndResolvable;
 
-            foreach (var info in selectPropertiesAndFields(instanceType))
+            var request = CreateRequest(instanceType).ResolveWith(new InstanceFactory(instance));
+            foreach (var info in selectPropertiesAndFields(instanceType, request, this))
                 if (info != null)
                 {
                     var value = this.Resolve(info.ServiceType, info.Details.ServiceKey, info.Details.IfUnresolved);
@@ -1918,15 +1911,15 @@ namespace DryIoc
 
         /// <summary>
         /// For given instance resolves and sets properties and fields.
-        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, or if rules are not set it uses
-        /// <see cref="Container.SelectPublicAssignablePropertiesAndFields"/>, 
+        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
+        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllWriteableAndResolvable"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
         /// <param name="resolver">Usually a container instance, cause <see cref="Container"/> implements <see cref="IResolver"/></param>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
         public static void ResolvePropertiesAndFields(this IResolver resolver, object instance,
-            Func<Type, IEnumerable<PropertyOrFieldServiceInfo>> selectPropertiesAndFields = null)
+            PropertiesAndFieldsSelector selectPropertiesAndFields = null)
         {
             resolver.ResolvePropertiesAndFields(instance, selectPropertiesAndFields);
         }
@@ -2835,7 +2828,7 @@ namespace DryIoc
         public static ParameterSelector AllowDefault = ((p, req, reg) =>
             ParameterServiceInfo.Of(p).With(ServiceInfoDetails.DefaultIfUnresolvedReturnDefault, req, reg));
 
-        public static ParameterSelector Integrate(this ParameterSelector source, ParameterSelector other)
+        public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other)
         {
             return source == null || source == Of ? other ?? Of
                 : other == null || other == Of ? source
@@ -2855,13 +2848,26 @@ namespace DryIoc
         {
             return source.Name(name, ServiceInfoDetails.Of((_, r) => value));
         }
+
+        public static ParameterSelector Name(this ParameterSelector source, string name, Func<IRegistry, object> getValue)
+        {
+            return source.Name(name, ServiceInfoDetails.Of((_, r) => getValue(r)));
+        }
     }
 
     public static class PropertiesAndFields
     {
         public static PropertiesAndFieldsSelector Of = (type, request, registry) => null;
 
-        public static PropertiesAndFieldsSelector Integrate(this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
+        public static PropertiesAndFieldsSelector AllWriteableAndResolvable = (type, req, reg) =>
+        {
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
+            var properties = type.GetProperties(flags).Where(ReflectionTools.IsWritableProperty).Select(PropertyOrFieldServiceInfo.Of);
+            var fields = type.GetFields(flags).Where(ReflectionTools.IsWritableField).Select(PropertyOrFieldServiceInfo.Of);
+            return properties.Concat(fields);
+        };
+
+        public static PropertiesAndFieldsSelector OverrideWith(this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
         {
             if (source == null || source == Of)
                 return other ?? Of;
@@ -2887,7 +2893,7 @@ namespace DryIoc
         {
             name.ThrowIfNull();
             details.ThrowIfNull();
-            return source.Integrate((type, req, reg) => new[] { PropertyOrFieldServiceInfo.Of(
+            return source.OverrideWith((type, req, reg) => new[] { PropertyOrFieldServiceInfo.Of(
                 type.GetProperty(name)
                     .ThrowIfNull(Error.UNABLE_TO_FIND_PROPERTY_WITH_NAME_IN_TYPE, name, req))
                     .With(details, req, reg) });
@@ -3061,7 +3067,7 @@ namespace DryIoc
 
         internal ParameterServiceInfo GetParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
         {
-            var getInfo = registry.Rules.Parameters.Integrate(Setup.Rules.Parameters);
+            var getInfo = registry.Rules.Parameters.OverrideWith(Setup.Rules.Parameters);
             return getInfo(parameter, request, registry) ?? ParameterServiceInfo.Of(parameter);
         }
 
@@ -3086,7 +3092,8 @@ namespace DryIoc
 
         private Expression InitMembersIfRequired(NewExpression newService, Request request, IRegistry registry)
         {
-            var infos = GetPropertiesAndFieldsInfo(request, registry);
+            var getInfos = registry.Rules.PropertiesAndFields.OverrideWith(Setup.Rules.PropertiesAndFields);
+            var infos = getInfos(_implementationType, request, registry);
             if (infos == null)
                 return newService;
 
@@ -3100,12 +3107,6 @@ namespace DryIoc
                 }
 
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
-        }
-
-        private IEnumerable<PropertyOrFieldServiceInfo> GetPropertiesAndFieldsInfo(Request request, IRegistry registry)
-        {
-            var getInfo = registry.Rules.PropertiesAndFields.Integrate(Setup.Rules.PropertiesAndFields);
-            return getInfo == null ? null : getInfo(_implementationType, request, registry);
         }
 
         private static Type[] GetClosedTypeArgsForGenericImplementationType(Type implType, Request request)
@@ -3376,13 +3377,13 @@ namespace DryIoc
 
         /// <summary>
         /// For given instance resolves and sets properties and fields.
-        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, or if rules are not set it uses
-        /// <see cref="Container.SelectPublicAssignablePropertiesAndFields"/>, 
+        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
+        /// or if rules are not set it uses default rule <see cref="PropertiesAndFields.AllWriteableAndResolvable"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
-        void ResolvePropertiesAndFields(object instance, Func<Type, IEnumerable<PropertyOrFieldServiceInfo>> selectPropertiesAndFields);
+        void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields);
     }
 
     public enum IfAlreadyRegistered { ThrowIfDuplicateKey, KeepRegistered, UpdateRegistered }
