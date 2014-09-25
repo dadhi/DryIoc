@@ -306,13 +306,13 @@ namespace DryIoc.MefAttributedModel
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
-            var properties = type.GetProperties(flags).Where(ReflectionTools.IsWritableProperty).Select(property =>
+            var properties = type.GetProperties(flags).Where(ReflectionTools.HasSetter).Select(property =>
             {
                 var details = GetFirstImportDetailsOrNull(property.PropertyType, property.GetCustomAttributes(false), request, registry);
                 return details == null ? null : PropertyOrFieldServiceInfo.Of(property).With(details, request, registry);
             });
 
-            var fields = type.GetFields(flags).Where(ReflectionTools.IsWritableField).Select(field =>
+            var fields = type.GetFields(flags).Where(ReflectionTools.NonReadonly).Select(field =>
             {
                 var details = GetFirstImportDetailsOrNull(field.FieldType, field.GetCustomAttributes(false), request, registry);
                 return details == null ? null : PropertyOrFieldServiceInfo.Of(field).With(details, request, registry);
