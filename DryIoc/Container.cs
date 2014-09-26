@@ -338,7 +338,7 @@ namespace DryIoc
         /// <summary>
         /// For given instance resolves and sets properties and fields.
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllPublic"/>, 
+        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllPublicNonPrimitive"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
@@ -350,7 +350,7 @@ namespace DryIoc
 
             selectPropertiesAndFields = selectPropertiesAndFields
                 ?? Rules.PropertiesAndFields
-                ?? PropertiesAndFields.AllPublic;
+                ?? PropertiesAndFields.AllPublicNonPrimitive;
 
             var request = CreateRequest(instanceType).ResolveWith(new InstanceFactory(instance));
             foreach (var info in selectPropertiesAndFields(instanceType, request, this))
@@ -1064,9 +1064,6 @@ namespace DryIoc
                 }
             }
 
-            if ((itemExprList == null || itemExprList.Count == 0) && request.IfUnresolved == IfUnresolved.Throw)
-                throw Error.UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS.Of(itemType, request);
-
             return Expression.NewArrayInit(itemType.ThrowIfNull(), itemExprList ?? Enumerable.Empty<Expression>());
         }
 
@@ -1437,9 +1434,6 @@ namespace DryIoc
         public static readonly string DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION =
             "Decorator factory should support resolution as {0}, but it does not.";
 
-        public static readonly string UNABLE_TO_RESOLVE_ENUMERABLE_ITEMS =
-            "Unable to resolve any service of item type {0} when resolving {1}.";
-
         public static readonly string DELEGATE_FACTORY_EXPRESSION_RETURNED_NULL =
             "Delegate factory expression returned NULL when resolving {0}.";
 
@@ -1480,10 +1474,10 @@ namespace DryIoc
         public static readonly string UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE =
             "Unable to register any of implementation {0} implemented services {1}.";
 
-        public static readonly string PROPERTY_DOES_NOT_HAVE_SETTER = 
+        public static readonly string PROPERTY_DOES_NOT_HAVE_SETTER =
             "Specified property \"{0}\" does not have setter when resolving: {1}.";
 
-        public static readonly string FIELD_IS_READONLY = 
+        public static readonly string FIELD_IS_READONLY =
             "Specified field \"{0}\" is readonly when resolving: {1}.";
     }
 
@@ -1921,7 +1915,7 @@ namespace DryIoc
         /// <summary>
         /// For given instance resolves and sets properties and fields.
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllPublic"/>, 
+        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllPublicNonPrimitive"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
         /// <param name="resolver">Usually a container instance, cause <see cref="Container"/> implements <see cref="IResolver"/></param>
@@ -1944,7 +1938,7 @@ namespace DryIoc
 
     public class ServiceInfoDetails
     {
-        public static readonly ServiceInfoDetails Default = new ServiceInfoDetails();
+        public static readonly ServiceInfoDetails DefaultIfUnresolvedThrow = new ServiceInfoDetails();
         public static readonly ServiceInfoDetails DefaultIfUnresolvedReturnDefault = new IfUnresolvedReturnNull();
 
         public static ServiceInfoDetails Of(Type requiredServiceType = null,
@@ -1952,7 +1946,7 @@ namespace DryIoc
         {
             return ifUnresolved == IfUnresolved.Throw
                 ? (requiredServiceType == null
-                    ? (serviceKey == null ? Default : new WithKey(serviceKey))
+                    ? (serviceKey == null ? DefaultIfUnresolvedThrow : new WithKey(serviceKey))
                     : new WithType(requiredServiceType, serviceKey))
                 : (requiredServiceType == null
                     ? (serviceKey == null ? DefaultIfUnresolvedReturnDefault : new WithKeyReturnDefault(serviceKey))
@@ -2058,7 +2052,7 @@ namespace DryIoc
         public static IServiceInfo InheritDependencyFromOwnerInfo(this IServiceInfo dependency, IServiceInfo owner, FactoryType ownerFactoryType)
         {
             var ownerDetails = owner.Details;
-            if (ownerDetails == null || ownerDetails == ServiceInfoDetails.Default)
+            if (ownerDetails == null || ownerDetails == ServiceInfoDetails.DefaultIfUnresolvedThrow)
                 return dependency;
 
             var dependencyDetails = dependency.Details;
@@ -2106,11 +2100,11 @@ namespace DryIoc
         }
 
         public Type ServiceType { get; private set; }
-        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.Default; } }
+        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.DefaultIfUnresolvedThrow; } }
 
         IServiceInfo IServiceInfo.Create(Type serviceType, ServiceInfoDetails details)
         {
-            return details == ServiceInfoDetails.Default
+            return details == ServiceInfoDetails.DefaultIfUnresolvedThrow
                 ? new ServiceInfo(serviceType)
                 : new WithDetails(serviceType, details);
         }
@@ -2160,7 +2154,7 @@ namespace DryIoc
         }
 
         public virtual Type ServiceType { get { return _parameter.ParameterType; } }
-        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.Default; } }
+        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.DefaultIfUnresolvedThrow; } }
 
         IServiceInfo IServiceInfo.Create(Type serviceType, ServiceInfoDetails details)
         {
@@ -2858,24 +2852,34 @@ namespace DryIoc
                 : (parameter, req, reg) => other(parameter, req, reg) ?? source(parameter, req, reg);
         }
 
-        public static ParameterSelector With(this ParameterSelector source, string name, ServiceInfoDetails details)
+        public static ParameterSelector With(this ParameterSelector source, string name,
+            Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        {
+            return source.WithDetails(name, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
+        }
+
+        public static ParameterSelector With(this ParameterSelector source, string name, object value)
+        {
+            return source.WithDetails(name, ServiceInfoDetails.Of((_, r) => value));
+        }
+
+        public static ParameterSelector With(this ParameterSelector source, string name, Func<IRegistry, object> getValue)
+        {
+            return source.WithDetails(name, ServiceInfoDetails.Of((_, r) => getValue(r)));
+        }
+
+        #region Implementation
+
+        private static ParameterSelector WithDetails(this ParameterSelector source, string name,
+            ServiceInfoDetails details)
         {
             name.ThrowIfNull();
-            details.ThrowIfNull();
             return (parameter, req, reg) => parameter.Name.Equals(name)
                 ? ParameterServiceInfo.Of(parameter).With(details, req, reg)
                 : source(parameter, req, reg);
         }
 
-        public static ParameterSelector With<T>(this ParameterSelector source, string name, T value)
-        {
-            return source.With(name, ServiceInfoDetails.Of((_, r) => value));
-        }
-
-        public static ParameterSelector With(this ParameterSelector source, string name, Func<IRegistry, object> getValue)
-        {
-            return source.With(name, ServiceInfoDetails.Of((_, r) => getValue(r)));
-        }
+        #endregion
     }
 
     /// <summary>DSL for specifying <see cref="PropertiesAndFieldsSelector"/> injection rules.</summary>
@@ -2883,13 +2887,56 @@ namespace DryIoc
     {
         public static PropertiesAndFieldsSelector None = (type, request, registry) => null;
 
-        public static PropertiesAndFieldsSelector AllPublic = (type, req, reg) =>
+        /// <summary>
+        /// Generates selector property and field selector with settings specified by parameters.
+        /// If all parameters are omitted the return all public not primitive members, which won't be set if unresolved.
+        /// </summary>
+        /// <param name="ifUnresolved">(optional) Specifies for all members to throw or return default if unresolved, by default does not throw.</param>
+        /// <param name="withNonPublic">(optional) If set specifies to include non-public members.</param>
+        /// <param name="withPrimitive">(optional) If set specifies to include primitive values, object and string using <see cref="TypeTools.IsPrimitiveOrObjectOrString"/>.</param>
+        /// <param name="except">(optional) Specifies rule to exclude members, e.g. exclude all fields, or property with specific name or attribute.</param>
+        /// <returns>Result selector composed using provided settings.</returns>
+        public static PropertiesAndFieldsSelector All(
+            IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, 
+            bool withNonPublic = false, bool withPrimitive = false,
+            Func<MemberInfo, bool> except = null)
         {
-            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-            var properties = type.GetProperties(flags).Where(ReflectionTools.HasPublicSetter).Select(PropertyOrFieldServiceInfo.Of);
-            var fields = type.GetFields(flags).Where(ReflectionTools.NonReadonly).Select(PropertyOrFieldServiceInfo.Of);
-            return properties.Concat(fields);
-        };
+            var flags = BindingFlags.Public | BindingFlags.Instance;
+            if (withNonPublic) flags |= BindingFlags.NonPublic;
+
+            var matchProperty = withPrimitive
+                ? (withNonPublic ? (Func<PropertyInfo, bool>)ReflectionTools.HasSetter : ReflectionTools.HasPublicSetter)
+                : p => p.HasPublicSetter() && !p.PropertyType.IsPrimitiveOrObjectOrString();
+
+            var matchField = withPrimitive
+                ? (Func<FieldInfo, bool>)ReflectionTools.NonReadonly
+                : f => f.NonReadonly() && !f.FieldType.IsPrimitiveOrObjectOrString();
+
+            return (type, request, registry) =>
+            {
+                var getPropertyInfo = ifUnresolved == IfUnresolved.ReturnDefault
+                    ? (Func<PropertyInfo, PropertyOrFieldServiceInfo>)PropertyOrFieldServiceInfo.Of
+                    : p => PropertyOrFieldServiceInfo.Of(p).With(ServiceInfoDetails.DefaultIfUnresolvedThrow, request, registry);
+
+                var getFieldInfo = ifUnresolved == IfUnresolved.ReturnDefault
+                    ? (Func<FieldInfo, PropertyOrFieldServiceInfo>)PropertyOrFieldServiceInfo.Of
+                    : (f => PropertyOrFieldServiceInfo.Of(f).With(ServiceInfoDetails.DefaultIfUnresolvedThrow, request, registry));
+
+                var properties = 
+                    (except == null ? type.GetProperties(flags) : type.GetProperties(flags).Where(p => !except(p)))
+                    .Where(matchProperty).Select(getPropertyInfo);
+                
+                var fields = (except == null ? type.GetFields(flags) : type.GetFields(flags).Where(f => !except(f)))
+                    .Where(matchField).Select(getFieldInfo);
+                
+                return properties.Concat(fields);
+            };
+        }
+
+        /// <summary>
+        /// Public assignable instance members of any type except object, string, primitives types, and arrays of those.
+        /// </summary>
+        public static PropertiesAndFieldsSelector AllPublicNonPrimitive = All();
 
         public static PropertiesAndFieldsSelector OverrideWith(this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
         {
@@ -2913,10 +2960,28 @@ namespace DryIoc
             };
         }
 
-        public static PropertiesAndFieldsSelector With(this PropertiesAndFieldsSelector source, string name, ServiceInfoDetails details)
+        public static PropertiesAndFieldsSelector With(this PropertiesAndFieldsSelector source, string name,
+            Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        {
+            return source.WithDetails(name, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
+        }
+
+        public static PropertiesAndFieldsSelector With(this PropertiesAndFieldsSelector source, string name, object value)
+        {
+            return source.WithDetails(name, ServiceInfoDetails.Of((_, r) => value));
+        }
+
+        public static PropertiesAndFieldsSelector With(this PropertiesAndFieldsSelector source, string name, Func<IRegistry, object> getValue)
+        {
+            return source.WithDetails(name, ServiceInfoDetails.Of((_, r) => getValue(r)));
+        }
+
+        #region Implementation
+
+        private static PropertiesAndFieldsSelector WithDetails(this PropertiesAndFieldsSelector source, string name, ServiceInfoDetails details)
         {
             name.ThrowIfNull();
-            details.ThrowIfNull();
+            details = details ?? ServiceInfoDetails.DefaultIfUnresolvedReturnDefault;
             return source.OverrideWith((type, req, reg) =>
             {
                 const BindingFlags privateAndPublic = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -2926,7 +2991,7 @@ namespace DryIoc
                     Throw.If(!property.CanWrite, Error.PROPERTY_DOES_NOT_HAVE_SETTER, name, req);
                     return new[] { PropertyOrFieldServiceInfo.Of(property).With(details, req, reg) };
                 }
-                
+
                 var field = type.GetField(name, privateAndPublic)
                     .ThrowIfNull(Error.UNABLE_TO_FIND_PROPERTY_OR_FIELD_WITH_NAME_IN_TYPE, name, req);
                 Throw.If(field.IsInitOnly, Error.FIELD_IS_READONLY, name, req);
@@ -2934,15 +2999,7 @@ namespace DryIoc
             });
         }
 
-        public static PropertiesAndFieldsSelector With<T>(this PropertiesAndFieldsSelector source, string name, T value)
-        {
-            return source.With(name, ServiceInfoDetails.Of((_, r) => value));
-        }
-
-        public static PropertiesAndFieldsSelector With(this PropertiesAndFieldsSelector source, string name, Func<IRegistry, object> getValue)
-        {
-            return source.With(name, ServiceInfoDetails.Of((_, r) => getValue(r)));
-        }
+        #endregion
     }
 
     public sealed class ReflectionFactory : Factory
@@ -3408,7 +3465,7 @@ namespace DryIoc
         /// <summary>
         /// For given instance resolves and sets properties and fields.
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses default rule <see cref="PropertiesAndFields.AllPublic"/>, 
+        /// or if rules are not set it uses default rule <see cref="PropertiesAndFields.AllPublicNonPrimitive"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
@@ -3617,6 +3674,12 @@ namespace DryIoc
                 if (paramNames[i] != null)
                     return false;
             return true;
+        }
+
+        public static bool IsPrimitiveOrObjectOrString(this Type type)
+        {
+            return type.IsPrimitive || type == typeof(string) || type == typeof(object) ||
+                type.IsArray && type.GetElementType().IsPrimitiveOrObjectOrString();
         }
 
         #region Implementation

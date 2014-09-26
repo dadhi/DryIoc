@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -88,7 +89,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Service>(named: "service");
-            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(parameters: 
+            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(parameters:
                 Parameters.All.With("x", "hola").With("service", r => r.Resolve<IService>("service", requiredServiceType: typeof(Service)))));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
@@ -103,12 +104,25 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Service>(named: "dependency");
             container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(
-                parameters: Parameters.All.With("x", "hola").With("service", ServiceInfoDetails.Of(typeof(Service), "dependency"))));
+                parameters: Parameters.All.With("x", "hola").With("service", typeof(Service), "dependency")));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
 
             Assert.That(client.Service, Is.InstanceOf<Service>());
             Assert.That(client.X, Is.EqualTo("hola"));
+        }
+
+        [Test]
+        public void Can_setup_parameter_base_on_its_type()
+        {
+            var container = new Container();
+            container.Register<ClientWithServiceAndStringParam>(
+                setup: Setup.With(parameters: Parameters.AllDefaultIfUnresolved.With("x", "hola")));
+
+            var client = container.Resolve<ClientWithServiceAndStringParam>();
+
+            Assert.That(client.X, Is.EqualTo("hola"));
+            Assert.That(client.Service, Is.Null);
         }
 
         [Test]
@@ -146,7 +160,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.AllPublic));
+                propertiesAndFields: PropertiesAndFields.AllPublicNonPrimitive));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -161,7 +175,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.None.With("PWithPrivateSetter", ServiceInfoDetails.Default)));
+                propertiesAndFields: PropertiesAndFields.None.With("PWithPrivateSetter")));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -174,7 +188,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.None.With("_pPrivate", ServiceInfoDetails.Default)));
+                propertiesAndFields: PropertiesAndFields.None.With("_pPrivate")));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -187,7 +201,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.None.With("_fPrivate", ServiceInfoDetails.Default)));
+                propertiesAndFields: PropertiesAndFields.None.With("_fPrivate")));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -200,12 +214,79 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.None.With("FReadonly", ServiceInfoDetails.Default)));
+                propertiesAndFields: PropertiesAndFields.None.With("FReadonly")));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<ClientWithPropsAndFields>());
 
             Assert.That(ex.Message, Is.StringContaining("Specified field \"FReadonly\" is readonly when resolving"));
+        }
+
+        [Test][Ignore]
+        public void Only_not_assigned_properies_and_fields_should_be_resolved_So_that_assgined_field_value_should_Not_change()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.Register<IService, AnotherService>(named: "another");
+            container.Register<ClientWithAssignedProperty>(setup: Setup.With(
+                propertiesAndFields: PropertiesAndFields.None.With("Service", serviceKey: "another")));
+
+            var client = container.Resolve<ClientWithAssignedProperty>();
+
+            Assert.That(client.Service, Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void Only_non_primitive_properies_and_fields_should_be_resolved()
+        {
+            var container = new Container();
+
+            container.Register<IService, Service>();
+            container.RegisterInstance("Hello string!");
+            container.Register<ClientWithServiceAndStringProperty>(setup: Setup.With(
+                propertiesAndFields: PropertiesAndFields.AllPublicNonPrimitive));
+
+            var client = container.Resolve<ClientWithServiceAndStringProperty>();
+
+            Assert.That(client.Service, Is.InstanceOf<Service>());
+            Assert.That(client.Message, Is.Null);
+        }
+
+        [Test]
+        public void Can_specify_all_to_throw_if_Any_property_is_unresolved()
+        {
+            var container = new Container();
+            container.Register<ClientWithServiceAndStringProperty>(setup: Setup.With(
+                propertiesAndFields: PropertiesAndFields.All(IfUnresolved.Throw)));
+
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<ClientWithServiceAndStringProperty>());
+        }
+
+        [Test]
+        public void I_can_easily_exclude_fields_from_resolution()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
+                propertiesAndFields: PropertiesAndFields.All(except: _ => _.MemberType == MemberTypes.Field)));
+
+            var client = container.Resolve<ClientWithPropsAndFields>();
+            Assert.That(client.F, Is.Null);
+            Assert.That(client.P, Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void I_can_easily_exclude_properties_from_resolution()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
+                propertiesAndFields: PropertiesAndFields.All(except: _ => _.MemberType == MemberTypes.Property)));
+
+            var client = container.Resolve<ClientWithPropsAndFields>();
+            Assert.That(client.F, Is.InstanceOf<Service>());
+            Assert.That(client.P, Is.Null);
         }
 
         #region CUT
@@ -266,6 +347,15 @@ namespace DryIoc.UnitTests
             public AnotherService PNonResolvable { get; set; }
         }
 
+        public class ClientWithAssignedProperty
+        {
+            public IService Service { get; set; }
+
+            public ClientWithAssignedProperty(IService service)
+            {
+                Service = service;
+            }
+        }
 
         #endregion
     }

@@ -139,7 +139,7 @@ namespace DryIoc.UnitTests
         public static ParameterServiceInfo GetServiceInfoFromImportAttribute(ParameterInfo parameter, Request request, IRegistry registry)
         {
             var import = (ImportAttribute)parameter.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
-            var details = import == null ? ServiceInfoDetails.Default
+            var details = import == null ? ServiceInfoDetails.DefaultIfUnresolvedThrow
                 : ServiceInfoDetails.Of(import.ContractType, import.ContractName);
             return ParameterServiceInfo.Of(parameter).With(details, request, registry);
         }
