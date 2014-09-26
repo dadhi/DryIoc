@@ -304,6 +304,7 @@ namespace DryIoc.MefAttributedModel
 
         public static IEnumerable<PropertyOrFieldServiceInfo>GetImportedPropertiesAndFields(Type type, Request request, IRegistry registry)
         {
+            // whatever is marked with Import don't matter the visibility
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
             var properties = type.GetProperties(flags).Where(ReflectionTools.HasSetter).Select(property =>

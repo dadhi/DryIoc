@@ -3780,7 +3780,7 @@ namespace DryIoc
     {
         public static bool HasSetter(this PropertyInfo property)
         {
-            return property.GetSetMethod() != null;
+            return property.CanWrite;
         }
 
         public static bool HasPublicSetter(this PropertyInfo property)

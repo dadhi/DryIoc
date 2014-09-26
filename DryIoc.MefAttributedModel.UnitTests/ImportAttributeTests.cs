@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.Composition;
-using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -150,9 +148,20 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.NotNull(client);
         }
 
+        [Test]
+        public void Could_import_property_with_private_setter()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(ServiceWithPropWithPrivateSetter), typeof(Service));
+
+            var service = container.Resolve<ServiceWithPropWithPrivateSetter>();
+
+            Assert.That(service.PropWithPrivateSetter, Is.InstanceOf<Service>());
+        }
+
         #region CUT
 
-        [Export, WithMetadata("blah")]
+        [ExportAll, WithMetadata("blah")]
         public class Service : IService {}
 
         [Export]
@@ -264,6 +273,15 @@ namespace DryIoc.MefAttributedModel.UnitTests
             {
                 Value = value;
             }
+        }
+
+        [Export]
+        public class ServiceWithPropWithPrivateSetter
+        {
+// ReSharper disable UnusedAutoPropertyAccessor.Local
+            [Import]
+            public IService PropWithPrivateSetter { get; private set; }
+// ReSharper restore UnusedAutoPropertyAccessor.Local
         }
 
         #endregion
