@@ -968,9 +968,7 @@ namespace DryIoc
     /// </summary>
     public static class GenericsSupport
     {
-        /// <summary>
-        /// Supported Func types up to 4 input parameters.
-        /// </summary>
+        /// <summary>Supported Func types up to 4 input parameters.</summary>
         public static readonly Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
 
         public static readonly HashTree<Type, Factory> GenericWrappers;
@@ -1036,8 +1034,6 @@ namespace DryIoc
 
             var wrappedItemType = registry.GetWrappedServiceType(itemType);
             var requiredItemType = request.ServiceInfo.Details.RequiredServiceType ?? wrappedItemType;
-            if (itemType == wrappedItemType)
-                itemType = requiredItemType;
 
             var items = registry.GetAllFactories(requiredItemType);
 
@@ -1080,9 +1076,6 @@ namespace DryIoc
             var itemType = manyType.GetGenericArguments()[0];
             var wrappedItemType = registry.GetWrappedServiceType(itemType);
             var requiredItemType = request.ServiceInfo.Details.RequiredServiceType ?? wrappedItemType;
-            // TODO: Check the tests with this uncommented
-            //if (itemType == wrappedItemType)
-            //    itemType = requiredItemType;
 
             // Composite pattern support: filter out composite root from available keys.
             var parentFactoryID = 0;
@@ -1110,8 +1103,8 @@ namespace DryIoc
 
             if (funcTypeArgs.Length == 1)
             {
-                var expression = serviceFactory.GetExpressionOrDefault(serviceRequest, registry);
-                return expression == null ? null : Expression.Lambda(funcType, expression, null);
+                var expr = serviceFactory.GetExpressionOrDefault(serviceRequest, registry);
+                return expr == null ? null : Expression.Lambda(funcType, expr, null);
             }
 
             IList<Type> unusedFuncArgs;
@@ -1127,12 +1120,8 @@ namespace DryIoc
             var serviceType = request.ServiceType.GetGenericArguments()[0];
             var serviceRequest = request.Push(ServiceInfo.Of(serviceType));
             var factory = registry.ResolveFactory(serviceRequest);
-            if (factory == null)
-                return null;
-            var expression = factory.GetExpressionOrDefault(serviceRequest, registry);
-            if (expression == null)
-                return null;
-            return Expression.New(ctor, request.State.GetOrAddItemExpression(expression.ToFactoryExpression()));
+            var expr = factory == null ? null : factory.GetExpressionOrDefault(serviceRequest, registry);
+            return expr == null ? null : Expression.New(ctor, request.State.GetOrAddItemExpression(expr.ToFactoryExpression()));
         }
 
         public static Factory GetKeyValuePairFactoryOrDefault(Request request, IRegistry registry)
@@ -1149,9 +1138,7 @@ namespace DryIoc
             {
                 var serviceRequest = pairReq.Push(ServiceInfo.Of(serviceType, serviceKey));
                 var serviceFactory = registry.ResolveFactory(serviceRequest);
-                if (serviceFactory == null)
-                    return null;
-                var serviceExpr = serviceFactory.GetExpressionOrDefault(serviceRequest, registry);
+                var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest, registry);
                 if (serviceExpr == null)
                     return null;
                 var pairCtor = pairReq.ServiceType.GetConstructors()[0];
@@ -1169,8 +1156,6 @@ namespace DryIoc
 
             var wrappedServiceType = registry.GetWrappedServiceType(serviceType);
             var requiredServiceType = request.ServiceInfo.Details.RequiredServiceType ?? wrappedServiceType;
-            if (serviceType == wrappedServiceType)
-                serviceType = requiredServiceType;
 
             object resultMetadata = null;
             var serviceKey = request.ServiceKey;
@@ -1201,9 +1186,7 @@ namespace DryIoc
             {
                 var serviceRequest = req.Push(ServiceInfo.Of(serviceType, serviceKey));
                 var serviceFactory = registry.ResolveFactory(serviceRequest);
-                if (serviceFactory == null)
-                    return null;
-                var serviceExpr = serviceFactory.GetExpressionOrDefault(serviceRequest, registry);
+                var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest, registry);
                 if (serviceExpr == null)
                     return null;
                 var metaCtor = req.ServiceType.GetConstructors()[0];
@@ -1998,11 +1981,11 @@ namespace DryIoc
             if (GetValue != null) return string.Empty;
             var s = new StringBuilder();
             if (RequiredServiceType != null)
-                s.Print(RequiredServiceType);
+                s.Append("(required ").Print(RequiredServiceType).Append(")");
             if (ServiceKey != null)
                 (s.Length == 0 ? s : s.Append(',')).Append('"').Append(ServiceKey).Append('"');
             if (IfUnresolved != IfUnresolved.Throw)
-                (s.Length == 0 ? s : s.Append(',')).Append("optional");
+                (s.Length == 0 ? s : s.Append(',')).Append("(allow default)");
             return s.ToString();
         }
 
@@ -2072,32 +2055,31 @@ namespace DryIoc
             return (T)source.Create(serviceType, details);
         }
 
-        public static IServiceInfo DeriveFrom(this IServiceInfo dependency, IServiceInfo holder, FactoryType holderType)
+        public static IServiceInfo InheritDependencyFromOwnerInfo(this IServiceInfo dependency, IServiceInfo owner, FactoryType ownerFactoryType)
         {
-            var holderDetails = holder.Details;
-            if (holderDetails == null || holderDetails == ServiceInfoDetails.Default)
+            var ownerDetails = owner.Details;
+            if (ownerDetails == null || ownerDetails == ServiceInfoDetails.Default)
                 return dependency;
 
             var dependencyDetails = dependency.Details;
 
-            var ifUnresolved = holderDetails.IfUnresolved == IfUnresolved.Throw
+            var ifUnresolved = ownerDetails.IfUnresolved == IfUnresolved.Throw
                 ? dependencyDetails.IfUnresolved
-                : holderDetails.IfUnresolved;
+                : ownerDetails.IfUnresolved;
 
-            var serviceKey = holderType == FactoryType.Service
-                ? dependencyDetails.ServiceKey
-                // use non default holder key, otherwise use dependency own key
-                : holderDetails.ServiceKey ?? dependencyDetails.ServiceKey;
+            var serviceKey = ownerFactoryType == FactoryType.Service
+                ? dependencyDetails.ServiceKey // use non default owner key, otherwise use dependency key
+                : ownerDetails.ServiceKey ?? dependencyDetails.ServiceKey;
 
             var serviceType = dependency.ServiceType;
             var requiredServiceType = dependencyDetails.RequiredServiceType;
-            if (holderDetails.RequiredServiceType != null)
+            if (ownerDetails.RequiredServiceType != null)
             {
                 requiredServiceType = null;
-                if (serviceType.IsAssignableFrom(holderDetails.RequiredServiceType))
-                    serviceType = holderDetails.RequiredServiceType;
+                if (serviceType.IsAssignableFrom(ownerDetails.RequiredServiceType))
+                    serviceType = ownerDetails.RequiredServiceType;
                 else
-                    requiredServiceType = holderDetails.RequiredServiceType;
+                    requiredServiceType = ownerDetails.RequiredServiceType;
             }
 
             if (serviceType == dependency.ServiceType && serviceKey == dependencyDetails.ServiceKey &&
@@ -2138,7 +2120,12 @@ namespace DryIoc
             return new StringBuilder().Print(this).ToString();
         }
 
-        private ServiceInfo(Type serviceType) { ServiceType = serviceType; }
+        #region Implementation
+
+        private ServiceInfo(Type serviceType)
+        {
+            ServiceType = serviceType;
+        }
 
         private static Type ThrowIfNullOrOpenGeneric(Type serviceType)
         {
@@ -2148,11 +2135,21 @@ namespace DryIoc
 
         private sealed class WithDetails : ServiceInfo
         {
-            public override ServiceInfoDetails Details { get { return _details; } }
+            public override ServiceInfoDetails Details
+            {
+                get { return _details; }
+            }
+
             public WithDetails(Type serviceType, ServiceInfoDetails details)
-                : base(serviceType) { _details = details; }
+                : base(serviceType)
+            {
+                _details = details;
+            }
+
             private readonly ServiceInfoDetails _details;
         }
+
+        #endregion
     }
 
     public class ParameterServiceInfo : IServiceInfo
@@ -2357,7 +2354,7 @@ namespace DryIoc
 
         public Request Push(IServiceInfo info)
         {
-            return new Request(this, State, _scope, info.DeriveFrom(ServiceInfo, ResolvedFactory.Setup.Type));
+            return new Request(this, State, _scope, info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup.Type));
         }
 
         public Request ReplaceServiceInfoWith(IServiceInfo info)
@@ -3449,6 +3446,13 @@ namespace DryIoc
 
         IEnumerable<KV<object, Factory>> GetAllFactories(Type serviceType);
 
+        /// <summary>
+        /// If <paramref name="type"/> is generic type then this method checks if the type registered as generic wrapper,
+        /// and recursively unwraps and returns its type argument. This type argument is the actual service type we want to find.
+        /// Otherwise, method returns the input <paramref name="type"/>.
+        /// </summary>
+        /// <param name="type">Type to unwrap. Method will return early if type is not generic.</param>
+        /// <returns>Unwrapped service type in case it corresponds to registered generic wrapper, or input type in all other cases.</returns>
         Type GetWrappedServiceType(Type type);
     }
 
