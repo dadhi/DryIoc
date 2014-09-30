@@ -93,5 +93,16 @@ namespace DryIoc.UnitTests
             Assert.That(services[0].Value(), Is.InstanceOf<Service>());
             Assert.That(services[1].Metadata, Is.EqualTo("b"));
         }
+
+        [Test]
+        public void Resolve_required_service_type_without_key()
+        {
+            var container = new Container();
+            container.Register<Service>();
+
+            var service = container.Resolve<IService>(typeof(Service));
+
+            Assert.That(service, Is.InstanceOf<Service>());
+        }
     }
 }

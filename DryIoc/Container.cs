@@ -307,12 +307,17 @@ namespace DryIoc
                 if (!wrappedServiceType.IsAssignableFrom(requiredServiceType))
                     throw Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE
                         .Of(requiredServiceType, wrappedServiceType, serviceType);
+
                 if (serviceType == wrappedServiceType)
                     serviceType = requiredServiceType;
                 else
                     cacheServiceKey = serviceKey == null ? requiredServiceType
-                        : (object)new KV<Type, object>(requiredServiceType, serviceKey);
+                            : (object)new KV<Type, object>(requiredServiceType, serviceKey);
             }
+
+            // if service key is null, then use resolve default instead of keeyed.
+            if (cacheServiceKey == null)
+                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved);
 
             var factoryDelegates = _resolvedKeyedDelegates.GetValueOrDefault(serviceType);
             if (factoryDelegates != null)
@@ -2859,34 +2864,47 @@ namespace DryIoc
                 : (parameter, req, reg) => other(parameter, req, reg) ?? source(parameter, req, reg);
         }
 
+        public static ParameterSelector With(this ParameterSelector source, Func<ParameterInfo, bool> condition,
+            Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        {
+            return source.WithDetails(condition, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
+        }
+
         public static ParameterSelector With(this ParameterSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return source.WithDetails(name, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
+            return source.With(p => p.Name.Equals(name), requiredServiceType, serviceKey, ifUnresolved);
         }
 
         public static ParameterSelector With(this ParameterSelector source, string name, object value)
         {
-            return source.WithDetails(name, ServiceInfoDetails.Of((_, r) => value));
+            return source.With(name, _ => value);
         }
 
         public static ParameterSelector With(this ParameterSelector source, string name, Func<IRegistry, object> getValue)
         {
-            return source.WithDetails(name, ServiceInfoDetails.Of((_, r) => getValue(r)));
+            return source.WithDetails(p => p.Name.Equals(name), ServiceInfoDetails.Of((_, r) => getValue(r)));
         }
 
-        #region Implementation
+        public static ParameterSelector With(this ParameterSelector source, Type type, object value)
+        {
+            return source.With(type, _ => value);
+        }
 
-        private static ParameterSelector WithDetails(this ParameterSelector source, string name,
+        public static ParameterSelector With(this ParameterSelector source, Type type, Func<IRegistry, object> getValue)
+        {
+            type.ThrowIfNull();
+            return source.WithDetails(p => p.ParameterType.IsAssignableFrom(type), ServiceInfoDetails.Of((_, r) => getValue(r)));
+        }
+
+        public static ParameterSelector WithDetails(this ParameterSelector source, Func<ParameterInfo, bool> condition,
             ServiceInfoDetails details)
         {
-            name.ThrowIfNull();
-            return (parameter, req, reg) => parameter.Name.Equals(name)
+            condition.ThrowIfNull();
+            return (parameter, req, reg) => condition(parameter)
                 ? ParameterServiceInfo.Of(parameter).With(details, req, reg)
                 : source(parameter, req, reg);
         }
-
-        #endregion
     }
 
     /// <summary>DSL for specifying <see cref="PropertiesAndFieldsSelector"/> injection rules.</summary>
@@ -2914,7 +2932,7 @@ namespace DryIoc
             Func<MemberInfo, Request, IRegistry, PropertyOrFieldServiceInfo> getInfoOrReturnNullToSkip = null)
         {
             var bindingFlags = BindingFlags.Public | BindingFlags.Instance;
-            if (flags == Flags.All || flags == Flags.NonPrimitive) 
+            if (flags == Flags.All || flags == Flags.NonPrimitive)
                 bindingFlags |= BindingFlags.NonPublic;
 
             getInfoOrReturnNullToSkip = getInfoOrReturnNullToSkip ?? ((m, req, reg) => PropertyOrFieldServiceInfo.Of(m));
@@ -2948,7 +2966,7 @@ namespace DryIoc
                             return null;
 
                         var info = PropertyOrFieldServiceInfo.Of(m);
-                        return ifUnresolved == IfUnresolved.ReturnDefault ? info 
+                        return ifUnresolved == IfUnresolved.ReturnDefault ? info
                             : info.With(ServiceInfoDetails.IfUnresolvedThrow, req, reg);
                     };
 
@@ -3027,30 +3045,26 @@ namespace DryIoc
             return source.WithDetails(name, ServiceInfoDetails.Of((_, r) => getValue(r)));
         }
 
-        #region Implementation
-
-        private static PropertiesAndFieldsSelector WithDetails(this PropertiesAndFieldsSelector source, string name, ServiceInfoDetails details)
+        public static PropertiesAndFieldsSelector WithDetails(this PropertiesAndFieldsSelector source, string name, ServiceInfoDetails details)
         {
             name.ThrowIfNull();
             details = details ?? ServiceInfoDetails.IfUnresolvedReturnDefault;
             return source.OverrideWith((type, req, reg) =>
             {
-                const BindingFlags privateAndPublic = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-                var property = type.GetProperty(name, privateAndPublic);
+                const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+                var property = type.GetProperty(name, flags);
                 if (property != null)
                 {
                     Throw.If(!property.CanWrite, Error.PROPERTY_DOES_NOT_HAVE_SETTER, name, req);
                     return new[] { PropertyOrFieldServiceInfo.Of(property).With(details, req, reg) };
                 }
 
-                var field = type.GetField(name, privateAndPublic)
+                var field = type.GetField(name, flags)
                     .ThrowIfNull(Error.UNABLE_TO_FIND_PROPERTY_OR_FIELD_WITH_NAME_IN_TYPE, name, req);
                 Throw.If(field.IsInitOnly, Error.FIELD_IS_READONLY, name, req);
                 return new[] { PropertyOrFieldServiceInfo.Of(field).With(details, req, reg) };
             });
         }
-
-        #endregion
     }
 
     public sealed class ReflectionFactory : Factory

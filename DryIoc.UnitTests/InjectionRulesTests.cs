@@ -47,6 +47,17 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_inject_primitive_value_by_type()
+        {
+            var container = new Container();
+            container.Register<ClientWithStringParam>(setup: Setup.With(parameters: Parameters.All.With("x", "hola")));
+
+            var client = container.Resolve<ClientWithStringParam>();
+
+            Assert.That(client.X, Is.EqualTo("hola"));
+        }
+
+        [Test]
         public void CanNot_inject_primitive_value_of_different_type()
         {
             var container = new Container();
@@ -62,7 +73,7 @@ namespace DryIoc.UnitTests
         public void Can_inject_primitive_value_and_resolve_the_rest_of_parameters()
         {
             var container = new Container();
-            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(parameters: Parameters.All.With("x", "hola")));
+            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(parameters: Parameters.All.With(typeof(string), "hola")));
             container.Register<IService, Service>();
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
@@ -99,12 +110,44 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_inject_resolved_value_per_parameter_based_on_type()
+        {
+            var container = new Container();
+            container.Register<Service>();
+            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(parameters:
+                Parameters.All
+                    .With("x", "hola")
+                    .With(typeof(Service), r => r.Resolve<IService>(typeof(Service)))));
+
+            var client = container.Resolve<ClientWithServiceAndStringParam>();
+
+            Assert.That(client.X, Is.EqualTo("hola"));
+            Assert.That(client.Service, Is.InstanceOf<Service>());
+        }
+
+        [Test]
         public void Can_nicely_specify_required_type_and_key_per_parameter()
         {
             var container = new Container();
             container.Register<Service>(named: "dependency");
             container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(
                 parameters: Parameters.All.With("x", "hola").With("service", typeof(Service), "dependency")));
+
+            var client = container.Resolve<ClientWithServiceAndStringParam>();
+
+            Assert.That(client.Service, Is.InstanceOf<Service>());
+            Assert.That(client.X, Is.EqualTo("hola"));
+        }
+
+        [Test]
+        public void Can_nicely_specify_required_type_and_key_per_parameter_based_on_arbitrarily_condition()
+        {
+            var container = new Container();
+            container.Register<Service>(named: "dependency");
+            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(
+                parameters: Parameters.All
+                    .With("x", "hola")
+                    .With(p => p.ParameterType.IsAssignableFrom(typeof(IService)), typeof(Service), "dependency")));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
 
