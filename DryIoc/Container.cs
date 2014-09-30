@@ -1938,18 +1938,18 @@ namespace DryIoc
 
     public class ServiceInfoDetails
     {
-        public static readonly ServiceInfoDetails DefaultIfUnresolvedThrow = new ServiceInfoDetails();
-        public static readonly ServiceInfoDetails DefaultIfUnresolvedReturnDefault = new IfUnresolvedReturnNull();
+        public static readonly ServiceInfoDetails IfUnresolvedThrow = new ServiceInfoDetails();
+        public static readonly ServiceInfoDetails IfUnresolvedReturnDefault = new IfUnresolvedReturnNull();
 
         public static ServiceInfoDetails Of(Type requiredServiceType = null,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
             return ifUnresolved == IfUnresolved.Throw
                 ? (requiredServiceType == null
-                    ? (serviceKey == null ? DefaultIfUnresolvedThrow : new WithKey(serviceKey))
+                    ? (serviceKey == null ? IfUnresolvedThrow : new WithKey(serviceKey))
                     : new WithType(requiredServiceType, serviceKey))
                 : (requiredServiceType == null
-                    ? (serviceKey == null ? DefaultIfUnresolvedReturnDefault : new WithKeyReturnDefault(serviceKey))
+                    ? (serviceKey == null ? IfUnresolvedReturnDefault : new WithKeyReturnDefault(serviceKey))
                     : new WithTypeReturnDefault(requiredServiceType, serviceKey));
         }
 
@@ -2052,7 +2052,7 @@ namespace DryIoc
         public static IServiceInfo InheritDependencyFromOwnerInfo(this IServiceInfo dependency, IServiceInfo owner, FactoryType ownerFactoryType)
         {
             var ownerDetails = owner.Details;
-            if (ownerDetails == null || ownerDetails == ServiceInfoDetails.DefaultIfUnresolvedThrow)
+            if (ownerDetails == null || ownerDetails == ServiceInfoDetails.IfUnresolvedThrow)
                 return dependency;
 
             var dependencyDetails = dependency.Details;
@@ -2100,11 +2100,11 @@ namespace DryIoc
         }
 
         public Type ServiceType { get; private set; }
-        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.DefaultIfUnresolvedThrow; } }
+        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.IfUnresolvedThrow; } }
 
         IServiceInfo IServiceInfo.Create(Type serviceType, ServiceInfoDetails details)
         {
-            return details == ServiceInfoDetails.DefaultIfUnresolvedThrow
+            return details == ServiceInfoDetails.IfUnresolvedThrow
                 ? new ServiceInfo(serviceType)
                 : new WithDetails(serviceType, details);
         }
@@ -2154,7 +2154,7 @@ namespace DryIoc
         }
 
         public virtual Type ServiceType { get { return _parameter.ParameterType; } }
-        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.DefaultIfUnresolvedThrow; } }
+        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.IfUnresolvedThrow; } }
 
         IServiceInfo IServiceInfo.Create(Type serviceType, ServiceInfoDetails details)
         {
@@ -2190,6 +2190,13 @@ namespace DryIoc
 
     public abstract class PropertyOrFieldServiceInfo : IServiceInfo
     {
+        public static PropertyOrFieldServiceInfo Of(MemberInfo member)
+        {
+            return member.ThrowIfNull().MemberType == MemberTypes.Property
+                ? (PropertyOrFieldServiceInfo)new Property((PropertyInfo)member)
+                : new Field((FieldInfo)member);
+        }
+
         public static PropertyOrFieldServiceInfo Of(PropertyInfo property)
         {
             return new Property(property.ThrowIfNull());
@@ -2201,7 +2208,7 @@ namespace DryIoc
         }
 
         public abstract Type ServiceType { get; }
-        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.DefaultIfUnresolvedReturnDefault; } }
+        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.IfUnresolvedReturnDefault; } }
         public abstract IServiceInfo Create(Type serviceType, ServiceInfoDetails details);
 
         public abstract MemberInfo Member { get; }
@@ -2831,7 +2838,7 @@ namespace DryIoc
         {
             var getParamInfo = registry.Rules.Parameters.OverrideWith(factory.Setup.Rules.Parameters);
             var paramInfo = getParamInfo(p, request, registry) ?? ParameterServiceInfo.Of(p);
-            var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.DefaultIfUnresolvedReturnDefault, request, registry));
+            var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.IfUnresolvedReturnDefault, request, registry));
             var paramFactory = registry.ResolveFactory(paramRequest);
             return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
         }
@@ -2843,7 +2850,7 @@ namespace DryIoc
         public static ParameterSelector All = (p, req, reg) => null;
 
         public static ParameterSelector AllDefaultIfUnresolved = ((p, req, reg) =>
-            ParameterServiceInfo.Of(p).With(ServiceInfoDetails.DefaultIfUnresolvedReturnDefault, req, reg));
+            ParameterServiceInfo.Of(p).With(ServiceInfoDetails.IfUnresolvedReturnDefault, req, reg));
 
         public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other)
         {
@@ -2885,58 +2892,102 @@ namespace DryIoc
     /// <summary>DSL for specifying <see cref="PropertiesAndFieldsSelector"/> injection rules.</summary>
     public static class PropertiesAndFields
     {
+        /// <summary>Say to not resolve any properties or fields.</summary>
         public static PropertiesAndFieldsSelector None = (type, request, registry) => null;
 
-        /// <summary>
-        /// Generates selector property and field selector with settings specified by parameters.
-        /// If all parameters are omitted the return all public not primitive members, which won't be set if unresolved.
-        /// </summary>
-        /// <param name="ifUnresolved">(optional) Specifies for all members to throw or return default if unresolved, by default does not throw.</param>
-        /// <param name="withNonPublic">(optional) If set specifies to include non-public members.</param>
-        /// <param name="withPrimitive">(optional) If set specifies to include primitive values, object and string using <see cref="TypeTools.IsPrimitiveOrObjectOrString"/>.</param>
-        /// <param name="except">(optional) Specifies rule to exclude members, e.g. exclude all fields, or property with specific name or attribute.</param>
-        /// <returns>Result selector composed using provided settings.</returns>
-        public static PropertiesAndFieldsSelector All(
-            IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, 
-            bool withNonPublic = false, bool withPrimitive = false,
-            Func<MemberInfo, bool> except = null)
-        {
-            var flags = BindingFlags.Public | BindingFlags.Instance;
-            if (withNonPublic) flags |= BindingFlags.NonPublic;
-
-            var matchProperty = withPrimitive
-                ? (withNonPublic ? (Func<PropertyInfo, bool>)ReflectionTools.HasSetter : ReflectionTools.HasPublicSetter)
-                : p => p.HasPublicSetter() && !p.PropertyType.IsPrimitiveOrObjectOrString();
-
-            var matchField = withPrimitive
-                ? (Func<FieldInfo, bool>)ReflectionTools.NonReadonly
-                : f => f.NonReadonly() && !f.FieldType.IsPrimitiveOrObjectOrString();
-
-            return (type, request, registry) =>
-            {
-                var getPropertyInfo = ifUnresolved == IfUnresolved.ReturnDefault
-                    ? (Func<PropertyInfo, PropertyOrFieldServiceInfo>)PropertyOrFieldServiceInfo.Of
-                    : p => PropertyOrFieldServiceInfo.Of(p).With(ServiceInfoDetails.DefaultIfUnresolvedThrow, request, registry);
-
-                var getFieldInfo = ifUnresolved == IfUnresolved.ReturnDefault
-                    ? (Func<FieldInfo, PropertyOrFieldServiceInfo>)PropertyOrFieldServiceInfo.Of
-                    : (f => PropertyOrFieldServiceInfo.Of(f).With(ServiceInfoDetails.DefaultIfUnresolvedThrow, request, registry));
-
-                var properties = 
-                    (except == null ? type.GetProperties(flags) : type.GetProperties(flags).Where(p => !except(p)))
-                    .Where(matchProperty).Select(getPropertyInfo);
-                
-                var fields = (except == null ? type.GetFields(flags) : type.GetFields(flags).Where(f => !except(f)))
-                    .Where(matchField).Select(getFieldInfo);
-                
-                return properties.Concat(fields);
-            };
-        }
+        /// <summary>Flags to specify visibility of properties and fields to resolve.</summary>
+        public enum Flags { PublicNonPrimitive, Public, NonPrimitive, All }
 
         /// <summary>
         /// Public assignable instance members of any type except object, string, primitives types, and arrays of those.
         /// </summary>
-        public static PropertiesAndFieldsSelector AllPublicNonPrimitive = All();
+        public static PropertiesAndFieldsSelector AllPublicNonPrimitive = All(Flags.PublicNonPrimitive);
+
+        /// <summary>
+        /// Generates selector property and field selector with settings specified by parameters.
+        /// If all parameters are omitted the return all public not primitive members.
+        /// </summary>
+        /// <param name="flags">(optional) Specifies visibility of members to be resolved. Default is <see cref="Flags.PublicNonPrimitive"/>.</param>
+        /// <param name="getInfoOrReturnNullToSkip">(optional) Return service info for a member or null to skip it resolution.</param>
+        /// <returns>Result selector composed using provided settings.</returns>
+        public static PropertiesAndFieldsSelector All(Flags flags,
+            Func<MemberInfo, Request, IRegistry, PropertyOrFieldServiceInfo> getInfoOrReturnNullToSkip = null)
+        {
+            var bindingFlags = BindingFlags.Public | BindingFlags.Instance;
+            if (flags == Flags.All || flags == Flags.NonPrimitive) 
+                bindingFlags |= BindingFlags.NonPublic;
+
+            getInfoOrReturnNullToSkip = getInfoOrReturnNullToSkip ?? ((m, req, reg) => PropertyOrFieldServiceInfo.Of(m));
+
+            return (type, request, registry) =>
+                type.GetProperties(bindingFlags).Where(p => p.Match(flags)).Cast<MemberInfo>().Concat(
+                type.GetFields(bindingFlags).Where(f => f.Match(flags)).Cast<MemberInfo>())
+                .Select(m => getInfoOrReturnNullToSkip(m, request, registry));
+        }
+
+        /// <summary>
+        /// Compose properties and fields selector using provided settings: 
+        /// in particularly I can change default setting to return null if member is unresolved,
+        /// and exclude properties by name, type (using <see cref="GetPropertyOrFieldType"/>), etc.
+        /// </summary>
+        /// <param name="ifUnresolved">(optional) Specifies for all members to throw or return default if unresolved, by default does not throw.</param>
+        /// <param name="flags">(optional) Specifies visibility of members to be resolved. Default is <see cref="Flags.PublicNonPrimitive"/>.</param>
+        /// <param name="except">(optional) Specifies rule to exclude members, e.g. exclude all fields, or property with specific name or attribute.</param>
+        /// <returns>Result selector composed using provided settings.</returns>
+        public static PropertiesAndFieldsSelector All(
+            IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault,
+            Flags flags = Flags.PublicNonPrimitive,
+            Func<MemberInfo, bool> except = null)
+        {
+            var selector =
+                ifUnresolved == IfUnresolved.ReturnDefault && except == null
+                    ? (Func<MemberInfo, Request, IRegistry, PropertyOrFieldServiceInfo>)null
+                    : (m, req, reg) =>
+                    {
+                        if (except != null && except(m))
+                            return null;
+
+                        var info = PropertyOrFieldServiceInfo.Of(m);
+                        return ifUnresolved == IfUnresolved.ReturnDefault ? info 
+                            : info.With(ServiceInfoDetails.IfUnresolvedThrow, req, reg);
+                    };
+
+
+            return All(flags, selector);
+        }
+
+        /// <summary>
+        /// Return either <see cref="PropertyInfo.PropertyType"/>, or <see cref="FieldInfo.FieldType"/> 
+        /// depending on actual type of the <paramref name="member"/>.
+        /// </summary>
+        /// <param name="member">Expecting member of type <see cref="PropertyInfo"/> or <see cref="FieldInfo"/> only.</param>
+        /// <returns>Type of property of field.</returns>
+        public static Type GetPropertyOrFieldType(this MemberInfo member)
+        {
+            return member.MemberType == MemberTypes.Property
+                ? ((PropertyInfo)member).PropertyType
+                : ((FieldInfo)member).FieldType;
+        }
+
+        /// <remarks>Matches property base on visibility <see cref="Flags"/> provided.</remarks>
+        public static bool Match(this PropertyInfo property, Flags flags = Flags.PublicNonPrimitive)
+        {
+            return property.GetSetMethod(flags == Flags.NonPrimitive || flags == Flags.All) != null
+                && (flags == Flags.Public || flags == Flags.All || !IsPrimitiveOrObjectOrString(property.PropertyType));
+        }
+
+        /// <remarks>Matches field base on visibility <see cref="Flags"/> provided.</remarks>
+        public static bool Match(this FieldInfo field, Flags flags = Flags.PublicNonPrimitive)
+        {
+            return !field.IsInitOnly
+                && (flags == Flags.Public || flags == Flags.All || !IsPrimitiveOrObjectOrString(field.FieldType));
+        }
+
+        public static bool IsPrimitiveOrObjectOrString(this Type type)
+        {
+            return type.IsPrimitive || type == typeof(string) || type == typeof(object) ||
+                   type.IsArray && type.GetElementType().IsPrimitiveOrObjectOrString();
+        }
 
         public static PropertiesAndFieldsSelector OverrideWith(this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
         {
@@ -2981,7 +3032,7 @@ namespace DryIoc
         private static PropertiesAndFieldsSelector WithDetails(this PropertiesAndFieldsSelector source, string name, ServiceInfoDetails details)
         {
             name.ThrowIfNull();
-            details = details ?? ServiceInfoDetails.DefaultIfUnresolvedReturnDefault;
+            details = details ?? ServiceInfoDetails.IfUnresolvedReturnDefault;
             return source.OverrideWith((type, req, reg) =>
             {
                 const BindingFlags privateAndPublic = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -3676,12 +3727,6 @@ namespace DryIoc
             return true;
         }
 
-        public static bool IsPrimitiveOrObjectOrString(this Type type)
-        {
-            return type.IsPrimitive || type == typeof(string) || type == typeof(object) ||
-                type.IsArray && type.GetElementType().IsPrimitiveOrObjectOrString();
-        }
-
         #region Implementation
 
         private static void NullifyNamesFoundInGenericParameters(string[] names, Type[] genericParameters)
@@ -3841,22 +3886,6 @@ namespace DryIoc
 
     public static class ReflectionTools
     {
-        public static bool HasSetter(this PropertyInfo property)
-        {
-            return property.CanWrite;
-        }
-
-        public static bool HasPublicSetter(this PropertyInfo property)
-        {
-            var setMethod = property.GetSetMethod();
-            return setMethod != null && setMethod.IsPublic;
-        }
-
-        public static bool NonReadonly(this FieldInfo field)
-        {
-            return !field.IsInitOnly;
-        }
-
         public static Expression GetDefaultValueExpression(this Type type)
         {
             return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), (Expression[])null);

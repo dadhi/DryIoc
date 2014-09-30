@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
@@ -154,24 +153,14 @@ namespace DryIoc.UnitTests
             Assert.That(chicken.SomeGuts, Is.Not.Null);
         }
 
-        private static IEnumerable<PropertyOrFieldServiceInfo> SelectPropertiesAndFieldsWithImportAttribute(Type type, Request req, IRegistry reg)
+        private static readonly PropertiesAndFieldsSelector SelectPropertiesAndFieldsWithImportAttribute =
+            PropertiesAndFields.All(PropertiesAndFields.Flags.All, GetImportedPropertiesAndFields);
+
+        private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFields(MemberInfo m, Request req, IRegistry reg)
         {
-            const BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-
-            var properties = type.GetProperties(bindingFlags).Where(ReflectionTools.HasSetter).Select(p =>
-            {
-                var import = (ImportAttribute)p.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
-                return import == null ? null : PropertyOrFieldServiceInfo.Of(p)
-                    .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req, reg);
-            });
-            var fields = type.GetFields(bindingFlags).Where(ReflectionTools.NonReadonly).Select(f =>
-            {
-                var import = (ImportAttribute)f.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
-                return import == null ? null : PropertyOrFieldServiceInfo.Of(f)
-                    .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req, reg);
-            });
-
-            return properties.Concat(fields);
+            var import = (ImportAttribute)m.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
+            return import == null ? null : PropertyOrFieldServiceInfo.Of(m)
+                .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req, reg);
         }
     }
 
