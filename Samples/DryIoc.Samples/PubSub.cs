@@ -1,54 +1,98 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.Samples
 {
-    //[TestFixture][Ignore]
+    [TestFixture]
     public class PubSub
     {
-        //[Test]
-        public void Test()
+        [Test]
+        public void Can_subscribe_to_Hub_based_on_implemented_interface()
         {
             var container = new Container();
-            container.RegisterAll<SomeHandler>();
-            container.RegisterAll<PubSubHub>(Reuse.Singleton);
+            container.Register<PubSubHub>(Reuse.Singleton);
+            container.RegisterInitializer<ISubsriber>((s, r) => r.Resolve<PubSubHub>().Subscribe(s.Receive));
+            
+            container.Register<Subscriber>();
 
-            var sub = container.Resolve<ISub>();
-            var handler = container.Resolve<SomeHandler>();
+            var subscriber = container.Resolve<Subscriber>();
+            var hub = container.Resolve<PubSubHub>();
+            hub.PingSubscribers();
 
-            Assert.That(handler, Is.Not.Null);
-            CollectionAssert.Contains(sub.Handlers, handler);
+            Assert.That(subscriber.LastMessage, Is.EqualTo("ping"));
         }
-    }
 
-    public class SomeHandler
-    {
-        public SomeHandler(ISub sub)
+        [Test]
+        public void Can_subscribe_attributed_subscriber()
         {
-            // remove that as infrastructure piece
-            //sub.Subscribe(this); 
+            var container = new Container();
+            container.Register<PubSubHub>(Reuse.Singleton);
+            container.RegisterInitializer<object>(
+                (s, r) =>
+                {
+                    var receive = s.GetType().GetMethods()
+                        .FirstOrDefault(m => m.GetCustomAttributes(typeof(ReceiveAttribute), false).Length == 1);
+                    r.Resolve<PubSubHub>().Subscribe(message => receive.Invoke(s, new[] { message }));
+                }, 
+                r => r.ImplementationType != null 
+                  && r.ImplementationType.GetCustomAttributes(typeof(SubscriberAttribute), false).Length == 1);
+            
+            container.Register<AttributedSubscriber>();
+
+            var subscriber = container.Resolve<AttributedSubscriber>();
+            var hub = container.Resolve<PubSubHub>();
+            hub.PingSubscribers();
+
+            Assert.That(subscriber.LastMessage, Is.EqualTo("ping"));
         }
     }
 
-    public interface ISub
+    public class PubSubHub
     {
-        IEnumerable<object> Handlers { get; }
+        public void Subscribe(Action<object> subscriber)
+        {
+            _subscribers.Add(subscriber);
+        }
 
-        void Subscribe<THandler>(THandler handler);
+        public void PingSubscribers()
+        {
+            for (var i = 0; i < _subscribers.Count; i++)
+                _subscribers[i]("ping");
+        }
+
+        private readonly List<Action<object>> _subscribers = new List<Action<object>>();
     }
 
-    public class PubSubHub : ISub
+    public interface ISubsriber
     {
-        public IEnumerable<object> Handlers
-        {
-            get { return _handlers.ToArray(); }
-        }
-
-        public void Subscribe<THandler>(THandler handler)
-        {
-            _handlers.Add(handler);
-        }
-
-        private readonly List<object> _handlers = new List<object>();
+        void Receive(object message);
     }
+
+    public class Subscriber : ISubsriber
+    {
+        public object LastMessage;
+
+        public void Receive(object message)
+        {
+            LastMessage = message;
+        }
+    }
+
+    [Subscriber]
+    public class AttributedSubscriber
+    {
+        public object LastMessage;
+
+        [Receive]
+        public void Handle(object message)
+        {
+            LastMessage = message;
+        }
+    }
+
+    public class ReceiveAttribute : Attribute {}
+
+    public class SubscriberAttribute : Attribute {}
 }

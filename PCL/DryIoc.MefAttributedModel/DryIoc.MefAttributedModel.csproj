@@ -41,7 +41,7 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{878e401e-474b-4aab-ae20-122051755c81}</Project>
-      <Name>DryIoc %28PCL\DryIoc%29</Name>
+      <Name>DryIoc</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>

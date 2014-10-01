@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.Composition;
-using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -135,7 +133,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<BadTypePropertyClient>());
 
-            Assert.That(ex.Message, Is.StringStarting("Provided service type").And.StringContaining("is not assignable"));
+            Assert.That(ex.Message, Is.StringStarting("Required service type").And.StringContaining("is not assignable"));
         }
 
         [Test]
@@ -151,68 +149,19 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Resolve_array_of_specified_type_should_work()
+        public void Could_import_property_with_private_setter()
         {
-            var container = new Container();
-            container.Register<IService, Service>();
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(ServiceWithPropWithPrivateSetter), typeof(Service));
 
-            var services = container.Resolve<object[]>(typeof(IService));
+            var service = container.Resolve<ServiceWithPropWithPrivateSetter>();
 
-            Assert.That(services.Length, Is.EqualTo(1));
-        }
-
-        [Test]
-        public void Resolve_Enumerable_of_specified_type_should_work()
-        {
-            var container = new Container();
-            container.Register<IService, Service>();
-
-            var services = container.Resolve<IEnumerable<Func<object>>>(typeof(IService));
-
-            Assert.That(services.Count(), Is.EqualTo(1));
-            Assert.That(services.First().Invoke(), Is.InstanceOf<Service>());
-        }
-
-        [Test]
-        public void Resolve_Many_of_provided_type_should_work()
-        {
-            var container = new Container();
-            container.Register<IService, Service>();
-
-            var services = container.Resolve<Many<object>>(typeof(IService));
-
-            Assert.That(services.Items.Count(), Is.EqualTo(1));
-        }
-
-        [Test]
-        public void Resolve_Many_services_twice_with_different_provided_types_should_work()
-        {
-            var container = new Container();
-            container.Register<IService, Service>(Reuse.InCurrentScope);
-
-            var objects = container.Resolve<Many<object>>(typeof(IService));
-            var services = container.Resolve<Many<IService>>(typeof(IService));
-
-            CollectionAssert.AreEqual(objects.Items.Cast<IService>().ToArray(), services.Items.ToArray());
-        }
-
-        [Test]
-        public void Resolve_Meta_of_provided_type_should_work()
-        {
-            var container = new Container();
-            container.Register<IService, Service>(setup: Setup.WithMetadata("a"));
-            container.Register<IService, AnotherService>(setup: Setup.WithMetadata("b"));
-
-            var services = container.Resolve<Meta<Func<object>, string>[]>(typeof(IService));
-
-            Assert.That(services[0].Metadata, Is.EqualTo("a"));
-            Assert.That(services[0].Value(), Is.InstanceOf<Service>());
-            Assert.That(services[1].Metadata, Is.EqualTo("b"));
+            Assert.That(service.PropWithPrivateSetter, Is.InstanceOf<Service>());
         }
 
         #region CUT
 
-        [Export, WithMetadata("blah")]
+        [ExportAll, WithMetadata("blah")]
         public class Service : IService {}
 
         [Export]
@@ -266,7 +215,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             public IService Some { get; set; }
 
-            public FuncArrayClient([Import(typeof (Service))] Func<IService>[] getService)
+            public FuncArrayClient([Import(typeof (Service))]Func<IService>[] getService)
             {
                 Some = getService[0]();
             }
@@ -280,7 +229,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             public IService Some { get; set; }
 
-            public FuncArrayKeyClient([Import("k")] Func<IService>[] getService)
+            public FuncArrayKeyClient([Import("k")]Func<IService>[] getService)
             {
                 Some = getService[0]();
             }
@@ -324,6 +273,15 @@ namespace DryIoc.MefAttributedModel.UnitTests
             {
                 Value = value;
             }
+        }
+
+        [Export]
+        public class ServiceWithPropWithPrivateSetter
+        {
+// ReSharper disable UnusedAutoPropertyAccessor.Local
+            [Import]
+            public IService PropWithPrivateSetter { get; private set; }
+// ReSharper restore UnusedAutoPropertyAccessor.Local
         }
 
         #endregion

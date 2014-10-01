@@ -21,7 +21,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportAll, AsDecoratorFor(ContractName = "slow")]
+    [ExportAll, AsDecorator(ContractName = "slow")]
     public class LoggingHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -32,7 +32,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, AsDecoratorFor, WithMetadata(2)]
+    [ExportAll, AsDecorator, WithMetadata(2)]
     public class RetryHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -43,7 +43,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, AsDecoratorFor(ContractName = "transact"), WithMetadata(1)]
+    [ExportAll, AsDecorator(ContractName = "transact"), WithMetadata(1)]
     public class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -54,7 +54,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export(typeof(IHandler)), AsDecoratorFor(ConditionType = typeof(Condition))]
+    [Export(typeof(IHandler)), AsDecorator(ConditionType = typeof(Condition))]
     public class CustomHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -73,7 +73,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, AsDecoratorFor]
+    [ExportAll, AsDecorator]
     public class DecoratorWithFastHandlerImport : IHandler
     {
         public IHandler Handler { get; set; }
@@ -92,7 +92,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     public enum BlahFooh { Blah, Fooh }
 
-    [ExportAll, AsDecoratorFor(ContractKey = BlahFooh.Fooh)]
+    [ExportAll, AsDecorator(ContractKey = BlahFooh.Fooh)]
     public class FoohDecorator : IHandler
     {
         public IHandler Handler { get; set; }

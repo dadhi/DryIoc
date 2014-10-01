@@ -131,7 +131,7 @@ namespace DryIoc.UnitTests
                 factories => factories.Select(f => f.Value).FirstOrDefault(f => !(f.Reuse is SingletonReuse))));
 
             container.Register<IService, Service>(Reuse.Singleton);
-            var service = container.Resolve(typeof(IService), IfUnresolved.ReturnNull);
+            var service = container.Resolve(typeof(IService), IfUnresolved.ReturnDefault);
 
             Assert.That(service, Is.Null);
         }
@@ -139,7 +139,7 @@ namespace DryIoc.UnitTests
         public static ParameterServiceInfo GetServiceInfoFromImportAttribute(ParameterInfo parameter, Request request, IRegistry registry)
         {
             var import = (ImportAttribute)parameter.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
-            var details = import == null ? ServiceInfoDetails.Default
+            var details = import == null ? ServiceInfoDetails.IfUnresolvedThrow
                 : ServiceInfoDetails.Of(import.ContractType, import.ContractName);
             return ParameterServiceInfo.Of(parameter).With(details, request, registry);
         }

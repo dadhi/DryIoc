@@ -48,6 +48,12 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\AttributedModelTests.cs">
       <Link>AttributedModelTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\CodeGenerationTests.cs">
+      <Link>CodeGenerationTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\CustomInjectionRulesTests.cs">
+      <Link>CustomInjectionRulesTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAllTests.cs">
       <Link>ExportAllTests.cs</Link>
     </Compile>
@@ -60,6 +66,9 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportFactoryTests.cs">
       <Link>ExportFactoryTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportImportWithKeyTests.cs">
+      <Link>ExportImportWithKeyTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportAttributeTests.cs">
       <Link>ImportAttributeTests.cs</Link>
     </Compile>
@@ -71,6 +80,9 @@
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\InheritedExportTests.cs">
       <Link>InheritedExportTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ReuseAttributeTests.cs">
+      <Link>ReuseAttributeTests.cs</Link>
     </Compile>
     <Compile Include="MefMultiExportTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -120,12 +120,13 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_array_of_not_registered_services_should_throw()
+        public void Resolving_array_of_not_registered_services_should_return_empty_array()
         {
             var container = new Container();
 
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<IService[]>());
+            var services = container.Resolve<IService[]>();
+
+            Assert.That(services.Length, Is.EqualTo(0));
         }
 
         [Test]
@@ -172,13 +173,14 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void If_some_item_is_not_resolved_then_it_would_throw()
+        public void If_some_item_is_not_resolved_then_it_will_return_empty_collection()
         {
             var container = new Container();
             container.Register<Service>(setup: Setup.WithMetadata(1));
 
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<IEnumerable<Meta<Service, bool>>>());
+            var items = container.Resolve<IEnumerable<Meta<Service, bool>>>();
+
+            Assert.That(items.Count(), Is.EqualTo(0));
         }
 
         [Test]

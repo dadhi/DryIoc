@@ -235,8 +235,10 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register(typeof(IService), typeof(Service), named: "blah");
 
-            Assert.Throws<ContainerException>(
-                () => container.Register(typeof(IService), typeof(AnotherService), named: "blah"));
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Register(typeof(IService), typeof(AnotherService), named: "blah"));
+
+            Assert.That(ex.Message, Is.StringContaining("IService with the same key \"blah\""));
         }
 
         [Test]
@@ -267,7 +269,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var service = container.Resolve<IService>(IfUnresolved.ReturnNull);
+            var service = container.Resolve<IService>(IfUnresolved.ReturnDefault);
 
             Assert.Null(service);
         }
