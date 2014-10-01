@@ -153,7 +153,7 @@ namespace DryIoc.UnitTests
             Assert.That(chicken.SomeGuts, Is.Not.Null);
         }
 
-        private static readonly PropertiesAndFieldsSelector SelectPropertiesAndFieldsWithImportAttribute =
+        public static readonly PropertiesAndFieldsSelector SelectPropertiesAndFieldsWithImportAttribute =
             PropertiesAndFields.All(PropertiesAndFields.Flags.All, GetImportedPropertiesAndFields);
 
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFields(MemberInfo m, Request req, IRegistry reg)

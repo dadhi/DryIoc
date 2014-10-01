@@ -11,7 +11,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Can_combine_MEF_Imports_with_custom_Injection_rules_for_parameters()
         {
             var container = new Container().WithAttributedModel();
-            container.Register<ClientWithPrimitiveParameter>(setup: Setup.With(parameters: Parameters.All.With("message", "hell")));
+            container.Register<ClientWithPrimitiveParameter>(setup: Setup.With(parameters: Parameters.All.And("message", "hell")));
             container.RegisterExports(typeof(KeyService));
 
             var client = container.Resolve<ClientWithPrimitiveParameter>();
@@ -24,7 +24,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             var container = new Container().WithAttributedModel();
             container.Register<ClientWithServiceAndPrimitiveProperty>(
-                setup: Setup.With(propertiesAndFields: PropertiesAndFields.None.With("Message", "hell")));
+                setup: Setup.With(propertiesAndFields: PropertiesAndFields.None.And("Message", "hell")));
 
             container.RegisterExports(typeof(KeyService));
 
