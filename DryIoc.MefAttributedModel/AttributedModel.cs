@@ -285,11 +285,9 @@ namespace DryIoc.MefAttributedModel
         {
             if (reuseType == null)
                 return null;
-
             IReuse reuse;
-            if (!AttributedModel.SupportedReuseTypes.TryGetValue(reuseType, out reuse))
-                throw Error.UNSUPPORTED_REUSE_TYPE.Ex(reuseType);
-            return reuse;
+            var supported = SupportedReuseTypes.TryGetValue(reuseType, out reuse);
+            return reuse.ThrowIf(!supported, Error.UNSUPPORTED_REUSE_TYPE, reuseType);
         }
 
         #endregion

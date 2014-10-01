@@ -278,15 +278,13 @@ namespace DryIoc
         {
             var request = CreateRequest(serviceType, ifUnresolved: ifUnresolved);
             var factory = ((IRegistry)this).ResolveFactory(request);
-            if (factory == null)
-                return null;
-
-            var factoryDelegate = factory.GetDelegateOrDefault(request, this);
+            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request, this);
             if (factoryDelegate == null)
                 return null;
 
-            Interlocked.Exchange(ref _resolvedDefaultDelegates,
-                _resolvedDefaultDelegates.AddOrUpdate(serviceType, factoryDelegate));
+            Interlocked.Exchange(ref _resolvedDefaultDelegates, _resolvedDefaultDelegates
+                .AddOrUpdate(serviceType, factoryDelegate));
+
             return factoryDelegate(request.State.Items, request.ResolutionScope);
         }
 
@@ -307,29 +305,28 @@ namespace DryIoc
                             : (object)new KV<Type, object>(requiredServiceType, serviceKey);
             }
 
-            // if service key is null, then use resolve default instead of keeyed.
+            // If service key is null, then use resolve default instead of keyed.
             if (cacheServiceKey == null)
                 return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved);
 
+            FactoryDelegate factoryDelegate;
+
             var factoryDelegates = _resolvedKeyedDelegates.GetValueOrDefault(serviceType);
-            if (factoryDelegates != null)
-            {
-                var factoryDelegate = factoryDelegates.GetValueOrDefault(cacheServiceKey);
-                if (factoryDelegate != null)
-                    return factoryDelegate(_resolutionState.Items, null);
-            }
+            if (factoryDelegates != null &&
+                (factoryDelegate = factoryDelegates.GetValueOrDefault(cacheServiceKey)) != null)
+                return factoryDelegate(_resolutionState.Items, null);
 
             var request = CreateRequest(serviceType, serviceKey, ifUnresolved, requiredServiceType);
             var factory = ((IRegistry)this).ResolveFactory(request);
-            if (factory == null)
+            factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request, this);
+            if (factoryDelegate == null)
                 return null;
 
-            var newFactoryDelegate = factory.GetDelegateOrDefault(request, this);
-            Interlocked.Exchange(ref _resolvedKeyedDelegates,
-                _resolvedKeyedDelegates.AddOrUpdate(serviceType,
-                (factoryDelegates ?? HashTree<object, FactoryDelegate>.Empty).AddOrUpdate(cacheServiceKey, newFactoryDelegate)));
+            factoryDelegates = factoryDelegates ?? HashTree<object, FactoryDelegate>.Empty;
+            Interlocked.Exchange(ref _resolvedKeyedDelegates, _resolvedKeyedDelegates
+                .AddOrUpdate(serviceType, factoryDelegates.AddOrUpdate(cacheServiceKey, factoryDelegate)));
 
-            return newFactoryDelegate(request.State.Items, request.ResolutionScope);
+            return factoryDelegate(request.State.Items, request.ResolutionScope);
         }
 
         /// <summary>
@@ -1451,7 +1448,7 @@ namespace DryIoc
             "Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine +
             "and the rest of parameters resolvable from Container when resolving: {1}.";
 
-        public static readonly string REGISTERED_FACTORY_DELEGATE_RETURNS_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
+        public static readonly string REGISTERED_FACTORY_DELEGATE_RESULT_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
             "Registered factory delegate returns object [{0}] of type {1}, not assignable to serviceType {2}.";
 
         public static readonly string REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
@@ -1689,10 +1686,14 @@ namespace DryIoc
             Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            var factory = new DelegateFactory(r => factoryDelegate(r).ThrowIf(x => (!serviceType.IsInstanceOfType(x)).Ex(
-                Error.REGISTERED_FACTORY_DELEGATE_RETURNS_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE, x, x.GetType(), serviceType)),
-                reuse, setup);
-            registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
+            Func<IResolver, object> checkedDelegate = r =>
+            {
+                var result = factoryDelegate(r);
+                return result.ThrowIf(!serviceType.IsInstanceOfType(result),
+                    Error.REGISTERED_FACTORY_DELEGATE_RESULT_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE, result, result.GetType(), serviceType);
+            };
+
+            registrator.Register(new DelegateFactory(checkedDelegate, reuse, setup), serviceType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1921,7 +1922,7 @@ namespace DryIoc
         ///     container.Resolve<IService[]>();            // for fixed result too
         /// ]]></code>
         /// </remarks>
-        public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver, 
+        public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver,
             Type requiredServiceType = null, ManyResult result = ManyResult.DynamicIsBitSlower)
         {
             return result == ManyResult.DynamicIsBitSlower
@@ -1989,9 +1990,9 @@ namespace DryIoc
 
         public override string ToString()
         {
-            if (GetValue != null) 
+            if (GetValue != null)
                 return "{with custom value}";
-            
+
             var s = new StringBuilder();
             if (RequiredServiceType != null)
                 s.Append("{required: ").Print(RequiredServiceType);
@@ -2322,8 +2323,26 @@ namespace DryIoc
         }
     }
 
-    public sealed class Request
+    public sealed class Request : IResolver
     {
+        public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
+        {
+            var request = Push(DryIoc.ServiceInfo.Of(serviceType, ifUnresolved: ifUnresolved));
+            //_registry.ResolveDefault(request);
+            throw new NotImplementedException();
+        }
+
+        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
+        {
+            var request = Push(DryIoc.ServiceInfo.Of(serviceType, ifUnresolved: ifUnresolved));
+            throw new NotImplementedException();
+        }
+
+        public void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
+        {
+            throw new NotImplementedException();
+        }
+
         #region ResolutionScope
 
         public static readonly ParameterExpression ResolutionScopeParamExpr = Expression.Parameter(typeof(IScope), "scope");
@@ -2976,7 +2995,7 @@ namespace DryIoc
         {
             var selector = ifUnresolved == IfUnresolved.ReturnDefault
                 ? (GetInfo)null
-                : (m, req, reg) => ifUnresolved == IfUnresolved.ReturnDefault 
+                : (m, req, reg) => ifUnresolved == IfUnresolved.ReturnDefault
                     ? PropertyOrFieldServiceInfo.Of(m)
                     : PropertyOrFieldServiceInfo.Of(m).With(ServiceInfoDetails.IfUnresolvedThrow, req, reg);
             return All(flags, selector);
@@ -3080,7 +3099,7 @@ namespace DryIoc
 
         public static bool IsPrimitiveOrObjectOrString(this Type type)
         {
-            return type.IsPrimitive || type == typeof (string) || type == typeof (object) ||
+            return type.IsPrimitive || type == typeof(string) || type == typeof(object) ||
                 type.IsArray && type.GetElementType().IsPrimitiveOrObjectOrString();
         }
 
@@ -3110,7 +3129,7 @@ namespace DryIoc
             Func<MemberInfo, bool> condition, ServiceInfoDetails details)
         {
             condition.ThrowIfNull();
-            return source.OverrideWith((ownerType, req, reg) => 
+            return source.OverrideWith((ownerType, req, reg) =>
                 ownerType.GetProperties(PUBLIC_AND_PRIVATE).Where(p => p.Match(Flags.All) && condition(p))
                 .Select(p => PropertyOrFieldServiceInfo.Of(p).With(details, req, reg)).Concat(
                 ownerType.GetFields(PUBLIC_AND_PRIVATE).Where(f => f.Match(Flags.All) && condition(f))
@@ -3148,12 +3167,12 @@ namespace DryIoc
             if (!implType.IsGenericTypeDefinition)
             {
                 if (implType.IsGenericType && implType.ContainsGenericParameters)
-                    throw Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS.Ex(
+                    Throw.Me(Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS,
                         implType, implType.GetGenericTypeDefinition());
 
                 if (implType != serviceType && serviceType != typeof(object) &&
                     Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1)
-                    throw Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE.Ex(implType, serviceType);
+                    Throw.Me(Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implType, serviceType);
             }
             else if (implType != serviceType)
             {
@@ -3169,18 +3188,16 @@ namespace DryIoc
                         implType, serviceType, implementedOpenGenericTypes);
                 }
                 else if (implType.IsGenericType && serviceType.ContainsGenericParameters)
-                    throw Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS.Ex(
+                    Throw.Me(Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS,
                         serviceType, serviceType.GetGenericTypeDefinition());
                 else
-                    throw Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE.Ex(implType, serviceType);
+                    Throw.Me(Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, implType, serviceType);
             }
-
 
             if (Setup.Rules.Constructor == null && registry.Rules.Constructor == null)
             {
                 var publicCtorCount = implType.GetConstructors().Length;
-                if (publicCtorCount != 1)
-                    throw Error.UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE.Ex(implType, publicCtorCount);
+                Throw.If(publicCtorCount != 1, Error.UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE, implType, publicCtorCount);
             }
         }
 
@@ -3392,18 +3409,18 @@ namespace DryIoc
                 var value = info.Details.GetValue(request, registry);
                 return value == null
                     ? info.ServiceType.GetDefaultValueExpression()
-                    : request.State.GetOrAddItemExpression(value, 
-                        value.GetType().ThrowIf(t => (!info.ServiceType.IsAssignableFrom(t))
-                            .Ex(Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, value, info, request)));
+                    : request.State.GetOrAddItemExpression(value,
+                        value.GetType().ThrowIf(!info.ServiceType.IsInstanceOfType(value),
+                            Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, value, info, request));
             }
 
-            var infoRequest = request.Push(info);
-            var factory = registry.ResolveFactory(infoRequest);
-            var expr = factory == null ? null : factory.GetExpressionOrDefault(infoRequest, registry);
+            var nextRequest = request.Push(info);
+            var factory = registry.ResolveFactory(nextRequest);
+            var expr = factory == null ? null : factory.GetExpressionOrDefault(nextRequest, registry);
 
             return expr ??
                 (request.IfUnresolved == IfUnresolved.ReturnDefault ? null
-                : infoRequest.ServiceType.GetDefaultValueExpression());
+                : nextRequest.ServiceType.GetDefaultValueExpression());
         }
 
         #endregion
@@ -3581,7 +3598,7 @@ namespace DryIoc
     {
         object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved);
 
-        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type wrappedType);
+        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType);
 
         /// <summary>
         /// For given instance resolves and sets properties and fields.
@@ -3704,23 +3721,23 @@ namespace DryIoc
             throw GetException(Format(message, arg0, arg1, arg2));
         }
 
+        public static void Me(string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        {
+            throw GetException(Format(message, arg0, arg1, arg2));
+        }
+
         public static Exception Ex(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             return GetException(Format(message, arg0, arg1, arg2));
         }
 
-        public static Exception Ex(this bool condition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null)
-        {
-            return condition ? GetException(Format(message, arg0, arg1, arg2)) : null;
-        }
-
-        public static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        private static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             return string.Format(message, PrintArg(arg0), PrintArg(arg1), PrintArg(arg2));
         }
 
-        public static readonly string ERROR_ARG_IS_NULL = "Argument of type {0} is null.";
-        public static readonly string ERROR_ARG_HAS_IMVALID_CONDITION = "Argument of type {0} has invalid condition.";
+        private static readonly string ERROR_ARG_IS_NULL = "Argument of type {0} is null.";
+        private static readonly string ERROR_ARG_HAS_IMVALID_CONDITION = "Argument of type {0} has invalid condition.";
     }
 
     /// <summary>
