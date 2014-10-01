@@ -66,7 +66,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<ClientWithStringParam>());
 
-            Assert.That(ex.Message, Is.StringContaining("Injected value 500 is not assignable to {with custom value} String parameter \"x\""));
+            Assert.That(ex.Message, Is.StringContaining("Injected value 500 is not assignable to System.String {with custom value} parameter \"x\""));
         }
 
         [Test]
