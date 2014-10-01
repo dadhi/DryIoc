@@ -139,11 +139,11 @@ namespace DryIoc
             ((IDisposable)_currentScope).Dispose();
         }
 
-        public Request CreateRequest(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw,
-            Type requiredServiceType = null)
+        public Request CreateRequest(Type serviceType, 
+            object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
             var serviceInfo = ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), null, this);
-            return new Request(null, _resolutionState, Ref.Of<IScope>(), serviceInfo);
+            return new Request(null, this, _resolutionState, Ref.Of<IScope>(), serviceInfo, null);
         }
 
         #region IRegistrator
@@ -285,7 +285,7 @@ namespace DryIoc
             Interlocked.Exchange(ref _resolvedDefaultDelegates, _resolvedDefaultDelegates
                 .AddOrUpdate(serviceType, factoryDelegate));
 
-            return factoryDelegate(request.State.Items, request.ResolutionScope);
+            return factoryDelegate(request.State.Items, request.Scope);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
@@ -326,7 +326,7 @@ namespace DryIoc
             Interlocked.Exchange(ref _resolvedKeyedDelegates, _resolvedKeyedDelegates
                 .AddOrUpdate(serviceType, factoryDelegates.AddOrUpdate(cacheServiceKey, factoryDelegate)));
 
-            return factoryDelegate(request.State.Items, request.ResolutionScope);
+            return factoryDelegate(request.State.Items, request.Scope);
         }
 
         /// <summary>
@@ -928,7 +928,7 @@ namespace DryIoc
                 expression = ((UnaryExpression)expression).Operand;
             if (expression.Type.IsValueType)
                 expression = Expression.Convert(expression, typeof(object));
-            return Expression.Lambda<FactoryDelegate>(expression, ResolutionState.ItemsParamExpr, Request.ResolutionScopeParamExpr);
+            return Expression.Lambda<FactoryDelegate>(expression, ResolutionState.ItemsParamExpr, Request.ScopeParamExpr);
         }
 
         public static FactoryDelegate CompileToDelegate(this Expression expression, IRegistry registry)
@@ -2105,8 +2105,9 @@ namespace DryIoc
 
         public static StringBuilder Print(this StringBuilder s, IServiceInfo info)
         {
+            s.Append(info.ServiceType);
             var details = info.Details.ToString();
-            return (details == string.Empty ? s : s.Append(details).Append(' ')).Print(info.ServiceType);
+            return details == string.Empty ? s : s.Append(' ').Append(details);
         }
     }
 
@@ -2328,8 +2329,7 @@ namespace DryIoc
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
             var request = Push(DryIoc.ServiceInfo.Of(serviceType, ifUnresolved: ifUnresolved));
-            //_registry.ResolveDefault(request);
-            throw new NotImplementedException();
+            return Registry.ResolveDefault(serviceType, ifUnresolved);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
@@ -2343,9 +2343,9 @@ namespace DryIoc
             throw new NotImplementedException();
         }
 
-        #region ResolutionScope
+        #region Resolution Scope
 
-        public static readonly ParameterExpression ResolutionScopeParamExpr = Expression.Parameter(typeof(IScope), "scope");
+        public static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "scope");
 
         public static IScope GetScope(ref IScope scope)
         {
@@ -2353,14 +2353,14 @@ namespace DryIoc
         }
 
         public static readonly MethodInfo GetScopeMethod = typeof(Request).GetMethod("GetScope");
-        public static readonly Expression ResolutionScopeExpr = Expression.Call(GetScopeMethod, ResolutionScopeParamExpr);
+        public static readonly Expression ScopeExpr = Expression.Call(GetScopeMethod, ScopeParamExpr);
 
-        public IScope ResolutionScope
+        public IScope Scope
         {
             get { return _scope.Value; }
         }
 
-        public IScope CreateResolutionScope()
+        public IScope CreateScope()
         {
             if (_scope.Value == null)
                 _scope.Swap(scope => scope ?? new Scope());
@@ -2369,9 +2369,12 @@ namespace DryIoc
 
         #endregion
 
+        public readonly IRegistry Registry;
+
         ///<remarks>Reference to resolved items and cached factory expressions. 
         /// Used to propagate the state from resolution root, probably from another container (request creator).</remarks>
         public readonly ResolutionState State;
+
         ///<remarks>It is  null for resolution root.</remarks>
         public readonly Request Parent;
         public readonly IServiceInfo ServiceInfo;
@@ -2393,12 +2396,13 @@ namespace DryIoc
 
         public Request Push(IServiceInfo info)
         {
-            return new Request(this, State, _scope, info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup.Type));
+            var inheritedInfo = info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup.Type);
+            return new Request(this, Registry, State, _scope, inheritedInfo, null);
         }
 
         public Request ReplaceServiceInfoWith(IServiceInfo info)
         {
-            return new Request(Parent, State, _scope, info, ResolvedFactory);
+            return new Request(Parent, Registry, State, _scope, info, ResolvedFactory);
         }
 
         public Request ResolveWith(Factory factory)
@@ -2407,7 +2411,7 @@ namespace DryIoc
                 for (var p = Parent; p != null; p = p.Parent)
                     if (p.ResolvedFactory != null && p.ResolvedFactory.ID == factory.ID)
                         throw Error.RECURSIVE_DEPENDENCY_DETECTED.Ex(this);
-            return new Request(Parent, State, _scope, ServiceInfo, factory);
+            return new Request(Parent, Registry, State, _scope, ServiceInfo, factory);
         }
 
         public Request GetNonWrapperParentOrDefault()
@@ -2429,27 +2433,24 @@ namespace DryIoc
         {
             if (ResolvedFactory != null && ResolvedFactory.Setup.Type != FactoryType.Service)
                 s.Append(Enum.GetName(typeof(FactoryType), ResolvedFactory.Setup.Type)).Append(' ');
-
-            s.Append(ServiceInfo);
-
             if (ImplementationType != null && ImplementationType != ServiceType)
-                s.Append(" of ").Print(ImplementationType);
-
-            return s;
+                s.Print(ImplementationType).Append(": ");
+            return s.Append(ServiceInfo);
         }
 
         public override string ToString()
         {
-            var str = Print(new StringBuilder());
-            return Parent == null ? str.ToString() :
-                Parent.Enumerate().Aggregate(str, (m, r) => r.Print(m.AppendLine().Append(" in "))).ToString();
+            var s = Print(new StringBuilder());
+            return Parent == null ? s.ToString() :
+                Parent.Enumerate().Aggregate(s, (m, r) => r.Print(m.AppendLine().Append(" in "))).ToString();
         }
 
         #region Implementation
 
-        internal Request(Request parent, ResolutionState state, Ref<IScope> scope, IServiceInfo serviceInfo, Factory factory = null)
+        internal Request(Request parent, IRegistry registry, ResolutionState state, Ref<IScope> scope, IServiceInfo serviceInfo, Factory factory)
         {
             Parent = parent;
+            Registry = registry;
             State = state;
             _scope = scope;
             ServiceInfo = serviceInfo.ThrowIfNull();
@@ -2691,8 +2692,7 @@ namespace DryIoc
                     else
                     {
                         var factoryDelegate = expression.ToFactoryExpression().Compile();
-                        var reusedInstance = scope.GetOrAdd(ID,
-                            () => factoryDelegate(request.State.Items, request.ResolutionScope));
+                        var reusedInstance = scope.GetOrAdd(ID, () => factoryDelegate(request.State.Items, request.Scope));
                         expression = request.State.GetOrAddItemExpression(reusedInstance, expression.Type);
                     }
                 }
@@ -2759,7 +2759,7 @@ namespace DryIoc
 
         protected Expression GetReusedItemExpression(Request request, IScope scope, Expression expression)
         {
-            var scopeExpr = scope == request.ResolutionScope ? Request.ResolutionScopeExpr
+            var scopeExpr = scope == request.Scope ? Request.ScopeExpr
                 : request.State.GetOrAddItemExpression(scope);
 
             var getScopedItemMethod = _scopeGetOrAddMethod.MakeGenericMethod(expression.Type);
@@ -3469,7 +3469,7 @@ namespace DryIoc
                 return (items, _) => _factoryDelegate(GetRegistry(items, registryRefIndex));
 
             var reuseScope = Reuse.GetScope(request, registry);
-            var scopeIndex = reuseScope == request.ResolutionScope ? -1 : request.State.GetOrAddItem(reuseScope);
+            var scopeIndex = reuseScope == request.Scope ? -1 : request.State.GetOrAddItem(reuseScope);
 
             return (items, scope) =>
                 (scopeIndex == -1 ? scope : (Scope)items.Get(scopeIndex))
@@ -3580,7 +3580,7 @@ namespace DryIoc
     {
         public IScope GetScope(Request request, IRegistry _)
         {
-            return request.CreateResolutionScope();
+            return request.CreateScope();
         }
     }
 
