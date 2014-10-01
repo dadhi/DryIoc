@@ -288,7 +288,7 @@ namespace DryIoc.MefAttributedModel
 
             IReuse reuse;
             if (!AttributedModel.SupportedReuseTypes.TryGetValue(reuseType, out reuse))
-                throw Error.UNSUPPORTED_REUSE_TYPE.Of(reuseType);
+                throw Error.UNSUPPORTED_REUSE_TYPE.Ex(reuseType);
             return reuse;
         }
 

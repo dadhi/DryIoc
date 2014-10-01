@@ -306,7 +306,7 @@ namespace DryIoc
                 var wrappedServiceType = ((IRegistry)this).GetWrappedServiceType(serviceType);
                 if (!wrappedServiceType.IsAssignableFrom(requiredServiceType))
                     throw Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE
-                        .Of(requiredServiceType, wrappedServiceType, serviceType);
+                        .Ex(requiredServiceType, wrappedServiceType, serviceType);
 
                 if (serviceType == wrappedServiceType)
                     serviceType = requiredServiceType;
@@ -658,7 +658,7 @@ namespace DryIoc
                             case IfAlreadyRegistered.UpdateRegistered:
                                 return factory;
                             default:
-                                throw Error.REGISTERING_WITH_DUPLICATE_SERVICE_KEY.Of(serviceType, serviceKey, oldFactory);
+                                throw Error.REGISTERING_WITH_DUPLICATE_SERVICE_KEY.Ex(serviceType, serviceKey, oldFactory);
                         }
                     }));
                 }));
@@ -707,7 +707,7 @@ namespace DryIoc
                         return defaultFactories[0].Value;
 
                     if (defaultFactories.Length > 1)
-                        throw Error.EXPECTED_SINGLE_DEFAULT_FACTORY.Of(serviceType, defaultFactories);
+                        throw Error.EXPECTED_SINGLE_DEFAULT_FACTORY.Ex(serviceType, defaultFactories);
                 }
             }
 
@@ -1699,8 +1699,8 @@ namespace DryIoc
             Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            var factory = new DelegateFactory(r => factoryDelegate(r).ThrowIf(x => serviceType.IsInstanceOfType(x) ? null :
-                Error.REGISTERED_FACTORY_DELEGATE_RETURNS_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE.Of(x, x.GetType(), serviceType)),
+            var factory = new DelegateFactory(r => factoryDelegate(r).ThrowIf(x => (!serviceType.IsInstanceOfType(x)).Ex(
+                Error.REGISTERED_FACTORY_DELEGATE_RETURNS_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE, x, x.GetType(), serviceType)),
                 reuse, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
@@ -2037,7 +2037,7 @@ namespace DryIoc
             {
                 var wrappedServiceType = registry.GetWrappedServiceType(serviceType);
                 if (!wrappedServiceType.IsAssignableFrom(requiredServiceType))
-                    throw Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE.Of(
+                    throw Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE.Ex(
                         requiredServiceType, wrappedServiceType, request);
 
                 if (wrappedServiceType == serviceType)
@@ -2369,7 +2369,7 @@ namespace DryIoc
             if (factory.Setup.Type == FactoryType.Service) // skip dependency recursion check for non-services (decorators, wrappers, ..)
                 for (var p = Parent; p != null; p = p.Parent)
                     if (p.ResolvedFactory != null && p.ResolvedFactory.ID == factory.ID)
-                        throw Error.RECURSIVE_DEPENDENCY_DETECTED.Of(this);
+                        throw Error.RECURSIVE_DEPENDENCY_DETECTED.Ex(this);
             return new Request(Parent, State, _scope, ServiceInfo, factory);
         }
 
@@ -2608,7 +2608,7 @@ namespace DryIoc
         public virtual void VerifyBeforeRegistration(Type serviceType, IRegistry registry)
         {
             if (serviceType.IsGenericTypeDefinition && !ProvidesFactoryForRequest)
-                throw Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE.Of(serviceType);
+                throw Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE.Ex(serviceType);
         }
 
         public virtual Factory GetFactoryForRequestOrDefault(Request request, IRegistry registry) { return null; }
@@ -2752,7 +2752,7 @@ namespace DryIoc
         public override void VerifyBeforeRegistration(Type serviceType, IRegistry _)
         {
             if (!serviceType.IsInstanceOfType(_instance))
-                throw Error.REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE.Of(_instance, _instance.GetType(), serviceType);
+                throw Error.REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE.Ex(_instance, _instance.GetType(), serviceType);
         }
 
         public override Expression CreateExpressionOrDefault(Request request, IRegistry _)
@@ -3083,7 +3083,7 @@ namespace DryIoc
                 if (field != null && field.Match(Flags.All))
                     return new[] { PropertyOrFieldServiceInfo.Of(field).With(details, req, reg) };
 
-                throw Error.UNABLE_TO_FIND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD.Of(name, req);
+                throw Error.UNABLE_TO_FIND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD.Ex(name, req);
             });
         }
 
@@ -3129,12 +3129,12 @@ namespace DryIoc
             if (!implType.IsGenericTypeDefinition)
             {
                 if (implType.IsGenericType && implType.ContainsGenericParameters)
-                    throw Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS.Of(
+                    throw Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS.Ex(
                         implType, implType.GetGenericTypeDefinition());
 
                 if (implType != serviceType && serviceType != typeof(object) &&
                     Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1)
-                    throw Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE.Of(implType, serviceType);
+                    throw Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE.Ex(implType, serviceType);
             }
             else if (implType != serviceType)
             {
@@ -3150,10 +3150,10 @@ namespace DryIoc
                         implType, serviceType, implementedOpenGenericTypes);
                 }
                 else if (implType.IsGenericType && serviceType.ContainsGenericParameters)
-                    throw Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS.Of(
+                    throw Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS.Ex(
                         serviceType, serviceType.GetGenericTypeDefinition());
                 else
-                    throw Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE.Of(implType, serviceType);
+                    throw Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE.Ex(implType, serviceType);
             }
 
 
@@ -3161,7 +3161,7 @@ namespace DryIoc
             {
                 var publicCtorCount = implType.GetConstructors().Length;
                 if (publicCtorCount != 1)
-                    throw Error.UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE.Of(implType, publicCtorCount);
+                    throw Error.UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE.Ex(implType, publicCtorCount);
             }
         }
 
@@ -3326,7 +3326,7 @@ namespace DryIoc
 
             var unmatchedArgIndex = Array.IndexOf(resultImplTypeArgs, null);
             if (unmatchedArgIndex != -1)
-                throw Error.UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE.Of(
+                throw Error.UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE.Ex(
                     implType, openImplTypeArgs[unmatchedArgIndex], request);
 
             return resultImplTypeArgs;
@@ -3373,9 +3373,9 @@ namespace DryIoc
                 var value = info.Details.GetValue(request, registry);
                 return value == null
                     ? info.ServiceType.GetDefaultValueExpression()
-                    : request.State.GetOrAddItemExpression(value, value.GetType().ThrowIf(
-                        valueType => info.ServiceType.IsAssignableFrom(valueType)
-                            ? null : Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE.Of(value, info, request)));
+                    : request.State.GetOrAddItemExpression(value, 
+                        value.GetType().ThrowIf(t => (!info.ServiceType.IsAssignableFrom(t))
+                            .Ex(Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, value, info, request)));
             }
 
             var infoRequest = request.Push(info);
@@ -3410,15 +3410,15 @@ namespace DryIoc
     /// and where possible will use delegate directly - without converting it to expression.</remarks>
     public sealed class DelegateFactory : Factory
     {
-        public DelegateFactory(Func<IResolver, object> customDelegate, IReuse reuse = null, FactorySetup setup = null)
+        public DelegateFactory(Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            _customDelegate = customDelegate.ThrowIfNull();
+            _factoryDelegate = factoryDelegate.ThrowIfNull();
         }
 
         public override Expression CreateExpressionOrDefault(Request request, IRegistry registry)
         {
-            var factoryDelegateExpr = request.State.GetOrAddItemExpression(_customDelegate);
+            var factoryDelegateExpr = request.State.GetOrAddItemExpression(_factoryDelegate);
             var registryExpr = request.State.GetOrAddItemExpression(registry);
             return Expression.Convert(Expression.Invoke(factoryDelegateExpr, registryExpr), request.ServiceType);
         }
@@ -3430,17 +3430,17 @@ namespace DryIoc
 
             var registryRefIndex = request.State.GetOrAddItem(registry);
             if (Reuse == null)
-                return (items, _) => _customDelegate(GetRegistry(items, registryRefIndex));
+                return (items, _) => _factoryDelegate(GetRegistry(items, registryRefIndex));
 
             var reuseScope = Reuse.GetScope(request, registry);
             var scopeIndex = reuseScope == request.ResolutionScope ? -1 : request.State.GetOrAddItem(reuseScope);
 
             return (items, scope) =>
                 (scopeIndex == -1 ? scope : (Scope)items.Get(scopeIndex))
-                    .GetOrAdd(ID, () => _customDelegate(GetRegistry(items, registryRefIndex)));
+                    .GetOrAdd(ID, () => _factoryDelegate(GetRegistry(items, registryRefIndex)));
         }
 
-        private readonly Func<IResolver, object> _customDelegate;
+        private readonly Func<IResolver, object> _factoryDelegate;
 
         private static IRegistry GetRegistry(AppendableArray<object> items, int registryWeakRefIndex)
         {
@@ -3484,7 +3484,7 @@ namespace DryIoc
         public T GetOrAdd<T>(int id, Func<T> factory)
         {
             if (_disposed == 1)
-                throw Error.SCOPE_IS_DISPOSED.Of();
+                throw Error.SCOPE_IS_DISPOSED.Ex();
             lock (_syncRoot)
             {
                 var item = _items.GetFirstValueByHashOrDefault(id);
@@ -3685,9 +3685,14 @@ namespace DryIoc
             throw GetException(Format(message, arg0, arg1, arg2));
         }
 
-        public static Exception Of(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        public static Exception Ex(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             return GetException(Format(message, arg0, arg1, arg2));
+        }
+
+        public static Exception Ex(this bool condition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null)
+        {
+            return condition ? GetException(Format(message, arg0, arg1, arg2)) : null;
         }
 
         public static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
