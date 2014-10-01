@@ -126,6 +126,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\RegisterWithNonStringServiceKeyTests.cs">
       <Link>RegisterWithNonStringServiceKeyTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\ResolveManyTests.cs">
+      <Link>ResolveManyTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\ReuseInCurrentScopeTests.cs">
       <Link>ReuseInCurrentScopeTests.cs</Link>
     </Compile>

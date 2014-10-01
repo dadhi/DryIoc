@@ -96,14 +96,6 @@ namespace DryIoc
         public Container(Func<Rules, Rules> updateRules)
             : this(updateRules.ThrowIfNull().Invoke(Rules.Default)) { }
 
-        /// <remarks>Use <paramref name="registerBatch"/> to register some services right after constructor creation. 
-        /// For some who prefer lambda syntax.</remarks>
-        public Container(Action<IRegistrator> registerBatch, Rules rules = null)
-            : this(rules)
-        {
-            registerBatch.ThrowIfNull().Invoke(this);
-        }
-
         /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
         /// <param name="newRules">New rules. Its could be based on <see cref="DryIoc.Rules.Default"/> or copied container rules.</param>
         /// <returns></returns>
@@ -344,21 +336,19 @@ namespace DryIoc
         /// For given instance resolves and sets properties and fields.
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
         /// or if rules are not set it uses <see cref="PropertiesAndFields.AllPublicNonPrimitive"/>, 
-        /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
+        /// or you can override the rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
         /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>
         void IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
         {
+            var selector = selectPropertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.AllPublicNonPrimitive;
+
             var instanceType = instance.ThrowIfNull().GetType();
-
-            selectPropertiesAndFields = selectPropertiesAndFields
-                ?? Rules.PropertiesAndFields
-                ?? PropertiesAndFields.AllPublicNonPrimitive;
-
             var request = CreateRequest(instanceType).ResolveWith(new InstanceFactory(instance));
-            foreach (var info in selectPropertiesAndFields(instanceType, request, this))
+
+            foreach (var info in selector(instanceType, request, this))
                 if (info != null)
                 {
                     var value = this.Resolve(info.ServiceType, info.Details.ServiceKey, info.Details.IfUnresolved);
@@ -1866,7 +1856,7 @@ namespace DryIoc
         /// </example>
         public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved, requiredServiceType.ThrowIfNull());
+            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved, requiredServiceType);
         }
 
         /// <summary>
@@ -1909,6 +1899,34 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
             return (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType);
+        }
+
+        /// <summary>Specifies new registered services awareness. Either dynamic or fixed view./// </summary>
+        public enum ManyResult { DynamicIsBitSlower, FixedIsBitFaster }
+
+        /// <summary>
+        /// Returns all registered services instances including all keyed and default registrations.
+        /// Use <paramref name="result"/> to return either all registered services at the moment of resolve (dynamic fresh view) or
+        /// the same services that were returned with first <see cref="ResolveMany{TService}"/> call (fixed view).
+        /// </summary>
+        /// <typeparam name="TService">Return collection item type. It denotes registered service type if <paramref name="requiredServiceType"/> is not specified.</typeparam>
+        /// <param name="resolver">Usually <see cref="Container"/> object.</param>
+        /// <param name="requiredServiceType">(optional) Denotes registered service type. Should be assignable to <typeparamref name="TService"/>.</param>
+        /// <param name="result">(optional) Specifies new registered services awareness. Aware by default.</param>
+        /// <returns>Result collection of services.</returns>
+        /// <remarks>The same result could be achieved by directly calling:
+        /// <code lang="cs"><![CDATA[
+        ///     container.Resolve<Many<IService>>();        // for dynamic result - default behavior
+        ///     container.Resolve<IEnumerable<IService>>(); // for fixed result
+        ///     container.Resolve<IService[]>();            // for fixed result too
+        /// ]]></code>
+        /// </remarks>
+        public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver, 
+            Type requiredServiceType = null, ManyResult result = ManyResult.DynamicIsBitSlower)
+        {
+            return result == ManyResult.DynamicIsBitSlower
+                ? resolver.Resolve<Many<TService>>(requiredServiceType).Items
+                : resolver.Resolve<IEnumerable<TService>>(requiredServiceType);
         }
 
         /// <summary>
@@ -2703,15 +2721,14 @@ namespace DryIoc
         public override string ToString()
         {
             var s = new StringBuilder();
-            s.Append("Factory {ID=").Append(ID);
+            s.Append("{FactoryID=").Append(ID);
             if (ImplementationType != null)
                 s.Append(", ImplType=").Print(ImplementationType);
             if (Reuse != null)
                 s.Append(", ReuseType=").Print(Reuse.GetType());
             if (Setup.Type != DryIoc.Setup.Default.Type)
                 s.Append(", FactoryType=").Append(Setup.Type);
-            s.Append("}");
-            return s.ToString();
+            return s.Append("}").ToString();
         }
 
         #region Implementation
@@ -2853,8 +2870,10 @@ namespace DryIoc
     /// <summary>DSL for specifying <see cref="ParameterSelector"/> injection rules.</summary>
     public static partial class Parameters
     {
+        /// <summary>Specifies to return default details <see cref="ServiceInfoDetails.IfUnresolvedThrow"/> for all parameters.</summary>
         public static ParameterSelector All = (p, req, reg) => null;
 
+        /// <summary>Specifies that all parameters could be set to default if unresolved.</summary>
         public static ParameterSelector AllDefaultIfUnresolved = ((p, req, reg) =>
             ParameterServiceInfo.Of(p).With(ServiceInfoDetails.IfUnresolvedReturnDefault, req, reg));
 
