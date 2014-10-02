@@ -137,8 +137,14 @@ namespace DryIoc.UnitTests
             container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
             container.Register<ServiceWithClient>();
 
-            Assert.Throws<ContainerException>(() =>
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<SomeClient>());
+
+            // JITing method, just for test. 
+            System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(
+                GetType().GetMethod("Detect_recursive_dependency_when_registered_with_delegate").MethodHandle);
+
+            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected in resolution of"));
         }
 
         internal class SomeClient
@@ -153,7 +159,12 @@ namespace DryIoc.UnitTests
 
         internal class ServiceWithClient
         {
-            public ServiceWithClient(SomeClient client) { }
+            public SomeClient Client { get; set; }
+
+            public ServiceWithClient(SomeClient client)
+            {
+                Client = client;
+            }
         }
     }
 }

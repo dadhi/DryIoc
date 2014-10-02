@@ -1255,7 +1255,7 @@ namespace DryIoc
         #region Implementation
 
         private InjectionRules _injectionRules;
-        private bool _compilationToDynamicAssemblyEnabled; // used by .NET 4 and higher versions.
+        private bool _compilationToDynamicAssemblyEnabled; // NOTE: used by .NET 4 and higher versions.
 
         private Rules()
         {
@@ -2087,7 +2087,7 @@ namespace DryIoc
 
         public static StringBuilder Print(this StringBuilder s, IServiceInfo info)
         {
-            s.Append(info.ServiceType);
+            s.Print(info.ServiceType);
             var details = info.Details.ToString();
             return details == string.Empty ? s : s.Append(' ').Append(details);
         }
@@ -3446,27 +3446,22 @@ namespace DryIoc
 
         public override FactoryDelegate GetDelegateOrDefault(Request request, IRegistry registry)
         {
-            if (registry.GetDecoratorExpressionOrDefault(request.ResolveWith(this)) != null)
+            request = request.ResolveWith(this);
+
+            if (registry.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request, registry);
 
-            var registryRefIndex = request.State.GetOrAddItem(registry);
             if (Reuse == null)
-                return (items, _) => _factoryDelegate(GetRegistry(items, registryRefIndex));
+                return (items, _) => _factoryDelegate(request);
 
             var reuseScope = Reuse.GetScope(request, registry);
             var scopeIndex = reuseScope == request.Scope ? -1 : request.State.GetOrAddItem(reuseScope);
 
-            return (items, scope) =>
-                (scopeIndex == -1 ? scope : (Scope)items.Get(scopeIndex))
-                    .GetOrAdd(ID, () => _factoryDelegate(GetRegistry(items, registryRefIndex)));
+            return (items, scope) => (scopeIndex == -1 ? scope : (Scope)items.Get(scopeIndex))
+                .GetOrAdd(ID, () => _factoryDelegate(request));
         }
 
         private readonly Func<IResolver, object> _factoryDelegate;
-
-        private static IRegistry GetRegistry(AppendableArray<object> items, int registryWeakRefIndex)
-        {
-            return ((RegistryWeakRef)items.Get(registryWeakRefIndex)).Target;
-        }
     }
 
     public sealed class FactoryProvider : Factory
