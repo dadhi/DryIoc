@@ -84,7 +84,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.RegisterDelegate(r => new ServiceWithDependency(r.Resolve<IDependency>()));
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
                 container.Resolve<ServiceWithDependency>());
         }
 
@@ -128,6 +128,32 @@ namespace DryIoc.UnitTests
 
             Assert.Throws<ContainerException>(() =>
                 container.RegisterInstance(typeof(IService), "ring", named: "MyPrecious"));
+        }
+
+        [Test]
+        public void Detect_recursive_dependency_when_registered_with_delegate()
+        {
+            var container = new Container();
+            container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
+            container.Register<ServiceWithClient>();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<SomeClient>());
+        }
+
+        internal class SomeClient
+        {
+            public ServiceWithClient Service { get; set; }
+
+            public SomeClient(ServiceWithClient service)
+            {
+                Service = service;
+            }
+        }
+
+        internal class ServiceWithClient
+        {
+            public ServiceWithClient(SomeClient client) { }
         }
     }
 }

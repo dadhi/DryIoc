@@ -139,7 +139,7 @@ namespace DryIoc
             ((IDisposable)_currentScope).Dispose();
         }
 
-        public Request CreateRequest(Type serviceType, 
+        public Request CreateRequest(Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
             var serviceInfo = ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), null, this);
@@ -266,17 +266,17 @@ namespace DryIoc
 
         #region IResolver
 
-        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
+        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault)
         {
             var factoryDelegate = _resolvedDefaultDelegates.GetValueOrDefault(serviceType);
             return factoryDelegate != null
                 ? factoryDelegate(_resolutionState.Items, null)
-                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved);
+                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, parentOrDefault);
         }
 
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved)
+        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault = null)
         {
-            var request = CreateRequest(serviceType, ifUnresolved: ifUnresolved);
+            var request = parentOrDefault ?? CreateRequest(serviceType, ifUnresolved: ifUnresolved);
             var factory = ((IRegistry)this).ResolveFactory(request);
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request, this);
             if (factoryDelegate == null)
@@ -288,26 +288,26 @@ namespace DryIoc
             return factoryDelegate(request.State.Items, request.Scope);
         }
 
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request request1)
         {
             var cacheServiceKey = serviceKey;
             if (requiredServiceType != null)
             {
                 var wrappedServiceType = ((IRegistry)this).GetWrappedServiceType(serviceType);
-                if (!wrappedServiceType.IsAssignableFrom(requiredServiceType))
-                    throw Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE
-                        .Ex(requiredServiceType, wrappedServiceType, serviceType);
+                Throw.If(!wrappedServiceType.IsAssignableFrom(requiredServiceType),
+                    Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE,
+                    requiredServiceType, wrappedServiceType, serviceType);
 
                 if (serviceType == wrappedServiceType)
                     serviceType = requiredServiceType;
                 else
                     cacheServiceKey = serviceKey == null ? requiredServiceType
-                            : (object)new KV<Type, object>(requiredServiceType, serviceKey);
+                        : (object)new KV<Type, object>(requiredServiceType, serviceKey);
             }
 
             // If service key is null, then use resolve default instead of keyed.
             if (cacheServiceKey == null)
-                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved);
+                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, null);
 
             FactoryDelegate factoryDelegate;
 
@@ -636,18 +636,10 @@ namespace DryIoc
                         return new FactoriesEntry(DefaultKey.Default, newEntry.Factories.AddOrUpdate(DefaultKey.Default, (Factory)oldValue));
 
                     var oldEntry = ((FactoriesEntry)oldValue);
-                    return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
-                    {
-                        switch (ifAlreadyRegistered)
-                        {
-                            case IfAlreadyRegistered.KeepRegistered:
-                                return oldFactory;
-                            case IfAlreadyRegistered.UpdateRegistered:
-                                return factory;
-                            default:
-                                throw Error.REGISTERING_WITH_DUPLICATE_SERVICE_KEY.Ex(serviceType, serviceKey, oldFactory);
-                        }
-                    }));
+                    return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) => 
+                        ifAlreadyRegistered == IfAlreadyRegistered.KeepRegistered ? oldFactory
+                        : ifAlreadyRegistered == IfAlreadyRegistered.UpdateRegistered ? factory
+                        : Throw.No<Factory>(Error.REGISTERING_WITH_DUPLICATE_SERVICE_KEY, serviceType, serviceKey, oldFactory)));
                 }));
             }
         }
@@ -666,36 +658,25 @@ namespace DryIoc
                 {
                     if (serviceKey != null && !DefaultKey.Default.Equals(serviceKey))
                         return null;
-
                     var factory = (Factory)entry;
-                    if (factorySelector != null)
-                        return factorySelector(new[] { new KeyValuePair<object, Factory>(DefaultKey.Default, factory) });
-
-                    return factory;
+                    return factorySelector == null ? factory 
+                        : factorySelector(new[] { new KeyValuePair<object, Factory>(DefaultKey.Default, factory) });
                 }
 
                 var factories = ((FactoriesEntry)entry).Factories;
                 if (serviceKey != null)
                 {
                     var factory = factories.GetValueOrDefault(serviceKey);
-                    if (factorySelector != null)
-                        return factorySelector(new[] { new KeyValuePair<object, Factory>(serviceKey, factory) });
-
-                    return factory;
+                    return factorySelector == null ? factory 
+                        : factorySelector(new[] { new KeyValuePair<object, Factory>(serviceKey, factory) });
                 }
 
                 var defaultFactories = factories.Enumerate().Where(x => x.Key is DefaultKey).ToArray();
                 if (defaultFactories.Length != 0)
-                {
-                    if (factorySelector != null)
-                        return factorySelector(defaultFactories.Select(kv => new KeyValuePair<object, Factory>(kv.Key, kv.Value)));
-
-                    if (defaultFactories.Length == 1)
-                        return defaultFactories[0].Value;
-
-                    if (defaultFactories.Length > 1)
-                        throw Error.EXPECTED_SINGLE_DEFAULT_FACTORY.Ex(serviceType, defaultFactories);
-                }
+                    return factorySelector != null
+                        ? factorySelector(defaultFactories.Select(kv => new KeyValuePair<object, Factory>(kv.Key, kv.Value)))
+                        : defaultFactories.Length == 1 ? defaultFactories[0].Value
+                        : Throw.No<Factory>(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
             }
 
             return null;
@@ -1218,7 +1199,8 @@ namespace DryIoc
 
             foreach (var item in items)
             {
-                var service = registry.ResolveKeyed(itemType, item.Key, IfUnresolved.ReturnDefault, wrappedItemType);
+                // TODO Change request from null.
+                var service = registry.ResolveKeyed(itemType, item.Key, IfUnresolved.ReturnDefault, wrappedItemType, null);
                 if (service != null) // skip unresolved items
                     yield return (TService)service;
             }
@@ -1823,7 +1805,7 @@ namespace DryIoc
         /// <returns>The requested service instance.</returns>
         public static object Resolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return resolver.ResolveDefault(serviceType, ifUnresolved);
+            return resolver.ResolveDefault(serviceType, ifUnresolved, null);
         }
 
         /// <summary>
@@ -1835,7 +1817,7 @@ namespace DryIoc
         /// <returns>The requested service instance.</returns>
         public static TService Resolve<TService>(this IResolver resolver, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveDefault(typeof(TService), ifUnresolved);
+            return (TService)resolver.ResolveDefault(typeof(TService), ifUnresolved, null);
         }
 
         /// <summary>
@@ -1857,7 +1839,7 @@ namespace DryIoc
         /// </example>
         public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved, requiredServiceType);
+            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved, requiredServiceType, null);
         }
 
         /// <summary>
@@ -1882,8 +1864,8 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
             return serviceKey == null
-                ? resolver.ResolveDefault(serviceType, ifUnresolved)
-                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType);
+                ? resolver.ResolveDefault(serviceType, ifUnresolved, null)
+                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, null);
         }
 
         /// <summary>
@@ -2186,7 +2168,7 @@ namespace DryIoc
 
         public override string ToString()
         {
-            return new StringBuilder().Print(this).Append(" parameter \"").Append(_parameter.Name).Append('"').ToString();
+            return new StringBuilder().Print(this).Append(" parameter ").Print(_parameter.Name, "\"").ToString();
         }
 
         private readonly ParameterInfo _parameter;
@@ -2253,7 +2235,7 @@ namespace DryIoc
 
             public override string ToString()
             {
-                return new StringBuilder().Print(this).Append(" property \"").Append(_property.Name).Append('"').ToString();
+                return new StringBuilder().Print(this).Append(" property ").Print(_property.Name, "\"").ToString();
             }
 
             private readonly PropertyInfo _property;
@@ -2297,7 +2279,7 @@ namespace DryIoc
 
             public override string ToString()
             {
-                return new StringBuilder().Print(this).Append(" field \"").Append(_field.Name).Append('"').ToString();
+                return new StringBuilder().Print(this).Append(" field ").Print(_field.Name, "\"").ToString();
             }
 
             private readonly FieldInfo _field;
@@ -2326,16 +2308,17 @@ namespace DryIoc
 
     public sealed class Request : IResolver
     {
-        public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
+        public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request _)
         {
             var request = Push(DryIoc.ServiceInfo.Of(serviceType, ifUnresolved: ifUnresolved));
-            return Registry.ResolveDefault(serviceType, ifUnresolved);
+            return Registry.ResolveDefault(serviceType, ifUnresolved, request);
         }
 
-        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
+        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request request1)
         {
-            var request = Push(DryIoc.ServiceInfo.Of(serviceType, ifUnresolved: ifUnresolved));
-            throw new NotImplementedException();
+            var request = Push(DryIoc.ServiceInfo.Of(serviceType)
+                .With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), this, Registry));
+            return Registry.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, request);
         }
 
         public void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
@@ -3442,8 +3425,10 @@ namespace DryIoc
         private readonly Func<Request, IRegistry, Expression> _getExpression;
     }
 
-    /// <remarks>This factory is the thin wrapper for user provided delegate 
-    /// and where possible will use delegate directly - without converting it to expression.</remarks>
+    /// <summary>
+    /// This factory is the thin wrapper for user provided delegate 
+    /// and where possible it uses delegate directly: without converting it to expression.
+    /// </summary>
     public sealed class DelegateFactory : Factory
     {
         public DelegateFactory(Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null)
@@ -3594,11 +3579,33 @@ namespace DryIoc
 
     public enum IfUnresolved { Throw, ReturnDefault }
 
+    /// <summary>
+    /// Declares minimal API for service resolution.
+    /// The user friendly convenient methods are implemented as extension methods in <see cref="Resolver"/> class.
+    /// </summary>
+    /// <remarks>Resolve default and keyed is separated because of micro optimization for faster resolution.</remarks>
     public interface IResolver
     {
-        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved);
+        /// <summary>Resolves service from container and returns created service object.</summary>
+        /// <param name="serviceType">Service type to search and to return.</param>
+        /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
+        /// <param name="parentOrDefault">Dependency owner request if dependency is resolved, and null for resolution root.</param>
+        /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
+        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault);
 
-        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType);
+        /// <summary>Resolves service from container and returns created service object.</summary>
+        /// <param name="serviceType">Service type to search and to return.</param>
+        /// <param name="serviceKey">Optional service key used for registering service.</param>
+        /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
+        /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
+        /// or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
+        /// <param name="parentOrDefault">Dependency owner request if dependency is resolved, and null for resolution root.</param>
+        /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
+        /// <remarks>
+        /// This method covers all possible resolution input parameters comparing to <see cref="ResolveDefault"/>, and
+        /// by specifying the same parameters as for <see cref="ResolveDefault"/> should return the same result.
+        /// </remarks>
+        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request parentOrDefault);
 
         /// <summary>
         /// For given instance resolves and sets properties and fields.
@@ -3708,13 +3715,6 @@ namespace DryIoc
             throw GetException(message == null ? Format(ERROR_ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
         }
 
-        public static T ThrowIf<T>(this T arg, Func<T, Exception> getErrorOrNull)
-        {
-            var error = getErrorOrNull(arg);
-            if (error == null) return arg;
-            throw error;
-        }
-
         public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             if (!throwCondition) return;
@@ -3722,6 +3722,11 @@ namespace DryIoc
         }
 
         public static void Me(string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        {
+            throw GetException(Format(message, arg0, arg1, arg2));
+        }
+
+        public static T No<T>(string message, object arg0 = null, object arg1 = null, object arg2 = null)
         {
             throw GetException(Format(message, arg0, arg1, arg2));
         }
@@ -3928,6 +3933,11 @@ namespace DryIoc
                 : s.Append(x);
         }
 
+        /// <summary>Appends string to string builder quoting with <paramref name="quote"/> if provided.</summary>
+        /// <param name="s">String builder to append string to.</param>
+        /// <param name="str">String to print.</param>
+        /// <param name="quote">(optional) Quote to add before and after string.</param>
+        /// <returns>String builder with appended string.</returns>
         public static StringBuilder Print(this StringBuilder s, string str, string quote = null)
         {
             return quote == null ? s.Append(str) : s.Append(quote).Append(str).Append(quote);
