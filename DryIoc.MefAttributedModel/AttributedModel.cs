@@ -252,20 +252,18 @@ namespace DryIoc.MefAttributedModel
             Func<Request, IRegistry, Expression> factoryCreateExpr = (request, registry) =>
                 Expression.Call(
                     Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
-                        request.State.GetOrAddItemExpression(registry),
+                        request.State.GetOrAddItemExpression(request),
                         Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved)),
                         Expression.Constant(null, typeof(Type))),
                     _factoryMethodName, null);
 
-            var factory = new ExpressionFactory(factoryCreateExpr,
-                GetReuseByType(info.ReuseType), info.GetSetup(attributes));
+            var factory = new ExpressionFactory(factoryCreateExpr, GetReuseByType(info.ReuseType), info.GetSetup(attributes));
 
             for (var i = 0; i < info.Exports.Length; i++)
             {
-                var export = info.Exports[i];
-                registrator.Register(factory,
-                    export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                var exp = info.Exports[i];
+                registrator.Register(factory, exp.ServiceType, exp.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
             }
         }
 

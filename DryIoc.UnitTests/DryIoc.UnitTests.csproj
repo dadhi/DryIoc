@@ -52,7 +52,7 @@
     <Compile Include="IfAlreadyRegisteredTests.cs" />
     <Compile Include="KeyValuePairResolutionTests.cs" />
     <Compile Include="ManyTests.cs" />
-    <Compile Include="Memory\NoLeakingMemoryTests.cs" />
+    <Compile Include="NoMemoryLeaksTests.cs" />
     <Compile Include="PrintTests.cs" />
     <Compile Include="RefTests.cs" />
     <Compile Include="RegisterWithNonStringServiceKeyTests.cs" />

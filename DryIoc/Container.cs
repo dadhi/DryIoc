@@ -143,7 +143,7 @@ namespace DryIoc
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
             var serviceInfo = ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), null, this);
-            return new Request(null, this, _resolutionState, Ref.Of<IScope>(), serviceInfo, null);
+            return new Request(null, GetThisWeakRef(), _resolutionState, Ref.Of<IScope>(), serviceInfo, null);
         }
 
         #region IRegistrator
@@ -357,11 +357,6 @@ namespace DryIoc
         #endregion
 
         #region IRegistry
-
-        RegistryWeakRef IRegistry.SelfWeakRef
-        {
-            get { return _selfWeakRef ?? (_selfWeakRef = new RegistryWeakRef(this)); }
-        }
 
         public Rules Rules { get; private set; }
 
@@ -686,7 +681,7 @@ namespace DryIoc
 
         #region Internal State
 
-        private RegistryWeakRef _selfWeakRef;
+        private WeakReference _thisWeakRef;
 
         private readonly Ref<HashTree<Type, object>> _factories; // where object is Factory or KeyedFactoriesEntry
         private readonly Ref<HashTree<Type, Factory[]>> _decorators;
@@ -697,6 +692,15 @@ namespace DryIoc
         private HashTree<Type, FactoryDelegate> _resolvedDefaultDelegates;
         private HashTree<Type, HashTree<object, FactoryDelegate>> _resolvedKeyedDelegates;
         private readonly ResolutionState _resolutionState;
+
+        #endregion
+
+        #region Implementation
+
+        private WeakReference GetThisWeakRef()
+        {
+            return _thisWeakRef ?? (_thisWeakRef = new WeakReference(this));
+        }
 
         #endregion
     }
@@ -772,12 +776,6 @@ namespace DryIoc
             return index;
         }
 
-        public int GetOrAddItem(IRegistry registry)
-        {
-            return _registryWeakRefID != -1 ? _registryWeakRefID
-                : (_registryWeakRefID = GetOrAddItem(registry.SelfWeakRef));
-        }
-
         public Expression GetItemExpression(int itemIndex, Type itemType)
         {
             var itemExpr = _itemsExpressions.GetFirstValueByHashOrDefault(itemIndex);
@@ -800,11 +798,6 @@ namespace DryIoc
             return GetItemExpression(GetOrAddItem(item), typeof(T));
         }
 
-        public Expression GetOrAddItemExpression(IRegistry registry)
-        {
-            return Expression.Property(GetItemExpression(GetOrAddItem(registry), typeof(RegistryWeakRef)), "Target");
-        }
-
         public Expression GetCachedFactoryExpressionOrDefault(int factoryID)
         {
             return _factoryExpressions.GetFirstValueByHashOrDefault(factoryID);
@@ -822,24 +815,8 @@ namespace DryIoc
         private AppendableArray<object> _items = AppendableArray<object>.Empty;
         private HashTree<int, Expression> _itemsExpressions = HashTree<int, Expression>.Empty;
         private HashTree<int, Expression> _factoryExpressions = HashTree<int, Expression>.Empty;
-        private int _registryWeakRefID = -1;
 
         #endregion
-    }
-
-    public sealed class RegistryWeakRef
-    {
-        public RegistryWeakRef(IRegistry registry)
-        {
-            _weakRef = new WeakReference(registry);
-        }
-
-        public IRegistry Target
-        {
-            get { return (_weakRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
-        }
-
-        private readonly WeakReference _weakRef;
     }
 
     public sealed class AppendableArray<T>
@@ -1044,6 +1021,7 @@ namespace DryIoc
         {
             var manyType = request.ServiceType;
             var itemType = manyType.GetGenericArguments()[0];
+
             var wrappedItemType = registry.GetWrappedServiceType(itemType);
             var requiredItemType = request.ServiceInfo.Details.RequiredServiceType ?? wrappedItemType;
 
@@ -1055,8 +1033,8 @@ namespace DryIoc
 
             var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, requiredItemType);
 
-            var registryRefExpr = request.State.GetOrAddItemExpression(registry.SelfWeakRef);
-            var resolveCallExpr = Expression.Call(resolveMethod, registryRefExpr, Expression.Constant(parentFactoryID));
+            var requestExpr = request.State.GetOrAddItemExpression(request);
+            var resolveCallExpr = Expression.Call(resolveMethod, requestExpr, Expression.Constant(parentFactoryID));
 
             return Expression.New(manyType.GetConstructors()[0], resolveCallExpr);
         }
@@ -1186,21 +1164,19 @@ namespace DryIoc
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
             typeof(GenericsSupport).GetMethod("ResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
 
-        internal static IEnumerable<TService> ResolveManyDynamically<TService, TWrappedService>(
-            RegistryWeakRef registryWeakRef, int parentFactoryID)
+        internal static IEnumerable<TService> ResolveManyDynamically<TService, TWrappedService>(Request request, int parentFactoryID)
         {
             var itemType = typeof(TService);
             var wrappedItemType = typeof(TWrappedService);
-            var registry = registryWeakRef.Target;
 
+            var registry = request.Registry;
             var items = registry.GetAllFactories(wrappedItemType);
             if (parentFactoryID != -1)
                 items = items.Where(kv => kv.Value.ID != parentFactoryID);
 
             foreach (var item in items)
             {
-                // TODO Change request from null.
-                var service = registry.ResolveKeyed(itemType, item.Key, IfUnresolved.ReturnDefault, wrappedItemType, null);
+                var service = request.ResolveKeyed(itemType, item.Key, IfUnresolved.ReturnDefault, wrappedItemType, null);
                 if (service != null) // skip unresolved items
                     yield return (TService)service;
             }
@@ -1675,7 +1651,8 @@ namespace DryIoc
                     Error.REGISTERED_FACTORY_DELEGATE_RESULT_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE, result, result.GetType(), serviceType);
             };
 
-            registrator.Register(new DelegateFactory(checkedDelegate, reuse, setup), serviceType, named, ifAlreadyRegistered);
+            var factory = new DelegateFactory(checkedDelegate, reuse, setup);
+            registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -2314,10 +2291,10 @@ namespace DryIoc
             return Registry.ResolveDefault(serviceType, ifUnresolved, request);
         }
 
-        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request request1)
+        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request _)
         {
-            var request = Push(DryIoc.ServiceInfo.Of(serviceType)
-                .With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), this, Registry));
+            var details = ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
+            var request = Push(DryIoc.ServiceInfo.Of(serviceType).With(details, this, Registry));
             return Registry.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, request);
         }
 
@@ -2352,8 +2329,6 @@ namespace DryIoc
 
         #endregion
 
-        public readonly IRegistry Registry;
-
         ///<remarks>Reference to resolved items and cached factory expressions. 
         /// Used to propagate the state from resolution root, probably from another container (request creator).</remarks>
         public readonly ResolutionState State;
@@ -2362,6 +2337,11 @@ namespace DryIoc
         public readonly Request Parent;
         public readonly IServiceInfo ServiceInfo;
         public readonly Factory ResolvedFactory;
+
+        public IRegistry Registry
+        {
+            get { return (_registryWeakRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
+        }
 
         public Type ServiceType { get { return ServiceInfo.ServiceType; } }
         public object ServiceKey { get { return ServiceInfo.Details.ServiceKey; } }
@@ -2380,12 +2360,12 @@ namespace DryIoc
         public Request Push(IServiceInfo info)
         {
             var inheritedInfo = info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup.Type);
-            return new Request(this, Registry, State, _scope, inheritedInfo, null);
+            return new Request(this, _registryWeakRef, State, _scope, inheritedInfo, null);
         }
 
         public Request ReplaceServiceInfoWith(IServiceInfo info)
         {
-            return new Request(Parent, Registry, State, _scope, info, ResolvedFactory);
+            return new Request(Parent, _registryWeakRef, State, _scope, info, ResolvedFactory);
         }
 
         public Request ResolveWith(Factory factory)
@@ -2394,7 +2374,7 @@ namespace DryIoc
                 for (var p = Parent; p != null; p = p.Parent)
                     if (p.ResolvedFactory != null && p.ResolvedFactory.ID == factory.ID)
                         throw Error.RECURSIVE_DEPENDENCY_DETECTED.Ex(this);
-            return new Request(Parent, Registry, State, _scope, ServiceInfo, factory);
+            return new Request(Parent, _registryWeakRef, State, _scope, ServiceInfo, factory);
         }
 
         public Request GetNonWrapperParentOrDefault()
@@ -2430,17 +2410,18 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(Request parent, IRegistry registry, ResolutionState state, Ref<IScope> scope, IServiceInfo serviceInfo, Factory factory)
+        internal Request(Request parent, WeakReference registryWeakRef, ResolutionState state, Ref<IScope> scope, IServiceInfo serviceInfo, Factory factory)
         {
             Parent = parent;
-            Registry = registry;
             State = state;
+            _registryWeakRef = registryWeakRef;
             _scope = scope;
             ServiceInfo = serviceInfo.ThrowIfNull();
             ResolvedFactory = factory;
         }
 
         private readonly Ref<IScope> _scope;
+        private readonly WeakReference _registryWeakRef;
 
         #endregion
     }
@@ -3440,8 +3421,8 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request, IRegistry registry)
         {
             var factoryDelegateExpr = request.State.GetOrAddItemExpression(_factoryDelegate);
-            var registryExpr = request.State.GetOrAddItemExpression(registry);
-            return Expression.Convert(Expression.Invoke(factoryDelegateExpr, registryExpr), request.ServiceType);
+            var requestExpr = request.State.GetOrAddItemExpression(request);
+            return Expression.Convert(Expression.Invoke(factoryDelegateExpr, requestExpr), request.ServiceType);
         }
 
         public override FactoryDelegate GetDelegateOrDefault(Request request, IRegistry registry)
@@ -3627,8 +3608,6 @@ namespace DryIoc
 
     public interface IRegistry : IResolver, IRegistrator
     {
-        RegistryWeakRef SelfWeakRef { get; }
-
         Rules Rules { get; }
 
         IScope CurrentScope { get; }

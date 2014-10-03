@@ -131,7 +131,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Detect_recursive_dependency_when_registered_with_delegate()
+        public void Detect_recursive_dependency_when_registered_as_delegate()
         {
             var container = new Container();
             container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
@@ -141,10 +141,25 @@ namespace DryIoc.UnitTests
                 container.Resolve<SomeClient>());
 
             // JITing method, just for test. 
-            System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(
-                GetType().GetMethod("Detect_recursive_dependency_when_registered_with_delegate").MethodHandle);
+            var method = GetType().GetMethod("Detect_recursive_dependency_when_registered_as_delegate");
+            System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(method.MethodHandle);
 
-            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected in resolution of"));
+            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
+        }
+
+        [Test]
+        public void Detect_recursive_dependency_when_dependency_registered_as_delegate()
+        {
+            var container = new Container();
+            
+            container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
+            container.Register<ServiceWithClient>();
+            container.Register<ClientFriend>();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<ClientFriend>());
+
+            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
         }
 
         internal class SomeClient
@@ -162,6 +177,16 @@ namespace DryIoc.UnitTests
             public SomeClient Client { get; set; }
 
             public ServiceWithClient(SomeClient client)
+            {
+                Client = client;
+            }
+        }
+
+        internal class ClientFriend
+        {
+            public SomeClient Client { get; set; }
+
+            public ClientFriend(SomeClient client)
             {
                 Client = client;
             }
