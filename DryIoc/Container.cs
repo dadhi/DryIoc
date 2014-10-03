@@ -1369,7 +1369,7 @@ namespace DryIoc
             "Expecting closed-generic service type but found {0}.";
 
         public static readonly string RECURSIVE_DEPENDENCY_DETECTED =
-            "Recursive dependency is detected in resolution of:" + Environment.NewLine + "{0}.";
+            "Recursive dependency is detected when resolving" + Environment.NewLine + "{0}.";
 
         public static readonly string SCOPE_IS_DISPOSED =
             "Scope is disposed and scoped instances are no longer available.";
@@ -1429,6 +1429,9 @@ namespace DryIoc
 
         public static readonly string UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE =
             "Unable to register any of implementation {0} implemented services {1}.";
+
+        public static readonly string PUSHING_TO_REQUEST_WITHOUT_FACTORY = 
+            "Pushing next info {0} to request not yet resolved to factory: {1}";
     }
 
     public static class Registrator
@@ -2151,7 +2154,7 @@ namespace DryIoc
 
         public override string ToString()
         {
-            return new StringBuilder().Print(this).Append(" parameter ").Print(_parameter.Name, "\"").ToString();
+            return new StringBuilder().Print(this).Append(" as parameter ").Print(_parameter.Name, "\"").ToString();
         }
 
         private readonly ParameterInfo _parameter;
@@ -2218,7 +2221,7 @@ namespace DryIoc
 
             public override string ToString()
             {
-                return new StringBuilder().Print(this).Append(" property ").Print(_property.Name, "\"").ToString();
+                return new StringBuilder().Print(this).Append(" as property ").Print(_property.Name, "\"").ToString();
             }
 
             private readonly PropertyInfo _property;
@@ -2262,7 +2265,7 @@ namespace DryIoc
 
             public override string ToString()
             {
-                return new StringBuilder().Print(this).Append(" field ").Print(_field.Name, "\"").ToString();
+                return new StringBuilder().Print(this).Append(" as field ").Print(_field.Name, "\"").ToString();
             }
 
             private readonly FieldInfo _field;
@@ -2365,6 +2368,7 @@ namespace DryIoc
 
         public Request Push(IServiceInfo info)
         {
+            ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info, this);
             var inheritedInfo = info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup.Type);
             return new Request(this, _registryWeakRef, State, _scope, inheritedInfo, null);
         }
@@ -2379,10 +2383,9 @@ namespace DryIoc
             if (ResolvedFactory != null && ResolvedFactory.ID == factory.ID)
                 return this; // resolving only once, no need to check recursion again.
 
-            if (factory.Setup.Type == FactoryType.Service) // skip dependency recursion check for non-services: decorators, wrappers
+            if (factory.Setup.Type == FactoryType.Service) // skip recursion check for non-services: decorators, wrappers
                 for (var p = Parent; p != null; p = p.Parent)
-                    Throw.If(p.ResolvedFactory != null && p.ResolvedFactory.ID == factory.ID,
-                        Error.RECURSIVE_DEPENDENCY_DETECTED, this);
+                    Throw.If(p.ResolvedFactory.ID == factory.ID, Error.RECURSIVE_DEPENDENCY_DETECTED, Print(factory.ID));
 
             return new Request(Parent, _registryWeakRef, State, _scope, ServiceInfo, factory);
         }
@@ -2401,8 +2404,7 @@ namespace DryIoc
                 yield return x;
         }
 
-        /// <remarks>Pretty prints request as: "DryIoc.UnitTests.IService "blah" as parameter "blah" in DryIoc.UnitTests.Service"</remarks>
-        public StringBuilder Print(StringBuilder s)
+        public StringBuilder PrintLast(StringBuilder s)
         {
             if (ResolvedFactory != null && ResolvedFactory.Setup.Type != FactoryType.Service)
                 s.Append(Enum.GetName(typeof(FactoryType), ResolvedFactory.Setup.Type)).Append(' ');
@@ -2411,11 +2413,23 @@ namespace DryIoc
             return s.Append(ServiceInfo);
         }
 
+        public StringBuilder Print(int recursiveFactoryID = -1)
+        {
+            var s = PrintLast(new StringBuilder());
+            if (Parent == null)
+                return s;
+
+            s = recursiveFactoryID == -1 ? s : s.Append(" <--recursive");
+            return Parent.Enumerate().Aggregate(s, (a, r) =>
+            {
+                a = r.PrintLast(a.AppendLine().Append(" in "));
+                return r.ResolvedFactory.ID == recursiveFactoryID ? a.Append(" <--recursive") : a;
+            });
+        }
+
         public override string ToString()
         {
-            var s = Print(new StringBuilder());
-            return Parent == null ? s.ToString() :
-                Parent.Enumerate().Aggregate(s, (m, r) => r.Print(m.AppendLine().Append(" in "))).ToString();
+            return Print().ToString();
         }
 
         #region Implementation

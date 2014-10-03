@@ -41,7 +41,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.That(ex.Message, Is
                 .StringContaining("Unable to resolve").And
-                .StringContaining("IService property \"Service\""));
+                .StringContaining("IService as property \"Service\""));
         }
 
 

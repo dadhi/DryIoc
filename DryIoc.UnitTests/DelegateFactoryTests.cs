@@ -173,7 +173,9 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<SomeClient>());
 
-            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
+            Assert.That(ex.Message, Is
+                .StringContaining("Recursive dependency is detected when resolving").And
+                .StringContaining("SomeClient <--recursive"));
         }
 
         internal class SomeClient
