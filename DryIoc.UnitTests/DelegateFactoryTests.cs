@@ -93,7 +93,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterDelegate(typeof(IService), _ => new Service());
+            container.RegisterDelegate(typeof (IService), _ => new Service());
 
             var service = container.Resolve<IService>();
             Assert.That(service, Is.InstanceOf<Service>());
@@ -104,7 +104,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterDelegate(typeof(IService), _ => "blah");
+            container.RegisterDelegate(typeof (IService), _ => "blah");
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
@@ -115,7 +115,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance(typeof(string), "ring", named: "MyPrecious");
+            container.RegisterInstance(typeof (string), "ring", named: "MyPrecious");
 
             var ring = container.Resolve<string>("MyPrecious");
             Assert.That(ring, Is.EqualTo("ring"));
@@ -127,7 +127,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             Assert.Throws<ContainerException>(() =>
-                container.RegisterInstance(typeof(IService), "ring", named: "MyPrecious"));
+                container.RegisterInstance(typeof (IService), "ring", named: "MyPrecious"));
         }
 
         [Test]
@@ -151,13 +151,27 @@ namespace DryIoc.UnitTests
         public void Detect_recursive_dependency_when_dependency_registered_as_delegate()
         {
             var container = new Container();
-            
+
             container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
             container.Register<ServiceWithClient>();
             container.Register<ClientFriend>();
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<ClientFriend>());
+
+            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
+        }
+
+        [Test]
+        public void Detect_recusive_dependency_for_custom_specified_parameter_with_factory_delegate()
+        {
+            var container = new Container();
+            container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
+            container.Register<ServiceWithClient>(setup: Setup.With(
+                parameters: Parameters.All.And("client", r => r.Resolve<SomeClient>())));
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<SomeClient>());
 
             Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
         }

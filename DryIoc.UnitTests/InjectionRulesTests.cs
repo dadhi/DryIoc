@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -380,6 +381,26 @@ namespace DryIoc.UnitTests
             var client = container.Resolve<ClientWithPropsAndFields>();
             Assert.That(client.F, Is.InstanceOf<Service>());
             Assert.That(client.P, Is.Null);
+        }
+
+        [Test]
+        public void Resolve_parameter_customly_inside_Func_should_happen_when_calling_Func_not_on_resolve()
+        {
+            var container = new Container();
+
+            var resolved = false;
+            container.Register<ClientWithStringParam>(setup: Setup.With(
+                parameters: Parameters.All.And("x", _ =>
+                {
+                    resolved = true;
+                    return "resolved";
+                })));
+
+            var getClient = container.Resolve<Func<ClientWithStringParam>>();
+
+            Assert.That(resolved, Is.False);
+            Assert.That(getClient().X, Is.EqualTo("resolved"));
+            Assert.That(resolved, Is.True);
         }
 
         #region CUT
