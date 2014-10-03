@@ -266,12 +266,12 @@ namespace DryIoc
 
         #region IResolver
 
-        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault)
+        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request ownerOrDefault)
         {
             var factoryDelegate = _resolvedDefaultDelegates.GetValueOrDefault(serviceType);
             return factoryDelegate != null
                 ? factoryDelegate(_resolutionState.Items, null)
-                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, parentOrDefault);
+                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, ownerOrDefault);
         }
 
         private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault = null)
@@ -291,7 +291,7 @@ namespace DryIoc
             return resultService;
         }
 
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request request1)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request ownerOrDefault)
         {
             var cacheServiceKey = serviceKey;
             if (requiredServiceType != null)
@@ -335,26 +335,18 @@ namespace DryIoc
             return resultService;
         }
 
-        /// <summary>
-        /// For given instance resolves and sets properties and fields.
-        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses <see cref="PropertiesAndFields.AllPublicNonPrimitive"/>, 
-        /// or you can override the rules with <paramref name="selectPropertiesAndFields"/> parameter.
-        /// </summary>
-        /// <param name="instance">Service instance with properties to resolve and initialize.</param>
-        /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>
-        void IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
+        void IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request ownerOrDefault)
         {
             var selector = selectPropertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.AllPublicNonPrimitive;
 
             var instanceType = instance.ThrowIfNull().GetType();
-            var request = CreateRequest(instanceType).ResolveTo(new InstanceFactory(instance));
+            
+            var request = ownerOrDefault ?? CreateRequest(instanceType).ResolveTo(new InstanceFactory(instance));
 
             foreach (var info in selector(instanceType, request, this))
                 if (info != null)
                 {
-                    var value = this.Resolve(info.ServiceType, info.Details.ServiceKey, info.Details.IfUnresolved);
+                    var value = request.Resolve(info.ServiceType, info.Details.ServiceKey, info.Details.IfUnresolved);
                     if (value != null)
                         info.SetValue(instance, value);
                 }
@@ -1904,14 +1896,17 @@ namespace DryIoc
         /// or if rules are not set it uses <see cref="PropertiesAndFields.AllPublicNonPrimitive"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.
         /// </summary>
+        /// <typeparam name="TService">Input and returned instance type.</typeparam>
         /// <param name="resolver">Usually a container instance, cause <see cref="Container"/> implements <see cref="IResolver"/></param>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
+        /// <returns>Input instance with resolved dependencies, to enable fluent method composition.</returns>
         /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
-        public static void ResolvePropertiesAndFields(this IResolver resolver, object instance,
+        public static TService ResolvePropertiesAndFields<TService>(this IResolver resolver, TService instance,
             PropertiesAndFieldsSelector selectPropertiesAndFields = null)
         {
-            resolver.ResolvePropertiesAndFields(instance, selectPropertiesAndFields);
+            resolver.ResolvePropertiesAndFields(instance, selectPropertiesAndFields, null);
+            return instance;
         }
     }
 
@@ -2307,9 +2302,9 @@ namespace DryIoc
             return Registry.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, request);
         }
 
-        public void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
+        public void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request _)
         {
-            throw new NotImplementedException();
+            Registry.ResolvePropertiesAndFields(instance, selectPropertiesAndFields, this);
         }
 
         #region Resolution Scope
@@ -3589,9 +3584,9 @@ namespace DryIoc
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
-        /// <param name="parentOrDefault">Dependency owner request if dependency is resolved, and null for resolution root.</param>
+        /// <param name="ownerOrDefault">Owner request if dependency is resolved, or null for resolution root.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
-        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault);
+        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request ownerOrDefault);
 
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
@@ -3599,13 +3594,13 @@ namespace DryIoc
         /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
         /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
         /// or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
-        /// <param name="parentOrDefault">Dependency owner request if dependency is resolved, and null for resolution root.</param>
+        /// <param name="ownerOrDefault">Owner request if dependency is resolved, or null for resolution root.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
         /// <remarks>
         /// This method covers all possible resolution input parameters comparing to <see cref="ResolveDefault"/>, and
         /// by specifying the same parameters as for <see cref="ResolveDefault"/> should return the same result.
         /// </remarks>
-        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request parentOrDefault);
+        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request ownerOrDefault);
 
         /// <summary>
         /// For given instance resolves and sets properties and fields.
@@ -3615,8 +3610,9 @@ namespace DryIoc
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
+        /// <param name="ownerOrDefault">Owner request if dependency is resolved, or null for resolution root.</param>
         /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
-        void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields);
+        void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request ownerOrDefault);
     }
 
     public enum IfAlreadyRegistered { ThrowIfDuplicateKey, KeepRegistered, UpdateRegistered }

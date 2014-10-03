@@ -178,6 +178,19 @@ namespace DryIoc.UnitTests
                 .StringContaining("SomeClient <--recursive"));
         }
 
+        [Test]
+        public void Recursive_dependency_could_be_detected_when_resolving_properties_in_delegate_factory()
+        {
+            var container = new Container();
+            container.RegisterDelegate(r => r.ResolvePropertiesAndFields(new SomeClientWithProps()));
+            container.Register<ServiceWithClientWithProps>();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<SomeClientWithProps>());
+
+            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
+        }
+
         internal class SomeClient
         {
             public ServiceWithClient Service { get; set; }
@@ -203,6 +216,21 @@ namespace DryIoc.UnitTests
             public SomeClient Client { get; set; }
 
             public ClientFriend(SomeClient client)
+            {
+                Client = client;
+            }
+        }
+
+        internal class SomeClientWithProps
+        {
+            public SomeClientWithProps Service { get; set; }
+        }
+
+        internal class ServiceWithClientWithProps
+        {
+            public SomeClientWithProps Client { get; set; }
+
+            public ServiceWithClientWithProps(SomeClientWithProps client)
             {
                 Client = client;
             }
