@@ -285,7 +285,8 @@ namespace DryIoc.MefAttributedModel
                 return null;
             IReuse reuse;
             var supported = SupportedReuseTypes.TryGetValue(reuseType, out reuse);
-            return reuse.ThrowIf(!supported, Error.UNSUPPORTED_REUSE_TYPE, reuseType);
+            reuseType.ThrowIf(!supported, Error.UNSUPPORTED_REUSE_TYPE);
+            return reuse;
         }
 
         #endregion
@@ -404,7 +405,7 @@ namespace DryIoc.MefAttributedModel
             "Unable to get contract types for implementation {0} cause all of its implemented types where filtered out: {1}";
 
         public static readonly string UNSUPPORTED_REUSE_TYPE =
-            "Attributed model does not support reuse type {0}. ";
+            "Attributed model does not support reuse type {0}.";
     }
 
     public static class PrintCode

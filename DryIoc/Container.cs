@@ -269,7 +269,7 @@ namespace DryIoc
 
         private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request ownerOrDefault = null)
         {
-            var request = ownerOrDefault  == null 
+            var request = ownerOrDefault == null
                 ? CreateRequest(serviceType, ifUnresolved: ifUnresolved)
                 : ownerOrDefault.Push(ServiceInfo.Of(serviceType, ifUnresolved: ifUnresolved));
 
@@ -315,7 +315,7 @@ namespace DryIoc
                 (factoryDelegate = factoryDelegates.GetValueOrDefault(cacheServiceKey)) != null)
                 return factoryDelegate(_resolutionState.Items, null);
 
-            var request = ownerOrDefault == null 
+            var request = ownerOrDefault == null
                 ? CreateRequest(serviceType, serviceKey, ifUnresolved, requiredServiceType)
                 : ownerOrDefault.Push(ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), ownerOrDefault, this));
 
@@ -1057,9 +1057,9 @@ namespace DryIoc
             }
 
             IList<Type> unusedFuncArgs;
-            var funcExpr = serviceFactory.GetFuncWithArgsOrDefault(funcType, serviceRequest, registry, out unusedFuncArgs)
-                .ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, serviceType, request)
-                .ThrowIf(unusedFuncArgs != null, Error.SOME_FUNC_PARAMS_ARE_UNUSED, unusedFuncArgs, request);
+            var funcExpr = serviceFactory.GetFuncWithArgsOrDefault(funcType, serviceRequest, registry, out unusedFuncArgs);
+            funcExpr.ThrowIfNull(Error.UNSUPPORTED_FUNC_WITH_ARGS, serviceType, request);
+            unusedFuncArgs.ThrowIf(unusedFuncArgs != null, Error.SOME_FUNC_PARAMS_ARE_UNUSED, request);
             return funcExpr;
         }
 
@@ -1655,7 +1655,7 @@ namespace DryIoc
             {
                 var result = factoryDelegate(r);
                 return result.ThrowIf(!serviceType.IsInstanceOfType(result),
-                    Error.REGISTERED_FACTORY_DELEGATE_RESULT_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE, result, result.GetType(), serviceType);
+                    Error.REGISTERED_FACTORY_DELEGATE_RESULT_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE, result.GetType(), serviceType);
             };
 
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
@@ -2083,7 +2083,7 @@ namespace DryIoc
 
     public class ServiceInfo : IServiceInfo
     {
-        public static ServiceInfo Of(Type serviceType, 
+        public static ServiceInfo Of(Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
             serviceType = ThrowIfNullOrOpenGeneric(serviceType);
@@ -2117,7 +2117,7 @@ namespace DryIoc
         private static Type ThrowIfNullOrOpenGeneric(Type serviceType)
         {
             return serviceType.ThrowIfNull()
-                .ThrowIf(serviceType.ContainsGenericParameters, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE, serviceType);
+                .ThrowIf(serviceType.ContainsGenericParameters, Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE);
         }
 
         private sealed class WithDetails : ServiceInfo
@@ -2579,7 +2579,7 @@ namespace DryIoc
 
         private static Type ThrowIfNotSingleTypeArg(Type[] typeArgs)
         {
-            return typeArgs.ThrowIf(typeArgs.Length != 1, Error.GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT, typeArgs)[0];
+            return typeArgs.ThrowIf(typeArgs.Length != 1, Error.GENERIC_WRAPPER_EXPECTS_SINGLE_TYPE_ARG_BY_DEFAULT)[0];
         }
 
         #endregion
@@ -3154,7 +3154,7 @@ namespace DryIoc
             : base(reuse, setup)
         {
             _implementationType = implementationType.ThrowIfNull()
-                .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implementationType);
+                .ThrowIf(implementationType.IsAbstract, Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE);
         }
 
         /// <remarks>
@@ -3414,7 +3414,7 @@ namespace DryIoc
                 {
                     var value = dependencyInfo.Details.GetValue(r);
                     return value.ThrowIf(!dependencyInfo.ServiceType.IsInstanceOfType(value),
-                        Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, value, dependencyInfo, ownerRequest);
+                        Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, dependencyInfo, ownerRequest);
                 });
 
             var expr = factory == null ? null : factory.GetExpressionOrDefault(request, request.Registry);
@@ -3718,13 +3718,15 @@ namespace DryIoc
         public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
         {
             if (arg != null) return arg;
-            throw GetException(message == null ? Format(ERROR_ARG_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2));
+            throw GetException(message == null ? Format(ARGUMENT_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2));
         }
 
-        public static T ThrowIf<T>(this T arg, bool throwCondition, string message = null, object arg0 = null, object arg1 = null, object arg2 = null)
+        public static T ThrowIf<T>(this T arg0, bool throwCondition, string message = null, object arg1 = null, object arg2 = null)
         {
-            if (!throwCondition) return arg;
-            throw GetException(message == null ? Format(ERROR_ARG_HAS_IMVALID_CONDITION, typeof(T)) : Format(message, arg0, arg1, arg2));
+            if (!throwCondition) return arg0;
+            throw GetException(message == null
+                ? Format(ARGUMENT_HAS_IMVALID_CONDITION, arg0, typeof(T))
+                : Format(message, arg0, arg1, arg2));
         }
 
         public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
@@ -3748,8 +3750,8 @@ namespace DryIoc
             return string.Format(message, PrintArg(arg0), PrintArg(arg1), PrintArg(arg2));
         }
 
-        private static readonly string ERROR_ARG_IS_NULL = "Argument of type {0} is null.";
-        private static readonly string ERROR_ARG_HAS_IMVALID_CONDITION = "Argument of type {0} has invalid condition.";
+        private static readonly string ARGUMENT_IS_NULL = "Argument of type {0} is null.";
+        private static readonly string ARGUMENT_HAS_IMVALID_CONDITION = "Argument {0} of type {1} has invalid condition.";
     }
 
     /// <summary>
