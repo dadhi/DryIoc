@@ -337,7 +337,7 @@ namespace DryIoc.MefAttributedModel
 
             reflectedType = registry.GetWrappedServiceType(reflectedType);
             var metadata = meta.Metadata;
-            var factory = registry.GetAllFactories(reflectedType)
+            var factory = registry.GetAllServiceFactories(reflectedType)
                 .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
                 .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, reflectedType, metadata, request);
 

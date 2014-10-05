@@ -5,7 +5,7 @@ using DryIoc.UnitTests.CUT;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class WipeResolutionCacheTests
+    public class WipeCacheTests
     {
         [Test]
         public void Resolving_service_after_updating_depenency_registration_will_return_old_dependency_due_Resolution_Cache()
@@ -30,7 +30,7 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<ServiceWithDependency>();
             Assert.That(service.Dependency, Is.InstanceOf<Dependency>());
 
-            container = container.WithResetResolutionCache();
+            container = container.WipeCache();
             container.Register<IDependency, Foo1>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateRegistered);
             service = container.Resolve<ServiceWithDependency>();
             Assert.That(service.Dependency, Is.InstanceOf<Foo1>());
@@ -45,7 +45,7 @@ namespace DryIoc.UnitTests
             Assert.NotNull(lazyService.Value);
 
             container.Unregister(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper);
-            container = container.WithResetResolutionCache();
+            container = container.WipeCache();
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Lazy<Service>>());
@@ -61,7 +61,7 @@ namespace DryIoc.UnitTests
             Assert.NotNull(service);
 
             container.Unregister(typeof(Service<>));
-            container = container.WithResetResolutionCache();
+            container = container.WipeCache();
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Service<int>>());

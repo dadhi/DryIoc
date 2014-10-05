@@ -40,29 +40,21 @@ namespace DryIoc
     public partial class Container : IRegistry, IDisposable
     {
         /// <summary>
-        /// Creates new container instance, optionally providing <see cref="Rules"/> to modify default container behavior.
+        /// Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.
         /// </summary>
         /// <param name="rules">
         /// (optional) Rules to modify container default resolution behavior. 
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.
         /// </param>
         public Container(Rules rules = null)
-        {
-            Rules = rules ?? Rules.Default;
-
-            _factories = Ref.Of(HashTree<Type, object>.Empty);
-            _decorators = Ref.Of(HashTree<Type, Factory[]>.Empty);
-            _genericWrappers = Ref.Of(GenericsSupport.GenericWrappers);
-
-            _singletonScope = _currentScope = new Scope();
-
-            _resolutionState = new ResolutionState();
-            _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
-            _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
-        }
+            : this(rules,
+            Ref.Of(HashTree<Type, object>.Empty),
+            Ref.Of(HashTree<Type, Factory[]>.Empty),
+            Ref.Of(GenericsSupport.GenericWrappers),
+            new Scope()) { }
 
         /// <summary>
-        /// Creates container specifying all of it state Except cache.
+        /// Creates container specifying all of its state Except cache.
         /// Useful to create fresh copy of existing container deciding what will be propagated to the copy.
         /// </summary>
         /// <param name="rules">Container-wide registration and resolution rules.</param>
@@ -75,16 +67,16 @@ namespace DryIoc
             Ref<HashTree<Type, object>> factories,
             Ref<HashTree<Type, Factory[]>> decorators,
             Ref<HashTree<Type, Factory>> genericWrappers,
-            IScope singletonScope, IScope currentScope)
+            IScope singletonScope, IScope currentScope = null)
         {
-            Rules = rules ?? Rules.Empty;
+            Rules = rules ?? Rules.Default;
 
             _factories = factories;
             _decorators = decorators;
             _genericWrappers = genericWrappers;
 
             _singletonScope = singletonScope;
-            _currentScope = currentScope;
+            _currentScope = currentScope ?? singletonScope;
 
             _resolutionState = new ResolutionState();
             _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
@@ -129,7 +121,7 @@ namespace DryIoc
             }));
         }
 
-        public Container WithResetResolutionCache()
+        public Container WipeCache()
         {
             return new Container(Rules, _factories, _decorators, _genericWrappers, _singletonScope, _currentScope);
         }
@@ -142,7 +134,8 @@ namespace DryIoc
         public Request CreateRequest(Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
-            var serviceInfo = ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), null, this);
+            var serviceInfoDetails = ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
+            var serviceInfo = ServiceInfo.Of(serviceType).With(serviceInfoDetails, null, this);
             return new Request(null, GetThisWeakRef(), _resolutionState, Ref.Of<IScope>(), serviceInfo, null);
         }
 
@@ -274,9 +267,12 @@ namespace DryIoc
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, ownerOrDefault);
         }
 
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault = null)
+        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request ownerOrDefault = null)
         {
-            var request = parentOrDefault ?? CreateRequest(serviceType, ifUnresolved: ifUnresolved);
+            var request = ownerOrDefault  == null 
+                ? CreateRequest(serviceType, ifUnresolved: ifUnresolved)
+                : ownerOrDefault.Push(ServiceInfo.Of(serviceType, ifUnresolved: ifUnresolved));
+
             var factory = ((IRegistry)this).ResolveFactory(request);
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request, this);
             if (factoryDelegate == null)
@@ -310,7 +306,7 @@ namespace DryIoc
 
             // If service key is null, then use resolve default instead of keyed.
             if (cacheServiceKey == null)
-                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, null);
+                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, ownerOrDefault);
 
             FactoryDelegate factoryDelegate;
 
@@ -319,7 +315,10 @@ namespace DryIoc
                 (factoryDelegate = factoryDelegates.GetValueOrDefault(cacheServiceKey)) != null)
                 return factoryDelegate(_resolutionState.Items, null);
 
-            var request = CreateRequest(serviceType, serviceKey, ifUnresolved, requiredServiceType);
+            var request = ownerOrDefault == null 
+                ? CreateRequest(serviceType, serviceKey, ifUnresolved, requiredServiceType)
+                : ownerOrDefault.Push(ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), ownerOrDefault, this));
+
             var factory = ((IRegistry)this).ResolveFactory(request);
             factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request, this);
             if (factoryDelegate == null)
@@ -340,15 +339,15 @@ namespace DryIoc
             var selector = selectPropertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.AllPublicNonPrimitive;
 
             var instanceType = instance.ThrowIfNull().GetType();
-            
-            var request = ownerOrDefault ?? CreateRequest(instanceType).ResolveTo(new InstanceFactory(instance));
+            var request = ownerOrDefault == null ? CreateRequest(instanceType) : ownerOrDefault.Push(ServiceInfo.Of(instanceType));
+            request = request.ResolveTo(new InstanceFactory(instance));
 
-            foreach (var info in selector(instanceType, request, this))
-                if (info != null)
+            foreach (var serviceInfo in selector(instanceType, ownerOrDefault, this))
+                if (serviceInfo != null)
                 {
-                    var value = request.Resolve(info.ServiceType, info.Details.ServiceKey, info.Details.IfUnresolved);
+                    var value = request.Resolve(serviceInfo);
                     if (value != null)
-                        info.SetValue(instance, value);
+                        serviceInfo.SetValue(instance, value);
                 }
         }
 
@@ -387,7 +386,7 @@ namespace DryIoc
                 retryForOpenGenericServiceType: true);
         }
 
-        IEnumerable<KV<object, Factory>> IRegistry.GetAllFactories(Type serviceType)
+        IEnumerable<KV<object, Factory>> IRegistry.GetAllServiceFactories(Type serviceType)
         {
             var entry = _factories.Value.GetValueOrDefault(serviceType);
             if (entry == null && serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition)
@@ -983,7 +982,7 @@ namespace DryIoc
             var wrappedItemType = registry.GetWrappedServiceType(itemType);
             var requiredItemType = request.ServiceInfo.Details.RequiredServiceType ?? wrappedItemType;
 
-            var items = registry.GetAllFactories(requiredItemType);
+            var items = registry.GetAllServiceFactories(requiredItemType);
 
             // Composite pattern support: filter out composite root from available keys.
             var parent = request.GetNonWrapperParentOrDefault();
@@ -992,6 +991,10 @@ namespace DryIoc
                 var parentFactoryID = parent.ResolvedFactory.ID;
                 items = items.Where(x => x.Value.ID != parentFactoryID);
             }
+
+            // Return collection of single matched item if key is specified.
+            if (request.ServiceKey != null)
+                items = items.Where(kv => request.ServiceKey.Equals(kv.Key));
 
             var itemArray = items.ToArray();
             List<Expression> itemExprList = null;
@@ -1107,7 +1110,7 @@ namespace DryIoc
             var serviceKey = request.ServiceKey;
             if (serviceKey == null)
             {
-                var result = registry.GetAllFactories(requiredServiceType).FirstOrDefault(kv =>
+                var result = registry.GetAllServiceFactories(requiredServiceType).FirstOrDefault(kv =>
                     kv.Value.Setup.Metadata != null && metadataType.IsInstanceOfType(kv.Value.Setup.Metadata));
                 if (result != null)
                 {
@@ -1162,21 +1165,24 @@ namespace DryIoc
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
             typeof(GenericsSupport).GetMethod("ResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
 
-        internal static IEnumerable<TService> ResolveManyDynamically<TService, TWrappedService>(Request request, int parentFactoryID)
+        internal static IEnumerable<TItem> ResolveManyDynamically<TItem, TWrappedItem>(Request request, int parentFactoryID)
         {
-            var itemType = typeof(TService);
-            var wrappedItemType = typeof(TWrappedService);
+            var itemType = typeof(TItem);
+            var wrappedItemType = typeof(TWrappedItem);
 
-            var registry = request.Registry;
-            var items = registry.GetAllFactories(wrappedItemType);
+            var items = request.Registry.GetAllServiceFactories(wrappedItemType);
             if (parentFactoryID != -1)
                 items = items.Where(kv => kv.Value.ID != parentFactoryID);
+
+            // Return collection of single matched item if key is specified.
+            if (request.ServiceKey != null)
+                items = items.Where(kv => request.ServiceKey.Equals(kv.Key));
 
             foreach (var item in items)
             {
                 var service = request.ResolveKeyed(itemType, item.Key, IfUnresolved.ReturnDefault, wrappedItemType, null);
                 if (service != null) // skip unresolved items
-                    yield return (TService)service;
+                    yield return (TItem)service;
             }
         }
 
@@ -1422,7 +1428,7 @@ namespace DryIoc
         public static readonly string UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE =
             "Unable to register any of implementation {0} implemented services {1}.";
 
-        public static readonly string PUSHING_TO_REQUEST_WITHOUT_FACTORY = 
+        public static readonly string PUSHING_TO_REQUEST_WITHOUT_FACTORY =
             "Pushing next info {0} to request not yet resolved to factory: {1}";
     }
 
@@ -2007,13 +2013,13 @@ namespace DryIoc
 
     public static class ServiceInfoTools
     {
-        public static T With<T>(this T source, ServiceInfoDetails details, Request request, IRegistry registry)
+        public static T With<T>(this T info, ServiceInfoDetails details, Request request, IRegistry registry)
             where T : IServiceInfo
         {
-            if (details == null || details == source.Details)
-                return source;
+            if (details == null || details == info.Details)
+                return info;
 
-            var serviceType = source.ServiceType;
+            var serviceType = info.ServiceType;
             var requiredServiceType = details.RequiredServiceType;
             if (requiredServiceType != null)
             {
@@ -2029,7 +2035,7 @@ namespace DryIoc
                 }
             }
 
-            return (T)source.Create(serviceType, details);
+            return (T)info.Create(serviceType, details);
         }
 
         public static IServiceInfo InheritDependencyFromOwnerInfo(this IServiceInfo dependency, IServiceInfo owner, FactoryType ownerFactoryType)
@@ -2044,9 +2050,10 @@ namespace DryIoc
                 ? dependencyDetails.IfUnresolved
                 : ownerDetails.IfUnresolved;
 
-            var serviceKey = ownerFactoryType == FactoryType.Service
-                ? dependencyDetails.ServiceKey // use non default owner key, otherwise use dependency key
-                : ownerDetails.ServiceKey ?? dependencyDetails.ServiceKey;
+            // Use dependency key if it's non default, otherwise and if owner is not service, the
+            var serviceKey = dependencyDetails.ServiceKey == null && ownerFactoryType != FactoryType.Service
+                ? ownerDetails.ServiceKey
+                : dependencyDetails.ServiceKey;
 
             var serviceType = dependency.ServiceType;
             var requiredServiceType = dependencyDetails.RequiredServiceType;
@@ -2076,11 +2083,13 @@ namespace DryIoc
 
     public class ServiceInfo : IServiceInfo
     {
-        public static ServiceInfo Of(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        public static ServiceInfo Of(Type serviceType, 
+            object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
+            serviceType = ThrowIfNullOrOpenGeneric(serviceType);
             return serviceKey == null && ifUnresolved == IfUnresolved.Throw
-                ? new ServiceInfo(ThrowIfNullOrOpenGeneric(serviceType))
-                : new WithDetails(ThrowIfNullOrOpenGeneric(serviceType), ServiceInfoDetails.Of(null, serviceKey, ifUnresolved));
+                ? new ServiceInfo(serviceType)
+                : new WithDetails(serviceType, ServiceInfoDetails.Of(null, serviceKey, ifUnresolved));
         }
 
         public Type ServiceType { get; private set; }
@@ -2289,23 +2298,32 @@ namespace DryIoc
 
     public sealed class Request : IResolver
     {
+        #region Resolver
+
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request _)
         {
-            var request = Push(DryIoc.ServiceInfo.Of(serviceType, ifUnresolved: ifUnresolved));
-            return Registry.ResolveDefault(serviceType, ifUnresolved, request);
+            return Registry.ResolveDefault(serviceType, ifUnresolved, this);
         }
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request _)
         {
-            var details = ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
-            var request = Push(DryIoc.ServiceInfo.Of(serviceType).With(details, this, Registry));
-            return Registry.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, request);
+            return Registry.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, this);
         }
 
         public void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request _)
         {
             Registry.ResolvePropertiesAndFields(instance, selectPropertiesAndFields, this);
         }
+
+        public object Resolve(IServiceInfo info)
+        {
+            var details = info.Details;
+            return details == ServiceInfoDetails.IfUnresolvedThrow || details == ServiceInfoDetails.IfUnresolvedReturnDefault
+                ? Registry.ResolveDefault(info.ServiceType, details.IfUnresolved, this)
+                : Registry.ResolveKeyed(info.ServiceType, details.ServiceKey, details.IfUnresolved, details.RequiredServiceType, this);
+        }
+
+        #endregion
 
         #region Resolution Scope
 
@@ -3584,7 +3602,7 @@ namespace DryIoc
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
-        /// <param name="ownerOrDefault">Owner request if dependency is resolved, or null for resolution root.</param>
+        /// <param name="ownerOrDefault">Dependency owner request for dependency, or null for resolution root.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
         object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request ownerOrDefault);
 
@@ -3594,7 +3612,7 @@ namespace DryIoc
         /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
         /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
         /// or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
-        /// <param name="ownerOrDefault">Owner request if dependency is resolved, or null for resolution root.</param>
+        /// <param name="ownerOrDefault">Dependency owner request for dependency, or null for resolution root.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
         /// <remarks>
         /// This method covers all possible resolution input parameters comparing to <see cref="ResolveDefault"/>, and
@@ -3610,7 +3628,7 @@ namespace DryIoc
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
-        /// <param name="ownerOrDefault">Owner request if dependency is resolved, or null for resolution root.</param>
+        /// <param name="ownerOrDefault">Dependency owner request for dependency, or null for resolution root.</param>
         /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
         void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request ownerOrDefault);
     }
@@ -3640,7 +3658,7 @@ namespace DryIoc
 
         Expression GetDecoratorExpressionOrDefault(Request request);
 
-        IEnumerable<KV<object, Factory>> GetAllFactories(Type serviceType);
+        IEnumerable<KV<object, Factory>> GetAllServiceFactories(Type serviceType);
 
         /// <summary>
         /// If <paramref name="type"/> is generic type then this method checks if the type registered as generic wrapper,

@@ -153,7 +153,7 @@ namespace DryIoc.UnitTests
             var serviceType = parameter.ParameterType;
             serviceType = registry.GetWrappedServiceType(serviceType);
             var metadata = import.Metadata;
-            var factory = registry.GetAllFactories(serviceType)
+            var factory = registry.GetAllServiceFactories(serviceType)
                 .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
                 .ThrowIfNull("Unable to resolve", serviceType, metadata, request);
 

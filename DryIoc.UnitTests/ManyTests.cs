@@ -150,7 +150,7 @@ namespace DryIoc.UnitTests
 		}
 
         [Test]
-        public void I_should_be_able_to_resolve_Meta_of_Many()
+        public void When_resolving_meta_of_many_only_first_matched_item_will_be_resolved()
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service), setup: Setup.WithMetadata("a"));
@@ -160,9 +160,10 @@ namespace DryIoc.UnitTests
 
             Assert.That(result, Is.InstanceOf<Meta<Many<IService>, string>>());
             Assert.That(result.Metadata, Is.EqualTo("a"));
+
             var services = result.Value.Items.ToArray();
+            Assert.That(services.Length, Is.EqualTo(1));
             Assert.That(services[0], Is.InstanceOf<Service>());
-            Assert.That(services[1], Is.InstanceOf<AnotherService>());
         }
 
 	    [Test]
