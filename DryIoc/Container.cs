@@ -254,17 +254,17 @@ namespace DryIoc
 
         #region IResolver
 
-        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request ownerOrDefault)
+        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault)
         {
             var factoryDelegate = _resolvedDefaultDelegates.GetValueOrDefault(serviceType);
             return factoryDelegate != null
                 ? factoryDelegate(_resolutionState.Items, null)
-                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, ownerOrDefault);
+                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, parentOrDefault);
         }
 
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request ownerOrDefault)
+        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault)
         {
-            var request = (ownerOrDefault ?? Root).Push(serviceType, ifUnresolved: ifUnresolved);
+            var request = (parentOrDefault ?? Root).Push(serviceType, ifUnresolved: ifUnresolved);
 
             var factory = ((IRegistry)this).ResolveFactory(request);
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
@@ -280,7 +280,8 @@ namespace DryIoc
             return resultService;
         }
 
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request ownerOrDefault)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, 
+            Request parentOrDefault)
         {
             var cacheServiceKey = serviceKey;
             if (requiredServiceType != null)
@@ -299,7 +300,7 @@ namespace DryIoc
 
             // If service key is null, then use resolve default instead of keyed.
             if (cacheServiceKey == null)
-                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, ownerOrDefault);
+                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, parentOrDefault);
 
             FactoryDelegate factoryDelegate;
 
@@ -308,7 +309,7 @@ namespace DryIoc
                 (factoryDelegate = factoryDelegates.GetValueOrDefault(cacheServiceKey)) != null)
                 return factoryDelegate(_resolutionState.Items, null);
 
-            var request = (ownerOrDefault ?? Root).Push(serviceType, serviceKey, ifUnresolved, requiredServiceType);
+            var request = (parentOrDefault ?? Root).Push(serviceType, serviceKey, ifUnresolved, requiredServiceType);
 
             var factory = ((IRegistry)this).ResolveFactory(request);
             factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
@@ -325,14 +326,15 @@ namespace DryIoc
             return resultService;
         }
 
-        void IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request ownerOrDefault)
+        void IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, 
+            Request parentOrDefault)
         {
             var selector = selectPropertiesAndFields 
                 ?? Rules.PropertiesAndFields 
                 ?? PropertiesAndFields.AllPublicNonPrimitive;
 
             var instanceType = instance.ThrowIfNull().GetType();
-            var request = (ownerOrDefault ?? Root).Push(instanceType).ResolveTo(new InstanceFactory(instance));
+            var request = (parentOrDefault ?? Root).Push(instanceType).ResolveTo(new InstanceFactory(instance));
 
             foreach (var serviceInfo in selector(instanceType, request))
                 if (serviceInfo != null)
@@ -1192,7 +1194,10 @@ namespace DryIoc
         /// Returns new instance of the rules with specified <see cref="InjectionRules"/>.
         /// </summary>
         /// <returns>New rules with specified <see cref="InjectionRules"/>.</returns>
-        public Rules With(ConstructorSelector constructor = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
+        public Rules With(
+            ConstructorSelector constructor = null, 
+            ParameterSelector parameters = null, 
+            PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             return new Rules(this)
             {
@@ -1277,6 +1282,9 @@ namespace DryIoc
         /// </summary>
         public ParameterSelector Parameters { get; private set; }
 
+        /// <summary>
+        /// Specifies what <see cref="ServiceInfo"/> should be used when resolving property or field.
+        /// </summary>
         public PropertiesAndFieldsSelector PropertiesAndFields { get; private set; }
 
         #region Implementation
@@ -1398,7 +1406,7 @@ namespace DryIoc
         public static readonly string REGISTERED_FACTORY_DELEGATE_RESULT_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
             "Registered factory delegate returns object [{0}] of type {1}, not assignable to serviceType {2}.";
 
-        public static readonly string REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
+        public static readonly string REGISTERED_INSTANCE_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
             "Registered instance [{0}] of type {1} is not assignable to serviceType {2}.";
 
         public static readonly string REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE =
@@ -2810,6 +2818,10 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Thin wrapper for pre-created service object registered: more lightweight then <see cref="DelegateFactory"/>,
+    /// and provides type of registered instance as <see cref="ImplementationType"/></summary>
+    /// <remarks>Reuse is not applied to registered object, therefore it does not saved to any Scope, 
+    /// and container is not responsible for Disposing it.</remarks>
     public sealed class InstanceFactory : Factory
     {
         public override Type ImplementationType
@@ -2825,9 +2837,8 @@ namespace DryIoc
 
         public override void VerifyBeforeRegistration(Type serviceType, IRegistry _)
         {
-            Throw.If(!serviceType.IsInstanceOfType(_instance),
-                Error.REGISTERED_INSTANCE_OBJECT_NOT_ASSIGNABLE_TO_SERVICE_TYPE,
-                _instance, _instance.GetType(), serviceType);
+            _instance.ThrowIf(!serviceType.IsInstanceOfType(_instance),
+                Error.REGISTERED_INSTANCE_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE, _instance.GetType(), serviceType);
         }
 
         public override Expression CreateExpressionOrDefault(Request request)
@@ -3635,9 +3646,9 @@ namespace DryIoc
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
-        /// <param name="ownerOrDefault">Dependency owner request for dependency, or null for resolution root.</param>
+        /// <param name="parentOrDefault">Parent request for dependency, or null for resolution root.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
-        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request ownerOrDefault);
+        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault);
 
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
@@ -3645,13 +3656,13 @@ namespace DryIoc
         /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
         /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
         /// or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
-        /// <param name="ownerOrDefault">Dependency owner request for dependency, or null for resolution root.</param>
+        /// <param name="parentOrDefault">Parent request for dependency, or null for resolution root.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
         /// <remarks>
         /// This method covers all possible resolution input parameters comparing to <see cref="ResolveDefault"/>, and
         /// by specifying the same parameters as for <see cref="ResolveDefault"/> should return the same result.
         /// </remarks>
-        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request ownerOrDefault);
+        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request parentOrDefault);
 
         /// <summary>
         /// For given instance resolves and sets properties and fields.
@@ -3661,9 +3672,9 @@ namespace DryIoc
         /// </summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
-        /// <param name="ownerOrDefault">Dependency owner request for dependency, or null for resolution root.</param>
+        /// <param name="parentOrDefault">Parent request for dependency, or null for resolution root.</param>
         /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
-        void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request ownerOrDefault);
+        void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request parentOrDefault);
     }
 
     public enum IfAlreadyRegistered { ThrowIfDuplicateKey, KeepRegistered, UpdateRegistered }

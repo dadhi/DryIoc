@@ -179,6 +179,18 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_use_props_and_fields_resolution_in_delegate_factory()
+        {
+            var container = new Container();
+            container.RegisterDelegate(r => r.ResolvePropertiesAndFields(new MyClass()));
+            container.Register<IService, Service>();
+
+            var myClass = container.Resolve<MyClass>();
+
+            Assert.That(myClass.MyService, Is.InstanceOf<Service>());
+        }
+
+        [Test]
         public void Recursive_dependency_could_be_detected_when_resolving_properties_in_delegate_factory()
         {
             var container = new Container();
@@ -223,7 +235,7 @@ namespace DryIoc.UnitTests
 
         internal class SomeClientWithProps
         {
-            public SomeClientWithProps Service { get; set; }
+            public ServiceWithClientWithProps Service { get; set; }
         }
 
         internal class ServiceWithClientWithProps
@@ -234,6 +246,11 @@ namespace DryIoc.UnitTests
             {
                 Client = client;
             }
+        }
+
+        internal class MyClass
+        {
+            public IService MyService { get; set; }
         }
     }
 }
