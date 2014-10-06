@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_should_be_able_to_add_rule_to_resolve_not_registered_service()
         {
-            var container = new Container(Rules.Default.With((request, registry) =>
+            var container = new Container(Rules.Default.With(request =>
                 request.ServiceType.IsClass && !request.ServiceType.IsAbstract
                     ? new ReflectionFactory(request.ServiceType)
                     : null));
@@ -85,7 +85,7 @@ namespace DryIoc.UnitTests
 
             container.Register(
                 typeof(IService<>),
-                new FactoryProvider((request, _) => new ReflectionFactory(
+                new FactoryProvider(request => new ReflectionFactory(
                     typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericArguments()),
                     Reuse.Singleton)));
 
@@ -103,7 +103,7 @@ namespace DryIoc.UnitTests
 
             container.Register(
                 typeof(IService<>),
-                new FactoryProvider((request, _) => new ReflectionFactory(
+                new FactoryProvider(request => new ReflectionFactory(
                     typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericArguments()),
                     Reuse.Singleton)));
 

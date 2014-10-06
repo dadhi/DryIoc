@@ -23,7 +23,6 @@ THE SOFTWARE.
 */
 
 using System;
-using System.IO;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -73,9 +72,9 @@ namespace DryIoc
             0x5C, 0xBE, 0x9B, 0xF3, 0x45, 0x3E, 0x00, 0x77, 0x64, 0x08, 0x5F, 0xAE, 0x8D, 0x96, 0xC0, 0x30, 0x1F, 0x41, 0xE6, 0x60
         };
 
-        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, IRegistry registry, ref FactoryDelegate result)
+        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, Rules rules, ref FactoryDelegate result)
         {
-            if (!registry.Rules.CompilationToDynamicAssemblyEnabled) 
+            if (!rules.CompilationToDynamicAssemblyEnabled) 
                 return;
 
             result.ThrowIf(result != null);

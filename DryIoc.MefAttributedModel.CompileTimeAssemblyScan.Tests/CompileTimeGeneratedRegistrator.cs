@@ -11,7 +11,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Service), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IService), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -21,7 +21,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.AnotherService), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IService), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -30,7 +30,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ITransientService), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -39,7 +39,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISingletonService), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -48,7 +48,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpenGenericService<>), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -57,7 +57,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.TransientOpenGenericService<>), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -66,7 +66,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OpenGenericServiceWithTwoParameters<,>), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -75,7 +75,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DependentService), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -84,7 +84,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -93,7 +93,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -102,7 +102,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -111,7 +111,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -120,7 +120,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -129,7 +129,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleCostructors), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -138,7 +138,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleCostructorsAndOneImporting), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -147,7 +147,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.SingleServiceWithMetadata), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -156,7 +156,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithImportedCtorParameter), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -165,7 +165,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.INamedService), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -174,7 +174,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.INamedService), "blah"),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -185,7 +185,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAnotherDb), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -195,7 +195,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DbMan<>), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb<>), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -205,7 +205,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeExample), 1),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IPrintToCode), 1),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -215,7 +215,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FastHandler), "fast"),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), "fast"),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -225,7 +225,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.SlowHandler), "slow"),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), "slow"),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -235,7 +235,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.TransactHandler), "transact"),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), "transact"),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -245,7 +245,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.LoggingHandlerDecorator), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Decorator,
 Decorator = new DecoratorInfo(null, "slow")
@@ -256,7 +256,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.RetryHandlerDecorator), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Decorator,
 Decorator = new DecoratorInfo(null, null)
@@ -267,7 +267,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.TransactHandlerDecorator), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Decorator,
 Decorator = new DecoratorInfo(null, "transact")
@@ -277,7 +277,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Decorator,
 Decorator = new DecoratorInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.CustomHandlerDecorator.Condition), null)
@@ -288,7 +288,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DecoratorWithFastHandlerImport), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Decorator,
 Decorator = new DecoratorInfo(null, null)
@@ -298,7 +298,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), DryIoc.MefAttributedModel.UnitTests.CUT.BlahFooh.Blah),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -308,7 +308,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FoohHandler), DryIoc.MefAttributedModel.UnitTests.CUT.BlahFooh.Fooh),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), DryIoc.MefAttributedModel.UnitTests.CUT.BlahFooh.Fooh),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -318,7 +318,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FoohDecorator), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IHandler), null),
         },
-    IsSingleton = false,
+    ReuseType = null,
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Decorator,
 Decorator = new DecoratorInfo(null, DryIoc.MefAttributedModel.UnitTests.CUT.BlahFooh.Fooh)
@@ -328,7 +328,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FactoryConsumer), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -338,7 +338,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.One), "two"),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.One), "one"),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -348,7 +348,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DryFactory<>), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IFactory<>), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.GenericWrapper,
     GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = 0 }
@@ -358,7 +358,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FactoryWithArgsConsumer), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -367,7 +367,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Two), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -377,7 +377,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DryFactory<,>), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IFactory<,>), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.GenericWrapper,
     GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = 1 }
@@ -387,7 +387,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyClient), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -396,7 +396,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IService), DryIoc.MefAttributedModel.UnitTests.CUT.ServiceKey.One),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -406,7 +406,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OtherKeyService), DryIoc.MefAttributedModel.UnitTests.CUT.ServiceKey.OtherOne),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IService), DryIoc.MefAttributedModel.UnitTests.CUT.ServiceKey.OtherOne),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -415,7 +415,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NativeUser), null),
         },
-    IsSingleton = true,
+    ReuseType = null,
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -424,7 +424,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.HomeUser), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -433,7 +433,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MyCode), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -442,7 +442,34 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithFieldAndProperty), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
+    HasMetadataAttribute = false,
+    FactoryType = DryIoc.FactoryType.Service
+}, 
+new RegistrationInfo {
+    ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OneDependsOnExternalTool),
+    Exports = new[] {
+        new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OneDependsOnExternalTool), null),
+        },
+    ReuseType = typeof(DryIoc.SingletonReuse),
+    HasMetadataAttribute = false,
+    FactoryType = DryIoc.FactoryType.Service
+}, 
+new RegistrationInfo {
+    ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OtherDependsOnExternalTool),
+    Exports = new[] {
+        new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OtherDependsOnExternalTool), null),
+        },
+    ReuseType = typeof(DryIoc.SingletonReuse),
+    HasMetadataAttribute = false,
+    FactoryType = DryIoc.FactoryType.Service
+}, 
+new RegistrationInfo {
+    ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WithUnregisteredExternalEdependency),
+    Exports = new[] {
+        new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WithUnregisteredExternalEdependency), null),
+        },
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -452,7 +479,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FooHey), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IFooService), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -462,7 +489,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FooBlah), null),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IFooService), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = true,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -471,7 +498,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FooConsumer), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -480,7 +507,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FooConsumerNotFound), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -489,7 +516,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -498,7 +525,7 @@ new RegistrationInfo {
     Exports = new[] {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ForExportBase), null),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 
@@ -512,7 +539,7 @@ new RegistrationInfo {
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported), "i"),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported), "j"),
         },
-    IsSingleton = true,
+    ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }, 

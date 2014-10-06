@@ -179,7 +179,7 @@ namespace DryIoc.UnitTests
 
     public class ThreadReuse : IReuse
     {
-        public IScope GetScope(Request request, IRegistry registry)
+        public IScope GetScope(Request request)
         {
             return _scope;
         }
@@ -213,13 +213,12 @@ namespace DryIoc.UnitTests
     {
         public static readonly HttpContextReuse Instance = new HttpContextReuse();
 
-        public IScope GetScope(Request request, IRegistry registry)
+        public IScope GetScope(Request request)
         {
             if (HttpContext.Current == null)
                 return new Scope();
 
             var items = HttpContext.Current.Items;
-            //lock (_yourLockObject)
             if (!items.Contains(_reuseScopeKey))
                 items[_reuseScopeKey] = new Scope();
             return (Scope)items[_reuseScopeKey];

@@ -15,7 +15,7 @@ namespace DryIoc.Samples
             var addinAssembly = new Lazy<Assembly>(() => Assembly.LoadFrom("DryIoc.Samples.CUT.dll"));
 
             container.Register<IAddin>(new FactoryProvider(
-                (_, __) => new ReflectionFactory(
+                _ => new ReflectionFactory(
                     addinAssembly.Value.GetType("DryIoc.Samples.CUT.SomeAddin"), 
                     Reuse.Singleton)));
             

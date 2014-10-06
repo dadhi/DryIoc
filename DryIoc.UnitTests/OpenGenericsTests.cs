@@ -290,7 +290,7 @@ namespace DryIoc.UnitTests
             var factory = new ReflectionFactory(typeof(BananaSplit<,>));
             var container = new Container();
             Assert.Throws<ContainerException>(() =>
-                factory.GetFactoryForRequestOrDefault(container.Root.Push(typeof(Banana<int>)), container));
+                factory.GetFactoryForRequestOrDefault(container.Root.Push(typeof(Banana<int>))));
         }
     }
 
