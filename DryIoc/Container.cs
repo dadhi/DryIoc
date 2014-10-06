@@ -454,7 +454,7 @@ namespace DryIoc
             // Next look for normal decorators.
             var serviceDecorators = decorators.GetValueOrDefault(serviceType);
             var openGenericDecoratorIndex = serviceDecorators == null ? 0 : serviceDecorators.Length;
-            var openGenericServiceType = request.OpenGenericServiceType;
+            var openGenericServiceType = request.ServiceType.GetGenericDefinitionOrNull();
             if (openGenericServiceType != null)
                 serviceDecorators = serviceDecorators.Append(decorators.GetValueOrDefault(openGenericServiceType));
 
@@ -938,13 +938,16 @@ namespace DryIoc
         public static readonly Rules.ResolveUnregisteredServiceRule ResolveGenericsAndArrays = (request, registry) =>
         {
             // When resolving array, use the same procedure as for IEnumerable 
-            var genericTypeDef = request.ServiceType.IsArray ? typeof(IEnumerable<>) : request.OpenGenericServiceType;
-            if (genericTypeDef == null)
+            var serviceTypeGenericDef = request.ServiceType.IsArray 
+                ? typeof(IEnumerable<>) 
+                : request.ServiceType.GetGenericDefinitionOrNull();
+
+            if (serviceTypeGenericDef == null)
                 return null;
 
             var factory =
-                registry.GetServiceFactoryOrDefault(genericTypeDef, request.ServiceKey) ??
-                registry.GetGenericWrapperOrDefault(genericTypeDef);
+                registry.GetServiceFactoryOrDefault(serviceTypeGenericDef, request.ServiceKey) ??
+                registry.GetGenericWrapperOrDefault(serviceTypeGenericDef);
 
             if (factory != null && factory.ProvidesFactoryForRequest)
                 factory = factory.GetFactoryForRequestOrDefault(request, registry);
@@ -1129,13 +1132,13 @@ namespace DryIoc
 
         public static bool IsFunc(this Request request)
         {
-            return !request.IsRoot && request.OpenGenericServiceType != null
-                && FuncTypes.Contains(request.OpenGenericServiceType);
+            var serviceTypeGenericDefinition = request.ServiceType.GetGenericDefinitionOrNull();
+            return serviceTypeGenericDefinition != null && FuncTypes.Contains(serviceTypeGenericDefinition);
         }
 
         public static bool IsFuncWithArgs(this Request request)
         {
-            return request.IsFunc() && request.OpenGenericServiceType != typeof(Func<>);
+            return request.IsFunc() && request.ServiceType.GetGenericDefinitionOrNull() != typeof(Func<>);
         }
 
         #endregion
@@ -2357,11 +2360,6 @@ namespace DryIoc
         public IfUnresolved IfUnresolved { get { return ServiceInfo.ThrowIfNull().Details.IfUnresolved; } }
         public FactoryType ResolvedFactoryType { get { return ResolvedFactory.ThrowIfNull().Setup.Type; } }
 
-        public Type OpenGenericServiceType
-        {
-            get { return ServiceType.IsGenericType ? ServiceType.GetGenericTypeDefinition() : null; }
-        }
-
         public Type ImplementationType
         {
             get { return ResolvedFactory == null ? null : ResolvedFactory.ImplementationType; }
@@ -3216,7 +3214,7 @@ namespace DryIoc
         /// <returns>Factory with the same setup and reuse but with closed concrete implementation type.</returns>
         public override Factory GetFactoryForRequestOrDefault(Request request, IRegistry _)
         {
-            var closedTypeArgs = _implementationType == request.OpenGenericServiceType
+            var closedTypeArgs = _implementationType == request.ServiceType.GetGenericDefinitionOrNull()
                 ? request.ServiceType.GetGenericArguments()
                 : GetClosedTypeArgsForGenericImplementationType(_implementationType, request);
 
@@ -3345,7 +3343,7 @@ namespace DryIoc
         private static Type[] GetClosedTypeArgsForGenericImplementationType(Type implType, Request request)
         {
             var serviceTypeArgs = request.ServiceType.GetGenericArguments();
-            var serviceTypeGenericDefinition = request.OpenGenericServiceType;
+            var serviceTypeGenericDef = request.ServiceType.GetGenericDefinitionOrNull().ThrowIfNull();
 
             var openImplTypeArgs = implType.GetGenericArguments();
             var implementedTypes = implType.GetImplementedTypes();
@@ -3355,7 +3353,7 @@ namespace DryIoc
             {
                 var implementedType = implementedTypes[i];
                 if (implementedType.IsGenericType && implementedType.ContainsGenericParameters &&
-                    implementedType.GetGenericTypeDefinition() == serviceTypeGenericDefinition)
+                    implementedType.GetGenericTypeDefinition() == serviceTypeGenericDef)
                 {
                     var matchedTypeArgs = new Type[openImplTypeArgs.Length];
                     if (MatchServiceWithImplementedTypeArgs(ref matchedTypeArgs,
@@ -4003,12 +4001,20 @@ namespace DryIoc
 
     public static class ReflectionTools
     {
+        public static Type GetGenericDefinitionOrNull(this Type type)
+        {
+            return type != null && type.IsGenericType ? type.GetGenericTypeDefinition() : null;
+        }
+    }
+
+    public static class ExpressionTools
+    {
         public static Expression GetDefaultValueExpression(this Type type)
         {
             return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), (Expression[])null);
         }
 
-        private static readonly MethodInfo _getDefaultMethod = typeof(ReflectionTools).GetMethod("GetDefault");
+        private static readonly MethodInfo _getDefaultMethod = typeof(ExpressionTools).GetMethod("GetDefault");
         public static T GetDefault<T>() { return default(T); }
     }
 
