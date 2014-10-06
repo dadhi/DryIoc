@@ -156,11 +156,11 @@ namespace DryIoc.UnitTests
         public static readonly PropertiesAndFieldsSelector SelectPropertiesAndFieldsWithImportAttribute =
             PropertiesAndFields.All(PropertiesAndFields.Flags.All, GetImportedPropertiesAndFields);
 
-        private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFields(MemberInfo m, Request req, IRegistry reg)
+        private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFields(MemberInfo m, Request req)
         {
             var import = (ImportAttribute)m.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
             return import == null ? null : PropertyOrFieldServiceInfo.Of(m)
-                .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req, reg);
+                .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req);
         }
     }
 

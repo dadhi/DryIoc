@@ -326,12 +326,14 @@ namespace DryIoc
 
         void IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request ownerOrDefault)
         {
-            var selector = selectPropertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.AllPublicNonPrimitive;
+            var selector = selectPropertiesAndFields 
+                ?? Rules.PropertiesAndFields 
+                ?? PropertiesAndFields.AllPublicNonPrimitive;
 
             var instanceType = instance.ThrowIfNull().GetType();
             var request = (ownerOrDefault ?? Root).Push(instanceType).ResolveTo(new InstanceFactory(instance));
 
-            foreach (var serviceInfo in selector(instanceType, ownerOrDefault, this))
+            foreach (var serviceInfo in selector(instanceType, request))
                 if (serviceInfo != null)
                 {
                     var value = request.Resolve(serviceInfo);
@@ -917,7 +919,7 @@ namespace DryIoc
             .AddOrUpdate(typeof(Lazy<>),
                 new ReflectionFactory(typeof(Lazy<>),
                     setup: GenericWrapperSetup.With(
-                        (t, req, reg) => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }))))
+                        (t, req) => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()) }))))
 
             .AddOrUpdate(typeof(KeyValuePair<,>),
                 new FactoryProvider(GetKeyValuePairFactoryOrDefault, GenericWrapperSetup.With(t => t[1])))
@@ -1264,7 +1266,7 @@ namespace DryIoc
         public InjectionRules With(Func<Type, ConstructorInfo> constructor)
         {
             return constructor == null ? this
-                : new InjectionRules((type, req, reg) => constructor(type), Parameters, PropertiesAndFields);
+                : new InjectionRules((type, _) => constructor(type), Parameters, PropertiesAndFields);
         }
 
         public ConstructorSelector Constructor { get; private set; }
@@ -1996,7 +1998,7 @@ namespace DryIoc
 
     public static class ServiceInfoTools
     {
-        public static T With<T>(this T info, ServiceInfoDetails details, Request request, IRegistry registry)
+        public static T With<T>(this T info, ServiceInfoDetails details, Request request)
             where T : IServiceInfo
         {
             if (details == null || details == info.Details)
@@ -2006,7 +2008,7 @@ namespace DryIoc
             var requiredServiceType = details.RequiredServiceType;
             if (requiredServiceType != null)
             {
-                var wrappedServiceType = registry.GetWrappedServiceType(serviceType);
+                var wrappedServiceType = request.Registry.GetWrappedServiceType(serviceType);
                 Throw.If(!wrappedServiceType.IsAssignableFrom(requiredServiceType),
                     Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE,
                         requiredServiceType, wrappedServiceType, request);
@@ -2381,7 +2383,7 @@ namespace DryIoc
             var info = requiredServiceType == null
                 ? DryIoc.ServiceInfo.Of(serviceType, serviceKey, ifUnresolved)
                 : DryIoc.ServiceInfo.Of(serviceType)
-                    .With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), this, Registry);
+                    .With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), this);
             return Push(info);
         }
 
@@ -2809,9 +2811,9 @@ namespace DryIoc
         private readonly object _instance;
     }
 
-    public delegate ConstructorInfo ConstructorSelector(Type implementationType, Request request, IRegistry registry);
-    public delegate ParameterServiceInfo ParameterSelector(ParameterInfo parameter, Request request, IRegistry registry);
-    public delegate IEnumerable<PropertyOrFieldServiceInfo> PropertiesAndFieldsSelector(Type implementationType, Request request, IRegistry registry);
+    public delegate ConstructorInfo ConstructorSelector(Type implementationType, Request request);
+    public delegate ParameterServiceInfo ParameterSelector(ParameterInfo parameter, Request request);
+    public delegate IEnumerable<PropertyOrFieldServiceInfo> PropertiesAndFieldsSelector(Type implementationType, Request request);
 
     /// <summary>
     /// Contains alternative rules to select constructor in implementation type registered with <see cref="ReflectionFactory"/>
@@ -2824,9 +2826,8 @@ namespace DryIoc
         /// </summary>
         /// <param name="implementationType">Type to instantiate with found constructor.</param>
         /// <param name="request"><see cref="Request"/> object leading to resolve this type.</param>
-        /// <param name="registry"><see cref="Container"/> used for resolution.</param>
         /// <returns>Found constructor or throws exception.</returns>
-        public static ConstructorInfo WithAllResolvableArguments(Type implementationType, Request request, IRegistry registry)
+        public static ConstructorInfo WithAllResolvableArguments(Type implementationType, Request request)
         {
             var ctors = implementationType.GetConstructors();
             if (ctors.Length == 0)
@@ -2834,8 +2835,6 @@ namespace DryIoc
 
             if (ctors.Length == 1)
                 return ctors[0];
-
-            var factory = (request.ResolvedFactory as ReflectionFactory).ThrowIfNull();
 
             var ctorsWithMoreParamsFirst = ctors
                 .Select(c => new { Ctor = c, Params = c.GetParameters() })
@@ -2863,7 +2862,7 @@ namespace DryIoc
                                 matchedIndecesMask |= inputArgIndex << 1;
                                 return true;
                             }))
-                            .All(p => ResolveParameter(p, factory, request, registry) != null);
+                            .All(p => ResolveParameter(p, request.ResolvedFactory, request) != null);
                     });
 
                 return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS, funcType, request).Ctor;
@@ -2871,18 +2870,19 @@ namespace DryIoc
             else
             {
                 var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(
-                    x => x.Params.All(p => ResolveParameter(p, factory, request, registry) != null));
+                    x => x.Params.All(p => ResolveParameter(p, request.ResolvedFactory, request) != null));
                 return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
             }
         }
 
         #region Implementation
 
-        private static Expression ResolveParameter(ParameterInfo p, Factory factory, Request request, IRegistry registry)
+        private static Expression ResolveParameter(ParameterInfo p, Factory factory, Request request)
         {
+            var registry = request.Registry;
             var getParamInfo = registry.Rules.Parameters.OverrideWith(factory.Setup.Rules.Parameters);
-            var paramInfo = getParamInfo(p, request, registry) ?? ParameterServiceInfo.Of(p);
-            var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.IfUnresolvedReturnDefault, request, registry));
+            var paramInfo = getParamInfo(p, request) ?? ParameterServiceInfo.Of(p);
+            var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
             var paramFactory = registry.ResolveFactory(paramRequest);
             return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
         }
@@ -2894,17 +2894,17 @@ namespace DryIoc
     public static partial class Parameters
     {
         /// <summary>Specifies to return default details <see cref="ServiceInfoDetails.IfUnresolvedThrow"/> for all parameters.</summary>
-        public static ParameterSelector All = (p, req, reg) => null;
+        public static ParameterSelector All = (p, req) => null;
 
         /// <summary>Specifies that all parameters could be set to default if unresolved.</summary>
-        public static ParameterSelector AllDefaultIfUnresolved = ((p, req, reg) =>
-            ParameterServiceInfo.Of(p).With(ServiceInfoDetails.IfUnresolvedReturnDefault, req, reg));
+        public static ParameterSelector AllDefaultIfUnresolved = ((p, req) =>
+            ParameterServiceInfo.Of(p).With(ServiceInfoDetails.IfUnresolvedReturnDefault, req));
 
         public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other)
         {
             return source == null || source == All ? other ?? All
                 : other == null || other == All ? source
-                : (parameter, req, reg) => other(parameter, req, reg) ?? source(parameter, req, reg);
+                : (parameter, req) => other(parameter, req) ?? source(parameter, req);
         }
 
         public static ParameterSelector And(this ParameterSelector source, Func<ParameterInfo, bool> condition,
@@ -2946,9 +2946,9 @@ namespace DryIoc
             ServiceInfoDetails details)
         {
             condition.ThrowIfNull();
-            return (parameter, req, reg) => condition(parameter)
-                ? ParameterServiceInfo.Of(parameter).With(details, req, reg)
-                : source(parameter, req, reg);
+            return (parameter, req) => condition(parameter)
+                ? ParameterServiceInfo.Of(parameter).With(details, req)
+                : source(parameter, req);
         }
 
         #endregion
@@ -2958,7 +2958,7 @@ namespace DryIoc
     public static partial class PropertiesAndFields
     {
         /// <summary>Say to not resolve any properties or fields.</summary>
-        public static PropertiesAndFieldsSelector None = (type, request, registry) => null;
+        public static PropertiesAndFieldsSelector None = (type, request) => null;
 
         /// <summary>
         /// Public assignable instance members of any type except object, string, primitives types, and arrays of those.
@@ -2968,7 +2968,7 @@ namespace DryIoc
         /// <summary>Flags to specify visibility of properties and fields to resolve.</summary>
         public enum Flags { PublicNonPrimitive, Public, NonPrimitive, All }
 
-        public delegate PropertyOrFieldServiceInfo GetInfo(MemberInfo m, Request req, IRegistry reg);
+        public delegate PropertyOrFieldServiceInfo GetInfo(MemberInfo m, Request req);
 
         /// <summary>
         /// Generates selector property and field selector with settings specified by parameters.
@@ -2980,11 +2980,11 @@ namespace DryIoc
         public static PropertiesAndFieldsSelector All(Flags flags, GetInfo getInfoOrNull = null)
         {
             var access = flags == Flags.All || flags == Flags.NonPrimitive ? PUBLIC_AND_PRIVATE : PUBLIC;
-            var getInfo = getInfoOrNull ?? ((m, req, reg) => PropertyOrFieldServiceInfo.Of(m));
+            var getInfo = getInfoOrNull ?? ((m, req) => PropertyOrFieldServiceInfo.Of(m));
 
-            return (t, req, reg) =>
-                t.GetProperties(access).Where(p => p.Match(flags)).Select(m => getInfo(m, req, reg)).Concat(
-                t.GetFields(access).Where(f => f.Match(flags)).Select(m => getInfo(m, req, reg)));
+            return (t, req) =>
+                t.GetProperties(access).Where(p => p.Match(flags)).Select(m => getInfo(m, req)).Concat(
+                t.GetFields(access).Where(f => f.Match(flags)).Select(m => getInfo(m, req)));
         }
 
         /// <summary>
@@ -2999,9 +2999,9 @@ namespace DryIoc
         {
             var selector = ifUnresolved == IfUnresolved.ReturnDefault
                 ? (GetInfo)null
-                : (m, req, reg) => ifUnresolved == IfUnresolved.ReturnDefault
+                : (m, req) => ifUnresolved == IfUnresolved.ReturnDefault
                     ? PropertyOrFieldServiceInfo.Of(m)
-                    : PropertyOrFieldServiceInfo.Of(m).With(ServiceInfoDetails.IfUnresolvedThrow, req, reg);
+                    : PropertyOrFieldServiceInfo.Of(m).With(ServiceInfoDetails.IfUnresolvedThrow, req);
             return All(flags, selector);
         }
 
@@ -3016,17 +3016,17 @@ namespace DryIoc
         public static PropertiesAndFieldsSelector Except(this PropertiesAndFieldsSelector source, Func<MemberInfo, bool> except)
         {
             except.ThrowIfNull();
-            return (type, req, reg) => source(type, req, reg).Where(x => !except(x.Member));
+            return (type, req) => source(type, req).Where(x => !except(x.Member));
         }
 
         public static PropertiesAndFieldsSelector OverrideWith(this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
         {
             return source == null || source == None ? (other ?? None)
                  : other == null || other == None ? source
-                 : (type, req, reg) =>
+                 : (type, req) =>
                 {
-                    var sourceMembers = source(type, req, reg).ToArray();
-                    var otherMembers = other(type, req, reg).ToArray();
+                    var sourceMembers = source(type, req).ToArray();
+                    var otherMembers = other(type, req).ToArray();
                     return sourceMembers == null || sourceMembers.Length == 0 ? otherMembers
                         : otherMembers == null || otherMembers.Length == 0 ? sourceMembers
                         : sourceMembers
@@ -3115,18 +3115,18 @@ namespace DryIoc
             string name, ServiceInfoDetails details)
         {
             name.ThrowIfNull();
-            return source.OverrideWith((type, req, reg) =>
+            return source.OverrideWith((type, request) =>
             {
                 var property = type.GetProperty(name, PUBLIC_AND_PRIVATE);
                 if (property != null && property.Match(Flags.All))
-                    return new[] { PropertyOrFieldServiceInfo.Of(property).With(details, req, reg) };
+                    return new[] { PropertyOrFieldServiceInfo.Of(property).With(details, request) };
 
                 var field = type.GetField(name, PUBLIC_AND_PRIVATE);
                 if (field != null && field.Match(Flags.All))
-                    return new[] { PropertyOrFieldServiceInfo.Of(field).With(details, req, reg) };
+                    return new[] { PropertyOrFieldServiceInfo.Of(field).With(details, request) };
 
                 return Throw.No<IEnumerable<PropertyOrFieldServiceInfo>>(
-                    Error.UNABLE_TO_FIND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD, name, req);
+                    Error.UNABLE_TO_FIND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD, name, request);
             });
         }
 
@@ -3134,11 +3134,11 @@ namespace DryIoc
             Func<MemberInfo, bool> condition, ServiceInfoDetails details)
         {
             condition.ThrowIfNull();
-            return source.OverrideWith((ownerType, req, reg) =>
+            return source.OverrideWith((ownerType, request) =>
                 ownerType.GetProperties(PUBLIC_AND_PRIVATE).Where(p => p.Match(Flags.All) && condition(p))
-                .Select(p => PropertyOrFieldServiceInfo.Of(p).With(details, req, reg)).Concat(
+                .Select(p => PropertyOrFieldServiceInfo.Of(p).With(details, request)).Concat(
                 ownerType.GetFields(PUBLIC_AND_PRIVATE).Where(f => f.Match(Flags.All) && condition(f))
-                .Select(f => PropertyOrFieldServiceInfo.Of(f).With(details, req, reg))));
+                .Select(f => PropertyOrFieldServiceInfo.Of(f).With(details, request))));
         }
 
         private const BindingFlags PUBLIC = BindingFlags.Instance | BindingFlags.Public;
@@ -3225,7 +3225,7 @@ namespace DryIoc
 
         public override Expression CreateExpressionOrDefault(Request request, IRegistry registry)
         {
-            var ctor = SelectConstructor(request, registry);
+            var ctor = SelectConstructor(request);
             var ctorParams = ctor.GetParameters();
 
             Expression[] paramExprs = null;
@@ -3234,7 +3234,7 @@ namespace DryIoc
                 paramExprs = new Expression[ctorParams.Length];
                 for (var i = 0; i < ctorParams.Length; i++)
                 {
-                    var info = GetParameterServiceInfo(ctorParams[i], request, registry);
+                    var info = GetParameterServiceInfo(ctorParams[i], request);
                     var expr = GetDependencyExpressionOrNull(info, request);
                     if (expr == null) return null;
                     paramExprs[i] = expr;
@@ -3242,7 +3242,7 @@ namespace DryIoc
             }
 
             var newExpr = Expression.New(ctor, paramExprs);
-            return InitMembersIfRequired(newExpr, request, registry);
+            return InitMembersIfRequired(newExpr, request);
         }
 
         public override LambdaExpression CreateFuncWithArgsOrDefault(Type funcType, Request request, IRegistry registry, out IList<Type> unusedFuncArgs)
@@ -3251,7 +3251,7 @@ namespace DryIoc
             Throw.If(funcParamTypes.Length == 1, Error.EXPECTED_FUNC_WITH_MULTIPLE_ARGS, funcType);
             unusedFuncArgs = null;
 
-            var ctor = SelectConstructor(request, registry);
+            var ctor = SelectConstructor(request);
             var ctorParams = ctor.GetParameters();
             var paramExprs = new Expression[ctorParams.Length];
             var funcParamExprs = new ParameterExpression[funcParamTypes.Length - 1]; // (minus Func return parameter).
@@ -3272,7 +3272,7 @@ namespace DryIoc
 
                 if (paramExprs[i] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
-                    var info = GetParameterServiceInfo(ctorParam, request, registry);
+                    var info = GetParameterServiceInfo(ctorParam, request);
                     var expr = GetDependencyExpressionOrNull(info, request);
                     if (expr == null) return null;
                     paramExprs[i] = expr;
@@ -3294,7 +3294,7 @@ namespace DryIoc
             }
 
             var newExpr = Expression.New(ctor, paramExprs);
-            var newExprInitialized = InitMembersIfRequired(newExpr, request, registry);
+            var newExprInitialized = InitMembersIfRequired(newExpr, request);
             return Expression.Lambda(funcType, newExprInitialized, funcParamExprs);
         }
 
@@ -3302,12 +3302,12 @@ namespace DryIoc
 
         private readonly Type _implementationType;
 
-        private ConstructorInfo SelectConstructor(Request request, IRegistry registry)
+        private ConstructorInfo SelectConstructor(Request request)
         {
             var implType = _implementationType;
-            var selector = Setup.Rules.Constructor ?? registry.Rules.Constructor;
+            var selector = Setup.Rules.Constructor ?? request.Registry.Rules.Constructor;
             if (selector != null)
-                return selector(implType, request, registry).ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_USING_SELECTOR, implType);
+                return selector(implType, request).ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_USING_SELECTOR, implType);
 
             var ctors = implType.GetConstructors();
             Throw.If(ctors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implType);
@@ -3315,10 +3315,10 @@ namespace DryIoc
             return ctors[0];
         }
 
-        private Expression InitMembersIfRequired(NewExpression newService, Request request, IRegistry registry)
+        private Expression InitMembersIfRequired(NewExpression newService, Request request)
         {
-            var getInfos = registry.Rules.PropertiesAndFields.OverrideWith(Setup.Rules.PropertiesAndFields);
-            var infos = getInfos(_implementationType, request, registry);
+            var getInfos = request.Registry.Rules.PropertiesAndFields.OverrideWith(Setup.Rules.PropertiesAndFields);
+            var infos = getInfos(_implementationType, request);
             if (infos == null)
                 return newService;
 
@@ -3334,9 +3334,9 @@ namespace DryIoc
             return bindings.Count == 0 ? (Expression)newService : Expression.MemberInit(newService, bindings);
         }
 
-        private ParameterServiceInfo GetParameterServiceInfo(ParameterInfo parameter, Request request, IRegistry registry)
+        private ParameterServiceInfo GetParameterServiceInfo(ParameterInfo parameter, Request request)
         {
-            return registry.Rules.Parameters.OverrideWith(Setup.Rules.Parameters)(parameter, request, registry)
+            return request.Registry.Rules.Parameters.OverrideWith(Setup.Rules.Parameters)(parameter, request) 
                 ?? ParameterServiceInfo.Of(parameter);
         }
 

@@ -15,7 +15,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
-                (type, request, registry) => type.GetProperties().Select(PropertyOrFieldServiceInfo.Of)));
+                (type, request) => type.GetProperties().Select(PropertyOrFieldServiceInfo.Of)));
             container.Register<IService, Service>();
 
             var blah = container.Resolve<SomeBlah>();
@@ -28,8 +28,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
-                (type, request, registry) => type.GetProperties().Select(p =>
-                    p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).With(ServiceInfoDetails.Of(typeof(Service)), request, registry) : null)));
+                (type, request) => type.GetProperties().Select(p =>
+                    p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).With(ServiceInfoDetails.Of(typeof(Service)), request) : null)));
             container.Register<Service>();
 
             var blah = container.Resolve<SomeBlah>();
