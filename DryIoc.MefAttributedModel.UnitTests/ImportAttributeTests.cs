@@ -296,7 +296,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         internal class ClientWithGenericWrapperProps
         {
             [Import(typeof(Service))]
-            public Func<IService> GetService;
+            public Func<IService> GetService { get; set; }
         }
 
         #endregion

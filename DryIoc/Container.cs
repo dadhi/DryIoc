@@ -81,6 +81,8 @@ namespace DryIoc
             _resolutionState = new ResolutionState();
             _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
             _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
+
+            Root = Request.CreateRoot(this, _resolutionState);
         }
 
         /// <summary>Creates new container instance with possibility to update default rules.</summary>
@@ -129,14 +131,6 @@ namespace DryIoc
         public void Dispose()
         {
             ((IDisposable)_currentScope).Dispose();
-        }
-
-        public Request CreateRequest(Type serviceType,
-            object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
-        {
-            var serviceInfoDetails = ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
-            var serviceInfo = ServiceInfo.Of(serviceType).With(serviceInfoDetails, null, this);
-            return new Request(null, GetThisWeakRef(), _resolutionState, Ref.Of<IScope>(), serviceInfo, null);
         }
 
         #region IRegistrator
@@ -267,11 +261,9 @@ namespace DryIoc
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, ownerOrDefault);
         }
 
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request ownerOrDefault = null)
+        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request ownerOrDefault)
         {
-            var request = ownerOrDefault == null
-                ? CreateRequest(serviceType, ifUnresolved: ifUnresolved)
-                : ownerOrDefault.Push(ServiceInfo.Of(serviceType, ifUnresolved: ifUnresolved));
+            var request = (ownerOrDefault ?? Root).Push(serviceType, ifUnresolved: ifUnresolved);
 
             var factory = ((IRegistry)this).ResolveFactory(request);
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request, this);
@@ -315,9 +307,7 @@ namespace DryIoc
                 (factoryDelegate = factoryDelegates.GetValueOrDefault(cacheServiceKey)) != null)
                 return factoryDelegate(_resolutionState.Items, null);
 
-            var request = ownerOrDefault == null
-                ? CreateRequest(serviceType, serviceKey, ifUnresolved, requiredServiceType)
-                : ownerOrDefault.Push(ServiceInfo.Of(serviceType).With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), ownerOrDefault, this));
+            var request = (ownerOrDefault ?? Root).Push(serviceType, serviceKey, ifUnresolved, requiredServiceType);
 
             var factory = ((IRegistry)this).ResolveFactory(request);
             factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request, this);
@@ -339,8 +329,7 @@ namespace DryIoc
             var selector = selectPropertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.AllPublicNonPrimitive;
 
             var instanceType = instance.ThrowIfNull().GetType();
-            var request = ownerOrDefault == null ? CreateRequest(instanceType) : ownerOrDefault.Push(ServiceInfo.Of(instanceType));
-            request = request.ResolveTo(new InstanceFactory(instance));
+            var request = (ownerOrDefault ?? Root).Push(instanceType).ResolveTo(new InstanceFactory(instance));
 
             foreach (var serviceInfo in selector(instanceType, ownerOrDefault, this))
                 if (serviceInfo != null)
@@ -405,12 +394,12 @@ namespace DryIoc
                 return null;
 
             // Decorators for non service types are not supported.
-            if (request.ResolvedFactory.Setup.Type != FactoryType.Service)
+            if (request.ResolvedFactoryType != FactoryType.Service)
                 return null;
 
             // We are already resolving decorator for the service, so stop now.
-            var parent = request.GetNonWrapperParentOrDefault();
-            if (parent != null && parent.ResolvedFactory.Setup.Type == FactoryType.Decorator)
+            var parent = request.GetNonWrapperParentOrRoot();
+            if (!parent.IsRoot && parent.ResolvedFactoryType == FactoryType.Decorator)
                 return null;
 
             LambdaExpression resultFuncExpr = null;
@@ -485,7 +474,7 @@ namespace DryIoc
                             Register(decorator, serviceType, null, IfAlreadyRegistered.ThrowIfDuplicateKey);
                         }
 
-                        var decoratorExpr = request.State.GetCachedFactoryExpressionOrDefault(decorator.ID);
+                        var decoratorExpr = request.State.GetCachedFactoryExpressionOrDefault(decorator.FactoryID);
                         if (decoratorExpr == null)
                         {
                             IList<Type> unusedFunArgs;
@@ -493,7 +482,7 @@ namespace DryIoc
                                 .GetFuncWithArgsOrDefault(decoratorFuncType, decoratorRequest, this, out unusedFunArgs)
                                 .ThrowIfNull(Error.DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION, decoratorFuncType);
                             decoratorExpr = unusedFunArgs != null ? funcExpr.Body : funcExpr;
-                            request.State.CacheFactoryExpression(decorator.ID, decoratorExpr);
+                            request.State.CacheFactoryExpression(decorator.FactoryID, decoratorExpr);
                         }
 
                         if (resultDecorator == null || !(decoratorExpr is LambdaExpression))
@@ -678,8 +667,6 @@ namespace DryIoc
 
         #region Internal State
 
-        private WeakReference _thisWeakRef;
-
         private readonly Ref<HashTree<Type, object>> _factories; // where object is Factory or KeyedFactoriesEntry
         private readonly Ref<HashTree<Type, Factory[]>> _decorators;
         private readonly Ref<HashTree<Type, Factory>> _genericWrappers;
@@ -690,14 +677,7 @@ namespace DryIoc
         private HashTree<Type, HashTree<object, FactoryDelegate>> _resolvedKeyedDelegates;
         private readonly ResolutionState _resolutionState;
 
-        #endregion
-
-        #region Implementation
-
-        private WeakReference GetThisWeakRef()
-        {
-            return _thisWeakRef ?? (_thisWeakRef = new WeakReference(this));
-        }
+        public readonly Request Root;
 
         #endregion
     }
@@ -985,11 +965,11 @@ namespace DryIoc
             var items = registry.GetAllServiceFactories(requiredItemType);
 
             // Composite pattern support: filter out composite root from available keys.
-            var parent = request.GetNonWrapperParentOrDefault();
-            if (parent != null && parent.ServiceType == requiredItemType)
+            var parent = request.GetNonWrapperParentOrRoot();
+            if (!parent.IsRoot && parent.ServiceType == requiredItemType)
             {
-                var parentFactoryID = parent.ResolvedFactory.ID;
-                items = items.Where(x => x.Value.ID != parentFactoryID);
+                var parentFactoryID = parent.ResolvedFactory.FactoryID;
+                items = items.Where(x => x.Value.FactoryID != parentFactoryID);
             }
 
             // Return collection of single matched item if key is specified.
@@ -1004,7 +984,7 @@ namespace DryIoc
                 for (var i = 0; i < itemArray.Length; i++)
                 {
                     var item = itemArray[i];
-                    var itemRequest = request.Push(ServiceInfo.Of(itemType, item.Key, IfUnresolved.ReturnDefault));
+                    var itemRequest = request.Push(itemType, item.Key, IfUnresolved.ReturnDefault);
                     var itemFactory = registry.ResolveFactory(itemRequest);
                     if (itemFactory != null)
                     {
@@ -1028,9 +1008,9 @@ namespace DryIoc
 
             // Composite pattern support: filter out composite root from available keys.
             var parentFactoryID = 0;
-            var parent = request.GetNonWrapperParentOrDefault();
-            if (parent != null && parent.ServiceType == requiredItemType)
-                parentFactoryID = parent.ResolvedFactory.ID;
+            var parent = request.GetNonWrapperParentOrRoot();
+            if (!parent.IsRoot && parent.ServiceType == requiredItemType)
+                parentFactoryID = parent.ResolvedFactory.FactoryID;
 
             var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, requiredItemType);
 
@@ -1045,7 +1025,7 @@ namespace DryIoc
             var funcType = request.ServiceType;
             var funcTypeArgs = funcType.GetGenericArguments();
             var serviceType = funcTypeArgs[funcTypeArgs.Length - 1];
-            var serviceRequest = request.Push(ServiceInfo.Of(serviceType));
+            var serviceRequest = request.Push(serviceType);
             var serviceFactory = registry.ResolveFactory(serviceRequest);
             if (serviceFactory == null)
                 return null;
@@ -1067,7 +1047,7 @@ namespace DryIoc
         {
             var ctor = request.ServiceType.GetConstructors()[0];
             var serviceType = request.ServiceType.GetGenericArguments()[0];
-            var serviceRequest = request.Push(ServiceInfo.Of(serviceType));
+            var serviceRequest = request.Push(serviceType);
             var factory = registry.ResolveFactory(serviceRequest);
             var expr = factory == null ? null : factory.GetExpressionOrDefault(serviceRequest, registry);
             return expr == null ? null : Expression.New(ctor, request.State.GetOrAddItemExpression(expr.ToFactoryExpression()));
@@ -1085,7 +1065,7 @@ namespace DryIoc
             var serviceType = typeArgs[1];
             return new ExpressionFactory((pairReq, _) =>
             {
-                var serviceRequest = pairReq.Push(ServiceInfo.Of(serviceType, serviceKey));
+                var serviceRequest = pairReq.Push(serviceType, serviceKey);
                 var serviceFactory = registry.ResolveFactory(serviceRequest);
                 var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest, registry);
                 if (serviceExpr == null)
@@ -1133,7 +1113,7 @@ namespace DryIoc
 
             return new ExpressionFactory((req, _) =>
             {
-                var serviceRequest = req.Push(ServiceInfo.Of(serviceType, serviceKey));
+                var serviceRequest = req.Push(serviceType, serviceKey);
                 var serviceFactory = registry.ResolveFactory(serviceRequest);
                 var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest, registry);
                 if (serviceExpr == null)
@@ -1149,7 +1129,7 @@ namespace DryIoc
 
         public static bool IsFunc(this Request request)
         {
-            return request != null && request.OpenGenericServiceType != null
+            return !request.IsRoot && request.OpenGenericServiceType != null
                 && FuncTypes.Contains(request.OpenGenericServiceType);
         }
 
@@ -1172,7 +1152,7 @@ namespace DryIoc
 
             var items = request.Registry.GetAllServiceFactories(wrappedItemType);
             if (parentFactoryID != -1)
-                items = items.Where(kv => kv.Value.ID != parentFactoryID);
+                items = items.Where(kv => kv.Value.FactoryID != parentFactoryID);
 
             // Return collection of single matched item if key is specified.
             if (request.ServiceKey != null)
@@ -2298,6 +2278,13 @@ namespace DryIoc
 
     public sealed class Request : IResolver
     {
+        public static Request CreateRoot(IRegistry registry, ResolutionState state)
+        {
+            return new Request(null, new WeakReference(registry), state, null, null, null);
+        }
+
+        public bool IsRoot { get { return ServiceInfo == null; } }
+
         #region Resolver
 
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request _)
@@ -2365,9 +2352,10 @@ namespace DryIoc
             get { return (_registryWeakRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
         }
 
-        public Type ServiceType { get { return ServiceInfo.ServiceType; } }
-        public object ServiceKey { get { return ServiceInfo.Details.ServiceKey; } }
-        public IfUnresolved IfUnresolved { get { return ServiceInfo.Details.IfUnresolved; } }
+        public Type ServiceType { get { return ServiceInfo == null ? null : ServiceInfo.ServiceType; } }
+        public object ServiceKey { get { return ServiceInfo.ThrowIfNull().Details.ServiceKey; } }
+        public IfUnresolved IfUnresolved { get { return ServiceInfo.ThrowIfNull().Details.IfUnresolved; } }
+        public FactoryType ResolvedFactoryType { get { return ResolvedFactory.ThrowIfNull().Setup.Type; } }
 
         public Type OpenGenericServiceType
         {
@@ -2381,9 +2369,22 @@ namespace DryIoc
 
         public Request Push(IServiceInfo info)
         {
-            ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info, this);
+            if (IsRoot)
+                return new Request(this, _registryWeakRef, State, new Ref<IScope>(), info.ThrowIfNull());
+
+            ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info.ThrowIfNull(), this);
             var inheritedInfo = info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup.Type);
-            return new Request(this, _registryWeakRef, State, _scope, inheritedInfo, null);
+            return new Request(this, _registryWeakRef, State, _scope, inheritedInfo);
+        }
+
+        public Request Push(Type serviceType,
+            object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
+        {
+            var info = requiredServiceType == null
+                ? DryIoc.ServiceInfo.Of(serviceType, serviceKey, ifUnresolved)
+                : DryIoc.ServiceInfo.Of(serviceType)
+                    .With(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), this, Registry);
+            return Push(info);
         }
 
         public Request ReplaceServiceInfoWith(IServiceInfo info)
@@ -2393,20 +2394,20 @@ namespace DryIoc
 
         public Request ResolveTo(Factory factory)
         {
-            if (ResolvedFactory != null && ResolvedFactory.ID == factory.ID)
+            if (IsRoot || (ResolvedFactory != null && ResolvedFactory.FactoryID == factory.FactoryID))
                 return this; // resolving only once, no need to check recursion again.
 
             if (factory.Setup.Type == FactoryType.Service) // skip recursion check for non-services: decorators, wrappers
-                for (var p = Parent; p != null; p = p.Parent)
-                    Throw.If(p.ResolvedFactory.ID == factory.ID, Error.RECURSIVE_DEPENDENCY_DETECTED, Print(factory.ID));
+                for (var p = Parent; !p.IsRoot; p = p.Parent)
+                    Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID, Error.RECURSIVE_DEPENDENCY_DETECTED, Print(factory.FactoryID));
 
             return new Request(Parent, _registryWeakRef, State, _scope, ServiceInfo, factory);
         }
 
-        public Request GetNonWrapperParentOrDefault()
+        public Request GetNonWrapperParentOrRoot()
         {
             var p = Parent;
-            while (p != null && p.ResolvedFactory.Setup.Type == FactoryType.GenericWrapper)
+            while (!p.IsRoot && p.ResolvedFactory.Setup.Type == FactoryType.GenericWrapper)
                 p = p.Parent;
             return p;
         }
@@ -2419,6 +2420,8 @@ namespace DryIoc
 
         public StringBuilder PrintLast(StringBuilder s)
         {
+            if (IsRoot)
+                return s.Append("<Root>");
             if (ResolvedFactory != null && ResolvedFactory.Setup.Type != FactoryType.Service)
                 s.Append(Enum.GetName(typeof(FactoryType), ResolvedFactory.Setup.Type)).Append(' ');
             if (ImplementationType != null && ImplementationType != ServiceType)
@@ -2433,10 +2436,10 @@ namespace DryIoc
                 return s;
 
             s = recursiveFactoryID == -1 ? s : s.Append(" <--recursive");
-            return Parent.Enumerate().Aggregate(s, (a, r) =>
+            return Parent.Enumerate().TakeWhile(r => !r.IsRoot).Aggregate(s, (a, r) =>
             {
                 a = r.PrintLast(a.AppendLine().Append(" in "));
-                return r.ResolvedFactory.ID == recursiveFactoryID ? a.Append(" <--recursive") : a;
+                return r.ResolvedFactory.FactoryID == recursiveFactoryID ? a.Append(" <--recursive") : a;
             });
         }
 
@@ -2447,13 +2450,15 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(Request parent, WeakReference registryWeakRef, ResolutionState state, Ref<IScope> scope, IServiceInfo serviceInfo, Factory factory)
+        internal Request(Request parent,
+            WeakReference registryWeakRef, ResolutionState state, Ref<IScope> scope,
+            IServiceInfo serviceInfo, Factory factory = null)
         {
             Parent = parent;
             State = state;
             _registryWeakRef = registryWeakRef;
             _scope = scope;
-            ServiceInfo = serviceInfo.ThrowIfNull();
+            ServiceInfo = serviceInfo;
             ResolvedFactory = factory;
         }
 
@@ -2625,7 +2630,7 @@ namespace DryIoc
 
     public abstract class Factory
     {
-        public readonly int ID;
+        public readonly int FactoryID;
         public readonly IReuse Reuse;
 
         public FactorySetup Setup
@@ -2639,7 +2644,7 @@ namespace DryIoc
 
         protected Factory(IReuse reuse = null, FactorySetup setup = null)
         {
-            ID = Interlocked.Increment(ref _idSeedAndCount);
+            FactoryID = Interlocked.Increment(ref _factoryIdSeedAndCount);
             Reuse = reuse;
             Setup = setup ?? DryIoc.Setup.Default;
         }
@@ -2671,7 +2676,7 @@ namespace DryIoc
             Expression expression = null;
 
             if (Setup.Caching == FactoryCaching.EnabledForExpression)
-                expression = request.State.GetCachedFactoryExpressionOrDefault(ID);
+                expression = request.State.GetCachedFactoryExpressionOrDefault(FactoryID);
 
             if (expression == null)
             {
@@ -2693,13 +2698,13 @@ namespace DryIoc
                     else
                     {
                         var factoryDelegate = expression.ToFactoryExpression().Compile();
-                        var reusedInstance = scope.GetOrAdd(ID, () => factoryDelegate(request.State.Items, request.Scope));
+                        var reusedInstance = scope.GetOrAdd(FactoryID, () => factoryDelegate(request.State.Items, request.Scope));
                         expression = request.State.GetOrAddItemExpression(reusedInstance, expression.Type);
                     }
                 }
 
                 if (Setup.Caching == FactoryCaching.EnabledForExpression)
-                    request.State.CacheFactoryExpression(ID, expression);
+                    request.State.CacheFactoryExpression(FactoryID, expression);
             }
 
             if (decorator != null)
@@ -2741,7 +2746,7 @@ namespace DryIoc
         public override string ToString()
         {
             var s = new StringBuilder();
-            s.Append("{FactoryID=").Append(ID);
+            s.Append("{FactoryID=").Append(FactoryID);
             if (ImplementationType != null)
                 s.Append(", ImplType=").Print(ImplementationType);
             if (Reuse != null)
@@ -2753,7 +2758,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private static int _idSeedAndCount;
+        private static int _factoryIdSeedAndCount;
         private FactorySetup _setup;
 
         private static readonly MethodInfo _scopeGetOrAddMethod = typeof(IScope).GetMethod("GetOrAdd");
@@ -2765,7 +2770,7 @@ namespace DryIoc
 
             var getScopedItemMethod = _scopeGetOrAddMethod.MakeGenericMethod(expression.Type);
 
-            var factoryIDExpr = Expression.Constant(ID);
+            var factoryIDExpr = Expression.Constant(FactoryID);
             var factoryExpr = Expression.Lambda(expression, null);
             return Expression.Call(scopeExpr, getScopedItemMethod, factoryIDExpr, factoryExpr);
         }
@@ -2879,8 +2884,7 @@ namespace DryIoc
         {
             var getParamInfo = registry.Rules.Parameters.OverrideWith(factory.Setup.Rules.Parameters);
             var paramInfo = getParamInfo(p, request, registry) ?? ParameterServiceInfo.Of(p);
-            var paramRequest =
-                request.Push(paramInfo.With(ServiceInfoDetails.IfUnresolvedReturnDefault, request, registry));
+            var paramRequest = request.Push(paramInfo.With(ServiceInfoDetails.IfUnresolvedReturnDefault, request, registry));
             var paramFactory = registry.ResolveFactory(paramRequest);
             return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest, registry);
         }
@@ -3475,7 +3479,7 @@ namespace DryIoc
             var scopeIndex = reuseScope == request.Scope ? -1 : request.State.GetOrAddItem(reuseScope);
 
             return (items, scope) => (scopeIndex == -1 ? scope : (Scope)items.Get(scopeIndex))
-                .GetOrAdd(ID, () => _factoryDelegate(request));
+                .GetOrAdd(FactoryID, () => _factoryDelegate(request));
         }
 
         private readonly Func<IResolver, object> _factoryDelegate;

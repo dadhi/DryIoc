@@ -15,8 +15,8 @@ namespace DryIoc.UnitTests
             var factories = HashTree<Type, Factory>.Empty;
             container.Register<ILogger>(new FactoryProvider((request, _) =>
             {
-                var parent = request.GetNonWrapperParentOrDefault();
-                parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
+                var parent = request.GetNonWrapperParentOrRoot();
+                Throw.If(parent.IsRoot, "{0} should be resolved only as dependency in other service.", request.ServiceType);
                 var typeArg = parent.ImplementationType ?? parent.ServiceType;
 
                 var factory = factories.GetValueOrDefault(typeArg);
@@ -41,8 +41,8 @@ namespace DryIoc.UnitTests
             var factories = HashTree<Type, Factory>.Empty;
             container.Register<ILogger>(new FactoryProvider((request, _) =>
             {
-                var parent = request.GetNonWrapperParentOrDefault();
-                parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
+                var parent = request.GetNonWrapperParentOrRoot();
+                Throw.If(parent.IsRoot, "{0} should be resolved only as dependency in other service.", request.ServiceType);
                 var typeArg = parent.ImplementationType ?? parent.ServiceType;
 
                 var factory = factories.GetValueOrDefault(typeArg);
@@ -69,8 +69,7 @@ namespace DryIoc.UnitTests
                 new FactoryProvider((request, _) =>
                 {
                     var implType = typeof(PlainLogger);
-                    var parent = request.GetNonWrapperParentOrDefault();
-                    if (parent != null && parent.ImplementationType == typeof(User2))
+                    if (request.GetNonWrapperParentOrRoot().ImplementationType == typeof(User2))
                         implType = typeof(FastLogger);
 
                     var factory = factories.GetValueOrDefault(implType);
