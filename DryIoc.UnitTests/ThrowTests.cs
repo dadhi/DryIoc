@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<InvalidOperationException>(() => 
                 arg.ThrowIf(arg == null));
 
-            Assert.That(ex.Message, Is.EqualTo("Argument of type String has invalid condition."));
+            Assert.That(ex.Message, Is.EqualTo("Argument null of type String has invalid condition."));
         }
 
         [Test]

@@ -84,7 +84,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.RegisterDelegate(r => new ServiceWithDependency(r.Resolve<IDependency>()));
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
                 container.Resolve<ServiceWithDependency>());
         }
 
@@ -93,7 +93,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterDelegate(typeof(IService), _ => new Service());
+            container.RegisterDelegate(typeof (IService), _ => new Service());
 
             var service = container.Resolve<IService>();
             Assert.That(service, Is.InstanceOf<Service>());
@@ -104,7 +104,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterDelegate(typeof(IService), _ => "blah");
+            container.RegisterDelegate(typeof (IService), _ => "blah");
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
@@ -115,7 +115,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance(typeof(string), "ring", named: "MyPrecious");
+            container.RegisterInstance(typeof (string), "ring", named: "MyPrecious");
 
             var ring = container.Resolve<string>("MyPrecious");
             Assert.That(ring, Is.EqualTo("ring"));
@@ -127,7 +127,130 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             Assert.Throws<ContainerException>(() =>
-                container.RegisterInstance(typeof(IService), "ring", named: "MyPrecious"));
+                container.RegisterInstance(typeof (IService), "ring", named: "MyPrecious"));
+        }
+
+        [Test]
+        public void Detect_recursive_dependency_when_registered_as_delegate()
+        {
+            var container = new Container();
+            container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
+            container.Register<ServiceWithClient>();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<SomeClient>());
+
+            // JITing method, just for test. 
+            var method = GetType().GetMethod("Detect_recursive_dependency_when_registered_as_delegate");
+            System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(method.MethodHandle);
+
+            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
+        }
+
+        [Test]
+        public void Detect_recursive_dependency_when_dependency_registered_as_delegate()
+        {
+            var container = new Container();
+
+            container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
+            container.Register<ServiceWithClient>();
+            container.Register<ClientFriend>();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<ClientFriend>());
+
+            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
+        }
+
+        [Test]
+        public void Detect_recusive_dependency_for_custom_specified_parameter_with_factory_delegate()
+        {
+            var container = new Container();
+            container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
+            container.Register<ServiceWithClient>(setup: Setup.With(
+                parameters: Parameters.All.And("client", r => r.Resolve<SomeClient>())));
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<SomeClient>());
+
+            Assert.That(ex.Message, Is
+                .StringContaining("Recursive dependency is detected when resolving").And
+                .StringContaining("SomeClient <--recursive"));
+        }
+
+        [Test]
+        public void Can_use_props_and_fields_resolution_in_delegate_factory()
+        {
+            var container = new Container();
+            container.RegisterDelegate(r => r.ResolvePropertiesAndFields(new MyClass()));
+            container.Register<IService, Service>();
+
+            var myClass = container.Resolve<MyClass>();
+
+            Assert.That(myClass.MyService, Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void Recursive_dependency_could_be_detected_when_resolving_properties_in_delegate_factory()
+        {
+            var container = new Container();
+            container.RegisterDelegate(r => r.ResolvePropertiesAndFields(new SomeClientWithProps()));
+            container.Register<ServiceWithClientWithProps>();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<SomeClientWithProps>());
+
+            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
+        }
+
+        internal class SomeClient
+        {
+            public ServiceWithClient Service { get; set; }
+
+            public SomeClient(ServiceWithClient service)
+            {
+                Service = service;
+            }
+        }
+
+        internal class ServiceWithClient
+        {
+            public SomeClient Client { get; set; }
+
+            public ServiceWithClient(SomeClient client)
+            {
+                Client = client;
+            }
+        }
+
+        internal class ClientFriend
+        {
+            public SomeClient Client { get; set; }
+
+            public ClientFriend(SomeClient client)
+            {
+                Client = client;
+            }
+        }
+
+        internal class SomeClientWithProps
+        {
+            public ServiceWithClientWithProps Service { get; set; }
+        }
+
+        internal class ServiceWithClientWithProps
+        {
+            public SomeClientWithProps Client { get; set; }
+
+            public ServiceWithClientWithProps(SomeClientWithProps client)
+            {
+                Client = client;
+            }
+        }
+
+        internal class MyClass
+        {
+            public IService MyService { get; set; }
         }
     }
 }

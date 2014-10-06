@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -14,7 +15,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
-                (type, request, registry) => type.GetProperties().Select(PropertyOrFieldServiceInfo.Of)));
+                (type, request) => type.GetProperties().Select(PropertyOrFieldServiceInfo.Of)));
             container.Register<IService, Service>();
 
             var blah = container.Resolve<SomeBlah>();
@@ -27,8 +28,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
-                (type, request, registry) => type.GetProperties().Select(p =>
-                    p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).With(ServiceInfoDetails.Of(typeof(Service)), request, registry) : null)));
+                (type, request) => type.GetProperties().Select(p =>
+                    p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).With(ServiceInfoDetails.Of(typeof(Service)), request) : null)));
             container.Register<Service>();
 
             var blah = container.Resolve<SomeBlah>();
@@ -66,7 +67,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<ClientWithStringParam>());
 
-            Assert.That(ex.Message, Is.StringContaining("Injected value 500 is not assignable to {with custom value} String parameter \"x\""));
+            Assert.That(ex.Message, Is.StringContaining("Injected value 500 is not assignable to String {with custom value} as parameter \"x\""));
         }
 
         [Test]
@@ -380,6 +381,26 @@ namespace DryIoc.UnitTests
             var client = container.Resolve<ClientWithPropsAndFields>();
             Assert.That(client.F, Is.InstanceOf<Service>());
             Assert.That(client.P, Is.Null);
+        }
+
+        [Test]
+        public void Resolve_parameter_customly_inside_Func_should_happen_when_calling_Func_not_on_resolve()
+        {
+            var container = new Container();
+
+            var resolved = false;
+            container.Register<ClientWithStringParam>(setup: Setup.With(
+                parameters: Parameters.All.And("x", _ =>
+                {
+                    resolved = true;
+                    return "resolved";
+                })));
+
+            var getClient = container.Resolve<Func<ClientWithStringParam>>();
+
+            Assert.That(resolved, Is.False);
+            Assert.That(getClient().X, Is.EqualTo("resolved"));
+            Assert.That(resolved, Is.True);
         }
 
         #region CUT

@@ -54,12 +54,12 @@ namespace DryIoc.UnitTests
         {
             var parent = new Container();
             parent.Register(typeof(IFruit), typeof(Melon), Reuse.InCurrentScope);
-            parent = parent.OpenScope();
+            var scoped = parent.OpenScope();
 
-            var child = parent.CreateChildContainer();
+            var child = scoped.CreateChildContainer();
             child.Register(typeof(IJuice), typeof(FruitJuice));
 
-            var parentFruit = parent.Resolve<IFruit>();
+            var parentFruit = scoped.Resolve<IFruit>();
             var snd = child.Resolve<IJuice>();
 
             Assert.That(parentFruit, Is.SameAs(snd.Fruit));

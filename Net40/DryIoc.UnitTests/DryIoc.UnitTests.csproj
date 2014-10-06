@@ -108,6 +108,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\MetadataTests.cs">
       <Link>MetadataTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\NoMemoryLeaksTests.cs">
+      <Link>NoMemoryLeaksTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\OpenGenericsTests.cs">
       <Link>OpenGenericsTests.cs</Link>
     </Compile>
@@ -153,8 +156,8 @@
     <Compile Include="..\..\DryIoc.UnitTests\UnregisterTests.cs">
       <Link>UnregisterTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\WipeResolutionCacheTests.cs">
-      <Link>WipeResolutionCacheTests.cs</Link>
+    <Compile Include="..\..\DryIoc.UnitTests\WipeCacheTests.cs">
+      <Link>WipeCacheTests.cs</Link>
     </Compile>
     <Compile Include="FactoryCompilerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

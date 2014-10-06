@@ -66,13 +66,11 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Inject_service_as_Func_Array_of_Service_with_Import_contract_key_no_type_specified()
         {
             var container = new Container().WithAttributedModel();
-            container.RegisterExports(typeof(FuncArrayKeyClient), typeof(Service));
+            container.RegisterExports(typeof(FuncArrayKeyClient), typeof(Service), typeof(KeyService));
 
-            Assert.Throws<ContainerException>(
-                () => container.Resolve<FuncArrayKeyClient>());
-
-            container.RegisterExports(typeof(KeyService));
-            container.Resolve<FuncArrayKeyClient>();
+            var client = container.Resolve<FuncArrayKeyClient>();
+            Assert.That(client.GetServices.Length, Is.EqualTo(1));
+            Assert.That(client.GetServices[0](), Is.InstanceOf<KeyService>());
         }
 
         [Test]
@@ -105,7 +103,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.RegisterExports(typeof(Service));
 
             var client = new NamedPropertyClient();
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
                 container.ResolvePropertiesAndFields(client));
 
             Assert.That(client.Some, Is.Null);
@@ -130,7 +128,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Register<Service>();
             container.Register<BadTypePropertyClient>();
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<BadTypePropertyClient>());
 
             Assert.That(ex.Message, Is.StringStarting("Required service type").And.StringContaining("is not assignable"));
@@ -159,10 +157,21 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.That(service.PropWithPrivateSetter, Is.InstanceOf<Service>());
         }
 
+        [Test]
+        public void When_resolving_props_and_fields_manually_required_type_should_work()
+        {
+            var container = new Container().WithAttributedModel();
+            container.Register<Service>();
+
+            var client = container.ResolvePropertiesAndFields(new ClientWithGenericWrapperProps());
+
+            Assert.That(client.GetService(), Is.InstanceOf<Service>());
+        }
+
         #region CUT
 
         [ExportAll, WithMetadata("blah")]
-        public class Service : IService {}
+        public class Service : IService { }
 
         [Export]
         public class Client
@@ -180,7 +189,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             public IService Some { get; set; }
 
-            public FuncClient([Import(typeof (Service))] Func<IService> getService)
+            public FuncClient([Import(typeof(Service))] Func<IService> getService)
             {
                 Some = getService();
             }
@@ -191,7 +200,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             public IService Some { get; set; }
 
-            public LazyClient([Import(typeof (Service))] Lazy<IService> getService)
+            public LazyClient([Import(typeof(Service))] Lazy<IService> getService)
             {
                 Some = getService.Value;
             }
@@ -203,7 +212,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             public IService Some { get; set; }
             public string Metadata { get; set; }
 
-            public LazyMetaClient([Import(typeof (Service))] Lazy<Meta<IService, string>> getService)
+            public LazyMetaClient([Import(typeof(Service))] Lazy<Meta<IService, string>> getService)
             {
                 Some = getService.Value.Value;
                 Metadata = getService.Value.Metadata;
@@ -215,47 +224,47 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             public IService Some { get; set; }
 
-            public FuncArrayClient([Import(typeof (Service))]Func<IService>[] getService)
+            public FuncArrayClient([Import(typeof(Service))]Func<IService>[] getService)
             {
                 Some = getService[0]();
             }
         }
 
-        [Export("k", typeof (IService))]
-        public class KeyService : IService {}
+        [Export("k", typeof(IService))]
+        public class KeyService : IService { }
 
-        [Export]
+        [Export, TransientReuse]
         public class FuncArrayKeyClient
         {
-            public IService Some { get; set; }
+            public Func<IService>[] GetServices { get; private set; }
 
-            public FuncArrayKeyClient([Import("k")]Func<IService>[] getService)
+            public FuncArrayKeyClient([Import("k")]Func<IService>[] getServices)
             {
-                Some = getService[0]();
+                GetServices = getServices;
             }
         }
 
         [Export]
         public class PropertyClient
         {
-            [Import(typeof (Service))]
+            [Import(typeof(Service))]
             public IService Some { get; set; }
         }
 
         [Export]
         public class NamedPropertyClient
         {
-            [Import("k", typeof (Service))]
+            [Import("k", typeof(Service))]
             public IService Some { get; set; }
         }
 
         [Export]
         public class BadTypePropertyClient
         {
-            [Import(typeof (BadType))]
+            [Import(typeof(BadType))]
             public IService Some { get; set; }
 
-            public class BadType {}
+            public class BadType { }
         }
 
         [Export]
@@ -278,10 +287,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Export]
         public class ServiceWithPropWithPrivateSetter
         {
-// ReSharper disable UnusedAutoPropertyAccessor.Local
+            // ReSharper disable UnusedAutoPropertyAccessor.Local
             [Import]
             public IService PropWithPrivateSetter { get; private set; }
-// ReSharper restore UnusedAutoPropertyAccessor.Local
+            // ReSharper restore UnusedAutoPropertyAccessor.Local
+        }
+
+        internal class ClientWithGenericWrapperProps
+        {
+            [Import(typeof(Service))]
+            public Func<IService> GetService { get; set; }
         }
 
         #endregion

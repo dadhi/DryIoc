@@ -13,10 +13,10 @@ namespace DryIoc.UnitTests
             container.Register(typeof(Client));
 
             var factories = HashTree<Type, Factory>.Empty;
-            container.Register<ILogger>(new FactoryProvider((request, _) =>
+            container.Register<ILogger>(new FactoryProvider(request =>
             {
-                var parent = request.GetNonWrapperParentOrDefault();
-                parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
+                var parent = request.GetNonWrapperParentOrRoot();
+                Throw.If(parent.IsRoot, "{0} should be resolved only as dependency in other service.", request.ServiceType);
                 var typeArg = parent.ImplementationType ?? parent.ServiceType;
 
                 var factory = factories.GetValueOrDefault(typeArg);
@@ -39,10 +39,10 @@ namespace DryIoc.UnitTests
             container.Register(typeof(ClientOfClient));
 
             var factories = HashTree<Type, Factory>.Empty;
-            container.Register<ILogger>(new FactoryProvider((request, _) =>
+            container.Register<ILogger>(new FactoryProvider(request =>
             {
-                var parent = request.GetNonWrapperParentOrDefault();
-                parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
+                var parent = request.GetNonWrapperParentOrRoot();
+                Throw.If(parent.IsRoot, "{0} should be resolved only as dependency in other service.", request.ServiceType);
                 var typeArg = parent.ImplementationType ?? parent.ServiceType;
 
                 var factory = factories.GetValueOrDefault(typeArg);
@@ -66,11 +66,10 @@ namespace DryIoc.UnitTests
 
             var factories = HashTree<Type, Factory>.Empty;
             container.Register<ILogger>(
-                new FactoryProvider((request, _) =>
+                new FactoryProvider(request =>
                 {
                     var implType = typeof(PlainLogger);
-                    var parent = request.GetNonWrapperParentOrDefault();
-                    if (parent != null && parent.ImplementationType == typeof(User2))
+                    if (request.GetNonWrapperParentOrRoot().ImplementationType == typeof(User2))
                         implType = typeof(FastLogger);
 
                     var factory = factories.GetValueOrDefault(implType);
@@ -90,7 +89,7 @@ namespace DryIoc.UnitTests
         public void If_FactoryProvider_is_returns_null_factory_it_should_Throw_Unable_to_resolve()
         {
             var container = new Container();
-            container.Register<object>(new FactoryProvider((request, registry) => null));
+            container.Register<object>(new FactoryProvider(request => null));
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<object>());

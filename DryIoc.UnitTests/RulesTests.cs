@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_should_be_able_to_add_rule_to_resolve_not_registered_service()
         {
-            var container = new Container(Rules.Default.With((request, registry) =>
+            var container = new Container(Rules.Default.With(request =>
                 request.ServiceType.IsClass && !request.ServiceType.IsAbstract
                     ? new ReflectionFactory(request.ServiceType)
                     : null));
@@ -85,7 +85,7 @@ namespace DryIoc.UnitTests
 
             container.Register(
                 typeof(IService<>),
-                new FactoryProvider((request, _) => new ReflectionFactory(
+                new FactoryProvider(request => new ReflectionFactory(
                     typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericArguments()),
                     Reuse.Singleton)));
 
@@ -103,7 +103,7 @@ namespace DryIoc.UnitTests
 
             container.Register(
                 typeof(IService<>),
-                new FactoryProvider((request, _) => new ReflectionFactory(
+                new FactoryProvider(request => new ReflectionFactory(
                     typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericArguments()),
                     Reuse.Singleton)));
 
@@ -136,29 +136,29 @@ namespace DryIoc.UnitTests
             Assert.That(service, Is.Null);
         }
 
-        public static ParameterServiceInfo GetServiceInfoFromImportAttribute(ParameterInfo parameter, Request request, IRegistry registry)
+        public static ParameterServiceInfo GetServiceInfoFromImportAttribute(ParameterInfo parameter, Request request)
         {
             var import = (ImportAttribute)parameter.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
             var details = import == null ? ServiceInfoDetails.IfUnresolvedThrow
                 : ServiceInfoDetails.Of(import.ContractType, import.ContractName);
-            return ParameterServiceInfo.Of(parameter).With(details, request, registry);
+            return ParameterServiceInfo.Of(parameter).With(details, request);
         }
 
-        public static ParameterServiceInfo GetServiceFromWithMetadataAttribute(ParameterInfo parameter, Request request, IRegistry registry)
+        public static ParameterServiceInfo GetServiceFromWithMetadataAttribute(ParameterInfo parameter, Request request)
         {
             var import = GetSingleAttributeOrDefault<ImportWithMetadataAttribute>(parameter.GetCustomAttributes(false));
             if (import == null)
                 return null;
 
+            var registry = request.Registry;
             var serviceType = parameter.ParameterType;
             serviceType = registry.GetWrappedServiceType(serviceType);
             var metadata = import.Metadata;
-            var factory = registry.GetAllFactories(serviceType)
+            var factory = registry.GetAllServiceFactories(serviceType)
                 .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
                 .ThrowIfNull("Unable to resolve", serviceType, metadata, request);
 
-            var details = ServiceInfoDetails.Of(serviceType, factory.Key);
-            return ParameterServiceInfo.Of(parameter).With(details, request, registry);
+            return ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(serviceType, factory.Key), request);
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
