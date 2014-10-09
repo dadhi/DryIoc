@@ -33,8 +33,6 @@ using System.Threading;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
-[assembly: SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable")]
-
 namespace DryIoc
 {
     /// <summary>
@@ -3752,6 +3750,7 @@ namespace DryIoc
         }
     }
 
+    [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable")]
     public class ContainerException : InvalidOperationException
     {
         public ContainerException(string message) : base(message) { }

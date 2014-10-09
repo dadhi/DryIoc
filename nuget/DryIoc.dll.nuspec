@@ -11,7 +11,7 @@
         <description>DryIoc is small, fast, capable IoC container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          fixed: #46: Reuse.InCurrentScope for nested dependencies is not working
+          fixed: #70: .Net 4.0 related: Unable to resolve types from unsigned assembly if compiling to dynamic assembly is turned On (it is by default)
         </releaseNotes>
     </metadata>
     <files>
