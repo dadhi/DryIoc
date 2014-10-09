@@ -741,9 +741,9 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
-            typeof(ContainerSetup).GetMethod("DoResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
+            typeof(ContainerSetup).GetMethod("DoResolveManyDynamically", BindingFlags.Static | BindingFlags.Public).ThrowIfNull();
 
-        internal static IEnumerable<TItem> DoResolveManyDynamically<TItem, TWrappedItem>(WeakReference registryRef, int parentFactoryID)
+        public static IEnumerable<TItem> DoResolveManyDynamically<TItem, TWrappedItem>(WeakReference registryRef, int parentFactoryID)
         {
             var itemType = typeof(TItem);
             var wrappedItemType = typeof(TWrappedItem);

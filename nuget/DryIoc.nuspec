@@ -11,7 +11,7 @@
         <description>DryIoc is small, fast, capable IoC container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          fixed: #56: ResolvePropertyAndFields/SatisfyImports for already created instance with regard of ResolutionRules, e.g. provided by MefAttributedModel
+          fixed: #70: .Net 4.0 related: Unable to resolve types from unsigned assembly if compiling to dynamic assembly is turned On (it is by default)
         </releaseNotes>
     </metadata>
     <files>
