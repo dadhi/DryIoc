@@ -28,7 +28,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(Bla<>),
-                withConstructor: t => t.GetConstructor(new[] { typeof(Func<>).MakeGenericType(t.GetGenericArguments()[0]) }));
+                withConstructor: t => t.GetConstructorWithParameters(new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()[0]) }));
 
             container.Register(typeof(SomeService), typeof(SomeService));
 
@@ -41,7 +41,7 @@ namespace DryIoc.UnitTests
         public void I_should_be_able_to_add_rule_to_resolve_not_registered_service()
         {
             var container = new Container(Rules.Default.With(request =>
-                request.ServiceType.IsClass && !request.ServiceType.IsAbstract
+                !request.ServiceType.IsValueType() && !request.ServiceType.IsAbstract()
                     ? new ReflectionFactory(request.ServiceType)
                     : null));
 
@@ -86,7 +86,7 @@ namespace DryIoc.UnitTests
             container.Register(
                 typeof(IService<>),
                 new FactoryProvider(request => new ReflectionFactory(
-                    typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericArguments()),
+                    typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericParamsAndArgs()),
                     Reuse.Singleton)));
 
             var service1 = container.Resolve<IService<int>>();
@@ -104,7 +104,7 @@ namespace DryIoc.UnitTests
             container.Register(
                 typeof(IService<>),
                 new FactoryProvider(request => new ReflectionFactory(
-                    typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericArguments()),
+                    typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericParamsAndArgs()),
                     Reuse.Singleton)));
 
             var service = container.Resolve<ServiceWithTwoSameGenericDependencies>();
@@ -146,7 +146,7 @@ namespace DryIoc.UnitTests
 
         public static ParameterServiceInfo GetServiceFromWithMetadataAttribute(ParameterInfo parameter, Request request)
         {
-            var import = GetSingleAttributeOrDefault<ImportWithMetadataAttribute>(parameter.GetCustomAttributes(false));
+            var import = (ImportWithMetadataAttribute)parameter.GetCustomAttributes(typeof(ImportWithMetadataAttribute), false).FirstOrDefault();
             if (import == null)
                 return null;
 
@@ -159,14 +159,6 @@ namespace DryIoc.UnitTests
                 .ThrowIfNull("Unable to resolve", serviceType, metadata, request);
 
             return ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(serviceType, factory.Key), request);
-        }
-
-        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
-        {
-            TAttribute attr = null;
-            for (var i = 0; i < attributes.Length && attr == null; i++)
-                attr = attributes[i] as TAttribute;
-            return attr;
         }
     }
 

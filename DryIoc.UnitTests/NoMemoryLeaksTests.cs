@@ -43,7 +43,7 @@ namespace DryIoc.UnitTests.Memory
             container = null;
             // ReSharper restore RedundantAssignment
             GC.Collect(Int32.MaxValue);
-            GC.WaitForFullGCComplete();
+            GC.WaitForPendingFinalizers();
             GC.Collect(Int32.MaxValue);
             GC.KeepAlive(services); 
             Assert.That(containerWeakRef.IsAlive, Is.False);
@@ -68,7 +68,7 @@ namespace DryIoc.UnitTests.Memory
             container = null;
             // ReSharper restore RedundantAssignment
             GC.Collect(Int32.MaxValue);
-            GC.WaitForFullGCComplete();
+            GC.WaitForPendingFinalizers();
             GC.Collect(Int32.MaxValue);
             GC.KeepAlive(savedResolver);
             Assert.That(containerWeakRef.IsAlive, Is.False);

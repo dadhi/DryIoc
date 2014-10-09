@@ -9,8 +9,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void GetImplementedTypes_should_work_for_open_generic_types()
         {
-            var types = typeof(Fuzz<>).GetImplementedTypes()
-                .Select(t => t.ContainsGenericParameters ? t.GetGenericTypeDefinition() : t);
+            var types = typeof(Fuzz<>).GetImplementedTypes().Select(t => t.GetGenericDefinitionOrNull() ?? t);
 
             CollectionAssert.AreEqual(new[] { typeof(IBuzz), typeof(IFuzz<>), typeof(IFuzz), typeof(Buzz) }, types);
         }
@@ -19,7 +18,7 @@ namespace DryIoc.UnitTests
         public void GetImplementedTypes_should_work_for_class_nested_in_open_generic_type_with_include_SourceType_option()
         {
             var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes(TypeTools.IncludeFlags.SourceType)
-                .Select(t => t.ContainsGenericParameters ? t.GetGenericTypeDefinition() : t);
+                .Select(t => t.GetGenericDefinitionOrNull() ?? t);
 
             CollectionAssert.AreEqual(new[] { typeof(Fuzz<>.NestedClazz), typeof(IFuzz<>), typeof(IFuzz) }, types);
         }
@@ -28,7 +27,7 @@ namespace DryIoc.UnitTests
         public void GetImplementedTypes_should_work_for_class_nested_in_open_generic_type_with_include_ObjectType_option()
         {
             var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes(TypeTools.IncludeFlags.ObjectType)
-                .Select(t => t.ContainsGenericParameters ? t.GetGenericTypeDefinition() : t);
+                .Select(t => t.GetGenericDefinitionOrNull() ?? t);
 
             CollectionAssert.AreEqual(new[] { typeof(IFuzz<>), typeof(IFuzz), typeof(object) }, types);
         }
@@ -37,7 +36,7 @@ namespace DryIoc.UnitTests
         public void GetImplementedTypes_should_work_for_class_nested_in_open_generic_type_with_both_SourceType_ObjectType_options()
         {
             var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes(TypeTools.IncludeFlags.ObjectType | TypeTools.IncludeFlags.SourceType)
-                .Select(t => t.ContainsGenericParameters ? t.GetGenericTypeDefinition() : t);
+                .Select(t => t.GetGenericDefinitionOrNull() ?? t);
 
             CollectionAssert.AreEqual(new[] { typeof(Fuzz<>.NestedClazz), typeof(IFuzz<>), typeof(IFuzz), typeof(object) }, types);
         }

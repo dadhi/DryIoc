@@ -160,6 +160,4 @@ namespace DryIoc.UnitTests
             CollectionAssert.AreEquivalent(new object[] { DefaultKey.Default, "another", EnumKey.Some }, pairs.Select(p => p.Key));
         }
     }
-
-    public enum EnumKey { Some };
 }

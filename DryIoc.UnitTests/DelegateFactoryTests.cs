@@ -140,10 +140,6 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<SomeClient>());
 
-            // JITing method, just for test. 
-            var method = GetType().GetMethod("Detect_recursive_dependency_when_registered_as_delegate");
-            System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(method.MethodHandle);
-
             Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
         }
 

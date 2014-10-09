@@ -375,12 +375,17 @@ namespace DryIoc.UnitTests.CUT
 
     public class ComplexCreativity
     {
+        public int Blah { get; set; }
+        public string Name { get; set; }
+
         public ComplexCreativity(string name)
         {
+            Name = name;
         }
 
         public ComplexCreativity(int blah)
         {
+            Blah = blah;
         }
 
         public ComplexCreativity()
@@ -428,6 +433,42 @@ namespace DryIoc.UnitTests.CUT
         public Fuh(IBar bar)
         {
             Bar = bar;
+        }
+    }
+
+    public class DisposableService : IService, IDisposable
+    {
+        public bool IsDisposed;
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    public enum EnumKey { Some };
+
+    public class Log {}
+
+    public class Consumer
+    {
+        public Account Account { get; set; }
+        public Log Log { get; set; }
+
+        public Consumer(Account account, Log log)
+        {
+            Account = account;
+            Log = log;
+        }
+    }
+
+    public class Account
+    {
+        public Log Log { get; set; }
+
+        public Account(Log log)
+        {
+            Log = log;
         }
     }
 }

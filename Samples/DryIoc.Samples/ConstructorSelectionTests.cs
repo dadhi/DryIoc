@@ -34,8 +34,7 @@ namespace DryIoc.Samples
             var container = new Container();
             container.Register<IService, SomeService>();
             
-            container.Register<ClassWithInternalConstructor>(
-                withConstructor: t => t.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)[0]);
+            container.Register<ClassWithInternalConstructor>(withConstructor: t => t.GetFirstConstructor(true));
 
             var obj = container.Resolve<ClassWithInternalConstructor>();
             Assert.IsNotNull(obj);

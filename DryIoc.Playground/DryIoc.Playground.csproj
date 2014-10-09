@@ -64,6 +64,7 @@
     <Compile Include="Performance\IlEmitDynamicMethodVsExpressionCompile.cs" />
     <Compile Include="Performance\MethodArgumentsPassingSpeedComparison.cs" />
     <Compile Include="Performance\ReflectionPerformanceTests.cs" />
+    <Compile Include="ReflectionTests.cs" />
     <Compile Include="TwoThreeTreeTests.cs" />
     <Compile Include="ValidatorTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

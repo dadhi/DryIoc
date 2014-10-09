@@ -15,7 +15,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
-                (type, request) => type.GetProperties().Select(PropertyOrFieldServiceInfo.Of)));
+                (type, request) => type.GetTypeInfo().DeclaredProperties.Select(PropertyOrFieldServiceInfo.Of)));
             container.Register<IService, Service>();
 
             var blah = container.Resolve<SomeBlah>();
@@ -28,7 +28,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
-                (type, request) => type.GetProperties().Select(p =>
+                (type, request) => type.GetTypeInfo().DeclaredProperties.Select(p =>
                     p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).With(ServiceInfoDetails.Of(typeof(Service)), request) : null)));
             container.Register<Service>();
 
@@ -148,7 +148,7 @@ namespace DryIoc.UnitTests
             container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(
                 parameters: Parameters.All
                     .And("x", "hola")
-                    .And(p => p.ParameterType.IsAssignableFrom(typeof(IService)), typeof(Service), "dependency")));
+                    .And(p => p.ParameterType.CanAssign(typeof(IService)), typeof(Service), "dependency")));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
 
@@ -447,7 +447,7 @@ namespace DryIoc.UnitTests
             // ReSharper restore UnassignedReadonlyField
 
             // ReSharper disable UnassignedField.Compiler
-            private IService _fPrivate;
+            protected IService _fPrivate;
             // ReSharper restore UnassignedField.Compiler
 
             public IService P { get; set; }

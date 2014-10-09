@@ -86,8 +86,7 @@ namespace DryIoc.MefAttributedModel
                 registrator.Register(factory, export.ServiceType,
                     export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
 
-                if (export.ServiceType.IsGenericType &&
-                    export.ServiceType.GetGenericTypeDefinition() == typeof(IFactory<>))
+                if (export.ServiceType.GetGenericDefinitionOrNull() == typeof(IFactory<>))
                     RegisterFactory(registrator, info.ImplementationType, export);
             }
         }
@@ -136,10 +135,10 @@ namespace DryIoc.MefAttributedModel
 
                     if (implementationType.IsGenericTypeDefinition)
                     {
-                        var implTypeArgs = implementationType.GetGenericArguments();
-                        allContractTypes = allContractTypes.Where(t =>
-                            t.IsGenericType && t.ContainsGenericParameters && t.ContainsAllGenericParameters(implTypeArgs))
-                            .Select(t => t.GetGenericTypeDefinition());
+                        var implTypeArgs = implementationType.GetGenericParamsAndArgs();
+                        allContractTypes = allContractTypes
+                            .Where(t => t.ContainsAllGenericParameters(implTypeArgs))
+                            .Select(t => t.GetGenericDefinitionOrNull());
                     }
 
                     var exportAllInfos = allContractTypes
@@ -203,9 +202,9 @@ namespace DryIoc.MefAttributedModel
         {
             var attributes = type.GetCustomAttributes(false);
 
-            for (var baseType = type.BaseType;
+            for (var baseType = type.GetBaseType();
                 baseType != typeof(object) && baseType != null;
-                baseType = baseType.BaseType)
+                baseType = baseType.GetBaseType())
                 attributes = attributes.Append(GetInheritedExportAttributes(baseType));
 
             var interfaces = type.GetInterfaces();
@@ -227,16 +226,16 @@ namespace DryIoc.MefAttributedModel
             return exports;
         }
 
-        private static readonly MethodInfo _resolveMethod =
-            typeof(Resolver).GetMethod("Resolve", new[] { typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type) });
+        private static readonly MethodInfo _resolveMethod = typeof(Resolver)
+            .GetDeclaredMethod("Resolve", new []{ typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type) });
 
-        private static readonly string _factoryMethodName = "Create";
-        private static readonly string _dotFactoryMethodName = "." + _factoryMethodName;
+        private const string _factoryMethodName = "Create";
+        private const string _dotFactoryMethodName = "." + _factoryMethodName;
 
         private static void RegisterFactory(IRegistrator registrator, Type factoryType, ExportInfo factoryExport)
         {
-            var serviceType = factoryExport.ServiceType.GetGenericArguments()[0];
-            var allMethods = factoryType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var serviceType = factoryExport.ServiceType.GetGenericParamsAndArgs()[0];
+            var allMethods = factoryType.GetAll(_ => _.DeclaredMethods);
             var factoryMethod = allMethods.FirstOrDefault(m =>
                 (m.Name == _factoryMethodName || m.Name.EndsWith(_dotFactoryMethodName))
                 && m.GetParameters().Length == 0 && m.ReturnType == serviceType)
@@ -273,7 +272,7 @@ namespace DryIoc.MefAttributedModel
 
         public static ConstructorInfo GetImportingConstructor(Type implementationType, Request request)
         {
-            var constructors = implementationType.GetConstructors();
+            var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
             return constructors.Length == 1 ? constructors[0]
                 : constructors.SingleOrDefault(x => Attribute.IsDefined(x, typeof(ImportingConstructorAttribute)))
                     .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, implementationType);
@@ -364,7 +363,7 @@ namespace DryIoc.MefAttributedModel
                 var reuse = GetReuseByType(reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType);
 
                 var withConstructor = import.WithConstructor == null ? null
-                    : (Func<Type, ConstructorInfo>)(t => t.GetConstructor(import.WithConstructor));
+                    : (Func<Type, ConstructorInfo>)(t => t.GetConstructorWithParameters(import.WithConstructor));
 
                 registry.Register(serviceType, implementationType,
                     reuse, withConstructor, Setup.WithMetadata(import.Metadata), serviceKey, IfAlreadyRegistered.KeepRegistered);

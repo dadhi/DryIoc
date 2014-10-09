@@ -47,7 +47,7 @@ namespace DryIoc.Playground
             var doMethod = methods.FirstOrDefault(
                 m => m.Name == "Do" || m.Name.EndsWith(".Do") 
                     && m.GetParameters().Length == 0 
-                    && m.ReturnType == typeof(IBoo<string>).GetGenericArguments()[0]);
+                    && m.ReturnType == typeof(IBoo<string>).GetGenericParamsAndArgs()[0]);
 
             Assert.That(doMethod, Is.Not.Null);
         }

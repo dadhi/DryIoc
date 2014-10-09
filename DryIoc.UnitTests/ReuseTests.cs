@@ -266,42 +266,6 @@ namespace DryIoc.UnitTests
         }
     }
 
-    public class DisposableService : IService, IDisposable
-    {
-        public bool IsDisposed;
-
-        public void Dispose()
-        {
-            IsDisposed = true;
-        }
-    }
-
-    public class Consumer
-    {
-        public Account Account { get; set; }
-        public Log Log { get; set; }
-
-        public Consumer(Account account, Log log)
-        {
-            Account = account;
-            Log = log;
-        }
-    }
-
-    public class Account
-    {
-        public Log Log { get; set; }
-
-        public Account(Log log)
-        {
-            Log = log;
-        }
-    }
-
-    public class Log
-    {
-    }
-
     public class ServiceWithResolutionAndSingletonDependencies
     {
         public SingletonDep SingletonDep { get; set; }
