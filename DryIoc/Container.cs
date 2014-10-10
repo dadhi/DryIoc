@@ -2989,6 +2989,11 @@ namespace DryIoc
             return source.WithDetails(p => p.ParameterType.CanAssign(type), ServiceInfoDetails.Of(getValue));
         }
 
+        public static IEnumerable<Attribute> GetAttributes(this ParameterInfo paremeter, Type attributeType = null, bool inherit = false)
+        {
+            return paremeter.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).Cast<Attribute>();
+        }
+
         #region Implementation
 
         private static ParameterSelector WithDetails(this ParameterSelector source, Func<ParameterInfo, bool> condition,
@@ -3152,6 +3157,11 @@ namespace DryIoc
         public static bool IsPublic(this PropertyInfo property)
         {
             return _getPropertySetMethodDelegate(property) != null;
+        }
+
+        public static IEnumerable<Attribute> GetAttributes(this MemberInfo member, Type attributeType = null, bool inherit = false)
+        {
+            return member.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).Cast<Attribute>();
         }
 
         #endregion
@@ -3822,7 +3832,7 @@ namespace DryIoc
         {
             Type[] results;
 
-            var interfaces = sourceType.GetTypeInfo().ImplementedInterfaces.ToArrayOrSelf();
+            var interfaces = sourceType.GetImplementedInterfaces();
             var interfaceStartIndex = (includeFlags & IncludeFlags.SourceType) == 0 ? 0 : 1;
             var includingObjectType = (includeFlags & IncludeFlags.ObjectType) == 0 ? 0 : 1;
             var sourcePlusInterfaceCount = interfaceStartIndex + interfaces.Length;
@@ -3858,6 +3868,14 @@ namespace DryIoc
                 results[results.Length - 1] = typeof(object);
 
             return results;
+        }
+
+        /// <summary>Gets a collection of the interfaces implemented by the current type and its base types.</summary>
+        /// <param name="type">Source type</param>
+        /// <returns>Collection of interface types.</returns>
+        public static Type[] GetImplementedInterfaces(this Type type)
+        {
+            return type.GetTypeInfo().ImplementedInterfaces.ToArrayOrSelf();
         }
 
         /// <summary>
@@ -3940,6 +3958,11 @@ namespace DryIoc
             return type.GetTypeInfo().IsAbstract;
         }
 
+        public static bool IsEnum(this Type type)
+        {
+            return type.GetTypeInfo().IsEnum;
+        }
+
         public static bool CanAssign(this Type type, Type other)
         {
             return type.GetTypeInfo().IsAssignableFrom(other.GetTypeInfo());
@@ -3955,6 +3978,11 @@ namespace DryIoc
             var typeInfo = type.GetTypeInfo();
             return typeInfo.IsPrimitive || type == typeof(string) || type == typeof(object) ||
                    typeInfo.IsArray && typeInfo.GetElementType().IsPrimitiveOrObjectOrString();
+        }
+
+        public static Attribute[] GetAttributes(this Type type, Type attributeType = null, bool inherit = false)
+        {
+            return type.GetTypeInfo().GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).ToArrayOrSelf();
         }
 
         public static IEnumerable<T> GetAll<T>(this Type type, Func<TypeInfo, IEnumerable<T>> getDeclared)
@@ -4007,6 +4035,8 @@ namespace DryIoc
             return type.GetAll(_ => _.DeclaredFields).FirstOrDefault(p => p.Name == name);
         }
 
+        public static Assembly GetAssembly(this Type type) { return type.GetTypeInfo().Assembly; }
+
         #region Implementation
 
         private static readonly Func<Type, Type[]> _getGenericArgumentsDelegate =
@@ -4035,7 +4065,9 @@ namespace DryIoc
     {
         public static T[] ToArrayOrSelf<T>(this IEnumerable<T> source)
         {
-            return source is T[] ? (T[])source : source.ToArray();
+            if (source is T[]) 
+                return (T[])source;
+            return source.ToArray();
         }
 
         public static T[] Append<T>(this T[] source, params T[] added)

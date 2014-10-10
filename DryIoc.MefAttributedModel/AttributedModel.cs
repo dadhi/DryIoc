@@ -29,6 +29,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using System.Diagnostics.CodeAnalysis;
 
 namespace DryIoc.MefAttributedModel
 {
@@ -93,18 +94,18 @@ namespace DryIoc.MefAttributedModel
 
         public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
-            return assemblies.SelectMany(a => a.GetTypes())
+            return assemblies.SelectMany(_getAssemblyTypes)
                 .Select(GetRegistrationInfoOrDefault)
                 .Where(info => info != null);
         }
 
         public static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType)
         {
-            return !implementationType.IsClass || implementationType.IsAbstract ? null
+            return implementationType.IsValueType() || implementationType.IsAbstract() ? null
                 : GetRegistrationInfoOrDefault(implementationType, GetAllExportRelatedAttributes(implementationType));
         }
 
-        public static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType, object[] attributes)
+        public static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType, Attribute[] attributes)
         {
             if (attributes.Length == 0 ||
                 attributes.IndexOf(a => a is ExportAttribute || a is ExportAllAttribute) == -1 ||
@@ -133,7 +134,7 @@ namespace DryIoc.MefAttributedModel
                     var exportAllAttribute = (ExportAllAttribute)attribute;
                     var allContractTypes = exportAllAttribute.GetAllContractTypes(implementationType);
 
-                    if (implementationType.IsGenericTypeDefinition)
+                    if (implementationType.IsGenericDefinition())
                     {
                         var implTypeArgs = implementationType.GetGenericParamsAndArgs();
                         allContractTypes = allContractTypes
@@ -182,7 +183,7 @@ namespace DryIoc.MefAttributedModel
                     info.Decorator = new DecoratorInfo(decorator.ConditionType, decorator.ContractName ?? decorator.ContractKey);
                 }
 
-                if (Attribute.IsDefined(attribute.GetType(), typeof(MetadataAttributeAttribute), true))
+                if (attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
                     Throw.If(info.HasMetadataAttribute, Error.UNSUPPORTED_MULTIPLE_METADATA, implementationType);
                     info.HasMetadataAttribute = true;
@@ -196,85 +197,13 @@ namespace DryIoc.MefAttributedModel
             return info;
         }
 
-        #region Implementation
-
-        private static object[] GetAllExportRelatedAttributes(Type type)
-        {
-            var attributes = type.GetCustomAttributes(false);
-
-            for (var baseType = type.GetBaseType();
-                baseType != typeof(object) && baseType != null;
-                baseType = baseType.GetBaseType())
-                attributes = attributes.Append(GetInheritedExportAttributes(baseType));
-
-            var interfaces = type.GetInterfaces();
-            for (var i = 0; i < interfaces.Length; i++)
-                attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
-
-            return attributes;
-        }
-
-        private static object[] GetInheritedExportAttributes(Type type)
-        {
-            var exports = type.GetCustomAttributes(typeof(InheritedExportAttribute), false);
-            for (var i = 0; i < exports.Length; i++)
-            {
-                var export = (InheritedExportAttribute)exports[i];
-                if (export.ContractType == null)
-                    exports[i] = new InheritedExportAttribute(export.ContractName, type);
-            }
-            return exports;
-        }
-
-        private static readonly MethodInfo _resolveMethod = typeof(Resolver)
-            .GetDeclaredMethod("Resolve", new []{ typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type) });
-
-        private const string _factoryMethodName = "Create";
-        private const string _dotFactoryMethodName = "." + _factoryMethodName;
-
-        private static void RegisterFactory(IRegistrator registrator, Type factoryType, ExportInfo factoryExport)
-        {
-            var serviceType = factoryExport.ServiceType.GetGenericParamsAndArgs()[0];
-            var allMethods = factoryType.GetAll(_ => _.DeclaredMethods);
-            var factoryMethod = allMethods.FirstOrDefault(m =>
-                (m.Name == _factoryMethodName || m.Name.EndsWith(_dotFactoryMethodName))
-                && m.GetParameters().Length == 0 && m.ReturnType == serviceType)
-                .ThrowIfNull();
-
-            var attributes = factoryMethod.GetCustomAttributes(false);
-
-            var info = GetRegistrationInfoOrDefault(serviceType, attributes);
-            if (info == null)
-                return;
-
-            // Result expression is {container.Resolve<IFactory<TService>>(factoryName).Create()} 
-            Func<Request, Expression> factoryCreateExpr = request =>
-                Expression.Call(
-                    Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
-                        request.State.GetOrAddItemExpression(request),
-                        Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
-                        Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved)),
-                        Expression.Constant(null, typeof(Type))),
-                    _factoryMethodName, null);
-
-            var factory = new ExpressionFactory(factoryCreateExpr, GetReuseByType(info.ReuseType), info.GetSetup(attributes));
-
-            for (var i = 0; i < info.Exports.Length; i++)
-            {
-                var exp = info.Exports[i];
-                registrator.Register(factory, exp.ServiceType, exp.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
-            }
-        }
-
-        #endregion
-
         #region Tools
 
         public static ConstructorInfo GetImportingConstructor(Type implementationType, Request request)
         {
             var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
             return constructors.Length == 1 ? constructors[0]
-                : constructors.SingleOrDefault(x => Attribute.IsDefined(x, typeof(ImportingConstructorAttribute)))
+                : constructors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
                     .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, implementationType);
         }
 
@@ -292,29 +221,31 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        public static ParameterServiceInfo GetImportedParameter(ParameterInfo p, Request request)
+        public static ParameterServiceInfo GetImportedParameter(ParameterInfo parameter, Request request)
         {
-            var attrs = p.GetCustomAttributes(false);
-            return attrs.Length == 0 ? ParameterServiceInfo.Of(p)
-                : ParameterServiceInfo.Of(p).With(GetFirstImportDetailsOrNull(p.ParameterType, attrs, request), request);
+            var serviceInfo = ParameterServiceInfo.Of(parameter);
+            var attrs = parameter.GetAttributes().ToArray();
+            return attrs.Length == 0 ? serviceInfo
+                : serviceInfo.With(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
         }
 
         public static readonly PropertiesAndFieldsSelector GetImportedPropertiesAndFields =
             PropertiesAndFields.All(PropertiesAndFields.Flags.All, GetImportedPropertiesAndFieldsOnly);
 
-        private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo m, Request request)
+        private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
         {
-            var attrs = m.GetCustomAttributes(false);
-            var details = attrs.Length == 0 ? null : GetFirstImportDetailsOrNull(m.GetPropertyOrFieldType(), attrs, request);
-            return details == null ? null : PropertyOrFieldServiceInfo.Of(m).With(details, request);
+            var attributes = member.GetAttributes().ToArray();
+            var details = attributes.Length == 0 ? null 
+                : GetFirstImportDetailsOrNull(member.GetPropertyOrFieldType(), attributes, request);
+            return details == null ? null : PropertyOrFieldServiceInfo.Of(member).With(details, request);
         }
 
-        public static ServiceInfoDetails GetFirstImportDetailsOrNull(Type type, object[] attributes, Request request)
+        public static ServiceInfoDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
         {
             return GetImportDetails(type, attributes, request) ?? GetImportExternalDetails(type, attributes, request);
         }
 
-        public static ServiceInfoDetails GetImportDetails(Type reflectedType, object[] attributes, Request request)
+        public static ServiceInfoDetails GetImportDetails(Type reflectedType, Attribute[] attributes, Request request)
         {
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
             if (import == null)
@@ -329,7 +260,7 @@ namespace DryIoc.MefAttributedModel
             return ServiceInfoDetails.Of(import.ContractType, serviceKey, ifUnresolved);
         }
 
-        public static object GetServiceKeyWithMetadataAttribute(Type reflectedType, object[] attributes, Request request)
+        public static object GetServiceKeyWithMetadataAttribute(Type reflectedType, Attribute[] attributes, Request request)
         {
             var meta = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
             if (meta == null)
@@ -345,7 +276,7 @@ namespace DryIoc.MefAttributedModel
             return factory.Key;
         }
 
-        public static ServiceInfoDetails GetImportExternalDetails(Type serviceType, object[] attributes, Request request)
+        public static ServiceInfoDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, Request request)
         {
             var import = GetSingleAttributeOrDefault<ImportExternalAttribute>(attributes);
             if (import == null)
@@ -372,12 +303,87 @@ namespace DryIoc.MefAttributedModel
             return ServiceInfoDetails.Of(serviceType, serviceKey);
         }
 
-        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
+        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(Attribute[] attributes) where TAttribute : Attribute
         {
             TAttribute attr = null;
             for (var i = 0; i < attributes.Length && attr == null; i++)
                 attr = attributes[i] as TAttribute;
             return attr;
+        }
+
+        #endregion
+
+        #region Implementation
+
+        private static Attribute[] GetAllExportRelatedAttributes(Type type)
+        {
+            var attributes = type.GetAttributes();
+
+            for (var baseType = type.GetBaseType();
+                baseType != typeof(object) && baseType != null;
+                baseType = baseType.GetBaseType())
+                attributes = attributes.Append(GetInheritedExportAttributes(baseType));
+
+            var interfaces = type.GetImplementedInterfaces();
+            for (var i = 0; i < interfaces.Length; i++)
+                attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
+
+            return attributes;
+        }
+
+        private static Attribute[] GetInheritedExportAttributes(Type type)
+        {
+            var exports = type.GetAttributes(typeof(InheritedExportAttribute));
+            for (var i = 0; i < exports.Length; i++)
+            {
+                var export = (InheritedExportAttribute)exports[i];
+                if (export.ContractType == null)
+                    exports[i] = new InheritedExportAttribute(export.ContractName, type);
+            }
+            return exports;
+        }
+
+        private static readonly MethodInfo _resolveMethod = typeof(Resolver)
+            .GetDeclaredMethod("Resolve", new[] { typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type) });
+
+        private static readonly Func<Assembly, IEnumerable<Type>> _getAssemblyTypes =
+            ExpressionTools.GetMethodDelegate<Assembly, IEnumerable<Type>>("GetTypes").ThrowIfNull();
+
+        private const string _factoryMethodName = "Create";
+        private const string _dotFactoryMethodName = "." + _factoryMethodName;
+
+        private static void RegisterFactory(IRegistrator registrator, Type factoryType, ExportInfo factoryExport)
+        {
+            var serviceType = factoryExport.ServiceType.GetGenericParamsAndArgs()[0];
+            var allMethods = factoryType.GetAll(_ => _.DeclaredMethods);
+            var factoryMethod = allMethods.FirstOrDefault(m =>
+                (m.Name == _factoryMethodName || m.Name.EndsWith(_dotFactoryMethodName))
+                && m.GetParameters().Length == 0 && m.ReturnType == serviceType)
+                .ThrowIfNull();
+
+            var attributes = factoryMethod.GetCustomAttributes(false).Cast<Attribute>().ToArray();
+
+            var info = GetRegistrationInfoOrDefault(serviceType, attributes);
+            if (info == null)
+                return;
+
+            // Result expression is {container.Resolve<IFactory<TService>>(factoryName).Create()} 
+            Func<Request, Expression> factoryCreateExpr = request =>
+                Expression.Call(
+                    Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
+                        request.State.GetOrAddItemExpression(request),
+                        Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
+                        Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved)),
+                        Expression.Constant(null, typeof(Type))),
+                    _factoryMethodName, null);
+
+            var factory = new ExpressionFactory(factoryCreateExpr, GetReuseByType(info.ReuseType), info.GetSetup(attributes));
+
+            for (var i = 0; i < info.Exports.Length; i++)
+            {
+                var exp = info.Exports[i];
+                registrator.Register(factory, exp.ServiceType, exp.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
+            }
         }
 
         #endregion
@@ -443,7 +449,7 @@ namespace DryIoc.MefAttributedModel
                 return code.AppendType((Type)x);
 
             var type = x.GetType();
-            if (type.IsEnum)
+            if (type.IsEnum())
                 return code.AppendEnum(type, x);
 
             if (ifNotRecognized != null)
@@ -481,7 +487,7 @@ namespace DryIoc.MefAttributedModel
             return ReuseType == null ? null : AttributedModel.SupportedReuseTypes[ReuseType];
         }
 
-        public FactorySetup GetSetup(object[] attributes = null)
+        public FactorySetup GetSetup(Attribute[] attributes = null)
         {
             if (FactoryType == FactoryType.GenericWrapper)
                 return GenericWrapper == null ? GenericWrapperSetup.Default : GenericWrapper.GetSetup();
@@ -534,11 +540,11 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
-        private object GetMetadata(object[] attributes = null)
+        private object GetMetadata(Attribute[] attributes = null)
         {
-            attributes = attributes ?? ImplementationType.GetCustomAttributes(false);
+            attributes = attributes ?? ImplementationType.GetAttributes();
             var metadataAttr = attributes.FirstOrDefault(
-                a => Attribute.IsDefined(a.GetType(), typeof(MetadataAttributeAttribute), true));
+                a => a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any());
 
             return metadataAttr is WithMetadataAttribute
                 ? ((WithMetadataAttribute)metadataAttr).Metadata
@@ -691,7 +697,7 @@ namespace DryIoc.MefAttributedModel
         public ResolutionScopeReuseAttribute() : base(typeof(ResolutionScopeReuse)) { }
     }
 
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
+    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible"), AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
     public class ExportWithKeyAttribute : ExportAttribute
     {
         /// <remarks>Specifies service key if <see cref="ExportAttribute.ContractName"/> is not specified.</remarks>
@@ -751,7 +757,7 @@ namespace DryIoc.MefAttributedModel
         bool CanApply(Request request);
     }
 
-    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
+    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible"), AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
     public class ImportWithKeyAttribute : ImportAttribute
     {
         public object ContractKey { get; set; }

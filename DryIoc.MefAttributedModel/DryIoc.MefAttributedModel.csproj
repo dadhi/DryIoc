@@ -29,6 +29,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System.Core" />
@@ -37,7 +38,7 @@
     <Compile Include="AttributedModel.cs" />
     <Compile Include="net40\ExportImportAttributes.cs" />
     <Compile Include="Properties\Version.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs"/>
+    <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">

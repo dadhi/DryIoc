@@ -138,7 +138,7 @@ namespace DryIoc.UnitTests
 
         public static ParameterServiceInfo GetServiceInfoFromImportAttribute(ParameterInfo parameter, Request request)
         {
-            var import = (ImportAttribute)parameter.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
+            var import = (ImportAttribute)parameter.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
             var details = import == null ? ServiceInfoDetails.IfUnresolvedThrow
                 : ServiceInfoDetails.Of(import.ContractType, import.ContractName);
             return ParameterServiceInfo.Of(parameter).With(details, request);
@@ -146,7 +146,8 @@ namespace DryIoc.UnitTests
 
         public static ParameterServiceInfo GetServiceFromWithMetadataAttribute(ParameterInfo parameter, Request request)
         {
-            var import = (ImportWithMetadataAttribute)parameter.GetCustomAttributes(typeof(ImportWithMetadataAttribute), false).FirstOrDefault();
+            var import = (ImportWithMetadataAttribute)parameter.GetAttributes(typeof(ImportWithMetadataAttribute))
+                .FirstOrDefault();
             if (import == null)
                 return null;
 

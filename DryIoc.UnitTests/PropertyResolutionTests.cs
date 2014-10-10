@@ -158,7 +158,7 @@ namespace DryIoc.UnitTests
 
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFields(MemberInfo m, Request req)
         {
-            var import = (ImportAttribute)m.GetCustomAttributes(typeof(ImportAttribute), false).FirstOrDefault();
+            var import = (ImportAttribute)m.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
             return import == null ? null : PropertyOrFieldServiceInfo.Of(m)
                 .With(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req);
         }

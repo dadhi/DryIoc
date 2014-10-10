@@ -14,9 +14,9 @@ namespace DryIoc.Samples
             var plugins = container.Resolve<Many<IPlugin>>();
             Assert.That(plugins.Items.Count(), Is.EqualTo(0));
 
-            var pluginAssembly = typeof(AutoWiring).Assembly;
+            var pluginAssembly = typeof(AutoWiring).GetAssembly();
 
-            var pluginTypes = pluginAssembly.GetTypes().Where(t => t.IsPublic && !t.IsAbstract 
+            var pluginTypes = pluginAssembly.GetTypes().Where(t => t.IsPublicOrNestedPublic() && !t.IsAbstract()
                 && t.GetImplementedTypes().Contains(typeof(IPlugin)));
 
             foreach (var pluginType in pluginTypes)

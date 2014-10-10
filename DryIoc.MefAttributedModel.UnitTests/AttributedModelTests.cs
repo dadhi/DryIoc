@@ -178,7 +178,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
         private void GivenAssemblyWithExportedTypes()
         {
-            _assembly = typeof(DependentService).Assembly;
+            _assembly = typeof(DependentService).GetAssembly();
         }
 
         private Assembly _assembly;

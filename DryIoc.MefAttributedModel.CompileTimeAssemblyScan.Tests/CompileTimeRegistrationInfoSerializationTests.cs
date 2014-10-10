@@ -39,7 +39,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         public void Given_scnanned_assembly_When_serialize_data_Then_deserialize_will_return_the_same_data()
         {
             // Given
-            var assembly = typeof(TransientService).Assembly;
+            var assembly = typeof(TransientService).GetAssembly();
             var services = AttributedModel.Scan(new[] { assembly }).ToArray();
 
             // When
@@ -63,7 +63,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         public void Given_deserialized_data_When_registering_scanned_data_into_container_Then_metadata_should_correctly_registered_too()
         {
             // Given
-            var assembly = typeof(TransientService).Assembly;
+            var assembly = typeof(TransientService).GetAssembly();
             var services = AttributedModel.Scan(new[] { assembly }).ToArray();
 
             if (File.Exists(DATA_FILE))

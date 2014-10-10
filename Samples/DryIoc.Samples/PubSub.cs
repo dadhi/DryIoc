@@ -33,11 +33,11 @@ namespace DryIoc.Samples
                 (s, r) =>
                 {
                     var receive = s.GetType().GetMethods()
-                        .FirstOrDefault(m => m.GetCustomAttributes(typeof(ReceiveAttribute), false).Length == 1);
+                        .FirstOrDefault(m => m.GetAttributes(typeof(ReceiveAttribute)).Count() == 1);
                     r.Resolve<PubSubHub>().Subscribe(message => receive.Invoke(s, new[] { message }));
                 }, 
                 r => r.ImplementationType != null 
-                  && r.ImplementationType.GetCustomAttributes(typeof(SubscriberAttribute), false).Length == 1);
+                  && r.ImplementationType.GetAttributes(typeof(SubscriberAttribute)).Count() == 1);
             
             container.Register<AttributedSubscriber>();
 

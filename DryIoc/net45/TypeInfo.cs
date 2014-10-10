@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace System.Reflection
 {
@@ -18,6 +19,8 @@ namespace System.Reflection
         }
 
         public Type AsType() { return _type; }
+
+        public Assembly Assembly { get { return _type.Assembly; } }
 
         public IEnumerable<ConstructorInfo> DeclaredConstructors
         {
@@ -40,6 +43,12 @@ namespace System.Reflection
         }
 
         public IEnumerable<Type> ImplementedInterfaces { get { return _type.GetInterfaces(); } }
+
+        public IEnumerable<Attribute> GetCustomAttributes(Type attributeType, bool inherit)
+        {
+            return _type.GetCustomAttributes(attributeType, inherit).Cast<Attribute>();
+        }  
+
         public Type BaseType { get { return _type.BaseType; } }
         public bool IsGenericType { get { return _type.IsGenericType; } }
         public bool IsGenericTypeDefinition { get { return _type.IsGenericTypeDefinition; } }
@@ -51,6 +60,7 @@ namespace System.Reflection
         public bool IsNestedPublic { get { return _type.IsNestedPublic; } }
         public Type DeclaringType { get { return _type.DeclaringType; } }
         public bool IsAbstract { get { return _type.IsAbstract;  } }
+        public bool IsEnum { get { return _type.IsEnum;  } }
 
         public Type GetElementType() { return _type.GetElementType(); }
 
