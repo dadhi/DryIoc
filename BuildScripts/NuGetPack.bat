@@ -2,22 +2,22 @@
 pushd ".."
 
 set NUGET=".nuget\NuGet.exe"
-set PACKAGE_OUTDIR="bin\NuGetPackages"
+set PACKAGEDIR="bin\NuGetPackages"
 
 echo:
-echo:Packing NuGet packages into %PACKAGE_OUTDIR% . . .
+echo:Packing NuGet packages into %PACKAGEDIR% . . .
 echo:
 
-if exist %PACKAGE_OUTDIR% rd /s /q %PACKAGE_OUTDIR%
-md %PACKAGE_OUTDIR% 
+if exist %PACKAGEDIR% rd /s /q %PACKAGEDIR%
+md %PACKAGEDIR% 
 
 call :ParseVersion "DryIoc\Properties\Version.cs"
-%NUGET% pack "NuGet\DryIoc.nuspec" -Version %VER% -OutputDirectory %PACKAGE_OUTDIR% -NonInteractive
-%NUGET% pack "NuGet\DryIoc.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGE_OUTDIR% -Symbols -NonInteractive
+%NUGET% pack "NuGet\DryIoc.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack "NuGet\DryIoc.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -Symbols -NonInteractive
 
 call :ParseVersion "DryIoc.MefAttributedModel\Properties\Version.cs"
-%NUGET% pack "NuGet\DryIoc.MefAttributedModel.nuspec" -Version %VER% -OutputDirectory %PACKAGE_OUTDIR% -NonInteractive
-%NUGET% pack "NuGet\DryIoc.MefAttributedModel.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGE_OUTDIR% -Symbols -NonInteractive
+%NUGET% pack "NuGet\DryIoc.MefAttributedModel.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack "NuGet\DryIoc.MefAttributedModel.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -Symbols -NonInteractive
 
 echo: 
 echo:Packaging succeeded.

@@ -5,4 +5,8 @@ os: Windows Server 2012
 test: off
  
 build_script:
-  - .\BuildScripts\Main.bat -nopause
+ - .\BuildScripts\Main.bat -nopause
+
+artefacts:
+ - path: DryIoc\bin\NuGetPackages\*.nupkg
+ - type: NuGet package
