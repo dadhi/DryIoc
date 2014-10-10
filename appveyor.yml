@@ -7,6 +7,15 @@ test: off
 build_script:
  - .\BuildScripts\_main.bat -nopause
 
+assembly_info:
+  patch: true
+  file: AssemblyInfo.*
+  assembly_version: "{version}"
+  assembly_file_version: "{version}"
+
 artefacts:
- - path: DryIoc\bin\NuGetPackages\*.nupkg
- - type: NuGet package
+ - path: bin\NuGetPackages\*.nupkg
+
+nuget:
+  account_feed: true
+  project_feed: true
