@@ -6,16 +6,25 @@ set PACKAGEDIR="bin\NuGetPackages"
 
 echo:
 echo:Packing NuGet packages into %PACKAGEDIR% . . .
-echo:
 
 if exist %PACKAGEDIR% rd /s /q %PACKAGEDIR%
 md %PACKAGEDIR% 
 
-call :ParseVersion "DryIoc\Properties\Version.cs"
+call :ParseVersion "DryIoc\Properties\AssemblyInfo.cs"
+
+echo:
+echo:DryIoc v%VER%
+echo:================
+
 %NUGET% pack "NuGet\DryIoc.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 %NUGET% pack "NuGet\DryIoc.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -Symbols -NonInteractive
 
-call :ParseVersion "DryIoc.MefAttributedModel\Properties\Version.cs"
+call :ParseVersion "DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs"
+
+echo:
+echo:MefAttributedModel v%VER%
+echo:============================
+
 %NUGET% pack "NuGet\DryIoc.MefAttributedModel.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 %NUGET% pack "NuGet\DryIoc.MefAttributedModel.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -Symbols -NonInteractive
 
@@ -28,5 +37,7 @@ goto:eof
 
 :ParseVersion
 set VERFILE=%~1
-for /f "usebackq delims==; tokens=2" %%Q in ("%VERFILE%") do for /f %%V in (%%Q) do set VER=%%V
+for /f "usebackq tokens=2,3 delims=:() " %%A in ("%VERFILE%") do (
+	if "%%A"=="AssemblyVersion" set VER=%%~B
+)
 exit /b

@@ -37,7 +37,6 @@
   <ItemGroup>
     <Compile Include="AttributedModel.cs" />
     <Compile Include="net40\ExportImportAttributes.cs" />
-    <Compile Include="Properties\Version.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

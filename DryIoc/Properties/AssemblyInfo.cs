@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
-using DryIoc.Properties;
 
 [assembly: AssemblyTitle("DryIoc")]
 [assembly: AssemblyDescription("DryIoc is small, fast, capable IoC container.")]
@@ -11,7 +10,7 @@ using DryIoc.Properties;
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
-[assembly: AssemblyVersion(Version.SEMANTIC_VERSION)]
-[assembly: AssemblyFileVersion(Version.SEMANTIC_VERSION)]
+[assembly: AssemblyVersion("2.0.0")]
+[assembly: AssemblyFileVersion("2.0.0")]
 
 [assembly: InternalsVisibleTo("DryIoc.UnitTests")]
