@@ -23,7 +23,6 @@ THE SOFTWARE.
 */
 
 using System;
-using System.IO;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -44,7 +43,7 @@ namespace DryIoc
             "48c796b22ebb70472c5412c997f68d6e5a044de3b0de7b95d1569ee57bf72469f23c748f5879e5" +
             "0a8d50b2";
 
-        public static readonly byte[] StrongNameKeyPairBytes =
+        public static byte[] StrongNameKeyPairBytes { get { return new byte[]
         {
             0x07, 0x02, 0x00, 0x00, 0x00, 0x24, 0x00, 0x00, 0x52, 0x53, 0x41, 0x32, 0x00, 0x04, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0xC3, 0xEE, 0x5D, 0xD1, 
             0x55, 0x05, 0xAE, 0xD4, 0x91, 0xF6, 0xEF, 0xFE, 0x15, 0x7E, 0x3E, 0xC3, 0x69, 0x4E, 0x4E, 0xC3, 0xA5, 0x32, 0xD3, 0xC1, 0x6E, 0x49, 0x7A, 0xB1, 
@@ -71,7 +70,7 @@ namespace DryIoc
             0xD3, 0x0B, 0xD6, 0xF4, 0x7F, 0x31, 0xCC, 0x57, 0x53, 0x63, 0x72, 0x1B, 0xD9, 0x0A, 0x3C, 0x67, 0x25, 0xA3, 0xCE, 0x5E, 0x1A, 0xED, 0xC7, 0x2C, 
             0x24, 0xC8, 0x88, 0x17, 0x43, 0x59, 0x07, 0x7F, 0x8D, 0x7B, 0x5A, 0x5E, 0x29, 0x98, 0x26, 0xEF, 0xE2, 0xB0, 0xB9, 0xB2, 0xBA, 0x72, 0x69, 0xFB, 
             0x5C, 0xBE, 0x9B, 0xF3, 0x45, 0x3E, 0x00, 0x77, 0x64, 0x08, 0x5F, 0xAE, 0x8D, 0x96, 0xC0, 0x30, 0x1F, 0x41, 0xE6, 0x60
-        };
+        }; }}
 
         static partial void CompileToMethod(Expression<CompiledFactory> factoryExpression, ref CompiledFactory resultFactory)
         {
@@ -102,10 +101,20 @@ namespace DryIoc
         private static ModuleBuilder DefineDynamicAssemblyModuleBuilder()
         {
             var assemblyName = new AssemblyName(DYNAMIC_ASSEMBLY_NAME);
-            assemblyName.KeyPair = new StrongNameKeyPair(StrongNameKeyPairBytes);
+
+            // if DryIoc assembly is signed, then sign the dynamic assembly too, otherwise don't.
+            if (IsDryIocSigned())
+                assemblyName.KeyPair = new StrongNameKeyPair(StrongNameKeyPairBytes);
+
             var assemblyBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
             var moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name);
             return moduleBuilder;
+        }
+
+        private static bool IsDryIocSigned()
+        {
+            var publicKey = typeof(FactoryCompiler).Assembly.GetName().GetPublicKey();
+            return publicKey != null && publicKey.Length != 0;
         }
 
         #endregion

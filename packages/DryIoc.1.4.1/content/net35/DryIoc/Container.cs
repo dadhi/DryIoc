@@ -741,9 +741,9 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
-            typeof(ContainerSetup).GetMethod("DoResolveManyDynamically", BindingFlags.Static | BindingFlags.NonPublic);
+            typeof(ContainerSetup).GetMethod("DoResolveManyDynamically", BindingFlags.Static | BindingFlags.Public).ThrowIfNull();
 
-        internal static IEnumerable<TItem> DoResolveManyDynamically<TItem, TWrappedItem>(WeakReference registryRef, int parentFactoryID)
+        public static IEnumerable<TItem> DoResolveManyDynamically<TItem, TWrappedItem>(WeakReference registryRef, int parentFactoryID)
         {
             var itemType = typeof(TItem);
             var wrappedItemType = typeof(TWrappedItem);
@@ -1085,32 +1085,6 @@ when resolving {1}.";
         }
 
         /// <summary>
-        /// Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
-        /// Delegate can use <see cref="IResolver"/> parameter to resolve any required dependencies, e.g.:
-        /// <code>RegisterDelegate&lt;ICar&gt;(r => new Car(r.Resolve&lt;IEngine&gt;()))</code>
-        /// </summary>
-        /// <param name="serviceType">The service type to register.</param>
-        /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="lambda">The delegate used to create a instance of <paramref name="serviceType" />.</param>
-        /// <param name="reuse">Optional <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="setup">Optional factory setup, by default is (<see cref="ServiceSetup"/>)</param>
-        /// <param name="named">Optional service name.</param>
-        public static void RegisterDelegate(this IRegistrator registrator, Type serviceType,
-            Func<IResolver, object> lambda, IReuse reuse = null, FactorySetup setup = null,
-            string named = null)
-        {
-            var factory = new DelegateFactory(
-                (_, registry) =>
-                {
-                    var lambdaExpr = registry.GetConstantExpression(lambda, typeof(Func<IResolver, object>));
-                    var invokeLambdaExpr = Expression.Invoke(lambdaExpr, Container.RegistryExpression);
-                    return Expression.Convert(invokeLambdaExpr, serviceType);
-                },
-                reuse, setup);
-            registrator.Register(factory, serviceType, named);
-        }
-
-        /// <summary>
         /// Registers a pre-created service instance of <typeparamref name="TService"/> 
         /// </summary>
         /// <typeparam name="TService">The type of service.</typeparam>
@@ -1216,20 +1190,42 @@ when resolving {1}.";
         public static void ResolvePropertiesAndFields(this IResolver resolver, object instance, Func<MemberInfo, string> getServiceName = null)
         {
             var implType = instance.ThrowIfNull().GetType();
-            getServiceName = getServiceName ?? (_ => null);
-
-            foreach (var property in implType.GetProperties(MembersToResolve).Where(p => p.GetSetMethod() != null))
+            ResolutionRules.ResolveMemberServiceKey tryGetMemberKey = null;
+            if (getServiceName != null)
+                tryGetMemberKey = ((out object key, MemberInfo member, Request _, IRegistry __) =>
+                {
+                    key = getServiceName(member);
+                    return true;
+                });
+            else
             {
-                var value = resolver.Resolve(property.PropertyType, getServiceName(property), IfUnresolved.ReturnNull);
-                if (value != null)
-                    property.SetValue(instance, value, null);
+                var rules = ((IRegistry)resolver).ResolutionRules;
+                if (rules.ShouldResolvePropertiesAndFields)
+                    tryGetMemberKey = rules.TryGetPropertyOrFieldServiceKey;
             }
 
-            foreach (var field in implType.GetFields(MembersToResolve).Where(f => !f.IsInitOnly))
+            var request = Request.Create(implType);
+            var registry = (IRegistry)resolver;
+            foreach (var property in implType.GetProperties(MembersToResolve).Where(Sugar.IsWritableProperty))
             {
-                var value = resolver.Resolve(field.FieldType, getServiceName(field), IfUnresolved.ReturnNull);
-                if (value != null)
-                    field.SetValue(instance, value);
+                object key = null;
+                if (tryGetMemberKey == null || tryGetMemberKey(out key, property, request, registry))
+                {
+                    var value = resolver.Resolve(property.PropertyType, key as string, IfUnresolved.ReturnNull);
+                    if (value != null)
+                        property.SetValue(instance, value, null);
+                }
+            }
+            
+            foreach (var field in implType.GetFields(MembersToResolve).Where(Sugar.IsWritableField))
+            {
+                object key = null;
+                if (tryGetMemberKey == null || tryGetMemberKey(out key, field, request, registry))
+                {
+                    var value = resolver.Resolve(field.FieldType, key as string, IfUnresolved.ReturnNull);
+                    if (value != null)
+                        field.SetValue(instance, value);
+                }
             }
         }
     }
@@ -1691,8 +1687,8 @@ when resolving {1}.";
             if (!registry.ResolutionRules.ShouldResolvePropertiesAndFields)
                 return newService;
 
-            var properties = implementationType.GetProperties(Resolver.MembersToResolve).Where(p => p.GetSetMethod() != null);
-            var fields = implementationType.GetFields(Resolver.MembersToResolve).Where(f => !f.IsInitOnly);
+            var properties = implementationType.GetProperties(Resolver.MembersToResolve).Where(Sugar.IsWritableProperty);
+            var fields = implementationType.GetFields(Resolver.MembersToResolve).Where(Sugar.IsWritableField);
 
             var bindings = new List<MemberBinding>();
             foreach (var member in properties.Cast<MemberInfo>().Concat(fields.Cast<MemberInfo>()))
@@ -1856,7 +1852,7 @@ when resolving {1}.";
             {
                 var item = _items.GetValueOrDefault(id);
                 if (item == null)
-                    _items = _items.AddOrUpdate(id, item = factory());
+                    Ref.Swap(ref _items, x => x.AddOrUpdate(id, item = factory()));
                 return (T)item;
             }
         }
@@ -1878,6 +1874,32 @@ when resolving {1}.";
         private int _disposed;
 
         #endregion
+    }
+
+    public static class Ref
+    {
+        /// <remarks>
+        /// First, it evaluates new value using <paramref name="getValue"/> function. 
+        /// Second, it checks that original value is not changed. 
+        /// If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getValue"/>).
+        /// </remarks>
+        public static T Swap<T>(ref T value, Func<T, T> getValue) where T : class
+        {
+            var retryCount = 0;
+            while (true)
+            {
+                var oldValue = value;
+                var newValue = getValue(oldValue);
+                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                    return oldValue;
+                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
+                    throw new InvalidOperationException(ERROR_RETRY_COUNT_EXCEEDED);
+            }
+        }
+
+        private const int RETRY_COUNT_UNTIL_THROW = 50;
+        private static readonly string ERROR_RETRY_COUNT_EXCEEDED =
+            "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
     }
 
     public interface IReuse
@@ -2229,6 +2251,17 @@ when resolving {1}.";
             Array.Copy(source, result, sourceLength);
             result[index] = value;
             return result;
+        }
+
+        public static bool IsWritableProperty(PropertyInfo property)
+        {
+            var setMethod = property.GetSetMethod();
+            return setMethod != null && !setMethod.IsPrivate;
+        }
+
+        public static bool IsWritableField(FieldInfo field)
+        {
+            return !field.IsInitOnly;
         }
     }
 
