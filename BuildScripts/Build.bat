@@ -16,13 +16,12 @@ for /f "tokens=2*" %%S in ('reg query HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuil
 		echo:
 		echo:Using MSBuild from "%%T"
 
-		"%%T\MSBuild.exe" %SLN% /t:Rebuild ^
+		"%%T\MSBuild.exe" %SLN% /t:Rebuild /m ^
    			/p:OutDir=%OUTDIR% ^
    			/p:GenerateProjectSpecificOutputFolder=false ^
    			/p:Configuration=Release ^ 
    			/p:RestorePackages=false ^ 
-			/p:BuildInParallel=true /maxcpucount:4 ^
-			/v:diag
+			/p:BuildInParallel=true 
     )
 )
 

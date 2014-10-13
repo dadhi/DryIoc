@@ -2447,8 +2447,8 @@ namespace DryIoc
 
         public IEnumerable<Request> Enumerate()
         {
-            for (var x = this; x != null; x = x.Parent)
-                yield return x;
+            for (var r = this; !r.IsRoot; r = r.Parent)
+                yield return r;
         }
 
         public StringBuilder PrintLast(StringBuilder s)
@@ -2737,7 +2737,7 @@ namespace DryIoc
                     // When singleton scope and no Func in request chain 
                     // then reused instance should can be inserted directly instead of calling Scope method.
                     if (scope != request.Registry.SingletonScope ||
-                        request.Parent != null && request.Parent.Enumerate().Any(GenericsSupport.IsFunc))
+                        !request.Parent.IsRoot && request.Parent.Enumerate().Any(GenericsSupport.IsFunc))
                     {
                         expression = GetReusedItemExpression(request, scope, expression);
                     }
@@ -2811,7 +2811,8 @@ namespace DryIoc
 
         protected Expression GetReusedItemExpression(Request request, IScope scope, Expression expression)
         {
-            var scopeExpr = scope == request.ResolutionScope ? Request.ScopeExpr
+            var scopeExpr = scope == request.ResolutionScope 
+                ? Request.ScopeExpr
                 : request.State.GetOrAddItemExpression(scope);
 
             var getScopedItemMethod = _scopeGetOrAddMethod.MakeGenericMethod(expression.Type);

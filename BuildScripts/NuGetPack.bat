@@ -38,6 +38,6 @@ goto:eof
 :ParseVersion
 set VERFILE=%~1
 for /f "usebackq tokens=2,3 delims=:() " %%A in ("%VERFILE%") do (
-	if "%%A"=="AssemblyVersion" set VER=%%~B
+	if "%%A"=="AssemblyInformationalVersion" set VER=%%~B
 )
 exit /b

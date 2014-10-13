@@ -1,4 +1,4 @@
-version: 2.0.0.{build}
+version: 2.0.0
 
 os: Windows Server 2012
 
@@ -12,6 +12,7 @@ assembly_info:
   file: AssemblyInfo.*
   assembly_version: "{version}"
   assembly_file_version: "{version}"
+  assembly_informational_version: "{version}-preview0{build}"
 
 artefacts:
  - path: bin\NuGetPackages\*.nupkg
