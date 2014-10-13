@@ -216,14 +216,24 @@ namespace DryIoc.UnitTests
         public IScope GetScope(Request request)
         {
             if (HttpContext.Current == null)
-                return new Scope();
+                return _contextNullScope ?? CreateNewScope();
 
             var items = HttpContext.Current.Items;
-            if (!items.Contains(_reuseScopeKey))
-                items[_reuseScopeKey] = new Scope();
+            lock (_singleScopeLocker)
+                if (!items.Contains(_reuseScopeKey))
+                    items[_reuseScopeKey] = _contextNullScope ?? new Scope();
+
             return (Scope)items[_reuseScopeKey];
         }
 
+        private IScope CreateNewScope()
+        {
+            lock (_singleScopeLocker)
+                return _contextNullScope = _contextNullScope ?? new Scope();
+        }
+
+        private IScope _contextNullScope;
+        private readonly object _singleScopeLocker = new object();
         private static readonly string _reuseScopeKey = typeof(HttpContextReuse).Name;
     }
 

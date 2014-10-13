@@ -32,6 +32,9 @@
         <!-- net40 -->
         <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net40\DryIoc.MefAttributedModel" />
 
+        <!-- net45 -->
+        <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net45\DryIoc.MefAttributedModel" />
+
         <!-- PCL: Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" 
               target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc.MefAttributedModel" />

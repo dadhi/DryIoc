@@ -3983,7 +3983,8 @@ namespace DryIoc
 
         public static Attribute[] GetAttributes(this Type type, Type attributeType = null, bool inherit = false)
         {
-            return type.GetTypeInfo().GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).ToArrayOrSelf();
+            return type.GetTypeInfo().GetCustomAttributes(attributeType ?? typeof(Attribute), inherit)
+                .Cast<Attribute>().ToArrayOrSelf();
         }
 
         public static IEnumerable<T> GetAll<T>(this Type type, Func<TypeInfo, IEnumerable<T>> getDeclared)

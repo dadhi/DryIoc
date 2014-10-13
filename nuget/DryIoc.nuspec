@@ -28,6 +28,9 @@
         <file src="..\Net40\DryIoc\FactoryCompiler.cs" target="content\net40\DryIoc" />
         <file src="..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs" target="content\net40\DryIoc" />
 
+        <!--net45-->
+        <file src="..\DryIoc\Container.cs" target="content\net45\DryIoc" />
+
         <!-- PCL: Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\DryIoc\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
         <file src="..\DryIoc\net45\TypeInfo.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
