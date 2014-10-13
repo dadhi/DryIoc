@@ -44,9 +44,9 @@ namespace DryIoc.UnitTests
             child.Register(typeof(IJuice), typeof(FruitJuice));
 
             var parentFruit = parent.Resolve<IFruit>();
-            var snd = child.Resolve<IJuice>();
+            var childJuice = child.Resolve<IJuice>();
 
-            Assert.That(parentFruit, Is.SameAs(snd.Fruit));
+            Assert.That(parentFruit, Is.SameAs(childJuice.Fruit));
         }
 
         [Test]
@@ -60,9 +60,9 @@ namespace DryIoc.UnitTests
             child.Register(typeof(IJuice), typeof(FruitJuice));
 
             var parentFruit = scoped.Resolve<IFruit>();
-            var snd = child.Resolve<IJuice>();
+            var childJuice = child.Resolve<IJuice>();
 
-            Assert.That(parentFruit, Is.SameAs(snd.Fruit));
+            Assert.That(parentFruit, Is.SameAs(childJuice.Fruit));
         }
     }
 

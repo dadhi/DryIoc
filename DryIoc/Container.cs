@@ -90,6 +90,7 @@ namespace DryIoc
             {
                 var childRequestWithParentRegistry = childRequest.ReplaceRegistryWith(parentRegistry);
                 var factory = childRequestWithParentRegistry.Registry.ResolveFactory(childRequestWithParentRegistry);
+
                 return factory == null ? null : new ExpressionFactory(
                     request => factory.GetExpressionOrDefault(request.ReplaceRegistryWith(parentRegistry)));
             }));
@@ -2373,9 +2374,10 @@ namespace DryIoc
         public readonly IServiceInfo ServiceInfo;
         public readonly Factory ResolvedFactory;
 
+        public readonly WeakReference RegistryWeakRef;
         public IRegistry Registry
         {
-            get { return (_registryWeakRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
+            get { return (RegistryWeakRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
         }
 
         public Type ServiceType { get { return ServiceInfo == null ? null : ServiceInfo.ServiceType; } }
@@ -2391,11 +2393,11 @@ namespace DryIoc
         public Request Push(IServiceInfo info)
         {
             if (IsRoot)
-                return new Request(this, _registryWeakRef, State, new Ref<IScope>(), info.ThrowIfNull(), null);
+                return new Request(this, RegistryWeakRef, State, new Ref<IScope>(), info.ThrowIfNull(), null);
 
             ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info.ThrowIfNull(), this);
             var inheritedInfo = info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup.Type);
-            return new Request(this, _registryWeakRef, State, _scope, inheritedInfo, null);
+            return new Request(this, RegistryWeakRef, State, _scope, inheritedInfo, null);
         }
 
         public Request Push(Type serviceType,
@@ -2410,7 +2412,7 @@ namespace DryIoc
 
         public Request ReplaceServiceInfoWith(IServiceInfo info)
         {
-            return new Request(Parent, _registryWeakRef, State, _scope, info, ResolvedFactory);
+            return new Request(Parent, RegistryWeakRef, State, _scope, info, ResolvedFactory);
         }
 
         /// <summary>
@@ -2434,7 +2436,7 @@ namespace DryIoc
                 for (var p = Parent; !p.IsRoot; p = p.Parent)
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID, Error.RECURSIVE_DEPENDENCY_DETECTED, Print(factory.FactoryID));
 
-            return new Request(Parent, _registryWeakRef, State, _scope, ServiceInfo, factory);
+            return new Request(Parent, RegistryWeakRef, State, _scope, ServiceInfo, factory);
         }
 
         public Request GetNonWrapperParentOrRoot()
@@ -2489,14 +2491,13 @@ namespace DryIoc
         {
             Parent = parent;
             State = state;
-            _registryWeakRef = registryWeakRef;
+            RegistryWeakRef = registryWeakRef;
             _scope = scope;
             ServiceInfo = serviceInfo;
             ResolvedFactory = resolvedFactory;
         }
 
         private readonly Ref<IScope> _scope;
-        private readonly WeakReference _registryWeakRef;
 
         #endregion
     }
