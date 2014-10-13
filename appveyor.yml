@@ -14,8 +14,8 @@ assembly_info:
   assembly_file_version: "{version}"
   assembly_informational_version: "{version}-preview0{build}"
 
-artefacts:
- - path: bin\NuGetPackages\*.nupkg
+artifacts:
+  - path: bin\NuGetPackages\*.nupkg
 
 nuget:
   account_feed: true
