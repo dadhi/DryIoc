@@ -5,7 +5,7 @@ os: Windows Server 2012
 test: off
  
 build_script:
- - .\BuildScripts\_main.bat -nopause -publish
+ - .\BuildScripts\_main.bat -nopause
 
 assembly_info:
   patch: true
@@ -20,3 +20,12 @@ artifacts:
 nuget:
   account_feed: true
   project_feed: true
+
+
+deploy:
+  provider: NuGet
+  server: https://staging.nuget.org
+  api_key:
+    secure: FkBbVyE9OGjhF+78Rsgog0nkKHQWwBdcZVzyD0P1+NEsxmiPt96tt61UUiZBVgHh
+  skip_symbols: true
+  artifact: /.*\.nupkg/
