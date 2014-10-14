@@ -25,7 +25,7 @@ nuget:
 deploy:
   provider: NuGet
   # server: https://staging.nuget.org
-  api_key: JPBrgilXGK52uuHgtpM8XDNO6C7RYfYRef6hfadvyVQh/mBKDBhdTw+2tWoA+gXg
-    secure: 
+  api_key: 
+    secure: JPBrgilXGK52uuHgtpM8XDNO6C7RYfYRef6hfadvyVQh/mBKDBhdTw+2tWoA+gXg 
   skip_symbols: true # skip symbols for preview packages
   artifact: /.*\.nupkg/
