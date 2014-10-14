@@ -17,7 +17,8 @@ echo:DryIoc v%VER%
 echo:================
 
 %NUGET% pack "NuGet\DryIoc.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
-%NUGET% pack "NuGet\DryIoc.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -Symbols -NonInteractive
+%NUGET% pack "NuGet\DryIoc.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive 
+rem -Symbols
 
 call :ParseVersion "DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs"
 
@@ -26,7 +27,8 @@ echo:MefAttributedModel v%VER%
 echo:============================
 
 %NUGET% pack "NuGet\DryIoc.MefAttributedModel.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
-%NUGET% pack "NuGet\DryIoc.MefAttributedModel.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -Symbols -NonInteractive
+%NUGET% pack "NuGet\DryIoc.MefAttributedModel.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+rem -Symbols 
 
 echo: 
 echo:Packaging succeeded.
