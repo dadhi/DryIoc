@@ -83,6 +83,13 @@ namespace DryIoc
             return new Container(Rules, _factories, _decorators, _genericWrappers, _singletonScope, new Scope());
         }
 
+        /// <summary>Synonym to <see cref="OpenScope"/>.</summary>
+        /// <returns>Container with new current scope.</returns>
+        public Container BeginScope()
+        {
+            return OpenScope();
+        }
+
         public Container CreateChildContainer()
         {
             var parentRegistry = new WeakReference(this);
@@ -90,7 +97,6 @@ namespace DryIoc
             {
                 var childRequestWithParentRegistry = childRequest.ReplaceRegistryWith(parentRegistry);
                 var factory = childRequestWithParentRegistry.Registry.ResolveFactory(childRequestWithParentRegistry);
-
                 return factory == null ? null : new ExpressionFactory(
                     request => factory.GetExpressionOrDefault(request.ReplaceRegistryWith(parentRegistry)));
             }));
@@ -2510,6 +2516,7 @@ namespace DryIoc
         public abstract FactoryType Type { get; }
         public virtual FactoryCaching Caching { get { return FactoryCaching.DisabledForExpression; } }
         public virtual object Metadata { get { return null; } }
+        public virtual IReusedObjectBehavior ReusedObjectBehavior { get { return null; } }
 
         public readonly InjectionRules Rules;
         protected FactorySetup(InjectionRules rules) { Rules = rules ?? InjectionRules.Empty; }
@@ -2548,6 +2555,11 @@ namespace DryIoc
             return new Setup(lazyGetMetadata: lazyGetMetadata.ThrowIfNull());
         }
 
+        public static FactorySetup With(IReusedObjectBehavior reusedObjectBehavior)
+        {
+            return new Setup(reusedObjectBehavior: reusedObjectBehavior.ThrowIfNull());
+        }
+
         public override FactorySetup WithRules(InjectionRules rules)
         {
             return new Setup(rules, Caching, _lazyGetMetadata, _metadata);
@@ -2555,6 +2567,7 @@ namespace DryIoc
 
         public override FactoryType Type { get { return FactoryType.Service; } }
         public override FactoryCaching Caching { get { return _caching; } }
+        public override IReusedObjectBehavior ReusedObjectBehavior { get { return _reusedObjectBehavior; } }
         public override object Metadata
         {
             get { return _metadata ?? (_metadata = _lazyGetMetadata == null ? null : _lazyGetMetadata()); }
@@ -2564,17 +2577,20 @@ namespace DryIoc
 
         private Setup(InjectionRules rules = null,
             FactoryCaching caching = FactoryCaching.EnabledForExpression,
-            Func<object> lazyGetMetadata = null, object metadata = null)
+            Func<object> lazyGetMetadata = null, object metadata = null,
+            IReusedObjectBehavior reusedObjectBehavior = null)
             : base(rules)
         {
             _caching = caching;
             _lazyGetMetadata = lazyGetMetadata;
             _metadata = metadata;
+            _reusedObjectBehavior = reusedObjectBehavior;
         }
 
         private readonly FactoryCaching _caching;
         private readonly Func<object> _lazyGetMetadata;
         private object _metadata;
+        private readonly IReusedObjectBehavior _reusedObjectBehavior;
 
         #endregion
     }
@@ -2720,15 +2736,15 @@ namespace DryIoc
             if (decorator != null && !(decorator is LambdaExpression))
                 return decorator;
 
-            Expression expression = null;
+            Expression serviceExpr = null;
 
             if (Setup.Caching == FactoryCaching.EnabledForExpression)
-                expression = request.State.GetCachedFactoryExpressionOrDefault(FactoryID);
+                serviceExpr = request.State.GetCachedFactoryExpressionOrDefault(FactoryID);
 
-            if (expression == null)
+            if (serviceExpr == null)
             {
-                expression = CreateExpressionOrDefault(request);
-                if (expression == null)
+                serviceExpr = CreateExpressionOrDefault(request);
+                if (serviceExpr == null)
                     return null;
 
                 if (Reuse != null)
@@ -2737,27 +2753,38 @@ namespace DryIoc
 
                     // When singleton scope and no Func in request chain 
                     // then reused instance should can be inserted directly instead of calling Scope method.
-                    if (scope != request.Registry.SingletonScope ||
-                        !request.Parent.IsRoot && request.Parent.Enumerate().Any(GenericsSupport.IsFunc))
+                    if (Reuse is SingletonReuse &&
+                        (request.Parent.IsRoot || !request.Parent.Enumerate().Any(GenericsSupport.IsFunc)))
                     {
-                        expression = GetReusedItemExpression(request, scope, expression);
+                        var factoryDelegate = serviceExpr.ToFactoryExpression().Compile();
+                        object reused;
+                        if (Setup.ReusedObjectBehavior == null)
+                        {
+                            reused = scope.GetOrAdd(FactoryID,
+                                () => factoryDelegate(request.State.Items, request.ResolutionScope));
+                        }
+                        else
+                        {
+                            var behavior = Setup.ReusedObjectBehavior;
+                            reused = behavior.Unwrap(scope.GetOrAdd(FactoryID,
+                                () => behavior.Wrap(factoryDelegate(request.State.Items, request.ResolutionScope))));
+                        }
+                        serviceExpr = request.State.GetOrAddItemExpression(reused, serviceExpr.Type);
                     }
                     else
                     {
-                        var factoryDelegate = expression.ToFactoryExpression().Compile();
-                        var reusedInstance = scope.GetOrAdd(FactoryID, () => factoryDelegate(request.State.Items, request.ResolutionScope));
-                        expression = request.State.GetOrAddItemExpression(reusedInstance, expression.Type);
+                        serviceExpr = GetReusedItemExpression(request, scope, serviceExpr);
                     }
                 }
 
                 if (Setup.Caching == FactoryCaching.EnabledForExpression)
-                    request.State.CacheFactoryExpression(FactoryID, expression);
+                    request.State.CacheFactoryExpression(FactoryID, serviceExpr);
             }
 
             if (decorator != null)
-                expression = Expression.Invoke(decorator, expression);
+                serviceExpr = Expression.Invoke(decorator, serviceExpr);
 
-            return expression;
+            return serviceExpr;
         }
 
         public virtual LambdaExpression GetFuncWithArgsOrDefault(Type funcType, Request request, out IList<Type> unusedFuncArgs)
@@ -2810,17 +2837,30 @@ namespace DryIoc
 
         private static readonly MethodInfo _scopeGetOrAddMethod = typeof(IScope).GetDeclaredMethod("GetOrAdd");
 
-        protected Expression GetReusedItemExpression(Request request, IScope scope, Expression expression)
+        protected Expression GetReusedItemExpression(Request request, IScope scope, Expression serviceExpr)
         {
             var scopeExpr = scope == request.ResolutionScope 
                 ? Request.ScopeExpr
                 : request.State.GetOrAddItemExpression(scope);
 
-            var getScopedItemMethod = _scopeGetOrAddMethod.MakeGenericMethod(expression.Type);
-
             var factoryIDExpr = Expression.Constant(FactoryID);
-            var factoryExpr = Expression.Lambda(expression, null);
-            return Expression.Call(scopeExpr, getScopedItemMethod, factoryIDExpr, factoryExpr);
+
+            if (Setup.ReusedObjectBehavior == null)
+                return Expression.Call(scopeExpr,
+                    _scopeGetOrAddMethod.MakeGenericMethod(serviceExpr.Type),
+                    factoryIDExpr, Expression.Lambda(serviceExpr, null));
+
+            var behavior = Setup.ReusedObjectBehavior;
+            var behaviorExpr = request.State.GetOrAddItemExpression(behavior, typeof(IReusedObjectBehavior));
+            var wrappedServiceExpr = Expression.Call(behaviorExpr, "Wrap", null, serviceExpr);
+
+            var getScopedObjectMethod = _scopeGetOrAddMethod.MakeGenericMethod(typeof(object));
+
+            var scopedServiceExpr = Expression.Call(scopeExpr, getScopedObjectMethod, factoryIDExpr, 
+                Expression.Lambda(wrappedServiceExpr, null));
+
+            var unwrappedServiceExpr = Expression.Call(behaviorExpr, "Unwrap", null, scopedServiceExpr);
+            return unwrappedServiceExpr;
         }
 
         #endregion
@@ -3646,6 +3686,42 @@ namespace DryIoc
         public static readonly IReuse Singleton = new SingletonReuse();
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
+    }
+
+    public interface IReusedObjectBehavior
+    {
+        object Wrap(object source);
+        object Unwrap(object wrapped);
+    }
+
+    public static class ReusedObjectBehavior
+    {
+        public static IReusedObjectBehavior ExternallyDisposable = new ExternallyDisposableReusedObjectBehavior();
+    }
+
+    public sealed class ExternallyDisposableReusedObjectBehavior : IReusedObjectBehavior 
+    {
+        public object Wrap(object source)
+        {
+            source.ThrowIf(!(source is IDisposable));
+            return new ExplicitlyDisposable(source.ThrowIfNull());
+        }
+
+        public object Unwrap(object wrapped)
+        {
+            wrapped.ThrowIf(!(wrapped is ExplicitlyDisposable));
+            return ((ExplicitlyDisposable)wrapped).Target;
+        }
+    }
+
+    public sealed class ExplicitlyDisposable
+    {
+        public readonly object Target;
+
+        public ExplicitlyDisposable(object target)
+        {
+            Target = target;
+        }
     }
 
     public enum IfUnresolved { Throw, ReturnDefault }

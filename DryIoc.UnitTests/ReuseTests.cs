@@ -175,6 +175,34 @@ namespace DryIoc.UnitTests
 
             Assert.That(service.ResolutionScopeDep, Is.SameAs(service.SingletonDep.ResolutionScopeDep));
         }
+
+        [Test]
+        public void Can_specify_do_Not_dispose_disposable_singleton_object()
+        {
+            var container = new Container();
+            container.Register<DisposableService>(Reuse.Singleton, 
+                setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
+
+            var service = container.Resolve<DisposableService>();
+
+            container.Dispose();
+
+            Assert.That(service.IsDisposed, Is.False);
+        }
+
+        [Test]
+        public void Can_specify_do_Not_dispose_disposable_scoped_object()
+        {
+            var container = new Container();
+            container.Register<DisposableService>(Reuse.InCurrentScope,
+                setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
+
+            var service = container.Resolve<DisposableService>();
+
+            container.Dispose();
+
+            Assert.That(service.IsDisposed, Is.False);
+        }
     }
 
     public class ThreadReuse : IReuse
