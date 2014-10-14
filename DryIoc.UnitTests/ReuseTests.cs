@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq.Expressions;
 using System.Threading;
 using System.Web;
 using DryIoc.UnitTests.CUT;
@@ -194,14 +195,58 @@ namespace DryIoc.UnitTests
         public void Can_specify_do_Not_dispose_disposable_scoped_object()
         {
             var container = new Container();
-            container.Register<DisposableService>(Reuse.InCurrentScope,
+            container.Register<IService, DisposableService>(Reuse.InCurrentScope,
                 setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
 
-            var service = container.Resolve<DisposableService>();
+            var service = container.Resolve<IService>();
 
             container.Dispose();
 
-            Assert.That(service.IsDisposed, Is.False);
+            Assert.That(((DisposableService)service).IsDisposed, Is.False);
+        }
+
+        [Test]
+        public void Can_resolve_explicitly_disposed_the_same_way_as_generic_wrapper()
+        {
+            var container = new Container();
+            container.Register<IService, DisposableService>(Reuse.InCurrentScope,
+                setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
+
+            container.Register(typeof(ExplicitlyDisposable<>),
+                new FactoryProvider(r => new ExpressionFactory(GetExplicitlyDisposableExpression, setup: GenericWrapperSetup.Default)));
+
+            var wrapper = container.Resolve<ExplicitlyDisposable<IService>>();
+
+            Assert.That(wrapper.Target, Is.InstanceOf<DisposableService>());
+        }
+
+        [Test]
+        public void Can_resolve_explicitly_disposed_and_dispose_its_target()
+        {
+            var container = new Container();
+            container.Register<IService, DisposableService>(Reuse.InCurrentScope,
+                setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
+
+            container.Register(typeof(ExplicitlyDisposable<>),
+                new FactoryProvider(r => new ExpressionFactory(GetExplicitlyDisposableExpression, setup: GenericWrapperSetup.Default)));
+
+            var disposable = container.Resolve<ExplicitlyDisposable<IService>>();
+            disposable.DisposeTarget();
+
+            Assert.That(disposable.IsDisposed, Is.True);
+            var ex = Assert.Throws<ContainerException>(() => 
+                { var _ = disposable.Target; });
+            Assert.That(ex.Message, Is.StringContaining("Target value was already disposed"));
+        }
+
+        private static Expression GetExplicitlyDisposableExpression(Request request)
+        {
+            var wrapperType = request.ServiceType;
+            var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
+            var serviceRequest = request.Push(serviceType);
+            var factory = request.Registry.ResolveFactory(serviceRequest);
+            var serviceExpr = factory == null ? null : factory.GetExpressionOrDefault(serviceRequest, wrapperType);
+            return serviceExpr;
         }
     }
 
