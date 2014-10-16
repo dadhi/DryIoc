@@ -148,7 +148,7 @@ namespace DryIoc.UnitTests
             container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(
                 parameters: Parameters.All
                     .And("x", "hola")
-                    .And(p => p.ParameterType.CanAssign(typeof(IService)), typeof(Service), "dependency")));
+                    .And(p => typeof(IService).IsAssignableTo(p.ParameterType), typeof(Service), "dependency")));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
 

@@ -213,7 +213,7 @@ namespace DryIoc.UnitTests
                 setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
 
             container.Register(typeof(ExplicitlyDisposable<>),
-                new FactoryProvider(r => new ExpressionFactory(GetExplicitlyDisposableExpression, setup: GenericWrapperSetup.Default)));
+                new FactoryProvider(r => new ExpressionFactory(GetReuseWrapperExpression, setup: GenericWrapperSetup.Default)));
 
             var wrapper = container.Resolve<ExplicitlyDisposable<IService>>();
 
@@ -221,33 +221,121 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_resolve_explicitly_disposed_and_dispose_its_target()
+        public void Can_resolve_explicitly_disposed_scoped_service_and_then_dispose_it()
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.InCurrentScope,
                 setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
 
             container.Register(typeof(ExplicitlyDisposable<>),
-                new FactoryProvider(r => new ExpressionFactory(GetExplicitlyDisposableExpression, setup: GenericWrapperSetup.Default)));
+                new FactoryProvider(r => new ExpressionFactory(GetReuseWrapperExpression), 
+                    GenericWrapperSetup.Default));
 
             var disposable = container.Resolve<ExplicitlyDisposable<IService>>();
-            disposable.DisposeTarget();
+            disposable.Dispose();
 
             Assert.That(disposable.IsDisposed, Is.True);
-            var ex = Assert.Throws<ContainerException>(() => 
-                { var _ = disposable.Target; });
-            Assert.That(ex.Message, Is.StringContaining("Target value was already disposed"));
+            var targetEx = Assert.Throws<ContainerException>(() => { var _ = disposable.Target; });
+            Assert.That(targetEx.Message, Is.StringContaining(
+                "Target of type DryIoc.UnitTests.CUT.DisposableService was already disposed in DryIoc.ExplicitlyDisposableWrapper"));
+
+            var resolveEx = Assert.Throws<ContainerException>(() => 
+                container.Resolve<IService>());
+            Assert.That(resolveEx.Message, Is.EqualTo(targetEx.Message));
         }
 
-        private static Expression GetExplicitlyDisposableExpression(Request request)
+        [Test]
+        public void Can_resolve_explicitly_disposed_singleton_and_then_dispose_it()
+        {
+            var container = new Container();
+            container.Register<IService, DisposableService>(Reuse.Singleton,
+                setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
+
+            container.Register(typeof(ExplicitlyDisposable<>),
+                new FactoryProvider(r => new ExpressionFactory(GetReuseWrapperExpression),
+                    GenericWrapperSetup.Default));
+
+            var disposable = container.Resolve<ExplicitlyDisposable<IService>>();
+            disposable.Dispose();
+
+            Assert.That(disposable.IsDisposed, Is.True);
+            var targetEx = Assert.Throws<ContainerException>(() => { var _ = disposable.Target; });
+            Assert.That(targetEx.Message, Is.StringContaining(
+                "Target of type DryIoc.UnitTests.CUT.DisposableService was already disposed in DryIoc.ExplicitlyDisposableWrapper"));
+
+            var resolveEx = Assert.Throws<ContainerException>(() =>
+                container.Resolve<IService>());
+            Assert.That(resolveEx.Message, Is.EqualTo(targetEx.Message));
+        }
+
+        [Test]
+        public void Can_resolve_explicitly_disposed_scoped_with_required_type()
+        {
+            var container = new Container();
+            container.Register<DisposableService>(Reuse.InCurrentScope,
+                setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
+
+            container.Register(typeof(ExplicitlyDisposable<>),
+                new FactoryProvider(r => new ExpressionFactory(GetReuseWrapperExpression), 
+                    GenericWrapperSetup.Default));
+
+            var disposable = container.Resolve<ExplicitlyDisposable<IService>>(typeof(DisposableService));
+
+            Assert.That(disposable.Target, Is.InstanceOf<DisposableService>());
+        }
+
+        [Test]
+        public void Can_resolve_explicitly_disposed_singleton_with_required_type()
+        {
+            var container = new Container();
+            container.Register<DisposableService>(Reuse.Singleton,
+                setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
+
+            container.Register(typeof(ExplicitlyDisposable<>),
+                new FactoryProvider(r => new ExpressionFactory(GetReuseWrapperExpression),
+                    GenericWrapperSetup.Default));
+
+            var disposable = container.Resolve<ExplicitlyDisposable<IService>>(typeof(DisposableService));
+
+            Assert.That(disposable.Target, Is.InstanceOf<DisposableService>());
+        }
+
+        [Test][Ignore]
+        public void Should_throw_on_unknown_reuse_wrapper()
+        {
+            var container = new Container();
+            container.Register<IService, DisposableService>(Reuse.Singleton,
+                setup: Setup.With(ReusedObjectBehavior.ExternallyDisposable));
+
+            container.Register(typeof(UnknownReuseWrapper<>),
+                new FactoryProvider(r => new ExpressionFactory(GetReuseWrapperExpression),
+                    GenericWrapperSetup.Default));
+
+            //var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<UnknownReuseWrapper<IService>>();//);
+
+            //Assert.That(ex.Message, Is.StringContaining("Unable to resolve reuse object wrapper"));
+        }
+
+        private static Expression GetReuseWrapperExpression(Request request)
         {
             var wrapperType = request.ServiceType;
+            var wrapperCtor = wrapperType.GetFirstConstructor();
+            var wrapperCtorParams = wrapperCtor.GetParameters();
+            var wrapperParamType = wrapperCtorParams.ThrowIf(wrapperCtorParams.Length != 1)[0].ParameterType;
+
             var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
-            var factory = request.Registry.ResolveFactory(serviceRequest);
-            var serviceExpr = factory == null ? null : factory.GetExpressionOrDefault(serviceRequest, wrapperType);
-            return serviceExpr;
+            var serviceFactory = request.Registry.ResolveFactory(serviceRequest);
+            var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest, wrapperParamType);
+            
+            return serviceExpr == null ? null : Expression.New(wrapperCtor, serviceExpr);
         }
+    }
+
+    public class UnknownReuseWrapper<T>
+    {
+        public UnknownReuseWrapper(WeakReference weakRef) {}
     }
 
     public class ThreadReuse : IReuse
@@ -261,7 +349,7 @@ namespace DryIoc.UnitTests
 
         class ThreadScope : IScope
         {
-            public T GetOrAdd<T>(int id, Func<T> factory)
+            public object GetOrAdd(int id, Func<object> factory)
             {
                 var threadId = Thread.CurrentThread.ManagedThreadId;
 

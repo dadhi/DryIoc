@@ -168,6 +168,20 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Should_support_decorator_implementation_without_decorated_service_argument_in_constructor_for_reused_service()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.Register<IOperation, AnotherOperation>(setup: DecoratorSetup.Default);
+
+            var first = container.Resolve<IOperation>();
+            var second = container.Resolve<IOperation>();
+
+            Assert.That(first, Is.InstanceOf<AnotherOperation>());
+            Assert.That(first, Is.SameAs(second));
+        }
+
+        [Test]
         public void Should_support_decorator_of_decorator_without_decorated_service_argument_in_constructor()
         {
             var container = new Container();

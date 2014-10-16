@@ -271,7 +271,7 @@ namespace DryIoc
             if (requiredServiceType != null)
             {
                 var wrappedServiceType = ((IRegistry)this).GetWrappedServiceType(serviceType);
-                Throw.If(!wrappedServiceType.CanAssign(requiredServiceType),
+                Throw.If(!requiredServiceType.IsAssignableTo(wrappedServiceType),
                     Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE,
                     requiredServiceType, wrappedServiceType, serviceType);
 
@@ -1399,9 +1399,6 @@ namespace DryIoc
         public static readonly string DECORATOR_FACTORY_SHOULD_SUPPORT_FUNC_RESOLUTION =
             "Decorator factory should support resolution as {0}, but it does not.";
 
-        public static readonly string EXPRESSION_FACTORY_RETURNED_NULL =
-            "Expression factory {0} returned NULL when resolving {1}.";
-
         public static readonly string UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE =
             "Unable to match service with any of open-generic implementation {0} implemented types {1} when resolving {2}.";
 
@@ -1441,6 +1438,9 @@ namespace DryIoc
 
         public static readonly string PUSHING_TO_REQUEST_WITHOUT_FACTORY =
             "Pushing next info {0} to request not yet resolved to factory: {1}";
+
+        public static readonly string TARGET_WAS_ALREADY_DISPOSED = 
+            "Target of type {0} was already disposed in {1}.";
     }
 
     public static class Registrator
@@ -2035,7 +2035,7 @@ namespace DryIoc
             if (requiredServiceType != null)
             {
                 var wrappedServiceType = request.Registry.GetWrappedServiceType(serviceType);
-                Throw.If(!wrappedServiceType.CanAssign(requiredServiceType),
+                Throw.If(!requiredServiceType.IsAssignableTo(wrappedServiceType),
                     Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE,
                         requiredServiceType, wrappedServiceType, request);
 
@@ -2071,7 +2071,7 @@ namespace DryIoc
             if (ownerDetails.RequiredServiceType != null)
             {
                 requiredServiceType = null;
-                if (serviceType.CanAssign(ownerDetails.RequiredServiceType))
+                if (ownerDetails.RequiredServiceType.IsAssignableTo(serviceType))
                     serviceType = ownerDetails.RequiredServiceType;
                 else
                     requiredServiceType = ownerDetails.RequiredServiceType;
@@ -2434,7 +2434,7 @@ namespace DryIoc
         }
 
         /// <summary>
-        /// Change registry to new one. 
+        /// Changes registry to provided one. 
         /// Could be used by child container, to switch child registry to parent preserving the rest of request state.
         /// </summary>
         /// <param name="registry">Reference to registry to switch to.</param>
@@ -2445,6 +2445,9 @@ namespace DryIoc
             return new Request(Parent, registry, State, _scope, ServiceInfo, ResolvedFactory);
         }
 
+        /// <summary>Returns new request with set <see cref="ResolvedFactory"/>.</summary>
+        /// <param name="factory">Factory to which request is resolved.</param>
+        /// <returns>New request with set factory.</returns>
         public Request ResolveTo(Factory factory)
         {
             if (IsRoot || (ResolvedFactory != null && ResolvedFactory.FactoryID == factory.FactoryID))
@@ -2457,6 +2460,11 @@ namespace DryIoc
             return new Request(Parent, RegistryWeakRef, State, _scope, ServiceInfo, factory);
         }
 
+        /// <summary>
+        /// Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
+        /// If not found returns <see cref="IsRoot"/> request.
+        /// </summary>
+        /// <returns>Return closest <see cref="FactoryType.Service"/> parent or root.</returns>
         public Request GetNonWrapperParentOrRoot()
         {
             var p = Parent;
@@ -2465,13 +2473,18 @@ namespace DryIoc
             return p;
         }
 
+        /// <summary>Enumerates all request stack parents. Last returned will <see cref="IsRoot"/> empty parent.</summary>
+        /// <returns>Unfolding parents.</returns>
         public IEnumerable<Request> Enumerate()
         {
             for (var r = this; !r.IsRoot; r = r.Parent)
                 yield return r;
         }
 
-        public StringBuilder PrintLast(StringBuilder s)
+        /// <summary> Prints current request info only (no parents printed) to provided builder.</summary>
+        /// <param name="s">Builder to print too.</param>
+        /// <returns>Builder with appended info.</returns>
+        public StringBuilder PrintCurrent(StringBuilder s)
         {
             if (IsRoot)
                 return s.Append("<root>");
@@ -2482,20 +2495,26 @@ namespace DryIoc
             return s.Append(ServiceInfo);
         }
 
+        /// <summary>Prints full stack of requests starting from current one using <see cref="PrintCurrent"/>.</summary>
+        /// <param name="recursiveFactoryID">Flag specifying that in case of found recursion/repetition of requests, 
+        /// mark repeated requests.</param>
+        /// <returns>Builder with appended request stack info.</returns>
         public StringBuilder Print(int recursiveFactoryID = -1)
         {
-            var s = PrintLast(new StringBuilder());
+            var s = PrintCurrent(new StringBuilder());
             if (Parent == null)
                 return s;
 
             s = recursiveFactoryID == -1 ? s : s.Append(" <--recursive");
             return Parent.Enumerate().TakeWhile(r => !r.IsRoot).Aggregate(s, (a, r) =>
             {
-                a = r.PrintLast(a.AppendLine().Append(" in "));
+                a = r.PrintCurrent(a.AppendLine().Append(" in "));
                 return r.ResolvedFactory.FactoryID == recursiveFactoryID ? a.Append(" <--recursive") : a;
             });
         }
 
+        /// <summary>Print while request stack info to string using <seealso cref="Print"/>.</summary>
+        /// <returns>String with info.</returns>
         public override string ToString()
         {
             return Print().ToString();
@@ -2520,9 +2539,13 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Type of services supported by Container.</summary>
     public enum FactoryType { Service, Decorator, GenericWrapper };
+
+    /// <summary>Specify caching policy for service expressions created by <see cref="Factory"/></summary>
     public enum FactoryCaching { DisabledForExpression, EnabledForExpression };
 
+    /// <summary>Base class to store optional <see cref="Factory"/> settings.</summary>
     public abstract class FactorySetup
     {
         public abstract FactoryType Type { get; }
@@ -2715,6 +2738,11 @@ namespace DryIoc
         }
 
         public virtual Type ImplementationType { get { return null; } }
+
+        /// <summary>
+        /// Indicates that Factory is factory provider and client should call <see cref="GetFactoryForRequestOrDefault"/>
+        /// to get concrete factory.
+        /// </summary>
         public virtual bool ProvidesFactoryForRequest { get { return false; } }
 
         protected Factory(IReuse reuse = null, FactorySetup setup = null)
@@ -2740,47 +2768,43 @@ namespace DryIoc
             return null;
         }
 
-        public virtual Expression GetExpressionOrDefault(Request request, Type wrapperType = null)
+        public Expression GetExpressionOrDefault(Request request, Type wrapperType = null)
         {
             request = request.ResolveTo(this);
 
             var decorator = request.Registry.GetDecoratorExpressionOrDefault(request);
-            if (decorator != null && !(decorator is LambdaExpression))
-                return decorator;
+            var noOrFuncDecorator = decorator == null || decorator is LambdaExpression;
 
-            Expression serviceExpr = null;
-
-            if (Setup.Caching == FactoryCaching.EnabledForExpression)
-                serviceExpr = request.State.GetCachedFactoryExpressionOrDefault(FactoryID);
-
-            if (serviceExpr == null)
+            if (noOrFuncDecorator && wrapperType == null &&
+                Setup.Caching == FactoryCaching.EnabledForExpression)
             {
-                serviceExpr = CreateExpressionOrDefault(request);
-                if (serviceExpr == null)
-                    return null;
-
-                if (Reuse != null)
-                {
-                    var scope = Reuse.GetScope(request);
-
-                    // When singleton scope and no Func in request chain 
-                    // then reused instance should can be inserted directly instead of calling Scope method.
-                    if (Reuse is SingletonReuse &&
-                        (request.Parent.IsRoot || !request.Parent.Enumerate().Any(GenericsSupport.IsFunc)))
-                    {
-                        serviceExpr = GetInstantiatedScopedServiceExpression(serviceExpr, scope, request, wrapperType);
-                    }
-                    else
-                    {
-                        serviceExpr = GetScopedServiceExpression(serviceExpr, scope, request, wrapperType);
-                    }
-                }
-
-                if (Setup.Caching == FactoryCaching.EnabledForExpression)
-                    request.State.CacheFactoryExpression(FactoryID, serviceExpr);
+                var cachedServiceExpr = request.State.GetCachedFactoryExpressionOrDefault(FactoryID);
+                if (cachedServiceExpr != null)
+                    return decorator == null ? cachedServiceExpr : Expression.Invoke(decorator, cachedServiceExpr);
             }
 
-            if (decorator != null)
+            var serviceExpr = noOrFuncDecorator ? CreateExpressionOrDefault(request) : decorator;
+            if (serviceExpr == null)
+                return null;
+
+            if (Reuse != null)
+            {
+                var scope = Reuse.GetScope(request);
+
+                // When singleton scope and no Func in request chain 
+                // then reused instance should can be inserted directly instead of calling Scope method.
+                if (Reuse is SingletonReuse &&
+                    (request.Parent.IsRoot || !request.Parent.Enumerate().Any(GenericsSupport.IsFunc)))
+                    serviceExpr = GetInstantiatedScopedServiceExpression(serviceExpr, scope, request, wrapperType);
+                else
+                    serviceExpr = GetScopedServiceExpression(serviceExpr, scope, request, wrapperType);
+            }
+            
+            if (noOrFuncDecorator && wrapperType == null &&
+                Setup.Caching == FactoryCaching.EnabledForExpression)
+                request.State.CacheFactoryExpression(FactoryID, serviceExpr);
+           
+            if (noOrFuncDecorator && decorator != null)
                 serviceExpr = Expression.Invoke(decorator, serviceExpr);
 
             return serviceExpr;
@@ -2836,7 +2860,8 @@ namespace DryIoc
 
         private static readonly MethodInfo _scopeGetOrAddMethod = typeof(IScope).GetDeclaredMethod("GetOrAdd");
 
-        protected Expression GetInstantiatedScopedServiceExpression(Expression serviceExpr, IScope scope, Request request, Type wrapperType = null)
+        protected Expression GetInstantiatedScopedServiceExpression(Expression serviceExpr, IScope scope, Request request, 
+            Type wrapperType = null)
         {
             var factoryDelegate = serviceExpr.ToFactoryExpression().Compile();
             object reused;
@@ -2848,11 +2873,17 @@ namespace DryIoc
             else
             {
                 var behavior = Setup.ReusedObjectBehavior;
-                reused = behavior.Unwrap<object>(scope.GetOrAdd(FactoryID,
-                    () => behavior.Wrap(factoryDelegate(request.State.Items, request.ResolutionScope))));
+                var wrapped = scope.GetOrAdd(FactoryID,
+                    () => behavior.Wrap(factoryDelegate(request.State.Items, request.ResolutionScope)));
+                
+                if (wrapperType != null)
+                    return wrapperType != behavior.WrapperType ? null 
+                        : request.State.GetOrAddItemExpression(wrapped, wrapperType);
+                
+                reused = behavior.Unwrap(wrapped);
             }
-            serviceExpr = request.State.GetOrAddItemExpression(reused, serviceExpr.Type);
-            return serviceExpr;
+
+            return request.State.GetOrAddItemExpression(reused, serviceExpr.Type);
         }
 
         protected Expression GetScopedServiceExpression(Expression serviceExpr, IScope scope, Request request, Type wrapperType = null)
@@ -2862,31 +2893,25 @@ namespace DryIoc
                 : request.State.GetOrAddItemExpression(scope);
 
             var factoryIDExpr = Expression.Constant(FactoryID);
-
             if (Setup.ReusedObjectBehavior == null)
-                return Expression.Call(scopeExpr,
-                    _scopeGetOrAddMethod.MakeGenericMethod(serviceExpr.Type),
-                    factoryIDExpr, Expression.Lambda(serviceExpr, null));
+                return Expression.Convert(Expression.Call(scopeExpr, _scopeGetOrAddMethod,
+                    factoryIDExpr, Expression.Lambda<Func<object>>(serviceExpr, null)), serviceExpr.Type);
 
             var behavior = Setup.ReusedObjectBehavior;
             var behaviorExpr = request.State.GetOrAddItemExpression(behavior, typeof(IReusedObjectBehavior));
 
             // First transform factory function to function returning wrapped object.
-            var serviceType = request.ServiceType;
-            var wrappedServiceExpr = Expression.Call(behaviorExpr, "Wrap", new[] { serviceType }, serviceExpr);
+            var wrappedServiceExpr = Expression.Call(behaviorExpr, "Wrap", null, serviceExpr);
 
             // Make call expression like the: scope.GetOrAdd(id, () => behavior.Wrap(new Service))
-            var getScopedObjectMethod = _scopeGetOrAddMethod.MakeGenericMethod(typeof(object));
-            var wrappedScopedServiceExpr = Expression.Call(scopeExpr, getScopedObjectMethod, factoryIDExpr,
-                Expression.Lambda(wrappedServiceExpr, null));
+            var getWrappedServiceExpr = Expression.Lambda(wrappedServiceExpr, null);
+            var wrappedScopedServiceExpr = Expression.Call(scopeExpr, _scopeGetOrAddMethod, factoryIDExpr, getWrappedServiceExpr);
 
             if (wrapperType != null)
-            {
-                //if (wrapperType.CanAssign(wrappedScopedServiceExpr))
-                return wrappedScopedServiceExpr;
-            }
+                return wrapperType != behavior.WrapperType ? null 
+                    : Expression.Convert(wrappedScopedServiceExpr, wrapperType);
 
-            var unwrappedServiceExpr = Expression.Call(behaviorExpr, "Unwrap", new[] { serviceType }, wrappedScopedServiceExpr);
+            var unwrappedServiceExpr = Expression.Call(behaviorExpr, "Unwrap", null, wrappedScopedServiceExpr);
             return unwrappedServiceExpr;
         }
 
@@ -3055,7 +3080,7 @@ namespace DryIoc
         public static ParameterSelector And(this ParameterSelector source, Type type, Func<IResolver, object> getValue)
         {
             type.ThrowIfNull();
-            return source.WithDetails(p => p.ParameterType.CanAssign(type), ServiceInfoDetails.Of(getValue));
+            return source.WithDetails(p => type.IsAssignableTo(p.ParameterType), ServiceInfoDetails.Of(getValue));
         }
 
         public static IEnumerable<Attribute> GetAttributes(this ParameterInfo paremeter, Type attributeType = null, bool inherit = false)
@@ -3180,7 +3205,7 @@ namespace DryIoc
 
         public static PropertiesAndFieldsSelector And(this PropertiesAndFieldsSelector source, Type type, Func<IResolver, object> getValue)
         {
-            return source.WithDetails(m => m.GetPropertyOrFieldType().CanAssign(type), ServiceInfoDetails.Of(getValue));
+            return source.WithDetails(m => type.IsAssignableTo(m.GetPropertyOrFieldType()), ServiceInfoDetails.Of(getValue));
         }
 
         public static PropertiesAndFieldsSelector And(this PropertiesAndFieldsSelector source, Type type, object value)
@@ -3553,18 +3578,18 @@ namespace DryIoc
 
     public sealed class ExpressionFactory : Factory
     {
-        public ExpressionFactory(Func<Request, Expression> expressionFactory, IReuse reuse = null, FactorySetup setup = null)
+        public ExpressionFactory(Func<Request, Expression> getServiceExpression, IReuse reuse = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            _expressionFactory = expressionFactory.ThrowIfNull();
+            _getServiceExpression = getServiceExpression.ThrowIfNull();
         }
 
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            return _expressionFactory(request).ThrowIfNull(Error.EXPRESSION_FACTORY_RETURNED_NULL, this, request);
+            return _getServiceExpression(request);
         }
 
-        private readonly Func<Request, Expression> _expressionFactory;
+        private readonly Func<Request, Expression> _getServiceExpression;
     }
 
     /// <summary>
@@ -3606,6 +3631,9 @@ namespace DryIoc
         private readonly Func<IResolver, object> _factoryDelegate;
     }
 
+    /// <summary>
+    /// Creates/provides <see cref="Factory"/> based on <see cref="Request"/> for enabling context-dependent scenarios.
+    /// </summary>
     public sealed class FactoryProvider : Factory
     {
         public override bool ProvidesFactoryForRequest { get { return true; } }
@@ -3632,14 +3660,33 @@ namespace DryIoc
         private readonly Func<Request, Factory> _provideFactoryOrDefault;
     }
 
+    /// <summary>
+    /// Lazy object storage that will create object with provided factory on first access, 
+    /// then will be returning the same object for subsequent access.
+    /// </summary>
     public interface IScope
     {
-        T GetOrAdd<T>(int id, Func<T> factory);
+        /// <summary>Creates, stores, and returns stored object.</summary>
+        /// <param name="id">Unique ID to find created object in subsequent calls.</param>
+        /// <param name="factory">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
+        /// <returns>Created and stored object.</returns>
+        object GetOrAdd(int id, Func<object> factory);
     }
 
+    /// <summary>
+    /// <see cref="IScope"/> implementation which will dispose stored <see cref="IDisposable"/> objects on its own dispose.
+    /// Locking is used internally to ensure that object factory called only once.
+    /// </summary>
     public sealed class Scope : IScope, IDisposable
     {
-        public T GetOrAdd<T>(int id, Func<T> factory)
+        /// <summary>
+        /// <see cref="IScope.GetOrAdd"/> for purpose.
+        /// Will throw <see cref="ContainerException"/> if scope is disposed.
+        /// </summary>
+        /// <param name="id">Unique ID to find created object in subsequent calls.</param>
+        /// <param name="factory">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
+        /// <returns>Created and stored object.</returns>
+        public object GetOrAdd(int id, Func<object> factory)
         {
             if (_disposed == 1)
                 Throw.Me(Error.SCOPE_IS_DISPOSED);
@@ -3649,10 +3696,11 @@ namespace DryIoc
                 var item = _items.GetFirstValueByHashOrDefault(id);
                 if (item == null)
                     Ref.Swap(ref _items, _ => _.AddOrUpdate(id, item = factory()));
-                return (T)item;
+                return item;
             }
         }
 
+        /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
@@ -3717,40 +3765,46 @@ namespace DryIoc
 
     public interface IReusedObjectBehavior
     {
-        object Wrap<T>(T target);
-        T Unwrap<T>(object wrapped);
+        Type WrapperType { get; }
+        object Wrap(object target);
+        object Unwrap(object wrapped);
     }
 
     public static class ReusedObjectBehavior
     {
-        public static IReusedObjectBehavior ExternallyDisposable = new ExternallyDisposableReusedObjectBehavior();
+        public static readonly IReusedObjectBehavior ExternallyDisposable = new ExternallyDisposableBehavior();
+
+        public sealed class ExternallyDisposableBehavior : IReusedObjectBehavior
+        {
+            public Type WrapperType { get { return typeof(ExplicitlyDisposableWrapper); } }
+
+            public object Wrap(object target)
+            {
+                return new ExplicitlyDisposableWrapper((target as IDisposable).ThrowIfNull());
+            }
+
+            public object Unwrap(object wrapped)
+            {
+                return (wrapped as ExplicitlyDisposableWrapper).ThrowIfNull().Target;
+            }
+        }
     }
 
-    public sealed class ExternallyDisposableReusedObjectBehavior : IReusedObjectBehavior
+    public sealed class ExplicitlyDisposableWrapper
     {
-        public object Wrap<T>(T target)
-        {
-            target.ThrowIf(!(target is IDisposable));
-            return new ExplicitlyDisposable<T>(target);
-        }
-
-        public T Unwrap<T>(object wrapped)
-        {
-            wrapped.ThrowIf(!(wrapped is ExplicitlyDisposable<T>));
-            return ((ExplicitlyDisposable<T>)wrapped).Target;
-        }
-    }
-
-    public sealed class ExplicitlyDisposable<T>
-    {
-        public ExplicitlyDisposable(T target)
+        public ExplicitlyDisposableWrapper(IDisposable target)
         {
             _target = target;
+            _targetType = _target.GetType();
         }
 
-        public T Target
+        public IDisposable Target
         {
-            get { return _target.ThrowIf(IsDisposed, "Target value was already disposed."); }
+            get 
+            { 
+                Throw.If(IsDisposed, Error.TARGET_WAS_ALREADY_DISPOSED, _targetType, typeof(ExplicitlyDisposableWrapper));
+                return _target;
+            }
         }
 
         public bool IsDisposed
@@ -3762,16 +3816,31 @@ namespace DryIoc
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
-
-            if (_target is IDisposable)
-            {
-                ((IDisposable)_target).Dispose();
-                _target = default(T);
-            }
+            _target.Dispose();
+            _target = null;
         }
 
-        private T _target;
+        private IDisposable _target;
+        private Type _targetType; 
         private int _disposed;
+    }
+
+    public sealed class ExplicitlyDisposable<T> : IDisposable
+    {
+        public ExplicitlyDisposable(ExplicitlyDisposableWrapper source)
+        {
+            _wrapper = source.ThrowIfNull().ThrowIf(!(source.Target is T));
+        }
+
+        public T Target { get{ return (T)_wrapper.Target; } }
+        public bool IsDisposed { get { return _wrapper.IsDisposed; } }
+
+        public void Dispose()
+        {
+            _wrapper.DisposeTarget();
+        }
+
+        private readonly ExplicitlyDisposableWrapper _wrapper;
     }
 
     public enum IfUnresolved { Throw, ReturnDefault }
@@ -3896,7 +3965,7 @@ namespace DryIoc
         public ContainerException(string message) : base(message) { }
     }
 
-    public static class Throw
+    public static partial class Throw
     {
         public static Func<string, Exception> GetException = message => new ContainerException(message);
 
@@ -4093,9 +4162,10 @@ namespace DryIoc
             return type.GetTypeInfo().IsEnum;
         }
 
-        public static bool CanAssign(this Type type, Type other)
+        public static bool IsAssignableTo(this Type type, Type other)
         {
-            return type.GetTypeInfo().IsAssignableFrom(other.GetTypeInfo());
+            return type != null && other != null 
+                && other.GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
         }
 
         public static bool IsTypeOf(this Type type, object obj)
@@ -4125,22 +4195,22 @@ namespace DryIoc
                 : declared.Concat(baseType.GetAll(getDeclared));
         }
 
-        public static IEnumerable<ConstructorInfo> GetAllConstructors(this Type type, bool withNonPublic = false)
+        public static IEnumerable<ConstructorInfo> GetAllConstructors(this Type type, bool includeNonPublic = false)
         {
             var all = type.GetTypeInfo().DeclaredConstructors;
-            return withNonPublic ? all : all.Where(c => c.IsPublic);
+            return includeNonPublic ? all : all.Where(c => c.IsPublic);
         }
 
-        public static ConstructorInfo GetConstructorWithParameters(this Type type, Type[] parameters, bool withNonPublic = false)
+        public static ConstructorInfo GetConstructorWithParameters(this Type type, Type[] parameters, bool includeNonPublic = false)
         {
-            return type.GetAllConstructors(withNonPublic)
+            return type.GetAllConstructors(includeNonPublic)
                 .FirstOrDefault(c => c.GetParameters().Select(p => p.ParameterType).SequenceEqual(parameters))
                 .ThrowIfNull();
         }
 
-        public static ConstructorInfo GetFirstConstructor(this Type type, bool withNonPublic = false)
+        public static ConstructorInfo GetFirstConstructor(this Type type, bool includeNonPublic = false)
         {
-            return type.GetAllConstructors(withNonPublic).FirstOrDefault().ThrowIfNull();
+            return type.GetAllConstructors(includeNonPublic).FirstOrDefault().ThrowIfNull();
         }
 
         public static MethodInfo GetDeclaredMethod(this Type type, string name)
