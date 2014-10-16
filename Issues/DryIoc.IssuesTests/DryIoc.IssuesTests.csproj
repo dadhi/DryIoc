@@ -51,6 +51,7 @@
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue46.cs" />
     <Compile Include="Issue58-HandleReusedObjectsIDisposableAndGCing.cs" />
+    <Compile Include="Issue64-ScopeAndChildContainerAccessAfterDisposal.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

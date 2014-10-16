@@ -67,6 +67,7 @@ namespace DryIoc
         /// <returns></returns>
         public Container WithNewRules(Rules newRules)
         {
+            ThrowIfContainerDisposed();
             return new Container(newRules, _registryID, _factories, _decorators, _genericWrappers, _singletonScope, _currentScope);
         }
 
@@ -81,6 +82,7 @@ namespace DryIoc
         /// </example>
         public Container OpenScope()
         {
+            ThrowIfContainerDisposed();
             return new Container(Rules, _registryID, _factories, _decorators, _genericWrappers, _singletonScope, new Scope());
         }
 
@@ -93,6 +95,7 @@ namespace DryIoc
 
         public Container CreateChildContainer()
         {
+            ThrowIfContainerDisposed();
             var parentRegistry = new WeakReference(this);
             return new Container(Rules.With(childRequest =>
             {
@@ -103,16 +106,31 @@ namespace DryIoc
             }));
         }
 
+        /// <summary>
+        /// Returns new container with all expression, delegate, items cache stripped off.
+        /// It will preserve resolved services in Singleton/Current scope.
+        /// </summary>
+        /// <returns>New container without cache.</returns>
         public Container WipeCache()
         {
+            ThrowIfContainerDisposed();
             return new Container(Rules, _registryID, _factories, _decorators, _genericWrappers, _singletonScope, _currentScope);
         }
 
+        /// <summary>Disposes container current scope and that means container itself.</summary>
         public void Dispose()
         {
-            ((IDisposable)_currentScope).Dispose();
+            _currentScope.Dispose();
         }
 
+        /// <summary>Indicates if container is disposed.</summary>
+        public bool IsDisposed
+        {
+            get { return _currentScope.IsDisposed; }
+        }
+
+        /// <summary>Prints container registry ID to identify it among others.</summary>
+        /// <returns>Printed info.</returns>
         public override string ToString()
         {
             return "{RegistryID=" + _registryID + "}";
@@ -122,6 +140,7 @@ namespace DryIoc
 
         public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
+            ThrowIfContainerDisposed();
             factory.ThrowIfNull().ValidateBeforeRegistration(serviceType.ThrowIfNull(), this);
             switch (factory.Setup.Type)
             {
@@ -139,6 +158,7 @@ namespace DryIoc
 
         public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
+            ThrowIfContainerDisposed();
             serviceType = serviceType.ThrowIfNull();
             switch (factoryType)
             {
@@ -160,6 +180,7 @@ namespace DryIoc
 
         public void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
+            ThrowIfContainerDisposed();
             switch (factoryType)
             {
                 case FactoryType.GenericWrapper:
@@ -246,24 +267,6 @@ namespace DryIoc
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, parentOrDefault);
         }
 
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault)
-        {
-            var request = (parentOrDefault ?? Root).Push(serviceType, ifUnresolved: ifUnresolved);
-
-            var factory = ((IRegistry)this).ResolveFactory(request);
-            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
-            if (factoryDelegate == null)
-                return null;
-
-            var resultService = factoryDelegate(request.State.Items, request.ResolutionScope);
-
-            // Safe to cache factory only after it is evaluated without errors.
-            Interlocked.Exchange(ref _resolvedDefaultDelegates, _resolvedDefaultDelegates
-                .AddOrUpdate(serviceType, factoryDelegate));
-
-            return resultService;
-        }
-
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType,
             Request parentOrDefault)
         {
@@ -285,6 +288,8 @@ namespace DryIoc
             // If service key is null, then use resolve default instead of keyed.
             if (cacheServiceKey == null)
                 return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, parentOrDefault);
+
+            ThrowIfContainerDisposed();
 
             FactoryDelegate factoryDelegate;
 
@@ -327,6 +332,31 @@ namespace DryIoc
                     if (value != null)
                         serviceInfo.SetValue(instance, value);
                 }
+        }
+
+        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrDefault)
+        {
+            ThrowIfContainerDisposed();
+
+            var request = (parentOrDefault ?? Root).Push(serviceType, ifUnresolved: ifUnresolved);
+
+            var factory = ((IRegistry)this).ResolveFactory(request);
+            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
+            if (factoryDelegate == null)
+                return null;
+
+            var resultService = factoryDelegate(request.State.Items, request.ResolutionScope);
+
+            // Safe to cache factory only after it is evaluated without errors.
+            Interlocked.Exchange(ref _resolvedDefaultDelegates, _resolvedDefaultDelegates
+                .AddOrUpdate(serviceType, factoryDelegate));
+
+            return resultService;
+        }
+
+        private void ThrowIfContainerDisposed()
+        {
+            this.ThrowIf(IsDisposed, Error.CONTAINER_IS_DISPOSED);
         }
 
         #endregion
@@ -668,7 +698,7 @@ namespace DryIoc
         private readonly Ref<HashTree<Type, Factory[]>> _decorators;
         private readonly Ref<HashTree<Type, Factory>> _genericWrappers;
 
-        private readonly IScope _singletonScope, _currentScope;
+        private readonly Scope _singletonScope, _currentScope;
 
         private HashTree<Type, FactoryDelegate> _resolvedDefaultDelegates;
         private HashTree<Type, HashTree<object, FactoryDelegate>> _resolvedKeyedDelegates;
@@ -679,7 +709,7 @@ namespace DryIoc
             Ref<HashTree<Type, object>> factories,
             Ref<HashTree<Type, Factory[]>> decorators,
             Ref<HashTree<Type, Factory>> genericWrappers,
-            IScope singletonScope, IScope currentScope = null)
+            Scope singletonScope, Scope currentScope = null)
         {
             Rules = rules;
             _registryID = registryID;
@@ -1441,6 +1471,9 @@ namespace DryIoc
 
         public static readonly string TARGET_WAS_ALREADY_DISPOSED = 
             "Target of type {0} was already disposed in {1}.";
+
+        public static readonly string CONTAINER_IS_DISPOSED = 
+            "Container {0} is disposed and its operations are no longer available.";
     }
 
     public static class Registrator
@@ -3713,6 +3746,11 @@ namespace DryIoc
                         item.Dispose();
                 _items = null;
             }
+        }
+
+        public bool IsDisposed
+        {
+            get { return _disposed == 1; }
         }
 
         #region Implementation
