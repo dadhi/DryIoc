@@ -121,6 +121,19 @@ namespace DryIoc
         public void Dispose()
         {
             _currentScope.Dispose();
+            if (_currentScope != _singletonScope) 
+                return; // Skip the rest for opened scope, to dispose only scoped container 
+
+            // Cleanup the state
+            _factories.Swap(_ => HashTree<Type, object>.Empty);
+            _decorators.Swap(_ => HashTree<Type, Factory[]>.Empty);
+            _genericWrappers.Swap(_ => HashTree<Type, Factory>.Empty);
+
+            _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
+            _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
+            _resolutionState.Dispose();
+            
+            Rules = Rules.Empty;
         }
 
         /// <summary>Indicates if container is disposed.</summary>
@@ -780,7 +793,10 @@ namespace DryIoc
         #endregion
     }
 
-    public sealed class ResolutionState
+    /// <summary>
+    /// Holds service expression cache, and state items passed to <see cref="FactoryDelegate"/> in resolution root.
+    /// </summary>
+    public sealed class ResolutionState : IDisposable
     {
         public static readonly ParameterExpression ItemsParamExpr = Expression.Parameter(typeof(AppendableArray<object>), "items");
 
@@ -832,6 +848,14 @@ namespace DryIoc
         public void CacheFactoryExpression(int factoryID, Expression factoryExpression)
         {
             Interlocked.Exchange(ref _factoryExpressions, _factoryExpressions.AddOrUpdate(factoryID, factoryExpression));
+        }
+
+        /// <summary>Cleans the state.</summary>
+        public void Dispose()
+        {
+            _items = AppendableArray<object>.Empty;
+            _itemsExpressions = HashTree<int, Expression>.Empty;
+            _factoryExpressions = HashTree<int, Expression>.Empty;
         }
 
         #region Implementation

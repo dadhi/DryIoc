@@ -42,9 +42,7 @@ namespace DryIoc.UnitTests.Memory
             // ReSharper disable RedundantAssignment
             container = null;
             // ReSharper restore RedundantAssignment
-            GC.Collect(Int32.MaxValue);
-            GC.WaitForPendingFinalizers();
-            GC.Collect(Int32.MaxValue);
+            GCFullCollect();
             GC.KeepAlive(services); 
             Assert.That(containerWeakRef.IsAlive, Is.False);
         }
@@ -67,11 +65,68 @@ namespace DryIoc.UnitTests.Memory
             // ReSharper disable RedundantAssignment
             container = null;
             // ReSharper restore RedundantAssignment
+            GCFullCollect();
+            GC.KeepAlive(savedResolver);
+            Assert.That(containerWeakRef.IsAlive, Is.False);
+        }
+
+        [Test]
+        public void After_disposing_container_there_should_be_No_reference_to_registered_instance()
+        {
+            var container = new Container();
+
+            var service = new Service();
+            container.RegisterInstance(service);
+
+            var serviceRef = new WeakReference(service);
+            container.Dispose();
+            service = null;
+
+            GCFullCollect();
+            Assert.That(serviceRef.IsAlive, Is.False);
+        }
+
+        [Test]
+        public void After_disposing_container_there_should_be_No_reference_to_registered_instance_if_it_was_resolved_already()
+        {
+            var container = new Container();
+
+            var service = new Service();
+            container.RegisterInstance(service);
+            container.Resolve<Service>();
+
+            var serviceRef = new WeakReference(service);
+            container.Dispose();
+            service = null;
+
+            GCFullCollect();
+            Assert.That(serviceRef.IsAlive, Is.False);
+        }
+
+        [Test]
+        public void After_disposing_container_there_should_be_No_reference_to_registered_delegate_if_it_was_resolved_already()
+        {
+            var container = new Container();
+
+            var service = new Service();
+            container.RegisterDelegate<IService>(_ => service);
+            container.Register<ServiceClient>();
+
+            container.Resolve<ServiceClient>();
+
+            var serviceRef = new WeakReference(service);
+            container.Dispose();
+            service = null;
+
+            GCFullCollect();
+            Assert.That(serviceRef.IsAlive, Is.False);
+        }
+    
+        private static void GCFullCollect()
+        {
             GC.Collect(Int32.MaxValue);
             GC.WaitForPendingFinalizers();
             GC.Collect(Int32.MaxValue);
-            GC.KeepAlive(savedResolver);
-            Assert.That(containerWeakRef.IsAlive, Is.False);
         }
     }
 }

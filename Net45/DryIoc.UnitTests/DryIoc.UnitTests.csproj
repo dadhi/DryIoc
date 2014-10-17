@@ -55,11 +55,11 @@
     <Compile Include="..\..\DryIoc.UnitTests\ContainerTests.cs">
       <Link>ContainerTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\ContainerTests.CUT.cs">
+      <Link>ContainerTests.CUT.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\ContextDependentResolutionTests.cs">
       <Link>ContextDependentResolutionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\CUT\ContainerTests.CUT.cs">
-      <Link>ContainerTests.CUT.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\DecoratorConditionTests.cs">
       <Link>DecoratorConditionTests.cs</Link>

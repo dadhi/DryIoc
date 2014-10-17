@@ -59,7 +59,7 @@
     <Compile Include="RulesTests.cs" />
     <Compile Include="ContainerTests.cs" />
     <Compile Include="ContextDependentResolutionTests.cs" />
-    <Compile Include="CUT\ContainerTests.CUT.cs" />
+    <Compile Include="ContainerTests.CUT.cs" />
     <Compile Include="DiagnosticsTests.cs" />
     <Compile Include="DecoratorTests.cs" />
     <Compile Include="DynamicFactoryTests.cs" />

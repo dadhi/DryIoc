@@ -15,6 +15,19 @@ namespace DryIoc.IssuesTests
         }
 
         [Fact]
+        public void ExternallyOwnedInstanceShouldNotBeAliveAfterDisposalAndGc2()
+        {
+            WeakReference @ref;
+            var c = new Container();
+            c.Register<ITest, Test>();
+            var cx = c.BeginScope();
+            RunTheTest(out @ref, c, cx);
+            //cx.Dispose();
+            GC.Collect();
+            Assert.False(@ref.IsAlive);
+        }
+
+        [Fact]
         public void ExternallyOwnedInstanceShouldNotBeAliveAfterDisposalAndGc()
         {
             WeakReference @ref;

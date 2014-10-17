@@ -104,6 +104,16 @@ namespace DryIoc.UnitTests.CUT
         }
     }
 
+    public class ServiceClient
+    {
+        public IService Service { get; private set; }
+
+        public ServiceClient(IService service)
+        {
+            Service = service;
+        }
+    }
+
     public interface IAbstractService { }
 
 	public abstract class AbstractService : IAbstractService

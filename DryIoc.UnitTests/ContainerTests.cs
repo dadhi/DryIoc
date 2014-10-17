@@ -321,6 +321,5 @@ namespace DryIoc.UnitTests
 
             Assert.That(service, Is.InstanceOf<Service>());
         }
-
     }
 }
