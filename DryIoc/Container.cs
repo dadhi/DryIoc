@@ -1472,10 +1472,10 @@ namespace DryIoc
             "and the rest of parameters resolvable from Container when resolving: {1}.";
 
         public static readonly string REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE =
-            "Registered factory delegate returns object [{0}] of type {1}, not assignable to serviceType {2}.";
+            "Registered factory delegate returns service {0} is not assignable to serviceType {1}.";
 
         public static readonly string REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
-            "Registered instance [{0}] of type {1} is not assignable to serviceType {2}.";
+            "Registered instance {0} is not assignable to serviceType {1}.";
 
         public static readonly string WRAPPED_TYPE_NOT_OF_REQUIRED_SERVICE_TYPE =
             "Registered service (wrapped) type {0} is not assignable to required service type {1} when resolving {2}.";
@@ -1695,7 +1695,7 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterDelegate<TService>(this IRegistrator registrator,
-            Func<IResolver, TService> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
+            Func<Request, TService> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var factory = new DelegateFactory(r => factoryDelegate(r), reuse, setup);
@@ -1715,13 +1715,13 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterDelegate(this IRegistrator registrator, Type serviceType,
-            Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
+            Func<Request, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            Func<IResolver, object> checkedDelegate = r => factoryDelegate(r).ThrowIfNotOf(serviceType,
-                Error.REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, factoryDelegate(r).GetType(), serviceType);
+            Func<Request, object> checkedFactory = r => factoryDelegate(r)
+                .ThrowIfNotOf(serviceType, Error.REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, serviceType);
 
-            var factory = new DelegateFactory(checkedDelegate, reuse, setup);
+            var factory = new DelegateFactory(checkedFactory, reuse, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
 
@@ -1732,13 +1732,15 @@ namespace DryIoc
         /// <typeparam name="TService">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="instance">The pre-created instance of <typeparamref name="TService"/>.</param>
+        /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        public static void RegisterInstance<TService>(this IRegistrator registrator, TService instance,
+        public static void RegisterInstance<TService>(this IRegistrator registrator, TService instance, IReuse reuse = null,
             FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            registrator.Register(new InstanceFactory(instance, setup), typeof(TService), named, ifAlreadyRegistered);
+            var factory = reuse == null ? (Factory)new InstanceFactory(instance, setup) : new DelegateFactory(_ => instance, reuse, setup);
+            registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1747,13 +1749,15 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceType">Service type to register.</param>
         /// <param name="instance">The pre-created instance of <paramref name="serviceType"/>.</param>
+        /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        public static void RegisterInstance(this IRegistrator registrator, Type serviceType, object instance,
+        public static void RegisterInstance(this IRegistrator registrator, Type serviceType, object instance, IReuse reuse = null, 
             FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            registrator.Register(new InstanceFactory(instance, setup), serviceType, named, ifAlreadyRegistered);
+            var factory = reuse == null ? (Factory)new InstanceFactory(instance, setup) : new DelegateFactory(_ => instance, reuse, setup);
+            registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
 
         /// <summary>
@@ -1779,11 +1783,9 @@ namespace DryIoc
         /// ]]></code>
         /// </example>
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
-            Action<TTarget, IResolver> initialize, Func<Request, bool> condition = null)
+            Action<TTarget, Request> initialize, Func<Request, bool> condition = null)
         {
-            registrator.RegisterDelegate<Action<TTarget>>(
-                r => target => initialize(target, r),
-                setup: DecoratorSetup.WithCondition(condition));
+            registrator.RegisterDelegate<Action<TTarget>>(r => target => initialize(target, r), setup: DecoratorSetup.WithCondition(condition));
         }
 
         /// <summary>
@@ -2003,7 +2005,7 @@ namespace DryIoc
                     : new WithTypeReturnDefault(requiredServiceType, serviceKey));
         }
 
-        public static ServiceInfoDetails Of(Func<IResolver, object> getValue)
+        public static ServiceInfoDetails Of(Func<Request, object> getValue)
         {
             return new WithValue(getValue.ThrowIfNull());
         }
@@ -2017,8 +2019,8 @@ namespace DryIoc
         /// <summary>Policy to deal with unresolved request.</summary>
         public virtual IfUnresolved IfUnresolved { get { return IfUnresolved.Throw; } }
 
-        /// <summary>Allows to get or resolve value using passed registry and request for dependency.</summary>
-        public virtual Func<IResolver, object> GetValue { get { return null; } }
+        /// <summary>Allows to get, or resolve value using passed <see cref="Request"/>.</summary>
+        public virtual Func<Request, object> GetValue { get { return null; } }
 
         public override string ToString()
         {
@@ -2042,9 +2044,9 @@ namespace DryIoc
 
         private class WithValue : ServiceInfoDetails
         {
-            public override Func<IResolver, object> GetValue { get { return _getValue; } }
-            public WithValue(Func<IResolver, object> getValue) { _getValue = getValue; }
-            private readonly Func<IResolver, object> _getValue;
+            public override Func<Request, object> GetValue { get { return _getValue; } }
+            public WithValue(Func<Request, object> getValue) { _getValue = getValue; }
+            private readonly Func<Request, object> _getValue;
         }
 
         private class WithKey : ServiceInfoDetails
@@ -2998,8 +3000,7 @@ namespace DryIoc
 
         public override void ValidateBeforeRegistration(Type serviceType, IRegistry _)
         {
-            _instance.ThrowIfNotOf(serviceType,
-                Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE, _instance.GetType(), serviceType);
+            _instance.ThrowIfNotOf(serviceType, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE, serviceType);
         }
 
         public override Expression CreateExpressionOrDefault(Request request)
@@ -3128,7 +3129,7 @@ namespace DryIoc
             return source.And(name, _ => value);
         }
 
-        public static ParameterSelector And(this ParameterSelector source, string name, Func<IResolver, object> getValue)
+        public static ParameterSelector And(this ParameterSelector source, string name, Func<Request, object> getValue)
         {
             return source.WithDetails(p => p.Name.Equals(name), ServiceInfoDetails.Of(getValue));
         }
@@ -3138,7 +3139,7 @@ namespace DryIoc
             return source.And(type, _ => value);
         }
 
-        public static ParameterSelector And(this ParameterSelector source, Type type, Func<IResolver, object> getValue)
+        public static ParameterSelector And(this ParameterSelector source, Type type, Func<Request, object> getValue)
         {
             type.ThrowIfNull();
             return source.WithDetails(p => type.IsAssignableTo(p.ParameterType), ServiceInfoDetails.Of(getValue));
@@ -3253,7 +3254,7 @@ namespace DryIoc
             return source.WithDetails(name, ServiceInfoDetails.Of(_ => value));
         }
 
-        public static PropertiesAndFieldsSelector And(this PropertiesAndFieldsSelector source, string name, Func<IResolver, object> getValue)
+        public static PropertiesAndFieldsSelector And(this PropertiesAndFieldsSelector source, string name, Func<Request, object> getValue)
         {
             return source.WithDetails(name, ServiceInfoDetails.Of(getValue));
         }
@@ -3264,7 +3265,7 @@ namespace DryIoc
             return source.WithDetails(condition, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
         }
 
-        public static PropertiesAndFieldsSelector And(this PropertiesAndFieldsSelector source, Type type, Func<IResolver, object> getValue)
+        public static PropertiesAndFieldsSelector And(this PropertiesAndFieldsSelector source, Type type, Func<Request, object> getValue)
         {
             return source.WithDetails(m => type.IsAssignableTo(m.GetPropertyOrFieldType()), ServiceInfoDetails.Of(getValue));
         }
@@ -3655,7 +3656,7 @@ namespace DryIoc
     /// </summary>
     public sealed class DelegateFactory : Factory
     {
-        public DelegateFactory(Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null)
+        public DelegateFactory(Func<Request, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
             _factoryDelegate = factoryDelegate.ThrowIfNull();
@@ -3685,7 +3686,7 @@ namespace DryIoc
                 .GetOrAdd(FactoryID, () => _factoryDelegate(request));
         }
 
-        private readonly Func<IResolver, object> _factoryDelegate;
+        private readonly Func<Request, object> _factoryDelegate;
     }
 
     /// <summary>

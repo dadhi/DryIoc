@@ -94,6 +94,22 @@ namespace DryIoc.UnitTests
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<object>());
         }
+
+        [Test]
+        public void Delegate_factory_may_resolve_different_objects_depending_on_request()
+        {
+            var container = new Container();
+            var root = "root";
+            var dependency = "dependency";
+            container.RegisterDelegate(r => r.Parent.IsRoot ? root : dependency);
+            container.Register<StrUser>();
+
+            var service = container.Resolve<string>();
+            Assert.That(service, Is.EqualTo(root));
+
+            var client = container.Resolve<StrUser>();
+            Assert.That(client.Dependency, Is.EqualTo(dependency));
+        }
     }
 
     #region CUT
@@ -164,6 +180,16 @@ namespace DryIoc.UnitTests
         public User2(ILogger logger)
         {
             Logger = logger;
+        }
+    }
+
+    public class StrUser
+    {
+        public string Dependency { get; private set; }
+
+        public StrUser(string dependency)
+        {
+            Dependency = dependency;
         }
     }
 

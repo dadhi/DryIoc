@@ -36,14 +36,16 @@ namespace DryIoc.UnitTests.Memory
             var container = new Container();
 
             container.Register(typeof(IService), typeof(Service), setup: Setup.WithMetadata("007"));
-            var services = container.Resolve<IEnumerable<Meta<Lazy<IService>, string>>>();
+            var servicesOne = container.Resolve<IEnumerable<Meta<Lazy<IService>, string>>>();
+            var servicesTwo = container.Resolve<IEnumerable<Meta<Lazy<IService>, string>>>();
 
             var containerWeakRef = new WeakReference(container);
             // ReSharper disable RedundantAssignment
             container = null;
             // ReSharper restore RedundantAssignment
             GCFullCollect();
-            GC.KeepAlive(services); 
+            GC.KeepAlive(servicesOne); 
+            GC.KeepAlive(servicesTwo); 
             Assert.That(containerWeakRef.IsAlive, Is.False);
         }
 
@@ -52,13 +54,14 @@ namespace DryIoc.UnitTests.Memory
         {
             var container = new Container();
 
-            IResolver savedResolver = null;
+            Request savedResolver = null;
             container.RegisterDelegate(r =>
             {
                 savedResolver = r;
                 return new Service();
             });
 
+            container.Resolve<Service>();
             container.Resolve<Service>();
 
             var containerWeakRef = new WeakReference(container);

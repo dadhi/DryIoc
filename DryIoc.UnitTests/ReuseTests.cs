@@ -85,8 +85,7 @@ namespace DryIoc.UnitTests
             Assert.That(consumer.Log, Is.Not.Null.And.Not.SameAs(account.Log));
         }
 
-        [Test]
-        [Ignore]
+        [Test, Explicit]
         public void For_signleton_injected_as_Func_and_as_instance_only_one_instance_should_be_created()
         {
             ServiceWithInstanceCountWithStringParam.InstanceCount = 0;
@@ -175,6 +174,18 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<ServiceWithResolutionAndSingletonDependencies>();
 
             Assert.That(service.ResolutionScopeDep, Is.SameAs(service.SingletonDep.ResolutionScopeDep));
+        }
+
+        [Test]
+        public void Can_specify_to_dispose_registered_instance()
+        {
+            var container = new Container();
+            container.RegisterInstance(new DisposableService(), Reuse.InCurrentScope);
+            var service = container.Resolve<DisposableService>();
+
+            container.Dispose();
+
+            Assert.That(service.IsDisposed, Is.True);
         }
 
         [Test]
