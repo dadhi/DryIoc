@@ -19,7 +19,7 @@ namespace DryIoc.UnitTests
                 () => container.Resolve<string>(typeof(Service)));
 
             Assert.That(ex.Message, Is
-                .StringContaining("Service is not assignable to").And
+                .StringContaining("Registered service (wrapped) type").And
                 .StringContaining("String"));
         }
 

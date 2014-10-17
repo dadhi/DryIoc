@@ -286,10 +286,8 @@ namespace DryIoc
             var cacheServiceKey = serviceKey;
             if (requiredServiceType != null)
             {
-                var wrappedServiceType = ((IRegistry)this).GetWrappedServiceType(serviceType);
-                Throw.If(!requiredServiceType.IsAssignableTo(wrappedServiceType),
-                    Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE,
-                    requiredServiceType, wrappedServiceType, serviceType);
+                var wrappedServiceType = ((IRegistry)this).GetWrappedServiceType(serviceType).ThrowIfNotOf(requiredServiceType, 
+                    Error.WRAPPED_TYPE_NOT_OF_REQUIRED_SERVICE_TYPE, requiredServiceType, serviceType);
 
                 if (serviceType == wrappedServiceType)
                     serviceType = requiredServiceType;
@@ -734,11 +732,12 @@ namespace DryIoc
             _singletonScope = singletonScope;
             _currentScope = currentScope ?? singletonScope;
 
-            _resolutionState = new ResolutionState();
             _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
             _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
 
-            Root = Request.CreateRoot(new WeakReference(this), _resolutionState);
+            _resolutionState = new ResolutionState();
+
+            Root = Request.CreateRoot(new WeakReference(this), new WeakReference(_resolutionState));
         }
 
         #endregion
@@ -1472,14 +1471,14 @@ namespace DryIoc
             "Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine +
             "and the rest of parameters resolvable from Container when resolving: {1}.";
 
-        public static readonly string REGISTERED_FACTORY_DELEGATE_RESULT_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
+        public static readonly string REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE =
             "Registered factory delegate returns object [{0}] of type {1}, not assignable to serviceType {2}.";
 
-        public static readonly string REGISTERED_INSTANCE_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
+        public static readonly string REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
             "Registered instance [{0}] of type {1} is not assignable to serviceType {2}.";
 
-        public static readonly string REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE =
-            "Required service type {0} is not assignable to (wrapped) type {1} when resolving {2}.";
+        public static readonly string WRAPPED_TYPE_NOT_OF_REQUIRED_SERVICE_TYPE =
+            "Registered service (wrapped) type {0} is not assignable to required service type {1} when resolving {2}.";
 
         public static readonly string INJECTED_VALUE_IS_OF_DIFFERENT_TYPE =
             "Injected value {0} is not assignable to {1} when resolving: {2}.";
@@ -1719,12 +1718,8 @@ namespace DryIoc
             Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            Func<IResolver, object> checkedDelegate = r =>
-            {
-                var result = factoryDelegate(r);
-                return result.ThrowIf(!serviceType.IsTypeOf(result),
-                    Error.REGISTERED_FACTORY_DELEGATE_RESULT_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE, result.GetType(), serviceType);
-            };
+            Func<IResolver, object> checkedDelegate = r => factoryDelegate(r).ThrowIfNotOf(serviceType,
+                Error.REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, factoryDelegate(r).GetType(), serviceType);
 
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
@@ -2091,11 +2086,8 @@ namespace DryIoc
             var requiredServiceType = details.RequiredServiceType;
             if (requiredServiceType != null)
             {
-                var wrappedServiceType = request.Registry.GetWrappedServiceType(serviceType);
-                Throw.If(!requiredServiceType.IsAssignableTo(wrappedServiceType),
-                    Error.REQUIRED_SERVICE_TYPE_IS_NOT_ASSIGNABLE_TO_WRAPPED_TYPE,
-                        requiredServiceType, wrappedServiceType, request);
-
+                var wrappedServiceType = request.Registry.GetWrappedServiceType(serviceType).ThrowIfNotOf(requiredServiceType, 
+                    Error.WRAPPED_TYPE_NOT_OF_REQUIRED_SERVICE_TYPE, requiredServiceType, request);
                 if (wrappedServiceType == serviceType)
                 {
                     serviceType = requiredServiceType;
@@ -2376,15 +2368,22 @@ namespace DryIoc
         /// Could be changed later with <see cref="ReplaceRegistryWith"/> method.
         /// </param>
         /// <param name="state">Resolution state associated with container. 
-        /// It is separated from registry, because later could be replaced.</param>
-        /// <returns></returns>
-        public static Request CreateRoot(WeakReference registry, ResolutionState state)
+        /// It is separated from registry, because later could be replaced: for instance by Parent container registry</param>
+        /// <returns>New root request.</returns>
+        public static Request CreateRoot(WeakReference registry, WeakReference state)
         {
-            registry.ThrowIf(!(registry.Target is IRegistry));
+            registry.ThrowIfNull().Target.ThrowIfNotOf(typeof(IRegistry));
+            state.ThrowIfNull().Target.ThrowIfNotOf(typeof(ResolutionState));
             return new Request(null, registry, state, null, null, null);
         }
 
-        public bool IsRoot { get { return ServiceInfo == null; } }
+        /// <summary>
+        /// Indicates that request is empty initial request: there is no <see cref="ServiceInfo"/> in such a request.
+        /// </summary>
+        public bool IsRoot
+        {
+            get { return ServiceInfo == null; }
+        }
 
         #region Resolver
 
@@ -2444,16 +2443,18 @@ namespace DryIoc
         /// Reference to resolved items and cached factory expressions. 
         /// Used to propagate the state from resolution root, probably from another container (request creator).
         /// </summary>
-        public readonly ResolutionState State;
+        public ResolutionState State
+        {
+            get { return (_stateWeakRef.Target as ResolutionState).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); } 
+        }
 
         public readonly Request Parent;
         public readonly IServiceInfo ServiceInfo;
         public readonly Factory ResolvedFactory;
 
-        public readonly WeakReference RegistryWeakRef;
         public IRegistry Registry
         {
-            get { return (RegistryWeakRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
+            get { return (_registryWeakRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
         }
 
         public Type ServiceType { get { return ServiceInfo == null ? null : ServiceInfo.ServiceType; } }
@@ -2469,11 +2470,11 @@ namespace DryIoc
         public Request Push(IServiceInfo info)
         {
             if (IsRoot)
-                return new Request(this, RegistryWeakRef, State, new Ref<IScope>(), info.ThrowIfNull(), null);
+                return new Request(this, _registryWeakRef, _stateWeakRef, new Ref<IScope>(), info.ThrowIfNull(), null);
 
             ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info.ThrowIfNull(), this);
             var inheritedInfo = info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup.Type);
-            return new Request(this, RegistryWeakRef, State, _scope, inheritedInfo, null);
+            return new Request(this, _registryWeakRef, _stateWeakRef, _scope, inheritedInfo, null);
         }
 
         public Request Push(Type serviceType,
@@ -2487,7 +2488,7 @@ namespace DryIoc
 
         public Request ReplaceServiceInfoWith(IServiceInfo info)
         {
-            return new Request(Parent, RegistryWeakRef, State, _scope, info, ResolvedFactory);
+            return new Request(Parent, _registryWeakRef, _stateWeakRef, _scope, info, ResolvedFactory);
         }
 
         /// <summary>
@@ -2498,8 +2499,8 @@ namespace DryIoc
         /// <returns>Request with replaced registry.</returns>
         public Request ReplaceRegistryWith(WeakReference registry)
         {
-            registry.ThrowIf(!(registry.Target is IRegistry));
-            return new Request(Parent, registry, State, _scope, ServiceInfo, ResolvedFactory);
+            registry.ThrowIfNull().Target.ThrowIfNotOf(typeof(IRegistry));
+            return new Request(Parent, registry, _stateWeakRef, _scope, ServiceInfo, ResolvedFactory);
         }
 
         /// <summary>Returns new request with set <see cref="ResolvedFactory"/>.</summary>
@@ -2514,7 +2515,7 @@ namespace DryIoc
                 for (var p = Parent; !p.IsRoot; p = p.Parent)
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID, Error.RECURSIVE_DEPENDENCY_DETECTED, Print(factory.FactoryID));
 
-            return new Request(Parent, RegistryWeakRef, State, _scope, ServiceInfo, factory);
+            return new Request(Parent, _registryWeakRef, _stateWeakRef, _scope, ServiceInfo, factory);
         }
 
         /// <summary>
@@ -2580,17 +2581,20 @@ namespace DryIoc
         #region Implementation
 
         internal Request(Request parent,
-            WeakReference registryWeakRef, ResolutionState state, Ref<IScope> scope, IServiceInfo serviceInfo,
+            WeakReference registryWeakRef, WeakReference resolutionStateWeakRef, 
+            Ref<IScope> scope, IServiceInfo serviceInfo,
             Factory resolvedFactory)
         {
             Parent = parent;
-            State = state;
-            RegistryWeakRef = registryWeakRef;
+            _registryWeakRef = registryWeakRef;
+            _stateWeakRef = resolutionStateWeakRef;
             _scope = scope;
             ServiceInfo = serviceInfo;
             ResolvedFactory = resolvedFactory;
         }
 
+        private readonly WeakReference _registryWeakRef;
+        private readonly WeakReference _stateWeakRef;
         private readonly Ref<IScope> _scope;
 
         #endregion
@@ -2994,8 +2998,8 @@ namespace DryIoc
 
         public override void ValidateBeforeRegistration(Type serviceType, IRegistry _)
         {
-            _instance.ThrowIf(!serviceType.IsTypeOf(_instance),
-                Error.REGISTERED_INSTANCE_IS_NOT_ASSIGNABLE_TO_SERVICE_TYPE, _instance.GetType(), serviceType);
+            _instance.ThrowIfNotOf(serviceType,
+                Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE, _instance.GetType(), serviceType);
         }
 
         public override Expression CreateExpressionOrDefault(Request request)
@@ -3617,12 +3621,8 @@ namespace DryIoc
             var request = ownerRequest.Push(dependencyInfo);
             var factory = dependencyInfo.Details.GetValue == null
                 ? request.Registry.ResolveFactory(request)
-                : new DelegateFactory(r =>
-                {
-                    var value = dependencyInfo.Details.GetValue(r);
-                    return value.ThrowIf(!dependencyInfo.ServiceType.IsTypeOf(value),
-                        Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, dependencyInfo, ownerRequest);
-                });
+                : new DelegateFactory(r => dependencyInfo.Details.GetValue(r)
+                    .ThrowIfNotOf(dependencyInfo.ServiceType, Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, dependencyInfo, ownerRequest));
 
             var expr = factory == null ? null : factory.GetExpressionOrDefault(request);
             return expr ??
@@ -4027,17 +4027,12 @@ namespace DryIoc
         public ContainerException(string message) : base(message) { }
     }
 
+    /// <summary>Enables more clean exception message formatting, and exception throwing.</summary>
     public static partial class Throw
     {
         public static Func<string, Exception> GetException = message => new ContainerException(message);
 
         public static Func<object, string> PrintArg = x => new StringBuilder().Print(x).ToString();
-
-        public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
-        {
-            if (arg != null) return arg;
-            throw GetException(message == null ? Format(ARGUMENT_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2));
-        }
 
         public static T ThrowIf<T>(this T arg0, bool throwCondition, string message = null, object arg1 = null, object arg2 = null)
         {
@@ -4045,6 +4040,24 @@ namespace DryIoc
             throw GetException(message == null
                 ? Format(ARGUMENT_HAS_IMVALID_CONDITION, arg0, typeof(T))
                 : Format(message, arg0, arg1, arg2));
+        }
+
+        public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
+        {
+            if (arg != null) return arg;
+            throw GetException(message == null ? Format(ARGUMENT_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2));
+        }
+
+        public static T ThrowIfNotOf<T>(this T arg0, Type type, string message = null, object arg1 = null, object arg2 = null) where T : class
+        {
+            if (type.IsTypeOf(arg0)) return arg0;
+            throw GetException(message == null ? Format(ARG_IS_NOT_OF_TYPE, arg0, type) : Format(message, arg0, arg1, arg2));
+        }
+
+        public static Type ThrowIfNotOf(this Type arg0, Type type, string message = null, object arg1 = null, object arg2 = null)
+        {
+            if (type.IsAssignableTo(arg0)) return arg0;
+            throw GetException(message == null ? Format(TYPE_ARG_IS_NOT_OF_TYPE, arg0, type) : Format(message, arg0, arg1, arg2));
         }
 
         public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
@@ -4070,6 +4083,8 @@ namespace DryIoc
 
         private static readonly string ARGUMENT_IS_NULL = "Argument of type {0} is null.";
         private static readonly string ARGUMENT_HAS_IMVALID_CONDITION = "Argument {0} of type {1} has invalid condition.";
+        private static readonly string ARG_IS_NOT_OF_TYPE = "Argument {0} is not of type {1}.";
+        private static readonly string TYPE_ARG_IS_NOT_OF_TYPE = "Argument type {0} is not assignable from type {1}.";
     }
 
     /// <summary>
@@ -4226,13 +4241,12 @@ namespace DryIoc
 
         public static bool IsAssignableTo(this Type type, Type other)
         {
-            return type != null && other != null 
-                && other.GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
+            return type != null && other != null && other.GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
         }
 
         public static bool IsTypeOf(this Type type, object obj)
         {
-            return type.GetTypeInfo().IsAssignableFrom(obj.GetType().GetTypeInfo());
+            return obj != null && obj.GetType().IsAssignableTo(type);
         }
 
         public static bool IsPrimitiveOrObjectOrString(this Type type)

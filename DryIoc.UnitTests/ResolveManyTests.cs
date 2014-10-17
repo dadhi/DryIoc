@@ -125,7 +125,8 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.ResolveMany<AnotherService>(typeof(Service)));
 
-            Assert.That(ex.Message, Is.StringContaining("Required service type DryIoc.UnitTests.CUT.Service is not assignable"));
+            Assert.That(ex.Message, Is.StringContaining(
+                "Registered service (wrapped)"));
         }
 
         [Test]
