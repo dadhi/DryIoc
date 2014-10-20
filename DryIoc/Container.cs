@@ -430,8 +430,8 @@ namespace DryIoc
                 return null;
 
             // We are already resolving decorator for the service, so stop now.
-            var parent = request.GetNonWrapperParentOrRoot();
-            if (!parent.IsRoot && parent.ResolvedFactoryType == FactoryType.Decorator)
+            var parent = request.GetNonWrapperParentOrEmpty();
+            if (!parent.IsEmpty && parent.ResolvedFactoryType == FactoryType.Decorator)
                 return null;
 
             LambdaExpression resultFuncExpr = null;
@@ -737,7 +737,7 @@ namespace DryIoc
 
             _resolutionState = new ResolutionState();
 
-            Root = Request.CreateRoot(new WeakReference(this), new WeakReference(_resolutionState));
+            Root = Request.CreateEmpty(new WeakReference(this), new WeakReference(_resolutionState));
         }
 
         #endregion
@@ -1042,8 +1042,8 @@ namespace DryIoc
             var items = registry.GetAllServiceFactories(requiredItemType);
 
             // Composite pattern support: filter out composite root from available keys.
-            var parent = request.GetNonWrapperParentOrRoot();
-            if (!parent.IsRoot && parent.ServiceType == requiredItemType)
+            var parent = request.GetNonWrapperParentOrEmpty();
+            if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
             {
                 var parentFactoryID = parent.ResolvedFactory.FactoryID;
                 items = items.Where(x => x.Value.FactoryID != parentFactoryID);
@@ -1085,8 +1085,8 @@ namespace DryIoc
 
             // Composite pattern support: filter out composite root from available keys.
             var parentFactoryID = 0;
-            var parent = request.GetNonWrapperParentOrRoot();
-            if (!parent.IsRoot && parent.ServiceType == requiredItemType)
+            var parent = request.GetNonWrapperParentOrEmpty();
+            if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
                 parentFactoryID = parent.ResolvedFactory.FactoryID;
 
             var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, requiredItemType);
@@ -2362,9 +2362,8 @@ namespace DryIoc
     public sealed class Request : IResolver
     {
         /// <summary>
-        /// Creates Root empty request associated with provided <paramref name="registry"/>.
-        /// Every resolution will start from Root request by pushing service information into request, 
-        /// and then resolving it.
+        /// Creates empty request associated with provided <paramref name="registry"/>.
+        /// Every resolution will start from this request by pushing service information into, and then resolving it.
         /// </summary>
         /// <param name="registry">Reference to associated registry. 
         /// Could be changed later with <see cref="ReplaceRegistryWith"/> method.
@@ -2372,7 +2371,7 @@ namespace DryIoc
         /// <param name="state">Resolution state associated with container. 
         /// It is separated from registry, because later could be replaced: for instance by Parent container registry</param>
         /// <returns>New root request.</returns>
-        public static Request CreateRoot(WeakReference registry, WeakReference state)
+        public static Request CreateEmpty(WeakReference registry, WeakReference state)
         {
             registry.ThrowIfNull().Target.ThrowIfNotOf(typeof(IRegistry));
             state.ThrowIfNull().Target.ThrowIfNotOf(typeof(ResolutionState));
@@ -2382,7 +2381,7 @@ namespace DryIoc
         /// <summary>
         /// Indicates that request is empty initial request: there is no <see cref="ServiceInfo"/> in such a request.
         /// </summary>
-        public bool IsRoot
+        public bool IsEmpty
         {
             get { return ServiceInfo == null; }
         }
@@ -2471,7 +2470,7 @@ namespace DryIoc
 
         public Request Push(IServiceInfo info)
         {
-            if (IsRoot)
+            if (IsEmpty)
                 return new Request(this, _registryWeakRef, _stateWeakRef, new Ref<IScope>(), info.ThrowIfNull(), null);
 
             ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info.ThrowIfNull(), this);
@@ -2510,11 +2509,11 @@ namespace DryIoc
         /// <returns>New request with set factory.</returns>
         public Request ResolveTo(Factory factory)
         {
-            if (IsRoot || (ResolvedFactory != null && ResolvedFactory.FactoryID == factory.FactoryID))
+            if (IsEmpty || (ResolvedFactory != null && ResolvedFactory.FactoryID == factory.FactoryID))
                 return this; // resolving only once, no need to check recursion again.
 
             if (factory.Setup.Type == FactoryType.Service) // skip recursion check for non-services: decorators, wrappers
-                for (var p = Parent; !p.IsRoot; p = p.Parent)
+                for (var p = Parent; !p.IsEmpty; p = p.Parent)
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID, Error.RECURSIVE_DEPENDENCY_DETECTED, Print(factory.FactoryID));
 
             return new Request(Parent, _registryWeakRef, _stateWeakRef, _scope, ServiceInfo, factory);
@@ -2522,22 +2521,22 @@ namespace DryIoc
 
         /// <summary>
         /// Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
-        /// If not found returns <see cref="IsRoot"/> request.
+        /// If not found returns <see cref="IsEmpty"/> request.
         /// </summary>
         /// <returns>Return closest <see cref="FactoryType.Service"/> parent or root.</returns>
-        public Request GetNonWrapperParentOrRoot()
+        public Request GetNonWrapperParentOrEmpty()
         {
             var p = Parent;
-            while (!p.IsRoot && p.ResolvedFactory.Setup.Type == FactoryType.GenericWrapper)
+            while (!p.IsEmpty && p.ResolvedFactory.Setup.Type == FactoryType.GenericWrapper)
                 p = p.Parent;
             return p;
         }
 
-        /// <summary>Enumerates all request stack parents. Last returned will <see cref="IsRoot"/> empty parent.</summary>
+        /// <summary>Enumerates all request stack parents. Last returned will <see cref="IsEmpty"/> empty parent.</summary>
         /// <returns>Unfolding parents.</returns>
         public IEnumerable<Request> Enumerate()
         {
-            for (var r = this; !r.IsRoot; r = r.Parent)
+            for (var r = this; !r.IsEmpty; r = r.Parent)
                 yield return r;
         }
 
@@ -2546,7 +2545,7 @@ namespace DryIoc
         /// <returns>Builder with appended info.</returns>
         public StringBuilder PrintCurrent(StringBuilder s)
         {
-            if (IsRoot)
+            if (IsEmpty)
                 return s.Append("<root>");
             if (ResolvedFactory != null && ResolvedFactory.Setup.Type != FactoryType.Service)
                 s.Append(Enum.GetName(typeof(FactoryType), ResolvedFactory.Setup.Type)).Append(' ');
@@ -2566,7 +2565,7 @@ namespace DryIoc
                 return s;
 
             s = recursiveFactoryID == -1 ? s : s.Append(" <--recursive");
-            return Parent.Enumerate().TakeWhile(r => !r.IsRoot).Aggregate(s, (a, r) =>
+            return Parent.Enumerate().TakeWhile(r => !r.IsEmpty).Aggregate(s, (a, r) =>
             {
                 a = r.PrintCurrent(a.AppendLine().Append(" in "));
                 return r.ResolvedFactory.FactoryID == recursiveFactoryID ? a.Append(" <--recursive") : a;
@@ -2614,7 +2613,7 @@ namespace DryIoc
         public abstract FactoryType Type { get; }
         public virtual FactoryCaching Caching { get { return FactoryCaching.DisabledForExpression; } }
         public virtual object Metadata { get { return null; } }
-        public virtual IReusedObjectBehavior ReusedObjectBehavior { get { return null; } }
+        public virtual IReusedObjectWrapper ReusedObjectWrapper { get { return null; } }
 
         public readonly InjectionRules Rules;
         protected FactorySetup(InjectionRules rules) { Rules = rules ?? InjectionRules.Empty; }
@@ -2635,10 +2634,12 @@ namespace DryIoc
 
         public static Setup With(
             ConstructorSelector constructor = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            FactoryCaching caching = FactoryCaching.EnabledForExpression, Func<object> lazyGetMetadata = null, object metadata = null)
+            FactoryCaching caching = FactoryCaching.EnabledForExpression, Func<object> lazyGetMetadata = null, 
+            IReusedObjectWrapper reusedObjectWrapper = null, object metadata = null)
         {
-            var setup = caching == FactoryCaching.EnabledForExpression && lazyGetMetadata == null && metadata == null
-                ? Default : new Setup(InjectionRules.Empty, caching, lazyGetMetadata);
+            var setup = caching == FactoryCaching.EnabledForExpression && reusedObjectWrapper == null 
+                && lazyGetMetadata == null && metadata == null
+                 ? Default : new Setup(InjectionRules.Empty, caching, reusedObjectWrapper, lazyGetMetadata, metadata);
             return constructor == null && parameters == null && propertiesAndFields == null
                 ? setup : (Setup)setup.WithRules(InjectionRules.With(constructor, parameters, propertiesAndFields));
         }
@@ -2653,19 +2654,14 @@ namespace DryIoc
             return new Setup(lazyGetMetadata: lazyGetMetadata.ThrowIfNull());
         }
 
-        public static FactorySetup With(IReusedObjectBehavior reusedObjectBehavior)
-        {
-            return new Setup(reusedObjectBehavior: reusedObjectBehavior.ThrowIfNull());
-        }
-
         public override FactorySetup WithRules(InjectionRules rules)
         {
-            return new Setup(rules, Caching, _lazyGetMetadata, _metadata);
+            return new Setup(rules, Caching, _reusedObjectWrapper, _lazyGetMetadata, _metadata);
         }
 
         public override FactoryType Type { get { return FactoryType.Service; } }
         public override FactoryCaching Caching { get { return _caching; } }
-        public override IReusedObjectBehavior ReusedObjectBehavior { get { return _reusedObjectBehavior; } }
+        public override IReusedObjectWrapper ReusedObjectWrapper { get { return _reusedObjectWrapper; } }
         public override object Metadata
         {
             get { return _metadata ?? (_metadata = _lazyGetMetadata == null ? null : _lazyGetMetadata()); }
@@ -2673,22 +2669,22 @@ namespace DryIoc
 
         #region Implementation
 
-        private Setup(InjectionRules rules = null,
-            FactoryCaching caching = FactoryCaching.EnabledForExpression,
-            Func<object> lazyGetMetadata = null, object metadata = null,
-            IReusedObjectBehavior reusedObjectBehavior = null)
+        private Setup(InjectionRules rules = null, 
+            FactoryCaching caching = FactoryCaching.EnabledForExpression, 
+            IReusedObjectWrapper reusedObjectWrapper = null, 
+            Func<object> lazyGetMetadata = null, object metadata = null)
             : base(rules)
         {
             _caching = caching;
+            _reusedObjectWrapper = reusedObjectWrapper;
             _lazyGetMetadata = lazyGetMetadata;
             _metadata = metadata;
-            _reusedObjectBehavior = reusedObjectBehavior;
         }
 
         private readonly FactoryCaching _caching;
+        private readonly IReusedObjectWrapper _reusedObjectWrapper;
         private readonly Func<object> _lazyGetMetadata;
         private object _metadata;
-        private readonly IReusedObjectBehavior _reusedObjectBehavior;
 
         #endregion
     }
@@ -2857,10 +2853,13 @@ namespace DryIoc
                 // When singleton scope and no Func in request chain 
                 // then reused instance should can be inserted directly instead of calling Scope method.
                 if (Reuse is SingletonReuse &&
-                    (request.Parent.IsRoot || !request.Parent.Enumerate().Any(GenericsSupport.IsFunc)))
+                    (request.Parent.IsEmpty || !request.Parent.Enumerate().Any(GenericsSupport.IsFunc)))
                     serviceExpr = GetInstantiatedScopedServiceExpression(serviceExpr, scope, request, wrapperType);
                 else
                     serviceExpr = GetScopedServiceExpression(serviceExpr, scope, request, wrapperType);
+
+                if (serviceExpr == null)
+                    return null;
             }
             
             if (noOrFuncDecorator && wrapperType == null &&
@@ -2928,19 +2927,22 @@ namespace DryIoc
         {
             var factoryDelegate = serviceExpr.ToFactoryExpression().Compile();
             object reused;
-            if (Setup.ReusedObjectBehavior == null)
+            if (Setup.ReusedObjectWrapper == null)
             {
                 reused = scope.GetOrAdd(FactoryID,
                     () => factoryDelegate(request.State.Items, request.ResolutionScope));
             }
             else
             {
-                var behavior = Setup.ReusedObjectBehavior;
+                var behavior = Setup.ReusedObjectWrapper;
                 var wrapped = scope.GetOrAdd(FactoryID,
                     () => behavior.Wrap(factoryDelegate(request.State.Items, request.ResolutionScope)));
                 
                 if (wrapperType != null)
-                    return wrapperType != behavior.WrapperType ? null 
+                    return wrapperType != behavior.ScopedWrapperType ? 
+                        (request.IfUnresolved == IfUnresolved.Throw
+                            ? Throw.No<Expression>("Unable to resolve {0} reused object wrapper for {1}", wrapperType, request)
+                            : wrapperType.GetDefaultValueExpression()) 
                         : request.State.GetOrAddItemExpression(wrapped, wrapperType);
                 
                 reused = behavior.Unwrap(wrapped);
@@ -2956,12 +2958,12 @@ namespace DryIoc
                 : request.State.GetOrAddItemExpression(scope);
 
             var factoryIDExpr = Expression.Constant(FactoryID);
-            if (Setup.ReusedObjectBehavior == null)
+            if (Setup.ReusedObjectWrapper == null)
                 return Expression.Convert(Expression.Call(scopeExpr, _scopeGetOrAddMethod,
                     factoryIDExpr, Expression.Lambda<Func<object>>(serviceExpr, null)), serviceExpr.Type);
 
-            var behavior = Setup.ReusedObjectBehavior;
-            var behaviorExpr = request.State.GetOrAddItemExpression(behavior, typeof(IReusedObjectBehavior));
+            var behavior = Setup.ReusedObjectWrapper;
+            var behaviorExpr = request.State.GetOrAddItemExpression(behavior, typeof(IReusedObjectWrapper));
 
             // First transform factory function to function returning wrapped object.
             var wrappedServiceExpr = Expression.Call(behaviorExpr, "Wrap", null, serviceExpr);
@@ -2971,7 +2973,10 @@ namespace DryIoc
             var wrappedScopedServiceExpr = Expression.Call(scopeExpr, _scopeGetOrAddMethod, factoryIDExpr, getWrappedServiceExpr);
 
             if (wrapperType != null)
-                return wrapperType != behavior.WrapperType ? null 
+                return wrapperType != behavior.ScopedWrapperType 
+                    ? (request.IfUnresolved == IfUnresolved.Throw 
+                        ? Throw.No<Expression>("Not supported reused object wrapper {0} when resolving {1}", wrapperType, request)
+                        : wrapperType.GetDefaultValueExpression()) 
                     : Expression.Convert(wrappedScopedServiceExpr, wrapperType);
 
             var unwrappedServiceExpr = Expression.Call(behaviorExpr, "Unwrap", null, wrappedScopedServiceExpr);
@@ -3446,7 +3451,7 @@ namespace DryIoc
                 for (var i = 0; i < ctorParams.Length; i++)
                 {
                     var info = GetParameterServiceInfo(ctorParams[i], request);
-                    var expr = GetDependencyExpressionOrNull(info, request);
+                    var expr = ReflectionFactoryTools.GetDependencyExpressionOrNull(info, request);
                     if (expr == null) return null;
                     paramExprs[i] = expr;
                 }
@@ -3484,7 +3489,7 @@ namespace DryIoc
                 if (paramExprs[i] == null) // If no matching constructor parameter found in Func, resolve it from Container.
                 {
                     var info = GetParameterServiceInfo(ctorParam, request);
-                    var expr = GetDependencyExpressionOrNull(info, request);
+                    var expr = ReflectionFactoryTools.GetDependencyExpressionOrNull(info, request);
                     if (expr == null) return null;
                     paramExprs[i] = expr;
                 }
@@ -3537,7 +3542,7 @@ namespace DryIoc
             foreach (var info in infos)
                 if (info != null)
                 {
-                    var expr = GetDependencyExpressionOrNull(info, request);
+                    var expr = ReflectionFactoryTools.GetDependencyExpressionOrNull(info, request);
                     if (expr == null) return null;
                     bindings.Add(Expression.Bind(info.Member, expr));
                 }
@@ -3617,7 +3622,13 @@ namespace DryIoc
             return true;
         }
 
-        private static Expression GetDependencyExpressionOrNull(IServiceInfo dependencyInfo, Request ownerRequest)
+        #endregion
+    }
+
+    /// <summary>Holds public tools that could be used outside of <see cref="ReflectionFactory"/>.</summary>
+    public static class ReflectionFactoryTools
+    {
+        public static Expression GetDependencyExpressionOrNull(IServiceInfo dependencyInfo, Request ownerRequest)
         {
             var request = ownerRequest.Push(dependencyInfo);
             var factory = dependencyInfo.Details.GetValue == null
@@ -3625,13 +3636,10 @@ namespace DryIoc
                 : new DelegateFactory(r => dependencyInfo.Details.GetValue(r)
                     .ThrowIfNotOf(dependencyInfo.ServiceType, Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, dependencyInfo, ownerRequest));
 
-            var expr = factory == null ? null : factory.GetExpressionOrDefault(request);
-            return expr ??
-                (ownerRequest.IfUnresolved == IfUnresolved.ReturnDefault ? null
-                : request.ServiceType.GetDefaultValueExpression());
+            var serviceExpr = factory == null ? null : factory.GetExpressionOrDefault(request);
+            return serviceExpr ?? (ownerRequest.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                 : request.ServiceType.GetDefaultValueExpression());
         }
-
-        #endregion
     }
 
     public sealed class ExpressionFactory : Factory
@@ -3826,20 +3834,21 @@ namespace DryIoc
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
     }
 
-    public interface IReusedObjectBehavior
+    public interface IReusedObjectWrapper
     {
-        Type WrapperType { get; }
+        Type ScopedWrapperType { get; }
         object Wrap(object target);
         object Unwrap(object wrapped);
     }
 
-    public static class ReusedObjectBehavior
+    public static class ReusedObjectWrapper
     {
-        public static readonly IReusedObjectBehavior ExternallyDisposable = new ExternallyDisposableBehavior();
+        public static readonly IReusedObjectWrapper ExternallyDisposable = new ExternallyDisposableWrapper();
+        public static readonly IReusedObjectWrapper WeaklyReferenced = new WeaklyReferencedWrapper();
 
-        public sealed class ExternallyDisposableBehavior : IReusedObjectBehavior
+        public sealed class ExternallyDisposableWrapper : IReusedObjectWrapper
         {
-            public Type WrapperType { get { return typeof(ExplicitlyDisposableWrapper); } }
+            public Type ScopedWrapperType { get { return typeof(ExplicitlyDisposableWrapper); } }
 
             public object Wrap(object target)
             {
@@ -3851,9 +3860,25 @@ namespace DryIoc
                 return (wrapped as ExplicitlyDisposableWrapper).ThrowIfNull().Target;
             }
         }
+
+        public sealed class WeaklyReferencedWrapper : IReusedObjectWrapper
+        {
+            public Type ScopedWrapperType { get { return typeof(WeakReference); } }
+
+            public object Wrap(object target)
+            {
+                return new WeakReference(target);
+            }
+
+            public object Unwrap(object wrapped)
+            {
+                return (wrapped as WeakReference).ThrowIfNull()
+                    .Target.ThrowIfNull("Service was reused as WeakReference, now it is garbage collected, and no longer available.");
+            }
+        }
     }
 
-    public sealed class ExplicitlyDisposableWrapper
+    public class ExplicitlyDisposableWrapper
     {
         public ExplicitlyDisposableWrapper(IDisposable target)
         {
@@ -3883,27 +3908,47 @@ namespace DryIoc
             _target = null;
         }
 
+        private readonly Type _targetType;
         private IDisposable _target;
-        private Type _targetType; 
         private int _disposed;
     }
 
-    public sealed class ExplicitlyDisposable<T> : IDisposable
+    public sealed class ExplicitlyDisposable<TService> : IDisposable
     {
-        public ExplicitlyDisposable(ExplicitlyDisposableWrapper source)
+        public ExplicitlyDisposable(ExplicitlyDisposableWrapper reused)
         {
-            _wrapper = source.ThrowIfNull().ThrowIf(!(source.Target is T));
+            _reused = reused.ThrowIfNull().ThrowIf(!(reused.Target is TService));
         }
 
-        public T Target { get{ return (T)_wrapper.Target; } }
-        public bool IsDisposed { get { return _wrapper.IsDisposed; } }
+        public TService Target { get{ return (TService)_reused.Target; } }
+        public bool IsDisposed { get { return _reused.IsDisposed; } }
 
         public void Dispose()
         {
-            _wrapper.DisposeTarget();
+            _reused.DisposeTarget();
         }
 
-        private readonly ExplicitlyDisposableWrapper _wrapper;
+        private readonly ExplicitlyDisposableWrapper _reused;
+    }
+
+    public sealed class WeaklyReferenced<TService> where TService : class
+    {
+        public WeaklyReferenced(WeakReference serviceWeakRef)
+        {
+            _serviceWeakRef = serviceWeakRef.ThrowIfNull();
+        }
+
+        public TService Target
+        {
+            get { return _serviceWeakRef.Target as TService; }
+        }
+
+        public bool IsAlive
+        {
+            get { return _serviceWeakRef.IsAlive; }
+        }
+
+        private readonly WeakReference _serviceWeakRef;
     }
 
     public enum IfUnresolved { Throw, ReturnDefault }

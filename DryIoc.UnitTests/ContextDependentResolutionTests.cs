@@ -15,8 +15,8 @@ namespace DryIoc.UnitTests
             var factories = HashTree<Type, Factory>.Empty;
             container.Register<ILogger>(new FactoryProvider(request =>
             {
-                var parent = request.GetNonWrapperParentOrRoot();
-                Throw.If(parent.IsRoot, "{0} should be resolved only as dependency in other service.", request.ServiceType);
+                var parent = request.GetNonWrapperParentOrEmpty();
+                Throw.If(parent.IsEmpty, "{0} should be resolved only as dependency in other service.", request.ServiceType);
                 var typeArg = parent.ImplementationType ?? parent.ServiceType;
 
                 var factory = factories.GetValueOrDefault(typeArg);
@@ -41,8 +41,8 @@ namespace DryIoc.UnitTests
             var factories = HashTree<Type, Factory>.Empty;
             container.Register<ILogger>(new FactoryProvider(request =>
             {
-                var parent = request.GetNonWrapperParentOrRoot();
-                Throw.If(parent.IsRoot, "{0} should be resolved only as dependency in other service.", request.ServiceType);
+                var parent = request.GetNonWrapperParentOrEmpty();
+                Throw.If(parent.IsEmpty, "{0} should be resolved only as dependency in other service.", request.ServiceType);
                 var typeArg = parent.ImplementationType ?? parent.ServiceType;
 
                 var factory = factories.GetValueOrDefault(typeArg);
@@ -69,7 +69,7 @@ namespace DryIoc.UnitTests
                 new FactoryProvider(request =>
                 {
                     var implType = typeof(PlainLogger);
-                    if (request.GetNonWrapperParentOrRoot().ImplementationType == typeof(User2))
+                    if (request.GetNonWrapperParentOrEmpty().ImplementationType == typeof(User2))
                         implType = typeof(FastLogger);
 
                     var factory = factories.GetValueOrDefault(implType);
@@ -101,7 +101,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             var root = "root";
             var dependency = "dependency";
-            container.RegisterDelegate(r => r.Parent.IsRoot ? root : dependency);
+            container.RegisterDelegate(r => r.Parent.IsEmpty ? root : dependency);
             container.Register<StrUser>();
 
             var service = container.Resolve<string>();
