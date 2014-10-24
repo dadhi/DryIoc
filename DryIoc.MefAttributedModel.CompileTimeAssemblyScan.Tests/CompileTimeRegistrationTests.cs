@@ -55,7 +55,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                     Exports = new[] { new ExportInfo(typeof(Wrap<>), null) }, 
                     ReuseType = null,
                     HasMetadataAttribute = false,
-                    FactoryType = FactoryType.GenericWrapper
+                    FactoryType = FactoryType.Wrapper
                 },
             });
 

@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace DryIoc.Playground
 {
-    [TestFixture][Ignore]
+    [TestFixture][Explicit]
     public class GetInterfaceMapCustomImplTests
     {
         [Test]

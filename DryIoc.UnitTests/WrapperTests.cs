@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class GenericWrapperTests
+    public class WrapperTests
     {
         [Test]
         public void IsRegistered_wont_work_for_generic_wrappers()
@@ -35,7 +35,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Lazy<IService>>(
-                withConstructor: t => t.GetConstructorWithParameters(new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) }));
+                withConstructor: t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) }));
             container.Register<IService, Service>();
 
             var service = container.Resolve<Lazy<IService>>();
@@ -48,7 +48,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Lazy<IService>>(
-                withConstructor: t => t.GetConstructorWithParameters(new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) }));
+                withConstructor: t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) }));
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(named: "named");
 
@@ -58,29 +58,55 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Wrapper_is_only_working_if_used_in_enumerable_or_other_wrapper_It_means_that_directly_resolving_multiple_wrapper_would_NOT_throw()
+        public void Wrapper_may_work_with_single_service_type_only_and_should_throw_otherwise()
         {
             var container = new Container();
-            container.Register(typeof(WrapperWithTwoArgs<,>), setup: GenericWrapperSetup.Default);
+            container.Register(typeof(WrapperWithTwoArgs<,>), setup: WrapperSetup.Default);
             container.Register<Service>();
             container.Register<AnotherService>();
 
-            var wrapper = container.Resolve<WrapperWithTwoArgs<Service, AnotherService>>();
-
-            Assert.That(wrapper.Arg0, Is.InstanceOf<Service>());
-            Assert.That(wrapper.Arg1, Is.InstanceOf<AnotherService>());
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<WrapperWithTwoArgs<Service, AnotherService>>());
         }
 
         [Test]
         public void Wrapper_is_only_working_if_used_in_enumerable_or_other_wrapper_It_means_that_resolving_array_of_multiple_wrapper_should_throw()
         {
             var container = new Container();
-            container.Register(typeof(WrapperWithTwoArgs<,>), setup: GenericWrapperSetup.Default);
+            container.Register(typeof(WrapperWithTwoArgs<,>), setup: WrapperSetup.Default);
             container.Register<Service>();
             container.Register<AnotherService>();
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<WrapperWithTwoArgs<Service, AnotherService>[]>());
+        }
+
+        [Test]
+        public void Wrapper_may_not_be_generic_as_WeakReference()
+        {
+            var container = new Container();
+
+            container.Register(typeof(WeakReference),
+                new ReflectionFactory(typeof(WeakReference),
+                    setup: WrapperSetup.With(
+                        (t, _) => t.GetConstructorOrNull(args: typeof(object)),
+                        getWrappedServiceType: _ => typeof(object))));
+
+            container.Register<Service>();
+
+            var serviceWeakRef = container.Resolve<WeakReference>(typeof(Service));
+            Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
+
+            var servicesWeakRef = container.Resolve<Func<WeakReference>[]>(typeof(Service));
+            Assert.That(servicesWeakRef[0]().Target, Is.InstanceOf<Service>());
+
+            var factoryWeakRef = container.Resolve<WeakReference>(typeof(Func<Service>));
+            Assert.That(factoryWeakRef.Target, Is.InstanceOf<Func<Service>>());
+            var func = factoryWeakRef.Target as Func<Service>;
+            Assert.That(func.ThrowIfNull()(), Is.InstanceOf<Service>());
+
+            var factoryWeakRefs = container.Resolve<WeakReference[]>(typeof(Func<Service>));
+            Assert.That(factoryWeakRefs.Length, Is.EqualTo(1));
         }
     }
 

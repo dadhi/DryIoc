@@ -29,7 +29,7 @@ namespace DryIoc.UnitTests
 
             container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
                 (type, request) => type.GetTypeInfo().DeclaredProperties.Select(p =>
-                    p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).With(ServiceInfoDetails.Of(typeof(Service)), request) : null)));
+                    p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).WithDetails(ServiceInfoDetails.Of(typeof(Service)), request) : null)));
             container.Register<Service>();
 
             var blah = container.Resolve<SomeBlah>();
@@ -403,7 +403,27 @@ namespace DryIoc.UnitTests
             Assert.That(resolved, Is.True);
         }
 
+        [Test][Ignore("Not fixed yet")]
+        public void Indexer_properties_should_be_ignored_by_All_properties_discovery()
+        {
+            var container = new Container();
+            container.Register<FooWithIndexer>(setup: Setup.With(
+                propertiesAndFields: PropertiesAndFields.All(IfUnresolved.Throw, PropertiesAndFields.Flags.All)));
+
+            Assert.DoesNotThrow(() => 
+                container.Resolve<FooWithIndexer>());
+        }
+
         #region CUT
+
+        public class FooWithIndexer
+        {
+            public object this[int index]
+            {
+                get { return null; }
+                set { }
+            }
+        }
 
         public class SomeBlah
         {

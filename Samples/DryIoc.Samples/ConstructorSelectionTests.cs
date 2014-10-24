@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
 namespace DryIoc.Samples
 {
@@ -33,8 +32,8 @@ namespace DryIoc.Samples
         {
             var container = new Container();
             container.Register<IService, SomeService>();
-            
-            container.Register<ClassWithInternalConstructor>(withConstructor: t => t.GetFirstConstructor(true));
+
+            container.Register<ClassWithInternalConstructor>(withConstructor: t => t.GetSingleConstructorOrNull(true));
 
             var obj = container.Resolve<ClassWithInternalConstructor>();
             Assert.IsNotNull(obj);

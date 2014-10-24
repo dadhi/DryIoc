@@ -82,9 +82,6 @@
     <Compile Include="..\..\DryIoc.UnitTests\FuncTests.cs">
       <Link>FuncTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\GenericWrapperTests.cs">
-      <Link>GenericWrapperTests.cs</Link>
-    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\HashTreeTests.cs">
       <Link>HashTreeTests.cs</Link>
     </Compile>
@@ -148,6 +145,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\ReuseTests.cs">
       <Link>ReuseTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\ReuseWrapperTests.cs">
+      <Link>ReuseWrapperTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\RulesTests.cs">
       <Link>RulesTests.cs</Link>
     </Compile>
@@ -168,6 +168,9 @@
     </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\WipeCacheTests.cs">
       <Link>WipeCacheTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\WrapperTests.cs">
+      <Link>WrapperTests.cs</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>

@@ -335,8 +335,8 @@ new RegistrationInfo {
 new RegistrationInfo {
     ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.One),
     Exports = new[] {
-        new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.One), "two"),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.One), "one"),
+        new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.One), "two"),
         },
     ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
@@ -350,8 +350,8 @@ new RegistrationInfo {
         },
     ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
-    FactoryType = DryIoc.FactoryType.GenericWrapper,
-    GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = 0 }
+    FactoryType = DryIoc.FactoryType.Wrapper,
+    Wrapper = new WrapperInfo { ServiceTypeIndex = 0 }
 }, 
 new RegistrationInfo {
     ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FactoryWithArgsConsumer),
@@ -379,8 +379,8 @@ new RegistrationInfo {
         },
     ReuseType = typeof(DryIoc.SingletonReuse),
     HasMetadataAttribute = false,
-    FactoryType = DryIoc.FactoryType.GenericWrapper,
-    GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = 1 }
+    FactoryType = DryIoc.FactoryType.Wrapper,
+    Wrapper = new WrapperInfo { ServiceTypeIndex = 1 }
 }, 
 new RegistrationInfo {
     ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyClient),

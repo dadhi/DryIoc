@@ -165,14 +165,14 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.ReuseType = ((ReuseAttribute)attribute).ReuseType;
                 }
-                else if (attribute is AsGenericWrapperAttribute)
+                else if (attribute is AsWrapperAttribute)
                 {
                     Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
-                    info.FactoryType = FactoryType.GenericWrapper;
-                    var genericWrapperAttribute = ((AsGenericWrapperAttribute)attribute);
-                    info.GenericWrapper = new GenericWrapperInfo
+                    info.FactoryType = FactoryType.Wrapper;
+                    var genericWrapperAttribute = ((AsWrapperAttribute)attribute);
+                    info.Wrapper = new WrapperInfo
                     {
-                        ServiceTypeIndex = genericWrapperAttribute.ContractTypeArgIndex
+                        ServiceTypeIndex = genericWrapperAttribute.ContractTypeGenericArgIndex
                     };
                 }
                 else if (attribute is AsDecoratorAttribute)
@@ -226,7 +226,7 @@ namespace DryIoc.MefAttributedModel
             var serviceInfo = ParameterServiceInfo.Of(parameter);
             var attrs = parameter.GetAttributes().ToArray();
             return attrs.Length == 0 ? serviceInfo
-                : serviceInfo.With(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
+                : serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
         }
 
         public static readonly PropertiesAndFieldsSelector GetImportedPropertiesAndFields =
@@ -237,7 +237,7 @@ namespace DryIoc.MefAttributedModel
             var attributes = member.GetAttributes().ToArray();
             var details = attributes.Length == 0 ? null 
                 : GetFirstImportDetailsOrNull(member.GetPropertyOrFieldType(), attributes, request);
-            return details == null ? null : PropertyOrFieldServiceInfo.Of(member).With(details, request);
+            return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details, request);
         }
 
         public static ServiceInfoDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
@@ -294,7 +294,7 @@ namespace DryIoc.MefAttributedModel
                 var reuse = GetReuseByType(reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType);
 
                 var withConstructor = import.WithConstructor == null ? null
-                    : (Func<Type, ConstructorInfo>)(t => t.GetConstructorWithParameters(import.WithConstructor));
+                    : (Func<Type, ConstructorInfo>)(t => t.GetConstructorOrNull(args: import.WithConstructor));
 
                 registry.Register(serviceType, implementationType,
                     reuse, withConstructor, Setup.WithMetadata(import.Metadata), serviceKey, IfAlreadyRegistered.KeepRegistered);
@@ -474,8 +474,8 @@ namespace DryIoc.MefAttributedModel
         public Type ReuseType;
         public bool HasMetadataAttribute;
         public FactoryType FactoryType;
-        public GenericWrapperInfo GenericWrapper;
         public DecoratorInfo Decorator;
+        public WrapperInfo Wrapper;
 
         public Factory CreateFactory()
         {
@@ -489,8 +489,8 @@ namespace DryIoc.MefAttributedModel
 
         public FactorySetup GetSetup(Attribute[] attributes = null)
         {
-            if (FactoryType == FactoryType.GenericWrapper)
-                return GenericWrapper == null ? GenericWrapperSetup.Default : GenericWrapper.GetSetup();
+            if (FactoryType == FactoryType.Wrapper)
+                return Wrapper == null ? WrapperSetup.Default : Wrapper.GetSetup();
 
             if (FactoryType == FactoryType.Decorator)
                 return Decorator == null ? DecoratorSetup.Default
@@ -510,7 +510,7 @@ namespace DryIoc.MefAttributedModel
                 && other.ImplementationType == ImplementationType
                 && other.ReuseType == ReuseType
                 && other.FactoryType == FactoryType
-                && Equals(other.GenericWrapper, GenericWrapper)
+                && Equals(other.Wrapper, Wrapper)
                 && Equals(other.Decorator, Decorator)
                 && other.Exports.SequenceEqual(Exports);
         }
@@ -528,8 +528,8 @@ namespace DryIoc.MefAttributedModel
     ReuseType = ").AppendType(ReuseType).Append(@",
     HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
     FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
-            if (GenericWrapper != null) code.Append(@",
-    GenericWrapper = new GenericWrapperInfo { ServiceTypeIndex = ").Append(GenericWrapper.ServiceTypeIndex).Append(@" }");
+            if (Wrapper != null) code.Append(@",
+    Wrapper = new WrapperInfo { ServiceTypeIndex = ").Append(Wrapper.ServiceTypeIndex).Append(@" }");
             if (Decorator != null)
             {
                 code.Append(@",
@@ -583,24 +583,24 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
-    public sealed class GenericWrapperInfo
+    public sealed class WrapperInfo
     {
         public int ServiceTypeIndex;
 
-        public GenericWrapperSetup GetSetup()
+        public WrapperSetup GetSetup()
         {
-            return GenericWrapperSetup.With(SelectServiceType);
+            return WrapperSetup.With(SelectWrappedServiceType);
         }
 
         public override bool Equals(object obj)
         {
-            var other = obj as GenericWrapperInfo;
+            var other = obj as WrapperInfo;
             return other != null && other.ServiceTypeIndex == ServiceTypeIndex;
         }
 
-        private Type SelectServiceType(Type[] typeArgs)
+        private Type SelectWrappedServiceType(Type wrapperType)
         {
-            return typeArgs[ServiceTypeIndex];
+            return wrapperType.GetGenericParamsAndArgs()[ServiceTypeIndex];
         }
     }
 
@@ -733,13 +733,13 @@ namespace DryIoc.MefAttributedModel
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public class AsGenericWrapperAttribute : Attribute
+    public class AsWrapperAttribute : Attribute
     {
-        public int ContractTypeArgIndex { get; set; }
+        public int ContractTypeGenericArgIndex { get; set; }
 
-        public AsGenericWrapperAttribute(int contractTypeArgIndex = 0)
+        public AsWrapperAttribute(int contractTypeArgIndex = 0)
         {
-            ContractTypeArgIndex = contractTypeArgIndex.ThrowIf(contractTypeArgIndex < 0);
+            ContractTypeGenericArgIndex = contractTypeArgIndex.ThrowIf(contractTypeArgIndex < 0);
         }
     }
 

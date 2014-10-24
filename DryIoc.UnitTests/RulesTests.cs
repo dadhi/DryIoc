@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
         public void It_is_possible_to_remove_Enumerable_support_per_container()
         {
             var container = new Container();
-            container.Unregister(typeof(IEnumerable<>), factoryType: FactoryType.GenericWrapper);
+            container.Unregister(typeof(IEnumerable<>), factoryType: FactoryType.Wrapper);
 
             container.Register<Service>();
 
@@ -28,7 +28,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(Bla<>),
-                withConstructor: t => t.GetConstructorWithParameters(new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()[0]) }));
+                withConstructor: t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()[0]) }));
 
             container.Register(typeof(SomeService), typeof(SomeService));
 
@@ -139,9 +139,9 @@ namespace DryIoc.UnitTests
         public static ParameterServiceInfo GetServiceInfoFromImportAttribute(ParameterInfo parameter, Request request)
         {
             var import = (ImportAttribute)parameter.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
-            var details = import == null ? ServiceInfoDetails.IfUnresolvedThrow
+            var details = import == null ? ServiceInfoDetails.Default
                 : ServiceInfoDetails.Of(import.ContractType, import.ContractName);
-            return ParameterServiceInfo.Of(parameter).With(details, request);
+            return ParameterServiceInfo.Of(parameter).WithDetails(details, request);
         }
 
         public static ParameterServiceInfo GetServiceFromWithMetadataAttribute(ParameterInfo parameter, Request request)
@@ -159,7 +159,7 @@ namespace DryIoc.UnitTests
                 .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
                 .ThrowIfNull("Unable to resolve", serviceType, metadata, request);
 
-            return ParameterServiceInfo.Of(parameter).With(ServiceInfoDetails.Of(serviceType, factory.Key), request);
+            return ParameterServiceInfo.Of(parameter).WithDetails(ServiceInfoDetails.Of(serviceType, factory.Key), request);
         }
     }
 

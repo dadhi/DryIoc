@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace DryIoc.Playground.Performance
 {
-	[TestFixture][Ignore]
+	[TestFixture][Explicit]
 	public class ReflectionPerformanceTests
 	{
 		[Test]

@@ -11,7 +11,7 @@ using NUnit.Framework;
 namespace DryIoc.Playground
 {
     [TestFixture]
-    [Ignore]
+    [Explicit]
     public class Experiments
     {
         [Test]

@@ -93,7 +93,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
             model.Add(typeof(ServiceKeyInfo), false).SetSurrogate(typeof(ServiceKeyInfoSurrogate));
             model.Add<RegistrationInfo>();
             model.Add<ExportInfo>();
-            model.Add<GenericWrapperInfo>();
+            model.Add<WrapperInfo>();
             model.Add<DecoratorInfo>();
             return model;
         }

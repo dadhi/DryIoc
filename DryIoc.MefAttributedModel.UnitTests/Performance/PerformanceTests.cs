@@ -6,7 +6,7 @@ using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests.Performance
 {
-	[TestFixture][Ignore]
+	[TestFixture][Explicit("Not really a unit test")]
 	public class PerformanceTests
 	{
 		[Test]

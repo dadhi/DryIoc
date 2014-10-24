@@ -47,7 +47,7 @@
     <Compile Include="InitializerTests.cs" />
     <Compile Include="RequiredServiceTypeTests.cs" />
     <Compile Include="ResolveManyTests.cs" />
-    <Compile Include="ReusedServiceWrapperTests.cs" />
+    <Compile Include="ReuseWrapperTests.cs" />
     <Compile Include="SelectConstructorWithAllResolvableArguments.cs" />
     <Compile Include="CompositePatternTests.cs" />
     <Compile Include="IfAlreadyRegisteredTests.cs" />
@@ -67,7 +67,7 @@
     <Compile Include="EnumerableAndArrayTests.cs" />
     <Compile Include="FuncTests.cs" />
     <Compile Include="OpenGenericsTests.cs" />
-    <Compile Include="GenericWrapperTests.cs" />
+    <Compile Include="WrapperTests.cs" />
     <Compile Include="HashTreeTests.cs" />
     <Compile Include="DelegateFactoryTests.cs" />
     <Compile Include="LazyTests.cs" />

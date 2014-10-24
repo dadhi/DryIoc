@@ -116,7 +116,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(LazyOne<>),
-                withConstructor: t => t.GetConstructorWithParameters(new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) }));
+                withConstructor: t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) }));
             container.Register<Service>();
 
             var service = container.Resolve<LazyOne<Service>>();
@@ -290,7 +290,7 @@ namespace DryIoc.UnitTests
             var factory = new ReflectionFactory(typeof(BananaSplit<,>));
             var container = new Container();
             Assert.Throws<ContainerException>(() =>
-                factory.GetFactoryForRequestOrDefault(container.Root.Push(typeof(Banana<int>))));
+                factory.GetFactoryForRequestOrDefault(container.EmptyRequest.Push(typeof(Banana<int>))));
         }
     }
 

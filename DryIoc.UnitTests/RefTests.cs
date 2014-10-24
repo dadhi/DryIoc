@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
-    [TestFixture][Ignore]
+    [TestFixture][Explicit("Multi-threaded non deterministic test")]
     public class RefTests
     {
         [Test]

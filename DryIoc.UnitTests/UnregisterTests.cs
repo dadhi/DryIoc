@@ -152,22 +152,22 @@ namespace DryIoc.UnitTests
         public void Unregister_generic_wrapper_is_possible()
         {
             var container = new Container();
-            Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper));
+            Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
             
-            container.Unregister(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper);
-            Assert.IsFalse(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper));
+            container.Unregister(typeof(Lazy<>), factoryType: FactoryType.Wrapper);
+            Assert.IsFalse(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
         }
 
         [Test]
         public void Unregister_generic_wrapper_with_condition_is_possible()
         {
             var container = new Container();
-            Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper));
+            Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
 
-            container.Unregister(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper,
+            container.Unregister(typeof(Lazy<>), factoryType: FactoryType.Wrapper,
                 condition: f => f.ImplementationType == typeof(Func<>));
 
-            Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.GenericWrapper));
+            Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
         }
     }
 
