@@ -2,21 +2,23 @@
 
 namespace DryIoc.IssuesTests
 {
-    class NewIssue
+    class Issue_SkipIndexerOnAllPropertiesInjection
     {
         [Test]
         public void Test()
         {
             var container = new Container();
             container.Register<FooWithIndexer>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.All()));
+                propertiesAndFields: PropertiesAndFields.All(IfUnresolved.Throw)));
 
-            var indexer = container.Resolve<FooWithIndexer>();
+            Assert.DoesNotThrow(() => 
+                container.Resolve<FooWithIndexer>()
+            );
         }
 
         public class FooWithIndexer
         {
-            public object this[int index]
+            public IService this[int index]
             {
                 get
                 {
@@ -28,5 +30,7 @@ namespace DryIoc.IssuesTests
                 }
             }
         }
+
+        internal interface IService {}
     }
 }

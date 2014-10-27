@@ -154,7 +154,7 @@ namespace DryIoc.UnitTests
         }
 
         public static readonly PropertiesAndFieldsSelector SelectPropertiesAndFieldsWithImportAttribute =
-            PropertiesAndFields.All(PropertiesAndFields.Flags.All, GetImportedPropertiesAndFields);
+            PropertiesAndFields.All(PropertiesAndFields.Include.All, GetImportedPropertiesAndFields);
 
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFields(MemberInfo m, Request req)
         {

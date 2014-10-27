@@ -290,7 +290,7 @@ namespace DryIoc.UnitTests
 
             container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
                 propertiesAndFields: PropertiesAndFields
-                    .All(PropertiesAndFields.Flags.All)
+                    .All(PropertiesAndFields.Include.All)
                     .And(m => m is FieldInfo, serviceKey: "another")));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
@@ -408,7 +408,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<FooWithIndexer>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.All(IfUnresolved.Throw, PropertiesAndFields.Flags.All)));
+                propertiesAndFields: PropertiesAndFields.All(IfUnresolved.Throw, PropertiesAndFields.Include.All)));
 
             Assert.DoesNotThrow(() => 
                 container.Resolve<FooWithIndexer>());

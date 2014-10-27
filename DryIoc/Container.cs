@@ -1956,14 +1956,12 @@ namespace DryIoc
             return (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType);
         }
 
-        /// <summary>Specifies new registered services awareness. Either dynamic or fixed view./// </summary>
-        public enum ManyResult { DynamicIsBitSlower, FixedIsBitFaster }
+        /// <summary>Specifies result of <see cref="Resolver.ResolveMany{TService}"/>: either dynamic(lazy) or fixed view.</summary>
+        public enum ManyResult { EachItemLazyResolved, AllItemsResolvedIntoFixedArray }
 
-        /// <summary>
-        /// Returns all registered services instances including all keyed and default registrations.
+        /// <summary>Returns all registered services instances including all keyed and default registrations.
         /// Use <paramref name="result"/> to return either all registered services at the moment of resolve (dynamic fresh view) or
-        /// the same services that were returned with first <see cref="ResolveMany{TService}"/> call (fixed view).
-        /// </summary>
+        /// the same services that were returned with first <see cref="ResolveMany{TService}"/> call (fixed view).</summary>
         /// <typeparam name="TService">Return collection item type. It denotes registered service type if <paramref name="requiredServiceType"/> is not specified.</typeparam>
         /// <param name="resolver">Usually <see cref="Container"/> object.</param>
         /// <param name="requiredServiceType">(optional) Denotes registered service type. Should be assignable to <typeparamref name="TService"/>.</param>
@@ -1977,9 +1975,9 @@ namespace DryIoc
         /// ]]></code>
         /// </remarks>
         public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver,
-            Type requiredServiceType = null, ManyResult result = ManyResult.DynamicIsBitSlower)
+            Type requiredServiceType = null, ManyResult result = ManyResult.EachItemLazyResolved)
         {
-            return result == ManyResult.DynamicIsBitSlower
+            return result == ManyResult.EachItemLazyResolved
                 ? resolver.Resolve<Many<TService>>(requiredServiceType).Items
                 : resolver.Resolve<IEnumerable<TService>>(requiredServiceType);
         }
@@ -2557,11 +2555,8 @@ namespace DryIoc
         public Request Push(Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
-            var info = /*requiredServiceType == null
-                ? DryIoc.ServiceInfo.Of(serviceType, serviceKey, ifUnresolved)
-                : */
-                DryIoc.ServiceInfo.Of(serviceType).WithDetails(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), this);
-            return Push(info);
+            var details = ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
+            return Push(DryIoc.ServiceInfo.Of(serviceType).WithDetails(details, this));
         }
 
         /// <summary>Allow to switch current service info to new one: for instance it is used be decorators.</summary>
@@ -3277,52 +3272,44 @@ namespace DryIoc
         /// <summary>
         /// Public assignable instance members of any type except object, string, primitives types, and arrays of those.
         /// </summary>
-        public static PropertiesAndFieldsSelector AllPublicNonPrimitive = All(Flags.PublicNonPrimitive);
+        public static PropertiesAndFieldsSelector AllPublicNonPrimitive = All(Include.PublicNonPrimitive);
 
         /// <summary>Flags to specify visibility of properties and fields to resolve.</summary>
-        public enum Flags { PublicNonPrimitive, Public, NonPrimitive, All }
+        public enum Include { PublicNonPrimitive, Public, NonPrimitive, All }
 
         public delegate PropertyOrFieldServiceInfo GetInfo(MemberInfo m, Request req);
 
-        /// <summary>
-        /// Generates selector property and field selector with settings specified by parameters.
-        /// If all parameters are omitted the return all public not primitive members.
-        /// </summary>
-        /// <param name="flags">(optional) Specifies visibility of members to be resolved. Default is <see cref="Flags.PublicNonPrimitive"/>.</param>
+        /// <summary>Generates selector property and field selector with settings specified by parameters.
+        /// If all parameters are omitted the return all public not primitive members.</summary>
+        /// <param name="include">(optional) Specifies visibility of members to be resolved. Default is <see cref="Include.PublicNonPrimitive"/>.</param>
         /// <param name="getInfoOrNull">(optional) Return service info for a member or null to skip it resolution.</param>
         /// <returns>Result selector composed using provided settings.</returns>
-        public static PropertiesAndFieldsSelector All(Flags flags, GetInfo getInfoOrNull = null)
+        public static PropertiesAndFieldsSelector All(Include include, GetInfo getInfoOrNull = null)
         {
             var getInfo = getInfoOrNull ?? ((m, req) => PropertyOrFieldServiceInfo.Of(m));
             return (t, req) =>
-                t.GetAll(_ => _.DeclaredProperties).Where(p => p.Match(flags)).Select(m => getInfo(m, req)).Concat(
-                t.GetAll(_ => _.DeclaredFields).Where(f => f.Match(flags)).Select(m => getInfo(m, req)));
+                t.GetAll(_ => _.DeclaredProperties).Where(p => p.Match(include)).Select(m => getInfo(m, req)).Concat(
+                t.GetAll(_ => _.DeclaredFields).Where(f => f.Match(include)).Select(m => getInfo(m, req)));
         }
 
-        /// <summary>
-        /// Compose properties and fields selector using provided settings: 
+        /// <summary>Compose properties and fields selector using provided settings: 
         /// in particularly I can change default setting to return null if member is unresolved,
-        /// and exclude properties by name, type (using <see cref="GetPropertyOrFieldType"/>), etc.
-        /// </summary>
+        /// and exclude properties by name, type (using <see cref="GetPropertyOrFieldType"/>), etc.</summary>
         /// <param name="ifUnresolved">(optional) Specifies for all members to throw or return default if unresolved, by default does not throw.</param>
-        /// <param name="flags">(optional) Specifies visibility of members to be resolved. Default is <see cref="Flags.PublicNonPrimitive"/>.</param>
+        /// <param name="include">(optional) Specifies visibility of members to be resolved. Default is <see cref="Include.PublicNonPrimitive"/>.</param>
         /// <returns>Result selector composed using provided settings.</returns>
-        public static PropertiesAndFieldsSelector All(IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, Flags flags = Flags.PublicNonPrimitive)
+        public static PropertiesAndFieldsSelector All(IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, Include include = Include.PublicNonPrimitive)
         {
             var selector = ifUnresolved == IfUnresolved.ReturnDefault
                 ? (GetInfo)null
-                : (m, req) => ifUnresolved == IfUnresolved.ReturnDefault
-                    ? PropertyOrFieldServiceInfo.Of(m)
-                    : PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceInfoDetails.Default, req);
-            return All(flags, selector);
+                : (m, req) => PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceInfoDetails.Default, req);
+            return All(include, selector);
         }
 
-        /// <summary>
-        /// Selects members provided by <paramref name="source"/> excluding members that satisfy condition <paramref name="except"/>.
-        /// </summary>
+        /// <summary>Selects members provided by <paramref name="source"/> excluding members that satisfy condition <paramref name="except"/>.</summary>
         /// <param name="source">Source selection of properties and fields, 
         /// could be <see cref="None"/>, or see <see cref="AllPublicNonPrimitive"/>, 
-        /// or one created by <see cref="All(DryIoc.PropertiesAndFields.Flags,DryIoc.PropertiesAndFields.GetInfo)"/></param>
+        /// or one created by <see cref="All(Include,DryIoc.PropertiesAndFields.GetInfo)"/></param>
         /// <param name="except">(optional) Specifies rule to exclude members, e.g. exclude all fields, or property with specific name or attribute.</param>
         /// <returns>Result selector composed using provided settings.</returns>
         public static PropertiesAndFieldsSelector Except(this PropertiesAndFieldsSelector source, Func<MemberInfo, bool> except)
@@ -3394,19 +3381,27 @@ namespace DryIoc
                 : ((FieldInfo)member).FieldType;
         }
 
-        /// <remarks>Matches property base on visibility <see cref="Flags"/> provided.</remarks>
-        public static bool Match(this PropertyInfo property, Flags flags = Flags.PublicNonPrimitive)
+        /// <summary>Returns true if property matches the <see cref="Include"/> provided, or false otherwise.</summary>
+        /// <param name="property">Property to match</param>
+        /// <param name="include">(optional) Indicate target properties, if omitted: then <see cref="Include.PublicNonPrimitive"/> by default.</param>
+        /// <returns>True if property is matched and false otherwise.</returns>
+        public static bool Match(this PropertyInfo property, Include include = Include.PublicNonPrimitive)
         {
-            return property.CanWrite
-                && (flags == Flags.NonPrimitive || flags == Flags.All || property.IsPublic())
-                && (flags == Flags.Public || flags == Flags.All || !property.PropertyType.IsPrimitiveOrObjectOrString());
+            return property.CanWrite && !property.IsIndexer() // first checks that property is assignable in general and not indexer
+                && (include == Include.NonPrimitive || include == Include.All || property.IsPublic())
+                && (include == Include.Public || include == Include.All || 
+                !property.PropertyType.IsPrimitive(TypeTools.ConsiderPrimitiveFlags.ObjectType | TypeTools.ConsiderPrimitiveFlags.StringType));
         }
 
-        /// <remarks>Matches field base on visibility <see cref="Flags"/> provided.</remarks>
-        public static bool Match(this FieldInfo field, Flags flags = Flags.PublicNonPrimitive)
+        /// <summary>Returns true if field matches the <see cref="Include"/> provided, or false otherwise.</summary>
+        /// <param name="field">Field to match.</param>
+        /// <param name="include">(optional) Indicate target properties, if omitted: then <see cref="Include.PublicNonPrimitive"/> by default.</param>
+        /// <returns>True if property is matched and false otherwise.</returns>
+        public static bool Match(this FieldInfo field, Include include = Include.PublicNonPrimitive)
         {
             return !field.IsInitOnly && !field.IsBackingField()
-                && (flags == Flags.Public || flags == Flags.All || !field.FieldType.IsPrimitiveOrObjectOrString());
+                && (include == Include.Public || include == Include.All || 
+                !field.FieldType.IsPrimitive(TypeTools.ConsiderPrimitiveFlags.ObjectType | TypeTools.ConsiderPrimitiveFlags.StringType));
         }
 
         public static bool IsBackingField(this FieldInfo field)
@@ -3417,6 +3412,12 @@ namespace DryIoc
         public static bool IsPublic(this PropertyInfo property)
         {
             return _getPropertySetMethodDelegate(property) != null;
+        }
+
+        public static bool IsIndexer(this PropertyInfo property)
+        {
+            var indexParameters = property.GetIndexParameters();
+            return indexParameters != null && indexParameters.Length != 0;
         }
 
         public static IEnumerable<Attribute> GetAttributes(this MemberInfo member, Type attributeType = null, bool inherit = false)
@@ -3435,11 +3436,11 @@ namespace DryIoc
             return source.OverrideWith((type, request) =>
             {
                 var property = type.GetPropertyOrNull(name);
-                if (property != null && property.Match(Flags.All))
+                if (property != null && property.Match(Include.All))
                     return new[] { PropertyOrFieldServiceInfo.Of(property).WithDetails(details, request) };
 
                 var field = type.GetFieldOrNull(name);
-                if (field != null && field.Match(Flags.All))
+                if (field != null && field.Match(Include.All))
                     return new[] { PropertyOrFieldServiceInfo.Of(field).WithDetails(details, request) };
 
                 return Throw.No<IEnumerable<PropertyOrFieldServiceInfo>>(
@@ -3452,9 +3453,9 @@ namespace DryIoc
         {
             condition.ThrowIfNull();
             return source.OverrideWith((ownerType, request) =>
-                ownerType.GetAll(_ => _.DeclaredProperties).Where(p => p.Match(Flags.All) && condition(p))
+                ownerType.GetAll(_ => _.DeclaredProperties).Where(p => p.Match(Include.All) && condition(p))
                 .Select(p => PropertyOrFieldServiceInfo.Of(p).WithDetails(details, request)).Concat(
-                ownerType.GetAll(_ => _.DeclaredFields).Where(f => f.Match(Flags.All) && condition(f))
+                ownerType.GetAll(_ => _.DeclaredFields).Where(f => f.Match(Include.All) && condition(f))
                 .Select(f => PropertyOrFieldServiceInfo.Of(f).WithDetails(details, request))));
         }
 
@@ -3963,27 +3964,33 @@ namespace DryIoc
 
     public static class ReuseWrapper
     {
-        public static readonly IReuseWrapper ExternallyDisposable = new ExternallyDisposableWrapper();
+        public static readonly IReuseWrapper ExplicitlyDisposable = new ExternallyDisposableWrapper();
         public static readonly IReuseWrapper WeaklyReferenced = new WeaklyReferencedWrapper();
 
         public sealed class ExternallyDisposableWrapper : IReuseWrapper
         {
-            public Type WrapperType { get { return typeof(ExternallyDisposable); } }
+            public Type WrapperType
+            {
+                get { return typeof(ExplicitlyDisposable); }
+            }
 
             public object Wrap(object target)
             {
-                return new ExternallyDisposable((target as IDisposable).ThrowIfNull());
+                return new ExplicitlyDisposable((target as IDisposable).ThrowIfNull());
             }
 
             public object Unwrap(object wrapped)
             {
-                return (wrapped as ExternallyDisposable).ThrowIfNull().Target;
+                return (wrapped as ExplicitlyDisposable).ThrowIfNull().Target;
             }
         }
 
         public sealed class WeaklyReferencedWrapper : IReuseWrapper
         {
-            public Type WrapperType { get { return typeof(WeakReference); } }
+            public Type WrapperType
+            {
+                get { return typeof(WeakReference); }
+            }
 
             public object Wrap(object target)
             {
@@ -3998,9 +4005,9 @@ namespace DryIoc
         }
     }
 
-    public sealed class ExternallyDisposable
+    public sealed class ExplicitlyDisposable
     {
-        public ExternallyDisposable(object target)
+        public ExplicitlyDisposable(object target)
         {
             _target = target;
             _targetType = _target.GetType();
@@ -4010,7 +4017,7 @@ namespace DryIoc
         {
             get
             {
-                Throw.If(IsDisposed, Error.TARGET_WAS_ALREADY_DISPOSED, _targetType, typeof(ExternallyDisposable));
+                Throw.If(IsDisposed, Error.TARGET_WAS_ALREADY_DISPOSED, _targetType, typeof(ExplicitlyDisposable));
                 return _target;
             }
         }
@@ -4034,9 +4041,9 @@ namespace DryIoc
         private int _disposed;
     }
 
-    public sealed class ExternallyDisposable<TService> : IDisposable
+    public sealed class ExplicitlyDisposable<TService> : IDisposable
     {
-        public ExternallyDisposable(ExternallyDisposable wrapper)
+        public ExplicitlyDisposable(ExplicitlyDisposable wrapper)
         {
             _wrapper = wrapper.ThrowIfNull().ThrowIf(!(wrapper.Target is TService));
         }
@@ -4049,7 +4056,7 @@ namespace DryIoc
             _wrapper.DisposeTarget();
         }
 
-        private readonly ExternallyDisposable _wrapper;
+        private readonly ExplicitlyDisposable _wrapper;
     }
 
     /// <summary>Specifies what to return when <see cref="IResolver"/> unable to resolve service.</summary>
@@ -4268,8 +4275,7 @@ namespace DryIoc
     public static class TypeTools
     {
         /// <summary>Flags for <see cref="GetImplementedTypes"/> method.</summary>
-        [Flags]
-        public enum IncludeFlags { None = 0, SourceType = 1, ObjectType = 2 }
+        [Flags] public enum IncludeFlags { None = 0, SourceType = 1, ObjectType = 2 }
 
         /// <summary>Returns all interfaces and all base types (in that order) implemented by <paramref name="sourceType"/>.
         /// Specify <paramref name="includeFlags"/> to include <paramref name="sourceType"/> itself as first item and 
@@ -4420,11 +4426,22 @@ namespace DryIoc
             return obj != null && obj.GetType().IsAssignableTo(type);
         }
 
-        public static bool IsPrimitiveOrObjectOrString(this Type type)
+        /// <summary>Flags to specify what else consider as primitive object in <see cref="TypeTools.IsPrimitive"/> method.</summary>
+        [Flags] public enum ConsiderPrimitiveFlags { None = 0, ObjectType = 1, StringType = 2 }
+
+        /// <summary>Returns true if provided type is primitive object in .Net terms and considered as primitive based
+        /// on <see cref="ConsiderPrimitiveFlags"/>, or false - otherwise. If provided type is array, method will check
+        /// array's item type.</summary>
+        /// <param name="type">Type to check.</param>
+        /// <param name="flags">Specifies what additional types consider as primitives.</param>
+        /// <returns>True if check succeeded, false - otherwise.</returns>
+        public static bool IsPrimitive(this Type type, ConsiderPrimitiveFlags flags = ConsiderPrimitiveFlags.None)
         {
             var typeInfo = type.GetTypeInfo();
-            return typeInfo.IsPrimitive || type == typeof(string) || type == typeof(object) ||
-                   typeInfo.IsArray && typeInfo.GetElementType().IsPrimitiveOrObjectOrString();
+            return typeInfo.IsPrimitive 
+                || type == typeof(object) && (flags & ConsiderPrimitiveFlags.ObjectType) == ConsiderPrimitiveFlags.ObjectType
+                || type == typeof(string) && (flags & ConsiderPrimitiveFlags.StringType) == ConsiderPrimitiveFlags.StringType 
+                || typeInfo.IsArray && typeInfo.GetElementType().IsPrimitive(flags);
         }
 
         public static Attribute[] GetAttributes(this Type type, Type attributeType = null, bool inherit = false)
@@ -4514,8 +4531,18 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>
     public static class ArrayTools
     {
+        /// <summary>Returns true if source array is null or empty, false - otherwise.</summary>
+        /// <typeparam name="T">Array item type.</typeparam>
+        /// <param name="source">Array to check.</param>
+        /// <returns>True if check succeeded and false otherwise.</returns>
+        public static bool IsNullOrEmpty<T>(this T[] source)
+        {
+            return source == null || source.Length == 0;
+        }
+
         public static T[] ToArrayOrSelf<T>(this IEnumerable<T> source)
         {
             if (source is T[])
@@ -4721,17 +4748,22 @@ namespace DryIoc
     public delegate V Update<V>(V oldValue, V newValue);
     public delegate bool ShouldUpdate<V>(V oldValue, out V updatedValue);
 
-    /// <summary>
-    /// Immutable kind of http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.
-    /// </summary>
+    /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.</summary>
     public sealed class HashTree<K, V>
     {
+        /// <summary>Empty tree to start with. The <see cref="Height"/> of the empty tree is 0.</summary>
         public static readonly HashTree<K, V> Empty = new HashTree<K, V>();
 
+        /// <summary>Key of type K that should support <see cref="object.Equals(object)"/> and <see cref="object.GetHashCode"/>.</summary>
         public readonly K Key;
+
+        /// <summary>Value of any type V.</summary>
         public readonly V Value;
 
+        /// <summary>Hash calculated from <see cref="Key"/> with <see cref="object.GetHashCode"/>. Hash is stored to improve speed.</summary>
         public readonly int Hash;
+
+        /// <summary>In case of <see cref="Hash"/> conflicts for different keys contains conflicted keys with their values.</summary>
         public readonly KV<K, V>[] Conflicts;
         public readonly HashTree<K, V> Left, Right;
         public readonly int Height;
@@ -4958,18 +4990,25 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Provides optimistic-concurrency consistent update <see cref="Swap{T}"/> operation.</summary>
     public static class Ref
     {
+        /// <summary>Factory for <see cref="Ref{T}"/> with type of value inference.</summary>
+        /// <typeparam name="T">Type of value to wrap.</typeparam>
+        /// <param name="value">Initial value to wrap.</param>
+        /// <returns>New ref.</returns>
         public static Ref<T> Of<T>(T value = default(T)) where T : class
         {
             return new Ref<T>(value);
         }
 
-        /// <remarks>
-        /// First, it evaluates new value using <paramref name="getValue"/> function. 
+        /// <summary>First, it evaluates new value using <paramref name="getValue"/> function. 
         /// Second, it checks that original value is not changed. 
-        /// If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getValue"/>).
-        /// </remarks>
+        /// If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getValue"/>).</summary>
+        /// <typeparam name="T">Type of value to swap.</typeparam>
+        /// <param name="value">Reference to change to new value</param>
+        /// <param name="getValue">Delegate to get value from old one: Could be called multiple times to retry attempt with newly updated value.</param>
+        /// <returns>Old/original value. By analogy with <see cref="Interlocked.Exchange(ref int,int)"/>.</returns>
         public static T Swap<T>(ref T value, Func<T, T> getValue) where T : class
         {
             var retryCount = 0;
