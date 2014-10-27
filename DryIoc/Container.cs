@@ -1019,18 +1019,18 @@ namespace DryIoc
 
             .AddOrUpdate(typeof(KeyValuePair<,>),
                 new FactoryProvider(GetKeyValuePairFactoryOrDefault,
-                    WrapperSetup.With(t => t.GetGenericParamsAndArgs()[1])))
+                    WrapperSetup.With(getWrappedServiceType: t => t.GetGenericParamsAndArgs()[1])))
 
             .AddOrUpdate(typeof(Meta<,>),
                 new FactoryProvider(GetMetaFactoryOrDefault,
-                    WrapperSetup.With(t => t.GetGenericParamsAndArgs()[0])))
+                    WrapperSetup.With(getWrappedServiceType: t => t.GetGenericParamsAndArgs()[0])))
 
             .AddOrUpdate(typeof(DebugExpression<>),
                 new FactoryProvider(_ => new ExpressionFactory(GetDebugExpression), WrapperSetup.Default));
 
             var funcFactory = new FactoryProvider(
                 _ => new ExpressionFactory(GetFuncExpression),
-                WrapperSetup.With(t => t.GetGenericParamsAndArgs().Last()));
+                WrapperSetup.With(getWrappedServiceType: t => t.GetGenericParamsAndArgs().Last()));
 
             foreach (var funcType in FuncTypes)
                 GenericWrappers = GenericWrappers.AddOrUpdate(funcType, funcFactory);
@@ -1520,6 +1520,9 @@ namespace DryIoc
 
         public static readonly string UNMATCHED_GENERIC_PARAM_CONSTRAINTS =
             "Service type does not match registered open-generic implementation constraints {0} when resolving {1}.";
+
+        public static readonly string NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED = 
+            "Non-generic wrapper {0} should specify wrapped service selector when registered.";
     }
 
     public static class Registrator
@@ -2683,14 +2686,27 @@ namespace DryIoc
     /// <summary>Base class to store optional <see cref="Factory"/> settings.</summary>
     public abstract class FactorySetup
     {
+        /// <summary>Factory type is required to be specified by concrete setups as in 
+        /// <see cref="Setup"/>, <see cref="DecoratorSetup"/>, <see cref="WrapperSetup"/>.</summary>
         public abstract FactoryType FactoryType { get; }
+
         public virtual FactoryCaching Caching { get { return FactoryCaching.DisabledForExpression; } }
         public virtual object Metadata { get { return null; } }
+
+        /// <summary>Specifies what would be reused service wrapped (in order): 
+        /// to apply additional behavior as <see cref="WeakReference"/>, or disable disposing for <see cref="IDisposable"/> service, 
+        /// etc.</summary>
         public virtual IReuseWrapper[] ReuseWrappers { get { return null; } }
 
+        /// <summary>Injection rules set for Constructor, Parameters, Properties and Fields.</summary>
         public readonly InjectionRules Rules;
-        protected FactorySetup(InjectionRules rules) { Rules = rules ?? InjectionRules.Empty; }
+
+        /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields.</summary>
+        /// <param name="rules">Rules to set.</param>
+        /// <returns>New factory setup with injection rules set.</returns>
         public abstract FactorySetup WithRules(InjectionRules rules);
+
+        protected FactorySetup(InjectionRules rules) { Rules = rules ?? InjectionRules.Empty; }
     }
 
     public static class FactorySetupTools
@@ -2767,8 +2783,15 @@ namespace DryIoc
     /// <summary>Setup for <see cref="DryIoc.FactoryType.Wrapper"/> factory.</summary>
     public class WrapperSetup : FactorySetup
     {
+        /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
         public static readonly WrapperSetup Default = new WrapperSetup();
 
+        /// <summary>Creates setup with all settings specified. If all is omitted: then <see cref="Default"/> will be used.</summary>
+        /// <param name="constructor">Constructor selector.</param>
+        /// <param name="parameters">Parameters selector rule.</param>
+        /// <param name="propertiesAndFields">Properties and fields selector rules.</param>
+        /// <param name="getWrappedServiceType">Wrapped service selector rule.</param>
+        /// <returns>New setup with non-default settings or <see cref="Default"/> otherwise.</returns>
         public static WrapperSetup With(ConstructorSelector constructor = null, 
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             Func<Type, Type> getWrappedServiceType = null)
@@ -2777,12 +2800,6 @@ namespace DryIoc
                 : new WrapperSetup(InjectionRules.Empty, getWrappedServiceType);
             return constructor == null && parameters == null && propertiesAndFields == null ? setup 
                 : (WrapperSetup)setup.WithRules(InjectionRules.With(constructor, parameters, propertiesAndFields));
-        }
-
-        public static WrapperSetup With(Func<Type, Type> getWrappedServiceType)
-        {
-            return getWrappedServiceType == null ? Default
-                : new WrapperSetup(InjectionRules.Empty, getWrappedServiceType);
         }
 
         public override FactorySetup WithRules(InjectionRules rules)
@@ -2802,12 +2819,14 @@ namespace DryIoc
             GetWrappedServiceType = getWrappedServiceType ?? GetSingleGenericArgByDefault;
         }
 
-        private Type GetSingleGenericArgByDefault(Type wrapperType)
+        private static Type GetSingleGenericArgByDefault(Type wrapperType)
         {
-            wrapperType.ThrowIf(!wrapperType.IsGeneric(), "Wrapper {0} is not generic, but service type selector expects wrapper to be generic with single parameter to use as service type.");
-            var args = wrapperType.GetGenericParamsAndArgs();
-            Throw.If(args.Length != 1, Error.WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY, wrapperType);
-            return args[0];
+            wrapperType.ThrowIf(!wrapperType.IsClosedGeneric(), 
+                Error.NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED);
+            
+            var typeArgs = wrapperType.GetGenericParamsAndArgs();
+            Throw.If(typeArgs.Length != 1, Error.WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY, wrapperType);
+            return typeArgs[0];
         }
 
         #endregion

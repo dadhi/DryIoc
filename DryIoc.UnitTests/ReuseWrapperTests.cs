@@ -312,7 +312,7 @@ namespace DryIoc.UnitTests
                     getWrappedServiceType: getWrappedServiceType));
 
                 return reflectionFactory.GetExpressionOrDefault(request);
-            }, setup: WrapperSetup.With(getWrappedServiceType));
+            }, setup: WrapperSetup.With(getWrappedServiceType: getWrappedServiceType));
         }
 
         public class UnknownWrapper

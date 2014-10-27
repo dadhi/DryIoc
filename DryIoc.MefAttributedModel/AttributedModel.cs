@@ -172,7 +172,8 @@ namespace DryIoc.MefAttributedModel
                     var genericWrapperAttribute = ((AsWrapperAttribute)attribute);
                     info.Wrapper = new WrapperInfo
                     {
-                        ServiceTypeIndex = genericWrapperAttribute.ContractTypeGenericArgIndex
+                        WrappedServiceType = genericWrapperAttribute.WrappedContractType,
+                        WrappedServiceTypeGenericArgIndex = genericWrapperAttribute.ContractTypeGenericArgIndex
                     };
                 }
                 else if (attribute is AsDecoratorAttribute)
@@ -413,6 +414,13 @@ namespace DryIoc.MefAttributedModel
 
         public static readonly string UNSUPPORTED_REUSE_TYPE =
             "Attributed model does not support reuse type {0}.";
+
+        public static readonly string EXPORTED_NONGENERIC_WRAPPER_NO_WRAPPED_TYPE = 
+            "Exported non-generic wrapper type {0} requires wrapped service type to be specified, but it is null, " +
+            "and instead generic argument index is set to {1}.";
+
+        public static readonly string EXPORTED_GENERIC_WRAPPER_BAD_ARG_INDEX = 
+            "Exported generic wrapper type {0} specifies generic argument index {1} outside of argument list size.";
     }
 
     public static class PrintCode
@@ -529,7 +537,10 @@ namespace DryIoc.MefAttributedModel
     HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
     FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
             if (Wrapper != null) code.Append(@",
-    Wrapper = new WrapperInfo { ServiceTypeIndex = ").Append(Wrapper.ServiceTypeIndex).Append(@" }");
+    Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ")
+                .Append(Wrapper.WrappedServiceTypeGenericArgIndex)
+                .Append(", WrappedServiceType = ")
+                .AppendType(Wrapper.WrappedServiceType).Append(@" }");
             if (Decorator != null)
             {
                 code.Append(@",
@@ -583,24 +594,36 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
+    /// <summary>Describes <see cref="WrapperSetup"/> in serializable way.</summary>
     public sealed class WrapperInfo
     {
-        public int ServiceTypeIndex;
+        public Type WrappedServiceType;
+        public int WrappedServiceTypeGenericArgIndex;
 
         public WrapperSetup GetSetup()
         {
-            return WrapperSetup.With(SelectWrappedServiceType);
+            return WrapperSetup.With(getWrappedServiceType: GetWrappedServiceType);
         }
 
         public override bool Equals(object obj)
         {
             var other = obj as WrapperInfo;
-            return other != null && other.ServiceTypeIndex == ServiceTypeIndex;
+            return other != null && other.WrappedServiceTypeGenericArgIndex == WrappedServiceTypeGenericArgIndex;
         }
 
-        private Type SelectWrappedServiceType(Type wrapperType)
+        private Type GetWrappedServiceType(Type wrapperType)
         {
-            return wrapperType.GetGenericParamsAndArgs()[ServiceTypeIndex];
+            if (WrappedServiceType != null)
+                return WrappedServiceType;
+
+            wrapperType.ThrowIf(!wrapperType.IsClosedGeneric(),
+                Error.EXPORTED_NONGENERIC_WRAPPER_NO_WRAPPED_TYPE, WrappedServiceTypeGenericArgIndex);
+
+            var typeArgs = wrapperType.GetGenericParamsAndArgs();
+            wrapperType.ThrowIf(WrappedServiceTypeGenericArgIndex > typeArgs.Length - 1,
+                Error.EXPORTED_GENERIC_WRAPPER_BAD_ARG_INDEX, WrappedServiceTypeGenericArgIndex);
+
+            return typeArgs[WrappedServiceTypeGenericArgIndex];
         }
     }
 
@@ -736,10 +759,16 @@ namespace DryIoc.MefAttributedModel
     public class AsWrapperAttribute : Attribute
     {
         public int ContractTypeGenericArgIndex { get; set; }
+        public Type WrappedContractType { get; set; }
 
-        public AsWrapperAttribute(int contractTypeArgIndex = 0)
+        public AsWrapperAttribute(int contractTypeGenericArgInsdex = 0)
         {
-            ContractTypeGenericArgIndex = contractTypeArgIndex.ThrowIf(contractTypeArgIndex < 0);
+            ContractTypeGenericArgIndex = contractTypeGenericArgInsdex.ThrowIf(contractTypeGenericArgInsdex < 0);
+        }
+
+        public AsWrapperAttribute(Type wrappedContractType)
+        {
+            WrappedContractType = wrappedContractType.ThrowIfNull();
         }
     }
 

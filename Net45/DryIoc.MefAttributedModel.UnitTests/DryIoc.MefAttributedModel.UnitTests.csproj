@@ -58,8 +58,8 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAsDecoratorTests.cs">
       <Link>ExportAsDecoratorTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAsGenericWrapperTests.cs">
-      <Link>ExportAsGenericWrapperTests.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAsWrapperTests.cs">
+      <Link>ExportAsWrapperTests.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportFactoryTests.cs">
       <Link>ExportFactoryTests.cs</Link>

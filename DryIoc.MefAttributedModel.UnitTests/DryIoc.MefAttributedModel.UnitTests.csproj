@@ -48,7 +48,7 @@
     <Compile Include="ExportFactoryTests.cs" />
     <Compile Include="ExportAllTests.cs" />
     <Compile Include="ExportAsDecoratorTests.cs" />
-    <Compile Include="ExportAsGenericWrapperTests.cs" />
+    <Compile Include="ExportAsWrapperTests.cs" />
     <Compile Include="ExportImportWithKeyTests.cs" />
     <Compile Include="ImportExternalTests.cs" />
     <Compile Include="ImportAttributeTests.cs" />
