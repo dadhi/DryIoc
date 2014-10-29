@@ -20,7 +20,7 @@ echo:---------------------------------
 
 set SCRIPTDIR="%~dp0"
 echo:
-echo:Switching to %SCRIPT_DIR% . . .
+echo:Switching to %SCRIPTDIR% . . .
 cd /d %SCRIPTDIR%  
 
 call Clean -nopause

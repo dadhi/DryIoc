@@ -165,7 +165,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeaklyReferenced }));
+                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference }));
 
             container.Register(typeof(WeakReference), CreateReuseWrapperFactory(_ => typeof(object), typeof(object)));
 
@@ -183,17 +183,17 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeaklyReferenced }));
+                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
             container.Register<Dependency>(Reuse.InResolutionScope,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeaklyReferenced }));
+                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
             container.Register<ServiceClient>(Reuse.InCurrentScope,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeaklyReferenced }));
+                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
 
-            container.Register(typeof(WeakReference), CreateReuseWrapperFactory(_ => typeof(object), typeof(object)));
+            container.Register(typeof(ExplicitlyDisposable), CreateReuseWrapperFactory(_ => typeof(object), typeof(object)));
 
-            var service = container.Resolve<WeakReference>(typeof(IService));
-            var dependency = container.Resolve<WeakReference>(typeof(Dependency));
-            var client = container.Resolve<WeakReference>(typeof(ServiceClient));
+            var service = container.Resolve<ExplicitlyDisposable>(typeof(IService));
+            var dependency = container.Resolve<ExplicitlyDisposable>(typeof(Dependency));
+            var client = container.Resolve<ExplicitlyDisposable>(typeof(ServiceClient));
 
             Assert.That(service.Target, Is.InstanceOf<Service>());
             Assert.That(dependency.Target, Is.InstanceOf<Dependency>());
@@ -205,7 +205,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable, ReuseWrapper.WeaklyReferenced }));
+                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable, ReuseWrapper.WeakReference }));
 
             var service = container.Resolve<IService>();
             var serviceWeakRef = new WeakReference(service);
@@ -224,7 +224,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable, ReuseWrapper.WeaklyReferenced }));
+                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable, ReuseWrapper.WeakReference }));
 
             container.Register(typeof(ExplicitlyDisposable), CreateReuseWrapperFactory(_ => typeof(object), typeof(object)));
 
@@ -241,7 +241,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable, ReuseWrapper.WeaklyReferenced }));
+                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable, ReuseWrapper.WeakReference }));
 
             container.Register(typeof(ExplicitlyDisposable), CreateReuseWrapperFactory(_ => typeof(object), typeof(object)));
 
@@ -287,6 +287,21 @@ namespace DryIoc.UnitTests
 
             var serviceWeakRef = container.Resolve<ExplicitlyDisposable>(typeof(IService));
             Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void Can_resolve_func_with_args_of_reuse_wrapper()
+        {
+            var container = new Container();
+            container.Register<ServiceWithParameterAndDependency>(Reuse.InCurrentScope, 
+                setup: Setup.With(reuseWrappers: new [] { ReuseWrapper.WeakReference }));
+            
+            container.Register<Service>();
+            container.Register(typeof(WeakReference), CreateReuseWrapperFactory(_ => typeof(object), typeof(object)));
+
+            var func = container.Resolve<Func<bool, WeakReference>>(typeof(ServiceWithParameterAndDependency));
+            var service = func(true).Target;
+            Assert.That(service, Is.InstanceOf<ServiceWithParameterAndDependency>());
         }
 
         private static Factory CreateReuseWrapperFactory(

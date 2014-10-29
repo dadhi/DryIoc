@@ -175,7 +175,21 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_constructor_with_two_parameters_of_same_type_When_resolving_Func_of_one_parameter_Then_first_constructor_parameter_will_become_Func_parameter()
+        public void Can_resolve_Func_with_args_of_Wrapper()
+        {
+            var container = new Container();
+            container.Register<IServiceWithParameterAndDependency, ServiceWithParameterAndDependency>();
+            container.Register(typeof(Service));
+
+            var func = container.Resolve<Func<bool, Lazy<IServiceWithParameterAndDependency>>>();
+            var service = func(true).Value;
+
+            Assert.That(service.Flag, Is.True);
+            Assert.That(service.Dependency, Is.Not.Null);
+        }
+
+        [Test]
+        public void Constructor_will_use_func_argument_only_once_for_first_ctor_parameter()
         {
             var container = new Container();
             container.Register(typeof(ServiceWithTwoDepenedenciesOfTheSameType));
@@ -298,24 +312,26 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_func_with_parameters_using_constructor_that_misses_some_of_func_parameters_should_Throw()
+        public void Resolving_func_with_some_unused_args_should_not_throw()
         {
             var container = new Container();
             container.Register<ServiceWithDependency>();
             container.Register<IDependency, Dependency>();
 
-            Assert.Throws<ContainerException>(() => 
-                container.Resolve<Func<string, ServiceWithDependency>>());
+            var func = container.Resolve<Func<string, ServiceWithDependency>>();
+
+            Assert.That(func(null), Is.InstanceOf<ServiceWithDependency>());
         }
 
         [Test]
-        public void Resolving_Func_of_delegate_factory_should_Throw()
+        public void Resolving_Func_of_delegate_factory_should_not_throw_The_func_argument_will_not_be_used()
         {
             var container = new Container();
-            container.RegisterDelegate(resolver => new Service());
+            container.RegisterDelegate(r => new Service());
 
-            Assert.Throws<ContainerException>(() => 
-                container.Resolve<Func<int, Service>>());
+            var func = container.Resolve<Func<int, Service>>();
+
+            Assert.That(func(0), Is.InstanceOf<Service>());
         }
     }
 
