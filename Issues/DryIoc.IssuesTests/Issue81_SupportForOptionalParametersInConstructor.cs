@@ -2,7 +2,7 @@
 
 namespace DryIoc.IssuesTests
 {
-    public class Issue_ShouldSpecifyIfUnresolvedReturnDefaultForOptionalParam
+    public class Issue81_SupportForOptionalParametersInConstructor
     {
         [Test]
         public void Should_automatically_specify_IfUnresolvedReturnDefault_for_optional_parameters()
