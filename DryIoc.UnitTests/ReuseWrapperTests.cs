@@ -305,5 +305,19 @@ namespace DryIoc.UnitTests
 
             Assert.That(ex.Message, Is.StringContaining("Target of type WeakReference was already disposed in DryIoc.ExplicitlyDisposable"));
         }
+
+        [Test]
+        public void Disposable_reuse_wrapper_allows_to_check_when_service_is_disposed()
+        {
+            var container = new Container();
+            container.Register<Service>(Reuse.InCurrentScope,
+                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.Disposable }));
+
+            var service = container.Resolve<Disposable>(typeof(Service));
+
+            container.Dispose();
+
+            Assert.That(service.IsDisposed, Is.True);
+        }
     }
 }

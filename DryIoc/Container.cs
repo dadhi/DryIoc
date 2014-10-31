@@ -56,7 +56,7 @@ namespace DryIoc
             Interlocked.Increment(ref _lastRegistryID),
             Ref.Of(HashTree<Type, object>.Empty),
             Ref.Of(HashTree<Type, Factory[]>.Empty),
-            Ref.Of(GenericsAndWrappersSupport.Wrappers),
+            Ref.Of(WrappersSupport.Wrappers),
             new Scope()) { }
 
         /// <summary>Creates new container instance with possibility to update default rules.</summary>
@@ -395,10 +395,22 @@ namespace DryIoc
             var factory = GetServiceFactoryOrDefault(request.ServiceType, request.ServiceKey, Rules.FactorySelector);
             if (factory != null && factory.ProvidesFactoryForRequest)
                 factory = factory.GetFactoryForRequestOrDefault(request);
-
             if (factory != null)
                 return factory;
 
+            // Try resolve factory for service type generic definition.
+            var serviceTypeGenericDef = request.ServiceType.GetGenericDefinitionOrNull();
+            if (serviceTypeGenericDef != null)
+            {
+                factory = GetServiceFactoryOrDefault(serviceTypeGenericDef, request.ServiceKey, Rules.FactorySelector);
+                if (factory != null && (factory = factory.GetFactoryForRequestOrDefault(request)) != null)
+                {   // Important to register produced factory, at least for recursive dependency check
+                    Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.UpdateRegistered);
+                    return factory;
+                }
+            }
+
+            // Try unregistered resolution rules.
             var rulesForUnregistered = Rules.ForUnregisteredService;
             if (rulesForUnregistered != null && rulesForUnregistered.Length != 0)
                 for (var i = 0; i < rulesForUnregistered.Length; i++)
@@ -1015,19 +1027,20 @@ namespace DryIoc
     /// <item>
     /// Service generics wrappers and arrays using <see cref="Rules.ForUnregisteredService"/> extension point.
     /// Supported wrappers include: Func of <see cref="FuncTypes"/>, Lazy, Many, IEnumerable, arrays, Meta, KeyValuePair, DebugExpression.
-    /// All wrapper factories are added into collection <see cref="Wrappers"/> and searched by <see cref="ResolveGenericsAndArrays"/>
+    /// All wrapper factories are added into collection <see cref="Wrappers"/> and searched by <see cref="ResolveWrappers"/>
     /// unregistered resolution rule.
     /// </item>
     /// </list>
     /// </summary>
-    public static class GenericsAndWrappersSupport
+    public static class WrappersSupport
     {
         /// <summary>Supported Func types up to 4 input parameters.</summary>
         public static readonly Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
 
+        /// <summary>Registered wrappers by their concrete or generic definition service type.</summary>
         public static readonly HashTree<Type, Factory> Wrappers;
 
-        static GenericsAndWrappersSupport()
+        static WrappersSupport()
         {
             Wrappers = HashTree<Type, Factory>.Empty;
 
@@ -1071,23 +1084,20 @@ namespace DryIoc
 
             Wrappers = Wrappers
                 .AddOrUpdate(typeof(ExplicitlyDisposable), GetReuseWrapperFactory(_ => typeof(object), typeof(object)))
+                .AddOrUpdate(typeof(Disposable), GetReuseWrapperFactory(_ => typeof(object), typeof(object)))
                 .AddOrUpdate(typeof(WeakReference), GetReuseWrapperFactory(_ => typeof(object), typeof(object)))
                 .AddOrUpdate(typeof(Ref<>), GetReuseWrapperFactory(t => t.GetGenericParamsAndArgs()[0]));
         }
 
-        public static readonly Rules.ResolveUnregisteredServiceRule ResolveGenericsAndArrays = request =>
+        /// <summary>Unregistered/fallback wrapper resolution rule.</summary>
+        public static readonly Rules.ResolveUnregisteredServiceRule ResolveWrappers = request =>
         {
             var serviceType = request.ServiceType;
-            var openGenericServiceType = serviceType.IsArray
-                ? typeof(IEnumerable<>) // when resolving array, use the same procedure as for IEnumerable
-                : serviceType.GetGenericDefinitionOrNull();
+            var itemType = serviceType.GetElementTypeOrNull();
+            if (itemType != null)
+                serviceType = typeof(IEnumerable<>).MakeGenericType(itemType);
 
-            Factory factory = null;
-            var registry = request.Registry;
-            if (openGenericServiceType != null)
-                factory = registry.GetServiceFactoryOrDefault(openGenericServiceType, request.ServiceKey);
-            factory = factory ?? registry.GetWrapperFactoryOrDefault(openGenericServiceType ?? serviceType);
-
+            var factory = request.Registry.GetWrapperFactoryOrDefault(serviceType);
             if (factory != null && factory.ProvidesFactoryForRequest)
                 factory = factory.GetFactoryForRequestOrDefault(request);
 
@@ -1307,7 +1317,7 @@ namespace DryIoc
         #region Implementation
 
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
-            typeof(GenericsAndWrappersSupport).GetDeclaredMethod("ResolveManyDynamically");
+            typeof(WrappersSupport).GetDeclaredMethod("ResolveManyDynamically");
 
         internal static IEnumerable<TItem> ResolveManyDynamically<TItem, TWrappedItem>(Request request, int parentFactoryID)
         {
@@ -1333,15 +1343,18 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed partial class Rules
     {
+        /// <summary>No rules specified.</summary>
+        /// <remarks>Rules <see cref="ForUnregisteredService"/> are empty too.</remarks>
         public static readonly Rules Empty = new Rules();
 
         /// <summary>
         /// Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
-        /// Check <see cref="GenericsAndWrappersSupport.ResolveGenericsAndArrays"/> for details.
+        /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.
         /// </summary>
-        public static readonly Rules Default = Empty.With(GenericsAndWrappersSupport.ResolveGenericsAndArrays);
+        public static readonly Rules Default = Empty.With(WrappersSupport.ResolveWrappers);
 
         public ConstructorSelector Constructor { get { return _injectionRules.Constructor; } }
         public ParameterSelector Parameters { get { return _injectionRules.Parameters; } }
@@ -2644,7 +2657,7 @@ namespace DryIoc
         }
 
         /// <summary>Returns new request with parameter expressions created for <paramref name="funcType"/> input arguments.
-        /// The expression is set to <see cref="FuncArgs"/> request field to use for <see cref="GenericsAndWrappersSupport.FuncTypes"/>
+        /// The expression is set to <see cref="FuncArgs"/> request field to use for <see cref="WrappersSupport.FuncTypes"/>
         /// resolution.</summary>
         /// <param name="funcType">Func type to get input arguments from.</param>
         /// <returns>New request with <see cref="FuncArgs"/> field set.</returns>
@@ -4045,6 +4058,7 @@ namespace DryIoc
     public static class ReuseWrapper
     {
         public static readonly IReuseWrapper ExplicitlyDisposable = new ExplicitlyDisposableWrapper();
+        public static readonly IReuseWrapper Disposable = new DisposableWrapper();
         public static readonly IReuseWrapper WeakReference = new WeakReferenceWrapper();
         public static readonly IReuseWrapper Ref = new RefWrapper();
 
@@ -4063,6 +4077,24 @@ namespace DryIoc
             public object Unwrap(object wrapped)
             {
                 return (wrapped as ExplicitlyDisposable).ThrowIfNull().Target;
+            }
+        }
+
+        public sealed class DisposableWrapper : IReuseWrapper
+        {
+            public Type WrapperType
+            {
+                get { return typeof (Disposable); }
+            }
+
+            public object Wrap(object target)
+            {
+                return new Disposable(target);
+            }
+
+            public object Unwrap(object wrapped)
+            {
+                return (wrapped as Disposable).ThrowIfNull().Target;
             }
         }
 
@@ -4104,7 +4136,7 @@ namespace DryIoc
         }
     }
 
-    public sealed class ExplicitlyDisposable
+    public class ExplicitlyDisposable
     {
         public ExplicitlyDisposable(object target)
         {
@@ -4139,6 +4171,16 @@ namespace DryIoc
         private readonly Type _targetType;
         private object _target;
         private int _disposed;
+    }
+
+    public sealed class Disposable : ExplicitlyDisposable, IDisposable
+    {
+        public Disposable(object target) : base(target) {}
+
+        public void Dispose()
+        {
+            DisposeTarget();
+        }
     }
 
     public sealed class ExplicitlyDisposable<TService> : IDisposable

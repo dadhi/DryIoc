@@ -316,20 +316,6 @@ namespace DryIoc.UnitTests
             Assert.That(ex.Message, Is.StringContaining("Unable to find writable property or field \"FReadonly\" when resolving"));
         }
 
-        [Test][Ignore("Not supported cause property are set as new Blah { Prop1 = x, Prop2 = y }")]
-        public void Only_not_assigned_properies_and_fields_should_be_resolved_So_that_assgined_field_value_should_Not_change()
-        {
-            var container = new Container();
-            container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: "another");
-            container.Register<ClientWithAssignedProperty>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.None.And("Service", serviceKey: "another")));
-
-            var client = container.Resolve<ClientWithAssignedProperty>();
-
-            Assert.That(client.Service, Is.InstanceOf<Service>());
-        }
-
         [Test]
         public void Only_non_primitive_properies_and_fields_should_be_resolved()
         {
@@ -502,16 +488,6 @@ namespace DryIoc.UnitTests
             // ReSharper restore UnusedAutoPropertyAccessor.Local
 
             public AnotherService PNonResolvable { get; set; }
-        }
-
-        public class ClientWithAssignedProperty
-        {
-            public IService Service { get; set; }
-
-            public ClientWithAssignedProperty(IService service)
-            {
-                Service = service;
-            }
         }
 
         public class Client
