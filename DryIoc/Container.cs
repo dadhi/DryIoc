@@ -896,6 +896,9 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Immutable array based on wide hash tree, where each node is sub-array with predefined size: 32 is default.
+    /// Array supports only append, no remove.</summary>
+    /// <typeparam name="T">Array item type.</typeparam>
     public sealed class AppendableArray<T>
     {
         public static readonly AppendableArray<T> Empty = new AppendableArray<T>();
@@ -2047,7 +2050,8 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Provides information required for service resolution.</summary>
+    /// <summary>Provides information required for service resolution: service type, 
+    /// and optional <see cref="ServiceInfoDetails"/>: key, what to do if service unresolved, and required service type.</summary>
     public interface IServiceInfo
     {
         /// <summary>The required piece of info: service type.</summary>
@@ -2298,8 +2302,15 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Provides <see cref="IServiceInfo"/> for parameter, 
+    /// by default using parameter name as <see cref="IServiceInfo.ServiceType"/>.</summary>
+    /// <remarks>For parameter default setting <see cref="ServiceInfoDetails.IfUnresolved"/> is <see cref="IfUnresolved.Throw"/>.</remarks>
     public class ParameterServiceInfo : IServiceInfo
     {
+        /// <summary>Creates service info from parameter alone, setting service type to parameter type,
+        /// and setting resolution policy to <see cref="IfUnresolved.ReturnDefault"/> if parameter is optional.</summary>
+        /// <param name="parameter">Parameter to create info for.</param>
+        /// <returns>Parameter service info.</returns>
         public static ParameterServiceInfo Of(ParameterInfo parameter)
         {
             return !parameter.IsOptional
@@ -2323,7 +2334,8 @@ namespace DryIoc
         }
 
         private readonly ParameterInfo _parameter;
-        public ParameterServiceInfo(ParameterInfo parameter) { _parameter = parameter; }
+
+        private ParameterServiceInfo(ParameterInfo parameter) { _parameter = parameter; }
 
         private class WithDetails : ParameterServiceInfo
         {
@@ -3630,32 +3642,44 @@ namespace DryIoc
             var ctor = SelectConstructor(request);
             var ctorParams = ctor.GetParameters();
 
-            List<Expression> paramExprs = null;
+            Expression[] paramExprs = null;
             if (ctorParams.Length != 0)
             {
-                paramExprs = new List<Expression>(ctorParams.Length);
+                paramExprs = new Expression[ctorParams.Length];
 
                 var funcArgs = request.FuncArgs;
+                var funcArgsUsedMask = 0;
                 
                 for (var i = 0; i < ctorParams.Length; i++)
                 {
                     var ctorParam = ctorParams[i];
+                    Expression paramExpr = null;
 
-                    int funcArgIndex;
-                    if (funcArgs != null &&
-                        (funcArgIndex = funcArgs.Value.IndexOf(a => a.Type.IsAssignableTo(ctorParam.ParameterType))) != -1 &&
-                        !paramExprs.Contains(funcArgs.Value[funcArgIndex])) // use func argument only once (for one constructor parameter)
+                    if (funcArgs != null)
                     {
-                        funcArgs.Key[funcArgIndex] = true; // mark that argument was used
-                        paramExprs.Add(funcArgs.Value[funcArgIndex]);
+                        for (var fa = 0; fa < funcArgs.Value.Length && paramExpr == null; ++fa)
+                        {
+                            var funcArg = funcArgs.Value[fa];
+                            if ((funcArgsUsedMask & 1 << fa) == 0 &&                  // not yet used func argument
+                                funcArg.Type.IsAssignableTo(ctorParam.ParameterType)) // and it assignable to parameter
+                            {
+                                paramExpr = funcArg;
+                                funcArgsUsedMask |= 1 << fa;  // mark that argument was used
+                                funcArgs.Key[fa] = true;      // globally mark that argument was used
+                            }
+                        }
                     }
-                    else
+
+                    // If parameter expression still null, try to resolve it
+                    if (paramExpr == null)
                     {
                         var info = GetParameterServiceInfo(ctorParam, request);
-                        var expr = Container.GetDependencyExpressionOrNull(info, request);
-                        if (expr == null) return null;
-                        paramExprs.Add(expr);
+                        paramExpr = Container.GetDependencyExpressionOrNull(info, request);
+                        if (paramExpr == null)
+                            return null;
                     }
+
+                    paramExprs[i] = paramExpr;
                 }
             }
 
@@ -4675,6 +4699,7 @@ namespace DryIoc
         }
     }
 
+    /// <summary>Provides pretty printing/debug view for number of types.</summary>
     public static class PrintTools
     {
         public readonly static string DEFAULT_ITEM_SEPARATOR = ";" + Environment.NewLine;

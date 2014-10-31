@@ -333,23 +333,46 @@ namespace DryIoc.UnitTests
 
             Assert.That(func(0), Is.InstanceOf<Service>());
         }
-    }
 
-    #region CUT
-
-    public class TwoCtors
-    {
-        public string Message { get; set; }
-
-        public TwoCtors() : this("Hey!")
+        [Test]
+        public void One_func_argument_should_be_used_only_once_for_one_parameter()
         {
+            var container = new Container();
+            container.Register<FullNameService>();
+
+            var func = container.Resolve<Func<string, string, FullNameService>>();
+            var service = func("Oh", "Yeah");
+
+            Assert.That(service.FullName, Is.EqualTo("Oh Yeah"));
         }
 
-        public TwoCtors(string message)
+        public class TwoCtors
         {
-            Message = message;
+            public string Message { get; set; }
+
+            public TwoCtors()
+                : this("Hey!")
+            {
+            }
+
+            public TwoCtors(string message)
+            {
+                Message = message;
+            }
+        }
+
+        public class FullNameService
+        {
+            public string FullName { get { return _name + " " + _surname; } }
+
+            public FullNameService(string name, string surname)
+            {
+                _name = name;
+                _surname = surname;
+            }
+
+            private readonly string _name;
+            private readonly string _surname;
         }
     }
-
-    #endregion
 }
