@@ -1,47 +1,28 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
-        <id>DryIoc</id>
+        <id>DryIoc.CommonServiceLocator</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIoc is small, fast, capable IoC container for .NET</description>
-        <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
-        <releaseNotes>
-          fixed: #70: .Net 4.0 related: Unable to resolve types from unsigned assembly if compiling to dynamic assembly is turned On (it is by default)
-        </releaseNotes>
+        <description>Implementation of CommonServiceLocator for DryIoc container, see rationale at https://commonservicelocator.codeplex.com/</description>
+        <tags>Service-Locator CommonServiceLocator IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
+        <releaseNotes>First release.</releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.0.0, 3.0.0)" />
+            <dependency id="DryIoc" version="[2.0.0, 3.0.0)" />
+            <dependency id="CommonServiceLocator" />
           </group>
         </dependencies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
 
-        <!--net35-->
-        <file src="..\DryIoc\Container.cs" target="content\net35\DryIoc" />
-        <file src="..\DryIoc\net40\Lazy.cs" target="content\net35\DryIoc" />
-        <file src="..\DryIoc\net45\TypeInfo.cs" target="content\net35\DryIoc" />
-
-        <!--net40-->
-        <file src="..\DryIoc\Container.cs" target="content\net40\DryIoc" />
-        <file src="..\DryIoc\net45\TypeInfo.cs" target="content\net40\DryIoc" />
-        <file src="..\Net40\DryIoc\FactoryCompiler.cs" target="content\net40\DryIoc" />
-        <file src="..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs" target="content\net40\DryIoc" />
-
-        <!--net45-->
-        <file src="..\DryIoc\Container.cs" target="content\net45\DryIoc" />
-
-        <!-- PCL: Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-        <file src="..\DryIoc\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\DryIoc\net45\TypeInfo.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-
-        <!-- PCL: Profile259	.NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-        <file src="..\DryIoc\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <!--for all platforms-->
+        <file src="..\Extensions\DryIoc.CommonServiceLocator\DryIocServiceLocator.cs" target="content\DryIoc.CommonServiceLocator" />
 
     </files>
 </package>

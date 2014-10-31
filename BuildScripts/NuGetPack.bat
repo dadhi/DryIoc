@@ -10,9 +10,8 @@ echo:Packing NuGet packages into %PACKAGEDIR% . . .
 if exist %PACKAGEDIR% rd /s /q %PACKAGEDIR%
 md %PACKAGEDIR% 
 
-call :ParseVersion "DryIoc\Properties\AssemblyInfo.cs"
-
 echo:
+call :ParseVersion "DryIoc\Properties\AssemblyInfo.cs"
 echo:DryIoc v%VER%
 echo:================
 
@@ -20,14 +19,23 @@ echo:================
 %NUGET% pack "NuGet\DryIoc.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive 
 rem -Symbols
 
-call :ParseVersion "DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs"
-
 echo:
+call :ParseVersion "DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs"
 echo:MefAttributedModel v%VER%
 echo:============================
 
 %NUGET% pack "NuGet\DryIoc.MefAttributedModel.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 %NUGET% pack "NuGet\DryIoc.MefAttributedModel.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+rem -Symbols 
+
+
+echo:
+call :ParseVersion "Extensions\DryIoc.CommonServiceLocator\Properties\AssemblyInfo.cs"
+echo:DryIoc.CommonServiceLocator v%VER%
+echo:============================
+
+%NUGET% pack "NuGet\DryIoc.CommonServiceLocator.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack "NuGet\DryIoc.CommonServiceLocator.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 rem -Symbols 
 
 echo: 

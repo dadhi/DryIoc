@@ -268,13 +268,12 @@ namespace DryIoc.UnitTests
             container.Register<ServiceWithParameterAndDependency>(Reuse.InCurrentScope,
                 setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference }));
 
-
             var func = container.Resolve<Func<bool, WeakReference>>(typeof(ServiceWithParameterAndDependency));
             var service = func(true).Target;
             Assert.That(service, Is.InstanceOf<ServiceWithParameterAndDependency>());
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_resolve_service_as_Ref()
         {
             var container = new Container();
@@ -283,17 +282,28 @@ namespace DryIoc.UnitTests
             container.Register<ServiceWithParameterAndDependency>(Reuse.Singleton,
                 setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.Ref }));
 
-            container.Resolve<Func<bool, Ref<object>>>(typeof(ServiceWithParameterAndDependency));
+            var func = container.Resolve<Func<bool, Ref<object>>>(typeof(ServiceWithParameterAndDependency));
+            var service = func(true);
+            var service2 = func(true);
+
+            Assert.That(service.Value, Is.InstanceOf<ServiceWithParameterAndDependency>());
+            Assert.That(service, Is.SameAs(service2));
         }
 
-        public class UnknownWrapper
+        [Test]
+        public void Service_wrapped_in_WeakReference_and_in_ExplicitlyDisposable_may_be_disposed()
         {
-            public WeakReference WekRef { get; set; }
+            var container = new Container();
+            container.Register<DisposableService>(Reuse.Singleton,
+                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference, ReuseWrapper.ExplicitlyDisposable }));
 
-            public UnknownWrapper(WeakReference wekRef)
-            {
-                WekRef = wekRef;
-            }
+            var service = container.Resolve<ExplicitlyDisposable>(typeof(DisposableService));
+            service.DisposeTarget();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<DisposableService>());
+
+            Assert.That(ex.Message, Is.StringContaining("Target of type WeakReference was already disposed in DryIoc.ExplicitlyDisposable"));
         }
     }
 }

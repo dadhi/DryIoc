@@ -7,7 +7,6 @@ echo:Running tests . . .
 set NUNIT="packages\NUnit.Runners\tools\nunit-console.exe"
 
 for %%P in ("."; "Net40"; "Net45"; "PCL-Net45"; "Extensions") do (
-    
 	for %%D in ("%%P\bin\Release\*Tests.dll") do (
 		
 		echo:

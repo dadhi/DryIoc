@@ -186,8 +186,7 @@ namespace DryIoc
             switch (factoryType)
             {
                 case FactoryType.Wrapper:
-                    serviceType.ThrowIf(!serviceType.IsGeneric(), Error.IS_REGISTERED_FOR_GENERIC_WRAPPER_CALLED_WITH_NONGENERIC_SERVICE_TYPE);
-                    var wrapper = _wrappers.Value.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
+                    var wrapper = ((IRegistry)this).GetWrapperFactoryOrDefault(serviceType);
                     return wrapper != null && (condition == null || condition(wrapper));
 
                 case FactoryType.Decorator:
@@ -450,54 +449,11 @@ namespace DryIoc
             if (!parent.IsEmpty && parent.ResolvedFactory.Setup.FactoryType == FactoryType.Decorator)
                 return null;
 
-            LambdaExpression resultFuncExpr = null;
-
             var serviceType = request.ServiceType;
-
-            var implementationType = request.ImplementationType ?? request.ServiceType;
-            var implementedTypes = implementationType.GetImplementedTypes(
-                TypeTools.IncludeFlags.SourceType | TypeTools.IncludeFlags.ObjectType);
-
-            // Look for Action<ImplementedType> initializer-decorator
-            for (var i = 0; i < implementedTypes.Length; i++)
-            {
-                var implementedType = implementedTypes[i];
-                var initializerActionType = typeof(Action<>).MakeGenericType(implementedType);
-                var initializerFactories = decorators.GetValueOrDefault(initializerActionType);
-                if (initializerFactories != null)
-                {
-                    var doAction = _doMethod.MakeGenericMethod(implementedType, implementationType);
-                    for (var j = 0; j < initializerFactories.Length; j++)
-                    {
-                        var initializerFactory = initializerFactories[j];
-                        if (((DecoratorSetup)initializerFactory.Setup).Condition(request))
-                        {
-                            var decoratorRequest = request.ReplaceServiceInfoWith(ServiceInfo.Of(initializerActionType)).ResolveTo(initializerFactory);
-                            var actionExpr = initializerFactory.GetExpressionOrDefault(decoratorRequest);
-                            if (actionExpr != null)
-                                ComposeDecoratorFuncExpression(ref resultFuncExpr, serviceType, Expression.Call(doAction, actionExpr));
-                        }
-                    }
-                }
-            }
-
-            // Then look for decorators registered as Func of decorated service returning decorator - Func<TService, TService>.
             var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
-            var funcDecoratorFactories = decorators.GetValueOrDefault(decoratorFuncType);
-            if (funcDecoratorFactories != null)
-            {
-                for (var i = 0; i < funcDecoratorFactories.Length; i++)
-                {
-                    var decoratorFactory = funcDecoratorFactories[i];
-                    var decoratorRequest = request.ReplaceServiceInfoWith(ServiceInfo.Of(decoratorFuncType)).ResolveTo(decoratorFactory);
-                    if (((DecoratorSetup)decoratorFactory.Setup).Condition(request))
-                    {
-                        var funcExpr = decoratorFactory.GetExpressionOrDefault(decoratorRequest);
-                        if (funcExpr != null)
-                            ComposeDecoratorFuncExpression(ref resultFuncExpr, serviceType, funcExpr);
-                    }
-                }
-            }
+
+            // First look for Func decorators Func<TService,TService> and initializers Action<TService>.
+            var funcDecoratorExpr = GetFuncDecoratorExpressionOrDefault(decoratorFuncType, decorators, request);
 
             // Next look for normal decorators.
             var serviceDecorators = decorators.GetValueOrDefault(serviceType);
@@ -506,7 +462,7 @@ namespace DryIoc
             if (openGenericServiceType != null)
                 serviceDecorators = serviceDecorators.Append(decorators.GetValueOrDefault(openGenericServiceType));
 
-            Expression resultDecorator = resultFuncExpr;
+            Expression resultDecorator = funcDecoratorExpr;
             if (serviceDecorators != null)
             {
                 for (var i = 0; i < serviceDecorators.Length; i++)
@@ -556,9 +512,14 @@ namespace DryIoc
             return resultDecorator;
         }
 
-        Factory IRegistry.GetWrapperOrDefault(Type openGenericServiceType)
+        Factory IRegistry.GetWrapperFactoryOrDefault(Type serviceType)
         {
-            return _wrappers.Value.GetValueOrDefault(openGenericServiceType);
+            Factory factory = null;
+            if (serviceType.IsGeneric())
+                factory = _wrappers.Value.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
+            if (factory == null && !serviceType.IsGenericDefinition())
+                factory = _wrappers.Value.GetValueOrDefault(serviceType);
+            return factory;
         }
 
         Type IRegistry.GetWrappedServiceType(Type serviceType)
@@ -567,8 +528,7 @@ namespace DryIoc
             if (itemType != null)
                 return ((IRegistry)this).GetWrappedServiceType(itemType);
 
-            var closedOrGenericType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
-            var factory = _wrappers.Value.GetValueOrDefault(closedOrGenericType);
+            var factory = ((IRegistry)this).GetWrapperFactoryOrDefault(serviceType);
             if (factory == null)
                 return serviceType;
 
@@ -595,6 +555,63 @@ namespace DryIoc
         #endregion
 
         #region Decorators supporting cast
+
+        private static LambdaExpression GetFuncDecoratorExpressionOrDefault(Type decoratorFuncType,
+            HashTree<Type, Factory[]> decorators, Request request)
+        {
+            LambdaExpression funcDecoratorExpr = null;
+
+            var serviceType = request.ServiceType;
+
+            // Look first for Action<ImplementedType> initializer-decorator
+            var implementationType = request.ImplementationType ?? serviceType;
+            var implementedTypes = implementationType.GetImplementedTypes(
+                TypeTools.IncludeFlags.SourceType | TypeTools.IncludeFlags.ObjectType);
+
+            for (var i = 0; i < implementedTypes.Length; i++)
+            {
+                var implementedType = implementedTypes[i];
+                var initializerActionType = typeof(Action<>).MakeGenericType(implementedType);
+                var initializerFactories = decorators.GetValueOrDefault(initializerActionType);
+                if (initializerFactories != null)
+                {
+                    var doAction = _doMethod.MakeGenericMethod(implementedType, implementationType);
+                    for (var j = 0; j < initializerFactories.Length; j++)
+                    {
+                        var initializerFactory = initializerFactories[j];
+                        if (((DecoratorSetup)initializerFactory.Setup).Condition(request))
+                        {
+                            var decoratorRequest =
+                                request.ReplaceServiceInfoWith(ServiceInfo.Of(initializerActionType))
+                                    .ResolveTo(initializerFactory);
+                            var actionExpr = initializerFactory.GetExpressionOrDefault(decoratorRequest);
+                            if (actionExpr != null)
+                                ComposeDecoratorFuncExpression(ref funcDecoratorExpr, serviceType,
+                                    Expression.Call(doAction, actionExpr));
+                        }
+                    }
+                }
+            }
+
+            // Then look for decorators registered as Func of decorated service returning decorator - Func<TService, TService>.
+            var funcDecoratorFactories = decorators.GetValueOrDefault(decoratorFuncType);
+            if (funcDecoratorFactories != null)
+            {
+                for (var i = 0; i < funcDecoratorFactories.Length; i++)
+                {
+                    var decoratorFactory = funcDecoratorFactories[i];
+                    var decoratorRequest = request.ReplaceServiceInfoWith(ServiceInfo.Of(decoratorFuncType)).ResolveTo(decoratorFactory);
+                    if (((DecoratorSetup)decoratorFactory.Setup).Condition(request))
+                    {
+                        var funcExpr = decoratorFactory.GetExpressionOrDefault(decoratorRequest);
+                        if (funcExpr != null)
+                            ComposeDecoratorFuncExpression(ref funcDecoratorExpr, serviceType, funcExpr);
+                    }
+                }
+            }
+
+            return funcDecoratorExpr;
+        }
 
         private static void ComposeDecoratorFuncExpression(ref LambdaExpression result, Type serviceType, Expression decoratorFuncExpr)
         {
@@ -1014,7 +1031,7 @@ namespace DryIoc
         {
             Wrappers = HashTree<Type, Factory>.Empty;
 
-            var arrayFactory = new FactoryProvider(_ => 
+            var arrayFactory = new FactoryProvider(_ =>
                 new ExpressionFactory(GetArrayExpression), WrapperSetup.Default);
 
             var arrayInterfaces = typeof(object[]).GetImplementedInterfaces()
@@ -1055,7 +1072,7 @@ namespace DryIoc
             Wrappers = Wrappers
                 .AddOrUpdate(typeof(ExplicitlyDisposable), GetReuseWrapperFactory(_ => typeof(object), typeof(object)))
                 .AddOrUpdate(typeof(WeakReference), GetReuseWrapperFactory(_ => typeof(object), typeof(object)))
-                .AddOrUpdate(typeof(Ref<object>), GetReuseWrapperFactory(_ => typeof(object), typeof(object)));
+                .AddOrUpdate(typeof(Ref<>), GetReuseWrapperFactory(t => t.GetGenericParamsAndArgs()[0]));
         }
 
         public static readonly Rules.ResolveUnregisteredServiceRule ResolveGenericsAndArrays = request =>
@@ -1069,7 +1086,7 @@ namespace DryIoc
             var registry = request.Registry;
             if (openGenericServiceType != null)
                 factory = registry.GetServiceFactoryOrDefault(openGenericServiceType, request.ServiceKey);
-            factory = factory ?? registry.GetWrapperOrDefault(openGenericServiceType ?? serviceType);
+            factory = factory ?? registry.GetWrapperFactoryOrDefault(openGenericServiceType ?? serviceType);
 
             if (factory != null && factory.ProvidesFactoryForRequest)
                 factory = factory.GetFactoryForRequestOrDefault(request);
@@ -1242,9 +1259,7 @@ namespace DryIoc
             });
         }
 
-        private static Factory GetReuseWrapperFactory(
-            Func<Type, Type> getWrappedServiceType,
-            params Type[] wrapperConstructorArgs)
+        private static Factory GetReuseWrapperFactory(Func<Type, Type> getWrappedServiceType, params Type[] wrapperCtorArgs)
         {
             return new ExpressionFactory(request =>
             {
@@ -1260,9 +1275,11 @@ namespace DryIoc
                     return serviceFactory.GetExpressionOrDefault(serviceRequest, wrapperType);
 
                 // otherwise resolve wrapper using reflection factory.
-                var reflectionFactory = new ReflectionFactory(wrapperType, setup: WrapperSetup.With(
-                    (type, _) => type.GetConstructorOrNull(args: wrapperConstructorArgs),
-                    getWrappedServiceType: getWrappedServiceType));
+                var reflectionFactory = new ReflectionFactory(wrapperType, setup:
+                    wrapperCtorArgs == null
+                    ? WrapperSetup.With(getWrappedServiceType: getWrappedServiceType)
+                    : WrapperSetup.With((t, _) => t.GetConstructorOrNull(args: wrapperCtorArgs),
+                        getWrappedServiceType: getWrappedServiceType));
 
                 return reflectionFactory.GetExpressionOrDefault(request);
             }, setup: WrapperSetup.With(getWrappedServiceType: getWrappedServiceType));
@@ -1519,9 +1536,6 @@ namespace DryIoc
 
         public static readonly string UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE =
             "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}.";
-
-        public static readonly string IS_REGISTERED_FOR_GENERIC_WRAPPER_CALLED_WITH_NONGENERIC_SERVICE_TYPE =
-            "IsRegistered for Wrapper called with non generic service type {0}.";
 
         public static readonly string UNABLE_TO_SELECT_CTOR_USING_SELECTOR =
             "Unable to get constructor of {0} using provided constructor selector.";
@@ -3649,7 +3663,7 @@ namespace DryIoc
 
                 var funcArgs = request.FuncArgs;
                 var funcArgsUsedMask = 0;
-                
+
                 for (var i = 0; i < ctorParams.Length; i++)
                 {
                     var ctorParam = ctorParams[i];
@@ -4116,8 +4130,9 @@ namespace DryIoc
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
-            if (_target is IDisposable)
-                ((IDisposable)_target).Dispose();
+            var target = _target is WeakReference ? ((WeakReference)_target).Target : _target;
+            if (target is IDisposable)
+                ((IDisposable)target).Dispose();
             _target = null;
         }
 
@@ -4200,29 +4215,45 @@ namespace DryIoc
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
     }
 
+    /// <summary>Exposes operations required for internal registry access. That's why most of them are implemented explicitly by
+    /// <see cref="Container"/>.</summary>
     public interface IRegistry : IResolver, IRegistrator
     {
+        /// <summary>Unique registry/container id. Supposed to identify registry associated factories in parent-child
+        /// container scenarios.</summary>
         int RegistryID { get; }
 
+        /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
 
-        IScope CurrentScope { get; }
+        /// <summary>Scope associated with container.</summary>
         IScope SingletonScope { get; }
+
+        /// <summary>Scope associated with containers created by <see cref="Container.OpenScope"/>.
+        /// If container is not created by <see cref="Container.OpenScope"/> then it is the same as <see cref="SingletonScope"/>.</summary>
+        IScope CurrentScope { get; }
 
         Factory ResolveFactory(Request request);
 
         Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey);
-        Factory GetWrapperOrDefault(Type openGenericServiceType);
 
+        Factory GetWrapperFactoryOrDefault(Type serviceType);
+
+        /// <summary>Creates decorator expression: it could be either Func{TService,TService}, 
+        /// or service expression for replacing decorators.</summary>
+        /// <param name="request">Decorated service request.</param>
+        /// <returns>Decorator expression.</returns>
         Expression GetDecoratorExpressionOrDefault(Request request);
 
+        /// <summary>Finds all registered default and keyed service factories and returns them.
+        /// It skips decorators and wrappers.</summary>
+        /// <param name="serviceType"></param>
+        /// <returns></returns>
         IEnumerable<KV<object, Factory>> GetAllServiceFactories(Type serviceType);
 
-        /// <summary>
-        /// If <paramref name="type"/> is generic type then this method checks if the type registered as generic wrapper,
+        /// <summary>If <paramref name="type"/> is generic type then this method checks if the type registered as generic wrapper,
         /// and recursively unwraps and returns its type argument. This type argument is the actual service type we want to find.
-        /// Otherwise, method returns the input <paramref name="type"/>.
-        /// </summary>
+        /// Otherwise, method returns the input <paramref name="type"/>.</summary>
         /// <param name="type">Type to unwrap. Method will return early if type is not generic.</param>
         /// <returns>Unwrapped service type in case it corresponds to registered generic wrapper, or input type in all other cases.</returns>
         Type GetWrappedServiceType(Type type);
