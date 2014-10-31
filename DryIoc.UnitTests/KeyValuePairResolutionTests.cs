@@ -85,7 +85,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>();
 
-            var pairs = container.Resolve<Many<KeyValuePair<object, IService>>>().Items;
+            var pairs = container.Resolve<Many<KeyValuePair<object, IService>>>();
 
             Assert.That(pairs.Count(), Is.EqualTo(2));
             Assert.That(pairs.First().Key, Is.EqualTo(DefaultKey.Default));

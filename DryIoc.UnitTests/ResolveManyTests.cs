@@ -126,7 +126,7 @@ namespace DryIoc.UnitTests
                 container.ResolveMany<AnotherService>(typeof(Service)));
 
             Assert.That(ex.Message, Is.StringContaining(
-                "Registered service (wrapped)"));
+                "Service (wrapped)"));
         }
 
         [Test]

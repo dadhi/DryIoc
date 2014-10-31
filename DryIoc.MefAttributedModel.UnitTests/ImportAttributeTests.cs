@@ -131,7 +131,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<BadTypePropertyClient>());
 
-            Assert.That(ex.Message, Is.StringStarting("Registered service (wrapped) type").And.StringContaining("is not assignable"));
+            Assert.That(ex.Message, Is.StringStarting("Service (wrapped) type").And.StringContaining("is not assignable"));
         }
 
         [Test]

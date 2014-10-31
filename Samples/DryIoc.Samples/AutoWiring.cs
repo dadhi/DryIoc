@@ -12,7 +12,7 @@ namespace DryIoc.Samples
         {
             var container = new Container();
             var plugins = container.Resolve<Many<IPlugin>>();
-            Assert.That(plugins.Items.Count(), Is.EqualTo(0));
+            Assert.That(plugins.Count(), Is.EqualTo(0));
 
             var pluginAssembly = typeof(AutoWiring).GetAssembly();
 
@@ -23,7 +23,7 @@ namespace DryIoc.Samples
                 container.Register(typeof(IPlugin), pluginType, Reuse.Singleton);
 
             plugins = container.Resolve<Many<IPlugin>>();
-            Assert.That(plugins.Items.Count(), Is.EqualTo(2));
+            Assert.That(plugins.Count(), Is.EqualTo(2));
         }
 
         // Setup similar to NInject https://github.com/ninject/ninject.extensions.conventions/wiki/Overview

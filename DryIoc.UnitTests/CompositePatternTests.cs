@@ -118,7 +118,7 @@ namespace DryIoc.UnitTests
 
             public PolygonOfMany(Many<IShape> shapes)
             {
-                Shapes = shapes.Items;
+                Shapes = shapes;
             }
         }
 

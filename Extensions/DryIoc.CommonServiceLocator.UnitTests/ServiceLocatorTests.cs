@@ -38,8 +38,7 @@ namespace DryIoc.CommonServiceLocator.UnitTests
 
             var services = locator.GetAllInstances<IService>().ToArray();
 
-            Assert.That(services[0], Is.InstanceOf<Service>());
-            Assert.That(services[1], Is.InstanceOf<AnotherService>());
+            Assert.That(services.Length, Is.EqualTo(2));
         }
 
         [Test]

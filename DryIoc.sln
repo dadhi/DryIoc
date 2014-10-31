@@ -28,6 +28,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.UnitTests", "Net40\D
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51-76A9-479E-8FF2-66C903C5856E}"
 	ProjectSection(SolutionItems) = preProject
+		NuGet\DryIoc.CommonServiceLocator.dll.nuspec = NuGet\DryIoc.CommonServiceLocator.dll.nuspec
+		NuGet\DryIoc.CommonServiceLocator.nuspec = NuGet\DryIoc.CommonServiceLocator.nuspec
 		nuget\DryIoc.dll.nuspec = nuget\DryIoc.dll.nuspec
 		NuGet\DryIoc.MefAttributedModel.dll.nuspec = NuGet\DryIoc.MefAttributedModel.dll.nuspec
 		NuGet\DryIoc.MefAttributedModel.nuspec = NuGet\DryIoc.MefAttributedModel.nuspec

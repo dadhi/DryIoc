@@ -403,7 +403,7 @@ namespace DryIoc.UnitTests
             Assert.That(resolved, Is.True);
         }
 
-        [Test][Ignore("Not fixed yet")]
+        [Test]
         public void Indexer_properties_should_be_ignored_by_All_properties_discovery()
         {
             var container = new Container();
@@ -412,6 +412,29 @@ namespace DryIoc.UnitTests
 
             Assert.DoesNotThrow(() => 
                 container.Resolve<FooWithIndexer>());
+        }
+
+        [Test]
+        public void Should_support_optional_constructor_parameters_if_dependency_registered_for_parameter()
+        {
+            var container = new Container();
+            container.Register<Client>();
+            container.Register<Dep>();
+
+            var client = container.Resolve<Client>();
+
+            Assert.That(client.Dep, Is.InstanceOf<Dep>());
+        }
+
+        [Test]
+        public void Should_automatically_specify_IfUnresolvedReturnDefault_for_optional_parameters()
+        {
+            var container = new Container();
+            container.Register<Client>();
+
+            var client = container.Resolve<Client>();
+
+            Assert.That(client.Dep, Is.Null);
         }
 
         #region CUT
@@ -490,6 +513,18 @@ namespace DryIoc.UnitTests
                 Service = service;
             }
         }
+
+        public class Client
+        {
+            public Dep Dep { get; set; }
+
+            public Client(Dep dep = null)
+            {
+                Dep = dep;
+            }
+        }
+
+        public class Dep { }
 
         #endregion
     }

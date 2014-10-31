@@ -38,31 +38,31 @@ namespace DryIoc.Samples
             var obj = container.Resolve<ClassWithInternalConstructor>();
             Assert.IsNotNull(obj);
         }
-    }
 
-    public class ClassWithMultipleConstructors
-    {
-        public readonly string Parameter;
-        public readonly IService Service;
-
-        public ClassWithMultipleConstructors(string parameter)
+        public class ClassWithMultipleConstructors
         {
-            Parameter = parameter;
+            public readonly string Parameter;
+            public readonly IService Service;
+
+            public ClassWithMultipleConstructors(string parameter)
+            {
+                Parameter = parameter;
+            }
+
+            public ClassWithMultipleConstructors(IService service)
+            {
+                Service = service;
+            }
         }
 
-        public ClassWithMultipleConstructors(IService service)
+        public class ClassWithInternalConstructor
         {
-            Service = service;
-        }
-    }
+            public readonly IService Service;
 
-    public class ClassWithInternalConstructor
-    {
-        public readonly IService Service;
-
-        internal ClassWithInternalConstructor(IService service)
-        {
-            Service = service;
+            internal ClassWithInternalConstructor(IService service)
+            {
+                Service = service;
+            }
         }
     }
 }

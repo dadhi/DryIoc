@@ -80,7 +80,7 @@ namespace DryIoc.UnitTests.CUT
 
         public ServiceWithManyDependencies(Many<IDependency> foos)
         {
-            Foos = foos.Items;
+            Foos = foos;
         }
     }
 
