@@ -29,7 +29,8 @@ call :Check
 call Build -nopause
 call :Check
 
-call RunTests -nopause
+rem call RunTests -nopause
+call RunTestsWithCoverage -nopause
 call :Check
 
 call NuGetPack -nopause

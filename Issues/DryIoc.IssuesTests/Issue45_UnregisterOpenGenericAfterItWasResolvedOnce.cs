@@ -4,8 +4,6 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    // NOTE: Tests fails because Service<int> factory is registered after resolve and not unregistered with its generic provider.
-    [Ignore("Not fixed yet")]
     public class Issue45_UnregisterOpenGenericAfterItWasResolvedOnce
     {
         [Test]

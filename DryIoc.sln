@@ -50,8 +50,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Playground", "DryIoc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocClient.NuGet.Net451", "NuGet\DryIocClient.NuGet.Net451\DryIocClient.NuGet.Net451.csproj", "{EACFFE31-252D-4542-A1F4-396AC431B38F}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{3726FC4E-B3F4-4E54-BDA3-A45346396AB4}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B6A9C3F2-C50A-447F-9523-3E864C698D0F}"
 	ProjectSection(SolutionItems) = preProject
 		appveyor.yml = appveyor.yml
@@ -106,6 +104,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildScripts", "BuildScript
 		BuildScripts\Clean.bat = BuildScripts\Clean.bat
 		BuildScripts\NuGetPack.bat = BuildScripts\NuGetPack.bat
 		BuildScripts\RunTests.bat = BuildScripts\RunTests.bat
+		BuildScripts\RunTestsWithCoverage.bat = BuildScripts\RunTestsWithCoverage.bat
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{75F9EC5A-506E-42F1-9C11-6513BEB47F4C}"

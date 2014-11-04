@@ -1,5 +1,4 @@
-﻿using System;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -23,34 +22,34 @@ namespace DryIoc.IssuesTests
         public void Passes()
         {
             _container.Resolve<Consumer>();
-            Console.WriteLine(1);
+            //Console.WriteLine(1);
             Resolve();
-            Console.WriteLine(2);
+            //Console.WriteLine(2);
             Resolve();
-            Console.WriteLine(3);
+            //Console.WriteLine(3);
             Resolve();
-            Console.WriteLine(4);
+            //Console.WriteLine(4);
             Resolve();
-            Console.WriteLine(5);
+            //Console.WriteLine(5);
             Resolve();
-            Console.WriteLine(6);
+            //Console.WriteLine(6);
             Resolve();
         }
 
         [Test]
         public void Fails()
         {
-            Console.WriteLine(1);
+            //Console.WriteLine(1);
             Resolve();
-            Console.WriteLine(2);
+            //Console.WriteLine(2);
             Resolve();
-            Console.WriteLine(3);
+            //Console.WriteLine(3);
             Resolve();
-            Console.WriteLine(4);
+            //Console.WriteLine(4);
             Resolve();
-            Console.WriteLine(5);
+            //Console.WriteLine(5);
             Resolve();
-            Console.WriteLine(6);
+            //Console.WriteLine(6);
             Resolve();
         }
 
