@@ -1358,8 +1358,12 @@ namespace DryIoc
             var serviceFactory = request.Registry.ResolveFactory(serviceRequest);
             if (serviceFactory == null)
                 return null;
-            if (serviceFactory.Reuse != null &&
-                serviceFactory.Setup.ReuseWrappers.IndexOf(w => w.WrapperType == wrapperType) != -1)
+
+            var reuse = request.Registry.Rules.OverriddenReuse == null 
+                ? serviceFactory.Reuse
+                : request.Registry.Rules.OverriddenReuse(serviceFactory.Reuse, serviceRequest);
+
+            if (reuse != null && serviceFactory.Setup.ReuseWrappers.IndexOf(w => w.WrapperType == wrapperType) != -1)
                 return serviceFactory.GetExpressionOrDefault(serviceRequest, wrapperType);
             Throw.If(request.IfUnresolved == IfUnresolved.Throw,
                 Error.CANT_RESOLVE_REUSE_WRAPPER, wrapperType, serviceRequest);
@@ -1421,19 +1425,15 @@ namespace DryIoc
         /// <remarks>Rules <see cref="ForUnregisteredService"/> are empty too.</remarks>
         public static readonly Rules Empty = new Rules();
 
-        /// <summary>
-        /// Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
-        /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.
-        /// </summary>
+        /// <summary>Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
+        /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.</summary>
         public static readonly Rules Default = Empty.With(WrappersSupport.ResolveWrappers);
 
         public ConstructorSelector Constructor { get { return _injectionRules.Constructor; } }
         public ParameterSelector Parameters { get { return _injectionRules.Parameters; } }
         public PropertiesAndFieldsSelector PropertiesAndFields { get { return _injectionRules.PropertiesAndFields; } }
 
-        /// <summary>
-        /// Returns new instance of the rules with specified <see cref="InjectionRules"/>.
-        /// </summary>
+        /// <summary>Returns new instance of the rules with specified <see cref="InjectionRules"/>.</summary>
         /// <returns>New rules with specified <see cref="InjectionRules"/>.</returns>
         public Rules With(
             ConstructorSelector constructor = null,
@@ -1451,7 +1451,7 @@ namespace DryIoc
 
         public delegate Factory FactorySelectorRule(IEnumerable<KeyValuePair<object, Factory>> factories);
         public FactorySelectorRule FactorySelector { get; private set; }
-        public Rules With(FactorySelectorRule rule)
+        public Rules WithFactorySelector(FactorySelectorRule rule)
         {
             return new Rules(this) { FactorySelector = rule };
         }
@@ -1463,10 +1463,22 @@ namespace DryIoc
             return new Rules(this) { ForUnregisteredService = rules };
         }
 
+        /// <summary>Turns on/off exception throwing when dependency has shorter reuse lifespan than its parent.</summary>
         public bool ThrowIfDepenedencyHasShorterReuseLifespan { get; private set; }
+
+        /// <summary>Returns new rules with <see cref="ThrowIfDepenedencyHasShorterReuseLifespan"/> set to specified value.</summary>
+        /// <param name="throwIfDepenedencyHasShorterReuseLifespan">Setting new value.</param>
+        /// <returns>New rules with new setting value.</returns>
         public Rules With(bool throwIfDepenedencyHasShorterReuseLifespan)
         {
             return new Rules(this) { ThrowIfDepenedencyHasShorterReuseLifespan = throwIfDepenedencyHasShorterReuseLifespan };
+        }
+
+        public delegate IReuse OverriddenReuseRule(IReuse reuse, Request request);
+        public OverriddenReuseRule OverriddenReuse { get; private set; }
+        public Rules WithOverriddenReuse(OverriddenReuseRule rule)
+        {
+            return new Rules(this) { OverriddenReuse = rule };
         }
 
         #region Implementation
@@ -1485,6 +1497,7 @@ namespace DryIoc
             FactorySelector = copy.FactorySelector;
             ForUnregisteredService = copy.ForUnregisteredService;
             ThrowIfDepenedencyHasShorterReuseLifespan = copy.ThrowIfDepenedencyHasShorterReuseLifespan;
+            OverriddenReuse = copy.OverriddenReuse;
             _injectionRules = copy._injectionRules;
             _compilationToDynamicAssemblyEnabled = copy._compilationToDynamicAssemblyEnabled;
         }
@@ -3139,12 +3152,16 @@ namespace DryIoc
         {
             request = request.ResolveTo(this);
 
+            var reuse = request.Registry.Rules.OverriddenReuse == null ? Reuse
+                : request.Registry.Rules.OverriddenReuse(Reuse, request);
+
+            ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
+
             var decorator = request.Registry.GetDecoratorExpressionOrDefault(request);
             var noOrFuncDecorator = decorator == null || decorator is LambdaExpression;
 
             var isCacheable = Setup.ServiceExpressionCaching
                 && noOrFuncDecorator && request.FuncArgs == null && requiredWrapperType == null;
-
             if (isCacheable)
             {
                 var cachedServiceExpr = request.State.GetCachedFactoryExpressionOrDefault(FactoryID);
@@ -3156,23 +3173,13 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
-            if (Reuse != null)
+            if (reuse != null)
             {
-                if (request.Registry.Rules.ThrowIfDepenedencyHasShorterReuseLifespan)
-                {
-                    var parent = request.GetNonWrapperParentOrEmpty();
-                    if (!parent.IsEmpty && parent.ResolvedFactory.Reuse != null)
-                    {
-                        var parentReuse = parent.ResolvedFactory.Reuse;
-                        Throw.If(Reuse.Lifespan < parentReuse.Lifespan, Error.DEP_HAS_SHORTER_REUSE_LIFESPAN, request.PrintCurrent(), Reuse, parentReuse, parent);
-                    }
-                }
-
-                var scope = Reuse.GetScope(request);
+                var scope = reuse.GetScope(request);
 
                 // When singleton scope, and no Func in request chain, and no renewable wrapper used,
                 // then reused instance could be directly inserted into delegate instead of lazy requested from Scope.
-                var canBeInstantiated = Reuse is SingletonReuse
+                var canBeInstantiated = reuse is SingletonReuse
                     && (request.Parent.IsEmpty || !request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc()))
                     && Setup.ReuseWrappers.IndexOf(w => w.WrapperType.IsAssignableTo(typeof(IReneweable))) == -1;
 
@@ -3191,6 +3198,21 @@ namespace DryIoc
                 serviceExpr = Expression.Invoke(decorator, serviceExpr);
 
             return serviceExpr;
+        }
+
+        protected static void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse, Request request)
+        {
+            if (reuse != null && request.Registry.Rules.ThrowIfDepenedencyHasShorterReuseLifespan)
+            {
+                var parent = request.GetNonWrapperParentOrEmpty();
+                if (!parent.IsEmpty)
+                {
+                    var parentReuse = parent.ResolvedFactory.Reuse;
+                    if (parentReuse != null)
+                        Throw.If(reuse.Lifespan < parentReuse.Lifespan,
+                            Error.DEP_HAS_SHORTER_REUSE_LIFESPAN, request.PrintCurrent(), reuse, parentReuse, parent);
+                }
+            }
         }
 
         /// <summary>Creates factory delegate from service expression and returns it. By default uses <see cref="FactoryCompiler"/>
@@ -3989,10 +4011,14 @@ namespace DryIoc
             if (request.Registry.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request);
 
-            if (Reuse == null)
+            var reuse = request.Registry.Rules.OverriddenReuse == null ? Reuse
+                : request.Registry.Rules.OverriddenReuse(Reuse, request);
+            ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
+
+            if (reuse == null)
                 return (items, _) => _factoryDelegate(request);
 
-            var reuseScope = Reuse.GetScope(request);
+            var reuseScope = reuse.GetScope(request);
             var scopeIndex = reuseScope == request.ResolutionScope ? -1 : request.State.GetOrAddItem(reuseScope);
 
             return (items, scope) => (scopeIndex == -1 ? scope : (Scope)items.Get(scopeIndex))

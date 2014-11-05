@@ -26,7 +26,7 @@ echo:
  -target:%NUNIT%^
  -targetargs:"%TESTLIBS% /nologo /noshadow"^
  -filter:"+[*]* -[*Test*]* -[protobuf*]* -[Microsoft*]*"^
- -excludebyattribute:"System.CodeDom.Compiler.GeneratedCodeAttribute"^
+ -excludebyattribute:"[*]*.GeneratedCodeAttribute"^
  -output:%COVERAGE%
 
 echo:

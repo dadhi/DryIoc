@@ -115,7 +115,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void You_can_specify_rules_to_resolve_last_registration_from_multiple_available()
         {
-            var container = new Container(Rules.Default.With(factories => factories.Last().Value));
+            var container = new Container(Rules.Default.WithFactorySelector(factories => factories.Last().Value));
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));
@@ -127,7 +127,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void You_can_specify_rules_to_disable_registration_based_on_reuse_type()
         {
-            var container = new Container(Rules.Default.With(
+            var container = new Container(Rules.Default.WithFactorySelector(
                 factories => factories.Select(f => f.Value).FirstOrDefault(f => !(f.Reuse is SingletonReuse))));
 
             container.Register<IService, Service>(Reuse.Singleton);

@@ -84,7 +84,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
     [Export, ResolutionScopeReuse]
     public class ServiceWithResolutionScopeReuse { }
 
-    [Export]
+    [Export, ResolutionScopeReuse]
     public class UserOfServiceWithResolutionScopeReuse
     {
         public ServiceWithResolutionScopeReuse One { get; set; }
