@@ -84,8 +84,8 @@ namespace DryIoc.UnitTests
         public void Resolve_Meta_of_required_type_should_work()
         {
             var container = new Container();
-            container.Register<IService, Service>(setup: Setup.WithMetadata("a"));
-            container.Register<IService, AnotherService>(setup: Setup.WithMetadata("b"));
+            container.Register<IService, Service>(setup: Setup.With(metadata: "a"));
+            container.Register<IService, AnotherService>(setup: Setup.With(metadata: "b"));
 
             var services = container.Resolve<Meta<Func<object>, string>[]>(typeof(IService));
 

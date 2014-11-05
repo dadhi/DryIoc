@@ -54,7 +54,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Consumer>();
-            container.Register<Account>(Reuse.Singleton);
+            container.Register<Account>();
             container.Register<Log>(Reuse.InCurrentScope);
 
             var outerConsumer = container.Resolve<Consumer>();
@@ -73,7 +73,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Consumer>();
-            container.Register<Account>(Reuse.Singleton);
+            container.Register<Account>();
             container.Register<Log>(Reuse.InCurrentScope);
 
             var outerConsumer = container.Resolve<Consumer>();

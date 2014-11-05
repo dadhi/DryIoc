@@ -167,17 +167,46 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ServiceWithResolutionAndSingletonDependencies>();
-            container.Register<SingletonDep>(Reuse.Singleton);
-            container.Register<ResolutionScopeDep>(Reuse.InResolutionScope);
+            container.Register<SingletonDep>(Reuse.InResolutionScope);
+            container.Register<ResolutionScopeDep>(Reuse.Singleton);
 
             var service = container.Resolve<ServiceWithResolutionAndSingletonDependencies>();
 
             Assert.That(service.ResolutionScopeDep, Is.SameAs(service.SingletonDep.ResolutionScopeDep));
         }
+
+        [Test]
+        public void Should_throw_if_rule_specified_and_dependency_lifespan_is_less_than_parents()
+        {
+            var container = new Container(rules => rules.With(throwIfDepenedencyHasShorterReuseLifespan: true));
+            container.Register<Client>(Reuse.Singleton);
+            container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<Client>());
+
+            Assert.That(ex.Message, Is.StringContaining(
+                "Dependency DryIoc.UnitTests.FastLogger: DryIoc.UnitTests.ILogger as parameter \"logger\" " + 
+                "has shorter reuse lifespan (InResolutionScope:10) than its parent (Singleton:1000)"));
+        }
+
+        [Test]
+        public void Should_Not_throw_if_rule_is_off_and_dependency_lifespan_is_less_than_parents()
+        {
+            var container = new Container(rules => rules.With(throwIfDepenedencyHasShorterReuseLifespan: false));
+            container.Register<Client>(Reuse.Singleton);
+            container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
+
+            var client = container.Resolve<Client>();
+
+            Assert.That(client.Logger, Is.InstanceOf<FastLogger>());
+        }
     }
 
     public class ThreadReuse : IReuse
     {
+        public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
+
         public IScope GetScope(Request request)
         {
             return _scope;
@@ -210,6 +239,8 @@ namespace DryIoc.UnitTests
 
     public sealed class HttpContextReuse : IReuse
     {
+        public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
+
         public static readonly HttpContextReuse Instance = new HttpContextReuse();
 
         public IScope GetScope(Request request)

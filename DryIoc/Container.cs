@@ -1463,6 +1463,12 @@ namespace DryIoc
             return new Rules(this) { ForUnregisteredService = rules };
         }
 
+        public bool ThrowIfDepenedencyHasShorterReuseLifespan { get; private set; }
+        public Rules With(bool throwIfDepenedencyHasShorterReuseLifespan)
+        {
+            return new Rules(this) { ThrowIfDepenedencyHasShorterReuseLifespan = throwIfDepenedencyHasShorterReuseLifespan };
+        }
+
         #region Implementation
 
         private InjectionRules _injectionRules;
@@ -1471,12 +1477,14 @@ namespace DryIoc
         private Rules()
         {
             _injectionRules = InjectionRules.Empty;
+            ThrowIfDepenedencyHasShorterReuseLifespan = true;
         }
 
         private Rules(Rules copy)
         {
             FactorySelector = copy.FactorySelector;
             ForUnregisteredService = copy.ForUnregisteredService;
+            ThrowIfDepenedencyHasShorterReuseLifespan = copy.ThrowIfDepenedencyHasShorterReuseLifespan;
             _injectionRules = copy._injectionRules;
             _compilationToDynamicAssemblyEnabled = copy._compilationToDynamicAssemblyEnabled;
         }
@@ -1484,14 +1492,12 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>
-    /// Rules to dictate Container or registered implementation (<see cref="ReflectionFactory"/>) how to:
+    /// <summary>Rules to dictate Container or registered implementation (<see cref="ReflectionFactory"/>) how to:
     /// <list type="bullet">
     /// <item>Select constructor for creating service with <see cref="Constructor"/>.</item>
     /// <item>Specify how to resolve constructor parameters with <see cref="Parameters"/>.</item>
     /// <item>Specify what properties/fields to resolve and how with <see cref="PropertiesAndFields"/>.</item>
-    /// </list>
-    /// </summary>
+    /// </list></summary>
     public class InjectionRules
     {
         /// <summary>Empty means that no rules specified.</summary>
@@ -1666,6 +1672,10 @@ namespace DryIoc
 
         public static readonly string CANT_RESOLVE_REUSE_WRAPPER =
             "Unable to resolve reuse wrapper {0} for: {1}";
+
+        public static readonly string DEP_HAS_SHORTER_REUSE_LIFESPAN = 
+            "Dependency {0} has shorter reuse lifespan ({1}) than its parent ({2}): {3}.\n" +
+            "You can turn off this exception by setting container Rules.ThrowIfDepenedencyHasShorterReuseLifespan to false.";
     }
 
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
@@ -2774,10 +2784,8 @@ namespace DryIoc
             return new Request(Parent, _registryWeakRef, _stateWeakRef, _scope, ServiceInfo, factory, FuncArgs);
         }
 
-        /// <summary>
-        /// Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
-        /// If not found returns <see cref="IsEmpty"/> request.
-        /// </summary>
+        /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
+        /// If not found returns <see cref="IsEmpty"/> request.</summary>
         /// <returns>Return closest <see cref="FactoryType.Service"/> parent or root.</returns>
         public Request GetNonWrapperParentOrEmpty()
         {
@@ -2795,11 +2803,12 @@ namespace DryIoc
                 yield return r;
         }
 
-        /// <summary> Prints current request info only (no parents printed) to provided builder.</summary>
+        /// <summary>Prints current request info only (no parents printed) to provided builder.</summary>
         /// <param name="s">Builder to print too.</param>
-        /// <returns>Builder with appended info.</returns>
-        public StringBuilder PrintCurrent(StringBuilder s)
+        /// <returns>(optional) Builder to appended info to, or new builder if not specified.</returns>
+        public StringBuilder PrintCurrent(StringBuilder s = null)
         {
+            s = s ?? new StringBuilder();
             if (IsEmpty) return s.Append("<empty>");
             if (ResolvedFactory != null && ResolvedFactory.Setup.FactoryType != FactoryType.Service)
                 s.Append(ResolvedFactory.Setup.FactoryType.ToString().ToLower()).Append(' ');
@@ -2860,9 +2869,6 @@ namespace DryIoc
     /// <summary>Type of services supported by Container.</summary>
     public enum FactoryType { Service, Decorator, Wrapper };
 
-    /// <summary>Specify caching policy for service expressions created by <see cref="Factory"/></summary>
-    public enum FactoryCaching { DisabledForExpression, EnabledForExpression };
-
     /// <summary>Base class to store optional <see cref="Factory"/> settings.</summary>
     public abstract class FactorySetup
     {
@@ -2870,7 +2876,10 @@ namespace DryIoc
         /// <see cref="Setup"/>, <see cref="DecoratorSetup"/>, <see cref="WrapperSetup"/>.</summary>
         public abstract FactoryType FactoryType { get; }
 
-        public virtual FactoryCaching Caching { get { return FactoryCaching.DisabledForExpression; } }
+        /// <summary>Set to true allows to cache and use cached factored service expression.</summary>
+        public virtual bool ServiceExpressionCaching { get { return false; } }
+
+        /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
 
         /// <summary>Specifies what would be reused service wrapped (in order): 
@@ -2886,6 +2895,8 @@ namespace DryIoc
         /// <returns>New factory setup with injection rules set.</returns>
         public abstract FactorySetup WithRules(InjectionRules rules);
 
+        /// <summary>Creates setup with specified injections rules for: constructor, parameters, properties and fields.</summary>
+        /// <param name="rules">(optional) Injection rules, or <see cref="InjectionRules.Empty"/> if not specified.</param>
         protected FactorySetup(InjectionRules rules) { Rules = rules ?? InjectionRules.Empty; }
     }
 
@@ -2905,56 +2916,48 @@ namespace DryIoc
 
         public static Setup With(
             ConstructorSelector constructor = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            FactoryCaching caching = FactoryCaching.EnabledForExpression, IReuseWrapper[] reuseWrappers = null,
-            Func<object> lazyGetMetadata = null, object metadata = null)
+            bool serviceExpressionCaching = true, IReuseWrapper[] reuseWrappers = null,
+            Func<object> lazyMetadata = null, object metadata = null)
         {
-            var setup = caching == FactoryCaching.EnabledForExpression && reuseWrappers == null
-                && lazyGetMetadata == null && metadata == null
-                 ? Default : new Setup(InjectionRules.Empty, caching, reuseWrappers, lazyGetMetadata, metadata);
+            var setup = serviceExpressionCaching && reuseWrappers == null && lazyMetadata == null && metadata == null
+                 ? Default : new Setup(InjectionRules.Empty, serviceExpressionCaching, reuseWrappers, lazyMetadata, metadata);
             return constructor == null && parameters == null && propertiesAndFields == null
                 ? setup : (Setup)setup.WithRules(InjectionRules.With(constructor, parameters, propertiesAndFields));
         }
 
-        public static Setup WithMetadata(object metadata = null)
-        {
-            return metadata == null ? Default : new Setup(metadata: metadata);
-        }
-
-        public static Setup WithMetadata(Func<object> lazyGetMetadata)
-        {
-            return new Setup(lazyGetMetadata: lazyGetMetadata.ThrowIfNull());
-        }
-
         public override FactorySetup WithRules(InjectionRules rules)
         {
-            return new Setup(rules, Caching, _reuseWrappers, _lazyGetMetadata, _metadata);
+            return new Setup(rules, ServiceExpressionCaching, _reuseWrappers, _lazyMetadata, _metadata);
         }
 
         public override FactoryType FactoryType { get { return FactoryType.Service; } }
-        public override FactoryCaching Caching { get { return _caching; } }
+        
+        public override bool ServiceExpressionCaching { get { return _serviceExpressionCaching; } }
+        
         public override IReuseWrapper[] ReuseWrappers { get { return _reuseWrappers; } }
+
         public override object Metadata
         {
-            get { return _metadata ?? (_metadata = _lazyGetMetadata == null ? null : _lazyGetMetadata()); }
+            get { return _metadata ?? (_metadata = _lazyMetadata == null ? null : _lazyMetadata()); }
         }
 
         #region Implementation
 
         private Setup(InjectionRules rules = null,
-            FactoryCaching caching = FactoryCaching.EnabledForExpression,
+            bool serviceExpressionCaching = true,
             IReuseWrapper[] reuseWrappers = null,
-            Func<object> lazyGetMetadata = null, object metadata = null)
+            Func<object> lazyMetadata = null, object metadata = null)
             : base(rules)
         {
-            _caching = caching;
+            _serviceExpressionCaching = serviceExpressionCaching;
             _reuseWrappers = reuseWrappers;
-            _lazyGetMetadata = lazyGetMetadata;
+            _lazyMetadata = lazyMetadata;
             _metadata = metadata;
         }
 
-        private readonly FactoryCaching _caching;
+        private readonly bool _serviceExpressionCaching;
         private readonly IReuseWrapper[] _reuseWrappers;
-        private readonly Func<object> _lazyGetMetadata;
+        private readonly Func<object> _lazyMetadata;
         private object _metadata;
 
         #endregion
@@ -3096,6 +3099,7 @@ namespace DryIoc
         /// to get concrete factory.</summary>
         public virtual bool ProvidesFactoryForRequest { get { return false; } }
 
+        /// <summary>Tracks factories created by <see cref="GetFactoryForRequestOrDefault"/>.</summary>
         public virtual HashTree<int, KV<Type, object>> ProvidedFactories { get { return HashTree<int, KV<Type, object>>.Empty; }}
 
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
@@ -3138,10 +3142,8 @@ namespace DryIoc
             var decorator = request.Registry.GetDecoratorExpressionOrDefault(request);
             var noOrFuncDecorator = decorator == null || decorator is LambdaExpression;
 
-            var isCacheable = Setup.Caching == FactoryCaching.EnabledForExpression
-                && noOrFuncDecorator
-                && request.FuncArgs == null
-                && requiredWrapperType == null;
+            var isCacheable = Setup.ServiceExpressionCaching
+                && noOrFuncDecorator && request.FuncArgs == null && requiredWrapperType == null;
 
             if (isCacheable)
             {
@@ -3156,6 +3158,16 @@ namespace DryIoc
 
             if (Reuse != null)
             {
+                if (request.Registry.Rules.ThrowIfDepenedencyHasShorterReuseLifespan)
+                {
+                    var parent = request.GetNonWrapperParentOrEmpty();
+                    if (!parent.IsEmpty && parent.ResolvedFactory.Reuse != null)
+                    {
+                        var parentReuse = parent.ResolvedFactory.Reuse;
+                        Throw.If(Reuse.Lifespan < parentReuse.Lifespan, Error.DEP_HAS_SHORTER_REUSE_LIFESPAN, request.PrintCurrent(), Reuse, parentReuse, parent);
+                    }
+                }
+
                 var scope = Reuse.GetScope(request);
 
                 // When singleton scope, and no Func in request chain, and no renewable wrapper used,
@@ -3168,10 +3180,8 @@ namespace DryIoc
                     ? GetInstantiatedScopedServiceExpressionOrNull(serviceExpr, scope, request, requiredWrapperType)
                     : GetScopedServiceExpressionOrNull(serviceExpr, scope, request, requiredWrapperType);
 
-                if (serviceExpr == null && requiredWrapperType != null)
-                    return request.IfUnresolved == IfUnresolved.Throw
-                        ? Throw.No<Expression>(Error.CANT_RESOLVE_REUSE_WRAPPER, requiredWrapperType, request)
-                        : requiredWrapperType.GetDefaultValueExpression();
+                if (serviceExpr == null)
+                    return null;
             }
 
             if (isCacheable)
@@ -3683,6 +3693,7 @@ namespace DryIoc
         public override Type ImplementationType { get { return _implementationType; } }
         public override bool ProvidesFactoryForRequest { get { return _providedFactories != null; } }
 
+        /// <summary>Tracks factories created by <see cref="GetFactoryForRequestOrDefault"/>.</summary>
         public override HashTree<int, KV<Type, object>> ProvidedFactories
         {
             get { return _providedFactories == null ? HashTree<int, KV<Type, object>>.Empty : _providedFactories.Value; }
@@ -3697,11 +3708,11 @@ namespace DryIoc
                 _providedFactories = Ref.Of(HashTree<int, KV<Type, object>>.Empty);
         }
 
-        /// <remarks>
-        /// Before registering factory checks that ImplementationType is assignable Or
+        /// <summary>Before registering factory checks that ImplementationType is assignable, Or
         /// in case of open generics, compatible with <paramref name="serviceType"/>. 
-        /// Then checks that there is defined constructor selector for implementation type with multiple/no constructors.
-        /// </remarks>
+        /// Then checks that there is defined constructor selector for implementation type with multiple/no constructors.</summary>
+        /// <param name="serviceType">Service type to register factory with.</param>
+        /// <param name="registry">Registry to register factory in.</param>
         public override void ValidateBeforeRegistration(Type serviceType, IRegistry registry)
         {
             base.ValidateBeforeRegistration(serviceType, registry);
@@ -3743,9 +3754,8 @@ namespace DryIoc
             }
         }
 
-        /// <summary>
-        /// Given factory with open-generic implementation type creates factory with closed type with type arguments provided by service type.
-        /// </summary>
+        /// <summary>Given factory with open-generic implementation type creates factory with closed type with type 
+        /// arguments provided by service type.</summary>
         /// <param name="request"><see cref="Request"/> with service type which provides concrete type arguments.</param>
         /// <returns>Factory with the same setup and reuse but with closed concrete implementation type.</returns>
         public override Factory GetFactoryForRequestOrDefault(Request request)
@@ -3997,6 +4007,7 @@ namespace DryIoc
     {
         public override bool ProvidesFactoryForRequest { get { return true; } }
 
+        /// <summary>Tracks factories created by <see cref="GetFactoryForRequestOrDefault"/>.</summary>
         public override HashTree<int, KV<Type, object>> ProvidedFactories { get { return _providedFactories.Value; }}
 
         public FactoryProvider(Func<Request, Factory> provideFactoryOrDefault, FactorySetup setup = null)
@@ -4112,6 +4123,9 @@ namespace DryIoc
     /// The reused service instances should be stored in scope(s).</remarks>
     public interface IReuse
     {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        int Lifespan { get; }
+
         /// <summary>Locates or creates scope where to store reused service objects.</summary>
         /// <param name="request">Context to find scope or use to create scope.</param>
         /// <returns>Located scope.</returns>
@@ -4121,6 +4135,9 @@ namespace DryIoc
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
     public sealed class SingletonReuse : IReuse
     {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        public int Lifespan { get { return 1000; } }
+
         /// <summary>Returns container bound Singleton scope.</summary>
         /// <param name="request">Request to get scope from.</param>
         /// <returns>Container singleton scope.</returns>
@@ -4128,12 +4145,17 @@ namespace DryIoc
         {
             return request.Registry.SingletonScope;
         }
+
+        public override string ToString() { return "Singleton:" + Lifespan; }
     }
 
     /// <summary>Returns container bound current scope created by <see cref="Container.OpenScope"/> method.</summary>
     /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
     public sealed class CurrentScopeReuse : IReuse
     {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        public int Lifespan { get { return 100; } }
+
         /// <summary>Return container current scope.</summary>
         /// <param name="request">Request to get scope from.</param>
         /// <returns>Located scope.</returns>
@@ -4141,12 +4163,17 @@ namespace DryIoc
         {
             return request.Registry.CurrentScope;
         }
+
+        public override string ToString() { return "InCurrentScope:" + Lifespan; }
     }
 
     /// <summary>Returns scope created for resolution root, when some of Resolve methods called.</summary>
     /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
     public sealed class ResolutionScopeReuse : IReuse
     {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        public int Lifespan { get { return 10; } }
+
         /// <summary>Creates or returns already created resolution root bound scope</summary>
         /// <param name="request">Request for resolution root.</param>
         /// <returns>Created or existing scope.</returns>
@@ -4154,6 +4181,8 @@ namespace DryIoc
         {
             return request.GetOrCreateResolutionScope();
         }
+
+        public override string ToString() { return "InResolutionScope:" + Lifespan; }
     }
 
     /// <summary>Specifies pre-defined reuse behaviors supported by container: 
@@ -4620,36 +4649,36 @@ namespace DryIoc
 
         public static Func<object, string> PrintArg = x => new StringBuilder().Print(x).ToString();
 
-        public static T ThrowIf<T>(this T arg0, bool throwCondition, string message = null, object arg1 = null, object arg2 = null)
+        public static T ThrowIf<T>(this T arg0, bool throwCondition, string message = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition) return arg0;
             throw GetException(message == null
                 ? Format(ARGUMENT_HAS_IMVALID_CONDITION, arg0, typeof(T))
-                : Format(message, arg0, arg1, arg2));
+                : Format(message, arg0, arg1, arg2, arg3));
         }
 
-        public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null) where T : class
+        public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null) where T : class
         {
             if (arg != null) return arg;
-            throw GetException(message == null ? Format(ARGUMENT_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2));
+            throw GetException(message == null ? Format(ARGUMENT_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2, arg3));
         }
 
-        public static T ThrowIfNotOf<T>(this T arg0, Type type, string message = null, object arg1 = null, object arg2 = null) where T : class
+        public static T ThrowIfNotOf<T>(this T arg0, Type type, string message = null, object arg1 = null, object arg2 = null, object arg3 = null) where T : class
         {
             if (type.IsTypeOf(arg0)) return arg0;
-            throw GetException(message == null ? Format(ARG_IS_NOT_OF_TYPE, arg0, type) : Format(message, arg0, arg1, arg2));
+            throw GetException(message == null ? Format(ARG_IS_NOT_OF_TYPE, arg0, type) : Format(message, arg0, arg1, arg2, arg3));
         }
 
-        public static Type ThrowIfNotOf(this Type arg0, Type type, string message = null, object arg1 = null, object arg2 = null)
+        public static Type ThrowIfNotOf(this Type arg0, Type type, string message = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (type.IsAssignableTo(arg0)) return arg0;
-            throw GetException(message == null ? Format(TYPE_ARG_IS_NOT_OF_TYPE, arg0, type) : Format(message, arg0, arg1, arg2));
+            throw GetException(message == null ? Format(TYPE_ARG_IS_NOT_OF_TYPE, arg0, type) : Format(message, arg0, arg1, arg2, arg3));
         }
 
-        public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition) return;
-            throw GetException(Format(message, arg0, arg1, arg2));
+            throw GetException(Format(message, arg0, arg1, arg2, arg3));
         }
 
         /// <summary>Invokes operation in try block and catches <typeparamref name="TEx"/> if thrown in operation.
@@ -4658,28 +4687,29 @@ namespace DryIoc
         /// <typeparam name="TEx">Exception to catch from operation.</typeparam>
         /// <typeparam name="T">Operation result type.</typeparam>
         /// <param name="operation">Operation to be invoked.</param>
-        /// <param name="message">Error message format string.</param><param name="arg0">Format arg0</param><param name="arg1">Format arg1</param><param name="arg2">Format arg2</param>
+        /// <param name="message">Error message format string.</param><param name="arg0">Format arg0</param><param name="arg1">Format arg1</param>
+        /// <param name="arg2">Format arg2</param><param name="arg3">Format arg3</param>
         /// <returns>Result of operation if no expected <typeparamref name="TEx"/> was thrown.</returns>
         public static T IfThrows<TEx, T>(Func<T> operation, string message, object arg0 = null, object arg1 = null,
-            object arg2 = null) where TEx : Exception
+            object arg2 = null, object arg3 = null) where TEx : Exception
         {
             try { return operation(); }
-            catch (TEx ex) { throw GetExceptionWithInnerOne(Format(message, arg0, arg1, arg2), ex); }
+            catch (TEx ex) { throw GetExceptionWithInnerOne(Format(message, arg0, arg1, arg2, arg3), ex); }
         }
 
-        public static void Me(string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        public static void Me(string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            throw GetException(Format(message, arg0, arg1, arg2));
+            throw GetException(Format(message, arg0, arg1, arg2, arg3));
         }
 
-        public static T No<T>(string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        public static T No<T>(string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            throw GetException(Format(message, arg0, arg1, arg2));
+            throw GetException(Format(message, arg0, arg1, arg2, arg3));
         }
 
-        private static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null)
+        private static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            return string.Format(message, PrintArg(arg0), PrintArg(arg1), PrintArg(arg2));
+            return string.Format(message, PrintArg(arg0), PrintArg(arg1), PrintArg(arg2), PrintArg(arg3));
         }
 
         private static readonly string ARGUMENT_IS_NULL = "Argument of type {0} is null.";

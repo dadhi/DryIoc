@@ -153,8 +153,8 @@ namespace DryIoc.UnitTests
         public void When_resolving_meta_of_many_only_first_matched_item_will_be_resolved()
         {
             var container = new Container();
-            container.Register(typeof(IService), typeof(Service), setup: Setup.WithMetadata("a"));
-            container.Register(typeof(IService), typeof(AnotherService), setup: Setup.WithMetadata("b"));
+            container.Register(typeof(IService), typeof(Service), setup: Setup.With(metadata: "a"));
+            container.Register(typeof(IService), typeof(AnotherService), setup: Setup.With(metadata: "b"));
 
             var result = container.Resolve<Meta<Many<IService>, string>>();
 
@@ -170,7 +170,7 @@ namespace DryIoc.UnitTests
 	    public void If_some_item_is_not_resolved_then_it_would_not_throw()
 	    {
             var container = new Container();
-	        container.Register<Service>(setup: Setup.WithMetadata(1));
+	        container.Register<Service>(setup: Setup.With(metadata: 1));
 
 	        var servicesWithBoolMeta = container.Resolve<Many<Meta<Service, bool>>>().Items;
             Assert.That(servicesWithBoolMeta.Count(), Is.EqualTo(0));

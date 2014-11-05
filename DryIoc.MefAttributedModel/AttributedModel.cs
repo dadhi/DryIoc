@@ -295,10 +295,11 @@ namespace DryIoc.MefAttributedModel
                 var reuse = GetReuseByType(reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType);
 
                 var withConstructor = import.WithConstructor == null ? null
-                    : (Func<Type, ConstructorInfo>)(t => t.GetConstructorOrNull(args: import.WithConstructor));
+                    : (ConstructorSelector)((t, _) => t.GetConstructorOrNull(args: import.WithConstructor));
 
                 registry.Register(serviceType, implementationType,
-                    reuse, withConstructor, Setup.WithMetadata(import.Metadata), serviceKey, IfAlreadyRegistered.KeepRegistered);
+                    reuse, null, Setup.With(withConstructor, metadata: import.Metadata), 
+                    serviceKey, IfAlreadyRegistered.KeepRegistered);
             }
 
             return ServiceInfoDetails.Of(serviceType, serviceKey);
@@ -506,7 +507,7 @@ namespace DryIoc.MefAttributedModel
                     : Decorator.GetSetup();
 
             if (HasMetadataAttribute)
-                return Setup.WithMetadata(() => GetMetadata(attributes));
+                return Setup.With(lazyMetadata: () => GetMetadata(attributes));
 
             return Setup.Default;
         }

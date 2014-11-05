@@ -236,7 +236,7 @@ namespace DryIoc.UnitTests
         public void Should_propagate_metadata_to_Meta_wrapper()
         {
             var container = new Container();
-            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.WithMetadata("blah"));
+            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.With(metadata: "blah"));
             container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: DecoratorSetup.Default);
             container.RegisterAll(typeof(OperationUser<>));
 
@@ -358,7 +358,7 @@ namespace DryIoc.UnitTests
         public void Should_support_multiple_decorator_in_object_graph()
         {
             var container = new Container();
-            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.WithMetadata("some"));
+            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.With(metadata: "some"));
             container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: DecoratorSetup.Default);
 
             container.Register<IOperationUser<int>, OperationUser<int>>();
