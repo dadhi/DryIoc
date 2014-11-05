@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.Composition;
+﻿using System;
+using System.ComponentModel.Composition;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
@@ -67,6 +68,19 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.That(one, Is.Not.SameAs(user.One));
             Assert.That(user.One, Is.SameAs(user.Another));
         }
+
+        [Test]
+        public void Can_specify_reuse_wrapper_for_exported_service()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(SharedWithReuseWrapper));
+
+            var serviceRef = container.Resolve<WeakReference>(typeof(SharedWithReuseWrapper));
+
+            Assert.That(serviceRef.Target, Is.InstanceOf<SharedWithReuseWrapper>());
+
+            GC.KeepAlive(serviceRef);
+        }
     }
 
     [Export, TransientReuse]
@@ -98,4 +112,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Another = another;
         }
     }
+
+    [Export, ReuseWrappers(typeof(WeakReference))]
+    public class SharedWithReuseWrapper {}
 }

@@ -35,22 +35,16 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace DryIoc
 {
-    /// <summary>
-    /// IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc.
-    /// </summary>
+    /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc </summary>
     public sealed partial class Container : IRegistry, IDisposable
     {
         /// <summary>Empty request bound to container: 
         /// all requests are created by <see cref="Request.Push(DryIoc.IServiceInfo)"/> into empty request.</summary>
         public readonly Request EmptyRequest;
 
-        /// <summary>
-        /// Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.
-        /// </summary>
-        /// <param name="rules">
-        /// (optional) Rules to modify container default resolution behavior. 
-        /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.
-        /// </param>
+        /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
+        /// <param name="rules">(optional) Rules to modify container default resolution behavior. 
+        /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
         public Container(Rules rules = null)
             : this(rules ?? Rules.Default,
             Interlocked.Increment(ref _lastRegistryID),
@@ -364,7 +358,7 @@ namespace DryIoc
             if (requiredServiceType != null)
             {
                 var wrappedServiceType = ((IRegistry)this).GetWrappedServiceType(serviceType)
-                    .ThrowIfNotOf(requiredServiceType, Error.WRAPPED_NOT_ASSIGNABLE_TO_REQUIRED_TYPE, requiredServiceType, serviceType);
+                    .ThrowIfNotSubtypeOf(requiredServiceType, Error.WRAPPED_NOT_ASSIGNABLE_TO_REQUIRED_TYPE, serviceType);
 
                 if (serviceType == wrappedServiceType)
                     serviceType = requiredServiceType;
@@ -859,7 +853,6 @@ namespace DryIoc
 
             _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
             _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
-
             _resolutionState = new ResolutionState();
 
             EmptyRequest = Request.CreateEmpty(new WeakReference(this), new WeakReference(_resolutionState));
@@ -917,9 +910,7 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>
-    /// Holds service expression cache, and state items passed to <see cref="FactoryDelegate"/> in resolution root.
-    /// </summary>
+    /// <summary>Holds service expression cache, and state items passed to <see cref="FactoryDelegate"/> in resolution root.</summary>
     public sealed class ResolutionState : IDisposable
     {
         public static readonly ParameterExpression ItemsParamExpr = Expression.Parameter(typeof(AppendableArray<object>), "items");
@@ -998,16 +989,22 @@ namespace DryIoc
     /// <typeparam name="T">Array item type.</typeparam>
     public sealed class AppendableArray<T>
     {
+        /// <summary>Empty/default value to start from.</summary>
         public static readonly AppendableArray<T> Empty = new AppendableArray<T>();
 
+        /// <summary>Number of items in array.</summary>
         public readonly int Length;
 
+        /// <summary>Appends value to array.</summary>
+        /// <param name="value">Value to append.</param> <returns>New array with appended value.</returns>
         public AppendableArray<T> Append(T value)
         {
             return new AppendableArray<T>(Length + 1,
                 _tree.AddOrUpdate(Length >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
         }
 
+        /// <summary>Returns index of first equal value in array if found, or -1 otherwise.</summary>
+        /// <param name="value">Value to look for.</param> <returns>Index of first equal value, or -1 otherwise.</returns>
         public int IndexOf(T value)
         {
             foreach (var node in _tree.Enumerate())
@@ -1032,13 +1029,12 @@ namespace DryIoc
 
         #region Implementation
 
-        // Node array length is number of items stored per tree node. 
-        // When the item added to same node, array will be copied. So if array is too long performance will degrade.
-        // Should be power of two: e.g. 2, 4, 8, 16, 32...
-        internal const int NODE_ARRAY_LENGTH = 32;
+        /// <summary>Node array size. When the item added to same node, array will be copied. 
+        /// So if array is too big performance will degrade. Should be power of two: e.g. 2, 4, 8, 16, 32...</summary>
+        internal const int NODE_ARRAY_SIZE = 32;
 
-        private const int NODE_ARRAY_BIT_MASK = NODE_ARRAY_LENGTH - 1; // for length 32 will be 11111 binary.
-        private const int NODE_ARRAY_BIT_COUNT = 5;                    // number of set bits in NODE_ARRAY_BIT_MASK.
+        private const int NODE_ARRAY_BIT_MASK = NODE_ARRAY_SIZE - 1; // for length 32 will be 11111 binary.
+        private const int NODE_ARRAY_BIT_COUNT = 5;                  // number of set bits in NODE_ARRAY_BIT_MASK.
 
         private readonly HashTree<int, T[]> _tree;
         private readonly bool _treeHasSingleNode;
@@ -1049,12 +1045,19 @@ namespace DryIoc
         {
             Length = length;
             _tree = tree;
-            _treeHasSingleNode = length <= NODE_ARRAY_LENGTH;
+            _treeHasSingleNode = length <= NODE_ARRAY_SIZE;
         }
 
         #endregion
     }
 
+    /// <summary>The delegate type which is actually used to create service instance by container.
+    /// Delegate instance required to be static with all information supplied by <paramref name="items"/> and <paramref name="scope"/>
+    /// parameters. The requirement is due to enable compilation to DynamicMethod in DynamicAssembly, and also to simplify
+    /// state management: and so minimize memory leaks.</summary>
+    /// <param name="items">All the state items available in resolution root (<see cref="ResolutionState"/>).</param>
+    /// <param name="scope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
+    /// <returns>Created service object.</returns>
     public delegate object FactoryDelegate(AppendableArray<object> items, IScope scope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
@@ -1689,6 +1692,9 @@ namespace DryIoc
         public static readonly string DEP_HAS_SHORTER_REUSE_LIFESPAN = 
             "Dependency {0} has shorter reuse lifespan ({1}) than its parent ({2}): {3}.\n" +
             "You can turn off this exception by setting container Rules.ThrowIfDepenedencyHasShorterReuseLifespan to false.";
+
+        public static readonly string WEAKREF_REUSE_WRAPPER_GCED = 
+            "Service with WeakReference reuse wrapper is garbage collected now, and no longer available.";
     }
 
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
@@ -2305,8 +2311,8 @@ namespace DryIoc
             }
             else // if required type was provided, check that it is assignable to service(wrapped)type.
             {
-                wrappedServiceType.ThrowIfNotOf(requiredServiceType,
-                    Error.WRAPPED_NOT_ASSIGNABLE_TO_REQUIRED_TYPE, requiredServiceType, request);
+                wrappedServiceType.ThrowIfNotSubtypeOf(requiredServiceType,
+                    Error.WRAPPED_NOT_ASSIGNABLE_TO_REQUIRED_TYPE, request);
                 if (wrappedServiceType == serviceType) // if Not a wrapper, 
                 {
                     serviceType = requiredServiceType; // override service type with required one
@@ -4252,11 +4258,13 @@ namespace DryIoc
         public static readonly IReuseWrapper Disposable = new DisposableWrapper();
         public static readonly IReuseWrapper Ref = new RefWrapper();
 
-        public sealed class WeakReferenceWrapper : IReuseWrapper
+        #region Implementation
+
+        private sealed class WeakReferenceWrapper : IReuseWrapper
         {
             public Type WrapperType
             {
-                get { return typeof(WeakReference); }
+                get { return typeof (WeakReference); }
             }
 
             public object Wrap(object target)
@@ -4266,16 +4274,15 @@ namespace DryIoc
 
             public object Unwrap(object wrapper)
             {
-                return (wrapper as WeakReference).ThrowIfNull()
-                    .Target.ThrowIfNull("Service reused as WeakReference is garbage collected now, and no longer available.");
+                return (wrapper as WeakReference).ThrowIfNull().Target.ThrowIfNull(Error.WEAKREF_REUSE_WRAPPER_GCED);
             }
         }
 
-        public sealed class ExplicitlyDisposableWrapper : IReuseWrapper
+        private sealed class ExplicitlyDisposableWrapper : IReuseWrapper
         {
             public Type WrapperType
             {
-                get { return typeof(ExplicitlyDisposable); }
+                get { return typeof (ExplicitlyDisposable); }
             }
 
             public object Wrap(object target)
@@ -4289,11 +4296,11 @@ namespace DryIoc
             }
         }
 
-        public sealed class DisposableWrapper : IReuseWrapper
+        private sealed class DisposableWrapper : IReuseWrapper
         {
             public Type WrapperType
             {
-                get { return typeof(Disposable); }
+                get { return typeof (Disposable); }
             }
 
             public object Wrap(object target)
@@ -4307,11 +4314,11 @@ namespace DryIoc
             }
         }
 
-        public sealed class RefWrapper : IReuseWrapper
+        private sealed class RefWrapper : IReuseWrapper
         {
             public Type WrapperType
             {
-                get { return typeof(Ref<object>); }
+                get { return typeof (Ref<object>); }
             }
 
             public object Wrap(object target)
@@ -4324,6 +4331,8 @@ namespace DryIoc
                 return (wrapper as Ref<object>).ThrowIfNull().Value;
             }
         }
+
+        #endregion
     }
 
     /// <summary>Wrapper for shared reused service object, that allow client (but no to container) to
@@ -4695,10 +4704,10 @@ namespace DryIoc
             throw GetException(message == null ? Format(ARG_IS_NOT_OF_TYPE, arg0, type) : Format(message, arg0, arg1, arg2, arg3));
         }
 
-        public static Type ThrowIfNotOf(this Type arg0, Type type, string message = null, object arg1 = null, object arg2 = null, object arg3 = null)
+        public static Type ThrowIfNotSubtypeOf(this Type arg0, Type arg1, string message = null, object arg2 = null, object arg3 = null)
         {
-            if (type.IsAssignableTo(arg0)) return arg0;
-            throw GetException(message == null ? Format(TYPE_ARG_IS_NOT_OF_TYPE, arg0, type) : Format(message, arg0, arg1, arg2, arg3));
+            if (arg1.IsAssignableTo(arg0)) return arg0;
+            throw GetException(message == null ? Format(TYPE_ARG_IS_NOT_SUBTYPE_OF, arg0, arg1) : Format(message, arg0, arg1, arg2, arg3));
         }
 
         public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
@@ -4741,7 +4750,7 @@ namespace DryIoc
         private static readonly string ARGUMENT_IS_NULL = "Argument of type {0} is null.";
         private static readonly string ARGUMENT_HAS_IMVALID_CONDITION = "Argument {0} of type {1} has invalid condition.";
         private static readonly string ARG_IS_NOT_OF_TYPE = "Argument {0} is not of type {1}.";
-        private static readonly string TYPE_ARG_IS_NOT_OF_TYPE = "Argument type {0} is not assignable from type {1}.";
+        private static readonly string TYPE_ARG_IS_NOT_SUBTYPE_OF = "Argument type {0} is not subtype of type {1}.";
     }
 
     /// <summary>Contains helper methods to work with Type: for instance to find Type implemented base types and interfaces, etc.</summary>

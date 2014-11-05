@@ -33,20 +33,23 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace DryIoc.MefAttributedModel
 {
-    /// <summary>
-    /// Implements MEF Attributed Programming Model. Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel.
-    /// </summary>
+    /// <summary>Implements MEF Attributed Programming Model. 
+    /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
     public static class AttributedModel
     {
-        ///<remarks>Default reuse policy is Singleton, the same as in MEF.</remarks>
+        ///<summary>Default reuse policy is Singleton, the same as in MEF.</summary>
         public static Type DefaultReuseType = typeof(SingletonReuse);
 
-        public readonly static Dictionary<Type, IReuse> SupportedReuseTypes = new Dictionary<Type, IReuse>
-        {
-            { typeof(SingletonReuse), Reuse.Singleton},
-            { typeof(CurrentScopeReuse), Reuse.InCurrentScope },
-            { typeof(ResolutionScopeReuse), Reuse.InResolutionScope }
-        };
+        public static readonly HashTree<Type, IReuse> SupportedReuseTypes = HashTree<Type, IReuse>.Empty
+            .AddOrUpdate(typeof(SingletonReuse), Reuse.Singleton)
+            .AddOrUpdate(typeof(CurrentScopeReuse), Reuse.InCurrentScope)
+            .AddOrUpdate(typeof(ResolutionScopeReuse), Reuse.InResolutionScope);
+
+        public static readonly HashTree<Type, IReuseWrapper> SupportedReuseWrapperTypes = HashTree<Type, IReuseWrapper>.Empty
+            .AddOrUpdate(typeof(WeakReference), ReuseWrapper.WeakReference)
+            .AddOrUpdate(typeof(ExplicitlyDisposable), ReuseWrapper.ExplicitlyDisposable)
+            .AddOrUpdate(typeof(Disposable), ReuseWrapper.Disposable)
+            .AddOrUpdate(typeof(Ref<object>), ReuseWrapper.Ref);
 
         public static Rules WithAttributedModel(this Rules rules)
         {
@@ -119,42 +122,11 @@ namespace DryIoc.MefAttributedModel
                 var attribute = attributes[attributeIndex];
                 if (attribute is ExportAttribute)
                 {
-                    var exportAttribute = (ExportAttribute)attribute;
-                    var export = new ExportInfo(exportAttribute.ContractType ?? implementationType,
-                        exportAttribute.ContractName ??
-                        (attribute is ExportWithKeyAttribute ? ((ExportWithKeyAttribute)attribute).ContractKey : null));
-
-                    if (info.Exports == null)
-                        info.Exports = new[] { export };
-                    else if (!info.Exports.Contains(export))
-                        info.Exports = info.Exports.AppendOrUpdate(export);
+                    info.Exports = GetExportsFromExportAttribute((ExportAttribute)attribute, info, implementationType);
                 }
                 else if (attribute is ExportAllAttribute)
                 {
-                    var exportAllAttribute = (ExportAllAttribute)attribute;
-                    var allContractTypes = exportAllAttribute.GetAllContractTypes(implementationType);
-
-                    if (implementationType.IsGenericDefinition())
-                    {
-                        var implTypeArgs = implementationType.GetGenericParamsAndArgs();
-                        allContractTypes = allContractTypes
-                            .Where(t => t.ContainsAllGenericParameters(implTypeArgs))
-                            .Select(t => t.GetGenericDefinitionOrNull());
-                    }
-
-                    var exportAllInfos = allContractTypes
-                        .Select(t => new ExportInfo(t, exportAllAttribute.ContractName ?? exportAllAttribute.ContractKey))
-                        .ToArray();
-
-                    Throw.If(exportAllInfos.Length == 0, Error.EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES,
-                        implementationType, allContractTypes);
-
-                    if (info.Exports != null)
-                        for (var index = 0; index < info.Exports.Length; index++)
-                            if (!exportAllInfos.Contains(info.Exports[index])) // filtering out identical exports
-                                exportAllInfos = exportAllInfos.AppendOrUpdate(info.Exports[index]);
-
-                    info.Exports = exportAllInfos;
+                    info.Exports = GetExportsFromExportAllAttribute((ExportAllAttribute)attribute, info, implementationType);
                 }
                 else if (attribute is PartCreationPolicyAttribute)
                 {
@@ -165,23 +137,17 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.ReuseType = ((ReuseAttribute)attribute).ReuseType;
                 }
+                else if (attribute is ReuseWrappersAttribute)
+                {
+                    info.ReuseWrapperTypes = ((ReuseWrappersAttribute)attribute).WrapperTypes;
+                }
                 else if (attribute is AsWrapperAttribute)
                 {
-                    Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
-                    info.FactoryType = FactoryType.Wrapper;
-                    var genericWrapperAttribute = ((AsWrapperAttribute)attribute);
-                    info.Wrapper = new WrapperInfo
-                    {
-                        WrappedServiceType = genericWrapperAttribute.WrappedContractType,
-                        WrappedServiceTypeGenericArgIndex = genericWrapperAttribute.ContractTypeGenericArgIndex
-                    };
+                    PopulateWrapperInfoFromAttribute(info, (AsWrapperAttribute)attribute, implementationType);
                 }
                 else if (attribute is AsDecoratorAttribute)
                 {
-                    Throw.If(info.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
-                    var decorator = ((AsDecoratorAttribute)attribute);
-                    info.FactoryType = FactoryType.Decorator;
-                    info.Decorator = new DecoratorInfo(decorator.ConditionType, decorator.ContractName ?? decorator.ContractKey);
+                    PopulateDecoratorInfoFromAttribute(info, (AsDecoratorAttribute)attribute, implementationType);
                 }
 
                 if (attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
@@ -198,6 +164,7 @@ namespace DryIoc.MefAttributedModel
             return info;
         }
 
+
         #region Tools
 
         public static ConstructorInfo GetImportingConstructor(Type implementationType, Request request)
@@ -210,12 +177,15 @@ namespace DryIoc.MefAttributedModel
 
         public static IReuse GetReuseByType(Type reuseType)
         {
-            if (reuseType == null)
-                return null;
-            IReuse reuse;
-            var supported = SupportedReuseTypes.TryGetValue(reuseType, out reuse);
-            reuseType.ThrowIf(!supported, Error.UNSUPPORTED_REUSE_TYPE);
-            return reuse;
+            return reuseType == null ? null
+                : SupportedReuseTypes.GetValueOrDefault(reuseType)
+                    .ThrowIfNull(Error.UNSUPPORTED_REUSE_TYPE, reuseType);
+        }
+
+        public static IReuseWrapper GetReuseWrapperByType(Type reuseWrapperType)
+        {
+            return SupportedReuseWrapperTypes.GetValueOrDefault(reuseWrapperType)
+                .ThrowIfNull(Error.UNSUPPORTED_REUSE_WRAPPER_TYPE, reuseWrapperType);
         }
 
         #endregion
@@ -236,7 +206,7 @@ namespace DryIoc.MefAttributedModel
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
         {
             var attributes = member.GetAttributes().ToArray();
-            var details = attributes.Length == 0 ? null 
+            var details = attributes.Length == 0 ? null
                 : GetFirstImportDetailsOrNull(member.GetPropertyOrFieldType(), attributes, request);
             return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details, request);
         }
@@ -298,7 +268,7 @@ namespace DryIoc.MefAttributedModel
                     : (ConstructorSelector)((t, _) => t.GetConstructorOrNull(args: import.WithConstructor));
 
                 registry.Register(serviceType, implementationType,
-                    reuse, null, Setup.With(withConstructor, metadata: import.Metadata), 
+                    reuse, null, Setup.With(withConstructor, metadata: import.Metadata),
                     serviceKey, IfAlreadyRegistered.KeepRegistered);
             }
 
@@ -316,6 +286,67 @@ namespace DryIoc.MefAttributedModel
         #endregion
 
         #region Implementation
+
+        private static ExportInfo[] GetExportsFromExportAttribute(ExportAttribute attribute,
+            RegistrationInfo currentInfo, Type implementationType)
+        {
+            var export = new ExportInfo(attribute.ContractType ?? implementationType,
+                attribute.ContractName ??
+                (attribute is ExportWithKeyAttribute ? ((ExportWithKeyAttribute)attribute).ContractKey : null));
+
+            var exports = currentInfo.Exports == null ? new[] { export }
+                : !currentInfo.Exports.Contains(export) ? currentInfo.Exports.AppendOrUpdate(export)
+                : null;
+            return exports;
+        }
+
+        private static ExportInfo[] GetExportsFromExportAllAttribute(ExportAllAttribute attribute,
+            RegistrationInfo currentInfo, Type implementationType)
+        {
+            var allContractTypes = attribute.GetAllContractTypes(implementationType);
+
+            if (implementationType.IsGenericDefinition())
+            {
+                var implTypeArgs = implementationType.GetGenericParamsAndArgs();
+                allContractTypes = allContractTypes
+                    .Where(t => t.ContainsAllGenericParameters(implTypeArgs))
+                    .Select(t => t.GetGenericDefinitionOrNull());
+            }
+
+            var exportInfos = allContractTypes
+                .Select(t => new ExportInfo(t, attribute.ContractName ?? attribute.ContractKey))
+                .ToArray();
+
+            Throw.If(exportInfos.Length == 0, Error.EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES,
+                implementationType, allContractTypes);
+
+            if (currentInfo.Exports != null)
+                for (var index = 0; index < currentInfo.Exports.Length; index++)
+                    if (!exportInfos.Contains(currentInfo.Exports[index])) // filtering out identical exports
+                        exportInfos = exportInfos.AppendOrUpdate(currentInfo.Exports[index]);
+
+            return exportInfos;
+        }
+
+        private static void PopulateWrapperInfoFromAttribute(RegistrationInfo resultInfo, AsWrapperAttribute attribute,
+            Type implementationType)
+        {
+            Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
+            resultInfo.FactoryType = FactoryType.Wrapper;
+            resultInfo.Wrapper = new WrapperInfo
+            {
+                WrappedServiceType = attribute.WrappedContractType,
+                WrappedServiceTypeGenericArgIndex = attribute.ContractTypeGenericArgIndex
+            };
+        }
+
+        private static void PopulateDecoratorInfoFromAttribute(RegistrationInfo resultInfo, AsDecoratorAttribute attribute,
+            Type implementationType)
+        {
+            Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
+            resultInfo.FactoryType = FactoryType.Decorator;
+            resultInfo.Decorator = new DecoratorInfo(attribute.ConditionType, attribute.ContractName ?? attribute.ContractKey);
+        }
 
         private static Attribute[] GetAllExportRelatedAttributes(Type type)
         {
@@ -416,11 +447,14 @@ namespace DryIoc.MefAttributedModel
         public static readonly string UNSUPPORTED_REUSE_TYPE =
             "Attributed model does not support reuse type {0}.";
 
-        public static readonly string EXPORTED_NONGENERIC_WRAPPER_NO_WRAPPED_TYPE = 
+        public static readonly string UNSUPPORTED_REUSE_WRAPPER_TYPE =
+            "Attributed model does not support reuse wrapper type {0}.";
+
+        public static readonly string EXPORTED_NONGENERIC_WRAPPER_NO_WRAPPED_TYPE =
             "Exported non-generic wrapper type {0} requires wrapped service type to be specified, but it is null, " +
             "and instead generic argument index is set to {1}.";
 
-        public static readonly string EXPORTED_GENERIC_WRAPPER_BAD_ARG_INDEX = 
+        public static readonly string EXPORTED_GENERIC_WRAPPER_BAD_ARG_INDEX =
             "Exported generic wrapper type {0} specifies generic argument index {1} outside of argument list size.";
     }
 
@@ -473,6 +507,7 @@ namespace DryIoc.MefAttributedModel
     #region Registration Info DTOs
 #pragma warning disable 659
 
+    /// <summary>Serializable DTO of all registration information.</summary>
     public sealed class RegistrationInfo
     {
         public ExportInfo[] Exports;
@@ -481,6 +516,8 @@ namespace DryIoc.MefAttributedModel
         public string ImplementationTypeFullName;
 
         public Type ReuseType;
+        public Type[] ReuseWrapperTypes;
+
         public bool HasMetadataAttribute;
         public FactoryType FactoryType;
         public DecoratorInfo Decorator;
@@ -491,25 +528,24 @@ namespace DryIoc.MefAttributedModel
             return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), GetSetup());
         }
 
-        public IReuse GetReuse()
-        {
-            return ReuseType == null ? null : AttributedModel.SupportedReuseTypes[ReuseType];
-        }
-
+        /// <summary>Create factory setup from DTO data.</summary>
+        /// <param name="attributes">Implementation type attributes provided to get optional metadata.</param>
+        /// <returns>Created factory setup.</returns>
         public FactorySetup GetSetup(Attribute[] attributes = null)
         {
             if (FactoryType == FactoryType.Wrapper)
                 return Wrapper == null ? WrapperSetup.Default : Wrapper.GetSetup();
 
+            var lazyMetadata = HasMetadataAttribute ? (Func<object>)(() => GetMetadata(attributes)) : null;
+
             if (FactoryType == FactoryType.Decorator)
-                return Decorator == null ? DecoratorSetup.Default
-                    : HasMetadataAttribute ? Decorator.GetSetup(() => GetMetadata(attributes))
-                    : Decorator.GetSetup();
+                return Decorator == null ? DecoratorSetup.Default : Decorator.GetSetup(lazyMetadata);
 
-            if (HasMetadataAttribute)
-                return Setup.With(lazyMetadata: () => GetMetadata(attributes));
+            IReuseWrapper[] reuseWrappers = null;
+            if (ReuseWrapperTypes != null && ReuseWrapperTypes.Length != 0)
+                reuseWrappers = ReuseWrapperTypes.Select(AttributedModel.GetReuseWrapperByType).ToArray();
 
-            return Setup.Default;
+            return Setup.With(reuseWrappers: reuseWrappers, lazyMetadata: lazyMetadata);
         }
 
         public override bool Equals(object obj)
@@ -641,15 +677,15 @@ namespace DryIoc.MefAttributedModel
         public Type ConditionType;
         public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
 
-        public DecoratorSetup GetSetup(Func<object> getMetadata = null)
+        public DecoratorSetup GetSetup(Func<object> lazyMetadata = null)
         {
             if (ConditionType != null)
                 return DecoratorSetup.WithCondition(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).CanApply);
 
-            if (ServiceKeyInfo != ServiceKeyInfo.Default || getMetadata != null)
+            if (ServiceKeyInfo != ServiceKeyInfo.Default || lazyMetadata != null)
                 return DecoratorSetup.WithCondition(request =>
                     (ServiceKeyInfo.Key == null || Equals(ServiceKeyInfo.Key, request.ServiceKey)) &&
-                    (getMetadata == null || Equals(getMetadata(), request.ResolvedFactory.Setup.Metadata)));
+                    (lazyMetadata == null || Equals(lazyMetadata(), request.ResolvedFactory.Setup.Metadata)));
 
             return DecoratorSetup.Default;
         }
@@ -688,9 +724,7 @@ namespace DryIoc.MefAttributedModel
 
     #region Additional Export/Import attributes
 
-    [AttributeUsage(
-        AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property,
-        AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, Inherited = false)]
     public class ReuseAttribute : Attribute
     {
         public readonly Type ReuseType;
@@ -721,6 +755,16 @@ namespace DryIoc.MefAttributedModel
         public ResolutionScopeReuseAttribute() : base(typeof(ResolutionScopeReuse)) { }
     }
 
+    public class ReuseWrappersAttribute : Attribute
+    {
+        public Type[] WrapperTypes { get; set; }
+
+        public ReuseWrappersAttribute(params Type[] wrapperTypes)
+        {
+            WrapperTypes = wrapperTypes;
+        }
+    }
+
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible"), AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
     public class ExportWithKeyAttribute : ExportAttribute
     {
@@ -736,7 +780,7 @@ namespace DryIoc.MefAttributedModel
         public ExportWithKeyAttribute(object contractKey) : this(contractKey, null) { }
     }
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class ExportAllAttribute : Attribute
     {
         public static Func<Type, bool> ExportedTypes = Registrator.DefaultImplementedTypesForRegisterAll;
@@ -756,7 +800,7 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class AsWrapperAttribute : Attribute
     {
         public int ContractTypeGenericArgIndex { get; set; }
@@ -773,7 +817,7 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class AsDecoratorAttribute : Attribute
     {
         /// <remarks> If <see cref="ContractName"/> specified, it has more priority over <see cref="ContractKey"/>. </remarks>
@@ -787,7 +831,7 @@ namespace DryIoc.MefAttributedModel
         bool CanApply(Request request);
     }
 
-    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible"), AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
+    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible"), AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property)]
     public class ImportWithKeyAttribute : ImportAttribute
     {
         public object ContractKey { get; set; }
@@ -810,8 +854,7 @@ namespace DryIoc.MefAttributedModel
 
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class | // for Export 
-        AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, // for Import
-        AllowMultiple = false, Inherited = false)]
+        AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, Inherited = false)]
     public class WithMetadataAttribute : Attribute
     {
         public WithMetadataAttribute(object metadata)
@@ -822,8 +865,7 @@ namespace DryIoc.MefAttributedModel
         public readonly object Metadata;
     }
 
-    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property,
-        AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property)]
     public class ImportExternalAttribute : Attribute
     {
         public Type ImplementationType { get; set; }

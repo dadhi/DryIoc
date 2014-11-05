@@ -72,7 +72,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Append_for_full_node_and_get_node_last_item()
         {
-            var nodeArrayLength = AppendableArray<int>.NODE_ARRAY_LENGTH;
+            var nodeArrayLength = AppendableArray<int>.NODE_ARRAY_SIZE;
             var array = AppendableArray<int>.Empty;
             for (var i = 0; i <= nodeArrayLength; i++)
                 array = array.Append(i);
