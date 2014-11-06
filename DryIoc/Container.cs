@@ -4634,15 +4634,22 @@ namespace DryIoc
         }
     }
 
-    public sealed class Meta<TService, TMetadata>
+    /// <summary>Wrapper type to box service with associated arbitrary metadata object.</summary>
+    /// <typeparam name="T">Service type.</typeparam>
+    /// <typeparam name="TMetadata">Arbitrary metadata object type.</typeparam>
+    public sealed class Meta<T, TMetadata>
     {
-        public readonly TService Value;
-
+        /// <summary>Value or object with associated metadata.</summary>
+        public readonly T Value;
+        
+        /// <summary>Associated metadata object. Could be anything.</summary>
         public readonly TMetadata Metadata;
 
-        public Meta(TService service, TMetadata metadata)
+        /// <summary>Boxes value and its associated metadata together.</summary>
+        /// <param name="value">value</param> <param name="metadata">any metadata object</param>
+        public Meta(T value, TMetadata metadata)
         {
-            Value = service;
+            Value = value;
             Metadata = metadata;
         }
     }
@@ -4658,10 +4665,8 @@ namespace DryIoc
         }
     }
 
-    /// <summary>
-    /// Exception that container throws in case of error. Dedicated exception type simplifies
-    /// filtering or catching container relevant exceptions from client code.
-    /// </summary>
+    /// <summary>Exception that container throws in case of error. Dedicated exception type simplifies
+    /// filtering or catching container relevant exceptions from client code.</summary>
     [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable")]
     public class ContainerException : InvalidOperationException
     {
@@ -4837,47 +4842,65 @@ namespace DryIoc
             return true;
         }
 
+        /// <summary>Returns true if type is generic.</summary><param name="type">Type to check.</param> <returns>True if type generic.</returns>
         public static bool IsGeneric(this Type type)
         {
             return type.GetTypeInfo().IsGenericType;
         }
 
+        /// <summary>Returns true if type if generic type definition (open type).</summary><param name="type">Type to check.</param>
+        /// <returns>True if type is open type: generic type definition.</returns>
         public static bool IsGenericDefinition(this Type type)
         {
             return type.GetTypeInfo().IsGenericTypeDefinition;
         }
 
+        /// <summary>Returns true if type is closed generic: does not have open generic parameters, only closed/concrete ones.</summary>
+        /// <param name="type">Type to check</param> <returns>True if closed generic.</returns>
         public static bool IsClosedGeneric(this Type type)
         {
             return type.GetTypeInfo().IsGenericType && !type.GetTypeInfo().ContainsGenericParameters;
         }
 
+        /// <summary>Returns true if type if open generic: contains at list one open generic parameter. Could be
+        /// generic type definition as well.</summary>
+        /// <param name="type">Type to check.</param> <returns>True if open generic.</returns>
         public static bool IsOpenGeneric(this Type type)
         {
             return type.GetTypeInfo().IsGenericType && type.GetTypeInfo().ContainsGenericParameters;
         }
 
+        /// <summary>Returns generic type definition if type is generic and null otherwise.</summary>
+        /// <param name="type">Source type, could be null.</param> <returns>Generic type definition.</returns>
         public static Type GetGenericDefinitionOrNull(this Type type)
         {
             return type != null && type.GetTypeInfo().IsGenericType ? type.GetGenericTypeDefinition() : null;
         }
 
+        /// <summary>Return generic type parameters and arguments in order they specified. If type is not generic, returns empty array.</summary>
+        /// <param name="type">Source type.</param> <returns>Array of generic type arguments (closed/concrete types) and parameters (open).</returns>
         public static Type[] GetGenericParamsAndArgs(this Type type)
         {
             return _getGenericArgumentsDelegate(type);
         }
 
+        /// <summary>If type is array returns is element type, otherwise returns null.</summary>
+        /// <param name="type">Source type.</param> <returns>Array element type or null.</returns>
         public static Type GetElementTypeOrNull(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
             return typeInfo.IsArray ? typeInfo.GetElementType() : null;
         }
 
+        /// <summary>Return base type or null, if not exist (the case for only for object type).</summary> 
+        /// <param name="type">Source type.</param> <returns>Base type or null for object.</returns>
         public static Type GetBaseType(this Type type)
         {
             return type.GetTypeInfo().BaseType;
         }
 
+        /// <summary>Checks if type is public or nested public in public type.</summary>
+        /// <param name="type">Type to check.</param> <returns>Return true if check succeeded.</returns>
         public static bool IsPublicOrNestedPublic(this Type type)
         {
             var typeInfo = type.GetTypeInfo();

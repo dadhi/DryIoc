@@ -40,45 +40,72 @@ namespace DryIoc.MefAttributedModel
         ///<summary>Default reuse policy is Singleton, the same as in MEF.</summary>
         public static Type DefaultReuseType = typeof(SingletonReuse);
 
+        /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/> 
+        /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
         public static readonly HashTree<Type, IReuse> SupportedReuseTypes = HashTree<Type, IReuse>.Empty
             .AddOrUpdate(typeof(SingletonReuse), Reuse.Singleton)
             .AddOrUpdate(typeof(CurrentScopeReuse), Reuse.InCurrentScope)
             .AddOrUpdate(typeof(ResolutionScopeReuse), Reuse.InResolutionScope);
 
+        /// <summary>Map of supported reuse wrapper types, so that specified in <see cref="ReuseWrappersAttribute"/> type
+        /// could be mapped to corresponding provider in <see cref="ReuseWrapper"/></summary>
         public static readonly HashTree<Type, IReuseWrapper> SupportedReuseWrapperTypes = HashTree<Type, IReuseWrapper>.Empty
             .AddOrUpdate(typeof(WeakReference), ReuseWrapper.WeakReference)
             .AddOrUpdate(typeof(ExplicitlyDisposable), ReuseWrapper.ExplicitlyDisposable)
             .AddOrUpdate(typeof(Disposable), ReuseWrapper.Disposable)
             .AddOrUpdate(typeof(Ref<object>), ReuseWrapper.Ref);
 
+        /// <summary>Returns new rules with attributed model importing rules appended.</summary>
+        /// <param name="rules">Source rules to append importing rules to.</param>
+        /// <returns>New rules with attributed model rules.</returns>
         public static Rules WithAttributedModel(this Rules rules)
         {
             // hello, Max!!! we are Martians.
             return rules.With(GetImportingConstructor, GetImportedParameter, GetImportedPropertiesAndFields);
         }
 
+        /// <summary>Appends attributed model rules to passed container using <see cref="WithAttributedModel(DryIoc.Rules)"/>.</summary>
+        /// <param name="container">Source container to apply attributed model importing rules to.</param>
+        /// <returns>Returns new container with new rules.</returns>
         public static Container WithAttributedModel(this Container container)
         {
             return container.WithNewRules(container.Rules.WithAttributedModel());
         }
 
+        /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
+        /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>.</summary>
+        /// <param name="registrator">Container to register types into.</param>
+        /// <param name="types">Implementation types to register.</param>
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
         {
             registrator.RegisterExports(types
                 .Select(GetRegistrationInfoOrDefault).Where(info => info != null));
         }
-
+        
+        /// <summary>First scans (<see cref="Scan"/>) provided assemblies to find types annotated with
+        /// <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>.
+        /// Then registers found types into registrator/container.</summary>
+        /// <param name="registrator">Container to register into</param>
+        /// <param name="assemblies">Assemblies to scan for implementation types.</param>
         public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
         {
             registrator.RegisterExports(Scan(assemblies));
         }
 
+        /// <summary>Registers new factories into registrator/container based on provided registration infos, which
+        /// is serializable DTO for registration.</summary>
+        /// <param name="registrator">Container to register into.</param>
+        /// <param name="infos">Registrations to register.</param>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<RegistrationInfo> infos)
         {
             foreach (var info in infos)
                 RegisterInfo(registrator, info);
         }
 
+        /// <summary>Registers factories into registrator/container based on single provided info, which could
+        /// contain multiple exported services with single implementation.</summary>
+        /// <param name="registrator">Container to register into.</param>
+        /// <param name="info">Registration information provided.</param>
         public static void RegisterInfo(this IRegistrator registrator, RegistrationInfo info)
         {
             var factory = info.CreateFactory();
@@ -95,6 +122,10 @@ namespace DryIoc.MefAttributedModel
             }
         }
 
+        /// <summary>Scans assemblies to find concrete type annotated with <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>
+        /// attributes, and create serializable DTO with all information required for registering of exported types.</summary>
+        /// <param name="assemblies">Assemblies to scan.</param>
+        /// <returns>Lazy collection of registration info DTOs.</returns>
         public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
             return assemblies.SelectMany(_getAssemblyTypes)
@@ -102,13 +133,147 @@ namespace DryIoc.MefAttributedModel
                 .Where(info => info != null);
         }
 
+        /// <summary>Creates registration info DTO for provided type. To find this info checks type attributes:
+        /// <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>.
+        /// If type is not concrete or is value type, then return null.</summary>
+        /// <param name="implementationType">Type to convert into registration info.</param>
+        /// <returns>Created DTO.</returns>
         public static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType)
         {
             return implementationType.IsValueType() || implementationType.IsAbstract() ? null
                 : GetRegistrationInfoOrDefault(implementationType, GetAllExportRelatedAttributes(implementationType));
         }
 
-        public static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType, Attribute[] attributes)
+        #region Tools
+
+        /// <summary>Returns reuse object by mapping provided type to <see cref="SupportedReuseTypes"/>.
+        /// Returns null (transient or no reuse) if null provided reuse type.</summary>
+        /// <param name="reuseType">Reuse type to find in supported.</param>
+        /// <returns>Supported reuse object.</returns>
+        public static IReuse GetReuseByType(Type reuseType)
+        {
+            return reuseType == null ? null
+                : SupportedReuseTypes.GetValueOrDefault(reuseType).ThrowIfNull(Error.UNSUPPORTED_REUSE_TYPE, reuseType);
+        }
+
+        /// <summary>Returns reuse wrapper object: corresponding member of <see cref="ReuseWrapper"/>.
+        /// Uses <see cref="SupportedReuseWrapperTypes"/> mapping to find it.</summary>
+        /// <param name="reuseWrapperType">Reuse wrapper type to find mapping for.</param>
+        /// <returns>Supported reuse wrapper object.</returns>
+        public static IReuseWrapper GetReuseWrapperByType(Type reuseWrapperType)
+        {
+            return SupportedReuseWrapperTypes.GetValueOrDefault(reuseWrapperType)
+                .ThrowIfNull(Error.UNSUPPORTED_REUSE_WRAPPER_TYPE, reuseWrapperType);
+        }
+
+        #endregion
+
+        #region Rules
+
+        private static ConstructorInfo GetImportingConstructor(Type implementationType, Request request)
+        {
+            var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
+            return constructors.Length == 1 ? constructors[0]
+                : constructors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
+                    .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, implementationType);
+        }
+
+        private static ParameterServiceInfo GetImportedParameter(ParameterInfo parameter, Request request)
+        {
+            var serviceInfo = ParameterServiceInfo.Of(parameter);
+            var attrs = parameter.GetAttributes().ToArray();
+            return attrs.Length == 0 ? serviceInfo
+                : serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
+        }
+
+        private static readonly PropertiesAndFieldsSelector GetImportedPropertiesAndFields =
+            PropertiesAndFields.All(PropertiesAndFields.Include.All, GetImportedPropertiesAndFieldsOnly);
+
+        private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
+        {
+            var attributes = member.GetAttributes().ToArray();
+            var details = attributes.Length == 0 ? null
+                : GetFirstImportDetailsOrNull(member.GetPropertyOrFieldType(), attributes, request);
+            return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details, request);
+        }
+
+        private static ServiceInfoDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
+        {
+            return GetImportDetails(type, attributes, request) ?? GetImportExternalDetails(type, attributes, request);
+        }
+
+        private static ServiceInfoDetails GetImportDetails(Type reflectedType, Attribute[] attributes, Request request)
+        {
+            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
+            if (import == null)
+                return null;
+
+            var serviceKey = import.ContractName
+                ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null)
+                ?? GetServiceKeyWithMetadataAttribute(reflectedType, attributes, request);
+
+            var ifUnresolved = import.AllowDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
+
+            return ServiceInfoDetails.Of(import.ContractType, serviceKey, ifUnresolved);
+        }
+
+        private static object GetServiceKeyWithMetadataAttribute(Type reflectedType, Attribute[] attributes, Request request)
+        {
+            var meta = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
+            if (meta == null)
+                return null;
+
+            var registry = request.Registry;
+            reflectedType = registry.GetWrappedServiceType(reflectedType);
+            var metadata = meta.Metadata;
+            var factory = registry.GetAllServiceFactories(reflectedType)
+                .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
+                .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, reflectedType, metadata, request);
+
+            return factory.Key;
+        }
+
+        private static ServiceInfoDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, Request request)
+        {
+            var import = GetSingleAttributeOrDefault<ImportExternalAttribute>(attributes);
+            if (import == null)
+                return null;
+
+            var registry = request.Registry;
+            serviceType = import.ContractType ?? registry.GetWrappedServiceType(serviceType);
+            var serviceKey = import.ContractKey;
+
+            if (!registry.IsRegistered(serviceType, serviceKey))
+            {
+                var implementationType = import.ImplementationType ?? serviceType;
+
+                var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
+                var reuse = GetReuseByType(reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType);
+
+                var withConstructor = import.WithConstructor == null ? null
+                    : (ConstructorSelector)((t, _) => t.GetConstructorOrNull(args: import.WithConstructor));
+
+                registry.Register(serviceType, implementationType,
+                    reuse, null, Setup.With(withConstructor, metadata: import.Metadata),
+                    serviceKey, IfAlreadyRegistered.KeepRegistered);
+            }
+
+            return ServiceInfoDetails.Of(serviceType, serviceKey);
+        }
+
+        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(Attribute[] attributes) where TAttribute : Attribute
+        {
+            TAttribute attr = null;
+            for (var i = 0; i < attributes.Length && attr == null; i++)
+                attr = attributes[i] as TAttribute;
+            return attr;
+        }
+
+        #endregion
+
+        #region Implementation
+
+        private static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType, Attribute[] attributes)
         {
             if (attributes.Length == 0 ||
                 attributes.IndexOf(a => a is ExportAttribute || a is ExportAllAttribute) == -1 ||
@@ -164,129 +329,6 @@ namespace DryIoc.MefAttributedModel
             return info;
         }
 
-
-        #region Tools
-
-        public static ConstructorInfo GetImportingConstructor(Type implementationType, Request request)
-        {
-            var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
-            return constructors.Length == 1 ? constructors[0]
-                : constructors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
-                    .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, implementationType);
-        }
-
-        public static IReuse GetReuseByType(Type reuseType)
-        {
-            return reuseType == null ? null
-                : SupportedReuseTypes.GetValueOrDefault(reuseType)
-                    .ThrowIfNull(Error.UNSUPPORTED_REUSE_TYPE, reuseType);
-        }
-
-        public static IReuseWrapper GetReuseWrapperByType(Type reuseWrapperType)
-        {
-            return SupportedReuseWrapperTypes.GetValueOrDefault(reuseWrapperType)
-                .ThrowIfNull(Error.UNSUPPORTED_REUSE_WRAPPER_TYPE, reuseWrapperType);
-        }
-
-        #endregion
-
-        #region Rules
-
-        public static ParameterServiceInfo GetImportedParameter(ParameterInfo parameter, Request request)
-        {
-            var serviceInfo = ParameterServiceInfo.Of(parameter);
-            var attrs = parameter.GetAttributes().ToArray();
-            return attrs.Length == 0 ? serviceInfo
-                : serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
-        }
-
-        public static readonly PropertiesAndFieldsSelector GetImportedPropertiesAndFields =
-            PropertiesAndFields.All(PropertiesAndFields.Include.All, GetImportedPropertiesAndFieldsOnly);
-
-        private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
-        {
-            var attributes = member.GetAttributes().ToArray();
-            var details = attributes.Length == 0 ? null
-                : GetFirstImportDetailsOrNull(member.GetPropertyOrFieldType(), attributes, request);
-            return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details, request);
-        }
-
-        public static ServiceInfoDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
-        {
-            return GetImportDetails(type, attributes, request) ?? GetImportExternalDetails(type, attributes, request);
-        }
-
-        public static ServiceInfoDetails GetImportDetails(Type reflectedType, Attribute[] attributes, Request request)
-        {
-            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
-            if (import == null)
-                return null;
-
-            var serviceKey = import.ContractName
-                ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null)
-                ?? GetServiceKeyWithMetadataAttribute(reflectedType, attributes, request);
-
-            var ifUnresolved = import.AllowDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
-
-            return ServiceInfoDetails.Of(import.ContractType, serviceKey, ifUnresolved);
-        }
-
-        public static object GetServiceKeyWithMetadataAttribute(Type reflectedType, Attribute[] attributes, Request request)
-        {
-            var meta = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
-            if (meta == null)
-                return null;
-
-            var registry = request.Registry;
-            reflectedType = registry.GetWrappedServiceType(reflectedType);
-            var metadata = meta.Metadata;
-            var factory = registry.GetAllServiceFactories(reflectedType)
-                .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
-                .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, reflectedType, metadata, request);
-
-            return factory.Key;
-        }
-
-        public static ServiceInfoDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, Request request)
-        {
-            var import = GetSingleAttributeOrDefault<ImportExternalAttribute>(attributes);
-            if (import == null)
-                return null;
-
-            var registry = request.Registry;
-            serviceType = import.ContractType ?? registry.GetWrappedServiceType(serviceType);
-            var serviceKey = import.ContractKey;
-
-            if (!registry.IsRegistered(serviceType, serviceKey))
-            {
-                var implementationType = import.ImplementationType ?? serviceType;
-
-                var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
-                var reuse = GetReuseByType(reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType);
-
-                var withConstructor = import.WithConstructor == null ? null
-                    : (ConstructorSelector)((t, _) => t.GetConstructorOrNull(args: import.WithConstructor));
-
-                registry.Register(serviceType, implementationType,
-                    reuse, null, Setup.With(withConstructor, metadata: import.Metadata),
-                    serviceKey, IfAlreadyRegistered.KeepRegistered);
-            }
-
-            return ServiceInfoDetails.Of(serviceType, serviceKey);
-        }
-
-        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(Attribute[] attributes) where TAttribute : Attribute
-        {
-            TAttribute attr = null;
-            for (var i = 0; i < attributes.Length && attr == null; i++)
-                attr = attributes[i] as TAttribute;
-            return attr;
-        }
-
-        #endregion
-
-        #region Implementation
-
         private static ExportInfo[] GetExportsFromExportAttribute(ExportAttribute attribute,
             RegistrationInfo currentInfo, Type implementationType)
         {
@@ -294,9 +336,10 @@ namespace DryIoc.MefAttributedModel
                 attribute.ContractName ??
                 (attribute is ExportWithKeyAttribute ? ((ExportWithKeyAttribute)attribute).ContractKey : null));
 
-            var exports = currentInfo.Exports == null ? new[] { export }
-                : !currentInfo.Exports.Contains(export) ? currentInfo.Exports.AppendOrUpdate(export)
-                : null;
+            var currentExports = currentInfo.Exports;
+            var exports = currentExports == null ? new[] { export }
+                : currentExports.Contains(export) ? currentExports 
+                : currentExports.AppendOrUpdate(export);
             return exports;
         }
 
@@ -313,19 +356,20 @@ namespace DryIoc.MefAttributedModel
                     .Select(t => t.GetGenericDefinitionOrNull());
             }
 
-            var exportInfos = allContractTypes
+            var exports = allContractTypes
                 .Select(t => new ExportInfo(t, attribute.ContractName ?? attribute.ContractKey))
                 .ToArray();
-
-            Throw.If(exportInfos.Length == 0, Error.EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES,
+            
+            Throw.If(exports.Length == 0, Error.EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES,
                 implementationType, allContractTypes);
 
-            if (currentInfo.Exports != null)
-                for (var index = 0; index < currentInfo.Exports.Length; index++)
-                    if (!exportInfos.Contains(currentInfo.Exports[index])) // filtering out identical exports
-                        exportInfos = exportInfos.AppendOrUpdate(currentInfo.Exports[index]);
+            var currentExports = currentInfo.Exports;
+            if (currentExports != null)
+                for (var index = 0; index < currentExports.Length; index++)
+                    if (!exports.Contains(currentExports[index])) // filtering out identical exports
+                        exports = exports.AppendOrUpdate(currentExports[index]);
 
-            return exportInfos;
+            return exports;
         }
 
         private static void PopulateWrapperInfoFromAttribute(RegistrationInfo resultInfo, AsWrapperAttribute attribute,
@@ -458,6 +502,8 @@ namespace DryIoc.MefAttributedModel
             "Exported generic wrapper type {0} specifies generic argument index {1} outside of argument list size.";
     }
 
+    /// <summary>Converts provided literal into valid C# code. Used for generating registration code 
+    /// from <see cref="RegistrationInfo"/> DTOs.</summary>
     public static class PrintCode
     {
         public static StringBuilder AppendBool(this StringBuilder code, bool x)
@@ -724,13 +770,19 @@ namespace DryIoc.MefAttributedModel
 
     #region Additional Export/Import attributes
 
+    /// <summary>Base attribute to specify type of reuse (implementing <see cref="IReuse"/>) for annotated class.</summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, Inherited = false)]
     public class ReuseAttribute : Attribute
     {
+        /// <summary>Implementation of <see cref="IReuse"/>. Could be null to specify transient or no reuse.</summary>
         public readonly Type ReuseType;
 
+        /// <summary>Create attribute with specified type implementing <see cref="IReuse"/>.</summary>
+        /// <param name="reuseType">Could be null to specify transient or no reuse.</param>
         public ReuseAttribute(Type reuseType)
         {
+            if (reuseType != null)
+                (typeof(IReuse)).ThrowIfNotSubtypeOf(reuseType);
             ReuseType = reuseType;
         }
     }
@@ -820,8 +872,9 @@ namespace DryIoc.MefAttributedModel
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class AsDecoratorAttribute : Attribute
     {
-        /// <remarks> If <see cref="ContractName"/> specified, it has more priority over <see cref="ContractKey"/>. </remarks>
+        /// <summary>If <see cref="ContractName"/> specified, it has more priority over <see cref="ContractKey"/>. </summary>
         public string ContractName { get; set; }
+
         public object ContractKey { get; set; }
         public Type ConditionType { get; set; }
     }

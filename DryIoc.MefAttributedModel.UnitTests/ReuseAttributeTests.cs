@@ -20,14 +20,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void If_reuse_type_does_not_implement_IReuse_it_should_Throw()
-        {
-            var container = new Container().WithAttributedModel();
-            Assert.Throws<ContainerException>(() => 
-                container.RegisterExports(typeof(ServiceWithBadReuseAttribute)));
-        }
-
-        [Test]
         public void Can_specify_singleton_reuse()
         {
             var container = new Container().WithAttributedModel();
@@ -85,9 +77,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
     [Export, TransientReuse]
     public class ServiceWithReuseAttribute {}
-
-    [Export, Reuse(typeof(string))]
-    public class ServiceWithBadReuseAttribute { }
 
     [Export, SingletonReuse]
     public class ServiceWithSingletonReuse { }
