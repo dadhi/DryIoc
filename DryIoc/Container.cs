@@ -47,7 +47,6 @@ namespace DryIoc
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
         public Container(Rules rules = null)
             : this(rules ?? Rules.Default,
-            Interlocked.Increment(ref _lastRegistryID),
             Ref.Of(HashTree<Type, object>.Empty),
             Ref.Of(HashTree<Type, Factory[]>.Empty),
             Ref.Of(WrappersSupport.Wrappers),
@@ -64,7 +63,7 @@ namespace DryIoc
         public Container WithNewRules(Rules newRules)
         {
             ThrowIfContainerDisposed();
-            return new Container(newRules, _registryID, _factories, _decorators, _wrappers, _singletonScope, _currentScope);
+            return new Container(newRules, _factories, _decorators, _wrappers, _singletonScope, _currentScope);
         }
 
         /// <example>
@@ -76,10 +75,10 @@ namespace DryIoc
         /// }
         /// ]]></code>
         /// </example>
-        public Container OpenScope()
+        public Container OpenScope2()
         {
             ThrowIfContainerDisposed();
-            return new Container(Rules, _registryID, _factories, _decorators, _wrappers, _singletonScope, new Scope());
+            return new Container(Rules, _factories, _decorators, _wrappers, _singletonScope, new Scope());
         }
 
         /// <summary>Synonym to <see cref="OpenScope"/>.</summary>
@@ -87,6 +86,14 @@ namespace DryIoc
         public Container BeginScope()
         {
             return OpenScope();
+        }
+
+        public Container OpenScope()
+        {
+            ThrowIfContainerDisposed();
+            return new Container(Rules,
+                Ref.Of(_factories.Value), Ref.Of(_decorators.Value), Ref.Of(_wrappers.Value), 
+                _singletonScope, new Scope());
         }
 
         public Container CreateChildContainer()
@@ -108,7 +115,7 @@ namespace DryIoc
         public Container WipeCache()
         {
             ThrowIfContainerDisposed();
-            return new Container(Rules, _registryID, _factories, _decorators, _wrappers, _singletonScope, _currentScope);
+            return new Container(Rules, _factories, _decorators, _wrappers, _singletonScope, _currentScope);
         }
 
         /// <summary>Disposes container current scope and that means container itself.</summary>
@@ -806,7 +813,11 @@ namespace DryIoc
                         : factorySelector(new[] { new KeyValuePair<object, Factory>(serviceKey, factory) });
                 }
 
-                var defaultFactories = factories.Enumerate().Where(x => x.Key is DefaultKey).ToArray();
+                var condition = factorySelector != null ? (Func<KV<object, Factory>, bool>)
+                      (x => x.Key is DefaultKey) : 
+                      (x => x.Key is DefaultKey && x.Value.RegistryID == _registryID);
+                
+                var defaultFactories = factories.Enumerate().Where(condition).ToArray();
                 if (defaultFactories.Length != 0)
                     return factorySelector != null
                         ? factorySelector(defaultFactories.Select(kv => new KeyValuePair<object, Factory>(kv.Key, kv.Value)))
@@ -835,14 +846,18 @@ namespace DryIoc
         private readonly ResolutionState _resolutionState;
 
         private Container(
-            Rules rules, int registryID,
+            Rules rules,
             Ref<HashTree<Type, object>> factories,
             Ref<HashTree<Type, Factory[]>> decorators,
             Ref<HashTree<Type, Factory>> wrappers,
-            Scope singletonScope, Scope currentScope = null)
+            Scope singletonScope, Scope currentScope = null,
+            HashTree<Type, FactoryDelegate> resolvedDefaultDelegates = null,
+            HashTree<Type, HashTree<object, FactoryDelegate>> resolvedKeyedDelegates = null,
+            ResolutionState resolutionState = null)
         {
+            _registryID = Interlocked.Increment(ref _lastRegistryID);
+
             Rules = rules;
-            _registryID = registryID;
 
             _factories = factories;
             _decorators = decorators;
@@ -851,9 +866,9 @@ namespace DryIoc
             _singletonScope = singletonScope;
             _currentScope = currentScope ?? singletonScope;
 
-            _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
-            _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
-            _resolutionState = new ResolutionState();
+            _resolvedDefaultDelegates = resolvedDefaultDelegates ?? HashTree<Type, FactoryDelegate>.Empty;
+            _resolvedKeyedDelegates = resolvedKeyedDelegates ?? HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
+            _resolutionState = resolutionState ?? new ResolutionState();
 
             EmptyRequest = Request.CreateEmpty(new WeakReference(this), new WeakReference(_resolutionState));
         }
