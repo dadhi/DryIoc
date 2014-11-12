@@ -233,7 +233,6 @@ namespace DryIoc.UnitTests
             public object GetOrAdd(int id, Func<object> factory)
             {
                 var threadId = Thread.CurrentThread.ManagedThreadId;
-
                 var threadScope = _threadScopes.Value.GetValueOrDefault(threadId);
                 if (threadScope == null)
                     _threadScopes.Swap(s => s.AddOrUpdate(threadId, threadScope = new Scope(), 
@@ -241,7 +240,7 @@ namespace DryIoc.UnitTests
                 return threadScope.GetOrAdd(id, factory);
             }
 
-            private readonly Ref<HashTree<int, Scope>> _threadScopes = Ref.Of(HashTree<int, Scope>.Empty);
+            private readonly Ref<HashTree<int, IScope>> _threadScopes = Ref.Of(HashTree<int, IScope>.Empty);
         }
     }
 

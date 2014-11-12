@@ -11,10 +11,10 @@ namespace DryIoc.UnitTests
         {
             var store = AppendableArray<string>.Empty;
             store = store
-                .Append("a")
-                .Append("b")
-                .Append("c")
-                .Append("d");
+                .AppendOrUpdate("a")
+                .AppendOrUpdate("b")
+                .AppendOrUpdate("c")
+                .AppendOrUpdate("d");
 
             Assert.AreEqual("d", store.Get(3));
             Assert.AreEqual("c", store.Get(2));
@@ -28,10 +28,10 @@ namespace DryIoc.UnitTests
             var store = AppendableArray<string>.Empty;
 
             store = store
-                .Append("a")
-                .Append("b")
-                .Append("c")
-                .Append("d");
+                .AppendOrUpdate("a")
+                .AppendOrUpdate("b")
+                .AppendOrUpdate("c")
+                .AppendOrUpdate("d");
 
             var i = store.Length - 1; 
 
@@ -51,7 +51,7 @@ namespace DryIoc.UnitTests
         {
             var store = AppendableArray<string>.Empty;
 
-            store = store.Append("a");
+            store = store.AppendOrUpdate("a");
 
             Assert.AreEqual(-1, store.IndexOf("b"));
         }
@@ -62,9 +62,9 @@ namespace DryIoc.UnitTests
             var store = AppendableArray<string>.Empty;
 
             store = store
-                .Append("a")
-                .Append("b")
-                .Append("c");
+                .AppendOrUpdate("a")
+                .AppendOrUpdate("b")
+                .AppendOrUpdate("c");
 
             Assert.AreEqual(1, store.IndexOf("b"));
         }
@@ -75,7 +75,7 @@ namespace DryIoc.UnitTests
             var nodeArrayLength = AppendableArray<int>.NODE_ARRAY_SIZE;
             var array = AppendableArray<int>.Empty;
             for (var i = 0; i <= nodeArrayLength; i++)
-                array = array.Append(i);
+                array = array.AppendOrUpdate(i);
 
             var item = array.Get(nodeArrayLength);
 
@@ -94,7 +94,7 @@ namespace DryIoc.UnitTests
                 var item = new Foo { Index = index };
 
                 list.Add(item);
-                array = array.Append(item);
+                array = array.AppendOrUpdate(item);
             }
 
             for (var index = 0; index < list.Count; ++index)

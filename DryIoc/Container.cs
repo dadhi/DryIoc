@@ -75,10 +75,11 @@ namespace DryIoc
         /// }
         /// ]]></code>
         /// </example>
-        public Container OpenScope2()
+        public Container OpenScope()
         {
             ThrowIfContainerDisposed();
-            return new Container(Rules, _factories, _decorators, _wrappers, _singletonScope, new Scope());
+            return new Container(Rules, _factories, _decorators, _wrappers, _singletonScope, new Scope(), 
+                _resolvedDefaultDelegates, _resolvedKeyedDelegates, _resolutionState);
         }
 
         /// <summary>Synonym to <see cref="OpenScope"/>.</summary>
@@ -86,14 +87,6 @@ namespace DryIoc
         public Container BeginScope()
         {
             return OpenScope();
-        }
-
-        public Container OpenScope()
-        {
-            ThrowIfContainerDisposed();
-            return new Container(Rules,
-                Ref.Of(_factories.Value), Ref.Of(_decorators.Value), Ref.Of(_wrappers.Value), 
-                _singletonScope, new Scope());
         }
 
         public Container CreateChildContainer()
@@ -744,8 +737,10 @@ namespace DryIoc
                             case IfAlreadyRegistered.KeepRegistered:
                                 return oldValue;
                             case IfAlreadyRegistered.UpdateRegistered:
+                                RemoveDefaultResolvedDelegate(serviceType);
                                 return factory;
                             default:
+                                RemoveDefaultResolvedDelegate(serviceType);
                                 return new FactoriesEntry(DefaultKey.Default.Next(), HashTree<object, Factory>.Empty
                                     .AddOrUpdate(DefaultKey.Default, (Factory)oldValue)
                                     .AddOrUpdate(DefaultKey.Default.Next(), factory));
@@ -762,8 +757,10 @@ namespace DryIoc
                         case IfAlreadyRegistered.KeepRegistered:
                             return oldValue;
                         case IfAlreadyRegistered.UpdateRegistered:
+                            RemoveDefaultResolvedDelegate(serviceType);
                             return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.Update(oldEntry.LastDefaultKey, factory));
                         default: // just add another default factory
+                            RemoveDefaultResolvedDelegate(serviceType);
                             var newDefaultKey = oldEntry.LastDefaultKey.Next();
                             return new FactoriesEntry(newDefaultKey, oldEntry.Factories.AddOrUpdate(newDefaultKey, factory));
                     }
@@ -785,6 +782,11 @@ namespace DryIoc
                         : Throw.No<Factory>(Error.REGISTERING_WITH_DUPLICATE_SERVICE_KEY, serviceType, serviceKey, oldFactory)));
                 }));
             }
+        }
+
+        private void RemoveDefaultResolvedDelegate(Type serviceType)
+        {
+            _resolvedDefaultDelegates = _resolvedDefaultDelegates.RemoveOrUpdate(serviceType);
         }
 
         private Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey,
@@ -868,7 +870,8 @@ namespace DryIoc
 
             _resolvedDefaultDelegates = resolvedDefaultDelegates ?? HashTree<Type, FactoryDelegate>.Empty;
             _resolvedKeyedDelegates = resolvedKeyedDelegates ?? HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
-            _resolutionState = resolutionState ?? new ResolutionState();
+            _resolutionState = resolutionState != null ? resolutionState.Copy() : new ResolutionState();
+            _resolutionState.AddOrUpdateItem(_currentScope, 0);
 
             EmptyRequest = Request.CreateEmpty(new WeakReference(this), new WeakReference(_resolutionState));
         }
@@ -928,7 +931,15 @@ namespace DryIoc
     /// <summary>Holds service expression cache, and state items passed to <see cref="FactoryDelegate"/> in resolution root.</summary>
     public sealed class ResolutionState : IDisposable
     {
-        public static readonly ParameterExpression ItemsParamExpr = Expression.Parameter(typeof(AppendableArray<object>), "items");
+        public static readonly ParameterExpression StateParamExpr = Expression.Parameter(typeof(AppendableArray<object>), "state");
+
+        public ResolutionState() 
+            : this(AppendableArray<object>.Empty, HashTree<int, Expression>.Empty, HashTree<int, Expression>.Empty) {}
+
+        public ResolutionState Copy()
+        {
+            return new ResolutionState(_items, _itemsExpressions, _factoryExpressions);
+        }
 
         public AppendableArray<object> Items
         {
@@ -942,10 +953,17 @@ namespace DryIoc
             {
                 index = x.IndexOf(item);
                 if (index == -1)
-                    index = (x = x.Append(item)).Length - 1;
+                    index = (x = x.AppendOrUpdate(item)).Length - 1;
                 return x;
             });
             return index;
+        }
+
+        public void AddOrUpdateItem(object item, int index)
+        {
+            index.ThrowIf(index < 0);
+            Ref.Swap(ref _items, items =>
+                items.AppendOrUpdate(item, index = index >= items.Length ? items.Length : index));
         }
 
         public Expression GetItemExpression(int itemIndex, Type itemType)
@@ -954,7 +972,7 @@ namespace DryIoc
             if (itemExpr == null)
             {
                 var indexExpr = Expression.Constant(itemIndex, typeof(int));
-                itemExpr = Expression.Convert(Expression.Call(ItemsParamExpr, _getItemMethod, indexExpr), itemType);
+                itemExpr = Expression.Convert(Expression.Call(StateParamExpr, _getItemMethod, indexExpr), itemType);
                 Interlocked.Exchange(ref _itemsExpressions, _itemsExpressions.AddOrUpdate(itemIndex, itemExpr));
             }
             return itemExpr;
@@ -992,14 +1010,25 @@ namespace DryIoc
 
         private static readonly MethodInfo _getItemMethod = typeof(AppendableArray<object>).GetDeclaredMethod("Get");
 
-        private AppendableArray<object> _items = AppendableArray<object>.Empty;
-        private HashTree<int, Expression> _itemsExpressions = HashTree<int, Expression>.Empty;
-        private HashTree<int, Expression> _factoryExpressions = HashTree<int, Expression>.Empty;
+        private AppendableArray<object> _items;
+        private HashTree<int, Expression> _itemsExpressions;
+        private HashTree<int, Expression> _factoryExpressions;
+
+        private ResolutionState(
+            AppendableArray<object> items,
+            HashTree<int, Expression> itemsExpressions,
+            HashTree<int, Expression> factoryExpressions)
+        {
+            _items = items;
+            _itemsExpressions = itemsExpressions;
+            _factoryExpressions = factoryExpressions;
+        }
 
         #endregion
     }
 
-    /// <summary>Immutable array based on wide hash tree, where each node is sub-array with predefined size: 32 is default.
+    /// <summary>Immutable array based on wide hash tree, 
+    /// where each node is sub-array with predefined size: 32 is by default.
     /// Array supports only append, no remove.</summary>
     /// <typeparam name="T">Array item type.</typeparam>
     public sealed class AppendableArray<T>
@@ -1010,12 +1039,18 @@ namespace DryIoc
         /// <summary>Number of items in array.</summary>
         public readonly int Length;
 
-        /// <summary>Appends value to array.</summary>
-        /// <param name="value">Value to append.</param> <returns>New array with appended value.</returns>
-        public AppendableArray<T> Append(T value)
+        /// <summary>Appends value, or updates value at specified index.</summary>
+        /// <param name="value">Value to append.</param> 
+        /// <param name="index">(optional) If specified, says where to update.</param>
+        /// <returns>New array with appended value.</returns>
+        public AppendableArray<T> AppendOrUpdate(T value, int index = -1)
         {
-            return new AppendableArray<T>(Length + 1,
-                _tree.AddOrUpdate(Length >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
+            return index == -1 || index >= Length
+                ? new AppendableArray<T>(Length + 1,
+                    _tree.AddOrUpdate(Length >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append))
+                : new AppendableArray<T>(Length,
+                    _tree.AddOrUpdate(index >> NODE_ARRAY_BIT_COUNT, new[] { value },
+                        (oldValue, newValue) => oldValue.AppendOrUpdate(newValue[0], index & NODE_ARRAY_BIT_MASK)));
         }
 
         /// <summary>Returns index of first equal value in array if found, or -1 otherwise.</summary>
@@ -1067,13 +1102,13 @@ namespace DryIoc
     }
 
     /// <summary>The delegate type which is actually used to create service instance by container.
-    /// Delegate instance required to be static with all information supplied by <paramref name="items"/> and <paramref name="scope"/>
+    /// Delegate instance required to be static with all information supplied by <paramref name="state"/> and <paramref name="scope"/>
     /// parameters. The requirement is due to enable compilation to DynamicMethod in DynamicAssembly, and also to simplify
     /// state management: and so minimize memory leaks.</summary>
-    /// <param name="items">All the state items available in resolution root (<see cref="ResolutionState"/>).</param>
+    /// <param name="state">All the state items available in resolution root (<see cref="ResolutionState"/>).</param>
     /// <param name="scope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
     /// <returns>Created service object.</returns>
-    public delegate object FactoryDelegate(AppendableArray<object> items, IScope scope);
+    public delegate object FactoryDelegate(AppendableArray<object> state, IScope scope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
     public static partial class FactoryCompiler
@@ -1085,7 +1120,7 @@ namespace DryIoc
                 expression = ((UnaryExpression)expression).Operand;
             if (expression.Type.IsValueType())
                 expression = Expression.Convert(expression, typeof(object));
-            return Expression.Lambda<FactoryDelegate>(expression, ResolutionState.ItemsParamExpr, Request.ScopeParamExpr);
+            return Expression.Lambda<FactoryDelegate>(expression, ResolutionState.StateParamExpr, Request.ScopeParamExpr);
         }
 
         public static FactoryDelegate CompileToDelegate(this Expression expression, Rules rules)
@@ -3313,7 +3348,7 @@ namespace DryIoc
         protected Expression GetInstantiatedScopedServiceExpressionOrNull(Expression serviceExpr, IScope scope, Request request,
             Type requiredWrapperType = null)
         {
-            var factoryDelegate = serviceExpr.ToFactoryExpression().Compile();
+            var factoryDelegate = serviceExpr.CompileToDelegate(request.Registry.Rules);
 
             var wrappers = Setup.ReuseWrappers;
             var serviceType = serviceExpr.Type;

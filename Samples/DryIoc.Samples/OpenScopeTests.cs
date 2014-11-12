@@ -58,6 +58,7 @@ namespace DryIoc.Samples
             container.Register<IServ, Serv>(Shared.InContainer);
 
             var client = container.Resolve<IClient>();
+            Assert.That(client, Is.InstanceOf<Client>());
             Assert.That(client.Dep, Is.InstanceOf<Dep>());
             Assert.That(client.Serv, Is.InstanceOf<Serv>());
 
@@ -71,6 +72,9 @@ namespace DryIoc.Samples
                 Assert.That(scopedClient.Dep, Is.InstanceOf<DepScoped>());
                 Assert.That(scopedClient.Serv, Is.InstanceOf<Serv>());
             }
+
+            client = container.Resolve<IClient>();
+            Assert.That(client, Is.InstanceOf<Client>());
         }
 
         internal interface IDep { }

@@ -35,5 +35,33 @@ namespace DryIoc.UnitTests
             service = container.Resolve<ServiceWithDependency>();
             Assert.That(service.Dependency, Is.InstanceOf<Foo1>());
         }
+
+        [Test]
+        public void Should_throw_for_second_default_registration()
+        {
+            var container = new Container();
+
+            container.Register<IService, Service>();
+            var service = container.Resolve<IService>();
+            Assert.That(service, Is.InstanceOf<Service>());
+
+            container.Register<IService, AnotherService>();
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<IService>());
+        }
+
+        [Test]
+        public void Should_return_updated_registration()
+        {
+            var container = new Container();
+
+            container.Register<IService, Service>();
+            var service = container.Resolve<IService>();
+            Assert.That(service, Is.InstanceOf<Service>());
+
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateRegistered);
+            service = container.Resolve<IService>();
+            Assert.That(service, Is.InstanceOf<AnotherService>());
+        }
     }
 }
