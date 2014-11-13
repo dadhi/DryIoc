@@ -48,7 +48,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent.cs" />
-    <Compile Include="Issue_MembersSetByConstructorShouldNotBeResetByPropsAndFieldsResolution.cs" />
+    <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
     <Compile Include="Issue45_UnregisterOpenGenericAfterItWasResolvedOnce.cs" />
@@ -57,7 +57,7 @@
     <Compile Include="Issue64_ScopeAndChildContainerAccessAfterDisposal.cs" />
     <Compile Include="Issue69_RecognizeGenericParameterConstraints.cs" />
     <Compile Include="Issue81_SupportForOptionalParametersInConstructor.cs" />
-    <Compile Include="Issue_SkipIndexerOnAllPropertiesInjection.cs" />
+    <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

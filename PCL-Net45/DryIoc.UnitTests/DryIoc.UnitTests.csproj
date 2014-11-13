@@ -63,6 +63,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\CompositePatternTests.cs">
       <Link>CompositePatternTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\ConstructionTests.cs">
+      <Link>ConstructionTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\ContainerTests.cs">
       <Link>ContainerTests.cs</Link>
     </Compile>

@@ -170,7 +170,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static ConstructorInfo GetImportingConstructor(Type implementationType, Request request)
+        private static ConstructionInfo GetImportingConstructor(Type implementationType, Request request)
         {
             var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
             return constructors.Length == 1 ? constructors[0]
@@ -835,7 +835,7 @@ namespace DryIoc.MefAttributedModel
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class ExportAllAttribute : Attribute
     {
-        public static Func<Type, bool> ExportedTypes = Registrator.DefaultImplementedTypesForRegisterAll;
+        public static Func<Type, bool> ExportedTypes = Registrator.DefaultServiceTypesForRegisterAll;
 
         /// <remarks>Specifies service key if <see cref="ContractName"/> is not specified.</remarks>
         public object ContractKey { get; set; }

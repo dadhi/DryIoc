@@ -2,7 +2,7 @@
 
 namespace DryIoc.IssuesTests
 {
-    class Issue_SkipIndexerOnAllPropertiesInjection
+    class Issue86_SkipIndexerOnAllPropertiesInjection
     {
         [Test]
         public void Test()
@@ -16,7 +16,7 @@ namespace DryIoc.IssuesTests
             );
         }
 
-        public class FooWithIndexer
+        internal class FooWithIndexer
         {
             public IService this[int index]
             {

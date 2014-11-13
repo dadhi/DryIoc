@@ -425,7 +425,7 @@ namespace DryIoc.UnitTests
 
         #region CUT
 
-        public class FooWithIndexer
+        internal class FooWithIndexer
         {
             public object this[int index]
             {
@@ -434,12 +434,12 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class SomeBlah
+        internal class SomeBlah
         {
             public IService Uses { get; set; }
         }
 
-        public class ClientWithStringParam
+        internal class ClientWithStringParam
         {
             public string X { get; private set; }
 
@@ -449,7 +449,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class ClientWithServiceAndStringParam
+        internal class ClientWithServiceAndStringParam
         {
             public IService Service { get; private set; }
             public string X { get; private set; }
@@ -461,7 +461,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class ClientWithServiceAndStringProperty
+        internal class ClientWithServiceAndStringProperty
         {
             public IService Service { get; set; }
             public string Message { get; set; }
@@ -490,7 +490,7 @@ namespace DryIoc.UnitTests
             public AnotherService PNonResolvable { get; set; }
         }
 
-        public class Client
+        internal class Client
         {
             public Dep Dep { get; set; }
 

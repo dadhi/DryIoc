@@ -49,7 +49,7 @@ namespace DryIoc.Samples
                 else
                 {   // By default register type with all of its interfaces as services. 
                     // Register with Singleton reuse.
-                    container.RegisterAll(implementingClass, Reuse.Singleton, types: t => t.IsInterface);
+                    container.RegisterAll(implementingClass, Reuse.Singleton, whereServiceTypes: t => t.IsInterface);
                 }
             }
         }
