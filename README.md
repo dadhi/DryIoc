@@ -14,17 +14,17 @@ DryIoc is small, fast, capable IoC Container for .NET
 **Provides [Autofac]+[MEF] level of functionality but performs faster and small enough to be included as code.**
 
 * Designed for low-ceremony use, performance and extensibility.
-* Supports .NET 3.5, 4.0, 4.5 _([PCL] planned for v2)_
+* Supports .NET 3.5, 4.0, 4.5 _([PCL] is available in v2 pre-release package)_
 * Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
 * Extensions: [MefAttributedModel] as [code][DryIoc.MefAttributedModel] or [dll][DryIoc.MefAttributedModel.dll].
 * [Docs are in a Wiki][Wiki] _(currently being updated for v2)_
 * Latest stable version is **1.4.1** [![Build status](https://ci.appveyor.com/api/projects/status/jfq01d9wcs4vcwpf/branch/default)](https://ci.appveyor.com/project/MaksimVolkau/dryioc/branch/default)
-* __Version 2.0 preview packages are now available at NuGet:__ `PM> Install-Package DryIoc -IncludePrerelease`
+* __v2.0 preview packages are now at NuGet:__ `PM> Install-Package DryIoc -IncludePrerelease`
 
 #### Fast
 * On par with fastest containers listed in [IoC Container Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
 * General use-cases optimized for max speed.
-* Callstack depth preserved as shallow as possible.
+* Call-stack depth preserved as shallow as possible.
 * Memory footprint preserved as low as possible.
 
 #### Small
@@ -46,12 +46,12 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Constructor, property and field injection. *You can select What and Where to inject.*
 * Delegate factory registration.
 * Auto-registration via __MefAttributedModel__ extension (see below).
-* Tools for custom auto-wiring and registation. Check `DryIoc.Samples.AutoWiring` for example.
+* Tools for custom auto-wiring and registration. Check `DryIoc.Samples.AutoWiring` for example.
 * `IsRegistered` check.
 * Open-generics without special syntax.
-* Arbitrary metadata object accociated with implementation.
+* Arbitrary metadata object associated with implementation.
 * Multiple named and unnamed implementations of single service.
-* Multiple services of single impelementation.
+* Multiple services of single implementation.
 * Resolution of multiple implementations as:
     * `IEnumerable<T>` or `T[]`. *Static view - next resolution woN't see new registrations.*
     * `Many<T>`. *Dynamic view - next resolution Will see new registrations.*
