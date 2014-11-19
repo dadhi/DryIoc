@@ -256,10 +256,10 @@ namespace DryIoc.MefAttributedModel
                 var reuse = GetReuseByType(reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType);
 
                 var withConstructor = import.WithConstructor == null ? null
-                    : (ConstructorSelector)(r => r.ImplementationType.GetConstructorOrNull(args: import.WithConstructor));
+                    : (Func<Type, ConstructorInfo>)(t => t.GetConstructorOrNull(args: import.WithConstructor));
 
                 registry.Register(serviceType, implementationType,
-                    reuse, null, null, Setup.With(withConstructor, metadata: import.Metadata),
+                    reuse, withConstructor, null, Setup.With(metadata: import.Metadata),
                     serviceKey, IfAlreadyRegistered.KeepRegistered);
             }
 
@@ -618,7 +618,7 @@ namespace DryIoc.MefAttributedModel
 
         public Factory CreateFactory()
         {
-            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), null, GetSetup());
+            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), setup: GetSetup());
         }
 
         /// <summary>Create factory setup from DTO data.</summary>
@@ -774,10 +774,10 @@ namespace DryIoc.MefAttributedModel
         public SetupDecorator GetSetup(Func<object> lazyMetadata = null)
         {
             if (ConditionType != null)
-                return SetupDecorator.WithCondition(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).CanApply);
+                return SetupDecorator.With(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).CanApply);
 
             if (ServiceKeyInfo != ServiceKeyInfo.Default || lazyMetadata != null)
-                return SetupDecorator.WithCondition(request =>
+                return SetupDecorator.With(request =>
                     (ServiceKeyInfo.Key == null || Equals(ServiceKeyInfo.Key, request.ServiceKey)) &&
                     (lazyMetadata == null || Equals(lazyMetadata(), request.ResolvedFactory.Setup.Metadata)));
 

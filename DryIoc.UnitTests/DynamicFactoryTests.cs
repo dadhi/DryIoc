@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -22,43 +23,39 @@ namespace DryIoc.UnitTests
             Assert.That(service.Parameter.CanCreate, Is.True);
             Assert.That(service.Parameter.Create(), Is.Not.Null);
 		}
+
+        public class ServiceWithNotRegisteredLazyParameter
+        {
+            public DynamicFactory<NotRegisteredService> Parameter { get; set; }
+
+            public ServiceWithNotRegisteredLazyParameter(DynamicFactory<NotRegisteredService> parameter)
+            {
+                Parameter = parameter;
+            }
+        }
+
+        public class NotRegisteredService
+        {
+        }
+
+        public class DynamicFactory<T>
+        {
+            public DynamicFactory(Container container)
+            {
+                _container = container;
+            }
+
+            public bool CanCreate
+            {
+                get { return _container.IsRegistered(typeof(T)); }
+            }
+
+            public T Create()
+            {
+                return _container.Resolve<T>();
+            }
+
+            private readonly Container _container;
+        }
 	}
-
-	#region CUT
-
-	public class ServiceWithNotRegisteredLazyParameter
-	{
-		public DynamicFactory<NotRegisteredService> Parameter { get; set; }
-
-		public ServiceWithNotRegisteredLazyParameter(DynamicFactory<NotRegisteredService> parameter)
-		{
-			Parameter = parameter;
-		}
-	}
-
-	public class NotRegisteredService
-	{
-	}
-
-	public class DynamicFactory<T>
-	{
-		public DynamicFactory(Container container)
-		{
-			_container = container;
-		}
-
-		public bool CanCreate
-		{
-			get { return _container.IsRegistered(typeof (T)); }
-		}
-
-		public T Create()
-		{
-			return _container.Resolve<T>();
-		}
-
-		private readonly Container _container;
-	}
-
-	#endregion
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -174,7 +175,7 @@ namespace DryIoc.UnitTests
             Assert.That(service.Dependency, Is.Not.Null);
         }
 
-        [Test]
+        [Test][Ignore]
         public void Can_resolve_Func_with_args_of_Wrapper()
         {
             var container = new Container();
@@ -183,6 +184,20 @@ namespace DryIoc.UnitTests
 
             var func = container.Resolve<Func<bool, Lazy<IServiceWithParameterAndDependency>>>();
             var service = func(true).Value;
+
+            Assert.That(service.Flag, Is.True);
+            Assert.That(service.Dependency, Is.Not.Null);
+        }
+
+        [Test][Ignore]
+        public void Can_resolve_Func_with_args_of_LazyEnumerable()
+        {
+            var container = new Container();
+            container.Register<IServiceWithParameterAndDependency, ServiceWithParameterAndDependency>();
+            container.Register(typeof(Service));
+
+            var func = container.Resolve<Func<bool, LazyEnumerable<IServiceWithParameterAndDependency>>>();
+            var service = func(true).First();
 
             Assert.That(service.Flag, Is.True);
             Assert.That(service.Dependency, Is.Not.Null);

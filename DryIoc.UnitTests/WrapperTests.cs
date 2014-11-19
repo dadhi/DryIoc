@@ -86,11 +86,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(WeakReference),
-                new ReflectionFactory(typeof(WeakReference),
-                    setup: SetupWrapper.With(
-                        r => r.ImplementationType.GetConstructorOrNull(args: typeof(object)),
-                        getWrappedServiceType: _ => typeof(object))));
+            container.Register(typeof(WeakReference), 
+                withConstructor: t => t.GetConstructorOrNull(args: typeof(object)),
+                setup: SetupWrapper.With(_ => typeof(object)));
 
             container.Register<Service>();
 

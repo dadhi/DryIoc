@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
+            container.Register<SomeBlah>(rules: InjectionRules.With(propertiesAndFields:
                 r => r.ImplementationType.GetTypeInfo().DeclaredProperties.Select(PropertyOrFieldServiceInfo.Of)));
             container.Register<IService, Service>();
 
@@ -27,7 +27,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<SomeBlah>(setup: Setup.With(propertiesAndFields:
+            container.Register<SomeBlah>(rules: InjectionRules.With(propertiesAndFields:
                 r => r.ImplementationType.GetTypeInfo().DeclaredProperties.Select(p =>
                     p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).WithDetails(ServiceInfoDetails.Of(typeof(Service)), r) : null)));
             container.Register<Service>();
@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
         public void Can_inject_primitive_value()
         {
             var container = new Container();
-            container.Register<ClientWithStringParam>(setup: Setup.With(parameters: Parameters.Of.Name("x", "hola")));
+            container.Register<ClientWithStringParam>(rules: Parameters.Of.Name("x", "hola"));
 
             var client = container.Resolve<ClientWithStringParam>();
 
@@ -51,7 +51,7 @@ namespace DryIoc.UnitTests
         public void Can_inject_primitive_value_by_type()
         {
             var container = new Container();
-            container.Register<ClientWithStringParam>(setup: Setup.With(parameters: Parameters.Of.Name("x", "hola")));
+            container.Register<ClientWithStringParam>(rules: Parameters.Of.Name("x", "hola"));
 
             var client = container.Resolve<ClientWithStringParam>();
 
@@ -62,7 +62,7 @@ namespace DryIoc.UnitTests
         public void CanNot_inject_primitive_value_of_different_type()
         {
             var container = new Container();
-            container.Register<ClientWithStringParam>(setup: Setup.With(parameters: Parameters.Of.Name("x", 500)));
+            container.Register<ClientWithStringParam>(rules: Parameters.Of.Name("x", 500));
 
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<ClientWithStringParam>());
@@ -74,7 +74,7 @@ namespace DryIoc.UnitTests
         public void Can_inject_primitive_value_and_resolve_the_rest_of_parameters()
         {
             var container = new Container();
-            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(parameters: Parameters.Of.Type(typeof(string), "hola")));
+            container.Register<ClientWithServiceAndStringParam>(rules: Parameters.Of.Type(typeof(string), "hola"));
             container.Register<IService, Service>();
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
@@ -87,8 +87,7 @@ namespace DryIoc.UnitTests
         public void Can_inject_primitive_value_and_handle_ReturnDefault_for_the_rest_of_parameters()
         {
             var container = new Container();
-            container.Register<ClientWithServiceAndStringParam>(
-                setup: Setup.With(parameters: Parameters.DefaultIfUnresolved.Name("x", "hola")));
+            container.Register<ClientWithServiceAndStringParam>(rules: Parameters.DefaultIfUnresolved.Name("x", "hola"));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
 
@@ -101,8 +100,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Service>(named: "service");
-            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(parameters:
-                Parameters.Of.Name("x", "hola").Name("service", r => r.Resolve<IService>("service", requiredServiceType: typeof(Service)))));
+            container.Register<ClientWithServiceAndStringParam>(rules: Parameters.Of
+                .Name("x", "hola")
+                .Name("service", r => r.Resolve<IService>("service", requiredServiceType: typeof(Service))));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
 
@@ -115,10 +115,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Service>();
-            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(parameters:
-                Parameters.Of
-                    .Name("x", "hola")
-                    .Type(typeof(Service), r => r.Resolve<IService>(typeof(Service)))));
+            container.Register<ClientWithServiceAndStringParam>(rules:
+                Parameters.Of.Name("x", "hola").Type(typeof(Service), r => r.Resolve<IService>(typeof(Service))));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
 
@@ -131,8 +129,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Service>(named: "dependency");
-            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(
-                parameters: Parameters.Of.Name("x", "hola").Name("service", typeof(Service), "dependency")));
+            container.Register<ClientWithServiceAndStringParam>(rules:
+                Parameters.Of.Name("x", "hola").Name("service", typeof(Service), "dependency"));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
 
@@ -145,10 +143,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Service>(named: "dependency");
-            container.Register<ClientWithServiceAndStringParam>(setup: Setup.With(
-                parameters: Parameters.Of
+            container.Register<ClientWithServiceAndStringParam>(rules: Parameters.Of
                     .Name("x", "hola")
-                    .Condition(p => typeof(IService).IsAssignableTo(p.ParameterType), typeof(Service), "dependency")));
+                    .Condition(p => typeof(IService).IsAssignableTo(p.ParameterType), typeof(Service), "dependency"));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
 
@@ -160,8 +157,7 @@ namespace DryIoc.UnitTests
         public void Can_setup_parameter_base_on_its_type()
         {
             var container = new Container();
-            container.Register<ClientWithServiceAndStringParam>(
-                setup: Setup.With(parameters: Parameters.DefaultIfUnresolved.Name("x", "hola")));
+            container.Register<ClientWithServiceAndStringParam>(rules: Parameters.DefaultIfUnresolved.Name("x", "hola"));
 
             var client = container.Resolve<ClientWithServiceAndStringParam>();
 
@@ -174,10 +170,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(named: "dependency");
-            container.Register<ClientWithServiceAndStringProperty>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.Of
+            container.Register<ClientWithServiceAndStringProperty>(rules: PropertiesAndFields.Of
                     .Name("Message", "hell")
-                    .Name("Service", r => r.Resolve<IService>("dependency"))));
+                    .Name("Service", r => r.Resolve<IService>("dependency")));
 
             var client = container.Resolve<ClientWithServiceAndStringProperty>();
 
@@ -190,10 +185,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(named: "dependency");
-            container.Register<ClientWithServiceAndStringProperty>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.Of
-                    .Type(typeof(string), "hell")));
-                    //.With("Service", r => r.Resolve<IService>("dependency"))));
+            container.Register<ClientWithServiceAndStringProperty>(rules: PropertiesAndFields.Of
+                .Type(typeof(string), "hell"));
+                    //.Name("Service", r => r.Resolve<IService>("dependency"))));
 
             var client = container.Resolve<ClientWithServiceAndStringProperty>();
 
@@ -205,8 +199,8 @@ namespace DryIoc.UnitTests
         public void Should_throw_if_property_is_not_found()
         {
             var container = new Container();
-            container.Register<ClientWithServiceAndStringProperty>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.Of.Name("WrongName", "wrong name")));
+            container.Register<ClientWithServiceAndStringProperty>(rules: 
+                PropertiesAndFields.Of.Name("WrongName", "wrong name"));
 
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<ClientWithServiceAndStringProperty>());
@@ -219,8 +213,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.PublicNonPrimitive));
+            container.RegisterAll<ClientWithPropsAndFields>(rules: PropertiesAndFields.PublicNonPrimitive);
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -234,8 +227,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.Of.Name("PWithPrivateSetter")));
+            container.RegisterAll<ClientWithPropsAndFields>(rules: PropertiesAndFields.Of.Name("PWithPrivateSetter"));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -247,8 +239,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.Of.Name("_pPrivate")));
+            container.RegisterAll<ClientWithPropsAndFields>(rules: PropertiesAndFields.Of.Name("_pPrivate"));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -260,8 +251,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.Of.Name("_fPrivate")));
+            container.RegisterAll<ClientWithPropsAndFields>(rules: PropertiesAndFields.Of.Name("_fPrivate"));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -273,8 +263,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.Of.Condition(m => m is FieldInfo)));
+            container.RegisterAll<ClientWithPropsAndFields>(rules: PropertiesAndFields.Of.Condition(m => m is FieldInfo));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -288,10 +277,9 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(named: "another");
 
-            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields
+            container.RegisterAll<ClientWithPropsAndFields>(rules: PropertiesAndFields
                     .All(PropertiesAndFields.Include.All)
-                    .Condition(m => m is FieldInfo, serviceKey: "another")));
+                    .Condition(m => m is FieldInfo, serviceKey: "another"));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -307,8 +295,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.Of.Name("FReadonly")));
+            container.RegisterAll<ClientWithPropsAndFields>(rules: PropertiesAndFields.Of.Name("FReadonly"));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<ClientWithPropsAndFields>());
@@ -323,8 +310,7 @@ namespace DryIoc.UnitTests
 
             container.Register<IService, Service>();
             container.RegisterInstance("Hello string!");
-            container.Register<ClientWithServiceAndStringProperty>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.PublicNonPrimitive));
+            container.Register<ClientWithServiceAndStringProperty>(rules: PropertiesAndFields.PublicNonPrimitive);
 
             var client = container.Resolve<ClientWithServiceAndStringProperty>();
 
@@ -336,8 +322,7 @@ namespace DryIoc.UnitTests
         public void Can_specify_all_to_throw_if_Any_property_is_unresolved()
         {
             var container = new Container();
-            container.Register<ClientWithServiceAndStringProperty>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.All(IfUnresolved.Throw)));
+            container.Register<ClientWithServiceAndStringProperty>(rules: PropertiesAndFields.All(IfUnresolved.Throw));
 
             Assert.Throws<ContainerException>(() => 
                 container.Resolve<ClientWithServiceAndStringProperty>());
@@ -348,8 +333,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.PublicNonPrimitive.Except(m => m is FieldInfo)));
+            container.RegisterAll<ClientWithPropsAndFields>(rules: 
+                PropertiesAndFields.PublicNonPrimitive.Except(m => m is FieldInfo));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
             Assert.That(client.F, Is.Null);
@@ -361,8 +346,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.PublicNonPrimitive.Except(m => m is PropertyInfo)));
+            container.RegisterAll<ClientWithPropsAndFields>(rules: 
+                PropertiesAndFields.PublicNonPrimitive.Except(m => m is PropertyInfo));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
             Assert.That(client.F, Is.InstanceOf<Service>());
@@ -375,12 +360,12 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var resolved = false;
-            container.Register<ClientWithStringParam>(setup: Setup.With(
-                parameters: Parameters.Of.Name("x", _ =>
+            container.Register<ClientWithStringParam>(rules: 
+                Parameters.Of.Name("x", _ =>
                 {
                     resolved = true;
                     return "resolved";
-                })));
+                }));
 
             var getClient = container.Resolve<Func<ClientWithStringParam>>();
 
@@ -393,8 +378,8 @@ namespace DryIoc.UnitTests
         public void Indexer_properties_should_be_ignored_by_All_properties_discovery()
         {
             var container = new Container();
-            container.Register<FooWithIndexer>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.All(IfUnresolved.Throw, PropertiesAndFields.Include.All)));
+            container.Register<FooWithIndexer>(rules: 
+                PropertiesAndFields.All(IfUnresolved.Throw, PropertiesAndFields.Include.All));
 
             Assert.DoesNotThrow(() => 
                 container.Resolve<FooWithIndexer>());
@@ -428,7 +413,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             var defaultDep = new Dep();
-            container.Register<Client>(setup: Setup.With(parameters: Parameters.Of.Name("dep", defaultValue: defaultDep)));
+            container.Register<Client>(rules: Parameters.Of.Name("dep", defaultValue: defaultDep));
 
             var client = container.Resolve<Client>();
 
@@ -440,7 +425,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             var defaultDep = new Dep();
-            container.Register<Client>(setup: Setup.With(parameters: Parameters.Of.Type(typeof(Dep), defaultValue: defaultDep)));
+            container.Register<Client>(rules: Parameters.Of.Type(typeof(Dep), defaultValue: defaultDep));
 
             var client = container.Resolve<Client>();
 
@@ -454,7 +439,9 @@ namespace DryIoc.UnitTests
             public object this[int index]
             {
                 get { return null; }
+                // ReSharper disable ValueParameterNotUsed
                 set { }
+                // ReSharper restore ValueParameterNotUsed
             }
         }
 

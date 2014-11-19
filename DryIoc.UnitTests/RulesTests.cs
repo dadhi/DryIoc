@@ -197,7 +197,6 @@ namespace DryIoc.UnitTests
     {
     }
 
-
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
     public class ImportWithMetadataAttribute : Attribute
     {
@@ -244,6 +243,10 @@ namespace DryIoc.UnitTests
         {
             NamedDependency = namedDependency;
         }
+    }
+
+    class NotRegisteredService
+    {
     }
 
     #endregion

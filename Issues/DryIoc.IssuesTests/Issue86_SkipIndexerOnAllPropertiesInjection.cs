@@ -8,8 +8,7 @@ namespace DryIoc.IssuesTests
         public void Test()
         {
             var container = new Container();
-            container.Register<FooWithIndexer>(setup: Setup.With(
-                propertiesAndFields: PropertiesAndFields.All(IfUnresolved.Throw)));
+            container.Register<FooWithIndexer>(rules: PropertiesAndFields.All(IfUnresolved.Throw));
 
             Assert.DoesNotThrow(() => 
                 container.Resolve<FooWithIndexer>()
@@ -20,14 +19,8 @@ namespace DryIoc.IssuesTests
         {
             public IService this[int index]
             {
-                get
-                {
-                    return null;
-                }
-                set
-                {
-
-                }
+                get { return null; }
+                set { }
             }
         }
 

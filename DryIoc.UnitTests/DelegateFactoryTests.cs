@@ -163,8 +163,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
-            container.Register<ServiceWithClient>(setup: Setup.With(
-                parameters: Parameters.Of.Name("client", r => r.Resolve<SomeClient>())));
+            container.Register<ServiceWithClient>(rules: Parameters.Of.Name("client", r => r.Resolve<SomeClient>()));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<SomeClient>());

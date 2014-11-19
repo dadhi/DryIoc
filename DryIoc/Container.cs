@@ -1176,14 +1176,14 @@ namespace DryIoc
                 new FactoryProvider(_ => new ExpressionFactory(GetLazyEnumerableExpression), SetupWrapper.Default));
 
             // TODO: Complete.
-            //Wrappers = Wrappers.AddOrUpdate(typeof(Lazy<>),
-            //    new FactoryProvider(_ => new ExpressionFactory(GetLazyExpression), SetupWrapper.Default));
-
             Wrappers = Wrappers.AddOrUpdate(typeof(Lazy<>),
-                new ReflectionFactory(typeof(Lazy<>),
-                    setup: SetupWrapper.With(r =>
-                        r.ImplementationType.GetConstructorOrNull(
-                            args: typeof(Func<>).MakeGenericType(r.ImplementationType.GetGenericParamsAndArgs())))));
+                new FactoryProvider(GetLazyFactoryOrNull, SetupWrapper.Default));
+
+            //Wrappers = Wrappers.AddOrUpdate(typeof(Lazy<>),
+            //    new ReflectionFactory(typeof(Lazy<>),
+            //        setup: SetupWrapper.With(r =>
+            //            r.ImplementationType.GetConstructorOrNull(
+            //                args: typeof(Func<>).MakeGenericType(r.ImplementationType.GetGenericParamsAndArgs())))));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
                 new FactoryProvider(GetKeyValuePairFactoryOrNull,
@@ -1192,6 +1192,9 @@ namespace DryIoc
             Wrappers = Wrappers.AddOrUpdate(typeof(Meta<,>),
                 new FactoryProvider(GetMetaFactoryOrNull,
                     SetupWrapper.With(getWrappedServiceType: t => t.GetGenericParamsAndArgs()[0])));
+
+            Wrappers = Wrappers.AddOrUpdate(typeof(ResolutionScoped<>),
+                new FactoryProvider(GetResolutionScopedFactoryOrNull, SetupWrapper.Default));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(DebugExpression<>),
                 new FactoryProvider(_ => new ExpressionFactory(GetDebugExpression), SetupWrapper.Default));
@@ -1202,35 +1205,31 @@ namespace DryIoc
             for (var i = 0; i < FuncTypes.Length; i++)
                 Wrappers = Wrappers.AddOrUpdate(FuncTypes[i], new FactoryProvider(
                     r => new ExpressionFactory(GetFuncExpression),
-                    SetupWrapper.With(getWrappedServiceType: t => t.GetGenericParamsAndArgs().Last())));
-
-            Wrappers = Wrappers.AddOrUpdate(typeof(ResolutionScoped<>),
-                new FactoryProvider(GetResolutionScopedFactoryOrNull, SetupWrapper.Default));
+                    SetupWrapper.With(t => t.GetGenericParamsAndArgs().Last())));
 
             // Reuse wrappers
             Wrappers = Wrappers
                 .AddOrUpdate(typeof(WeakReference), new FactoryProvider(
                     r => new ExpressionFactory(GetReuseWrapperExpressionOrDefault),
-                    SetupWrapper.With(r => r.ImplementationType.GetConstructorOrNull(args: typeof(object)),
-                        getWrappedServiceType: t => typeof(object))))
+                    SetupWrapper.With(t => typeof(object))))
                 .AddOrUpdate(typeof(WeakReferenceProxy<>),
                     new ReflectionFactory(typeof(WeakReferenceProxy<>), setup: SetupWrapper.Default))
 
                 .AddOrUpdate(typeof(ExplicitlyDisposable), new FactoryProvider(
                     r => new ExpressionFactory(GetReuseWrapperExpressionOrDefault),
-                    SetupWrapper.With(getWrappedServiceType: t => typeof(object))))
+                    SetupWrapper.With(t => typeof(object))))
                 .AddOrUpdate(typeof(ExplicitlyDisposableProxy<>),
                     new ReflectionFactory(typeof(ExplicitlyDisposableProxy<>), setup: SetupWrapper.Default))
 
                 .AddOrUpdate(typeof(Disposable), new FactoryProvider(
                     r => new ExpressionFactory(GetReuseWrapperExpressionOrDefault),
-                    SetupWrapper.With(getWrappedServiceType: t => typeof(object))))
+                    SetupWrapper.With(t => typeof(object))))
                 .AddOrUpdate(typeof(DisposableProxy<>),
                     new ReflectionFactory(typeof(DisposableProxy<>), setup: SetupWrapper.Default))
 
                 .AddOrUpdate(typeof(Ref<object>), new FactoryProvider(
                     r => new ExpressionFactory(GetReuseWrapperExpressionOrDefault),
-                    SetupWrapper.With(getWrappedServiceType: t => typeof(object))))
+                    SetupWrapper.With(t => typeof(object))))
                 .AddOrUpdate(typeof(RefProxy<>),
                     new ReflectionFactory(typeof(RefProxy<>), setup: SetupWrapper.Default));
         }
@@ -1315,24 +1314,33 @@ namespace DryIoc
         }
 
         // Result: new Lazy<TService>(() => request.Resolve<TService>());
-        private static Expression GetLazyExpression(Request request)
+        private static Factory GetLazyFactoryOrNull(Request _)
         {
-            var wrapperType = request.ServiceType;
-            var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
+            return new ExpressionFactory(r =>
+            {
+                var wrapperType = r.ServiceType;
+                var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
 
-            var wrapperCtor = wrapperType.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(serviceType));
+                var wrapperCtor = wrapperType.GetConstructorOrNull(args: typeof (Func<>).MakeGenericType(serviceType));
 
-            var requestExpr = request.State.GetOrAddItemExpression(request);
-            var ifUnresolvedExpr = request.State.GetOrAddItemExpression(request.IfUnresolved);
-            var resolveMethod = _resolveMethod.MakeGenericMethod(serviceType);
-            var factoryExpr = Expression.Lambda(Expression.Call(resolveMethod, requestExpr, ifUnresolvedExpr));
+                var resolveMethod = _resolveMethod.MakeGenericMethod(serviceType);
+                var requestExpr = r.State.GetOrAddItemExpression(r);
+                var serviceKeyExp = r.ServiceKey == null ? Expression.Constant(null, typeof(object)) 
+                    : r.State.GetOrAddItemExpression(r.ServiceKey);
+                var ifUnresolvedExpr = r.State.GetOrAddItemExpression(r.IfUnresolved);
+                var requiredServiceKeyExpr = r.RequiredServiceType == null ?Expression.Constant(null, typeof(Type))
+                    : r.State.GetOrAddItemExpression(r.RequiredServiceType);
 
-            var newLazyExpr = Expression.New(wrapperCtor, factoryExpr);
-            return newLazyExpr;
+                var factoryExpr = Expression.Lambda(
+                    Expression.Call(resolveMethod, requestExpr, serviceKeyExp, ifUnresolvedExpr, requiredServiceKeyExpr));
+
+                var newLazyExpr = Expression.New(wrapperCtor, factoryExpr);
+                return newLazyExpr;
+            });
         }
 
         private static readonly MethodInfo _resolveMethod = typeof(Resolver)
-            .GetDeclaredMethod("Resolve", new[] { typeof(IResolver), typeof(IfUnresolved) });
+            .GetDeclaredMethod("Resolve", new[] { typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type) });
 
         private static Expression GetFuncExpression(Request request)
         {
@@ -1466,8 +1474,7 @@ namespace DryIoc
             if (serviceFactory == null)
                 return null;
 
-            var reuse = request.Registry.Rules.ReuseMapping == null
-                ? serviceFactory.Reuse
+            var reuse = request.Registry.Rules.ReuseMapping == null ? serviceFactory.Reuse
                 : request.Registry.Rules.ReuseMapping(serviceFactory.Reuse, serviceRequest);
 
             if (reuse != null && serviceFactory.Setup.ReuseWrappers.IndexOf(w => w.WrapperType == wrapperType) != -1)
@@ -1538,7 +1545,7 @@ namespace DryIoc
 
         public ConstructorSelector Constructor { get { return _injectionRules.Constructor; } }
 
-        public ParameterSelector Parameters { get { return _injectionRules.Parameters; } }
+        public ParameterProvider Parameters { get { return _injectionRules.Parameters; } }
         
         public PropertiesAndFieldsSelector PropertiesAndFields { get { return _injectionRules.PropertiesAndFields; } }
 
@@ -1546,7 +1553,7 @@ namespace DryIoc
         /// <returns>New rules with specified <see cref="InjectionRules"/>.</returns>
         public Rules With(
             ConstructorSelector constructor = null, 
-            ParameterSelector parameters = null,
+            ParameterProvider parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             return new Rules(this)
@@ -1604,7 +1611,7 @@ namespace DryIoc
 
         private Rules()
         {
-            _injectionRules = InjectionRules.Empty;
+            _injectionRules = InjectionRules.Default;
             ThrowIfDepenedencyHasShorterReuseLifespan = true;
         }
 
@@ -1630,14 +1637,17 @@ namespace DryIoc
     /// </list></summary>
     public class InjectionRules
     {
-        /// <summary>Empty means that no rules specified.</summary>
-        public static readonly InjectionRules Empty = new InjectionRules();
+        /// <summary>No rules specified.</summary>
+        public static readonly InjectionRules Default = new InjectionRules();
 
+        /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
+        /// <param name="constructor">(optional)</param> <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
+        /// <returns></returns>
         public static InjectionRules With(ConstructorSelector constructor = null,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
+            ParameterProvider parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             return constructor == null && parameters == null && propertiesAndFields == null
-                ? Empty : new InjectionRules(constructor, parameters, propertiesAndFields);
+                ? Default : new InjectionRules(constructor, parameters, propertiesAndFields);
         }
 
         /// <summary>Sets rule how to select constructor with simplified signature without <see cref="Request"/> 
@@ -1650,11 +1660,27 @@ namespace DryIoc
                 : new InjectionRules(r => getConstructor(r.ImplementationType), Parameters, PropertiesAndFields);
         }
 
+        public static implicit operator InjectionRules(ConstructorSelector selector)
+        {
+            return With(selector);
+        }
+
+        public static implicit operator InjectionRules(ParameterProvider provider)
+        {
+            return With(parameters: provider);
+        }
+
+        public static implicit operator InjectionRules(PropertiesAndFieldsSelector selector)
+        {
+            return With(propertiesAndFields: selector);
+        }
+
+        /// <summary>Returns delegate to select constructor based on provided request.</summary>
         public ConstructorSelector Constructor { get; private set; }
 
         /// <summary>Specifies how constructor parameters should be resolved: 
         /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
-        public ParameterSelector Parameters { get; private set; }
+        public ParameterProvider Parameters { get; private set; }
 
         /// <summary>Specifies what <see cref="ServiceInfo"/> should be used when resolving property or field.</summary>
         public PropertiesAndFieldsSelector PropertiesAndFields { get; private set; }
@@ -1665,7 +1691,7 @@ namespace DryIoc
 
         private InjectionRules(
             ConstructorSelector constructor = null,
-            ParameterSelector parameters = null,
+            ParameterProvider parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             Constructor = constructor;
@@ -1844,6 +1870,7 @@ namespace DryIoc
         /// (optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. 
         /// Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
+        /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) Factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="named">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
@@ -1851,7 +1878,7 @@ namespace DryIoc
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null, InjectionRules rules = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
+            rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(implementationType, reuse, rules, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
@@ -1863,6 +1890,7 @@ namespace DryIoc
         /// <param name="implementationAndServiceType">Implementation type. Concrete and open-generic class are supported.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
+        /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
@@ -1871,7 +1899,7 @@ namespace DryIoc
             InjectionRules rules = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
+            rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(implementationAndServiceType, reuse, rules, setup);
             registrator.Register(factory, implementationAndServiceType, named, ifAlreadyRegistered);
         }
@@ -1884,6 +1912,7 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
+        /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
@@ -1893,7 +1922,7 @@ namespace DryIoc
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
             where TImplementation : TService
         {
-            setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
+            rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(typeof(TImplementation), reuse, rules, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
@@ -1903,6 +1932,7 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
+        /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) Factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="named">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
@@ -1911,7 +1941,7 @@ namespace DryIoc
             InjectionRules rules = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
+            rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, rules, setup);
             registrator.Register(factory, typeof(TServiceAndImplementation), named, ifAlreadyRegistered);
         }
@@ -1929,6 +1959,7 @@ namespace DryIoc
         /// <param name="implementationType">Service implementation type. Concrete and open-generic class are supported.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
+        /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="whereServiceTypes">(optional) condition to include selected types only. Default value is <see cref="DefaultServiceTypesForRegisterAll"/></param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
@@ -1938,7 +1969,7 @@ namespace DryIoc
             InjectionRules rules = null, FactorySetup setup = null, Func<Type, bool> whereServiceTypes = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
+            rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(implementationType, reuse, rules, setup);
 
             var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeFlags.SourceType);
@@ -1966,6 +1997,7 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
+        /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="types">(optional) condition to include selected types only. Default value is <see cref="DefaultServiceTypesForRegisterAll"/></param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
@@ -2069,7 +2101,7 @@ namespace DryIoc
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
             Action<TTarget, Request> initialize, Func<Request, bool> condition = null)
         {
-            registrator.RegisterDelegate<Action<TTarget>>(r => target => initialize(target, r), setup: SetupDecorator.WithCondition(condition));
+            registrator.RegisterDelegate<Action<TTarget>>(r => target => initialize(target, r), setup: SetupDecorator.With(condition));
         }
 
         /// <summary>Returns true if <paramref name="serviceType"/> is registered in container or its open generic definition is registered in container.</summary>
@@ -3024,25 +3056,6 @@ namespace DryIoc
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
         /// or disable disposing with <see cref="ExplicitlyDisposable"/>, etc.</summary>
         public virtual IReuseWrapper[] ReuseWrappers { get { return null; } }
-
-        /// <summary>Injection rules set for Constructor, Parameters, Properties and Fields.</summary>
-        public readonly InjectionRules Rules;
-
-        /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields.</summary>
-        /// <param name="rules">Rules to set.</param> <returns>New factory setup with injection rules set.</returns>
-        public abstract FactorySetup WithRules(InjectionRules rules);
-
-        /// <summary>Use simplified delegate to get constructor with implementation type instead of <see cref="ConstructorSelector"/>.</summary>
-        /// <param name="getConstructor">Delegate to get constructor given implementation type.</param>
-        /// <returns>Constructor info.</returns>
-        public FactorySetup WithConstructor(Func<Type, ConstructorInfo> getConstructor = null)
-        {
-            return getConstructor == null ? this : WithRules(Rules.With(getConstructor));
-        }
-
-        /// <summary>Creates setup with specified injections rules for: constructor, parameters, properties and fields.</summary>
-        /// <param name="rules">(optional) Injection rules, or <see cref="InjectionRules.Empty"/> if not specified.</param>
-        protected FactorySetup(InjectionRules rules) { Rules = rules ?? InjectionRules.Empty; }
     }
 
     /// <summary>Setup for <see cref="DryIoc.FactoryType.Service"/> factory.</summary>
@@ -3052,26 +3065,15 @@ namespace DryIoc
         public static readonly Setup Default = new Setup();
 
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Default"/> setup will be returned.</summary>
-        /// <param name="constructor">(optional)</param> <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
         /// <param name="serviceExpressionCaching">(optional)</param> <param name="reuseWrappers">(optional)</param>
         /// <param name="lazyMetadata">(optional)</param> <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param>
         /// <returns>New setup object or <see cref="Default"/>.</returns>
         public static Setup With(
-            ConstructorSelector constructor = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             bool serviceExpressionCaching = true, IReuseWrapper[] reuseWrappers = null,
             Func<object> lazyMetadata = null, object metadata = null)
         {
-            var setup = serviceExpressionCaching && reuseWrappers == null && lazyMetadata == null && metadata == null
-                 ? Default : new Setup(InjectionRules.Empty, serviceExpressionCaching, reuseWrappers, lazyMetadata, metadata);
-            return constructor == null && parameters == null && propertiesAndFields == null
-                ? setup : (Setup)setup.WithRules(InjectionRules.With(constructor, parameters, propertiesAndFields));
-        }
-
-        /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields.</summary>
-        /// <param name="rules">Rules to set.</param> <returns>New factory setup with injection rules set.</returns>
-        public override FactorySetup WithRules(InjectionRules rules)
-        {
-            return new Setup(rules, ServiceExpressionCaching, _reuseWrappers, _lazyMetadata, _metadata);
+            return serviceExpressionCaching && reuseWrappers == null && lazyMetadata == null && metadata == null
+                 ? Default : new Setup(serviceExpressionCaching, reuseWrappers, lazyMetadata, metadata);
         }
 
         /// <summary>Default factory type is for service factory.</summary>
@@ -3092,11 +3094,8 @@ namespace DryIoc
 
         #region Implementation
 
-        private Setup(InjectionRules rules = null,
-            bool serviceExpressionCaching = true,
-            IReuseWrapper[] reuseWrappers = null,
+        private Setup(bool serviceExpressionCaching = true, IReuseWrapper[] reuseWrappers = null,
             Func<object> lazyMetadata = null, object metadata = null)
-            : base(rules)
         {
             _serviceExpressionCaching = serviceExpressionCaching;
             _reuseWrappers = reuseWrappers;
@@ -3119,34 +3118,23 @@ namespace DryIoc
         public static readonly SetupWrapper Default = new SetupWrapper();
 
         /// <summary>Creates setup with all settings specified. If all is omitted: then <see cref="Default"/> will be used.</summary>
-        /// <param name="constructor">Constructor selector.</param>
-        /// <param name="parameters">Parameters selector rule.</param>
-        /// <param name="propertiesAndFields">Properties and fields selector rules.</param>
         /// <param name="getWrappedServiceType">Wrapped service selector rule.</param>
         /// <returns>New setup with non-default settings or <see cref="Default"/> otherwise.</returns>
-        public static SetupWrapper With(ConstructorSelector constructor = null,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            Func<Type, Type> getWrappedServiceType = null)
+        public static SetupWrapper With(Func<Type, Type> getWrappedServiceType = null)
         {
-            var setup = getWrappedServiceType == null ? Default
-                : new SetupWrapper(InjectionRules.Empty, getWrappedServiceType);
-            return constructor == null && parameters == null && propertiesAndFields == null ? setup
-                : (SetupWrapper)setup.WithRules(InjectionRules.With(constructor, parameters, propertiesAndFields));
+            return getWrappedServiceType == null ? Default : new SetupWrapper(getWrappedServiceType);
         }
 
-        public override FactorySetup WithRules(InjectionRules rules)
-        {
-            return new SetupWrapper(rules, GetWrappedServiceType);
-        }
-
+        /// <summary>Returns <see cref="DryIoc.FactoryType.Wrapper"/> type.</summary>
         public override FactoryType FactoryType { get { return FactoryType.Wrapper; } }
 
+        /// <summary>Delegate to get wrapped type from provided wrapper type. 
+        /// If wrapper is generic, then wrapped type is usually a generic parameter.</summary>
         public readonly Func<Type, Type> GetWrappedServiceType;
 
         #region Implementation
 
-        private SetupWrapper(InjectionRules rules = null, Func<Type, Type> getWrappedServiceType = null)
-            : base(rules)
+        private SetupWrapper(Func<Type, Type> getWrappedServiceType = null)
         {
             GetWrappedServiceType = getWrappedServiceType ?? GetSingleGenericArgByDefault;
         }
@@ -3164,39 +3152,29 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>Setup for <see cref="DryIoc.FactoryType.Decorator"/> factory.</summary>
+    /// <summary>Setup for <see cref="DryIoc.FactoryType.Decorator"/> factory.
+    /// By default decorator is applied to service type it registered with. Or you can provide specific <see cref="Condition"/>.</summary>
     public class SetupDecorator : FactorySetup
     {
+        /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
         public static readonly SetupDecorator Default = new SetupDecorator();
 
-        public static SetupDecorator With(
-            ConstructorSelector constructor = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            Func<Request, bool> condition = null)
+        /// <summary>Creates setup with optional condition.</summary>
+        /// <param name="condition">(optional)</param> <returns>New setup with condition or <see cref="Default"/>.</returns>
+        public static SetupDecorator With(Func<Request, bool> condition = null)
         {
-            var setup = condition == null
-                ? Default : new SetupDecorator(InjectionRules.Empty, condition);
-            return constructor == null && parameters == null && propertiesAndFields == null
-                ? setup : (SetupDecorator)setup.WithRules(InjectionRules.With(constructor, parameters, propertiesAndFields));
+            return condition == null ? Default : new SetupDecorator(condition);
         }
 
-        public static SetupDecorator WithCondition(Func<Request, bool> condition = null)
-        {
-            return condition == null ? Default : new SetupDecorator(InjectionRules.Empty, condition);
-        }
-
-        public override FactorySetup WithRules(InjectionRules rules)
-        {
-            return new SetupDecorator(rules, Condition);
-        }
-
+        /// <summary>Returns <see cref="DryIoc.FactoryType.Decorator"/> factory type.</summary>
         public override FactoryType FactoryType { get { return FactoryType.Decorator; } }
 
+        /// <summary>Predicate to check if request is fine to apply decorator for resolved service.</summary>
         public readonly Func<Request, bool> Condition;
 
         #region Implementation
 
-        private SetupDecorator(InjectionRules rules = null, Func<Request, bool> condition = null)
-            : base(rules)
+        private SetupDecorator(Func<Request, bool> condition = null)
         {
             Condition = condition ?? (_ => true);
         }
@@ -3507,7 +3485,7 @@ namespace DryIoc
     }
 
     public delegate ConstructorInfo ConstructorSelector(Request request);
-    public delegate ParameterServiceInfo ParameterSelector(ParameterInfo parameter, Request request);
+    public delegate ParameterServiceInfo ParameterProvider(ParameterInfo parameter, Request request);
     public delegate IEnumerable<PropertyOrFieldServiceInfo> PropertiesAndFieldsSelector(Request request);
 
     /// <summary>Contains alternative rules to select constructor in implementation type registered with <see cref="ReflectionFactory"/>.</summary>
@@ -3515,9 +3493,7 @@ namespace DryIoc
     {
         /// <summary>Searches for constructor with all resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving as service and as Func&lt;TArgs..., TService&gt;.</summary>
-        /// <param name="request">Request with resolved implementation type.</param>
-        /// <returns>Found constructor or throws exception.</returns>
-        public static ConstructorInfo WithAllResolvableArguments(Request request)
+        public static ConstructorSelector WithAllResolvableArguments = request =>
         {
             var implementationType = request.ImplementationType.ThrowIfNull();
             var ctors = implementationType.GetAllConstructors().ToArrayOrSelf();
@@ -3528,7 +3504,7 @@ namespace DryIoc
                 return ctors[0];
 
             var ctorsWithMoreParamsFirst = ctors
-                .Select(c => new { Ctor = c, Params = c.GetParameters() })
+                .Select(c => new {Ctor = c, Params = c.GetParameters()})
                 .OrderByDescending(x => x.Params.Length);
 
             if (request.Parent.ServiceType.IsFuncWithArgs())
@@ -3548,30 +3524,35 @@ namespace DryIoc
                             {
                                 var inputArgIndex = funcArgs.IndexOf(t => t == p.ParameterType);
                                 if (inputArgIndex == -1 || inputArgIndex == inputArgCount ||
-                                    (matchedIndecesMask & inputArgIndex << 1) != 0) // input argument was already matched by another parameter
+                                    (matchedIndecesMask & inputArgIndex << 1) != 0)
+                                    // input argument was already matched by another parameter
                                     return false;
                                 matchedIndecesMask |= inputArgIndex << 1;
                                 return true;
                             }))
-                            .All(p => ResolveParameter(p, (ReflectionFactory)request.ResolvedFactory, request) != null);
+                            .All(p => ResolveParameter(p, (ReflectionFactory) request.ResolvedFactory, request) != null);
                     });
 
-                return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS, funcType, request).Ctor;
+                return
+                    matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS, funcType, request)
+                        .Ctor;
             }
             else
             {
                 var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(
-                    x => x.Params.All(p => ResolveParameter(p, (ReflectionFactory)request.ResolvedFactory, request) != null));
+                    x =>
+                        x.Params.All(
+                            p => ResolveParameter(p, (ReflectionFactory) request.ResolvedFactory, request) != null));
                 return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
             }
-        }
+        };
 
         #region Implementation
 
         private static Expression ResolveParameter(ParameterInfo p, ReflectionFactory factory, Request request)
         {
             var registry = request.Registry;
-            var getParamInfo = registry.Rules.Parameters.OverrideWith(factory.Setup.Rules.Parameters);
+            var getParamInfo = registry.Rules.Parameters.OverrideWith(factory.Rules.Parameters);
             var paramInfo = getParamInfo(p, request) ?? ParameterServiceInfo.Of(p);
             var paramRequest = request.Push(paramInfo.WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
             var paramFactory = registry.ResolveFactory(paramRequest);
@@ -3581,59 +3562,59 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>DSL for specifying <see cref="ParameterSelector"/> injection rules.</summary>
+    /// <summary>DSL for specifying <see cref="ParameterProvider"/> injection rules.</summary>
     public static partial class Parameters
     {
         /// <summary>Specifies to return default details <see cref="ServiceInfoDetails.Default"/> for all parameters.</summary>
-        public static ParameterSelector Of = (p, req) => null;
+        public static ParameterProvider Of = (p, req) => null;
 
         /// <summary>Specifies that all parameters could be set to default if unresolved.</summary>
-        public static ParameterSelector DefaultIfUnresolved = ((p, req) =>
+        public static ParameterProvider DefaultIfUnresolved = ((p, req) =>
             ParameterServiceInfo.Of(p).WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, req));
 
-        public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other)
+        public static ParameterProvider OverrideWith(this ParameterProvider source, ParameterProvider other)
         {
             return source == null || source == Of ? other ?? Of
                 : other == null || other == Of ? source
                 : (parameter, req) => other(parameter, req) ?? source(parameter, req);
         }
 
-        public static ParameterSelector Condition(this ParameterSelector source, Func<ParameterInfo, bool> condition,
+        public static ParameterProvider Condition(this ParameterProvider source, Func<ParameterInfo, bool> condition,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
             return source.WithDetails(condition, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
         }
 
-        public static ParameterSelector Name(this ParameterSelector source, string name,
+        public static ParameterProvider Name(this ParameterProvider source, string name,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
             return source.Condition(p => p.Name.Equals(name), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
-        public static ParameterSelector Name(this ParameterSelector source, string name, Func<Request, object> getValue)
+        public static ParameterProvider Name(this ParameterProvider source, string name, Func<Request, object> getValue)
         {
             return source.WithDetails(p => p.Name.Equals(name), ServiceInfoDetails.Of(getValue));
         }
 
-        public static ParameterSelector Name(this ParameterSelector source, string name, object value)
+        public static ParameterProvider Name(this ParameterProvider source, string name, object value)
         {
             return source.Name(name, _ => value);
         }
 
-        public static ParameterSelector Type(this ParameterSelector source, Type type,
+        public static ParameterProvider Type(this ParameterProvider source, Type type,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
             type.ThrowIfNull();
             return source.Condition(p => type.IsAssignableTo(p.ParameterType), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
-        public static ParameterSelector Type(this ParameterSelector source, Type type, Func<Request, object> getValue)
+        public static ParameterProvider Type(this ParameterProvider source, Type type, Func<Request, object> getValue)
         {
             type.ThrowIfNull();
             return source.WithDetails(p => type.IsAssignableTo(p.ParameterType), ServiceInfoDetails.Of(getValue));
         }
         
-        public static ParameterSelector Type(this ParameterSelector source, Type type, object value)
+        public static ParameterProvider Type(this ParameterProvider source, Type type, object value)
         {
             return source.Type(type, _ => value);
         }
@@ -3645,7 +3626,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private static ParameterSelector WithDetails(this ParameterSelector source, Func<ParameterInfo, bool> condition,
+        private static ParameterProvider WithDetails(this ParameterProvider source, Func<ParameterInfo, bool> condition,
             ServiceInfoDetails details)
         {
             condition.ThrowIfNull();
@@ -3896,7 +3877,7 @@ namespace DryIoc
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">Non-abstract close or open generic type.</param>
-        /// <param name="reuse"></param> <param name="setup"></param>
+        /// <param name="reuse">(optional)</param> <param name="rules">(optional)</param> <param name="setup">(optional)</param>
         public ReflectionFactory(Type implementationType, IReuse reuse = null, InjectionRules rules = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
@@ -3907,7 +3888,7 @@ namespace DryIoc
             if (implementationType.IsGenericDefinition())
                 _providedFactories = Ref.Of(HashTree<int, KV<Type, object>>.Empty);
 
-            Rules = rules;
+            Rules = rules ?? InjectionRules.Default;
         }
 
         /// <summary>Before registering factory checks that ImplementationType is assignable, Or
@@ -3949,7 +3930,7 @@ namespace DryIoc
                     Throw.Error(Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, implType, serviceType);
             }
 
-            if (registry.Rules.Constructor == null && Setup.Rules.Constructor == null)
+            if (registry.Rules.Constructor == null && Rules.Constructor == null)
             {
                 var publicCtorCount = implType.GetAllConstructors().Count();
                 Throw.If(publicCtorCount != 1, Error.UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE, implType, publicCtorCount);
@@ -3990,7 +3971,7 @@ namespace DryIoc
             {
                 paramExprs = new Expression[parameters.Length];
 
-                var getParamInfo = request.Registry.Rules.Parameters.OverrideWith(Setup.Rules.Parameters);
+                var getParamInfo = request.Registry.Rules.Parameters.OverrideWith(Rules.Parameters);
 
                 var funcArgs = request.FuncArgs;
                 var funcArgsUsedMask = 0;
@@ -4049,7 +4030,7 @@ namespace DryIoc
         private ConstructorInfo SelectConstructor(Request request)
         {
             var implType = _implementationType;
-            var selector = Setup.Rules.Constructor ?? request.Registry.Rules.Constructor;
+            var selector = Rules.Constructor ?? request.Registry.Rules.Constructor;
             if (selector != null)
                 return selector(request).ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_USING_SELECTOR, implType);
 
@@ -4062,7 +4043,7 @@ namespace DryIoc
         private Expression SetPropertiesAndFields(Expression serviceExpr, Request request)
         {
             var memberHolderType = request.ImplementationType ?? request.ServiceType;
-            var getMemberInfos = request.Registry.Rules.PropertiesAndFields.OverrideWith(Setup.Rules.PropertiesAndFields);
+            var getMemberInfos = request.Registry.Rules.PropertiesAndFields.OverrideWith(Rules.PropertiesAndFields);
             var memberInfos = getMemberInfos(request);
             if (memberInfos == null)
                 return serviceExpr;
@@ -4905,17 +4886,27 @@ namespace DryIoc
         }
     }
 
+    /// <summary>Used to wrap resolution scope together with directly resolved service value.
+    /// Disposing wrapper means disposing service (if disposable) and disposing scope (all reused disposable dependencies.)</summary>
+    /// <typeparam name="T">Type of resolved service.</typeparam>
     public sealed class ResolutionScoped<T> : IDisposable
     {
+        /// <summary>Resolved service.</summary>
         public T Value { get; private set; }
-        public IScope Scope { get; private set; }
 
+        /// <summary>Exposes resolution scope. The supported operation for it is <see cref="IDisposable.Dispose"/>.
+        /// So you can dispose scope separately from resolved service.</summary>
+        public IDisposable Scope { get; private set; }
+
+        /// <summary>Creates wrapper</summary>
+        /// <param name="value">Resolved service.</param> <param name="scope">Resolution root scope.</param>
         public ResolutionScoped(T value, IScope scope)
         {
             Value = value;
-            Scope = scope;
+            Scope = scope as IDisposable;
         }
 
+        /// <summary>Disposes both resolved service (if disposable) and then disposes resolution scope.</summary>
         public void Dispose()
         {
             var disposableValue = Value as IDisposable;
@@ -4925,20 +4916,23 @@ namespace DryIoc
                 Value = default(T);
             }
 
-            var disposableScope = Scope as IDisposable;
-            if (disposableScope != null)
+            if (Scope != null)
             {
-                disposableScope.Dispose();
+                Scope.Dispose();
                 Scope = null;
             }
         }
     }
 
+    /// <summary>Wraps factory expression created by container internally. May be used for debugging.</summary>
+    /// <typeparam name="TService">Service type to resolve.</typeparam>
     [DebuggerDisplay("{Expression}")]
     public sealed class DebugExpression<TService>
     {
+        /// <summary>Factory expression that Container compiles to delegate.</summary>
         public readonly Expression<FactoryDelegate> Expression;
 
+        /// <summary>Creates wrapper.</summary> <param name="expression">Wrapped expression.</param>
         public DebugExpression(Expression<FactoryDelegate> expression)
         {
             Expression = expression;
