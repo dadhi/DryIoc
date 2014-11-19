@@ -113,7 +113,7 @@ namespace DryIoc.UnitTests
             container.Register<DisposableService>(Reuse.InCurrentScope,
                 setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
 
-            container.Register(typeof(ExplicitlyDisposableProxy<>), setup: WrapperSetup.Default);
+            container.Register(typeof(ExplicitlyDisposableProxy<>), setup: SetupWrapper.Default);
 
             var disposable = container.Resolve<ExplicitlyDisposableProxy<IService>>(typeof(DisposableService));
 
@@ -128,7 +128,7 @@ namespace DryIoc.UnitTests
                 setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
 
 
-            container.Register(typeof(ExplicitlyDisposableProxy<>), setup: WrapperSetup.Default);
+            container.Register(typeof(ExplicitlyDisposableProxy<>), setup: SetupWrapper.Default);
 
             var disposable = container.Resolve<ExplicitlyDisposableProxy<IService>>(typeof(DisposableService));
 

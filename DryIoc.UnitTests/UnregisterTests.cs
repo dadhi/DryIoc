@@ -122,7 +122,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IHandler, FastHandler>();
-            container.Register<IHandler, LoggingHandlerDecorator>(setup: DecoratorSetup.Default);
+            container.Register<IHandler, LoggingHandlerDecorator>(setup: SetupDecorator.Default);
 
             container.Unregister<IHandler>(factoryType: FactoryType.Decorator);
 
@@ -135,8 +135,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IHandler, FastHandler>();
-            container.Register<IHandler, LoggingHandlerDecorator>(setup: DecoratorSetup.Default);
-            container.Register<IHandler, NullHandlerDecorator>(setup: DecoratorSetup.Default);
+            container.Register<IHandler, LoggingHandlerDecorator>(setup: SetupDecorator.Default);
+            container.Register<IHandler, NullHandlerDecorator>(setup: SetupDecorator.Default);
 
             container.Unregister<IHandler>(factoryType: FactoryType.Decorator,
                 condition: f => f.ImplementationType == typeof(NullHandlerDecorator));

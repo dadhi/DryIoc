@@ -105,20 +105,20 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Registers factories into registrator/container based on single provided info, which could
         /// contain multiple exported services with single implementation.</summary>
         /// <param name="registrator">Container to register into.</param>
-        /// <param name="info">Registration information provided.</param>
-        public static void RegisterInfo(this IRegistrator registrator, RegistrationInfo info)
+        /// <param name="registrationInfo">Registration information provided.</param>
+        public static void RegisterInfo(this IRegistrator registrator, RegistrationInfo registrationInfo)
         {
-            var factory = info.CreateFactory();
+            var factory = registrationInfo.CreateFactory();
 
-            for (var i = 0; i < info.Exports.Length; i++)
+            for (var i = 0; i < registrationInfo.Exports.Length; i++)
             {
-                var export = info.Exports[i];
+                var export = registrationInfo.Exports[i];
 
                 registrator.Register(factory, export.ServiceType,
                     export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
 
-                if (export.ServiceType.GetGenericDefinitionOrNull() == typeof(IFactory<>))
-                    RegisterFactory(registrator, info.ImplementationType, export);
+                if (registrationInfo.IsFactory)
+                    RegisterFactoryMethods(registrator, registrationInfo.ImplementationType);
             }
         }
 
@@ -140,8 +140,11 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Created DTO.</returns>
         public static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType)
         {
-            return implementationType.IsValueType() || implementationType.IsAbstract() ? null
-                : GetRegistrationInfoOrDefault(implementationType, GetAllExportRelatedAttributes(implementationType));
+            if (implementationType.IsValueType() || implementationType.IsAbstract()) 
+                return null;
+
+            var attributes = GetAllExportRelatedAttributes(implementationType);
+            return !DefineExport(attributes) ? null : GetRegistrationInfoOrDefault(implementationType, attributes);
         }
 
         #region Tools
@@ -170,10 +173,12 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static ConstructionInfo GetImportingConstructor(Type implementationType, Request request)
+        private static ConstructorInfo GetImportingConstructor(Request request)
         {
+            var implementationType = request.ImplementationType;
             var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
-            return constructors.Length == 1 ? constructors[0]
+            return constructors.Length == 1 
+                ? constructors[0]
                 : constructors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
                     .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, implementationType);
         }
@@ -251,7 +256,7 @@ namespace DryIoc.MefAttributedModel
                 var reuse = GetReuseByType(reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType);
 
                 var withConstructor = import.WithConstructor == null ? null
-                    : (ConstructorSelector)((t, _) => t.GetConstructorOrNull(args: import.WithConstructor));
+                    : (ConstructorSelector)(r => r.ImplementationType.GetConstructorOrNull(args: import.WithConstructor));
 
                 registry.Register(serviceType, implementationType,
                     reuse, null, Setup.With(withConstructor, metadata: import.Metadata),
@@ -275,11 +280,6 @@ namespace DryIoc.MefAttributedModel
 
         private static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType, Attribute[] attributes)
         {
-            if (attributes.Length == 0 ||
-                attributes.IndexOf(a => a is ExportAttribute || a is ExportAllAttribute) == -1 ||
-                attributes.IndexOf(a => a is PartNotDiscoverableAttribute) != -1)
-                return null;
-
             var info = new RegistrationInfo { ImplementationType = implementationType, ReuseType = DefaultReuseType };
 
             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
@@ -314,6 +314,10 @@ namespace DryIoc.MefAttributedModel
                 {
                     PopulateDecoratorInfoFromAttribute(info, (AsDecoratorAttribute)attribute, implementationType);
                 }
+                else if (attribute is AsFactoryAttribute)
+                {
+                    info.IsFactory = true;
+                }
 
                 if (attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
@@ -327,6 +331,13 @@ namespace DryIoc.MefAttributedModel
 
             info.Exports.ThrowIfNull(Error.EXPORT_IS_REQUIRED, implementationType);
             return info;
+        }
+
+        private static bool DefineExport(Attribute[] attributes)
+        {
+            return attributes.Length != 0 
+                && attributes.IndexOf(a => a is ExportAttribute || a is ExportAllAttribute) != -1 
+                && attributes.IndexOf(a => a is PartNotDiscoverableAttribute) == -1;
         }
 
         private static ExportInfo[] GetExportsFromExportAttribute(ExportAttribute attribute,
@@ -346,7 +357,7 @@ namespace DryIoc.MefAttributedModel
         private static ExportInfo[] GetExportsFromExportAllAttribute(ExportAllAttribute attribute,
             RegistrationInfo currentInfo, Type implementationType)
         {
-            var allContractTypes = attribute.GetAllContractTypes(implementationType);
+            var allContractTypes = attribute.GetContractTypes(implementationType);
 
             if (implementationType.IsGenericDefinition())
             {
@@ -424,17 +435,51 @@ namespace DryIoc.MefAttributedModel
             .GetDeclaredMethod("Resolve", new[] { typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type) });
 
         private static readonly Func<Assembly, IEnumerable<Type>> _getAssemblyTypes =
-            ExpressionTools.GetMethodDelegate<Assembly, IEnumerable<Type>>("GetTypes").ThrowIfNull();
+            ExpressionTools.GetMethodDelegate<Assembly, IEnumerable<Type>>("GetTypes");
 
-        private const string _factoryMethodName = "Create";
-        private const string _dotFactoryMethodName = "." + _factoryMethodName;
+        private const string FACTORY_METHOD_NAME = "Create";
+        private const string DOT_FACTORY_METHOD_NAME = "." + FACTORY_METHOD_NAME;
+
+        private static void RegisterFactoryMethods(IRegistrator registrator, Type factoryType)
+        {
+            //var serviceType = factoryExport.ServiceType.GetGenericParamsAndArgs()[0];
+            var methods = factoryType.GetAll(_ => _.DeclaredMethods);
+            foreach (var method in methods)
+            {
+                var attributes = method.GetAttributes().ToArrayOrSelf();
+                if (!DefineExport(attributes))
+                    continue;
+
+                var info = GetRegistrationInfoOrDefault(method.ReturnType, attributes);
+                if (info == null)
+                    continue;
+
+                //// Result expression is {container.Resolve<IFactory<TService>>(factoryName).Create()} 
+                //Func<Request, Expression> factoryCreateExpr = request =>
+                //    Expression.Call(
+                //        Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
+                //            request.State.GetOrAddItemExpression(request),
+                //            Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
+                //            Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved)),
+                //            Expression.Constant(null, typeof(Type))),
+                //        FACTORY_METHOD_NAME, null);
+
+                //var factory = new ExpressionFactory(factoryCreateExpr, GetReuseByType(info.ReuseType), info.GetSetup(attributes));
+
+                //for (var i = 0; i < info.Exports.Length; i++)
+                //{
+                //    var exp = info.Exports[i];
+                //    registrator.Register(factory, exp.ServiceType, exp.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                //}
+            }
+        }
 
         private static void RegisterFactory(IRegistrator registrator, Type factoryType, ExportInfo factoryExport)
         {
             var serviceType = factoryExport.ServiceType.GetGenericParamsAndArgs()[0];
             var allMethods = factoryType.GetAll(_ => _.DeclaredMethods);
             var factoryMethod = allMethods.FirstOrDefault(m =>
-                (m.Name == _factoryMethodName || m.Name.EndsWith(_dotFactoryMethodName))
+                (m.Name == FACTORY_METHOD_NAME || m.Name.EndsWith(DOT_FACTORY_METHOD_NAME))
                 && m.GetParameters().Length == 0 && m.ReturnType == serviceType)
                 .ThrowIfNull();
 
@@ -452,7 +497,7 @@ namespace DryIoc.MefAttributedModel
                         Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
                         Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved)),
                         Expression.Constant(null, typeof(Type))),
-                    _factoryMethodName, null);
+                    FACTORY_METHOD_NAME, null);
 
             var factory = new ExpressionFactory(factoryCreateExpr, GetReuseByType(info.ReuseType), info.GetSetup(attributes));
 
@@ -462,6 +507,7 @@ namespace DryIoc.MefAttributedModel
                 registrator.Register(factory, exp.ServiceType, exp.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
             }
         }
+
 
         #endregion
     }
@@ -568,6 +614,7 @@ namespace DryIoc.MefAttributedModel
         public FactoryType FactoryType;
         public DecoratorInfo Decorator;
         public WrapperInfo Wrapper;
+        public bool IsFactory;
 
         public Factory CreateFactory()
         {
@@ -580,12 +627,12 @@ namespace DryIoc.MefAttributedModel
         public FactorySetup GetSetup(Attribute[] attributes = null)
         {
             if (FactoryType == FactoryType.Wrapper)
-                return Wrapper == null ? WrapperSetup.Default : Wrapper.GetSetup();
+                return Wrapper == null ? SetupWrapper.Default : Wrapper.GetSetup();
 
             var lazyMetadata = HasMetadataAttribute ? (Func<object>)(() => GetMetadata(attributes)) : null;
 
             if (FactoryType == FactoryType.Decorator)
-                return Decorator == null ? DecoratorSetup.Default : Decorator.GetSetup(lazyMetadata);
+                return Decorator == null ? SetupDecorator.Default : Decorator.GetSetup(lazyMetadata);
 
             IReuseWrapper[] reuseWrappers = null;
             if (ReuseWrapperTypes != null && ReuseWrapperTypes.Length != 0)
@@ -646,6 +693,7 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
+    /// <summary>Defines DTO for exported service type and key.</summary>
     public sealed class ExportInfo
     {
         public Type ServiceType;
@@ -677,15 +725,15 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
-    /// <summary>Describes <see cref="WrapperSetup"/> in serializable way.</summary>
+    /// <summary>Describes <see cref="SetupWrapper"/> in serializable way.</summary>
     public sealed class WrapperInfo
     {
         public Type WrappedServiceType;
         public int WrappedServiceTypeGenericArgIndex;
 
-        public WrapperSetup GetSetup()
+        public SetupWrapper GetSetup()
         {
-            return WrapperSetup.With(getWrappedServiceType: GetWrappedServiceType);
+            return SetupWrapper.With(getWrappedServiceType: GetWrappedServiceType);
         }
 
         public override bool Equals(object obj)
@@ -723,17 +771,17 @@ namespace DryIoc.MefAttributedModel
         public Type ConditionType;
         public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
 
-        public DecoratorSetup GetSetup(Func<object> lazyMetadata = null)
+        public SetupDecorator GetSetup(Func<object> lazyMetadata = null)
         {
             if (ConditionType != null)
-                return DecoratorSetup.WithCondition(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).CanApply);
+                return SetupDecorator.WithCondition(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).CanApply);
 
             if (ServiceKeyInfo != ServiceKeyInfo.Default || lazyMetadata != null)
-                return DecoratorSetup.WithCondition(request =>
+                return SetupDecorator.WithCondition(request =>
                     (ServiceKeyInfo.Key == null || Equals(ServiceKeyInfo.Key, request.ServiceKey)) &&
                     (lazyMetadata == null || Equals(lazyMetadata(), request.ResolvedFactory.Setup.Metadata)));
 
-            return DecoratorSetup.Default;
+            return SetupDecorator.Default;
         }
 
         public override bool Equals(object obj)
@@ -832,25 +880,35 @@ namespace DryIoc.MefAttributedModel
         public ExportWithKeyAttribute(object contractKey) : this(contractKey, null) { }
     }
 
+    /// <summary>Specifies to export all implemented contract types automatically.</summary>
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class ExportAllAttribute : Attribute
     {
-        public static Func<Type, bool> ExportedTypes = Registrator.DefaultServiceTypesForRegisterAll;
+        /// <summary>Default rule to check that type could be exported.</summary>
+        public static Func<Type, bool> ExportedContractTypes = Registrator.DefaultServiceTypesForRegisterAll;
 
-        /// <remarks>Specifies service key if <see cref="ContractName"/> is not specified.</remarks>
+        /// <summary>Specifies service key if <see cref="ContractName"/> is not specified.</summary>
         public object ContractKey { get; set; }
 
-        /// <remarks>If specified has more priority over <see cref="ContractKey"/>.</remarks>
+        /// <summary>If specified has more priority over <see cref="ContractKey"/>.</summary>
         public string ContractName { get; set; }
 
+        /// <summary>Excludes specified contract types.</summary>
         public Type[] Except { get; set; }
 
-        public IEnumerable<Type> GetAllContractTypes(Type implementationType)
+        /// <summary>Returns all contract types implemented by implementation type,
+        /// that adhere to <see cref="ExportedContractTypes"/> rule, <see cref="Except"/> some specified.</summary>
+        /// <param name="implementationType">To get contract types from.</param> <returns>Exported contract types.</returns>
+        public IEnumerable<Type> GetContractTypes(Type implementationType)
         {
-            var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeFlags.SourceType).Where(ExportedTypes);
+            var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeFlags.SourceType).Where(ExportedContractTypes);
             return Except == null || Except.Length == 0 ? contractTypes : contractTypes.Except(Except);
         }
     }
+
+    /// <summary>Specifies that class exporting static or instance method factories</summary>
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
+    public class AsFactoryAttribute : Attribute { }
 
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class AsWrapperAttribute : Attribute

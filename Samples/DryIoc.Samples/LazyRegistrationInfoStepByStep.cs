@@ -61,7 +61,7 @@ namespace DryIoc.Samples
                 return info;
             });
 
-            // In run time De-serialize registrations and register them as rule for unresolved services
+            // In run-time deserialize registrations and register them as rule for unresolved services
             //=========================================================================================
 
             var lazyLoadedAssembly = new Lazy<Assembly>(() => Assembly.LoadFrom(assemblyFile));

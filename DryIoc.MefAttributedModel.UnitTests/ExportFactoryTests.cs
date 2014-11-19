@@ -134,7 +134,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
     }
 
-    [ExportAll]
+    [ExportAll][AsFactory]
     public class OrangeFactory : IFactory<Orange>
     {
         [Export]

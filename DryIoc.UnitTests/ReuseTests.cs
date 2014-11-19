@@ -206,7 +206,7 @@ namespace DryIoc.UnitTests
         public void Can_replace_singleton_reuse_with_transient_in_container()
         {
             var container = new Container(rules => rules
-                .WithOverriddenReuse((reuse, _) => reuse is SingletonReuse ? Reuse.Transient : reuse));
+                .WithReuseMapping((reuse, _) => reuse is SingletonReuse ? Reuse.Transient : reuse));
 
             container.Register<Service>(Reuse.Singleton);
 

@@ -143,7 +143,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_named_Lazy_of_property_marked_with_Import()
         {
-            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
+            var container = new Container(r => r.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<LazyChicken>();
             container.Register<Guts>(named: "lazy-me");

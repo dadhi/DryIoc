@@ -16,7 +16,7 @@ namespace DryIoc.UnitTests
             {
                 x.Initialize("blah");
                 return x;
-            }, setup: DecoratorSetup.Default);
+            }, setup: SetupDecorator.Default);
 
             var service = container.Resolve<InitializableService>();
 
@@ -30,7 +30,7 @@ namespace DryIoc.UnitTests
             container.Register<IInitializable<InitializableService>, InitializableService>();
             container.RegisterDelegate<Func<IInitializable<InitializableService>, IInitializable<InitializableService>>>(
                 r => x => x.Initialize("blah"), 
-                setup: DecoratorSetup.Default);
+                setup: SetupDecorator.Default);
 
             var service = (InitializableService)container.Resolve<IInitializable<InitializableService>>();
 
