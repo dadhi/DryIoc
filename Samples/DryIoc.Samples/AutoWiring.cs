@@ -11,7 +11,7 @@ namespace DryIoc.Samples
         public void Discover_and_register_new_plugins_from_assembly()
         {
             var container = new Container();
-            var plugins = container.Resolve<Many<IPlugin>>();
+            var plugins = container.Resolve<LazyEnumerable<IPlugin>>();
             Assert.That(plugins.Count(), Is.EqualTo(0));
 
             var pluginAssembly = typeof(AutoWiring).GetAssembly();
@@ -22,7 +22,7 @@ namespace DryIoc.Samples
             foreach (var pluginType in pluginTypes)
                 container.Register(typeof(IPlugin), pluginType, Reuse.Singleton);
 
-            plugins = container.Resolve<Many<IPlugin>>();
+            plugins = container.Resolve<LazyEnumerable<IPlugin>>();
             Assert.That(plugins.Count(), Is.EqualTo(2));
         }
 

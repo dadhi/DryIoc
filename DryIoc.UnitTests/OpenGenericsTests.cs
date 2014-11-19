@@ -260,7 +260,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
 
-            var disposable = container.Resolve<Many<IDisposable>>().ToArray();
+            var disposable = container.Resolve<LazyEnumerable<IDisposable>>().ToArray();
 
             Assert.That(disposable.Length, Is.EqualTo(0));
         }

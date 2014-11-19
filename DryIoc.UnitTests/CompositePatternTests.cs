@@ -84,7 +84,7 @@ namespace DryIoc.UnitTests
             var polygon = (PolygonOfMany)container.Resolve<IShape>("composite");
             Assert.That(polygon.Shapes.Count(), Is.EqualTo(2));
 
-            var shapes = container.Resolve<Many<IShape>>().Items;
+            var shapes = container.Resolve<LazyEnumerable<IShape>>().Items;
             Assert.That(shapes.Count(), Is.EqualTo(3));
         }
 
@@ -116,7 +116,7 @@ namespace DryIoc.UnitTests
         {
             public IEnumerable<IShape> Shapes { get; set; }
 
-            public PolygonOfMany(Many<IShape> shapes)
+            public PolygonOfMany(LazyEnumerable<IShape> shapes)
             {
                 Shapes = shapes;
             }

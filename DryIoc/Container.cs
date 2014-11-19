@@ -1172,8 +1172,11 @@ namespace DryIoc
             foreach (var arrayInterface in arrayInterfaces)
                 Wrappers = Wrappers.AddOrUpdate(arrayInterface, arrayFactory);
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(Many<>),
-                new FactoryProvider(_ => new ExpressionFactory(GetManyExpression), SetupWrapper.Default));
+            Wrappers = Wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
+                new FactoryProvider(_ => new ExpressionFactory(GetLazyEnumerableExpression), SetupWrapper.Default));
+
+            //Wrappers = Wrappers.AddOrUpdate(typeof(Lazy<>),
+            //    new FactoryProvider(_ => new ExpressionFactory(GetLazyExpression), SetupWrapper.Default));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(Lazy<>),
                 new ReflectionFactory(typeof(Lazy<>),
@@ -1287,10 +1290,10 @@ namespace DryIoc
             return Expression.NewArrayInit(itemType.ThrowIfNull(), itemExprList ?? Enumerable.Empty<Expression>());
         }
 
-        private static Expression GetManyExpression(Request request)
+        private static Expression GetLazyEnumerableExpression(Request request)
         {
-            var manyType = request.ServiceType;
-            var itemType = manyType.GetGenericParamsAndArgs()[0];
+            var wrapperType = request.ServiceType;
+            var itemType = wrapperType.GetGenericParamsAndArgs()[0];
             var requiredItemType = request.Registry.GetWrappedServiceType(request.RequiredServiceType ?? itemType);
 
             // Composite pattern support: filter out composite root from available keys.
@@ -1304,8 +1307,28 @@ namespace DryIoc
             var requestExpr = request.State.GetOrAddItemExpression(request);
             var resolveCallExpr = Expression.Call(resolveMethod, requestExpr, Expression.Constant(parentFactoryID));
 
-            return Expression.New(manyType.GetSingleConstructorOrNull().ThrowIfNull(), resolveCallExpr);
+            return Expression.New(wrapperType.GetSingleConstructorOrNull().ThrowIfNull(), resolveCallExpr);
         }
+
+        // Result: new Lazy<TService>(() => request.Resolve<TService>());
+        private static Expression GetLazyExpression(Request request)
+        {
+            var wrapperType = request.ServiceType;
+            var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
+
+            var wrapperCtor = wrapperType.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(serviceType));
+
+            var requestExpr = request.State.GetOrAddItemExpression(request);
+            var ifUnresolvedExpr = request.State.GetOrAddItemExpression(request.IfUnresolved);
+            var resolveMethod = _resolveMethod.MakeGenericMethod(serviceType);
+            var factoryExpr = Expression.Lambda(Expression.Call(resolveMethod, requestExpr, ifUnresolvedExpr));
+
+            var newLazyExpr = Expression.New(wrapperCtor, factoryExpr);
+            return newLazyExpr;
+        }
+
+        private static readonly MethodInfo _resolveMethod = typeof(Resolver)
+            .GetDeclaredMethod("Resolve", new[] { typeof(IResolver), typeof(IfUnresolved) });
 
         private static Expression GetFuncExpression(Request request)
         {
@@ -2172,7 +2195,7 @@ namespace DryIoc
             Type requiredServiceType = null, ManyResult result = ManyResult.EachItemLazyResolved)
         {
             return result == ManyResult.EachItemLazyResolved
-                ? resolver.Resolve<Many<TService>>(requiredServiceType)
+                ? resolver.Resolve<LazyEnumerable<TService>>(requiredServiceType)
                 : resolver.Resolve<IEnumerable<TService>>(requiredServiceType);
         }
 
@@ -3506,7 +3529,7 @@ namespace DryIoc
                                 matchedIndecesMask |= inputArgIndex << 1;
                                 return true;
                             }))
-                            .All(p => ResolveParameter(p, request.ResolvedFactory, request) != null);
+                            .All(p => ResolveParameter(p, (ReflectionFactory)request.ResolvedFactory, request) != null);
                     });
 
                 return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS, funcType, request).Ctor;
@@ -3514,14 +3537,14 @@ namespace DryIoc
             else
             {
                 var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(
-                    x => x.Params.All(p => ResolveParameter(p, request.ResolvedFactory, request) != null));
+                    x => x.Params.All(p => ResolveParameter(p, (ReflectionFactory)request.ResolvedFactory, request) != null));
                 return matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
             }
         }
 
         #region Implementation
 
-        private static Expression ResolveParameter(ParameterInfo p, Factory factory, Request request)
+        private static Expression ResolveParameter(ParameterInfo p, ReflectionFactory factory, Request request)
         {
             var registry = request.Registry;
             var getParamInfo = registry.Rules.Parameters.OverrideWith(factory.Setup.Rules.Parameters);
@@ -4808,15 +4831,21 @@ namespace DryIoc
         Type GetWrappedServiceType(Type type);
     }
 
-    public sealed class Many<TService> : IEnumerable<TService>
+    /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand, 
+    /// when enumerator <see cref="IEnumerator.MoveNext"/> called. If service type is not found, empty returned.</summary>
+    /// <typeparam name="TService">Service type to resolve.</typeparam>
+    public sealed class LazyEnumerable<TService> : IEnumerable<TService>
     {
+        /// <summary>Exposes internal items enumerable.</summary>
         public readonly IEnumerable<TService> Items;
 
-        public Many(IEnumerable<TService> items)
+        /// <summary>Wraps lazy resolved items.</summary> <param name="items">Lazy resolved items.</param>
+        public LazyEnumerable(IEnumerable<TService> items)
         {
             Items = items.ThrowIfNull();
         }
 
+        /// <summary>Return items enumerator.</summary> <returns>items enumerator.</returns>
         public IEnumerator<TService> GetEnumerator()
         {
             return Items.GetEnumerator();

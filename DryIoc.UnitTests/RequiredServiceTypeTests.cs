@@ -63,7 +63,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
 
-            var services = container.Resolve<Many<object>>(typeof(IService));
+            var services = container.Resolve<LazyEnumerable<object>>(typeof(IService));
 
             Assert.That(services.Items.Count(), Is.EqualTo(1));
         }
@@ -74,8 +74,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>(Reuse.InCurrentScope);
 
-            var objects = container.Resolve<Many<object>>(typeof(IService));
-            var services = container.Resolve<Many<IService>>(typeof(IService));
+            var objects = container.Resolve<LazyEnumerable<object>>(typeof(IService));
+            var services = container.Resolve<LazyEnumerable<IService>>(typeof(IService));
 
             CollectionAssert.AreEqual(objects.Items.Cast<IService>().ToArray(), services.Items.ToArray());
         }

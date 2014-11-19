@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
 	[TestFixture]
-	public class ManyTests
+	public class LazyEnumerableTests
 	{
 		[Test]
 		public void Resolving_many_with_default_and_one_named_service_will_return_both_services()
@@ -16,7 +16,7 @@ namespace DryIoc.UnitTests
 			container.Register(typeof(IService), typeof(Service));
 			container.Register(typeof(IService), typeof(AnotherService), named: "another");
 
-			var many = container.Resolve<Many<Func<IService>>>();
+			var many = container.Resolve<LazyEnumerable<Func<IService>>>();
 
             Assert.That(many.Items.Count(), Is.EqualTo(2));
 		}
@@ -27,7 +27,7 @@ namespace DryIoc.UnitTests
 			var container = new Container();
 			container.Register(typeof(IService), typeof(Service), Reuse.Singleton);
 
-			var many = container.Resolve<Many<IService>>();
+			var many = container.Resolve<LazyEnumerable<IService>>();
 
             Assert.That(many.Items.Count(), Is.EqualTo(1));
 		}
@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
 			container.Register(typeof(IService), typeof(Service), Reuse.Singleton);
 			container.Register(typeof(IService), typeof(AnotherService), named: "another");
 
-			var many = container.Resolve<Many<IService>>();
+			var many = container.Resolve<LazyEnumerable<IService>>();
 
             Assert.That(many.Items.Count(), Is.EqualTo(2));
 		}
@@ -50,7 +50,7 @@ namespace DryIoc.UnitTests
 			var container = new Container();
 			container.RegisterDelegate<IService<string>>(_ => new ClosedGenericClass());
 
-			var many = container.Resolve<Many<IService<string>>>();
+			var many = container.Resolve<LazyEnumerable<IService<string>>>();
 
 			Assert.That(many.Items.Single(), Is.Not.Null);
 		}
@@ -61,7 +61,7 @@ namespace DryIoc.UnitTests
 			var container = new Container();
 			container.Register(typeof(IService<>), typeof(Service<>), Reuse.Singleton);
 
-			var many = container.Resolve<Many<IService<int>>>();
+			var many = container.Resolve<LazyEnumerable<IService<int>>>();
 
             Assert.That(many.Items.Single(), Is.InstanceOf<Service<int>>());
 		}
@@ -74,7 +74,7 @@ namespace DryIoc.UnitTests
 
 			container.Register(typeof(ServiceWithInstanceCount), Reuse.Singleton);
 
-			var services = container.Resolve<Many<Lazy<ServiceWithInstanceCount>>>().Items;
+			var services = container.Resolve<LazyEnumerable<Lazy<ServiceWithInstanceCount>>>().Items;
             Assert.That(ServiceWithInstanceCount.InstanceCount, Is.EqualTo(0));
 
 			var service = services.First().Value;
@@ -101,7 +101,7 @@ namespace DryIoc.UnitTests
 		{
 			var container = new Container();
 
-		    var items = container.Resolve<Many<IService>>().Items;
+		    var items = container.Resolve<LazyEnumerable<IService>>().Items;
 
             Assert.That(items.Count(), Is.EqualTo(0));
 		}
@@ -111,12 +111,12 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
-            var servicesBefore = container.Resolve<Many<IService>>().Items;
+            var servicesBefore = container.Resolve<LazyEnumerable<IService>>().Items;
             Assert.That(servicesBefore.Count(), Is.EqualTo(1));
 
             container.Register(typeof(IService), typeof(AnotherService), named: "another");
 
-            var servicesAfter = container.Resolve<Many<IService>>().Items;
+            var servicesAfter = container.Resolve<LazyEnumerable<IService>>().Items;
             Assert.That(servicesAfter.Count(), Is.EqualTo(2));
         }
 
@@ -143,9 +143,9 @@ namespace DryIoc.UnitTests
 			container.Register(typeof(IService), typeof(Service));
 			container.Register(typeof(IService), typeof(AnotherService));
 
-			var result = container.Resolve<Lazy<Func<Many<IService>>>>();
+			var result = container.Resolve<Lazy<Func<LazyEnumerable<IService>>>>();
 
-            Assert.That(result, Is.InstanceOf<Lazy<Func<Many<IService>>>>());
+            Assert.That(result, Is.InstanceOf<Lazy<Func<LazyEnumerable<IService>>>>());
             Assert.That(result.Value.Invoke().Items.Count(), Is.EqualTo(2));
 		}
 
@@ -156,9 +156,9 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IService), typeof(Service), setup: Setup.With(metadata: "a"));
             container.Register(typeof(IService), typeof(AnotherService), setup: Setup.With(metadata: "b"));
 
-            var result = container.Resolve<Meta<Many<IService>, string>>();
+            var result = container.Resolve<Meta<LazyEnumerable<IService>, string>>();
 
-            Assert.That(result, Is.InstanceOf<Meta<Many<IService>, string>>());
+            Assert.That(result, Is.InstanceOf<Meta<LazyEnumerable<IService>, string>>());
             Assert.That(result.Metadata, Is.EqualTo("a"));
 
             var services = result.Value.Items.ToArray();
@@ -172,10 +172,10 @@ namespace DryIoc.UnitTests
             var container = new Container();
 	        container.Register<Service>(setup: Setup.With(metadata: 1));
 
-	        var servicesWithBoolMeta = container.Resolve<Many<Meta<Service, bool>>>().Items;
+	        var servicesWithBoolMeta = container.Resolve<LazyEnumerable<Meta<Service, bool>>>().Items;
             Assert.That(servicesWithBoolMeta.Count(), Is.EqualTo(0));
 
-            var servicesWithIntMeta = container.Resolve<Many<Meta<Service, int>>>().Items;
+            var servicesWithIntMeta = container.Resolve<LazyEnumerable<Meta<Service, int>>>().Items;
             Assert.That(servicesWithIntMeta.Count(), Is.EqualTo(1));
 	    }
 	}

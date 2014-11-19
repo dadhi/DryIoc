@@ -78,7 +78,7 @@ namespace DryIoc.UnitTests.CUT
     {
         public IEnumerable<IDependency> Foos { get; private set; }
 
-        public ServiceWithManyDependencies(Many<IDependency> foos)
+        public ServiceWithManyDependencies(LazyEnumerable<IDependency> foos)
         {
             Foos = foos;
         }

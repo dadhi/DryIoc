@@ -96,14 +96,17 @@
     <Compile Include="..\..\DryIoc.UnitTests\InjectionRulesTests.cs">
       <Link>InjectionRulesTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\KeyMappingTests.cs">
+      <Link>KeyMappingTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\KeyValuePairResolutionTests.cs">
       <Link>KeyValuePairResolutionTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\LazyEnumerableTests.cs">
+      <Link>LazyEnumerableTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\LazyTests.cs">
       <Link>LazyTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ManyTests.cs">
-      <Link>ManyTests.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\MetadataTests.cs">
       <Link>MetadataTests.cs</Link>
