@@ -259,7 +259,7 @@ namespace DryIoc.MefAttributedModel
                     : (ConstructorSelector)(r => r.ImplementationType.GetConstructorOrNull(args: import.WithConstructor));
 
                 registry.Register(serviceType, implementationType,
-                    reuse, null, Setup.With(withConstructor, metadata: import.Metadata),
+                    reuse, null, null, Setup.With(withConstructor, metadata: import.Metadata),
                     serviceKey, IfAlreadyRegistered.KeepRegistered);
             }
 
@@ -618,7 +618,7 @@ namespace DryIoc.MefAttributedModel
 
         public Factory CreateFactory()
         {
-            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), GetSetup());
+            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), null, GetSetup());
         }
 
         /// <summary>Create factory setup from DTO data.</summary>

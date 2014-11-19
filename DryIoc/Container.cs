@@ -1175,6 +1175,7 @@ namespace DryIoc
             Wrappers = Wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
                 new FactoryProvider(_ => new ExpressionFactory(GetLazyEnumerableExpression), SetupWrapper.Default));
 
+            // TODO: Complete.
             //Wrappers = Wrappers.AddOrUpdate(typeof(Lazy<>),
             //    new FactoryProvider(_ => new ExpressionFactory(GetLazyExpression), SetupWrapper.Default));
 
@@ -1185,11 +1186,11 @@ namespace DryIoc
                             args: typeof(Func<>).MakeGenericType(r.ImplementationType.GetGenericParamsAndArgs())))));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
-                new FactoryProvider(GetKeyValuePairFactoryOrDefault,
+                new FactoryProvider(GetKeyValuePairFactoryOrNull,
                     SetupWrapper.With(getWrappedServiceType: t => t.GetGenericParamsAndArgs()[1])));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(Meta<,>),
-                new FactoryProvider(GetMetaFactoryOrDefault,
+                new FactoryProvider(GetMetaFactoryOrNull,
                     SetupWrapper.With(getWrappedServiceType: t => t.GetGenericParamsAndArgs()[0])));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(DebugExpression<>),
@@ -1202,6 +1203,9 @@ namespace DryIoc
                 Wrappers = Wrappers.AddOrUpdate(FuncTypes[i], new FactoryProvider(
                     r => new ExpressionFactory(GetFuncExpression),
                     SetupWrapper.With(getWrappedServiceType: t => t.GetGenericParamsAndArgs().Last())));
+
+            Wrappers = Wrappers.AddOrUpdate(typeof(ResolutionScoped<>),
+                new FactoryProvider(GetResolutionScopedFactoryOrNull, SetupWrapper.Default));
 
             // Reuse wrappers
             Wrappers = Wrappers
@@ -1359,7 +1363,7 @@ namespace DryIoc
             return expr == null ? null : Expression.New(ctor, request.State.GetOrAddItemExpression(expr.ToFactoryExpression()));
         }
 
-        private static Factory GetKeyValuePairFactoryOrDefault(Request request)
+        private static Factory GetKeyValuePairFactoryOrNull(Request request)
         {
             var typeArgs = request.ServiceType.GetGenericParamsAndArgs();
             var serviceKeyType = typeArgs[0];
@@ -1383,7 +1387,7 @@ namespace DryIoc
             });
         }
 
-        private static Factory GetMetaFactoryOrDefault(Request request)
+        private static Factory GetMetaFactoryOrNull(Request request)
         {
             var typeArgs = request.ServiceType.GetGenericParamsAndArgs();
             var metadataType = typeArgs[1];
@@ -1428,6 +1432,28 @@ namespace DryIoc
                 var metadataExpr = req.State.GetOrAddItemExpression(resultMetadata, metadataType);
                 var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
                 return metaExpr;
+            });
+        }
+
+        private static Factory GetResolutionScopedFactoryOrNull(Request request)
+        {
+            if (!request.Parent.IsEmpty)
+                return null; // wrapper is only valid for resolution root.
+
+            return new ExpressionFactory(r =>
+            {
+                var wrapperType = request.ServiceType;
+                var wrapperCtor = wrapperType.GetSingleConstructorOrNull();
+
+                var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
+                var serviceRequest = r.Push(serviceType, request.ServiceKey);
+                var serviceFactory = request.Registry.ResolveFactory(serviceRequest);
+                var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
+                if (serviceExpr == null)
+                    return null;
+
+                var wrapperExpr = Expression.New(wrapperCtor, serviceExpr, Request.ScopeParamExpr);
+                return wrapperExpr;
             });
         }
 
@@ -1822,11 +1848,11 @@ namespace DryIoc
         /// <param name="named">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType, Type implementationType,
-            IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null, InjectionRules rules = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
-            var factory = new ReflectionFactory(implementationType, reuse, setup);
+            var factory = new ReflectionFactory(implementationType, reuse, rules, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
 
@@ -1842,11 +1868,11 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator,
             Type implementationAndServiceType, IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
-            FactorySetup setup = null,
+            InjectionRules rules = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
-            var factory = new ReflectionFactory(implementationAndServiceType, reuse, setup);
+            var factory = new ReflectionFactory(implementationAndServiceType, reuse, rules, setup);
             registrator.Register(factory, implementationAndServiceType, named, ifAlreadyRegistered);
         }
 
@@ -1863,12 +1889,12 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
-            FactorySetup setup = null,
+            InjectionRules rules = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
             where TImplementation : TService
         {
             setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
-            var factory = new ReflectionFactory(typeof(TImplementation), reuse, setup);
+            var factory = new ReflectionFactory(typeof(TImplementation), reuse, rules, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
 
@@ -1881,11 +1907,12 @@ namespace DryIoc
         /// <param name="named">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TServiceAndImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null, FactorySetup setup = null,
+            IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null, 
+            InjectionRules rules = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
-            var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, setup);
+            var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, rules, setup);
             registrator.Register(factory, typeof(TServiceAndImplementation), named, ifAlreadyRegistered);
         }
 
@@ -1908,11 +1935,11 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterAll(this IRegistrator registrator, Type implementationType,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
-            FactorySetup setup = null, Func<Type, bool> whereServiceTypes = null,
+            InjectionRules rules = null, FactorySetup setup = null, Func<Type, bool> whereServiceTypes = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             setup = (setup ?? Setup.Default).WithConstructor(withConstructor);
-            var factory = new ReflectionFactory(implementationType, reuse, setup);
+            var factory = new ReflectionFactory(implementationType, reuse, rules, setup);
 
             var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeFlags.SourceType);
             var serviceTypes = implementedTypes.Where(whereServiceTypes ?? DefaultServiceTypesForRegisterAll);
@@ -1945,11 +1972,11 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterAll<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
-            FactorySetup setup = null, Func<Type, bool> types = null,
+            InjectionRules rules = null, FactorySetup setup = null, Func<Type, bool> types = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             registrator.RegisterAll(typeof(TImplementation),
-                reuse, withConstructor, setup, types, named, ifAlreadyRegistered);
+                reuse, withConstructor, rules, setup, types, named, ifAlreadyRegistered);
         }
 
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
@@ -2751,14 +2778,11 @@ namespace DryIoc
 
         public static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "scope");
 
-        public static readonly MethodInfo GetScopeMethod = typeof(Request).GetDeclaredMethod("GetScope");
+        internal static IScope GetOrCreateScope(ref IScope scope) { return scope = scope ?? new Scope(); }
 
-        internal static IScope GetScope(ref IScope scope)
-        {
-            return scope = scope ?? new Scope();
-        }
-
-        public static readonly Expression ScopeExpr = Expression.Call(GetScopeMethod, ScopeParamExpr);
+        private static readonly MethodInfo _getScopeMethod = typeof(Request).GetDeclaredMethod("GetOrCreateScope");
+        
+        public static readonly Expression GetOrCreateScopeExpr = Expression.Call(_getScopeMethod, ScopeParamExpr);
 
         public IScope ResolutionScope
         {
@@ -3364,7 +3388,7 @@ namespace DryIoc
             Type requiredWrapperType = null)
         {
             var scopeExpr = scope == request.ResolutionScope
-                ? Request.ScopeExpr
+                ? Request.GetOrCreateScopeExpr
                 : request.State.GetOrAddItemExpression(scope);
 
             var factoryIDExpr = Expression.Constant(FactoryID);
@@ -3867,16 +3891,23 @@ namespace DryIoc
             get { return _providedFactories == null ? HashTree<int, KV<Type, object>>.Empty : _providedFactories.Value; }
         }
 
+        /// <summary>Injection rules set for Constructor, Parameters, Properties and Fields.</summary>
+        public readonly InjectionRules Rules;
+
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">Non-abstract close or open generic type.</param>
         /// <param name="reuse"></param> <param name="setup"></param>
-        public ReflectionFactory(Type implementationType, IReuse reuse = null, FactorySetup setup = null)
+        public ReflectionFactory(Type implementationType, IReuse reuse = null, InjectionRules rules = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
-            if (implementationType == null) return;
+            if (implementationType == null) 
+                return;
+
             _implementationType = implementationType.ThrowIf(implementationType.IsAbstract(), Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE);
             if (implementationType.IsGenericDefinition())
                 _providedFactories = Ref.Of(HashTree<int, KV<Type, object>>.Empty);
+
+            Rules = rules;
         }
 
         /// <summary>Before registering factory checks that ImplementationType is assignable, Or
@@ -3940,7 +3971,7 @@ namespace DryIoc
                 () => _implementationType.MakeGenericType(closedTypeArgs),
                 Error.UNMATCHED_GENERIC_PARAM_CONSTRAINTS, _implementationType, request);
 
-            var factory = new ReflectionFactory(closedImplType, Reuse, Setup);
+            var factory = new ReflectionFactory(closedImplType, Reuse, Rules, Setup);
             _providedFactories.Swap(_ => _.AddOrUpdate(factory.FactoryID, new KV<Type, object>(serviceType, request.ServiceKey)));
             return factory;
         }
@@ -4871,6 +4902,35 @@ namespace DryIoc
         {
             Value = value;
             Metadata = metadata;
+        }
+    }
+
+    public sealed class ResolutionScoped<T> : IDisposable
+    {
+        public T Value { get; private set; }
+        public IScope Scope { get; private set; }
+
+        public ResolutionScoped(T value, IScope scope)
+        {
+            Value = value;
+            Scope = scope;
+        }
+
+        public void Dispose()
+        {
+            var disposableValue = Value as IDisposable;
+            if (disposableValue != null)
+            {
+                disposableValue.Dispose();
+                Value = default(T);
+            }
+
+            var disposableScope = Scope as IDisposable;
+            if (disposableScope != null)
+            {
+                disposableScope.Dispose();
+                Scope = null;
+            }
         }
     }
 

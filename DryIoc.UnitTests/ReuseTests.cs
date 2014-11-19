@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Linq.Expressions;
+using System.Reflection;
 using System.Threading;
 using System.Web;
 using DryIoc.UnitTests.CUT;
@@ -215,133 +217,166 @@ namespace DryIoc.UnitTests
 
             Assert.That(one, Is.Not.SameAs(two));
         }
-    }
 
-    public class ThreadReuse : IReuse
-    {
-        public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
-
-        public IScope GetScope(Request request)
+        [Test]
+        public void Can_disposed_resolution_reused_services()
         {
-            return _scope;
+            var container = new Container();
+            container.Register<SomeDep>(Shared.InResolutionScope);
+            container.Register<SomeRoot>();
+
+            var service = container.Resolve<ResolutionScoped<SomeRoot>>();
+            using (service)
+                Assert.That(service.Scope, Is.Not.Null);
+
+            Assert.That(service.Value.Dep.IsDisposed, Is.True);
         }
 
-        private readonly ThreadScope _scope = new ThreadScope();
-
-        class ThreadScope : IScope
+        internal class SomeDep : IDisposable 
         {
-            public object GetOrAdd(int id, Func<object> factory)
+            public bool IsDisposed { get; private set; }
+
+            public void Dispose()
             {
-                var threadId = Thread.CurrentThread.ManagedThreadId;
-                var threadScope = _threadScopes.Value.GetValueOrDefault(threadId);
-                if (threadScope == null)
-                    _threadScopes.Swap(s => s.AddOrUpdate(threadId, threadScope = new Scope(), 
-                        (oldValue, newValue) => threadScope = oldValue)); // if Scope is already added in between then use it.
-                return threadScope.GetOrAdd(id, factory);
+                IsDisposed = true;
+            }
+        }
+
+        internal class SomeRoot
+        {
+            public SomeDep Dep { get; private set; }
+            public SomeRoot(SomeDep dep)
+            {
+                Dep = dep;
+            }
+        }
+
+        public class ThreadReuse : IReuse
+        {
+            public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
+
+            public IScope GetScope(Request request)
+            {
+                return _scope;
             }
 
-            private readonly Ref<HashTree<int, IScope>> _threadScopes = Ref.Of(HashTree<int, IScope>.Empty);
+            private readonly ThreadScope _scope = new ThreadScope();
+
+            class ThreadScope : IScope
+            {
+                public object GetOrAdd(int id, Func<object> factory)
+                {
+                    var threadId = Thread.CurrentThread.ManagedThreadId;
+                    var threadScope = _threadScopes.Value.GetValueOrDefault(threadId);
+                    if (threadScope == null)
+                        _threadScopes.Swap(s => s.AddOrUpdate(threadId, threadScope = new Scope(),
+                            (oldValue, newValue) => threadScope = oldValue)); // if Scope is already added in between then use it.
+                    return threadScope.GetOrAdd(id, factory);
+                }
+
+                private readonly Ref<HashTree<int, IScope>> _threadScopes = Ref.Of(HashTree<int, IScope>.Empty);
+            }
         }
-    }
 
-    public static partial class ReuseIt
-    {
-        public static ThreadReuse InThread = new ThreadReuse();
-        public static HttpContextReuse InRequest = new HttpContextReuse();
-    }
-
-    public sealed class HttpContextReuse : IReuse
-    {
-        public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
-
-        public static readonly HttpContextReuse Instance = new HttpContextReuse();
-
-        public IScope GetScope(Request request)
+        public static partial class ReuseIt
         {
-            if (HttpContext.Current == null)
-                return _contextNullScope ?? CreateNewScope();
-
-            var items = HttpContext.Current.Items;
-            lock (_singleScopeLocker)
-                if (!items.Contains(_reuseScopeKey))
-                    items[_reuseScopeKey] = _contextNullScope ?? new Scope();
-
-            return (Scope)items[_reuseScopeKey];
+            public static ThreadReuse InThread = new ThreadReuse();
+            public static HttpContextReuse InRequest = new HttpContextReuse();
         }
 
-        private IScope CreateNewScope()
+        public sealed class HttpContextReuse : IReuse
         {
-            lock (_singleScopeLocker)
-                return _contextNullScope = _contextNullScope ?? new Scope();
+            public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
+
+            public static readonly HttpContextReuse Instance = new HttpContextReuse();
+
+            public IScope GetScope(Request request)
+            {
+                if (HttpContext.Current == null)
+                    return _contextNullScope ?? CreateNewScope();
+
+                var items = HttpContext.Current.Items;
+                lock (_singleScopeLocker)
+                    if (!items.Contains(_reuseScopeKey))
+                        items[_reuseScopeKey] = _contextNullScope ?? new Scope();
+
+                return (Scope)items[_reuseScopeKey];
+            }
+
+            private IScope CreateNewScope()
+            {
+                lock (_singleScopeLocker)
+                    return _contextNullScope = _contextNullScope ?? new Scope();
+            }
+
+            private IScope _contextNullScope;
+            private readonly object _singleScopeLocker = new object();
+            private static readonly string _reuseScopeKey = typeof(HttpContextReuse).Name;
         }
 
-        private IScope _contextNullScope;
-        private readonly object _singleScopeLocker = new object();
-        private static readonly string _reuseScopeKey = typeof(HttpContextReuse).Name;
-    }
+        // Old example v1.3.1 
+        //public sealed class HttpContextReuse : IReuse
+        //{
+        //    public static readonly HttpContextReuse Instance = new HttpContextReuse();
 
-    // Old example v1.3.1 
-    //public sealed class HttpContextReuse : IReuse
-    //{
-    //    public static readonly HttpContextReuse Instance = new HttpContextReuse();
+        //    public static T GetOrAddToContext<T>(int factoryID, Func<T> factory)
+        //    {
+        //        var key = KEY_UNIQUE_PREFIX + factoryID;
+        //        var items = HttpContext.Current.Items;
+        //        lock (_locker)
+        //            if (!items.Contains(key))
+        //                items[key] = factory();
+        //        return (T)items[key];
+        //    }
 
-    //    public static T GetOrAddToContext<T>(int factoryID, Func<T> factory)
-    //    {
-    //        var key = KEY_UNIQUE_PREFIX + factoryID;
-    //        var items = HttpContext.Current.Items;
-    //        lock (_locker)
-    //            if (!items.Contains(key))
-    //                items[key] = factory();
-    //        return (T)items[key];
-    //    }
+        //    public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
+        //    {
+        //        return Expression.Call(_getOrAddToContextMethod.MakeGenericMethod(factoryExpr.Type),
+        //            Expression.Constant(factoryID),        // use factoryID (unique per Container) as service ID.
+        //            Expression.Lambda(factoryExpr, null)); // pass Func<TService> to create service only when not found in context.
+        //    }
 
-    //    public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
-    //    {
-    //        return Expression.Call(_getOrAddToContextMethod.MakeGenericMethod(factoryExpr.Type),
-    //            Expression.Constant(factoryID),        // use factoryID (unique per Container) as service ID.
-    //            Expression.Lambda(factoryExpr, null)); // pass Func<TService> to create service only when not found in context.
-    //    }
+        //    private static readonly object _locker = new object();
+        //    private readonly MethodInfo _getOrAddToContextMethod = typeof(HttpContextReuse).GetMethod("GetOrAddToContext");
+        //    private const string KEY_UNIQUE_PREFIX = "DryIocHCR#";
+        //}
 
-    //    private static readonly object _locker = new object();
-    //    private readonly MethodInfo _getOrAddToContextMethod = typeof(HttpContextReuse).GetMethod("GetOrAddToContext");
-    //    private const string KEY_UNIQUE_PREFIX = "DryIocHCR#";
-    //}
+        #region CUT
 
-    #region CUT
-
-    public class Soose
-    {
-        public int Scopes;
-
-        public Soose(int scopes)
+        public class Soose
         {
-            Scopes = scopes;
+            public int Scopes;
+
+            public Soose(int scopes)
+            {
+                Scopes = scopes;
+            }
         }
-    }
 
-    public class ServiceWithResolutionAndSingletonDependencies
-    {
-        public SingletonDep SingletonDep { get; set; }
-        public ResolutionScopeDep ResolutionScopeDep { get; set; }
-
-        public ServiceWithResolutionAndSingletonDependencies(SingletonDep singletonDep, ResolutionScopeDep resolutionScopeDep)
+        public class ServiceWithResolutionAndSingletonDependencies
         {
-            SingletonDep = singletonDep;
-            ResolutionScopeDep = resolutionScopeDep;
+            public SingletonDep SingletonDep { get; set; }
+            public ResolutionScopeDep ResolutionScopeDep { get; set; }
+
+            public ServiceWithResolutionAndSingletonDependencies(SingletonDep singletonDep, ResolutionScopeDep resolutionScopeDep)
+            {
+                SingletonDep = singletonDep;
+                ResolutionScopeDep = resolutionScopeDep;
+            }
         }
-    }
 
-    public class ResolutionScopeDep { }
+        public class ResolutionScopeDep { }
 
-    public class SingletonDep
-    {
-        public ResolutionScopeDep ResolutionScopeDep { get; set; }
-
-        public SingletonDep(ResolutionScopeDep resolutionScopeDep)
+        public class SingletonDep
         {
-            ResolutionScopeDep = resolutionScopeDep;
-        }
-    }
+            public ResolutionScopeDep ResolutionScopeDep { get; set; }
 
-    #endregion
+            public SingletonDep(ResolutionScopeDep resolutionScopeDep)
+            {
+                ResolutionScopeDep = resolutionScopeDep;
+            }
+        }
+
+        #endregion
+    }
 }
