@@ -183,6 +183,7 @@
     <Compile Include="..\..\DryIoc.UnitTests\WrapperTests.cs">
       <Link>WrapperTests.cs</Link>
     </Compile>
+    <Compile Include="Playground.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />

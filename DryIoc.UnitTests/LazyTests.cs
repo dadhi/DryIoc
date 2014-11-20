@@ -20,7 +20,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_registered_transient_Resolved_Lazy_should_create_new_instances()
+        public void Given_registered_transient_resolved_Lazy_should_create_new_instances()
         {
             var container = new Container();
             container.Register(typeof(ISingleton), typeof(Singleton), Reuse.Singleton);
@@ -32,7 +32,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_registered_singleton_Resolved_Lazy_should_create_same_instances()
+        public void Given_registered_singleton_resolved_Lazy_should_create_same_instances()
         {
             var container = new Container();
             container.Register(typeof(ISingleton), typeof(Singleton), Reuse.Singleton);
@@ -44,7 +44,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_registered_singleton_Resolving_as_Lazy_should_NOT_create_service_instance_until_Value_is_accessed()
+        public void Given_registered_singleton_resolving_as_Lazy_should_NOT_create_service_instance_until_Value_is_accessed()
         {
             var container = new Container();
             container.Register<ServiceWithInstanceCount>(Reuse.Singleton);
@@ -91,6 +91,67 @@ namespace DryIoc.UnitTests
             var instance = container.Resolve<ServiceWithLazyDependency>();
 
             Assert.That(instance.LazyOne, Is.Not.Null);
+        }
+
+        enum X { A, B }
+        enum Y { A, B }
+
+        void GetE<T>(T e = default(T))
+        {
+            if (e.GetType() == typeof(X))
+                Assert.AreEqual(e, X.A);
+
+            if (e.GetType() == typeof(Y))
+                Assert.AreEqual(e, Y.A);
+        }
+
+        [Test]
+        public void Lazy_is_dynamic_and_allow_recursive_dependency()
+        {
+            var container = new Container();
+            container.Register<Me>();
+
+            var me = container.Resolve<Me>();
+
+            Assert.That(me.Self.Value, Is.InstanceOf<Me>());
+        }
+
+        [Test, Explicit]
+        public void When_container_is_disposed_lazy_will_stop_working()
+        {
+            var container = new Container();
+            container.Register<Me>();
+            var me = container.Resolve<Lazy<Me>>();
+            var containerRef = new WeakReference(container);
+            
+            container = null;
+            GC.Collect();
+
+            Assert.That(containerRef.IsAlive, Is.False);
+            Assert.Throws<ContainerException>(() => { var _ = me.Value; });
+        }
+
+        [Test]
+        public void Not_possible_to_resolve_Func_With_Args_of_Lazy_cause_no_way_to_pass_the_args()
+        {
+            var container = new Container();
+            container.Register<IServiceWithParameterAndDependency, ServiceWithParameterAndDependency>();
+            container.Register<Service>();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<Func<bool, Lazy<IServiceWithParameterAndDependency>>>());
+
+            Assert.That(ex.Message, Is.StringContaining("Unable to resolve Lazy"));
+        }
+
+        internal class Me
+        {
+            public Lazy<Me> Self { get; private set; }
+
+            public Me(Lazy<Me> self)
+            {
+                Self = self;
+            }
         }
     }
 }

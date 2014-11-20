@@ -24,6 +24,21 @@ namespace DryIoc.UnitTests
             Assert.That(service.Parameter.Create(), Is.Not.Null);
 		}
 
+	    [Test]
+	    public void Can_resolve_Func_of_Lazy()
+	    {
+            var container = new Container();
+            container.RegisterInstance<IResolver>(container);
+            container.Register<IServiceWithDependency, ServiceWithDependency>();
+            container.Register(typeof(Service));
+            container.Register(typeof(LazyDynamic<>), setup: SetupWrapper.Default);
+
+            var func = container.Resolve<Func<LazyDynamic<IServiceWithDependency>>>();
+            var service = func().Value.Value;
+
+            Assert.That(service.Dependency, Is.InstanceOf<Service>());
+	    }
+
         public class ServiceWithNotRegisteredLazyParameter
         {
             public DynamicFactory<NotRegisteredService> Parameter { get; set; }
@@ -56,6 +71,33 @@ namespace DryIoc.UnitTests
             }
 
             private readonly Container _container;
+        }
+
+        internal class LazyDynamic<T>
+        {
+            public readonly Lazy<T> Value;
+
+            public LazyDynamic(IResolver resolver)
+            {
+                Value = new Lazy<T>(() => resolver.Resolve<T>());
+            }
+        }
+
+	    internal class Service {}
+
+	    internal interface IServiceWithDependency
+        {
+            Service Dependency { get; }
+        }
+
+	    internal class ServiceWithDependency : IServiceWithDependency
+        {
+            public Service Dependency { get; private set; }
+
+            public ServiceWithDependency(Service dependency)
+            {
+                Dependency = dependency;
+            }
         }
 	}
 }

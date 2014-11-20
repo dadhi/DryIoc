@@ -830,7 +830,7 @@ namespace DryIoc.MefAttributedModel
         public ReuseAttribute(Type reuseType)
         {
             if (reuseType != null)
-                (typeof(IReuse)).ThrowIfNotSubtypeOf(reuseType);
+                (typeof(IReuse)).ThrowIfNotOf(reuseType);
             ReuseType = reuseType;
         }
     }

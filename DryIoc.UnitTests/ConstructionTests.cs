@@ -5,17 +5,17 @@ namespace DryIoc.UnitTests
     [TestFixture]
     public class ConstructionTests
     {
-        //[Test]
-        //public void Can_use_any_type_static_method_for_service_creation()
-        //{
-        //    var container = new Container();
-        //    //container.Register<IService>(setup: Setup.With(
-        //    //    r => typeof(ServiceFactory).GetDeclaredMethod("CreateService")));
+        [Test]
+        public void Can_use_any_type_static_method_for_service_creation()
+        {
+            var container = new Container();
+            container.Register<IService>(rules: InjectionRules.With(
+                factoryMethod: typeof(ServiceFactory).GetDeclaredMethod("CreateService")));
 
-        //    var service = container.Resolve<SomeService>();
+            var service = container.Resolve<IService>();
 
-        //    Assert.That(service.Message, Is.EqualTo("yes!"));
-        //}
+            Assert.That(service.Message, Is.EqualTo("yep!"));
+        }
 
         //[Test]
         //public void Can_use_static_method_for_service_creation()
@@ -127,7 +127,7 @@ namespace DryIoc.UnitTests
 
         internal class ServiceFactory
         {
-            public IService CreateService()
+            public static IService CreateService()
             {
                 return new SomeService("yep!");
             }

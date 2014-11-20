@@ -178,5 +178,18 @@ namespace DryIoc.UnitTests
             var servicesWithIntMeta = container.Resolve<LazyEnumerable<Meta<Service, int>>>().Items;
             Assert.That(servicesWithIntMeta.Count(), Is.EqualTo(1));
 	    }
+        
+        [Test]
+        public void Can_resolve_Func_with_args_of_LazyEnumerable()
+        {
+            var container = new Container();
+            container.Register<IServiceWithParameterAndDependency, ServiceWithParameterAndDependency>();
+            container.Register(typeof(Service));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<Func<bool, LazyEnumerable<IServiceWithParameterAndDependency>>>());
+
+            Assert.That(ex.Message, Is.StringContaining("Unable to resolve DryIoc.LazyEnumerable"));
+        }
 	}
 }
