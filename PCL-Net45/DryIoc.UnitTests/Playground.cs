@@ -14,6 +14,18 @@ namespace DryIoc.UnitTests
 
             MethodBase method = GetType().GetDeclaredMethod("Reflection_tests");
             Assert.IsFalse(method.IsConstructor);
+
+            var methodInfos = typeof(X).GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+        }
+
+        class Y
+        {
+            public void Me() { }
+        }
+
+        class X : Y
+        {
+            public void Yours() { }
         }
     }
 }

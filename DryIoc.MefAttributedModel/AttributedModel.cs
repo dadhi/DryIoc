@@ -432,7 +432,8 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly MethodInfo _resolveMethod = typeof(Resolver)
-            .GetDeclaredMethod("Resolve", new[] { typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type) });
+            .GetDeclaredMethodOrNull("Resolve", typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type))
+            .ThrowIfNull();
 
         private static readonly Func<Assembly, IEnumerable<Type>> _getAssemblyTypes =
             ExpressionTools.GetMethodDelegate<Assembly, IEnumerable<Type>>("GetTypes");

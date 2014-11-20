@@ -10,7 +10,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService>(rules: InjectionRules.With(
-                factoryMethod: typeof(ServiceFactory).GetDeclaredMethod("CreateService")));
+                factoryMethod: typeof(ServiceFactory).GetDeclaredMethodOrNull("CreateService")));
 
             var service = container.Resolve<IService>();
 
@@ -21,8 +21,8 @@ namespace DryIoc.UnitTests
         //public void Can_use_static_method_for_service_creation()
         //{
         //    var container = new Container();
-        //    container.Register<SomeService>(setup: Setup.With(
-        //        //(t, _) => ConstructionInfo.Of(t.GetDeclaredMethod("Create"))));
+        //    container.Register<SomeService>(rules: InjectionRules.With(
+        //        factoryMethod: r => r.ImplementationType.GetDeclaredMethod("Create")));
 
         //    var service = container.Resolve<SomeService>();
 

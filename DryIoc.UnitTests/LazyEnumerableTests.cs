@@ -191,5 +191,20 @@ namespace DryIoc.UnitTests
 
             Assert.That(ex.Message, Is.StringContaining("Unable to resolve DryIoc.LazyEnumerable"));
         }
+
+	    [Test, Explicit]
+        public void When_container_is_disposed_lazy_enumerable_will_stop_working()
+	    {
+            var container = new Container();
+            container.Register<Service>();
+	        var services = container.Resolve<LazyEnumerable<Service>>();
+            var containerRef = new WeakReference(container);
+
+	        container = null;
+            GC.Collect();
+
+            Assert.That(containerRef.IsAlive, Is.False);
+            Assert.Throws<ContainerException>(() => { var _ = services.FirstOrDefault(); });
+	    }
 	}
 }

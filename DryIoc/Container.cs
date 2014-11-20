@@ -697,8 +697,7 @@ namespace DryIoc
             }
         }
 
-        private static readonly MethodInfo _doMethod = typeof(Container).GetDeclaredMethod("DoAction");
-
+        private static readonly MethodInfo _doMethod = typeof(Container).GetSingleDeclaredMethodOrNull("DoAction");
         internal static Func<T, R> DoAction<T, R>(Action<T> action) where R : T
         {
             return x => { action(x); return (R)x; };
@@ -1010,7 +1009,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private static readonly MethodInfo _getItemMethod = typeof(AppendableArray<object>).GetDeclaredMethod("Get");
+        private static readonly MethodInfo _getItemMethod = typeof(AppendableArray<object>).GetSingleDeclaredMethodOrNull("Get");
 
         private AppendableArray<object> _items;
         private HashTree<int, Expression> _itemsExpressions;
@@ -1343,7 +1342,8 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _resolveMethod = typeof(Resolver)
-            .GetDeclaredMethod("Resolve", new[] { typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type) });
+            .GetDeclaredMethodOrNull("Resolve", typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type))
+            .ThrowIfNull();
 
         private static Expression GetFuncExpression(Request request)
         {
@@ -1509,7 +1509,7 @@ namespace DryIoc
         #region Implementation
 
         private static readonly MethodInfo _resolveManyDynamicallyMethod =
-            typeof(WrappersSupport).GetDeclaredMethod("ResolveManyDynamically");
+            typeof(WrappersSupport).GetSingleDeclaredMethodOrNull("ResolveManyDynamically");
 
         internal static IEnumerable<TItem> ResolveManyDynamically<TItem, TWrappedItem>(Request request, int parentFactoryID)
         {
@@ -1635,15 +1635,26 @@ namespace DryIoc
     public sealed class FactoryMethodInfo
     {
         public readonly MethodInfo Method;
+        public readonly Func<Request, MethodInfo> GetMethod;
 
         public static implicit operator FactoryMethodInfo(MethodInfo method)
         {
             return new FactoryMethodInfo(method);
         }
 
+        public static implicit operator FactoryMethodInfo(Func<Request, MethodInfo> getMethod)
+        {
+            return new FactoryMethodInfo(getMethod);
+        }
+
         public FactoryMethodInfo(MethodInfo method)
         {
             Method = method;
+        }
+
+        public FactoryMethodInfo(Func<Request, MethodInfo> getMethod)
+        {
+            GetMethod = getMethod;
         }
     }
 
@@ -2831,9 +2842,8 @@ namespace DryIoc
 
         public static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "scope");
 
+        private static readonly MethodInfo _getScopeMethod = typeof(Request).GetSingleDeclaredMethodOrNull("GetOrCreateScope");
         internal static IScope GetOrCreateScope(ref IScope scope) { return scope = scope ?? new Scope(); }
-
-        private static readonly MethodInfo _getScopeMethod = typeof(Request).GetDeclaredMethod("GetOrCreateScope");
 
         public static readonly Expression GetOrCreateScopeExpr = Expression.Call(_getScopeMethod, ScopeParamExpr);
 
@@ -3387,7 +3397,8 @@ namespace DryIoc
         private static int _lastFactoryID;
         private FactorySetup _setup;
 
-        private static readonly MethodInfo _scopeGetOrAddMethod = typeof(IScope).GetDeclaredMethod("GetOrAdd");
+        private static readonly MethodInfo _scopeGetOrAddMethod =
+            typeof (IScope).GetSingleDeclaredMethodOrNull("GetOrAdd");
 
         protected Expression GetScopedServiceExpressionOrNull(Expression serviceExpr, IScope scope, Request request,
             Type requiredWrapperType = null)
@@ -4116,7 +4127,7 @@ namespace DryIoc
                         else
                         {
                             var prop = (PropertyInfo)memberInfo.Member;
-                            var propSetMethod = memberHolderType.GetDeclaredMethod("set_" + prop.Name);
+                            var propSetMethod = memberHolderType.GetSingleDeclaredMethodOrNull("set_" + prop.Name);
                             var setProp = _setPropertyMethod.MakeGenericMethod(memberHolderType, prop.PropertyType);
 
                             // Result is like: x => SetProperty(x, x.Prop, _x => _x.set_Prop(value))
@@ -4134,7 +4145,7 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        private static MethodInfo _setFieldMethod = typeof(ReflectionFactory).GetDeclaredMethod("SetField");
+        private static MethodInfo _setFieldMethod = typeof(ReflectionFactory).GetSingleDeclaredMethodOrNull("SetField");
         internal static T SetField<T, F>(T holder, ref F currentValue, F value)
         {
             if (ReferenceEquals(currentValue, default(F)) || Equals(currentValue, default(F)))
@@ -4142,7 +4153,7 @@ namespace DryIoc
             return holder;
         }
 
-        private static MethodInfo _setPropertyMethod = typeof(ReflectionFactory).GetDeclaredMethod("SetProperty");
+        private static MethodInfo _setPropertyMethod = typeof(ReflectionFactory).GetSingleDeclaredMethodOrNull("SetProperty");
         internal static T SetProperty<T, P>(T holder, P currentValue, Action<T> setProperty)
         {
             if (ReferenceEquals(currentValue, default(P)) || Equals(currentValue, default(P)))
@@ -5322,6 +5333,11 @@ namespace DryIoc
                 .ToArrayOrSelf();
         }
 
+        /// <summary>Recursive method to enumerate all input type and its base types for specific details.
+        /// Details are returned by <paramref name="getDeclared"/> delegate.</summary>
+        /// <typeparam name="T">Details type: properties, fields, methods, etc.</typeparam>
+        /// <param name="type">Input type.</param> <param name="getDeclared">Get declared type details.</param>
+        /// <returns>Enumerated details info objects.</returns>
         public static IEnumerable<T> GetAll<T>(this Type type, Func<TypeInfo, IEnumerable<T>> getDeclared)
         {
             var typeInfo = type.GetTypeInfo();
@@ -5331,12 +5347,21 @@ namespace DryIoc
                 : declared.Concat(baseType.GetAll(getDeclared));
         }
 
+        /// <summary>Enumerates all constructors from input type.</summary>
+        /// <param name="type">Input type.</param>
+        /// <param name="includeNonPublic">(optional) If set include non-public constructors into result.</param>
+        /// <returns>Enumerated constructors.</returns>
         public static IEnumerable<ConstructorInfo> GetAllConstructors(this Type type, bool includeNonPublic = false)
         {
             var all = type.GetTypeInfo().DeclaredConstructors;
             return includeNonPublic ? all : all.Where(c => c.IsPublic);
         }
 
+        /// <summary>Searches and returns constructor by its signature.</summary>
+        /// <param name="type">Input type.</param>
+        /// <param name="includeNonPublic">(optional) If set include non-public constructors into result.</param>
+        /// <param name="args">Signature - constructor argument types.</param>
+        /// <returns>Found constructor or null.</returns>
         public static ConstructorInfo GetConstructorOrNull(this Type type, bool includeNonPublic = false, params Type[] args)
         {
             return type.GetAllConstructors(includeNonPublic)
@@ -5353,29 +5378,41 @@ namespace DryIoc
             return ctors.Length == 1 ? ctors[0] : null;
         }
 
-        public static MethodInfo GetDeclaredMethod(this Type type, string name)
+        /// <summary>Returns single declared (not inherited) method by name, or null if not found.</summary>
+        /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
+        /// <returns>Found method or null.</returns>
+        public static MethodInfo GetSingleDeclaredMethodOrNull(this Type type, string name)
         {
-            return type.GetTypeInfo().DeclaredMethods.FirstOrDefault(m => m.Name == name).ThrowIfNull();
+            var methods = type.GetTypeInfo().DeclaredMethods.Where(m => m.Name == name).ToArrayOrSelf();
+            return methods.Length == 1 ? methods[0] : null;
         }
 
-        public static MethodInfo GetDeclaredMethod(this Type type, string name, Type[] parameters)
+        /// <summary>Returns declared (not inherited) method by name and argument types, or null if not found.</summary>
+        /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
+        /// <param name="args">Argument types</param> <returns>Found method or null.</returns>
+        public static MethodInfo GetDeclaredMethodOrNull(this Type type, string name, params Type[] args)
         {
-            parameters.ThrowIfNull();
             return type.GetTypeInfo().DeclaredMethods.FirstOrDefault(m =>
-                m.Name == name && m.GetParameters().Select(p => p.ParameterType).SequenceEqual(parameters))
-                .ThrowIfNull();
+                m.Name == name && m.GetParameters().Select(p => p.ParameterType).SequenceEqual(args));
         }
 
+        /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
+        /// <param name="type">Input type.</param> <param name="name">Property name to look for.</param>
+        /// <returns>Found property or null.</returns>
         public static PropertyInfo GetPropertyOrNull(this Type type, string name)
         {
             return type.GetAll(_ => _.DeclaredProperties).FirstOrDefault(p => p.Name == name);
         }
 
+        /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
+        /// <param name="type">Input type.</param> <param name="name">Field name to look for.</param>
+        /// <returns>Found field or null.</returns>
         public static FieldInfo GetFieldOrNull(this Type type, string name)
         {
             return type.GetAll(_ => _.DeclaredFields).FirstOrDefault(p => p.Name == name);
         }
 
+        /// <summary>Returns type assembly.</summary> <param name="type">Input type</param> <returns>Type assembly.</returns>
         public static Assembly GetAssembly(this Type type) { return type.GetTypeInfo().Assembly; }
 
         #region Implementation
@@ -5476,8 +5513,16 @@ namespace DryIoc
     /// <summary>Provides pretty printing/debug view for number of types.</summary>
     public static class PrintTools
     {
+        /// <summary>Default separator used for printing enumerable.</summary>
         public readonly static string DEFAULT_ITEM_SEPARATOR = ";" + Environment.NewLine;
 
+        /// <summary>Prints input object by using corresponding Print methods for know types.</summary>
+        /// <param name="s">Builder to append output to.</param>
+        /// <param name="x">Object to print.</param>
+        /// <param name="quote">(optional) Quote to use for quoting string object.</param>
+        /// <param name="itemSeparator">(optional) Separator for enumerable.</param>
+        /// <param name="getTypeName">(optional) Custom type printing policy.</param>
+        /// <returns>String builder with appended output.</returns>
         public static StringBuilder Print(this StringBuilder s, object x,
             string quote = null, string itemSeparator = null, Func<Type, string> getTypeName = null)
         {
@@ -5499,6 +5544,12 @@ namespace DryIoc
             return quote == null ? s.Append(str) : s.Append(quote).Append(str).Append(quote);
         }
 
+        /// <summary>Prints enumerable by using corresponding Print method for known item type.</summary>
+        /// <param name="s">String builder to append output to.</param>
+        /// <param name="items">Items to print.</param>
+        /// <param name="separator">(optional) Custom separator if provided.</param>
+        /// <param name="printItem">(optional) Custom item printer if provided.</param>
+        /// <returns>String builder with appended output.</returns>
         public static StringBuilder Print(this StringBuilder s, IEnumerable items,
             string separator = ", ", Action<StringBuilder, object> printItem = null)
         {
@@ -5510,9 +5561,16 @@ namespace DryIoc
             return s;
         }
 
+        /// <summary>Default delegate to print Type details: by default print <see cref="Type.FullName"/> and
+        /// spare namespace if it start with "System."</summary>
         public static readonly Func<Type, string> GetTypeNameDefault = t =>
             t.FullName != null && t.Namespace != null && !t.Namespace.StartsWith("System") ? t.FullName : t.Name;
 
+        /// <summary>Appends <see cref="Type"/> object details to string builder.</summary>
+        /// <param name="s">String builder to append output to.</param>
+        /// <param name="type">Input type to print.</param>
+        /// <param name="getTypeName">(optional) Delegate to provide custom type details.</param>
+        /// <returns>String builder with appended output.</returns>
         public static StringBuilder Print(this StringBuilder s, Type type, Func<Type, string> getTypeName = null)
         {
             if (type == null) return s;
@@ -5548,7 +5606,7 @@ namespace DryIoc
     {
         public static Func<TInstance, TReturn> GetMethodDelegate<TInstance, TReturn>(string methodName)
         {
-            var methodInfo = typeof(TInstance).GetDeclaredMethod(methodName, new Type[0]);
+            var methodInfo = typeof(TInstance).GetDeclaredMethodOrNull(methodName).ThrowIfNull();
             var thisParamExpr = Expression.Parameter(typeof(TInstance), "_");
             var methodExpr = Expression.Lambda<Func<TInstance, TReturn>>(Expression.Call(thisParamExpr, methodInfo), thisParamExpr);
             return methodExpr.Compile();
@@ -5559,7 +5617,7 @@ namespace DryIoc
             return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), (Expression[])null);
         }
 
-        private static readonly MethodInfo _getDefaultMethod = typeof(ExpressionTools).GetDeclaredMethod("GetDefault");
+        private static readonly MethodInfo _getDefaultMethod = typeof(ExpressionTools).GetDeclaredMethodOrNull("GetDefault");
         internal static T GetDefault<T>() { return default(T); }
     }
 
