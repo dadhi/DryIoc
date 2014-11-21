@@ -1,6 +1,5 @@
 ﻿using System;
 using System.ComponentModel.Composition;
-using System.Linq.Expressions;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
@@ -8,38 +7,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
     [TestFixture]
     public class ExportFactoryTests
     {
-        [Test]
-        public void Could_use_factory_interface_for_delegate_factory_registration()
-        {
-            var container = new Container();
-
-            container.Register<IFactory<Orange>, OrangeFactory>();
-            container.RegisterDelegate(r => r.Resolve<IFactory<Orange>>().Create());
-
-            var orange = container.Resolve<Orange>();
-
-            Assert.NotNull(orange);
-        }
-
-        [Test]
-        public void Could_dynamically_register_IFactory_method_with_delegate_factory()
-        {
-            var container = new Container();
-
-            container.Register<IFactory<Orange>, OrangeFactory>();
-
-            var factoryType = typeof(IFactory<Orange>);
-
-            container.Register(typeof(Orange), new ExpressionFactory(request =>
-                Expression.Call(
-                    request.State.GetOrAddItemExpression(request.Registry.Resolve(factoryType), factoryType), 
-                    "Create", null)));
-
-            var orange = container.Resolve<Orange>();
-
-            Assert.NotNull(orange);
-        }
-
         [Test]
         public void Could_register_factory_automatically_when_exported()
         {
@@ -116,17 +83,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void You_should_attribute_Create_with_Export_to_register_Otherwise_only_factory_itself_will_be_registered()
         {
             var container = new Container().WithAttributedModel();
-            container.RegisterExports(typeof(BareFactory));
+            container.RegisterExports(typeof(AppleFactory));
 
-            container.Resolve<IFactory<Apple>>();
+            container.Resolve<AppleFactory>();
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Apple>());
         }
     }
 
-    [ExportAll]
-    public class BareFactory : IFactory<Apple>
+    [Export, AsFactory]
+    public class AppleFactory
     {
         public Apple Create()
         {
@@ -134,8 +101,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
     }
 
-    [ExportAll][AsFactory]
-    public class OrangeFactory : IFactory<Orange>
+    [Export, AsFactory]
+    public class OrangeFactory
     {
         [Export]
         public Orange Create()
@@ -144,41 +111,40 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
     }
 
-    [ExportAll]
-    public class FruitFactory : IFactory<Orange>, IFactory<Apple>
+    [ExportAll, AsFactory]
+    public class FruitFactory
     {
         [Export]
-        Orange IFactory<Orange>.Create()
+        public Orange CreateOrange()
         {
             return new Orange();
         }
 
         [Export]
-        Apple IFactory<Apple>.Create()
+        public Apple CreateApple()
         {
             return new Apple();
         }
     }
 
-    [Export("orange", typeof(IFactory<Orange>))]
-    [Export("apple", typeof(IFactory<Apple>))]
-    public class NamedFruitFactory : IFactory<Orange>, IFactory<Apple>
+    [Export, AsFactory]
+    public class NamedFruitFactory
     {
         [Export("orange")]
-        public Orange Create()
+        public Orange CreateOrange()
         {
             return new Orange();
         }
 
         [Export("apple")]
-        Apple IFactory<Apple>.Create()
+        public Apple CreateApple()
         {
             return new Apple();
         }
     }
 
-    [ExportAll]
-    public class TransientOrangeFactory : IFactory<Orange>
+    [Export, AsFactory]
+    public class TransientOrangeFactory
     {
         [Export, TransientReuse]
         public Orange Create()
@@ -187,13 +153,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
     }
 
-    [ExportAll]
-    public class FuncFactory : IFactory<Func<string, Orange>>
+    [Export, AsFactory]
+    public class FuncFactory
     {
         [Export]
         public Func<string, Orange> Create()
         {
-            return s => new Orange();
+            return CreateOrange;
+        }
+
+        public Orange CreateOrange(string s)
+        {
+            return new Orange();
         }
     }
 

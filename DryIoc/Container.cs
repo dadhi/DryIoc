@@ -1632,29 +1632,30 @@ namespace DryIoc
         #endregion
     }
 
-    public sealed class FactoryMethodInfo
+    public sealed class FactoryMethod
     {
-        public readonly MethodInfo Method;
-        public readonly Func<Request, MethodInfo> GetMethod;
+        public readonly MethodBase Method;
+        public readonly object Factory;
 
-        public static implicit operator FactoryMethodInfo(MethodInfo method)
+        public static implicit operator FactoryMethod(MethodBase method)
         {
-            return new FactoryMethodInfo(method);
+            return Of(method);
         }
 
-        public static implicit operator FactoryMethodInfo(Func<Request, MethodInfo> getMethod)
+        public static FactoryMethod Of(MethodBase method, object factory = null)
         {
-            return new FactoryMethodInfo(getMethod);
+            return new FactoryMethod(method.ThrowIfNull(), factory);
         }
 
-        public FactoryMethodInfo(MethodInfo method)
+        public override string ToString()
+        {
+            return Method.DeclaringType + "::[" + Method + "]";
+        }
+
+        private FactoryMethod(MethodBase method, object factory = null)
         {
             Method = method;
-        }
-
-        public FactoryMethodInfo(Func<Request, MethodInfo> getMethod)
-        {
-            GetMethod = getMethod;
+            Factory = factory;
         }
     }
 
@@ -1675,11 +1676,10 @@ namespace DryIoc
         public static InjectionRules With(
             ConstructorSelector constructor = null,
             ParameterProvider parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null,
-            FactoryMethodInfo factoryMethod = null)
+            PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            return constructor == null && parameters == null && propertiesAndFields == null && factoryMethod == null
-                ? Default : new InjectionRules(constructor, parameters, propertiesAndFields, factoryMethod);
+            return constructor == null && parameters == null && propertiesAndFields == null
+                ? Default : new InjectionRules(constructor, parameters, propertiesAndFields);
         }
 
         /// <summary>Sets rule how to select constructor with simplified signature without <see cref="Request"/> 
@@ -1695,6 +1695,11 @@ namespace DryIoc
         public static implicit operator InjectionRules(ConstructorSelector selector)
         {
             return With(selector);
+        }
+
+        public static implicit operator InjectionRules(MethodInfo factoryMethod)
+        {
+            return With(_ => FactoryMethod.Of(factoryMethod));
         }
 
         public static implicit operator InjectionRules(ParameterProvider provider)
@@ -1717,8 +1722,6 @@ namespace DryIoc
         /// <summary>Specifies what <see cref="ServiceInfo"/> should be used when resolving property or field.</summary>
         public PropertiesAndFieldsSelector PropertiesAndFields { get; private set; }
 
-        public FactoryMethodInfo FactoryMethod { get; private set; }
-
         #region Implementation
 
         private InjectionRules() { }
@@ -1726,13 +1729,11 @@ namespace DryIoc
         private InjectionRules(
             ConstructorSelector constructor = null,
             ParameterProvider parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null,
-            FactoryMethodInfo factoryMethod = null)
+            PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             Constructor = constructor;
             Parameters = parameters;
             PropertiesAndFields = propertiesAndFields;
-            FactoryMethod = factoryMethod;
         }
 
         #endregion
@@ -1869,6 +1870,15 @@ namespace DryIoc
 
         public static readonly string INSTANCE_FACTORY_IS_NULL =
             "Instance factory is null when resolving: {0}";
+
+        public static readonly string SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD = 
+            "Service of {0} is not assignable from factory method {2} when resolving: {3}.";
+
+        public static readonly string FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD = 
+            "Unable to use null factory object with factory method {0} when resolving: {1}.";
+
+        public static readonly string FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC = 
+            "Factory instance provided {0} But factory method is static {1} when resolving: {2}.";
     }
 
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
@@ -3523,13 +3533,18 @@ namespace DryIoc
         private readonly object _instance;
     }
 
-    public delegate ConstructorInfo ConstructorSelector(Request request);
+    public delegate FactoryMethod ConstructorSelector(Request request);
     public delegate ParameterServiceInfo ParameterProvider(ParameterInfo parameter, Request request);
     public delegate IEnumerable<PropertyOrFieldServiceInfo> PropertiesAndFieldsSelector(Request request);
 
     /// <summary>Contains alternative rules to select constructor in implementation type registered with <see cref="ReflectionFactory"/>.</summary>
     public static partial class Constructor
     {
+        public static ConstructorSelector Of(Func<Request, MethodInfo> getMethod)
+        {
+            return r => FactoryMethod.Of(getMethod(r));
+        }
+
         /// <summary>Searches for constructor with all resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving as service and as Func&lt;TArgs..., TService&gt;.</summary>
         public static ConstructorSelector WithAllResolvableArguments = request =>
@@ -3920,12 +3935,13 @@ namespace DryIoc
         public ReflectionFactory(Type implementationType, IReuse reuse = null, InjectionRules rules = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
+            _implementationType = implementationType;
             Rules = rules ?? InjectionRules.Default;
-            if (Rules.FactoryMethod != null) // ignore implementation type
-                return;
 
-            _implementationType = implementationType.ThrowIf(implementationType.IsAbstract(), Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE);
-            if (implementationType.IsGenericDefinition())
+            if (Rules.Constructor == null)
+                implementationType.ThrowIf(implementationType.IsAbstract(), Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE);
+
+            if (implementationType != null && implementationType.IsGenericDefinition())
                 _providedFactories = Ref.Of(HashTree<int, KV<Type, object>>.Empty);
         }
 
@@ -3938,15 +3954,10 @@ namespace DryIoc
         {
             base.ValidateBeforeRegistration(serviceType, registry);
 
-            if (Rules.FactoryMethod != null)
-            {
-                var factoryMethod = Rules.FactoryMethod;
-                if (factoryMethod.Method != null)
-                    serviceType.ThrowIfNotOf(factoryMethod.Method.ReturnType);
-                return;
-            }
-
             var implType = _implementationType;
+            if (implType == null)
+                return;
+
             if (!implType.IsGenericDefinition())
             {
                 if (implType.IsOpenGeneric())
@@ -4009,8 +4020,11 @@ namespace DryIoc
         /// <param name="request">Request for service to resolve.</param> <returns>Created expression.</returns>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            var method = GetCreationMethod(request);
-            var parameters = method.GetParameters();
+            var method = GetFactoryMethodOrNull(request);
+            if (method == null)
+                return null;
+
+            var parameters = method.Method.GetParameters();
 
             Expression[] paramExprs = null;
             if (parameters.Length != 0)
@@ -4064,9 +4078,10 @@ namespace DryIoc
                 }
             }
 
-            var serviceExpr = method.IsConstructor
-                ? SetPropertiesAndFields(Expression.New((ConstructorInfo)method, paramExprs), request)
-                : Expression.Call((MethodInfo)method, paramExprs);
+            var serviceExpr = method.Method.IsConstructor
+                ? SetPropertiesAndFields(Expression.New((ConstructorInfo)method.Method, paramExprs), request)
+                : method.Method.IsStatic ? Expression.Call((MethodInfo)method.Method, paramExprs)
+                : Expression.Call(request.State.GetOrAddItemExpression(method.Factory), (MethodInfo)method.Method, paramExprs);
             return serviceExpr;
         }
 
@@ -4075,18 +4090,27 @@ namespace DryIoc
         private readonly Type _implementationType;
         private readonly Ref<HashTree<int, KV<Type, object>>> _providedFactories;
 
-        private MethodBase GetCreationMethod(Request request)
+        private FactoryMethod GetFactoryMethodOrNull(Request request)
         {
-            if (Rules.FactoryMethod != null)
-            {
-                var factory = Rules.FactoryMethod;
-                return factory.Method;
-            }
-
             var implType = _implementationType;
-            var selector = Rules.Constructor ?? request.Registry.Rules.Constructor;
-            if (selector != null)
-                return selector(request).ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_USING_SELECTOR, implType);
+            var getMethodOrNull = Rules.Constructor ?? request.Registry.Rules.Constructor;
+            if (getMethodOrNull != null)
+            {
+                var method = getMethodOrNull(request);
+                if (method != null && method.Method is MethodInfo)
+                {
+                    Throw.If(method.Method.IsStatic && method.Factory != null, Error.FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC, method.Factory, method, request); 
+                    
+                    request.ServiceType.ThrowIfNotOf(((MethodInfo)method.Method).ReturnType,
+                        Error.SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD, method, request);
+
+                    if (!method.Method.IsStatic && method.Factory == null)
+                        return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                            : Throw.No<FactoryMethod>(Error.FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD, method, request);
+                }
+
+                return method.ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_USING_SELECTOR, implType);
+            }
 
             var ctors = implType.GetAllConstructors().ToArrayOrSelf();
             Throw.If(ctors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implType);
@@ -4145,7 +4169,7 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        private static MethodInfo _setFieldMethod = typeof(ReflectionFactory).GetSingleDeclaredMethodOrNull("SetField");
+        private static readonly MethodInfo _setFieldMethod = typeof(ReflectionFactory).GetSingleDeclaredMethodOrNull("SetField");
         internal static T SetField<T, F>(T holder, ref F currentValue, F value)
         {
             if (ReferenceEquals(currentValue, default(F)) || Equals(currentValue, default(F)))
@@ -4153,7 +4177,7 @@ namespace DryIoc
             return holder;
         }
 
-        private static MethodInfo _setPropertyMethod = typeof(ReflectionFactory).GetSingleDeclaredMethodOrNull("SetProperty");
+        private static readonly MethodInfo _setPropertyMethod = typeof(ReflectionFactory).GetSingleDeclaredMethodOrNull("SetProperty");
         internal static T SetProperty<T, P>(T holder, P currentValue, Action<T> setProperty)
         {
             if (ReferenceEquals(currentValue, default(P)) || Equals(currentValue, default(P)))
@@ -5048,26 +5072,26 @@ namespace DryIoc
         {
             if (!throwCondition) return arg0;
             throw GetException(message == null
-                ? Format(ARGUMENT_HAS_IMVALID_CONDITION, arg0, typeof(T))
+                ? Format(IMVALID_CONDITION, arg0, typeof(T))
                 : Format(message, arg0, arg1, arg2, arg3));
         }
 
         public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null) where T : class
         {
             if (arg != null) return arg;
-            throw GetException(message == null ? Format(ARGUMENT_IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2, arg3));
+            throw GetException(message == null ? Format(IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2, arg3));
         }
 
         public static T ThrowIfNotOf<T>(this T arg0, Type arg1, string message = null, object arg2 = null, object arg3 = null) where T : class
         {
             if (arg1.IsTypeOf(arg0)) return arg0;
-            throw GetException(message == null ? Format(ARG_IS_NOT_OF_TYPE, arg0, arg1) : Format(message, arg0, arg1, arg2, arg3));
+            throw GetException(message == null ? Format(IS_NOT_OF_TYPE, arg0, arg1) : Format(message, arg0, arg1, arg2, arg3));
         }
 
         public static Type ThrowIfNotOf(this Type arg0, Type arg1, string message = null, object arg2 = null, object arg3 = null)
         {
             if (arg1.IsAssignableTo(arg0)) return arg0;
-            throw GetException(message == null ? Format(TYPE_ARG_IS_NOT_SUBTYPE_OF, arg0, arg1) : Format(message, arg0, arg1, arg2, arg3));
+            throw GetException(message == null ? Format(TYPE_IS_NOT_OF_TYPE, arg0, arg1) : Format(message, arg0, arg1, arg2, arg3));
         }
 
         public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
@@ -5107,10 +5131,10 @@ namespace DryIoc
             return string.Format(message, PrintArg(arg0), PrintArg(arg1), PrintArg(arg2), PrintArg(arg3));
         }
 
-        private static readonly string ARGUMENT_IS_NULL = "Argument of type {0} is null.";
-        private static readonly string ARGUMENT_HAS_IMVALID_CONDITION = "Argument {0} of type {1} has invalid condition.";
-        private static readonly string ARG_IS_NOT_OF_TYPE = "Argument {0} is not of type {1}.";
-        private static readonly string TYPE_ARG_IS_NOT_SUBTYPE_OF = "Argument type {0} is not subtype of type {1}.";
+        private static readonly string IS_NULL = "Argument of type {0} is null.";
+        private static readonly string IMVALID_CONDITION = "Argument {0} of type {1} has invalid condition.";
+        private static readonly string IS_NOT_OF_TYPE = "Argument {0} is not of type {1}.";
+        private static readonly string TYPE_IS_NOT_OF_TYPE = "Type argument {0} is not assignable from type {1}.";
     }
 
     public class ErrorMessage { }

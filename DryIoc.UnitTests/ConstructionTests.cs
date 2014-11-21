@@ -6,102 +6,102 @@ namespace DryIoc.UnitTests
     public class ConstructionTests
     {
         [Test]
+        public void Can_use_static_method_for_service_creation()
+        {
+            var container = new Container();
+            container.Register<SomeService>(rules: Constructor.Of(r => r.ImplementationType.GetDeclaredMethodOrNull("Create")));
+
+            var service = container.Resolve<SomeService>();
+
+            Assert.That(service.Message, Is.EqualTo("static"));
+        }
+
+        [Test]
         public void Can_use_any_type_static_method_for_service_creation()
         {
             var container = new Container();
-            container.Register<IService>(rules: InjectionRules.With(
-                factoryMethod: typeof(ServiceFactory).GetDeclaredMethodOrNull("CreateService")));
+            container.Register<IService>(rules: typeof(ServiceFactory).GetDeclaredMethodOrNull("CreateService"));
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service.Message, Is.EqualTo("yep!"));
+            Assert.That(service.Message, Is.EqualTo("static"));
         }
 
-        //[Test]
-        //public void Can_use_static_method_for_service_creation()
-        //{
-        //    var container = new Container();
-        //    container.Register<SomeService>(rules: InjectionRules.With(
-        //        factoryMethod: r => r.ImplementationType.GetDeclaredMethod("Create")));
+        [Test]
+        public void Can_use_instance_method_for_service_creation()
+        {
+            var container = new Container();
+            container.Register<ServiceFactory>();
+            container.Register<IService>(rules: InjectionRules.With(r => FactoryMethod.Of(
+                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), r.Resolve<ServiceFactory>())));
 
-        //    var service = container.Resolve<SomeService>();
+            var service = container.Resolve<IService>();
 
-        //    Assert.That(service.Message, Is.EqualTo("yes!"));
-        //}
+            Assert.That(service.Message, Is.EqualTo("instance"));
+        }
 
-        //[Test]
-        //public void Can_use_instance_method_for_service_creation()
-        //{
-        //    var container = new Container();
-        //    container.Register<ServiceFactory>();
-        //    container.Register<SomeService>(setup: Setup.With(
-        //        (_, __) => ConstructionInfo.Of(typeof(ServiceFactory).GetDeclaredMethod("CreateService"), 
-        //            r => r.Resolve<ServiceFactory>())));
+        [Test]
+        public void Can_use_instance_method_with_resolved_parameter()
+        {
+            var container = new Container();
+            container.Register<ServiceFactory>();
+            container.RegisterInstance("parameter");
+            container.Register<IService>(rules: InjectionRules.With(r => FactoryMethod.Of(
+                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create", typeof(string)), r.Resolve<ServiceFactory>())));
 
-        //    var service = container.Resolve<SomeService>();
+            var service = container.Resolve<IService>();
 
-        //    Assert.That(service.Message, Is.EqualTo("yep!"));
-        //}
+            Assert.That(service.Message, Is.EqualTo("parameter"));
+        }
 
-        //[Test]
-        //public void Can_use_instance_method_with_resolved_parameter()
-        //{
-        //    var container = new Container();
-        //    container.Register<ServiceFactory>();
-        //    container.RegisterInstance("dah!");
-        //    container.Register<SomeService>(setup: Setup.With(
-        //        (_, r) => ConstructionInfo.Of(typeof(ServiceFactory).GetDeclaredMethod("CreateService", new[] { typeof(string) }),
-        //            _r => _r.Resolve<ServiceFactory>())));
+        [Test]
+        public void Should_throw_if_instance_factory_unresolved()
+        {
+            var container = new Container();
+            container.Register<SomeService>(rules: InjectionRules.With(r => FactoryMethod.Of(
+                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), r.Resolve<ServiceFactory>())));
 
-        //    var service = container.Resolve<SomeService>();
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<SomeService>());
 
-        //    Assert.That(service.Message, Is.EqualTo("dah!"));
-        //}
+            Assert.That(ex.Message, Is.StringContaining("Unable to resolve"));
+        }
 
-        //[Test]
-        //public void Should_throw_if_instance_factory_unresolved()
-        //{
-        //    var container = new Container();
-        //    container.Register<SomeService>(setup: Setup.With(
-        //        (_, r) => ConstructionInfo.Of(typeof(ServiceFactory).GetDeclaredMethod("CreateService"), rr => rr.Resolve<ServiceFactory>())));
-            
-        //    Assert.Throws<ContainerException>(() => 
-        //        container.Resolve<SomeService>());
-        //}
+        [Test]
+        public void Should_throw_for_instance_method_without_factory()
+        {
+            var container = new Container();
+            container.Register<IService>(rules: typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"));
 
-        //[Test]
-        //public void Should_throw_if_instance_factory_is_null()
-        //{
-        //    var container = new Container();
-        //    container.Register<SomeService>(setup: Setup.With(
-        //        (_, r) => ConstructionInfo.Of(typeof(ServiceFactory).GetDeclaredMethod("CreateService"), __ => null)));
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<IService>());
 
-        //    Assert.Throws<ContainerException>(() =>
-        //        container.Resolve<SomeService>());
-        //}
+            Assert.That(ex.Message, Is.StringContaining("Unable to use null factory object with factory method"));
+        }
 
-        //[Test]
-        //public void Should_return_null_if_instance_factory_is_not_registered_and_we_try_to_resolve_service()
-        //{
-        //    var container = new Container();
-        //    container.Register<SomeService>(setup: Setup.With(
-        //        (_, r) => ConstructionInfo.Of(typeof(ServiceFactory).GetDeclaredMethod("CreateService"), rr => rr.Resolve<ServiceFactory>())));
+        [Test]
+        public void Should_return_null_if_instance_factory_is_not_resolved_on_TryResolve()
+        {
+            var container = new Container();
+            container.Register<IService>(rules: InjectionRules.With(r => FactoryMethod.Of(
+                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), r.Resolve<ServiceFactory>())));
 
-        //   var service = container.Resolve<SomeService>(IfUnresolved.ReturnDefault);
+            var service = container.Resolve<IService>(IfUnresolved.ReturnDefault);
 
-        //    Assert.That(service, Is.Null);
-        //}
+            Assert.That(service, Is.Null);
+        }
 
-        //[Test]
-        //public void What_if_factory_method_return_incompatible_type()
-        //{
-        //    var container = new Container();
-        //    container.Register<SomeService>(setup: Setup.With(
-        //        (t, _) => ConstructionInfo.Of(typeof(BadFactory).GetDeclaredMethod("Create"))));
+        [Test]
+        public void What_if_factory_method_returned_incompatible_type()
+        {
+            var container = new Container();
+            container.Register<SomeService>(rules: typeof(BadFactory).GetDeclaredMethodOrNull("Create"));
 
-        //    var ex = Assert.Throws<ContainerException>(() => 
-        //        container.Resolve<SomeService>());
-        //}
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<SomeService>());
+
+            Assert.That(ex.Message, Is.StringContaining("SomeService is not assignable from factory method"));
+        }
 
         #region CUT
 
@@ -121,7 +121,7 @@ namespace DryIoc.UnitTests
 
             public static SomeService Create()
             {
-                return new SomeService("yes!");
+                return new SomeService("static");
             }
         }
 
@@ -129,12 +129,17 @@ namespace DryIoc.UnitTests
         {
             public static IService CreateService()
             {
-                return new SomeService("yep!");
+                return new SomeService("static");
             }
 
-            public IService CreateService(string message)
+            public IService Create()
             {
-                return new SomeService(message);
+                return new SomeService("instance");
+            }
+
+            public IService Create(string parameter)
+            {
+                return new SomeService(parameter);
             }
         }
 

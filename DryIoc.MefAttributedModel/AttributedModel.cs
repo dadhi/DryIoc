@@ -61,7 +61,7 @@ namespace DryIoc.MefAttributedModel
         public static Rules WithAttributedModel(this Rules rules)
         {
             // hello, Max!!! we are Martians.
-            return rules.With(GetImportingConstructor, GetImportedParameter, GetImportedPropertiesAndFields);
+            return rules.With(GetImportingConstructor, GetImportedParameter, _getImportedPropertiesAndFields);
         }
 
         /// <summary>Appends attributed model rules to passed container using <see cref="WithAttributedModel(DryIoc.Rules)"/>.</summary>
@@ -116,10 +116,10 @@ namespace DryIoc.MefAttributedModel
 
                 registrator.Register(factory, export.ServiceType,
                     export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
-
-                if (registrationInfo.IsFactory)
-                    RegisterFactoryMethods(registrator, registrationInfo.ImplementationType);
             }
+
+            if (registrationInfo.IsFactory)
+                RegisterFactoryMethods(registrator, registrationInfo);
         }
 
         /// <summary>Scans assemblies to find concrete type annotated with <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>
@@ -144,7 +144,7 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var attributes = GetAllExportRelatedAttributes(implementationType);
-            return !DefineExport(attributes) ? null : GetRegistrationInfoOrDefault(implementationType, attributes);
+            return !IsExportDefined(attributes) ? null : GetRegistrationInfoOrDefault(implementationType, attributes);
         }
 
         #region Tools
@@ -173,7 +173,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static ConstructorInfo GetImportingConstructor(Request request)
+        private static FactoryMethod GetImportingConstructor(Request request)
         {
             var implementationType = request.ImplementationType;
             var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
@@ -191,7 +191,7 @@ namespace DryIoc.MefAttributedModel
                 : serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
         }
 
-        private static readonly PropertiesAndFieldsSelector GetImportedPropertiesAndFields =
+        private static readonly PropertiesAndFieldsSelector _getImportedPropertiesAndFields =
             PropertiesAndFields.All(PropertiesAndFields.Include.All, GetImportedPropertiesAndFieldsOnly);
 
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
@@ -333,7 +333,7 @@ namespace DryIoc.MefAttributedModel
             return info;
         }
 
-        private static bool DefineExport(Attribute[] attributes)
+        private static bool IsExportDefined(Attribute[] attributes)
         {
             return attributes.Length != 0 
                 && attributes.IndexOf(a => a is ExportAttribute || a is ExportAllAttribute) != -1 
@@ -431,84 +431,35 @@ namespace DryIoc.MefAttributedModel
             return exports;
         }
 
-        private static readonly MethodInfo _resolveMethod = typeof(Resolver)
-            .GetDeclaredMethodOrNull("Resolve", typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type))
-            .ThrowIfNull();
-
         private static readonly Func<Assembly, IEnumerable<Type>> _getAssemblyTypes =
             ExpressionTools.GetMethodDelegate<Assembly, IEnumerable<Type>>("GetTypes");
 
-        private const string FACTORY_METHOD_NAME = "Create";
-        private const string DOT_FACTORY_METHOD_NAME = "." + FACTORY_METHOD_NAME;
-
-        private static void RegisterFactoryMethods(IRegistrator registrator, Type factoryType)
+        private static void RegisterFactoryMethods(IRegistrator registrator, RegistrationInfo factoryInfo)
         {
-            //var serviceType = factoryExport.ServiceType.GetGenericParamsAndArgs()[0];
-            var methods = factoryType.GetAll(_ => _.DeclaredMethods);
+            var methods = factoryInfo.ImplementationType.GetAll(_ => _.DeclaredMethods);
             foreach (var method in methods)
             {
                 var attributes = method.GetAttributes().ToArrayOrSelf();
-                if (!DefineExport(attributes))
+                if (!IsExportDefined(attributes))
                     continue;
 
-                var info = GetRegistrationInfoOrDefault(method.ReturnType, attributes);
-                if (info == null)
-                    continue;
+                var serviceInfo = GetRegistrationInfoOrDefault(method.ReturnType, attributes).ThrowIfNull();
 
-                //// Result expression is {container.Resolve<IFactory<TService>>(factoryName).Create()} 
-                //Func<Request, Expression> factoryCreateExpr = request =>
-                //    Expression.Call(
-                //        Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
-                //            request.State.GetOrAddItemExpression(request),
-                //            Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
-                //            Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved)),
-                //            Expression.Constant(null, typeof(Type))),
-                //        FACTORY_METHOD_NAME, null);
+                var factoryMethod = method;
+                var factoryExport = factoryInfo.Exports[0];
+                var rules = InjectionRules.With(r => FactoryMethod.Of(
+                    factoryMethod, r.Resolve(factoryExport.ServiceType, factoryExport.ServiceKeyInfo.Key, IfUnresolved.ReturnDefault)));
+                
+                var serviceFactory = serviceInfo.CreateFactory(rules);
 
-                //var factory = new ExpressionFactory(factoryCreateExpr, GetReuseByType(info.ReuseType), info.GetSetup(attributes));
-
-                //for (var i = 0; i < info.Exports.Length; i++)
-                //{
-                //    var exp = info.Exports[i];
-                //    registrator.Register(factory, exp.ServiceType, exp.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
-                //}
+                var serviceExports = serviceInfo.Exports;
+                for (var i = 0; i < serviceExports.Length; i++)
+                {
+                    var export = serviceExports[i];
+                    registrator.Register(serviceFactory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                }
             }
         }
-
-        private static void RegisterFactory(IRegistrator registrator, Type factoryType, ExportInfo factoryExport)
-        {
-            var serviceType = factoryExport.ServiceType.GetGenericParamsAndArgs()[0];
-            var allMethods = factoryType.GetAll(_ => _.DeclaredMethods);
-            var factoryMethod = allMethods.FirstOrDefault(m =>
-                (m.Name == FACTORY_METHOD_NAME || m.Name.EndsWith(DOT_FACTORY_METHOD_NAME))
-                && m.GetParameters().Length == 0 && m.ReturnType == serviceType)
-                .ThrowIfNull();
-
-            var attributes = factoryMethod.GetCustomAttributes(false).Cast<Attribute>().ToArray();
-
-            var info = GetRegistrationInfoOrDefault(serviceType, attributes);
-            if (info == null)
-                return;
-
-            // Result expression is {container.Resolve<IFactory<TService>>(factoryName).Create()} 
-            Func<Request, Expression> factoryCreateExpr = request =>
-                Expression.Call(
-                    Expression.Call(_resolveMethod.MakeGenericMethod(factoryExport.ServiceType),
-                        request.State.GetOrAddItemExpression(request),
-                        Expression.Constant(factoryExport.ServiceKeyInfo.Key, typeof(string)),
-                        Expression.Constant(IfUnresolved.Throw, typeof(IfUnresolved)),
-                        Expression.Constant(null, typeof(Type))),
-                    FACTORY_METHOD_NAME, null);
-
-            var factory = new ExpressionFactory(factoryCreateExpr, GetReuseByType(info.ReuseType), info.GetSetup(attributes));
-
-            for (var i = 0; i < info.Exports.Length; i++)
-            {
-                var exp = info.Exports[i];
-                registrator.Register(factory, exp.ServiceType, exp.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
-            }
-        }
-
 
         #endregion
     }
@@ -617,9 +568,9 @@ namespace DryIoc.MefAttributedModel
         public WrapperInfo Wrapper;
         public bool IsFactory;
 
-        public Factory CreateFactory()
+        public Factory CreateFactory(InjectionRules rules = null)
         {
-            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), setup: GetSetup());
+            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), rules, GetSetup());
         }
 
         /// <summary>Create factory setup from DTO data.</summary>
@@ -995,11 +946,6 @@ namespace DryIoc.MefAttributedModel
             ContractType = contractType;
             ContractKey = contractKey;
         }
-    }
-
-    public interface IFactory<T>
-    {
-        T Create();
     }
 
     #endregion

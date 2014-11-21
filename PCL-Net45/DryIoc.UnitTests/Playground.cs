@@ -12,7 +12,7 @@ namespace DryIoc.UnitTests
             MethodBase ctor = GetType().GetConstructorOrNull();
             Assert.IsTrue(ctor.IsConstructor);
 
-            MethodBase method = GetType().GetDeclaredMethod("Reflection_tests");
+            MethodBase method = GetType().GetDeclaredMethodOrNull("Reflection_tests");
             Assert.IsFalse(method.IsConstructor);
 
             var methodInfos = typeof(X).GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
