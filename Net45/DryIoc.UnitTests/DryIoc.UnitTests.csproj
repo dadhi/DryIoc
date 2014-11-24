@@ -100,9 +100,6 @@
     <Compile Include="..\..\DryIoc.UnitTests\InjectionRulesTests.cs">
       <Link>InjectionRulesTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\KeyMappingTests.cs">
-      <Link>KeyMappingTests.cs</Link>
-    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\KeyValuePairResolutionTests.cs">
       <Link>KeyValuePairResolutionTests.cs</Link>
     </Compile>

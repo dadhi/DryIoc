@@ -49,8 +49,36 @@ namespace DryIoc.Samples
 
         #endregion
 
-        [Test]
+        [Test, Ignore]
         public void Can_override_registrations_in_open_scope()
+        {
+            var container = new Container();
+            container.Register<IClient, Client>();
+            container.Register<IDep, Dep>();
+            container.Register<IServ, Serv>(Shared.InContainer);
+
+            var client = container.Resolve<IClient>();
+            Assert.That(client, Is.InstanceOf<Client>());
+            Assert.That(client.Dep, Is.InstanceOf<Dep>());
+            Assert.That(client.Serv, Is.InstanceOf<Serv>());
+
+            using (var scoped = container.OpenScope())
+            {
+                scoped.Register<IClient, ClientScoped>(named: "scoped");
+                scoped.Register<IDep, DepScoped>(named: "scoped");
+
+                var scopedClient = scoped.Resolve<IClient>("scoped");
+                Assert.That(scopedClient, Is.InstanceOf<ClientScoped>());
+                Assert.That(scopedClient.Dep, Is.InstanceOf<DepScoped>());
+                Assert.That(scopedClient.Serv, Is.InstanceOf<Serv>());
+            }
+
+            client = container.Resolve<IClient>();
+            Assert.That(client, Is.InstanceOf<Client>());
+        }
+
+        [Test, Ignore]
+        public void Can_override_registrations_in_open_scope_OLDONE()
         {
             var container = new Container();
             container.Register<IClient, Client>();
@@ -75,6 +103,63 @@ namespace DryIoc.Samples
 
             client = container.Resolve<IClient>();
             Assert.That(client, Is.InstanceOf<Client>());
+        }
+
+        [Test]
+        public void NoReuseBetweenRequests()
+        {
+            var container = new Container();
+            container.Register<IndependentService>(Shared.InCurrentScope);
+
+            var firstScope = container.OpenScope();
+            var first = firstScope.Resolve<IndependentService>();
+            firstScope.Dispose();
+
+            var secondScope = container.OpenScope();
+            var second = secondScope.Resolve<IndependentService>();
+            secondScope.Dispose();
+
+            Assert.AreNotSame(first, second);
+        }
+
+        //[Feature]
+        //[DisplayName("Instance is disposed at the end of request")]
+        //[DependsOnFeature("PerRequestSupport")]
+        //public void ComponentIsDisposedAtTheEndOfRequest(IContainerAdapter adapter)
+        //{
+        //    adapter.RegisterPerWebRequest<DisposableService>();
+
+        //    BeginRequest(adapter);
+        //    var service = adapter.Resolve<DisposableService>();
+        //    EndRequest(adapter);
+
+        //    Assert.True(service.Disposed);
+        //}
+
+        //[Feature]
+        //[DisplayName("Singleton using factory does not reuse instance between requests")]
+        //[DependsOnFeature("PerRequestSupport")]
+        //[DependsOnFeature(typeof(FuncTests), "FactoryWithNoParameters")]
+        //public void FactoryNoReuseBetweenRequests(IContainerAdapter adapter)
+        //{
+        //    adapter.RegisterPerWebRequest<IService, IndependentService>();
+        //    adapter.RegisterSingleton<ServiceWithFuncConstructorDependency>();
+
+        //    var service = adapter.Resolve<ServiceWithFuncConstructorDependency>();
+
+        //    BeginRequest(adapter);
+        //    var first = service.Factory();
+        //    EndRequest(adapter);
+
+        //    BeginRequest(adapter);
+        //    var second = service.Factory();
+        //    EndRequest(adapter);
+
+        //    Assert.NotSame(first, second);
+        //}
+
+        internal class IndependentService : IService
+        {
         }
 
         internal interface IDep { }

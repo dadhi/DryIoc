@@ -333,6 +333,37 @@ namespace DryIoc.UnitTests
             Assert.That(service.FullName, Is.EqualTo("Oh Yeah"));
         }
 
+        [Test]
+        public void Can_resolve_subdependency_with_func_argument()
+        {
+            var container = new Container();
+            container.Register<ClassWithDepAndSubDep>();
+            container.Register<DepWithSubDep>();
+
+            var func = container.Resolve<Func<string, ClassWithDepAndSubDep>>();
+            var service = func("Hey");
+
+            Assert.That(service.Dep.Message, Is.EqualTo("Hey"));
+        }
+
+        internal class ClassWithDepAndSubDep
+        {
+            public DepWithSubDep Dep { get; private set; }
+            public ClassWithDepAndSubDep(DepWithSubDep dep)
+            {
+                Dep = dep;
+            }
+        }
+
+        internal class DepWithSubDep
+        {
+            public string Message { get; private set; }
+            public DepWithSubDep(string message)
+            {
+                Message = message;
+            }
+        }
+
         public class TwoCtors
         {
             public string Message { get; set; }

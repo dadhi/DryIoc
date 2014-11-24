@@ -78,7 +78,8 @@ namespace DryIoc
         public Container OpenScope()
         {
             ThrowIfContainerDisposed();
-            return new Container(Rules, _factories, _decorators, _wrappers, _singletonScope, new Scope(),
+            return new Container(Rules, 
+                _factories, _decorators, _wrappers, _singletonScope, new Scope(),
                 _resolvedDefaultDelegates, _resolvedKeyedDelegates, _resolutionState);
         }
 
@@ -126,8 +127,8 @@ namespace DryIoc
             _decorators.Swap(_ => HashTree<Type, Factory[]>.Empty);
             _wrappers.Swap(_ => HashTree<Type, Factory>.Empty);
 
-            _resolvedDefaultDelegates = HashTree<Type, FactoryDelegate>.Empty;
-            _resolvedKeyedDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
+            _resolvedDefaultDelegates = Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
+            _resolvedKeyedDelegates = Ref.Of(HashTree<Type, HashTree<object, FactoryDelegate>>.Empty);
             _resolutionState.Dispose();
 
             Rules = Rules.Empty;
@@ -159,7 +160,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             factory.ThrowIfNull().ValidateBeforeRegistration(serviceType.ThrowIfNull(), this);
-            factory.RegisteredWith(_registryID);
+            factory.RegisteredInto(_registryID);
 
             switch (factory.FactoryType)
             {
@@ -215,7 +216,6 @@ namespace DryIoc
             {
                 case FactoryType.Wrapper:
                     if (condition == null)
-                    {
                         _wrappers.Swap(_ => _.RemoveOrUpdate(serviceType,
                             (Factory factory, out Factory remainingFactory) =>
                             {
@@ -223,7 +223,6 @@ namespace DryIoc
                                 remainingFactory = null;
                                 return false;
                             }));
-                    }
                     else
                         _wrappers.Swap(_ => _.RemoveOrUpdate(serviceType,
                             (Factory factory, out Factory remainingFactory) =>
@@ -347,14 +346,7 @@ namespace DryIoc
 
         object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request parentOrEmpty)
         {
-            if (Rules.KeyMapping != null)
-            {
-                var serviceKey = Rules.KeyMapping(null, serviceType);
-                if (serviceKey != null)
-                    return ((IResolver)this).ResolveKeyed(serviceType, serviceKey, ifUnresolved, null, parentOrEmpty);
-            }
-
-            var factoryDelegate = _resolvedDefaultDelegates.GetValueOrDefault(serviceType);
+            var factoryDelegate = _resolvedDefaultDelegates.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
                 ? factoryDelegate(_resolutionState.Items, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, parentOrEmpty);
@@ -363,9 +355,6 @@ namespace DryIoc
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType,
             Request parentOrEmpty)
         {
-            if (Rules.KeyMapping != null)
-                serviceKey = Rules.KeyMapping(serviceKey, serviceType);
-
             var cacheServiceKey = serviceKey;
             if (requiredServiceType != null)
             {
@@ -387,7 +376,7 @@ namespace DryIoc
 
             FactoryDelegate factoryDelegate;
 
-            var factoryDelegates = _resolvedKeyedDelegates.GetValueOrDefault(serviceType);
+            var factoryDelegates = _resolvedKeyedDelegates.Value.GetValueOrDefault(serviceType);
             if (factoryDelegates != null &&
                 (factoryDelegate = factoryDelegates.GetValueOrDefault(cacheServiceKey)) != null)
                 return factoryDelegate(_resolutionState.Items, null);
@@ -402,9 +391,8 @@ namespace DryIoc
             var resultService = factoryDelegate(request.State.Items, request.ResolutionScope);
 
             // Safe to cache factory only after it is evaluated without errors.
-            factoryDelegates = factoryDelegates ?? HashTree<object, FactoryDelegate>.Empty;
-            Interlocked.Exchange(ref _resolvedKeyedDelegates, _resolvedKeyedDelegates
-                .AddOrUpdate(serviceType, factoryDelegates.AddOrUpdate(cacheServiceKey, factoryDelegate)));
+            _resolvedKeyedDelegates.Swap(_ => _.AddOrUpdate(serviceType, 
+                (factoryDelegates ?? HashTree<object, FactoryDelegate>.Empty).AddOrUpdate(cacheServiceKey, factoryDelegate)));
 
             return resultService;
         }
@@ -437,11 +425,7 @@ namespace DryIoc
                 return null;
 
             var resultService = factoryDelegate(request.State.Items, request.ResolutionScope);
-
-            // Safe to cache factory only after it is evaluated without errors.
-            Interlocked.Exchange(ref _resolvedDefaultDelegates, _resolvedDefaultDelegates
-                .AddOrUpdate(serviceType, factoryDelegate));
-
+            _resolvedDefaultDelegates.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
             return resultService;
         }
 
@@ -732,10 +716,10 @@ namespace DryIoc
                             case IfAlreadyRegistered.KeepRegistered:
                                 return oldValue;
                             case IfAlreadyRegistered.UpdateRegistered:
-                                RemoveDefaultResolvedDelegate(serviceType);
+                                _resolvedDefaultDelegates.Swap(x1 => x1.RemoveOrUpdate(serviceType));
                                 return factory;
                             default:
-                                RemoveDefaultResolvedDelegate(serviceType);
+                                _resolvedDefaultDelegates.Swap(x1 => x1.RemoveOrUpdate(serviceType));
                                 return new FactoriesEntry(DefaultKey.Default.Next(), HashTree<object, Factory>.Empty
                                     .AddOrUpdate(DefaultKey.Default, (Factory)oldValue)
                                     .AddOrUpdate(DefaultKey.Default.Next(), factory));
@@ -752,10 +736,10 @@ namespace DryIoc
                         case IfAlreadyRegistered.KeepRegistered:
                             return oldValue;
                         case IfAlreadyRegistered.UpdateRegistered:
-                            RemoveDefaultResolvedDelegate(serviceType);
+                            _resolvedDefaultDelegates.Swap(x1 => x1.RemoveOrUpdate(serviceType));
                             return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.Update(oldEntry.LastDefaultKey, factory));
                         default: // just add another default factory
-                            RemoveDefaultResolvedDelegate(serviceType);
+                            _resolvedDefaultDelegates.Swap(x1 => x1.RemoveOrUpdate(serviceType));
                             var newDefaultKey = oldEntry.LastDefaultKey.Next();
                             return new FactoriesEntry(newDefaultKey, oldEntry.Factories.AddOrUpdate(newDefaultKey, factory));
                     }
@@ -777,11 +761,6 @@ namespace DryIoc
                         : Throw.No<Factory>(Error.REGISTERING_WITH_DUPLICATE_SERVICE_KEY, serviceType, serviceKey, oldFactory)));
                 }));
             }
-        }
-
-        private void RemoveDefaultResolvedDelegate(Type serviceType)
-        {
-            _resolvedDefaultDelegates = _resolvedDefaultDelegates.RemoveOrUpdate(serviceType);
         }
 
         private Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey,
@@ -838,8 +817,8 @@ namespace DryIoc
 
         private readonly Scope _singletonScope, _currentScope;
 
-        private HashTree<Type, FactoryDelegate> _resolvedDefaultDelegates;
-        private HashTree<Type, HashTree<object, FactoryDelegate>> _resolvedKeyedDelegates;
+        private Ref<HashTree<Type, FactoryDelegate>> _resolvedDefaultDelegates;
+        private Ref<HashTree<Type, HashTree<object, FactoryDelegate>>> _resolvedKeyedDelegates;
         private readonly ResolutionState _resolutionState;
 
         private Container(
@@ -848,8 +827,8 @@ namespace DryIoc
             Ref<HashTree<Type, Factory[]>> decorators,
             Ref<HashTree<Type, Factory>> wrappers,
             Scope singletonScope, Scope currentScope = null,
-            HashTree<Type, FactoryDelegate> resolvedDefaultDelegates = null,
-            HashTree<Type, HashTree<object, FactoryDelegate>> resolvedKeyedDelegates = null,
+            Ref<HashTree<Type, FactoryDelegate>> resolvedDefaultDelegates = null,
+            Ref<HashTree<Type, HashTree<object, FactoryDelegate>>> resolvedKeyedDelegates = null,
             ResolutionState resolutionState = null)
         {
             _registryID = Interlocked.Increment(ref _lastRegistryID);
@@ -863,8 +842,8 @@ namespace DryIoc
             _singletonScope = singletonScope;
             _currentScope = currentScope ?? singletonScope;
 
-            _resolvedDefaultDelegates = resolvedDefaultDelegates ?? HashTree<Type, FactoryDelegate>.Empty;
-            _resolvedKeyedDelegates = resolvedKeyedDelegates ?? HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
+            _resolvedDefaultDelegates = resolvedDefaultDelegates ?? Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
+            _resolvedKeyedDelegates = resolvedKeyedDelegates ?? Ref.Of(HashTree<Type, HashTree<object, FactoryDelegate>>.Empty);
             _resolutionState = resolutionState != null ? resolutionState.Copy() : new ResolutionState();
             _resolutionState.AddOrUpdateItem(_currentScope, 0);
 
@@ -1600,13 +1579,6 @@ namespace DryIoc
             return new Rules(this) { ReuseMapping = rule };
         }
 
-        public delegate object KeyMappingRule(object serviceKey, Type serviceType);
-        public KeyMappingRule KeyMapping { get; private set; }
-        public Rules WithKeyMapping(KeyMappingRule rule)
-        {
-            return new Rules(this) { KeyMapping = rule };
-        }
-
         #region Implementation
 
         private InjectionRules _injectionRules;
@@ -1624,7 +1596,6 @@ namespace DryIoc
             ForUnregisteredService = copy.ForUnregisteredService;
             ThrowIfDepenedencyHasShorterReuseLifespan = copy.ThrowIfDepenedencyHasShorterReuseLifespan;
             ReuseMapping = copy.ReuseMapping;
-            KeyMapping = copy.KeyMapping;
             _injectionRules = copy._injectionRules;
             _compilationToDynamicAssemblyEnabled = copy._compilationToDynamicAssemblyEnabled;
         }
@@ -2925,8 +2896,7 @@ namespace DryIoc
 
             ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info.ThrowIfNull(), this);
             var inheritedInfo = info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup);
-            var funcArgExprs = ResolvedFactory.FactoryType == FactoryType.Wrapper ? FuncArgs : null;
-            return new Request(this, _registryWeakRef, _stateWeakRef, _scope, inheritedInfo, null, funcArgExprs);
+            return new Request(this, _registryWeakRef, _stateWeakRef, _scope, inheritedInfo, null, FuncArgs);
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls <see cref="Push(DryIoc.IServiceInfo)"/>.</summary>
@@ -3260,7 +3230,7 @@ namespace DryIoc
 
         /// <summary>Sets what registry factory is registered within. Used by container parent-child scenarios.</summary>
         /// <param name="registryID">ID of registry to set: <see cref="RegistryID"/>.</param>
-        public void RegisteredWith(int registryID)
+        public void RegisteredInto(int registryID)
         {
             RegistryID = registryID;
         }
@@ -4005,9 +3975,18 @@ namespace DryIoc
                 ? serviceType.GetGenericParamsAndArgs()
                 : GetClosedTypeArgsForGenericImplementationType(_implementationType, request);
 
-            var closedImplType = Throw.IfThrows<ArgumentException, Type>(
-                () => _implementationType.MakeGenericType(closedTypeArgs),
-                Error.UNMATCHED_GENERIC_PARAM_CONSTRAINTS, _implementationType, request);
+            Type closedImplType;
+            if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+            {
+                try { closedImplType = _implementationType.MakeGenericType(closedTypeArgs); }
+                catch { return null; }
+            }
+            else
+            {
+                closedImplType = Throw.IfThrows<ArgumentException, Type>(
+                   () => _implementationType.MakeGenericType(closedTypeArgs),
+                   Error.UNMATCHED_GENERIC_PARAM_CONSTRAINTS, _implementationType, request);               
+            }
 
             var factory = new ReflectionFactory(closedImplType, Reuse, Rules, Setup);
             _providedFactories.Swap(_ => _.AddOrUpdate(factory.FactoryID, new KV<Type, object>(serviceType, request.ServiceKey)));
@@ -4401,10 +4380,8 @@ namespace DryIoc
     /// </summary>
     public sealed class Scope : IScope, IDisposable
     {
-        /// <summary>
-        /// <see cref="IScope.GetOrAdd"/> for purpose.
-        /// Will throw <see cref="ContainerException"/> if scope is disposed.
-        /// </summary>
+        /// <summary><see cref="IScope.GetOrAdd"/> for description.
+        /// Will throw <see cref="ContainerException"/> if scope is disposed.</summary>
         /// <param name="id">Unique ID to find created object in subsequent calls.</param>
         /// <param name="factory">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
         /// <returns>Created and stored object.</returns>

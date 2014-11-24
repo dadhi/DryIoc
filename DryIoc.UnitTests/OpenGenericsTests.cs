@@ -137,6 +137,19 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Resolve_many_should_filter_out_implementations_with_notfit_constraints()
+        {
+            var container = new Container();
+            container.Register(typeof(IGeneric<>), typeof(GenericWithConstraint<>));
+            container.Register(typeof(IGeneric<>), typeof(AnotherGenericWithConstraint<>));
+            container.Register<Blah>();
+
+            var services = container.Resolve<IGeneric<Blah>[]>();
+
+            Assert.That(services.Length, Is.EqualTo(1));
+        }
+
+        [Test]
         public void Should_handle_reordered_type_arguments_for_closed_generics()
         {
             var container = new Container();
@@ -312,15 +325,33 @@ namespace DryIoc.UnitTests
         }
     }
 
-    public class GenericWithConstraint<T> where T : IService, new()
+    internal interface IGeneric<T>
     {
-        public T Service { get; set; }
+        T Service { get; }
+    }
+
+    internal class GenericWithConstraint<T> : IGeneric<T>
+        where T : IService, new()
+    {
+        public T Service { get; private set; }
 
         public GenericWithConstraint(T service)
         {
             Service = service;
         }
     }
+
+    internal class AnotherGenericWithConstraint<T> : IGeneric<T>
+    {
+        public T Service { get; private set; }
+
+        public AnotherGenericWithConstraint(T service)
+        {
+            Service = service;
+        }
+    }
+
+    internal class Blah { }
 
     public interface IDouble<T1, T2> { }
 
