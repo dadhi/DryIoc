@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System;
+using NUnit.Framework;
 // ReSharper disable MemberHidesStaticFromOuterClass
 
 namespace DryIoc.Samples
@@ -106,60 +107,53 @@ namespace DryIoc.Samples
         }
 
         [Test]
-        public void NoReuseBetweenRequests()
+        public void Services_should_be_different_in_different_scopes()
         {
             var container = new Container();
             container.Register<IndependentService>(Shared.InCurrentScope);
 
-            var firstScope = container.OpenScope();
-            var first = firstScope.Resolve<IndependentService>();
-            firstScope.Dispose();
+            var scope = container.OpenScope();
+            var first = scope.Resolve<IndependentService>();
+            scope.Dispose();
 
-            var secondScope = container.OpenScope();
-            var second = secondScope.Resolve<IndependentService>();
-            secondScope.Dispose();
+            scope = container.OpenScope();
+            var second = scope.Resolve<IndependentService>();
+            scope.Dispose();
 
-            Assert.AreNotSame(first, second);
+            Assert.That(second, Is.Not.SameAs(first));
         }
 
-        //[Feature]
-        //[DisplayName("Instance is disposed at the end of request")]
-        //[DependsOnFeature("PerRequestSupport")]
-        //public void ComponentIsDisposedAtTheEndOfRequest(IContainerAdapter adapter)
-        //{
-        //    adapter.RegisterPerWebRequest<DisposableService>();
-
-        //    BeginRequest(adapter);
-        //    var service = adapter.Resolve<DisposableService>();
-        //    EndRequest(adapter);
-
-        //    Assert.True(service.Disposed);
-        //}
-
-        //[Feature]
-        //[DisplayName("Singleton using factory does not reuse instance between requests")]
-        //[DependsOnFeature("PerRequestSupport")]
-        //[DependsOnFeature(typeof(FuncTests), "FactoryWithNoParameters")]
-        //public void FactoryNoReuseBetweenRequests(IContainerAdapter adapter)
-        //{
-        //    adapter.RegisterPerWebRequest<IService, IndependentService>();
-        //    adapter.RegisterSingleton<ServiceWithFuncConstructorDependency>();
-
-        //    var service = adapter.Resolve<ServiceWithFuncConstructorDependency>();
-
-        //    BeginRequest(adapter);
-        //    var first = service.Factory();
-        //    EndRequest(adapter);
-
-        //    BeginRequest(adapter);
-        //    var second = service.Factory();
-        //    EndRequest(adapter);
-
-        //    Assert.NotSame(first, second);
-        //}
-
-        internal class IndependentService : IService
+        [Test]
+        public void Factory_should_return_different_service_when_called_in_different_scopes()
         {
+            var container = new Container();
+
+            container.Register<IService, IndependentService>(Reuse.InCurrentScope);
+            container.Register<ServiceWithFuncConstructorDependency>(Reuse.Singleton);
+
+            var service = container.Resolve<ServiceWithFuncConstructorDependency>();
+
+            var scope = container.BeginScope();
+            var first = service.GetScopedService();
+            scope.Dispose();
+
+            scope = container.BeginScope();
+            var second = service.GetScopedService();
+            scope.Dispose();
+
+            Assert.That(second, Is.Not.SameAs(first));
+        }
+
+        internal class IndependentService : IService { }
+
+        internal class ServiceWithFuncConstructorDependency
+        {
+            public Func<IService> GetScopedService { get; private set; }
+
+            public ServiceWithFuncConstructorDependency(Func<IService> getScopedService)
+            {
+                GetScopedService = getScopedService;
+            }
         }
 
         internal interface IDep { }

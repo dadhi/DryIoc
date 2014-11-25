@@ -60,13 +60,11 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        public class Producer
-        {
-        }
+        public class Producer { }
 
         public class Consumer
         {
-            public Producer Producer { get; set; }
+            public Producer Producer { get; private set; }
 
             public Consumer(Producer producer)
             {
