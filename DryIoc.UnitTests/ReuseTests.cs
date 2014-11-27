@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Linq.Expressions;
-using System.Reflection;
 using System.Threading;
 using System.Web;
 using DryIoc.UnitTests.CUT;
@@ -184,11 +182,11 @@ namespace DryIoc.UnitTests
             container.Register<Client>(Reuse.Singleton);
             container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Client>());
 
             Assert.That(ex.Message, Is.StringContaining(
-                "Dependency DryIoc.UnitTests.FastLogger: DryIoc.UnitTests.ILogger as parameter \"logger\" " + 
+                "Dependency DryIoc.UnitTests.FastLogger: DryIoc.UnitTests.ILogger as parameter \"logger\" " +
                 "has shorter reuse lifespan (InResolutionScope:10) than its parent (Singleton:1000)"));
         }
 
@@ -232,7 +230,7 @@ namespace DryIoc.UnitTests
             Assert.That(service.Value.Dep.IsDisposed, Is.True);
         }
 
-        internal class SomeDep : IDisposable 
+        internal class SomeDep : IDisposable
         {
             public bool IsDisposed { get; private set; }
 
@@ -248,6 +246,84 @@ namespace DryIoc.UnitTests
             public SomeRoot(SomeDep dep)
             {
                 Dep = dep;
+            }
+        }
+
+        public interface IReuseContext
+        {
+            bool IsAvailable { get; }
+
+            IScope Current { get; set; }
+        }
+
+        public static class AmbientReuseContext
+        {
+            public static readonly IReuseContext InThread = new ThreadReuseContext();
+            public static readonly IReuseContext InWeb = new HttpContextReuseContext();
+
+            private class ThreadReuseContext : IReuseContext
+            {
+                public bool IsAvailable
+                {
+                    get { return true; }
+                }
+
+                public IScope Current
+                {
+                    get { return _scopes.Value.GetValueOrDefault(Thread.CurrentThread.ManagedThreadId); }
+                    set { _scopes.Swap(_ => _.AddOrUpdate(Thread.CurrentThread.ManagedThreadId, value)); }
+                }
+
+                private readonly Ref<HashTree<int, IScope>> _scopes = Ref.Of(HashTree<int, IScope>.Empty);
+            }
+
+            private class HttpContextReuseContext : IReuseContext
+            {
+                public bool IsAvailable
+                {
+                    get { return HttpContext.Current == null; }
+                }
+
+                public IScope Current
+                {
+                    get
+                    {
+                        var scope = _scopeWhenHttpContextIsNull;
+                        if (scope != null)
+                            return scope;
+                        var httpContext = HttpContext.Current;
+                        if (httpContext != null)
+                            return (IScope)httpContext.Items[_scopeKey];
+                        return null;
+                    }
+                    set
+                    {
+                        var httpContext = HttpContext.Current;
+                        if (httpContext == null)
+                            _scopeWhenHttpContextIsNull = value;
+                        else
+                        {
+                            httpContext.Items[_scopeKey] = value;
+                            _scopeWhenHttpContextIsNull = null;
+                        }
+                    }
+                }
+
+                private static readonly Type _scopeKey = typeof(HttpContextReuse);
+                private IScope _scopeWhenHttpContextIsNull;
+            }
+        }
+
+        public class NewThreadReuse
+        {
+            public int Lifespan
+            {
+                get { return Reuse.InResolutionScope.Lifespan; }
+            }
+
+            public IScope GetScope(IReuseContext context)
+            {
+                return context.Current;
             }
         }
 
@@ -314,7 +390,7 @@ namespace DryIoc.UnitTests
             private static readonly string _reuseScopeKey = typeof(HttpContextReuse).Name;
         }
 
-        // Old example v1.3.1 
+        // Old example for v1.3.1 
         //public sealed class HttpContextReuse : IReuse
         //{
         //    public static readonly HttpContextReuse Instance = new HttpContextReuse();

@@ -3085,6 +3085,8 @@ namespace DryIoc
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
 
+        public virtual Func<Request, bool> Condition { get { return null; } } 
+
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
         /// or disable disposing with <see cref="ExplicitlyDisposable"/>, etc.</summary>
         public virtual IReuseWrapper[] ReuseWrappers { get { return null; } }
@@ -3202,13 +3204,18 @@ namespace DryIoc
         public override FactoryType FactoryType { get { return FactoryType.Decorator; } }
 
         /// <summary>Predicate to check if request is fine to apply decorator for resolved service.</summary>
-        public readonly Func<Request, bool> Condition;
-
+        public override Func<Request, bool> Condition
+        {
+            get { return _condition; }
+        }
+        
         #region Implementation
+
+        private readonly Func<Request, bool> _condition;
 
         private SetupDecorator(Func<Request, bool> condition = null)
         {
-            Condition = condition ?? (_ => true);
+            _condition = condition ?? (_ => true);
         }
 
         #endregion
@@ -3287,6 +3294,8 @@ namespace DryIoc
                 Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE, serviceType);
         }
 
+        /// <summary>Method applied for factory provider, returns new factory per request.</summary>
+        /// <param name="request">Request to resolve.</param> <returns>Returns new factory per request.</returns>
         public virtual Factory GetFactoryForRequestOrDefault(Request request) { return null; }
 
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
@@ -3353,17 +3362,16 @@ namespace DryIoc
             return serviceExpr;
         }
 
+        /// <summary>Check method name for explanation XD.</summary> <param name="reuse">Reuse to check.</param> <param name="request">Request to resolve.</param>
         protected static void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse, Request request)
         {
-            if (reuse != null && request.Registry.Rules.ThrowIfDepenedencyHasShorterReuseLifespan)
+            if (reuse != null && !request.Parent.IsEmpty && 
+                request.Registry.Rules.ThrowIfDepenedencyHasShorterReuseLifespan)
             {
-                if (!request.Parent.IsEmpty)
-                {
-                    var parentReuse = request.Parent.ResolvedFactory.Reuse;
-                    if (parentReuse != null)
-                        Throw.If(reuse.Lifespan < parentReuse.Lifespan,
-                            Error.DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN, request.PrintCurrent(), reuse, parentReuse, request.Parent);
-                }
+                var parentReuse = request.Parent.ResolvedFactory.Reuse;
+                if (parentReuse != null)
+                    Throw.If(reuse.Lifespan < parentReuse.Lifespan,
+                        Error.DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN, request.PrintCurrent(), reuse, parentReuse, request.Parent);
             }
         }
 
@@ -4060,7 +4068,12 @@ namespace DryIoc
                     {
                         var paramInfo = getParamInfo(ctorParam, request) ?? ParameterServiceInfo.Of(ctorParam);
                         var paramRequest = request.Push(paramInfo);
-                        paramExpr = GetDependencyExpressionOrNull(paramInfo, paramRequest);
+                        var factory = paramInfo.Details.GetValue == null 
+                            ? paramRequest.Registry.ResolveFactory(paramRequest)
+                            : new DelegateFactory(r => paramRequest.ServiceInfo.Details.GetValue(r)
+                                .ThrowIfNotOf(paramRequest.ServiceType, Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, paramRequest));
+                        
+                        paramExpr = factory == null ? null : factory.GetExpressionOrDefault(paramRequest);
                         if (paramExpr == null)
                         {
                             if (request.IfUnresolved == IfUnresolved.ReturnDefault)
@@ -4130,7 +4143,12 @@ namespace DryIoc
                 if (memberInfo != null)
                 {
                     var memberRequest = request.Push(memberInfo);
-                    var memberExpr = GetDependencyExpressionOrNull(memberInfo, memberRequest);
+                    var factory = memberInfo.Details.GetValue == null
+                        ? memberRequest.Registry.ResolveFactory(memberRequest)
+                        : new DelegateFactory(r => memberRequest.ServiceInfo.Details.GetValue(r)
+                            .ThrowIfNotOf(memberRequest.ServiceType, Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, memberRequest));
+
+                    var memberExpr = factory == null ? null : factory.GetExpressionOrDefault(memberRequest);
                     if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault)
                         return null;
 
@@ -4182,16 +4200,6 @@ namespace DryIoc
             if (ReferenceEquals(currentValue, default(P)) || Equals(currentValue, default(P)))
                 setProperty(holder);
             return holder;
-        }
-
-        // TODO: Inline to decrease call stack
-        private static Expression GetDependencyExpressionOrNull(IServiceInfo dependencyInfo, Request request)
-        {
-            var factory = dependencyInfo.Details.GetValue == null
-                ? request.Registry.ResolveFactory(request)
-                : new DelegateFactory(r => dependencyInfo.Details.GetValue(r)
-                    .ThrowIfNotOf(dependencyInfo.ServiceType, Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, request));
-            return factory == null ? null : factory.GetExpressionOrDefault(request);
         }
 
         private static Type[] GetClosedTypeArgsForGenericImplementationType(Type implType, Request request)
@@ -4872,9 +4880,9 @@ namespace DryIoc
         void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request parentOrEmpty);
     }
 
-    // TODO: Use ThrowIfDuplicateKeyOrDefault
+    // TODO: Use Throw
     /// <summary>Specifies options to handle situation when registering some service already present in the registry.</summary>
-    public enum IfAlreadyRegistered { ThrowIfDuplicateOrMultipleDefaultKey, ThrowIfDuplicateKey, KeepRegistered, UpdateRegistered }
+    public enum IfAlreadyRegistered { Throw, ThrowIfDuplicateKey, KeepRegistered, UpdateRegistered }
 
     /// <summary>Defines operations that for changing registry, and checking if something exist in registry.</summary>
     public interface IRegistrator
