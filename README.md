@@ -12,15 +12,13 @@ DryIoc is small, fast, capable IoC Container for .NET
 [PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
 [v2.0]: https://bitbucket.org/dadhi/dryioc/wiki/Home
 
-**Provides [Autofac]+[MEF] level of functionality but performs faster and small enough to be included as code.**
-
 * Designed for low-ceremony use, performance and extensibility.
-* Supports .NET 3.5, 4.0, 4.5 _([PCL] is available in v2 pre-release package)_
+* Supports .NET 3.5, 4.0, 4.5 _([PCL] is available in v2.0 pre-release packages)_
 * Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
 * Extensions: [MefAttributedModel] as [code][DryIoc.MefAttributedModel] or [dll][DryIoc.MefAttributedModel.dll].
 * [Docs are in a Wiki][Wiki] _(currently being updated for v2)_
 * Latest stable version is **1.4.1** [![Build status](https://ci.appveyor.com/api/projects/status/jfq01d9wcs4vcwpf/branch/default)](https://ci.appveyor.com/project/MaksimVolkau/dryioc/branch/default)
-* __[v2.0] preview packages are now at NuGet:__ `PM> Install-Package DryIoc -IncludePrerelease`
+* __[v2.0] pre-release packages:__ `PM> Install-Package DryIoc -IncludePrerelease`
 
 #### Fast
 * On par with fastest containers listed in [IoC Container Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
