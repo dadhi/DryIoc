@@ -105,62 +105,62 @@ namespace DryIoc.UnitTests
             }
         }
 
-        [Test]
-        public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same()
-        {
-            var container = new Container();
-            container.Register<Service>(ReuseIt.InThread);
+        //[Test]
+        //public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same()
+        //{
+        //    var container = new Container();
+        //    container.Register<Service>(ReuseIt.InThread);
 
-            var one = container.Resolve<Service>();
-            var another = container.Resolve<Service>();
+        //    var one = container.Resolve<Service>();
+        //    var another = container.Resolve<Service>();
 
-            Assert.That(one, Is.SameAs(another));
-        }
+        //    Assert.That(one, Is.SameAs(another));
+        //}
 
-        [Test]
-        public void Given_Thread_reuse_Dependencies_injected_in_same_thread_should_be_the_same()
-        {
-            var container = new Container();
-            container.Register<ServiceWithDependency>();
-            container.Register<IDependency, Dependency>(ReuseIt.InThread);
+        //[Test]
+        //public void Given_Thread_reuse_Dependencies_injected_in_same_thread_should_be_the_same()
+        //{
+        //    var container = new Container();
+        //    container.Register<ServiceWithDependency>();
+        //    container.Register<IDependency, Dependency>(ReuseIt.InThread);
 
-            var one = container.Resolve<ServiceWithDependency>();
-            var another = container.Resolve<ServiceWithDependency>();
-            Assert.That(one.Dependency, Is.SameAs(another.Dependency));
-        }
+        //    var one = container.Resolve<ServiceWithDependency>();
+        //    var another = container.Resolve<ServiceWithDependency>();
+        //    Assert.That(one.Dependency, Is.SameAs(another.Dependency));
+        //}
 
-        [Test]
-        public void Given_Thread_reuse_Services_resolved_in_different_thread_should_be_the_different()
-        {
-            var container = new Container();
-            container.Register<Service>(ReuseIt.InThread);
+        //[Test]
+        //public void Given_Thread_reuse_Services_resolved_in_different_thread_should_be_the_different()
+        //{
+        //    var container = new Container();
+        //    container.Register<Service>(ReuseIt.InThread);
 
-            Service one = null;
-            var threadOne = new Thread(() => one = container.Resolve<Service>()) { IsBackground = true };
-            threadOne.Start();
+        //    Service one = null;
+        //    var threadOne = new Thread(() => one = container.Resolve<Service>()) { IsBackground = true };
+        //    threadOne.Start();
 
-            var another = container.Resolve<Service>();
+        //    var another = container.Resolve<Service>();
 
-            threadOne.Join();
-            Assert.That(one, Is.Not.SameAs(another));
-        }
+        //    threadOne.Join();
+        //    Assert.That(one, Is.Not.SameAs(another));
+        //}
 
-        [Test]
-        public void Given_Thread_reuse_Dependencies_injected_in_different_thread_should_be_different()
-        {
-            var container = new Container();
-            container.Register<ServiceWithDependency>();
-            container.Register<IDependency, Dependency>(ReuseIt.InThread);
+        //[Test]
+        //public void Given_Thread_reuse_Dependencies_injected_in_different_thread_should_be_different()
+        //{
+        //    var container = new Container();
+        //    container.Register<ServiceWithDependency>();
+        //    container.Register<IDependency, Dependency>(ReuseIt.InThread);
 
-            ServiceWithDependency one = null;
-            var threadOne = new Thread(() => one = container.Resolve<ServiceWithDependency>());
-            threadOne.Start();
+        //    ServiceWithDependency one = null;
+        //    var threadOne = new Thread(() => one = container.Resolve<ServiceWithDependency>());
+        //    threadOne.Start();
 
-            var another = container.Resolve<ServiceWithDependency>();
+        //    var another = container.Resolve<ServiceWithDependency>();
 
-            threadOne.Join();
-            Assert.That(one.Dependency, Is.Not.SameAs(another.Dependency));
-        }
+        //    threadOne.Join();
+        //    Assert.That(one.Dependency, Is.Not.SameAs(another.Dependency));
+        //}
 
         [Test]
         public void Can_use_both_resolution_scope_and_singleton_reuse_in_same_resolution_root()
@@ -178,7 +178,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_throw_if_rule_specified_and_dependency_lifespan_is_less_than_parents()
         {
-            var container = new Container(rules => rules.With(throwIfDepenedencyHasShorterReuseLifespan: true));
+            var container = new Container(rules => rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(true));
             container.Register<Client>(Reuse.Singleton);
             container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
 
@@ -187,13 +187,13 @@ namespace DryIoc.UnitTests
 
             Assert.That(ex.Message, Is.StringContaining(
                 "Dependency DryIoc.UnitTests.FastLogger: DryIoc.UnitTests.ILogger as parameter \"logger\" " +
-                "has shorter reuse lifespan (InResolutionScope:10) than its parent (Singleton:1000)"));
+                "has shorter reuse lifespan (ResolutionScopeReuse:10) than its parent (SingletonReuse:1000)"));
         }
 
         [Test]
         public void Should_Not_throw_if_rule_is_off_and_dependency_lifespan_is_less_than_parents()
         {
-            var container = new Container(rules => rules.With(throwIfDepenedencyHasShorterReuseLifespan: false));
+            var container = new Container(rules => rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(throwIfDepenedencyHasShorterReuseLifespan: false));
             container.Register<Client>(Reuse.Singleton);
             container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
 
@@ -249,146 +249,104 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public interface IReuseContext
+        public class HttpContextReuseContext : IReuseContext
         {
-            bool IsAvailable { get; }
-
-            IScope Current { get; set; }
-        }
-
-        public static class AmbientReuseContext
-        {
-            public static readonly IReuseContext InThread = new ThreadReuseContext();
-            public static readonly IReuseContext InWeb = new HttpContextReuseContext();
-
-            private class ThreadReuseContext : IReuseContext
+            public bool IsAvailable
             {
-                public bool IsAvailable
-                {
-                    get { return true; }
-                }
-
-                public IScope Current
-                {
-                    get { return _scopes.Value.GetValueOrDefault(Thread.CurrentThread.ManagedThreadId); }
-                    set { _scopes.Swap(_ => _.AddOrUpdate(Thread.CurrentThread.ManagedThreadId, value)); }
-                }
-
-                private readonly Ref<HashTree<int, IScope>> _scopes = Ref.Of(HashTree<int, IScope>.Empty);
+                get { return HttpContext.Current == null; }
             }
 
-            private class HttpContextReuseContext : IReuseContext
+            public IScope Current
             {
-                public bool IsAvailable
+                get
                 {
-                    get { return HttpContext.Current == null; }
+                    var scope = _scopeWhenHttpContextIsNull;
+                    if (scope != null)
+                        return scope;
+                    var httpContext = HttpContext.Current;
+                    if (httpContext != null)
+                        return (IScope)httpContext.Items[_scopeKey];
+                    return null;
                 }
-
-                public IScope Current
+                set
                 {
-                    get
+                    var httpContext = HttpContext.Current;
+                    if (httpContext == null)
+                        _scopeWhenHttpContextIsNull = value;
+                    else
                     {
-                        var scope = _scopeWhenHttpContextIsNull;
-                        if (scope != null)
-                            return scope;
-                        var httpContext = HttpContext.Current;
-                        if (httpContext != null)
-                            return (IScope)httpContext.Items[_scopeKey];
-                        return null;
-                    }
-                    set
-                    {
-                        var httpContext = HttpContext.Current;
-                        if (httpContext == null)
-                            _scopeWhenHttpContextIsNull = value;
-                        else
-                        {
-                            httpContext.Items[_scopeKey] = value;
-                            _scopeWhenHttpContextIsNull = null;
-                        }
+                        httpContext.Items[_scopeKey] = value;
+                        _scopeWhenHttpContextIsNull = null;
                     }
                 }
-
-                private static readonly Type _scopeKey = typeof(HttpContextReuse);
-                private IScope _scopeWhenHttpContextIsNull;
             }
+
+            private static readonly Type _scopeKey = typeof(HttpContextReuseContext);
+            private IScope _scopeWhenHttpContextIsNull;
         }
 
-        public class NewThreadReuse
-        {
-            public int Lifespan
-            {
-                get { return Reuse.InResolutionScope.Lifespan; }
-            }
+        //public class ThreadReuse : IReuse
+        //{
+        //    public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
 
-            public IScope GetScope(IReuseContext context)
-            {
-                return context.Current;
-            }
-        }
+        //    public IScope GetScope(Request request)
+        //    {
+        //        return _scope;
+        //    }
 
-        public class ThreadReuse : IReuse
-        {
-            public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
+        //    private readonly ThreadScope _scope = new ThreadScope();
 
-            public IScope GetScope(Request request)
-            {
-                return _scope;
-            }
+        //    class ThreadScope : IScope
+        //    {
+        //        public object GetOrAdd(int id, Func<object> factory)
+        //        {
+        //            var threadId = Thread.CurrentThread.ManagedThreadId;
+        //            var threadScope = _threadScopes.Value.GetValueOrDefault(threadId);
+        //            if (threadScope == null)
+        //                _threadScopes.Swap(s => s.AddOrUpdate(threadId, threadScope = new Scope(),
+        //                    (oldValue, newValue) => threadScope = oldValue)); // if Scope is already added in between then use it.
+        //            return threadScope.GetOrAdd(id, factory);
+        //        }
 
-            private readonly ThreadScope _scope = new ThreadScope();
+        //        private readonly Ref<HashTree<int, IScope>> _threadScopes = Ref.Of(HashTree<int, IScope>.Empty);
+        //    }
+        //}
 
-            class ThreadScope : IScope
-            {
-                public object GetOrAdd(int id, Func<object> factory)
-                {
-                    var threadId = Thread.CurrentThread.ManagedThreadId;
-                    var threadScope = _threadScopes.Value.GetValueOrDefault(threadId);
-                    if (threadScope == null)
-                        _threadScopes.Swap(s => s.AddOrUpdate(threadId, threadScope = new Scope(),
-                            (oldValue, newValue) => threadScope = oldValue)); // if Scope is already added in between then use it.
-                    return threadScope.GetOrAdd(id, factory);
-                }
+        //public static partial class ReuseIt
+        //{
+        //    public static ThreadReuse InThread = new ThreadReuse();
+        //    public static HttpContextReuse InRequest = new HttpContextReuse();
+        //}
 
-                private readonly Ref<HashTree<int, IScope>> _threadScopes = Ref.Of(HashTree<int, IScope>.Empty);
-            }
-        }
+        //public sealed class HttpContextReuse : IReuse
+        //{
+        //    public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
 
-        public static partial class ReuseIt
-        {
-            public static ThreadReuse InThread = new ThreadReuse();
-            public static HttpContextReuse InRequest = new HttpContextReuse();
-        }
+        //    public static readonly HttpContextReuse Instance = new HttpContextReuse();
 
-        public sealed class HttpContextReuse : IReuse
-        {
-            public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
+        //    public IScope GetScope(Request request)
+        //    {
+        //        if (HttpContext.Current == null)
+        //            return _contextNullScope ?? CreateNewScope();
 
-            public static readonly HttpContextReuse Instance = new HttpContextReuse();
+        //        var items = HttpContext.Current.Items;
+        //        lock (_singleScopeLocker)
+        //            if (!items.Contains(_reuseScopeKey))
+        //                items[_reuseScopeKey] = _contextNullScope ?? new Scope();
 
-            public IScope GetScope(Request request)
-            {
-                if (HttpContext.Current == null)
-                    return _contextNullScope ?? CreateNewScope();
+        //        return (Scope)items[_reuseScopeKey];
+        //    }
 
-                var items = HttpContext.Current.Items;
-                lock (_singleScopeLocker)
-                    if (!items.Contains(_reuseScopeKey))
-                        items[_reuseScopeKey] = _contextNullScope ?? new Scope();
+        //    private IScope CreateNewScope()
+        //    {
+        //        lock (_singleScopeLocker)
+        //            return _contextNullScope = _contextNullScope ?? new Scope();
+        //    }
 
-                return (Scope)items[_reuseScopeKey];
-            }
-
-            private IScope CreateNewScope()
-            {
-                lock (_singleScopeLocker)
-                    return _contextNullScope = _contextNullScope ?? new Scope();
-            }
-
-            private IScope _contextNullScope;
-            private readonly object _singleScopeLocker = new object();
-            private static readonly string _reuseScopeKey = typeof(HttpContextReuse).Name;
-        }
+        //    private IScope _contextNullScope;
+        //    private readonly object _singleScopeLocker = new object();
+        //    private static readonly string _reuseScopeKey = typeof(HttpContextReuse).Name;
+        //}
 
         // Old example for v1.3.1 
         //public sealed class HttpContextReuse : IReuse
