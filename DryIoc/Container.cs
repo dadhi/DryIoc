@@ -96,7 +96,7 @@ namespace DryIoc
         public Container CreateChildContainer()
         {
             ThrowIfContainerDisposed();
-            var parentRegistry = new WeakReference(this);
+            var parentRegistry = _registryWeakRef;
             return new Container(Rules.With(childRequest =>
             {
                 var childRequestWithParentRegistry = childRequest.ReplaceRegistryWith(parentRegistry);
@@ -135,7 +135,11 @@ namespace DryIoc
 
             _resolvedDefaultDelegates = Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
             _resolvedKeyedDelegates = Ref.Of(HashTree<Type, HashTree<object, FactoryDelegate>>.Empty);
+            
             _resolutionState.Dispose();
+            _resolutionState = null;
+            
+            _registryWeakRef = null;
 
             Rules = Rules.Empty;
         }
@@ -151,7 +155,7 @@ namespace DryIoc
 
         #region Static State
 
-        public static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof (Ref<IScope>), "currentScope");
+        public static readonly ParameterExpression RegistryWeakRefParamExpr = Expression.Parameter(typeof(RegistryWeakRef), "registry");
 
         #endregion
 
@@ -357,7 +361,7 @@ namespace DryIoc
         {
             var factoryDelegate = _resolvedDefaultDelegates.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
-                ? factoryDelegate(_resolutionState.Items, _currentScope, null)
+                ? factoryDelegate(_resolutionState.Items, _registryWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, parentOrEmpty);
         }
 
@@ -388,7 +392,7 @@ namespace DryIoc
             var factoryDelegates = _resolvedKeyedDelegates.Value.GetValueOrDefault(serviceType);
             if (factoryDelegates != null &&
                 (factoryDelegate = factoryDelegates.GetValueOrDefault(cacheServiceKey)) != null)
-                return factoryDelegate(_resolutionState.Items, _currentScope, null);
+                return factoryDelegate(_resolutionState.Items, _registryWeakRef, null);
 
             var request = (parentOrEmpty ?? EmptyRequest).Push(serviceType, serviceKey, ifUnresolved, requiredServiceType);
 
@@ -397,7 +401,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var resultService = factoryDelegate(request.State.Items, request.Registry.CurrentScope, request.ResolutionScope);
+            var resultService = factoryDelegate(request.State.Items, _registryWeakRef, request.ResolutionScope);
 
             // Safe to cache factory only after it is evaluated without errors.
             _resolvedKeyedDelegates.Swap(_ => _.AddOrUpdate(serviceType,
@@ -433,7 +437,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var resultService = factoryDelegate(request.State.Items, _currentScope, request.ResolutionScope);
+            var resultService = factoryDelegate(request.State.Items, _registryWeakRef, request.ResolutionScope);
             _resolvedDefaultDelegates.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
             return resultService;
         }
@@ -449,11 +453,16 @@ namespace DryIoc
 
         int IRegistry.RegistryID { get { return _registryID; } }
 
+        RegistryWeakRef IRegistry.RegistryWeakRef { get { return _registryWeakRef; } }
+
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
 
         IScope IRegistry.SingletonScope { get { return _singletonScope; } }
-        Ref<IScope> IRegistry.CurrentScope { get { return _currentScope; } }
+
+        IScope IRegistry.CurrentScope { get { return _currentScope.Value; } }
+
+        ResolutionState IRegistry.ResolutionState { get { return _resolutionState; } }
 
         Factory IRegistry.ResolveFactory(Request request)
         {
@@ -829,7 +838,9 @@ namespace DryIoc
 
         private Ref<HashTree<Type, FactoryDelegate>> _resolvedDefaultDelegates;
         private Ref<HashTree<Type, HashTree<object, FactoryDelegate>>> _resolvedKeyedDelegates;
-        private readonly ResolutionState _resolutionState;
+
+        public RegistryWeakRef _registryWeakRef;
+        public ResolutionState _resolutionState;
 
         private int _disposed;
 
@@ -861,9 +872,11 @@ namespace DryIoc
 
             _resolvedDefaultDelegates = resolvedDefaultDelegates ?? Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
             _resolvedKeyedDelegates = resolvedKeyedDelegates ?? Ref.Of(HashTree<Type, HashTree<object, FactoryDelegate>>.Empty);
+            
             _resolutionState = resolutionState ?? new ResolutionState();
 
-            EmptyRequest = Request.CreateEmpty(new WeakReference(this), new WeakReference(_resolutionState));
+            _registryWeakRef = new RegistryWeakRef(this);
+            EmptyRequest = Request.CreateEmpty(_registryWeakRef);
         }
 
         #endregion
@@ -1104,6 +1117,21 @@ namespace DryIoc
         #endregion
     }
 
+    public sealed class RegistryWeakRef
+    {
+        public IRegistry Value
+        {
+            get { return (_ref.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);}
+        }
+
+        public RegistryWeakRef(IRegistry registry)
+        {
+            _ref = new WeakReference(registry);
+        }
+
+        private readonly WeakReference _ref;
+    }
+
     /// <summary>The delegate type which is actually used to create service instance by container.
     /// Delegate instance required to be static with all information supplied by <paramref name="state"/> and <paramref name="resolutionScope"/>
     /// parameters. The requirement is due to enable compilation to DynamicMethod in DynamicAssembly, and also to simplify
@@ -1111,7 +1139,7 @@ namespace DryIoc
     /// <param name="state">All the state items available in resolution root (<see cref="ResolutionState"/>).</param>
     /// <param name="resolutionScope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
     /// <returns>Created service object.</returns>
-    public delegate object FactoryDelegate(AppendableArray<object> state, Ref<IScope> currentScope, IScope resolutionScope);
+    public delegate object FactoryDelegate(AppendableArray<object> state, RegistryWeakRef registryWeakRef, IScope resolutionScope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
     public static partial class FactoryCompiler
@@ -1124,7 +1152,7 @@ namespace DryIoc
             if (expression.Type.IsValueType())
                 expression = Expression.Convert(expression, typeof(object));
             return Expression.Lambda<FactoryDelegate>(expression, 
-                ResolutionState.StateParamExpr, Container.ScopeParamExpr, Request.ScopeParamExpr);
+                ResolutionState.StateParamExpr, Container.RegistryWeakRefParamExpr, Request.ScopeParamExpr);
         }
 
         public static FactoryDelegate CompileToDelegate(this Expression expression, Rules rules)
@@ -2793,18 +2821,13 @@ namespace DryIoc
     /// Request implements <see cref="IResolver"/> interface on top of provided Registry, which could be use by delegate factories.</summary>
     public sealed class Request : IResolver
     {
-        /// <summary>Creates empty request associated with provided <paramref name="registry"/>.
+        /// <summary>Creates empty request associated with provided <paramref name="registryWeakRef"/>.
         /// Every resolution will start from this request by pushing service information into, and then resolving it.</summary>
-        /// <param name="registry">Reference to associated registry. 
-        /// Could be changed later with <see cref="ReplaceRegistryWith"/> method.</param>
-        /// <param name="state">Resolution state associated with container. 
-        /// It is separated from registry, because later could be replaced: for instance by Parent container registry</param>
-        /// <returns>New root request.</returns>-
-        public static Request CreateEmpty(WeakReference registry, WeakReference state)
+        /// <param name="registryWeakRef">Reference to associated registry. Could be changed later with <see cref="ReplaceRegistryWith"/> method.</param>
+        /// <returns>New empty request.</returns>
+        public static Request CreateEmpty(RegistryWeakRef registryWeakRef)
         {
-            registry.ThrowIfNull().Target.ThrowIfNotOf(typeof(IRegistry));
-            state.ThrowIfNull().Target.ThrowIfNotOf(typeof(ResolutionState));
-            return new Request(null, registry, state, null, null, null);
+            return new Request(null, registryWeakRef, new WeakReference(registryWeakRef.Value.ResolutionState), null, null, null);
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="ServiceInfo"/> in such a request.</summary>
@@ -2844,21 +2867,9 @@ namespace DryIoc
 
         public static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "resolutionScope");
 
-        private static readonly MethodInfo _getScopeMethod = typeof(Request).GetSingleDeclaredMethodOrNull("GetOrCreateScope");
-        internal static IScope GetOrCreateScope(ref IScope scope) { return scope = scope ?? new Scope(); }
-
-        public static readonly Expression GetOrCreateScopeExpr = Expression.Call(_getScopeMethod, ScopeParamExpr);
-
         public IScope ResolutionScope
         {
             get { return _scope.Value; }
-        }
-
-        public IScope GetOrCreateResolutionScope()
-        {
-            if (_scope.Value == null)
-                _scope.Swap(scope => scope ?? new Scope());
-            return _scope.Value;
         }
 
         #endregion
@@ -2867,7 +2878,7 @@ namespace DryIoc
         /// Used to propagate the state from resolution root, probably from another container (request creator).</summary>
         public ResolutionState State
         {
-            get { return (_stateWeakRef.Target as ResolutionState).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
+            get { return (_resolutionStateWeakRef.Target as ResolutionState).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
         }
 
         /// <summary>Previous request in dependency chain. It <see cref="IsEmpty"/> for resolution root.</summary>
@@ -2881,12 +2892,11 @@ namespace DryIoc
 
         public readonly KV<bool[], ParameterExpression[]> FuncArgs;
 
+        public readonly RegistryWeakRef RegistryWeakRef;
+
         /// <summary>Provides access to container/registry currently bound to request. By default it is registry initiated request by calling resolve method,
         /// but could be changed along the way: for instance when resolving from parent container.</summary>
-        public IRegistry Registry
-        {
-            get { return (_registryWeakRef.Target as IRegistry).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
-        }
+        public IRegistry Registry { get { return RegistryWeakRef.Value; } }
 
         /// <summary>Shortcut access to <see cref="IServiceInfo.ServiceType"/>.</summary>
         public Type ServiceType { get { return ServiceInfo == null ? null : ServiceInfo.ServiceType; } }
@@ -2913,11 +2923,11 @@ namespace DryIoc
         public Request Push(IServiceInfo info)
         {
             if (IsEmpty)
-                return new Request(this, _registryWeakRef, _stateWeakRef, new Ref<IScope>(), info.ThrowIfNull(), null);
+                return new Request(this, RegistryWeakRef, _resolutionStateWeakRef, new Ref<IScope>(), info.ThrowIfNull(), null);
 
             ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info.ThrowIfNull(), this);
             var inheritedInfo = info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup);
-            return new Request(this, _registryWeakRef, _stateWeakRef, _scope, inheritedInfo, null, FuncArgs);
+            return new Request(this, RegistryWeakRef, _resolutionStateWeakRef, _scope, inheritedInfo, null, FuncArgs);
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls <see cref="Push(DryIoc.IServiceInfo)"/>.</summary>
@@ -2938,7 +2948,7 @@ namespace DryIoc
         /// <returns>New request with new info but the rest intact: e.g. <see cref="ResolvedFactory"/>.</returns>
         public Request ReplaceServiceInfoWith(IServiceInfo info)
         {
-            return new Request(Parent, _registryWeakRef, _stateWeakRef, _scope, info, ResolvedFactory, FuncArgs);
+            return new Request(Parent, RegistryWeakRef, _resolutionStateWeakRef, _scope, info, ResolvedFactory, FuncArgs);
         }
 
         /// <summary>Returns new request with parameter expressions created for <paramref name="funcType"/> input arguments.
@@ -2958,17 +2968,16 @@ namespace DryIoc
 
             var isArgUsed = new bool[funcArgExprs.Length];
             var funcArgExpr = new KV<bool[], ParameterExpression[]>(isArgUsed, funcArgExprs);
-            return new Request(Parent, _registryWeakRef, _stateWeakRef, _scope, ServiceInfo, ResolvedFactory, funcArgExpr);
+            return new Request(Parent, RegistryWeakRef, _resolutionStateWeakRef, _scope, ServiceInfo, ResolvedFactory, funcArgExpr);
         }
 
         /// <summary>Changes registry to provided one. Could be used by child container, 
         /// to switch child registry to parent preserving the rest of request state.</summary>
         /// <param name="registry">Reference to registry to switch to.</param>
         /// <returns>Request with replaced registry.</returns>
-        public Request ReplaceRegistryWith(WeakReference registry)
+        public Request ReplaceRegistryWith(RegistryWeakRef registry)
         {
-            registry.ThrowIfNull().Target.ThrowIfNotOf(typeof(IRegistry));
-            return new Request(Parent, registry, _stateWeakRef, _scope, ServiceInfo, ResolvedFactory, FuncArgs);
+            return new Request(Parent, registry.ThrowIfNull(), _resolutionStateWeakRef, _scope, ServiceInfo, ResolvedFactory, FuncArgs);
         }
 
         /// <summary>Returns new request with set <see cref="ResolvedFactory"/>.</summary>
@@ -2984,7 +2993,7 @@ namespace DryIoc
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID,
                         Error.RECURSIVE_DEPENDENCY_DETECTED, Print(factory.FactoryID));
 
-            return new Request(Parent, _registryWeakRef, _stateWeakRef, _scope, ServiceInfo, factory, FuncArgs);
+            return new Request(Parent, RegistryWeakRef, _resolutionStateWeakRef, _scope, ServiceInfo, factory, FuncArgs);
         }
 
         /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
@@ -3048,22 +3057,20 @@ namespace DryIoc
         #region Implementation
 
         internal Request(Request parent,
-            WeakReference registryWeakRef, WeakReference resolutionStateWeakRef,
+            RegistryWeakRef registryWeakRef, WeakReference resolutionStateWeakRef,
             Ref<IScope> scope, IServiceInfo serviceInfo, Factory resolvedFactory,
             KV<bool[], ParameterExpression[]> funcArgs = null)
         {
             Parent = parent;
-            _registryWeakRef = registryWeakRef;
-            _stateWeakRef = resolutionStateWeakRef;
+            RegistryWeakRef = registryWeakRef;
+            _resolutionStateWeakRef = resolutionStateWeakRef;
             _scope = scope;
             ServiceInfo = serviceInfo;
             ResolvedFactory = resolvedFactory;
             FuncArgs = funcArgs;
         }
 
-        // TODO: Combine into internal data structure for easy sharing/passing between requests
-        private readonly WeakReference _registryWeakRef;
-        private readonly WeakReference _stateWeakRef;
+        private readonly WeakReference _resolutionStateWeakRef;
         private readonly Ref<IScope> _scope;
 
         #endregion
@@ -3452,14 +3459,14 @@ namespace DryIoc
         {
             var factoryDelegate = serviceExpr.CompileToDelegate(request.Registry.Rules);
             var _ = request.ResolutionScope;
-            var scope = reuse.GetScope(request.Registry, ref _);
+            var scope = reuse.GetScope(request.Registry, ref _); // TODO: need to save _ back to request.
 
             var wrappers = Setup.ReuseWrappers;
             var serviceType = serviceExpr.Type;
             if (wrappers == null || wrappers.Length == 0)
             {
                 return request.State.GetOrAddItemExpression(
-                    scope.GetOrAdd(FactoryID, () => factoryDelegate(request.State.Items, request.Registry.CurrentScope, request.ResolutionScope)),
+                    scope.GetOrAdd(FactoryID, () => factoryDelegate(request.State.Items, request.RegistryWeakRef, request.ResolutionScope)),
                     serviceType);
             }
 
@@ -3471,7 +3478,7 @@ namespace DryIoc
             }
 
             var wrappedService = scope.GetOrAdd(FactoryID,
-                () => factoryDelegate(request.State.Items, request.Registry.CurrentScope, request.ResolutionScope));
+                () => factoryDelegate(request.State.Items, request.RegistryWeakRef, request.ResolutionScope));
 
             for (var i = wrappers.Length - 1; i >= 0; --i)
             {
@@ -4503,7 +4510,6 @@ namespace DryIoc
         int Lifespan { get; }
 
         /// <summary>Locates or creates scope where to store reused service objects.</summary>
-        /// <param name="request">Context to find scope or use to create scope.</param>
         /// <returns>Located scope.</returns>
         IScope GetScope(IRegistry registry, ref IScope resolutionScope);
     }
@@ -4515,7 +4521,6 @@ namespace DryIoc
         public int Lifespan { get { return 1000; } }
 
         /// <summary>Returns container bound Singleton scope.</summary>
-        /// <param name="request">Request to get scope from.</param>
         /// <returns>Container singleton scope.</returns>
         public IScope GetScope(IRegistry registry, ref IScope resolutionScope)
         {
@@ -4537,7 +4542,7 @@ namespace DryIoc
         /// <returns>Located scope.</returns>
         public IScope GetScope(IRegistry registry, ref IScope resolutionScope)
         {
-            return registry.CurrentScope.Value;
+            return registry.CurrentScope;
         }
 
         public override string ToString() { return GetType().Name + ":" + Lifespan; }
@@ -4920,6 +4925,8 @@ namespace DryIoc
         /// container scenarios.</summary>
         int RegistryID { get; }
 
+        RegistryWeakRef RegistryWeakRef { get; }
+
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
 
@@ -4928,7 +4935,9 @@ namespace DryIoc
 
         /// <summary>Scope associated with containers created by <see cref="Container.OpenScope"/>.
         /// If container is not created by <see cref="Container.OpenScope"/> then it is the same as <see cref="SingletonScope"/>.</summary>
-        Ref<IScope> CurrentScope { get; }
+        IScope CurrentScope { get; }
+
+        ResolutionState ResolutionState { get; }
 
         /// <summary>Searches for requested factory in registry, and then using <see cref="DryIoc.Rules.ForUnregisteredService"/>.</summary>
         /// <param name="request">Factory lookup info.</param>
