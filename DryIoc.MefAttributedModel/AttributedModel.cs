@@ -68,7 +68,7 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Returns new container with new rules.</returns>
         public static Container WithAttributedModel(this Container container)
         {
-            return container.WithNewRules(container.Rules.WithAttributedModel());
+            return container.WithRules(rules => rules.WithAttributedModel());
         }
 
         /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
@@ -431,7 +431,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Func<Assembly, IEnumerable<Type>> _getAssemblyTypes =
-            ExpressionTools.GetMethodDelegate<Assembly, IEnumerable<Type>>("GetTypes");
+            ReflectionTools.GetMethodDelegate<Assembly, IEnumerable<Type>>("GetTypes");
 
         private static void RegisterFactoryMethods(IRegistrator registrator, RegistrationInfo factoryInfo)
         {

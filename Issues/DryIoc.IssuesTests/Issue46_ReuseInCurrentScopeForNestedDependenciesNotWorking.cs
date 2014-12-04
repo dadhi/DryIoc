@@ -8,25 +8,26 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Main()
         {
-            var container = new Container();
-
-            container.Register<Main>(Reuse.InCurrentScope);
-            container.Register<Class1>(Reuse.InCurrentScope);
-            container.Register<Class2>(Reuse.InCurrentScope);
-            container.Register<Class3>(Reuse.InCurrentScope);
-
-            Main mainScoped;
-            using (var scope = container.OpenScope())
+            using (var container = new Container().OpenScope())
             {
-                mainScoped = scope.Resolve<Main>();
-                Assert.That(mainScoped.C1.C, Is.SameAs(mainScoped.C2.C));
-            }
+                container.Register<Main>(Reuse.InCurrentScope);
+                container.Register<Class1>(Reuse.InCurrentScope);
+                container.Register<Class2>(Reuse.InCurrentScope);
+                container.Register<Class3>(Reuse.InCurrentScope);
 
-            var main = container.Resolve<Main>();
-            Assert.That(main, Is.Not.SameAs(mainScoped));
-            Assert.That(main.C1, Is.Not.SameAs(mainScoped.C1));
-            Assert.That(main.C1.C, Is.Not.SameAs(mainScoped.C1.C));
-            Assert.That(main.C1.C, Is.SameAs(main.C2.C));
+                Main mainScoped;
+                using (var scope = container.OpenScope())
+                {
+                    mainScoped = scope.Resolve<Main>();
+                    Assert.That(mainScoped.C1.C, Is.SameAs(mainScoped.C2.C));
+                }
+
+                var main = container.Resolve<Main>();
+                Assert.That(main, Is.Not.SameAs(mainScoped));
+                Assert.That(main.C1, Is.Not.SameAs(mainScoped.C1));
+                Assert.That(main.C1.C, Is.Not.SameAs(mainScoped.C1.C));
+                Assert.That(main.C1.C, Is.SameAs(main.C2.C));
+            }
         }
     }
 

@@ -34,11 +34,13 @@
     </DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Container.cs" />
     <Compile Include="net40\Lazy.cs" />
+    <Compile Include="net45\ThreadTools.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="net45\TypeInfo.cs" />
   </ItemGroup>

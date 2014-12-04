@@ -10,42 +10,46 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_reuse_instances_in_new_open_scope()
         {
-            var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
-
-            var outerLog = container.Resolve<Log>();
-            using (var scope = container.OpenScope())
+            using (var container = new Container().OpenScope())
             {
-                var scopedLog1 = scope.Resolve<Log>();
-                var scopedLog2 = scope.Resolve<Log>();
+                container.Register<Log>(Reuse.InCurrentScope);
 
-                Assert.That(scopedLog1, Is.SameAs(scopedLog2));
-                Assert.That(scopedLog1, Is.Not.SameAs(outerLog));
+                var outerLog = container.Resolve<Log>();
+                using (var scope = container.OpenScope())
+                {
+                    var scopedLog1 = scope.Resolve<Log>();
+                    var scopedLog2 = scope.Resolve<Log>();
+
+                    Assert.That(scopedLog1, Is.SameAs(scopedLog2));
+                    Assert.That(scopedLog1, Is.Not.SameAs(outerLog));
+                }
             }
         }
 
         [Test]
-        public void Can_reuse_instances_in_two_level_nested_scope()
+        public void Can_reuse_instances_in_three_level_nested_scope()
         {
-            var container = new Container();
-            container.Register<Log>(Reuse.InCurrentScope);
-
-            var outerLog = container.Resolve<Log>();
-            using (var scope = container.OpenScope())
+            using (var container = new Container().OpenScope())
             {
-                var scopedLog = scope.Resolve<Log>();
+                container.Register<Log>(Reuse.InCurrentScope);
 
-                using (var deepScope = scope.OpenScope())
+                var outerLog = container.Resolve<Log>();
+                using (var scope = container.OpenScope())
                 {
-                    var deepLog1 = deepScope.Resolve<Log>();
-                    var deepLog2 = deepScope.Resolve<Log>();
+                    var scopedLog = scope.Resolve<Log>();
 
-                    Assert.That(deepLog1, Is.SameAs(deepLog2));
-                    Assert.That(deepLog1, Is.Not.SameAs(scopedLog));
-                    Assert.That(deepLog1, Is.Not.SameAs(outerLog));
+                    using (var deepScope = scope.OpenScope())
+                    {
+                        var deepLog1 = deepScope.Resolve<Log>();
+                        var deepLog2 = deepScope.Resolve<Log>();
+
+                        Assert.That(deepLog1, Is.SameAs(deepLog2));
+                        Assert.That(deepLog1, Is.Not.SameAs(scopedLog));
+                        Assert.That(deepLog1, Is.Not.SameAs(outerLog));
+                    }
+
+                    Assert.That(scopedLog, Is.Not.SameAs(outerLog));
                 }
-
-                Assert.That(scopedLog, Is.Not.SameAs(outerLog));
             }
         }
 
@@ -57,41 +61,29 @@ namespace DryIoc.UnitTests
             container.Register<Account>();
             container.Register<Log>(Reuse.InCurrentScope);
 
-            var outerConsumer = container.Resolve<Consumer>();
-            using (var scope = container.OpenScope())
+            using (var scoped = container.OpenScope())
             {
-                var scopedConsumer1 = scope.Resolve<Consumer>();
-                var scopedConsumer2 = scope.Resolve<Consumer>();
+                var outerConsumer = scoped.Resolve<Consumer>();
 
-                Assert.That(scopedConsumer1.Log, Is.SameAs(scopedConsumer2.Log));
-                Assert.That(scopedConsumer1.Log, Is.Not.SameAs(outerConsumer.Log));
+                using (var nestedScoped = scoped.OpenScope())
+                {
+                    var scopedConsumer1 = nestedScoped.Resolve<Consumer>();
+                    var scopedConsumer2 = nestedScoped.Resolve<Consumer>();
+
+                    Assert.That(scopedConsumer1.Log, Is.SameAs(scopedConsumer2.Log));
+                    Assert.That(scopedConsumer1.Log, Is.Not.SameAs(outerConsumer.Log));
+                }
             }
         }
 
         [Test]
-        public void Can_reuse_injected_dependencies_in_two_level_nested_scope()
+        public void CanNot_open_deeply_nested_scope_from_root_container()
         {
             var container = new Container();
-            container.Register<Consumer>();
-            container.Register<Account>();
-            container.Register<Log>(Reuse.InCurrentScope);
-
-            var outerConsumer = container.Resolve<Consumer>();
-            using (var scope = container.OpenScope())
+            using (container.OpenScope())
             {
-                var scopedConsumer = scope.Resolve<Consumer>();
-
-                using (var deepScope = scope.OpenScope())
-                {
-                    var deepConsumer1 = deepScope.Resolve<Consumer>();
-                    var deepConsumer2 = deepScope.Resolve<Consumer>();
-
-                    Assert.That(deepConsumer1.Log, Is.SameAs(deepConsumer2.Log));
-                    Assert.That(deepConsumer1.Log, Is.Not.SameAs(scopedConsumer.Log));
-                    Assert.That(deepConsumer1.Log, Is.Not.SameAs(outerConsumer.Log));
-                }
-
-                Assert.That(scopedConsumer.Log, Is.Not.SameAs(outerConsumer.Log));
+                var ex = Assert.Throws<ContainerException>(() => container.OpenScope());
+                Assert.That(ex.Message, Is.StringContaining("Unable to Open Scope from not a current scope ancestor."));
             }
         }
 
@@ -124,15 +116,17 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Nested_scope_disposition_should_not_affect_outer_scope_factories()
+        public void Calling_Func_of_scoped_service_outside_of_scope_should_Throw()
         {
             var container = new Container();
             container.Register<Log>(Reuse.InCurrentScope);
 
             var getLog = container.Resolve<Func<Log>>();
-            using (container.OpenScope()) { }
+            using (container.OpenScope())
+                Assert.That(getLog(), Is.InstanceOf<Log>());
 
-            Assert.DoesNotThrow(() => getLog());
+            var ex = Assert.Throws<ContainerException>(() => getLog());
+            Assert.That(ex.Message, Is.StringContaining("No current scope available: probably you are resolving scoped service outside of scope."));
         }
 
         [Test]

@@ -18,7 +18,7 @@ namespace DryIoc.UnitTests
             var factory = container.Resolve<Func<IService>>();
             container.Dispose();
 
-            Assert.Throws<ContainerException>(() => factory());
+            var service = factory();
         }
 
         [Test]
@@ -249,39 +249,32 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class HttpContextReuseContext : IReuseContext
+        public class HttpScopeContext : IScopeContext
         {
-            public bool IsAvailable
+            public IScope GetCurrentOrDefault()
             {
-                get { return HttpContext.Current == null; }
+                var scope = _scopeWhenHttpContextIsNull;
+                if (scope != null)
+                    return scope;
+                var httpContext = HttpContext.Current;
+                if (httpContext != null)
+                    return (IScope)httpContext.Items[_scopeKey];
+                return null;
             }
 
-            public IScope Current
+            public void SetCurrent(Func<IScope, IScope> update)
             {
-                get
+                var httpContext = HttpContext.Current;
+                if (httpContext == null)
+                    _scopeWhenHttpContextIsNull = update(GetCurrentOrDefault());
+                else
                 {
-                    var scope = _scopeWhenHttpContextIsNull;
-                    if (scope != null)
-                        return scope;
-                    var httpContext = HttpContext.Current;
-                    if (httpContext != null)
-                        return (IScope)httpContext.Items[_scopeKey];
-                    return null;
-                }
-                set
-                {
-                    var httpContext = HttpContext.Current;
-                    if (httpContext == null)
-                        _scopeWhenHttpContextIsNull = value;
-                    else
-                    {
-                        httpContext.Items[_scopeKey] = value;
-                        _scopeWhenHttpContextIsNull = null;
-                    }
+                    httpContext.Items[_scopeKey] = update(GetCurrentOrDefault());
+                    _scopeWhenHttpContextIsNull = null;
                 }
             }
 
-            private static readonly Type _scopeKey = typeof(HttpContextReuseContext);
+            private static readonly Type _scopeKey = typeof(HttpScopeContext);
             private IScope _scopeWhenHttpContextIsNull;
         }
 

@@ -34,17 +34,19 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_specify_current_scope_reuse()
         {
-            var container = new Container().WithAttributedModel();
-            container.RegisterExports(typeof(ServiceWithCurrentScopeReuse));
+            using (var container = new Container().WithAttributedModel().OpenScope()) 
+            { 
+                container.RegisterExports(typeof(ServiceWithCurrentScopeReuse));
 
-            var one = container.Resolve<ServiceWithCurrentScopeReuse>();
-            using (var scope = container.OpenScope())
-            {
-                var oneInScope = scope.Resolve<ServiceWithCurrentScopeReuse>();
-                var anotherInScope = scope.Resolve<ServiceWithCurrentScopeReuse>();
+                var one = container.Resolve<ServiceWithCurrentScopeReuse>();
+                using (var scope = container.OpenScope())
+                {
+                    var oneInScope = scope.Resolve<ServiceWithCurrentScopeReuse>();
+                    var anotherInScope = scope.Resolve<ServiceWithCurrentScopeReuse>();
 
-                Assert.That(one, Is.Not.SameAs(oneInScope));
-                Assert.That(oneInScope, Is.SameAs(anotherInScope));
+                    Assert.That(one, Is.Not.SameAs(oneInScope));
+                    Assert.That(oneInScope, Is.SameAs(anotherInScope));
+                }
             }
         }
 

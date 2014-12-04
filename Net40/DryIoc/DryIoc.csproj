@@ -39,6 +39,9 @@
     <Compile Include="..\..\DryIoc\Container.cs">
       <Link>Container.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc\net45\ThreadTools.cs">
+      <Link>net45\ThreadTools.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc\net45\TypeInfo.cs">
       <Link>net45\TypeInfo.cs</Link>
     </Compile>
