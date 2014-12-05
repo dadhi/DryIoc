@@ -12,6 +12,9 @@ DryIoc is small, fast, capable IoC Container for .NET
 [PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
 [v2.0]: https://bitbucket.org/dadhi/dryioc/wiki/Home
 
+<a href="https://twitter.com/DryIoc" class="twitter-follow-button" data-show-count="false" data-size="large">Follow @DryIoc</a>
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
 * Designed for low-ceremony use, performance and extensibility.
 * Supports .NET 3.5, 4.0, 4.5 _([PCL] is available in v2.0 pre-release packages)_
 * Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
