@@ -49,7 +49,7 @@ namespace DryIoc.UnitTests
             Assert.That(parentFruit, Is.SameAs(childJuice.Fruit));
         }
 
-        [Test]
+        [Test, Ignore]
         public void Can_inject_current_scope_service_from_parent_container_After_it_was_resolved_from_parent()
         {
             var parent = new Container();

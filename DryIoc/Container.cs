@@ -45,17 +45,19 @@ namespace DryIoc
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
         /// <param name="rules">(optional) Rules to modify container default resolution behavior. 
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
-        public Container(Rules rules = null)
+        /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadLocalScopeContext"/>.</param>
+        public Container(Rules rules = null, IScopeContext scopeContext = null)
             : this(rules ?? Rules.Default,
             Ref.Of(HashTree<Type, object>.Empty),
             Ref.Of(HashTree<Type, Factory[]>.Empty),
             Ref.Of(WrappersSupport.Wrappers),
-            new Scope()) { }
+            new Scope(), scopeContext) { }
 
         /// <summary>Creates new container with configured rules.</summary>
         /// <param name="configure">Delegate gets <see cref="DryIoc.Rules.Default"/> as input and may return configured rules.</param>
-        public Container(Func<Rules, Rules> configure)
-            : this(configure.ThrowIfNull().Invoke(Rules.Default) ?? Rules.Default) { }
+        /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadLocalScopeContext"/>.</param>
+        public Container(Func<Rules, Rules> configure, IScopeContext scopeContext = null)
+            : this(configure.ThrowIfNull()(Rules.Default) ?? Rules.Default, scopeContext) { }
 
         /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
         /// <param name="configure">Configure new rules.</param> <returns>New container.</returns>
@@ -63,7 +65,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var rules = configure.ThrowIfNull().Invoke(Rules);
-            return new Container(rules, _factories, _decorators, _wrappers, _singletonScope, _nestedScope, _scopeContext, _disposed);
+            return new Container(rules, _factories, _decorators, _wrappers, _singletonScope, _scopeContext, _openedScope, _disposed);
         }
 
         /// <summary>Creates new container with new current scope. New container shares the state with one its created from.</summary>
@@ -80,12 +82,13 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             scopeContext = scopeContext ?? _scopeContext;
 
-            var newNestedScope = new Scope(_nestedScope);
-            scopeContext.SetCurrent(current =>
-                newNestedScope.ThrowIf(current != _nestedScope, "Unable to Open Scope from not a current scope ancestor."));
+            var nestedScope = new Scope(_openedScope);
+
+            // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
+            scopeContext.SetCurrent(current => nestedScope.ThrowIf(current != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT));
 
             return new Container(Rules,
-                _factories, _decorators, _wrappers, _singletonScope, newNestedScope, scopeContext, 
+                _factories, _decorators, _wrappers, _singletonScope, scopeContext, nestedScope, 
                 _disposed, _resolvedDefaultDelegates, _resolvedKeyedDelegates, _resolutionState);
         }
 
@@ -118,7 +121,7 @@ namespace DryIoc
         public Container WipeCache()
         {
             ThrowIfContainerDisposed();
-            return new Container(Rules, _factories, _decorators, _wrappers, _singletonScope, _nestedScope, _scopeContext, _disposed);
+            return new Container(Rules, _factories, _decorators, _wrappers, _singletonScope, _scopeContext, _openedScope, _disposed);
         }
 
         /// <summary>Disposes container current scope and that means container itself.</summary>
@@ -127,12 +130,12 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
 
-            if (_nestedScope != null)
+            if (_openedScope != null)
             {
-                var nestedScope = _nestedScope;
-                _scopeContext.SetCurrent(current => current.ThrowIf(current != nestedScope, "Unable to dispose not current scope.").Parent);
-                _nestedScope.Dispose();
-                _nestedScope = null;
+                var openedScope = _openedScope;
+                _scopeContext.SetCurrent(current => current.ThrowIf(current != openedScope, "Unable to dispose not a current opened scope.").Parent);
+                _openedScope.Dispose();
+                _openedScope = null;
                 return; // Skip the rest for scoped container
             } 
 
@@ -140,11 +143,9 @@ namespace DryIoc
                 ((IDisposable)_scopeContext).Dispose();
             _scopeContext = null;
 
-
             _singletonScope.Dispose();
             _singletonScope = null;
 
-            // Cleanup the state
             _factories.Swap(_ => HashTree<Type, object>.Empty);
             _decorators.Swap(_ => HashTree<Type, Factory[]>.Empty);
             _wrappers.Swap(_ => HashTree<Type, Factory>.Empty);
@@ -166,9 +167,10 @@ namespace DryIoc
             return "{RegistryID=" + _registryID + "}";
         }
 
-        #region Static State
+        #region Static state
 
-        public static readonly ParameterExpression RegistryWeakRefParamExpr = Expression.Parameter(typeof(RegistryWeakRef), "registry");
+        internal static readonly ParameterExpression RegistryWeakRefParamExpr = Expression.Parameter(typeof(RegistryWeakRef), "regWeakRef");
+        public static readonly Expression RegistryExpr = Expression.Property(RegistryWeakRefParamExpr, "Target");
 
         #endregion
 
@@ -852,7 +854,7 @@ namespace DryIoc
 
         private Scope _singletonScope;
 
-        private Scope _nestedScope;
+        private Scope _openedScope;
         private IScopeContext _scopeContext;
 
         private Ref<HashTree<Type, FactoryDelegate>> _resolvedDefaultDelegates;
@@ -863,14 +865,13 @@ namespace DryIoc
 
         private int _disposed;
 
-        private Container(
-            Rules rules,
+        private Container(Rules rules,
             Ref<HashTree<Type, object>> factories,
             Ref<HashTree<Type, Factory[]>> decorators,
             Ref<HashTree<Type, Factory>> wrappers,
-            Scope singletonScope, 
-            Scope nestedScope = null,
-            IScopeContext scopeContext = null, 
+            Scope singletonScope,
+            IScopeContext scopeContext = null,
+            Scope openedScope = null,
             int disposed = 0,
             Ref<HashTree<Type, FactoryDelegate>> resolvedDefaultDelegates = null,
             Ref<HashTree<Type, HashTree<object, FactoryDelegate>>> resolvedKeyedDelegates = null,
@@ -886,7 +887,7 @@ namespace DryIoc
 
             _singletonScope = singletonScope;
 
-            _nestedScope = nestedScope;
+            _openedScope = openedScope;
             _scopeContext = scopeContext ?? new ThreadLocalScopeContext();
 
             _disposed = disposed;
@@ -1140,7 +1141,7 @@ namespace DryIoc
 
     public sealed class RegistryWeakRef
     {
-        public IRegistry Value
+        public IRegistry Target
         {
             get
             {
@@ -1685,21 +1686,53 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Wraps constructor or factory method optionally with factory instance to create service.</summary>
     public sealed class FactoryMethod
     {
+        /// <summary><see cref="ConstructorInfo"/> or <see cref="MethodInfo"/> for factory method.</summary>
         public readonly MethodBase Method;
+
+        /// <summary>Factory instance if <see cref="Method"/> is instance factory method.</summary>
         public readonly object Factory;
 
+        /// <summary>For convenience conversation from method to its wrapper.</summary>
+        /// <param name="method">Method to wrap.</param> <returns>Factory method wrapper.</returns>
         public static implicit operator FactoryMethod(MethodBase method)
         {
             return Of(method);
         }
 
+        /// <summary>Wraps method and factory instance.</summary>
+        /// <param name="method">Static or instance method.</param> <param name="factory">Factory instance in case of instance <paramref name="method"/>.</param>
+        /// <returns>New factory method wrapper.</returns>
         public static FactoryMethod Of(MethodBase method, object factory = null)
         {
             return new FactoryMethod(method.ThrowIfNull(), factory);
         }
 
+        /// <summary>Creates factory method using refactoring friendly static method call expression (without string method name).
+        /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
+        /// <typeparam name="TService">Factory product type.</typeparam> <param name="method">Static method call expression.</param>
+        /// <returns>New factory method wrapper.</returns>
+        public static FactoryMethod Of<TService>(Expression<Func<TService>> method)
+        {
+            var methodInfo = ExpressionTools.GetMethodOrNull(method);
+            return new FactoryMethod(methodInfo.ThrowIfNull().ThrowIf(!methodInfo.IsStatic));
+        }
+
+        /// <summary>Creates factory method using refactoring friendly instance method call expression (without string method name).
+        /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
+        /// <typeparam name="TFactory">Factory type.</typeparam> <typeparam name="TService">Factory product type.</typeparam>
+        /// <param name="factory">Factory instance.</param> <param name="method">Method call expression.</param>
+        /// <returns>New factory method wrapper.</returns>
+        public static FactoryMethod Of<TFactory, TService>(TFactory factory, Expression<Func<TFactory, TService>> method)
+            where TFactory : class
+        {
+            var methodInfo = ExpressionTools.GetMethodOrNull(method);
+            return new FactoryMethod(methodInfo.ThrowIfNull(), factory.ThrowIfNull());
+        }
+
+        /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
             return Method.DeclaringType + "::[" + Method + "]";
@@ -1745,9 +1778,14 @@ namespace DryIoc
                 : new InjectionRules(r => getConstructor(r.ImplementationType), Parameters, PropertiesAndFields);
         }
 
-        public static implicit operator InjectionRules(ConstructorSelector selector)
+        public static implicit operator InjectionRules(ConstructorSelector constructor)
         {
-            return With(selector);
+            return With(constructor);
+        }
+
+        public static implicit operator InjectionRules(FactoryMethod factoryMethod)
+        {
+            return With(_ => factoryMethod);
         }
 
         public static implicit operator InjectionRules(MethodInfo factoryMethod)
@@ -1933,7 +1971,11 @@ namespace DryIoc
         public static readonly string FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC =
             "Factory instance provided {0} But factory method is static {1} when resolving: {2}.";
 
-        public static readonly string NO_CURRENT_SCOPE = "No current scope available: probably you are resolving scoped service outside of scope.";
+        public static readonly string NO_CURRENT_SCOPE = 
+            "No current scope available: probably you are resolving scoped service outside of scope.";
+
+        public static readonly string NOT_DIRECT_SCOPE_PARENT = 
+            "Unable to Open Scope from not a direct parent container.";
     }
 
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
@@ -2863,7 +2905,7 @@ namespace DryIoc
         /// <returns>New empty request.</returns>
         public static Request CreateEmpty(RegistryWeakRef registryWeakRef)
         {
-            return new Request(null, registryWeakRef, new WeakReference(registryWeakRef.Value.ResolutionState), null, null, null);
+            return new Request(null, registryWeakRef, new WeakReference(registryWeakRef.Target.ResolutionState), null, null, null);
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="ServiceInfo"/> in such a request.</summary>
@@ -2932,7 +2974,7 @@ namespace DryIoc
 
         /// <summary>Provides access to container/registry currently bound to request. By default it is registry initiated request by calling resolve method,
         /// but could be changed along the way: for instance when resolving from parent container.</summary>
-        public IRegistry Registry { get { return RegistryWeakRef.Value; } }
+        public IRegistry Registry { get { return RegistryWeakRef.Target; } }
 
         /// <summary>Shortcut access to <see cref="IServiceInfo.ServiceType"/>.</summary>
         public Type ServiceType { get { return ServiceInfo == null ? null : ServiceInfo.ServiceType; } }
@@ -3380,8 +3422,6 @@ namespace DryIoc
 
             if (reuse != null)
             {
-                //var scope = reuse.GetScope();
-
                 // When singleton scope, and no Func in request chain, and no renewable wrapper used,
                 // then reused instance could be directly inserted into delegate instead of lazy requested from Scope.
                 var canBeInstantiated = reuse is SingletonReuse
@@ -3453,7 +3493,7 @@ namespace DryIoc
         protected Expression GetScopedServiceExpressionOrDefault(Expression serviceExpr, IReuse reuse, Request request, Type requiredWrapperType = null)
         {
             var reuseExpr = request.State.GetOrAddItemExpression(reuse);
-            var registryExpr = request.State.GetOrAddItemExpression(request.Registry);
+            var registryExpr = Container.RegistryExpr;
             var getScopeExpr = Expression.Call(reuseExpr, _getScopeMethod, registryExpr, Request.ScopeParamExpr);
 
             var serviceType = serviceExpr.Type;
@@ -3569,7 +3609,7 @@ namespace DryIoc
         /// <param name="_">(ignored)</param> <returns>Instance wrapped in delegate.</returns>
         public override FactoryDelegate GetDelegateOrDefault(Request _)
         {
-            return (state, cscope, rscope) => _instance;
+            return (state, regRef, scope) => _instance;
         }
 
         private readonly object _instance;
@@ -3866,7 +3906,7 @@ namespace DryIoc
             return property.CanWrite && !property.IsIndexer() // first checks that property is assignable in general and not indexer
                 && (include == Include.NonPrimitive || include == Include.All || property.IsPublic())
                 && (include == Include.Public || include == Include.All ||
-                !property.PropertyType.IsPrimitive(TypeTools.ConsiderPrimitiveFlags.ObjectType | TypeTools.ConsiderPrimitiveFlags.StringType));
+                !property.PropertyType.IsPrimitive(TypeTools.IsPrimitiveFlags.ObjectType | TypeTools.IsPrimitiveFlags.StringType));
         }
 
         /// <summary>Returns true if field matches the <see cref="Include"/> provided, or false otherwise.</summary>
@@ -3877,7 +3917,7 @@ namespace DryIoc
         {
             return !field.IsInitOnly && !field.IsBackingField()
                 && (include == Include.Public || include == Include.All ||
-                !field.FieldType.IsPrimitive(TypeTools.ConsiderPrimitiveFlags.ObjectType | TypeTools.ConsiderPrimitiveFlags.StringType));
+                !field.FieldType.IsPrimitive(TypeTools.IsPrimitiveFlags.ObjectType | TypeTools.IsPrimitiveFlags.StringType));
         }
 
         /// <summary>Returns true if field is backing field for property.</summary>
@@ -3947,7 +3987,7 @@ namespace DryIoc
         }
 
         private static readonly Func<PropertyInfo, MethodInfo> _getPropertySetMethodDelegate =
-            ReflectionTools.GetMethodDelegate<PropertyInfo, MethodInfo>("GetSetMethod");
+            ExpressionTools.GetMethodDelegate<PropertyInfo, MethodInfo>("GetSetMethod");
 
         #endregion
     }
@@ -4380,13 +4420,11 @@ namespace DryIoc
             ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
 
             if (reuse == null)
-                return (items, cs, rs) => _factoryDelegate(request);
+                return (state, reg, scope) => _factoryDelegate(request);
 
             var reuseIndex = request.State.GetOrAddItem(reuse);
-            var registryIndex = request.State.GetOrAddItem(request.Registry);
-            return (state, _, resolutionScope) => ((IReuse)state.Get(reuseIndex))
-                .GetScope((IRegistry)state.Get(registryIndex), ref resolutionScope)
-                .GetOrAdd(FactoryID, () => _factoryDelegate(request));
+            return (state, regWeakRef, scope) => ((IReuse)state.Get(reuseIndex))
+                .GetScope(regWeakRef.Target, ref scope).GetOrAdd(FactoryID, () => _factoryDelegate(request));
         }
 
         private readonly Func<Request, object> _factoryDelegate;
@@ -4471,6 +4509,7 @@ namespace DryIoc
         public Scope(Scope parent = null)
         {
             Parent = parent;
+            DisposingExceptions = AppendableArray<Exception>.Empty;
         }
 
         public static readonly MethodInfo GetOrAddMethod = typeof(IScope).GetSingleDeclaredMethodOrNull("GetOrAdd");
@@ -5416,20 +5455,20 @@ namespace DryIoc
 
         /// <summary>Flags to specify what else consider as primitive object in <see cref="TypeTools.IsPrimitive"/> method.</summary>
         [Flags]
-        public enum ConsiderPrimitiveFlags { None = 0, ObjectType = 1, StringType = 2 }
+        public enum IsPrimitiveFlags { None = 0, ObjectType = 1, StringType = 2 }
 
         /// <summary>Returns true if provided type is primitive object in .Net terms and considered as primitive based
-        /// on <see cref="ConsiderPrimitiveFlags"/>, or false - otherwise. If provided type is array, method will check
+        /// on <see cref="IsPrimitiveFlags"/>, or false - otherwise. If provided type is array, method will check
         /// array's item type.</summary>
         /// <param name="type">Type to check.</param>
         /// <param name="flags">Specifies what additional types consider as primitives.</param>
         /// <returns>True if check succeeded, false - otherwise.</returns>
-        public static bool IsPrimitive(this Type type, ConsiderPrimitiveFlags flags = ConsiderPrimitiveFlags.None)
+        public static bool IsPrimitive(this Type type, IsPrimitiveFlags flags = IsPrimitiveFlags.None)
         {
             var typeInfo = type.GetTypeInfo();
-            return typeInfo.IsPrimitive
-                || type == typeof(object) && (flags & ConsiderPrimitiveFlags.ObjectType) == ConsiderPrimitiveFlags.ObjectType
-                || type == typeof(string) && (flags & ConsiderPrimitiveFlags.StringType) == ConsiderPrimitiveFlags.StringType
+            return typeInfo.IsPrimitive || typeInfo.IsEnum
+                || type == typeof(object) && (flags & IsPrimitiveFlags.ObjectType) == IsPrimitiveFlags.ObjectType
+                || type == typeof(string) && (flags & IsPrimitiveFlags.StringType) == IsPrimitiveFlags.StringType
                 || typeInfo.IsArray && typeInfo.GetElementType().IsPrimitive(flags);
         }
 
@@ -5530,7 +5569,7 @@ namespace DryIoc
         #region Implementation
 
         private static readonly Func<Type, Type[]> _getGenericArgumentsDelegate =
-            ReflectionTools.GetMethodDelegate<Type, Type[]>("GetGenericArguments");
+            ExpressionTools.GetMethodDelegate<Type, Type[]>("GetGenericArguments");
 
         private static void SetNamesFoundInGenericParametersToNull(string[] names, Type[] genericParameters)
         {
@@ -5732,8 +5771,15 @@ namespace DryIoc
             : Expression.Lambda<Func<int>>(Expression.Call(_getEnvCurrentManagedThreadIdMethod), null).Compile();
     }
 
-    public static partial class ReflectionTools
+    /// <summary>Tools for expressions, that are not supported out-of-box.</summary>
+    public static class ExpressionTools
     {
+        public static MethodInfo GetMethodOrNull(LambdaExpression expression)
+        {
+            var callExpr = expression.Body as MethodCallExpression;
+            return callExpr == null? null : callExpr.Method;
+        }
+
         public static Func<T, TReturn> GetMethodDelegate<T, TReturn>(string methodName, bool returnNullIfNoMethod = false)
         {
             var methodInfo = typeof(T).GetDeclaredMethodOrNull(methodName);
@@ -5750,7 +5796,7 @@ namespace DryIoc
             return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), (Expression[])null);
         }
 
-        private static readonly MethodInfo _getDefaultMethod = typeof(ReflectionTools).GetDeclaredMethodOrNull("GetDefault");
+        private static readonly MethodInfo _getDefaultMethod = typeof(ExpressionTools).GetDeclaredMethodOrNull("GetDefault");
         internal static T GetDefault<T>() { return default(T); }
     }
 
@@ -5900,10 +5946,9 @@ namespace DryIoc
             }
         }
 
-        /// <summary> Remove or updates value for specified key, or does nothing if key is not found.
+        /// <summary>Removes or updates value for specified key, or does nothing if key is not found.
         /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx </summary>
-        /// <param name="key">Key to look for.</param>
-        /// <param name="isUpdated">(optional) Delegate to update value: return true from delegate if value is updated.</param>
+        /// <param name="key">Key to look for.</param> <param name="isUpdated">(optional) Delegate to update value, return true from delegate if value is updated.</param>
         /// <returns>New tree with removed or updated value.</returns>
         public HashTree<K, V> RemoveOrUpdate(K key, IsUpdated<V> isUpdated = null)
         {

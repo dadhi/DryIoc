@@ -9,7 +9,8 @@ namespace DryIoc.UnitTests
         public void Can_use_static_method_for_service_creation()
         {
             var container = new Container();
-            container.Register<SomeService>(rules: Constructor.Of(r => r.ImplementationType.GetDeclaredMethodOrNull("Create")));
+            container.Register<SomeService>(rules: InjectionRules.With(
+                r => FactoryMethod.Of(r.ImplementationType.GetDeclaredMethodOrNull("Create"))));
 
             var service = container.Resolve<SomeService>();
 
@@ -21,6 +22,17 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService>(rules: typeof(ServiceFactory).GetDeclaredMethodOrNull("CreateService"));
+
+            var service = container.Resolve<IService>();
+
+            Assert.That(service.Message, Is.EqualTo("static"));
+        }
+
+        [Test]
+        public void Can_use_any_type_static_method_for_service_creation_Refactoring_friendly()
+        {
+            var container = new Container();
+            container.Register<IService>(rules: FactoryMethod.Of(() => ServiceFactory.CreateService()));
 
             var service = container.Resolve<IService>();
 

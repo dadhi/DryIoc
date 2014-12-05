@@ -18,7 +18,8 @@ namespace DryIoc.UnitTests
             var factory = container.Resolve<Func<IService>>();
             container.Dispose();
 
-            var service = factory();
+            var ex = Assert.Throws<ContainerException>(() => factory());
+            Assert.That(ex.Message, Is.StringContaining("is disposed and its operations are no longer available"));
         }
 
         [Test]

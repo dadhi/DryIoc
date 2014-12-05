@@ -12,20 +12,44 @@ namespace DryIoc.Samples
         {
             var container = new Container();
             container.Register<ISessionFactory, TestSessionFactory>();
-            container.RegisterDelegate(r => r.Resolve<ISessionFactory>().OpenSession(), Reuse.InCurrentScope);
+            container.RegisterDelegate<ISession>(r => r.Resolve<ISessionFactory>().OpenSession(), Reuse.InCurrentScope);
 
             ISession scopeOneSession;
-            using (var scopedContainer = container.OpenScope())
+            using (var scoped = container.OpenScope())
             {
-                scopeOneSession = scopedContainer.Resolve<ISession>();
-                Assert.AreSame(scopeOneSession, scopedContainer.Resolve<ISession>());
+                scopeOneSession = scoped.Resolve<ISession>();
+                Assert.AreSame(scopeOneSession, scoped.Resolve<ISession>());
             }
 
-            using (var scopedContainer = container.OpenScope())
+            using (var scoped = container.OpenScope())
             {
-                var scopeTwoSession = scopedContainer.Resolve<ISession>();
+                var scopeTwoSession = scoped.Resolve<ISession>();
                 Assert.AreNotSame(scopeOneSession, scopeTwoSession);
-                Assert.AreSame(scopeTwoSession, scopedContainer.Resolve<ISession>());
+                Assert.AreSame(scopeTwoSession, scoped.Resolve<ISession>());
+            }
+        }
+
+        [Test]
+        public void Session_example_of_scope_usage_using_factory_method()
+        {
+            var container = new Container();
+            container.Register<ISessionFactory, TestSessionFactory>();
+
+            container.Register<ISession>(Reuse.InCurrentScope,
+                rules: InjectionRules.With(r => FactoryMethod.Of(r.Resolve<ISessionFactory>(), f => f.OpenSession())));
+
+            ISession scopeOneSession;
+            using (var scoped = container.OpenScope())
+            {
+                scopeOneSession = scoped.Resolve<ISession>();
+                Assert.AreSame(scopeOneSession, scoped.Resolve<ISession>());
+            }
+
+            using (var scoped = container.OpenScope())
+            {
+                var scopeTwoSession = scoped.Resolve<ISession>();
+                Assert.AreNotSame(scopeOneSession, scopeTwoSession);
+                Assert.AreSame(scopeTwoSession, scoped.Resolve<ISession>());
             }
         }
 

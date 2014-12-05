@@ -83,7 +83,7 @@ namespace DryIoc.UnitTests
             using (container.OpenScope())
             {
                 var ex = Assert.Throws<ContainerException>(() => container.OpenScope());
-                Assert.That(ex.Message, Is.StringContaining("Unable to Open Scope from not a current scope ancestor."));
+                Assert.That(ex.Message, Is.StringContaining("Unable to Open Scope from not a direct parent container"));
             }
         }
 

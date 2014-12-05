@@ -431,7 +431,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Func<Assembly, IEnumerable<Type>> _getAssemblyTypes =
-            ReflectionTools.GetMethodDelegate<Assembly, IEnumerable<Type>>("GetTypes");
+            ExpressionTools.GetMethodDelegate<Assembly, IEnumerable<Type>>("GetTypes");
 
         private static void RegisterFactoryMethods(IRegistrator registrator, RegistrationInfo factoryInfo)
         {
