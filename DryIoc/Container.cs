@@ -998,7 +998,7 @@ namespace DryIoc
 
         public Expression GetOrAddItemExpression(object item, Type itemType = null)
         {
-            int itemIndex = GetOrAddItem(item);
+            var itemIndex = GetOrAddItem(item);
             var itemExpr = _itemsExpressions.GetFirstValueByHashOrDefault(itemIndex);
             if (itemExpr == null)
             {
@@ -1359,16 +1359,17 @@ namespace DryIoc
             var itemType = wrapperType.GetGenericParamsAndArgs()[0];
             var requiredItemType = request.Registry.GetWrappedServiceType(request.RequiredServiceType ?? itemType);
 
-            // Composite pattern support: filter out composite root from available keys.
-            var parentFactoryID = 0;
+            // Composite pattern support: find composite parent key to exclude from result.
+            var compositeFactoryID = 0;
             var parent = request.GetNonWrapperParentOrEmpty();
             if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
-                parentFactoryID = parent.ResolvedFactory.FactoryID;
+                compositeFactoryID = parent.ResolvedFactory.FactoryID;
 
-            var resolveMethod = _resolveManyDynamicallyMethod.MakeGenericMethod(itemType, requiredItemType);
-
-            var requestExpr = request.State.GetOrAddItemExpression(request);
-            var resolveCallExpr = Expression.Call(resolveMethod, requestExpr, Expression.Constant(parentFactoryID));
+            var resolveCallExpr = Expression.Call(
+                _resolveLazyEnumerableMethod.MakeGenericMethod(itemType, requiredItemType), 
+                Container.RegistryExpr,
+                Expression.Constant(compositeFactoryID),
+                Expression.Constant(request.ServiceKey));
 
             return Expression.New(wrapperType.GetSingleConstructorOrNull().ThrowIfNull(), resolveCallExpr);
         }
@@ -1380,10 +1381,6 @@ namespace DryIoc
             var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
             var wrapperCtor = wrapperType.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(serviceType));
 
-            var resolveMethod = _resolveMethod.MakeGenericMethod(serviceType);
-
-            var requestExpr = request.State.GetOrAddItemExpression(request);
-
             var serviceKeyExp = request.ServiceKey == null
                 ? Expression.Constant(null, typeof(object))
                 : request.State.GetOrAddItemExpression(request.ServiceKey);
@@ -1394,8 +1391,9 @@ namespace DryIoc
                 ? Expression.Constant(null, typeof(Type))
                 : request.State.GetOrAddItemExpression(request.RequiredServiceType);
 
+            var resolveMethod = _resolveMethod.MakeGenericMethod(serviceType);
             var factoryExpr = Expression.Lambda(
-                Expression.Call(resolveMethod, requestExpr, serviceKeyExp, ifUnresolvedExpr, requiredServiceKeyExpr));
+                Expression.Call(resolveMethod, Container.RegistryExpr, serviceKeyExp, ifUnresolvedExpr, requiredServiceKeyExpr));
 
             return Expression.New(wrapperCtor, factoryExpr);
         }
@@ -1570,25 +1568,22 @@ namespace DryIoc
 
         #region Implementation
 
-        private static readonly MethodInfo _resolveManyDynamicallyMethod =
-            typeof(WrappersSupport).GetSingleDeclaredMethodOrNull("ResolveManyDynamically");
+        private static readonly MethodInfo _resolveLazyEnumerableMethod =
+            typeof(WrappersSupport).GetSingleDeclaredMethodOrNull("ResolveLazyEnumerable");
 
-        internal static IEnumerable<TItem> ResolveManyDynamically<TItem, TWrappedItem>(Request request, int parentFactoryID)
+        internal static IEnumerable<TItem> ResolveLazyEnumerable<TItem, TWrappedItem>(IRegistry registry, int compositeFactoryID, object serviceKey)
         {
-            var itemType = typeof(TItem);
-            var wrappedItemType = typeof(TWrappedItem);
+            var items = registry.GetAllServiceFactories(typeof(TWrappedItem));
 
-            var items = request.Registry.GetAllServiceFactories(wrappedItemType);
-            if (parentFactoryID != -1)
-                items = items.Where(kv => kv.Value.FactoryID != parentFactoryID);
+            if (compositeFactoryID != -1) // exclude composite parent from items
+                items = items.Where(kv => kv.Value.FactoryID != compositeFactoryID);
 
-            // Return collection of single matched item if key is specified.
-            if (request.ServiceKey != null)
-                items = items.Where(kv => request.ServiceKey.Equals(kv.Key));
+            if (serviceKey != null) // include only single item matching key.
+                items = items.Where(kv => serviceKey.Equals(kv.Key));
 
             foreach (var item in items)
             {
-                var service = request.ResolveKeyed(itemType, item.Key, IfUnresolved.ReturnDefault, wrappedItemType, null);
+                var service = registry.ResolveKeyed(typeof(TItem), item.Key, IfUnresolved.ReturnDefault, typeof(TWrappedItem), null);
                 if (service != null) // skip unresolved items
                     yield return (TItem)service;
             }
@@ -2161,7 +2156,7 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterDelegate<TService>(this IRegistrator registrator,
-            Func<Request, TService> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
+            Func<IResolver, TService> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             var factory = new DelegateFactory(r => factoryDelegate(r), reuse, setup);
@@ -2179,10 +2174,10 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterDelegate(this IRegistrator registrator, Type serviceType,
-            Func<Request, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
+            Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            Func<Request, object> checkedDelegate = r => factoryDelegate(r)
+            Func<IResolver, object> checkedDelegate = r => factoryDelegate(r)
                 .ThrowIfNotOf(serviceType, Error.REGISTERED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, r);
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
@@ -2238,7 +2233,7 @@ namespace DryIoc
         ///     container.RegisterInitiliazer<ISubscriber>((s, r) => r.Resolve<EventAggregator>().Subscribe(s));
         /// ]]></code></example>
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
-            Action<TTarget, Request> initialize, Func<Request, bool> condition = null)
+            Action<TTarget, IResolver> initialize, Func<Request, bool> condition = null)
         {
             registrator.RegisterDelegate<Action<TTarget>>(r => target => initialize(target, r), setup: SetupDecorator.With(condition));
         }
@@ -2463,7 +2458,7 @@ namespace DryIoc
         /// <summary>Sets custom value for service. This setting is orthogonal to the rest.</summary>
         /// <param name="getValue">Delegate to return custom service value.</param>
         /// <returns>Details with custom value provider set.</returns>
-        public static ServiceInfoDetails Of(Func<Request, object> getValue)
+        public static ServiceInfoDetails Of(Func<IResolver, object> getValue)
         {
             return new WithValue(getValue.ThrowIfNull());
         }
@@ -2481,7 +2476,7 @@ namespace DryIoc
         public virtual object DefaultValue { get { return null; } }
 
         /// <summary>Allows to get, or resolve value using passed <see cref="Request"/>.</summary>
-        public virtual Func<Request, object> GetValue { get { return null; } }
+        public virtual Func<IResolver, object> GetValue { get { return null; } }
 
         /// <summary>Pretty prints service details to string for debugging and errors.</summary> <returns>Details string.</returns>
         public override string ToString()
@@ -2508,9 +2503,9 @@ namespace DryIoc
 
         private class WithValue : ServiceInfoDetails
         {
-            public override Func<Request, object> GetValue { get { return _getValue; } }
-            public WithValue(Func<Request, object> getValue) { _getValue = getValue; }
-            private readonly Func<Request, object> _getValue;
+            public override Func<IResolver, object> GetValue { get { return _getValue; } }
+            public WithValue(Func<IResolver, object> getValue) { _getValue = getValue; }
+            private readonly Func<IResolver, object> _getValue;
         }
 
         private class WithKey : ServiceInfoDetails
@@ -3727,7 +3722,7 @@ namespace DryIoc
             return source.Condition(p => p.Name.Equals(name), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
-        public static ParameterProvider Name(this ParameterProvider source, string name, Func<Request, object> getValue)
+        public static ParameterProvider Name(this ParameterProvider source, string name, Func<IResolver, object> getValue)
         {
             return source.WithDetails(p => p.Name.Equals(name), ServiceInfoDetails.Of(getValue));
         }
@@ -3744,7 +3739,7 @@ namespace DryIoc
             return source.Condition(p => type.IsAssignableTo(p.ParameterType), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
-        public static ParameterProvider Type(this ParameterProvider source, Type type, Func<Request, object> getValue)
+        public static ParameterProvider Type(this ParameterProvider source, Type type, Func<IResolver, object> getValue)
         {
             type.ThrowIfNull();
             return source.WithDetails(p => type.IsAssignableTo(p.ParameterType), ServiceInfoDetails.Of(getValue));
@@ -3862,7 +3857,7 @@ namespace DryIoc
             return source.WithDetails(name, ServiceInfoDetails.Of(_ => value));
         }
 
-        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name, Func<Request, object> getValue)
+        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name, Func<IResolver, object> getValue)
         {
             return source.WithDetails(name, ServiceInfoDetails.Of(getValue));
         }
@@ -3874,7 +3869,7 @@ namespace DryIoc
                 ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
         }
 
-        public static PropertiesAndFieldsSelector Type(this PropertiesAndFieldsSelector source, Type type, Func<Request, object> getValue)
+        public static PropertiesAndFieldsSelector Type(this PropertiesAndFieldsSelector source, Type type, Func<IResolver, object> getValue)
         {
             return source.WithDetails(m => type.IsAssignableTo(m.GetPropertyOrFieldType()), ServiceInfoDetails.Of(getValue));
         }
@@ -4388,7 +4383,7 @@ namespace DryIoc
         /// <param name="factoryDelegate">User specified service creation delegate.</param>
         /// <param name="reuse">Reuse behavior for created service.</param>
         /// <param name="setup">Additional settings.</param>
-        public DelegateFactory(Func<Request, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null)
+        public DelegateFactory(Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null)
             : base(reuse, setup)
         {
             _factoryDelegate = factoryDelegate.ThrowIfNull();
@@ -4400,8 +4395,7 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var factoryDelegateExpr = request.State.GetOrAddItemExpression(_factoryDelegate);
-            var requestExpr = request.State.GetOrAddItemExpression(request);
-            return Expression.Convert(Expression.Invoke(factoryDelegateExpr, requestExpr), request.ServiceType);
+            return Expression.Convert(Expression.Invoke(factoryDelegateExpr, Container.RegistryExpr), request.ServiceType);
         }
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
@@ -4420,14 +4414,14 @@ namespace DryIoc
             ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
 
             if (reuse == null)
-                return (state, reg, scope) => _factoryDelegate(request);
+                return (state, regRef, scope) => _factoryDelegate(regRef.Target);
 
             var reuseIndex = request.State.GetOrAddItem(reuse);
-            return (state, regWeakRef, scope) => ((IReuse)state.Get(reuseIndex))
-                .GetScope(regWeakRef.Target, ref scope).GetOrAdd(FactoryID, () => _factoryDelegate(request));
+            return (state, regRef, scope) => ((IReuse)state.Get(reuseIndex))
+                .GetScope(regRef.Target, ref scope).GetOrAdd(FactoryID, () => _factoryDelegate(regRef.Target));
         }
 
-        private readonly Func<Request, object> _factoryDelegate;
+        private readonly Func<IResolver, object> _factoryDelegate;
     }
 
     /// <summary>Creates/provides <see cref="Factory"/> based on <see cref="Request"/> for enabling context-dependent scenarios.</summary>

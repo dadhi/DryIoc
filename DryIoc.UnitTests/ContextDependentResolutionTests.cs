@@ -95,13 +95,13 @@ namespace DryIoc.UnitTests
                 container.Resolve<object>());
         }
 
-        [Test]
+        [Test, Ignore("Not supported")]
         public void Delegate_factory_may_resolve_different_objects_depending_on_request()
         {
             var container = new Container();
             var root = "root";
             var dependency = "dependency";
-            container.RegisterDelegate(r => r.Parent.IsEmpty ? root : dependency);
+            //container.RegisterDelegate(r => r.Parent.IsEmpty ? root : dependency);
             container.Register<StrUser>();
 
             var service = container.Resolve<string>();

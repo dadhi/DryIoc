@@ -12,7 +12,7 @@ namespace DryIoc.Samples
         {
             var container = new Container();
             container.Register<ISessionFactory, TestSessionFactory>();
-            container.RegisterDelegate<ISession>(r => r.Resolve<ISessionFactory>().OpenSession(), Reuse.InCurrentScope);
+            container.RegisterDelegate(r => r.Resolve<ISessionFactory>().OpenSession(), Reuse.InCurrentScope);
 
             ISession scopeOneSession;
             using (var scoped = container.OpenScope())
@@ -26,6 +26,29 @@ namespace DryIoc.Samples
                 var scopeTwoSession = scoped.Resolve<ISession>();
                 Assert.AreNotSame(scopeOneSession, scopeTwoSession);
                 Assert.AreSame(scopeTwoSession, scoped.Resolve<ISession>());
+            }
+        }
+
+        [Test]
+        public void Session_example_of_scope_usage_when_factory_is_not_resolution_root()
+        {
+            var container = new Container();
+            container.Register<SessionClient>();
+            container.Register<ISessionFactory, TestSessionFactory>();
+            container.RegisterDelegate(r => r.Resolve<ISessionFactory>().OpenSession(), Reuse.InCurrentScope);
+
+            SessionClient client;
+            using (var scoped = container.OpenScope())
+            {
+                client = scoped.Resolve<SessionClient>();
+                Assert.AreSame(client.Session, scoped.Resolve<SessionClient>().Session);
+            }
+
+            using (var scoped = container.OpenScope())
+            {
+                var clientScope2 = scoped.Resolve<SessionClient>();
+                Assert.AreNotSame(client.Session, clientScope2.Session);
+                Assert.AreSame(clientScope2.Session, scoped.Resolve<SessionClient>().Session);
             }
         }
 
@@ -69,6 +92,16 @@ namespace DryIoc.Samples
             public ISession OpenSession()
             {
                 return new TestSession();
+            }
+        }
+
+        internal class SessionClient
+        {
+            public ISession Session { get; private set; }
+
+            public SessionClient(ISession session)
+            {
+                Session = session;
             }
         }
 

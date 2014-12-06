@@ -48,6 +48,7 @@
     <Compile Include="CreateEnumerableWithExpressionTests.cs" />
     <Compile Include="DirectVsIndirectArrayAccessSpeedTests.cs" />
     <Compile Include="Experiments.cs" />
+    <Compile Include="ExpressionTreeTests.cs" />
     <Compile Include="FasterAppendStore.cs" />
     <Compile Include="GetInterfaceMapCustomImplTests.cs" />
     <Compile Include="HashArrayMappedTrieTests.cs" />

@@ -54,7 +54,7 @@ namespace DryIoc.UnitTests.Memory
         {
             var container = new Container();
 
-            Request savedResolver = null;
+            IResolver savedResolver = null;
             container.RegisterDelegate(r =>
             {
                 savedResolver = r;
