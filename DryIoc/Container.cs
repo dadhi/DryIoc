@@ -88,7 +88,7 @@ namespace DryIoc
             scopeContext.SetCurrent(current => nestedScope.ThrowIf(current != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT));
 
             return new Container(Rules,
-                _factories, _decorators, _wrappers, _singletonScope, scopeContext, nestedScope, 
+                _factories, _decorators, _wrappers, _singletonScope, scopeContext, nestedScope,
                 _disposed, _resolvedDefaultDelegates, _resolvedKeyedDelegates, _resolutionState);
         }
 
@@ -137,7 +137,7 @@ namespace DryIoc
                 _openedScope.Dispose();
                 _openedScope = null;
                 return; // Skip the rest for scoped container
-            } 
+            }
 
             if (_scopeContext is IDisposable)
                 ((IDisposable)_scopeContext).Dispose();
@@ -756,7 +756,7 @@ namespace DryIoc
                                 return factory;
                             default:
                                 _resolvedDefaultDelegates.Swap(x1 => x1.RemoveOrUpdate(serviceType));
-                                return new FactoriesEntry(DefaultKey.Default.Next(), 
+                                return new FactoriesEntry(DefaultKey.Default.Next(),
                                     HashTree<object, Factory>.Empty
                                         .AddOrUpdate(DefaultKey.Default, (Factory)oldValue)
                                         .AddOrUpdate(DefaultKey.Default.Next(), factory));
@@ -990,20 +990,19 @@ namespace DryIoc
             return index;
         }
 
-        public void AddOrUpdateItem(object item, int index)
-        {
-            index.ThrowIf(index < 0);
-            Ref.Swap(ref _items, x => x.AppendOrUpdate(item, index = index >= x.Length ? x.Length : index));
-        }
-
         public Expression GetOrAddItemExpression(object item, Type itemType = null)
         {
+            itemType = itemType ?? item.GetType();
+            if (itemType.IsPrimitive() || itemType.IsEnum() ||
+                itemType == typeof(string) || itemType == typeof(Type))
+                return Expression.Constant(item, itemType);
+
             var itemIndex = GetOrAddItem(item);
             var itemExpr = _itemsExpressions.GetFirstValueByHashOrDefault(itemIndex);
             if (itemExpr == null)
             {
                 var indexExpr = Expression.Constant(itemIndex, typeof(int));
-                itemExpr = Expression.Convert(Expression.Call(StateParamExpr, _getItemMethod, indexExpr), itemType ?? item.GetType());
+                itemExpr = Expression.Convert(Expression.Call(StateParamExpr, _getItemMethod, indexExpr), itemType);
                 Interlocked.Exchange(ref _itemsExpressions, _itemsExpressions.AddOrUpdate(itemIndex, itemExpr));
             }
             return itemExpr;
@@ -1365,16 +1364,18 @@ namespace DryIoc
             if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
                 compositeFactoryID = parent.ResolvedFactory.FactoryID;
 
+            var serviceKeyExp = request.ServiceKey == null
+                ? Expression.Constant(null, typeof(object))
+                : request.State.GetOrAddItemExpression(request.ServiceKey);
+
             var resolveCallExpr = Expression.Call(
-                _resolveLazyEnumerableMethod.MakeGenericMethod(itemType, requiredItemType), 
-                Container.RegistryExpr,
-                Expression.Constant(compositeFactoryID),
-                Expression.Constant(request.ServiceKey));
+                _resolveLazyEnumerableMethod.MakeGenericMethod(itemType, requiredItemType),
+                Container.RegistryExpr, Expression.Constant(compositeFactoryID), serviceKeyExp);
 
             return Expression.New(wrapperType.GetSingleConstructorOrNull().ThrowIfNull(), resolveCallExpr);
         }
 
-        // Result: new Lazy<TService>(() => request.Resolve<TService>(key, ifUnresolved, requiredType));
+        // Result: regRef => new Lazy<TService>(() => regRef.Target.Resolve<TService>(key, ifUnresolved, requiredType));
         private static Expression GetLazyExpression(Request request)
         {
             var wrapperType = request.ServiceType;
@@ -1386,14 +1387,11 @@ namespace DryIoc
                 : request.State.GetOrAddItemExpression(request.ServiceKey);
 
             var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved);
-
-            var requiredServiceKeyExpr = request.RequiredServiceType == null
-                ? Expression.Constant(null, typeof(Type))
-                : request.State.GetOrAddItemExpression(request.RequiredServiceType);
+            var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
 
             var resolveMethod = _resolveMethod.MakeGenericMethod(serviceType);
-            var factoryExpr = Expression.Lambda(
-                Expression.Call(resolveMethod, Container.RegistryExpr, serviceKeyExp, ifUnresolvedExpr, requiredServiceKeyExpr));
+            var factoryExpr = Expression.Lambda(Expression.Call(resolveMethod,
+                Container.RegistryExpr, serviceKeyExp, ifUnresolvedExpr, requiredServiceTypeExpr));
 
             return Expression.New(wrapperCtor, factoryExpr);
         }
@@ -1966,10 +1964,10 @@ namespace DryIoc
         public static readonly string FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC =
             "Factory instance provided {0} But factory method is static {1} when resolving: {2}.";
 
-        public static readonly string NO_CURRENT_SCOPE = 
+        public static readonly string NO_CURRENT_SCOPE =
             "No current scope available: probably you are resolving scoped service outside of scope.";
 
-        public static readonly string NOT_DIRECT_SCOPE_PARENT = 
+        public static readonly string NOT_DIRECT_SCOPE_PARENT =
             "Unable to Open Scope from not a direct parent container.";
     }
 
@@ -4096,7 +4094,7 @@ namespace DryIoc
             }
 
             var factory = new ReflectionFactory(closedImplType, Reuse, Rules, Setup);
-            _providedFactories.Swap(_ => _.AddOrUpdate(factory.FactoryID, 
+            _providedFactories.Swap(_ => _.AddOrUpdate(factory.FactoryID,
                 new KV<Type, object>(serviceType, request.ServiceKey)));
             return factory;
         }
@@ -4445,7 +4443,7 @@ namespace DryIoc
             if (factory != null && factory.Setup == DryIoc.Setup.Default)
                 factory.Setup = Setup; // propagate provider setup if it is not specified by client.
             if (factory != null)
-                _providedFactories.Swap(_ => _.AddOrUpdate(factory.FactoryID, 
+                _providedFactories.Swap(_ => _.AddOrUpdate(factory.FactoryID,
                     new KV<Type, object>(request.ServiceType, request.ServiceKey)));
             return factory;
         }
@@ -5771,7 +5769,7 @@ namespace DryIoc
         public static MethodInfo GetMethodOrNull(LambdaExpression expression)
         {
             var callExpr = expression.Body as MethodCallExpression;
-            return callExpr == null? null : callExpr.Method;
+            return callExpr == null ? null : callExpr.Method;
         }
 
         public static Func<T, TReturn> GetMethodDelegate<T, TReturn>(string methodName, bool returnNullIfNoMethod = false)

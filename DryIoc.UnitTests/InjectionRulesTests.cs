@@ -239,7 +239,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(rules: PropertiesAndFields.Of.Name("_pPrivate"));
+            container.RegisterAll<ClientWithPropsAndFields>(rules: PropertiesAndFields.Of.Name("_pInternal"));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -450,7 +450,7 @@ namespace DryIoc.UnitTests
             public IService Uses { get; set; }
         }
 
-        internal class ClientWithStringParam
+        public class ClientWithStringParam
         {
             public string X { get; private set; }
 
@@ -487,16 +487,13 @@ namespace DryIoc.UnitTests
             // ReSharper restore UnassignedReadonlyField
 
             // ReSharper disable UnassignedField.Compiler
-            protected IService _fPrivate;
+            internal IService _fPrivate;
             // ReSharper restore UnassignedField.Compiler
 
             public IService P { get; set; }
-            // ReSharper disable UnusedAutoPropertyAccessor.Local
-            public IService PWithPrivateSetter { get; private set; }
-            private IService _pPrivate { get; set; }
-            public IService PWithBackingPrivateProperty { get { return _pPrivate; } }
-
-            // ReSharper restore UnusedAutoPropertyAccessor.Local
+            public IService PWithPrivateSetter { get; internal set; }
+            internal IService _pInternal { get; set; }
+            public IService PWithBackingPrivateProperty { get { return _pInternal; } }
 
             public AnotherService PNonResolvable { get; set; }
         }

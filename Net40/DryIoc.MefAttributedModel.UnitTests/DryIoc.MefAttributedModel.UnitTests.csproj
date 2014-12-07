@@ -84,6 +84,9 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ReuseAttributeTests.cs">
       <Link>ReuseAttributeTests.cs</Link>
     </Compile>
+    <Compile Include="..\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs">
+      <Link>Properties\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs</Link>
+    </Compile>
     <Compile Include="MefMultiExportTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

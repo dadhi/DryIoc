@@ -175,6 +175,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\WrapperTests.cs">
       <Link>WrapperTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs">
+      <Link>Properties\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">

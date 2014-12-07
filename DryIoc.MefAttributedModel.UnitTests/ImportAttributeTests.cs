@@ -147,7 +147,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Could_import_property_with_private_setter()
+        public void Could_import_property_with_internal_setter()
         {
             var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(ServiceWithPropWithPrivateSetter), typeof(Service));
@@ -289,7 +289,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             // ReSharper disable UnusedAutoPropertyAccessor.Local
             [Import]
-            public IService PropWithPrivateSetter { get; private set; }
+            public IService PropWithPrivateSetter { get; internal set; }
             // ReSharper restore UnusedAutoPropertyAccessor.Local
         }
 

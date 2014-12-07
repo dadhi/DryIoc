@@ -74,7 +74,7 @@ namespace DryIoc
 
         static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, Rules rules, ref FactoryDelegate result)
         {
-            if (!rules.CompilationToDynamicAssemblyEnabled) 
+            if (!rules.CompilationToDynamicAssemblyEnabled)
                 return;
 
             result.ThrowIf(result != null);
@@ -82,8 +82,11 @@ namespace DryIoc
             var typeName = "Factory" + Interlocked.Increment(ref _typeId);
             var typeBuilder = GetDynamicAssemblyModuleBuilder().DefineType(typeName, TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
 
-            var methodBuilder = typeBuilder.DefineMethod("GetService", MethodAttributes.Public | MethodAttributes.Static,
-                typeof(object), new[] { typeof(object[]), typeof(Scope) });
+            var methodBuilder = typeBuilder.DefineMethod(
+                "GetService", 
+                MethodAttributes.Public | MethodAttributes.Static,
+                typeof(object),
+                new[] { typeof(AppendableArray<object>), typeof(RegistryWeakRef), typeof(IScope) });
 
             factoryExpression.CompileToMethod(methodBuilder);
 
@@ -101,6 +104,7 @@ namespace DryIoc
             return _moduleBuilder ?? (_moduleBuilder = DefineDynamicAssemblyModuleBuilder());
         }
 
+        //I me
         private static ModuleBuilder DefineDynamicAssemblyModuleBuilder()
         {
             var assemblyName = new AssemblyName(DYNAMIC_ASSEMBLY_NAME);

@@ -165,6 +165,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\WrapperTests.cs">
       <Link>WrapperTests.cs</Link>
     </Compile>
+    <Compile Include="..\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs">
+      <Link>Properties\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs</Link>
+    </Compile>
     <Compile Include="FactoryCompilerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

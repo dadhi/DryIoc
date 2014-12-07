@@ -38,9 +38,9 @@ namespace DryIoc.UnitTests
             container.Register(typeof(ISingleton), typeof(Singleton), Reuse.Singleton);
 
             var one = container.Resolve<Lazy<ISingleton>>();
-            var another = container.Resolve<Lazy<ISingleton>>();
+            var two = container.Resolve<Lazy<ISingleton>>();
 
-            Assert.That(one.Value, Is.SameAs(another.Value));
+            Assert.That(one.Value, Is.SameAs(two.Value));
         }
 
         [Test]
