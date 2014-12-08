@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Web;
 using DryIoc.UnitTests.CUT;
@@ -175,9 +176,8 @@ namespace DryIoc.UnitTests
             {
                 using (var threadLocal = container.OpenScope())
                     one = threadLocal.Resolve<Service>();
-            }) 
-            { IsBackground = true };
-            
+            }) { IsBackground = true };
+
             threadOne.Start();
 
             var another = mainThread.Resolve<Service>();
@@ -197,7 +197,7 @@ namespace DryIoc.UnitTests
             ServiceWithDependency one = null;
             var threadOne = new Thread(() =>
             {
-                using(var otherThread = parent.OpenScope())
+                using (var otherThread = parent.OpenScope())
                     one = otherThread.Resolve<ServiceWithDependency>();
             });
             threadOne.Start();
@@ -276,6 +276,61 @@ namespace DryIoc.UnitTests
             Assert.That(service.Value.Dep.IsDisposed, Is.True);
         }
 
+        [Test]
+        public void Working_with_HttpScopeContext()
+        {
+            var root = new Container();
+            root.Register<SomeRoot>(Reuse.InCurrentScope);
+            root.Register<SomeDep>(Reuse.InCurrentScope);
+
+            SomeDep savedOutside;
+            using (var scoped = root.OpenScope(new HttpScopeContext()))
+            {
+                var firstRoot = scoped.Resolve<SomeRoot>();
+                var otherRoot = scoped.Resolve<SomeRoot>();
+
+                Assert.That(firstRoot, Is.SameAs(otherRoot));
+
+                savedOutside = firstRoot.Dep;
+            }
+
+            using (var scoped = root.OpenScope(new HttpScopeContext()))
+            {
+                var firstRoot = scoped.Resolve<SomeRoot>();
+                var otherRoot = scoped.Resolve<SomeRoot>();
+
+                Assert.That(firstRoot, Is.SameAs(otherRoot));
+                Assert.That(firstRoot.Dep, Is.Not.SameAs(savedOutside));
+            }
+
+            Assert.That(savedOutside.IsDisposed, Is.True);
+        }
+
+        [Test]
+        public void I_can_use_execution_flow_context()
+        {
+            var container = new Container(scopeContext: new ExecutionFlowScopeContext());
+            
+            container.Register<SomeRoot>(Reuse.InCurrentScope);
+            container.Register<SomeDep>(Reuse.InCurrentScope);
+
+            SomeDep outerDep;
+            using (var scoped = container.OpenScope())
+            {
+                outerDep = scoped.Resolve<SomeRoot>().Dep;
+                Assert.That(outerDep, Is.SameAs(scoped.Resolve<SomeRoot>().Dep));
+            }
+
+            using (var scoped = container.OpenScope())
+            {
+                Assert.That(scoped.Resolve<SomeRoot>().Dep,
+                    Is.SameAs(scoped.Resolve<SomeRoot>().Dep));
+                Assert.That(outerDep, Is.Not.SameAs(scoped.Resolve<SomeRoot>().Dep));
+            }
+
+            Assert.That(outerDep.IsDisposed, Is.True);
+        }
+
         internal class SomeDep : IDisposable
         {
             public bool IsDisposed { get; private set; }
@@ -295,7 +350,39 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class HttpScopeContext : IScopeContext
+        public sealed class ExecutionFlowScopeContext : IScopeContext
+        {
+            public static readonly object ROOT_SCOPE_NAME = typeof(ExecutionFlowScopeContext);
+
+            public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
+
+            public IScope GetCurrentOrDefault()
+            {
+                var scope = (Remote<IScope>)CallContext.LogicalGetData(_key);
+                return scope == null ? null : scope.Value;
+            }
+
+            public void SetCurrent(Func<IScope, IScope> update)
+            {
+                var oldScope = GetCurrentOrDefault();
+                var newScope = update.ThrowIfNull()(oldScope);
+                CallContext.LogicalSetData(_key, new Remote<IScope>(newScope));
+            }
+
+            private static readonly string _key = typeof(ExecutionFlowScopeContext).Name;
+        }
+
+        public sealed class Remote<T> : MarshalByRefObject
+        {
+            public readonly T Value;
+
+            public Remote(T value)
+            {
+                Value = value;
+            }
+        }
+
+        public sealed class HttpScopeContext : IScopeContext
         {
             public static readonly object ROOT_SCOPE_NAME = typeof(HttpScopeContext);
 
@@ -303,60 +390,28 @@ namespace DryIoc.UnitTests
 
             public IScope GetCurrentOrDefault()
             {
-                var scope = _scopeWhenHttpContextIsNull;
-                if (scope != null)
-                    return scope;
                 var httpContext = HttpContext.Current;
-                if (httpContext != null)
-                    return (IScope)httpContext.Items[_scopeKey];
-                return null;
+                return httpContext == null ? _fallbackScope : (IScope)httpContext.Items[ROOT_SCOPE_NAME];
             }
 
             public void SetCurrent(Func<IScope, IScope> update)
             {
+                var currentOrDefault = GetCurrentOrDefault();
+                var newScope = update.ThrowIfNull().Invoke(currentOrDefault);
                 var httpContext = HttpContext.Current;
                 if (httpContext == null)
-                    _scopeWhenHttpContextIsNull = update(GetCurrentOrDefault());
+                {
+                    _fallbackScope = newScope;
+                }
                 else
                 {
-                    httpContext.Items[_scopeKey] = update(GetCurrentOrDefault());
-                    _scopeWhenHttpContextIsNull = null;
+                    httpContext.Items[ROOT_SCOPE_NAME] = newScope;
+                    _fallbackScope = null;
                 }
             }
 
-            private static readonly Type _scopeKey = typeof(HttpScopeContext);
-            private IScope _scopeWhenHttpContextIsNull;
+            private IScope _fallbackScope;
         }
-
-        //public sealed class HttpContextReuse : IReuse
-        //{
-        //    public int Lifespan { get { return Reuse.InResolutionScope.Lifespan; } }
-
-        //    public static readonly HttpContextReuse Instance = new HttpContextReuse();
-
-        //    public IScope GetScope(Request request)
-        //    {
-        //        if (HttpContext.Current == null)
-        //            return _contextNullScope ?? CreateNewScope();
-
-        //        var items = HttpContext.Current.Items;
-        //        lock (_singleScopeLocker)
-        //            if (!items.Contains(_reuseScopeKey))
-        //                items[_reuseScopeKey] = _contextNullScope ?? new Scope();
-
-        //        return (Scope)items[_reuseScopeKey];
-        //    }
-
-        //    private IScope CreateNewScope()
-        //    {
-        //        lock (_singleScopeLocker)
-        //            return _contextNullScope = _contextNullScope ?? new Scope();
-        //    }
-
-        //    private IScope _contextNullScope;
-        //    private readonly object _singleScopeLocker = new object();
-        //    private static readonly string _reuseScopeKey = typeof(HttpContextReuse).Name;
-        //}
 
         // Old example for v1.3.1 
         //public sealed class HttpContextReuse : IReuse

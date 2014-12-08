@@ -68,7 +68,7 @@ namespace DryIoc
             return new Container(rules, _factories, _decorators, _wrappers, _singletonScope, _scopeContext, _openedScope, _disposed);
         }
 
-        /// <summary>Creates new container with new current scope. New container shares the state with one its created from.</summary>
+        /// <summary>Creates new container with new opened scope and set this scope as current in provided/inherited context.</summary>
         /// <returns>New container with different current scope.</returns>
         /// <example><code lang="cs"><![CDATA[
         /// using (var scoped = container.OpenScope())
@@ -77,16 +77,17 @@ namespace DryIoc
         ///     handler.Handle(data);
         /// }
         /// ]]></code></example>
-        public Container OpenScope(IScopeContext scopeContext = null)
+        public Container OpenScope(IScopeContext scopeContext = null, object scopeName = null)
         {
             ThrowIfContainerDisposed();
             scopeContext = scopeContext ?? _scopeContext;
 
-            var scopeName = _openedScope == null ? scopeContext.RootScopeName : null;
+            scopeName = scopeName ?? (_openedScope == null ? scopeContext.RootScopeName : null);
             var nestedScope = new Scope(scopeName, _openedScope);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
-            scopeContext.SetCurrent(current => nestedScope.ThrowIf(current != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT));
+            scopeContext.SetCurrent(current => 
+                nestedScope.ThrowIf(current != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT));
 
             return new Container(Rules,
                 _factories, _decorators, _wrappers, _singletonScope, scopeContext, nestedScope,
@@ -134,7 +135,9 @@ namespace DryIoc
             if (_openedScope != null)
             {
                 var openedScope = _openedScope;
-                _scopeContext.SetCurrent(x => x.ThrowIf(x != openedScope, Error.UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE).Parent);
+                _scopeContext.SetCurrent(current => 
+                    current.ThrowIf(current != openedScope, Error.UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE).Parent);
+
                 _openedScope.Dispose();
                 _openedScope = null;
                 return; // Skip the rest for scoped container
@@ -3988,7 +3991,7 @@ namespace DryIoc
         }
 
         private static readonly Func<PropertyInfo, MethodInfo> _getPropertySetMethodDelegate =
-            ExpressionTools.GetMethodDelegate<PropertyInfo, MethodInfo>("GetSetMethod");
+            ExpressionTools.GetMethodDelegateOrNull<PropertyInfo, MethodInfo>("GetSetMethod").ThrowIfNull();
 
         #endregion
     }
@@ -4496,7 +4499,7 @@ namespace DryIoc
         void MarkForRenew();
     }
 
-    /// <summary><see cref="IScope"/> implementation which will dispose stored <see cref="IDisposable"/> objects on its own dispose.
+    /// <summary><see cref="IScope"/> implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
     /// Locking is used internally to ensure that object factory called only once.</summary>
     public sealed class Scope : IScope, IDisposable
     {
@@ -4513,7 +4516,7 @@ namespace DryIoc
         }
 
         /// <summary>Accumulates exceptions thrown by disposed items.</summary>
-        public AppendableArray<Exception> DisposingExceptions = AppendableArray<Exception>.Empty;
+        public Exception[] DisposingExceptions;
 
         /// <summary>Create scope with optional parent and name.</summary>
         /// <param name="name">(optional) Associated name object, e.g. <see cref="IScopeContext.RootScopeName"/></param> 
@@ -4532,6 +4535,7 @@ namespace DryIoc
         /// <param name="id">Unique ID to find created object in subsequent calls.</param>
         /// <param name="factory">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
         /// <returns>Created and stored object.</returns>
+        /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, Func<object> factory)
         {
             if (_disposed == 1)
@@ -4548,6 +4552,8 @@ namespace DryIoc
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
+        /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.
+        /// Rather all thrown exceptions are aggregated in <see cref="DisposingExceptions"/> array. If no exceptions, array is null.</remarks>
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
@@ -4607,10 +4613,7 @@ namespace DryIoc
         public void SetCurrent(Func<IScope, IScope> update)
         {
             var threadId = ThreadTools.GetCurrentManagedThreadID();
-            _scopes.Swap(scopes =>
-            {
-                return scopes.AddOrUpdate(threadId, update(scopes.GetFirstValueByHashOrDefault(threadId)));
-            });
+            _scopes.Swap(scopes => scopes.AddOrUpdate(threadId, update(scopes.GetFirstValueByHashOrDefault(threadId))));
         }
 
         public void Dispose()
@@ -4748,6 +4751,7 @@ namespace DryIoc
         public static readonly IReuse InContainer = new SingletonReuse();
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
+        public static readonly IReuse InThreadScope = new ThreadLocalScopeReuse();
         // NOTE: Do we need InAppDomain/static, or in InProcess?
     }
 
@@ -5627,7 +5631,7 @@ namespace DryIoc
         #region Implementation
 
         private static readonly Func<Type, Type[]> _getGenericArgumentsDelegate =
-            ExpressionTools.GetMethodDelegate<Type, Type[]>("GetGenericArguments");
+            ExpressionTools.GetMethodDelegateOrNull<Type, Type[]>("GetGenericArguments").ThrowIfNull();
 
         private static void SetNamesFoundInGenericParametersToNull(string[] names, Type[] genericParameters)
         {
@@ -5838,12 +5842,11 @@ namespace DryIoc
             return callExpr == null ? null : callExpr.Method;
         }
 
-        public static Func<T, TReturn> GetMethodDelegate<T, TReturn>(string methodName, bool returnNullIfNoMethod = false)
+        public static Func<T, TReturn> GetMethodDelegateOrNull<T, TReturn>(string methodName)
         {
             var methodInfo = typeof(T).GetDeclaredMethodOrNull(methodName);
             if (methodInfo == null)
-                return returnNullIfNoMethod ? null :
-                    Throw.Instead<Func<T, TReturn>>("Method {0}.{1} is not found.", typeof(T), methodName);
+                return null;
             var thisParamExpr = Expression.Parameter(typeof(T), "_");
             var methodExpr = Expression.Lambda<Func<T, TReturn>>(Expression.Call(thisParamExpr, methodInfo), thisParamExpr);
             return methodExpr.Compile();
