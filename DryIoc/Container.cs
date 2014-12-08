@@ -82,7 +82,8 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             scopeContext = scopeContext ?? _scopeContext;
 
-            var nestedScope = new Scope(_openedScope);
+            var scopeName = _openedScope == null ? scopeContext.RootScopeName : null;
+            var nestedScope = new Scope(scopeName, _openedScope);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             scopeContext.SetCurrent(current => nestedScope.ThrowIf(current != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT));
@@ -133,7 +134,7 @@ namespace DryIoc
             if (_openedScope != null)
             {
                 var openedScope = _openedScope;
-                _scopeContext.SetCurrent(current => current.ThrowIf(current != openedScope, "Unable to dispose not a current opened scope.").Parent);
+                _scopeContext.SetCurrent(x => x.ThrowIf(x != openedScope, Error.UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE).Parent);
                 _openedScope.Dispose();
                 _openedScope = null;
                 return; // Skip the rest for scoped container
@@ -223,9 +224,11 @@ namespace DryIoc
                     return decorators != null && (condition == null || decorators.Any(condition));
 
                 default:
-                    return GetServiceFactoryOrDefault(serviceType, serviceKey,
-                        factories => factories.Select(x => x.Value).FirstOrDefault(condition ?? (factory => true)),
-                        retryForOpenGeneric: true) != null;
+                    var selector = condition != null ? (Rules.FactorySelectorRule)
+                         (factories => factories.Select(x => x.Value).FirstOrDefault(condition)) : 
+                         (factories => factories.Select(x => x.Value).FirstOrDefault());
+                    var factory = GetServiceFactoryOrDefault(serviceType, serviceKey, selector, retryForOpenGeneric: true);
+                    return factory != null;
             }
         }
 
@@ -853,7 +856,6 @@ namespace DryIoc
         private readonly Ref<HashTree<Type, Factory>> _wrappers;
 
         private Scope _singletonScope;
-
         private Scope _openedScope;
         private IScopeContext _scopeContext;
 
@@ -1969,6 +1971,11 @@ namespace DryIoc
 
         public static readonly string NOT_DIRECT_SCOPE_PARENT =
             "Unable to Open Scope from not a direct parent container.";
+
+        public static readonly string NO_OPEN_THREAD_SCOPE = 
+            "Unable to find open thread scope in {0}. Please OpenScope with {0} to make sure thread reuse work.";
+
+        public static readonly string UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE = "Unable to dispose not a current opened scope.";
     }
 
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
@@ -2935,9 +2942,10 @@ namespace DryIoc
         #endregion
 
         #region Resolution Scope
-
+        
         public static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "resolutionScope");
 
+        // TODO: remove.
         public IScope ResolutionScope
         {
             get { return _scope.Value; }
@@ -4465,7 +4473,11 @@ namespace DryIoc
     /// then will be returning the same object for subsequent access.</summary>
     public interface IScope
     {
+        /// <summary>Parent scope in scope stack. Null for root scope.</summary>
         Scope Parent { get; }
+
+        /// <summary>Optional name object associated with scope.</summary>
+        object Name { get; }
 
         /// <summary>Creates, stores, and returns stored object.</summary>
         /// <param name="id">Unique ID to find created object in subsequent calls.</param>
@@ -4474,21 +4486,25 @@ namespace DryIoc
         object GetOrAdd(int id, Func<object> factory);
     }
 
-    /// <summary>After call to <see cref="Renew"/> shows <see cref="Scope"/> to create new object on next access.</summary>
+    /// <summary>After call to <see cref="MarkForRenew"/> shows <see cref="Scope"/> to create new object on next access.</summary>
     public interface IReneweable
     {
-        bool ShouldBeRenewed { get; }
+        /// <summary>If set, specifies to consumer code to recreate object.</summary>
+        bool MarkedForRenewal { get; }
 
-        void Renew();
+        /// <summary>Recycles current object state and marks object for renewal with <see cref="MarkedForRenewal"/></summary>
+        void MarkForRenew();
     }
 
-    /// <summary>
-    /// <see cref="IScope"/> implementation which will dispose stored <see cref="IDisposable"/> objects on its own dispose.
-    /// Locking is used internally to ensure that object factory called only once.
-    /// </summary>
+    /// <summary><see cref="IScope"/> implementation which will dispose stored <see cref="IDisposable"/> objects on its own dispose.
+    /// Locking is used internally to ensure that object factory called only once.</summary>
     public sealed class Scope : IScope, IDisposable
     {
+        /// <summary>Parent scope in scope stack. Null for root scope.</summary>
         public Scope Parent { get; private set; }
+
+        /// <summary>Optional name object associated with scope.</summary>
+        public object Name { get; private set; }
 
         /// <summary>Returns true if scope disposed.</summary>
         public bool IsDisposed
@@ -4496,14 +4512,19 @@ namespace DryIoc
             get { return _disposed == 1; }
         }
 
-        public AppendableArray<Exception> DisposingExceptions;
+        /// <summary>Accumulates exceptions thrown by disposed items.</summary>
+        public AppendableArray<Exception> DisposingExceptions = AppendableArray<Exception>.Empty;
 
-        public Scope(Scope parent = null)
+        /// <summary>Create scope with optional parent and name.</summary>
+        /// <param name="name">(optional) Associated name object, e.g. <see cref="IScopeContext.RootScopeName"/></param> 
+        /// <param name="parent">(optional) Parent in scope stack.</param>
+        public Scope(object name = null, Scope parent = null)
         {
+            Name = name;
             Parent = parent;
-            DisposingExceptions = AppendableArray<Exception>.Empty;
         }
 
+        /// <summary>Provides access to <see cref="GetOrAdd"/> method for reflection client.</summary>
         public static readonly MethodInfo GetOrAddMethod = typeof(IScope).GetSingleDeclaredMethodOrNull("GetOrAdd");
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -4520,7 +4541,7 @@ namespace DryIoc
             {
                 var item = _items.GetFirstValueByHashOrDefault(id);
                 if (item == null ||
-                    item is IReneweable && ((IReneweable)item).ShouldBeRenewed)
+                    item is IReneweable && ((IReneweable)item).MarkedForRenewal)
                     Ref.Swap(ref _items, items => items.AddOrUpdate(id, item = factory()));
                 return item;
             }
@@ -4561,8 +4582,12 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Provides ambient current scope and optionally scope storage for container, 
+    /// examples are HttpContext storage, Execution context, Thread local.</summary>
     public interface IScopeContext
     {
+        object RootScopeName { get; }
+
         IScope GetCurrentOrDefault();
 
         void SetCurrent(Func<IScope, IScope> update);
@@ -4570,15 +4595,22 @@ namespace DryIoc
 
     public sealed class ThreadLocalScopeContext : IScopeContext, IDisposable
     {
+        public static readonly object ROOT_SCOPE_NAME = typeof(ThreadLocalScopeContext);
+
+        public object RootScopeName { get { return ROOT_SCOPE_NAME; }}
+
         public IScope GetCurrentOrDefault()
         {
-            return _scopes.Value.GetValueOrDefault(ThreadTools.GetCurrentManagedThreadID());
+            return _scopes.Value.GetFirstValueByHashOrDefault(ThreadTools.GetCurrentManagedThreadID());
         }
 
         public void SetCurrent(Func<IScope, IScope> update)
         {
             var threadId = ThreadTools.GetCurrentManagedThreadID();
-            _scopes.Swap(scopes => scopes.AddOrUpdate(threadId, update(scopes.GetFirstValueByHashOrDefault(threadId))));
+            _scopes.Swap(scopes =>
+            {
+                return scopes.AddOrUpdate(threadId, update(scopes.GetFirstValueByHashOrDefault(threadId)));
+            });
         }
 
         public void Dispose()
@@ -4611,8 +4643,10 @@ namespace DryIoc
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
     public sealed class SingletonReuse : IReuse
     {
+        public static readonly int LIFESPAN = 1000;
+
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get { return 1000; } }
+        public int Lifespan { get { return LIFESPAN; } }
 
         /// <summary>Returns container bound Singleton scope.</summary>
         /// <returns>Container singleton scope.</returns>
@@ -4628,8 +4662,10 @@ namespace DryIoc
     /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
     public sealed class CurrentScopeReuse : IReuse
     {
+        public static readonly int LIFESPAN = 100;
+
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get { return 100; } }
+        public int Lifespan { get { return LIFESPAN; } }
 
         /// <summary>Return container current scope.</summary>
         /// <returns>Located scope.</returns>
@@ -4641,12 +4677,14 @@ namespace DryIoc
         public override string ToString() { return GetType().Name + ":" + Lifespan; }
     }
 
-    /// <summary>Returns scope created for resolution root, when some of Resolve methods called.</summary>
+    /// <summary>Represents services created once per resolution root (when some of Resolve methods called).</summary>
     /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
     public sealed class ResolutionScopeReuse : IReuse
     {
+        public static readonly int LIFESPAN = 10;
+
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get { return 10; } }
+        public int Lifespan { get { return LIFESPAN; } }
 
         /// <summary>Creates or returns already created resolution root bound scope</summary>
         /// <returns>Created or existing scope.</returns>
@@ -4655,6 +4693,31 @@ namespace DryIoc
             return resolutionScope ?? (resolutionScope = new Scope());
         }
 
+        public override string ToString() { return GetType().Name + ":" + Lifespan; }
+    }
+
+    /// <summary>Represents services that have single instance per Thread.
+    /// The reuse requires <see cref="Container.OpenScope"/> to be called with <see cref="ThreadLocalScopeContext.ROOT_SCOPE_NAME"/>
+    /// scope available.</summary>
+    public sealed class ThreadLocalScopeReuse : IReuse
+    {
+        /// <summary>The same lifespan as for <see cref="CurrentScopeReuse"/> cause the reuse is bound to current scope.</summary>
+        public int Lifespan { get { return CurrentScopeReuse.LIFESPAN; } }
+
+        /// <summary>Searches and returns root scope in ambient context with name <see cref="ThreadLocalScopeContext.ROOT_SCOPE_NAME"/>,
+        /// otherwise throws.</summary>
+        /// <param name="registry">To get current scope from.</param> <param name="resolutionScope">(ignored)</param>
+        /// <returns>Found scope.</returns>
+        /// <exception cref="ContainerException">If no matching root scope found.</exception>
+        public IScope GetScope(IRegistry registry, ref IScope resolutionScope)
+        {
+            var scope = registry.CurrentScope;
+            while (scope != null && scope.Name != ThreadLocalScopeContext.ROOT_SCOPE_NAME)
+                scope = scope.Parent;
+            return scope.ThrowIfNull(Error.NO_OPEN_THREAD_SCOPE, typeof(ThreadLocalScopeContext).Name);
+        }
+
+        /// <summary>Pretty prints scope to refer in exception.</summary> <returns></returns>
         public override string ToString() { return GetType().Name + ":" + Lifespan; }
     }
 
@@ -4673,6 +4736,9 @@ namespace DryIoc
 
         /// <summary>Specifies to store single service instance per resolution root created by <see cref="Resolver"/> methods.</summary>
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
+        
+        /// <summary>Ensuring single service instance per Thread.</summary>
+        public static readonly IReuse InThreadScope = new ThreadLocalScopeReuse();
     }
 
     /// <summary>Alternative reuse perspective/notation.</summary>
@@ -4810,11 +4876,11 @@ namespace DryIoc
             _target = null;
         }
 
-        public bool ShouldBeRenewed { get; private set; }
+        public bool MarkedForRenewal { get; private set; }
 
-        public void Renew()
+        public void MarkForRenew()
         {
-            ShouldBeRenewed = true;
+            MarkedForRenewal = true;
             DisposeTarget();
         }
 
@@ -4857,14 +4923,14 @@ namespace DryIoc
             _source.DisposeTarget();
         }
 
-        public bool ShouldBeRenewed
+        public bool MarkedForRenewal
         {
-            get { return _source.ShouldBeRenewed; }
+            get { return _source.MarkedForRenewal; }
         }
 
-        public void Renew()
+        public void MarkForRenew()
         {
-            _source.Renew();
+            _source.MarkForRenew();
         }
 
         #region Implementation
@@ -5882,6 +5948,12 @@ namespace DryIoc
         public HashTree<K, V> AddOrUpdate(K key, V value, Update<V> update = null)
         {
             return AddOrUpdate(key.GetHashCode(), key, value, update);
+        }
+
+        public HashTree<K, V> Update(K key, Update<V> update)
+        {
+            var value = GetValueOrDefault(key);
+            return Equals(value, default(V)) ? this : AddOrUpdate(key, default(V), update);
         }
 
         /// <summary>Searches for key in tree and returns the value if found, or <paramref name="defaultValue"/> otherwise.</summary>

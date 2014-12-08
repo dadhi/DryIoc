@@ -366,7 +366,7 @@ namespace DryIoc.UnitTests
 
                 var renewable = container.Resolve<DisposableProxy<Service>>();
                 var service = renewable.Target;
-                renewable.Renew();
+                renewable.MarkForRenew();
 
                 var newService = container.Resolve(typeof(Service));
                 Assert.That(newService, Is.Not.SameAs(service));
