@@ -157,7 +157,7 @@ namespace DryIoc.UnitTests
             var metadata = import.Metadata;
             var factory = registry.GetAllServiceFactories(serviceType)
                 .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
-                .ThrowIfNull("Unable to resolve", serviceType, metadata, request);
+                .ThrowIfNull();
 
             return ParameterServiceInfo.Of(parameter).WithDetails(ServiceInfoDetails.Of(serviceType, factory.Key), request);
         }

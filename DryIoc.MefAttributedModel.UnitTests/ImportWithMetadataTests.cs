@@ -23,8 +23,9 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(FooConsumerNotFound), typeof(FooHey), typeof(FooBlah));
 
-            Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<AttributedModelException>(() => 
                 container.Resolve<FooConsumerNotFound>());
+            Assert.AreEqual(ex.Error, Error.NOT_FIND_DEPENDENCY_WITH_METADATA);
         }
     }
 }

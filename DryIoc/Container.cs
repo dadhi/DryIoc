@@ -38,8 +38,7 @@ namespace DryIoc
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IRegistry, IDisposable
     {
-        /// <summary>Empty request bound to container: 
-        /// all requests are created by <see cref="Request.Push(DryIoc.IServiceInfo)"/> into empty request.</summary>
+        /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
         public readonly Request EmptyRequest;
 
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
@@ -60,15 +59,19 @@ namespace DryIoc
             : this(configure.ThrowIfNull()(Rules.Default) ?? Rules.Default, scopeContext) { }
 
         /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
-        /// <param name="configure">Configure new rules.</param> <returns>New container.</returns>
-        public Container WithRules(Func<Rules, Rules> configure)
+        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
+        /// <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>
+        /// <returns>New container.</returns>
+        public Container With(Func<Rules, Rules> configure = null, IScopeContext scopeContext = null)
         {
             ThrowIfContainerDisposed();
-            var rules = configure.ThrowIfNull().Invoke(Rules);
-            return new Container(rules, _factories, _decorators, _wrappers, _singletonScope, _scopeContext, _openedScope, _disposed);
+            var rules = configure == null ? Rules : configure(Rules);
+            scopeContext = scopeContext ?? _scopeContext;
+            return new Container(rules, _factories, _decorators, _wrappers, _singletonScope, scopeContext, _openedScope, _disposed);
         }
 
         /// <summary>Creates new container with new opened scope and set this scope as current in provided/inherited context.</summary>
+        /// <param name="scopeName">(optional) Name for opened scope to allow reuse to identify the scope.</param>
         /// <returns>New container with different current scope.</returns>
         /// <example><code lang="cs"><![CDATA[
         /// using (var scoped = container.OpenScope())
@@ -77,25 +80,23 @@ namespace DryIoc
         ///     handler.Handle(data);
         /// }
         /// ]]></code></example>
-        public Container OpenScope(IScopeContext scopeContext = null, object scopeName = null)
+        public Container OpenScope(object scopeName = null)
         {
             ThrowIfContainerDisposed();
-            scopeContext = scopeContext ?? _scopeContext;
 
-            scopeName = scopeName ?? (_openedScope == null ? scopeContext.RootScopeName : null);
+            scopeName = scopeName ?? (_openedScope == null ? _scopeContext.RootScopeName : null);
             var nestedScope = new Scope(scopeName, _openedScope);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
-            scopeContext.SetCurrent(current => 
+            _scopeContext.SetCurrent(current =>
                 nestedScope.ThrowIf(current != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT));
 
             return new Container(Rules,
-                _factories, _decorators, _wrappers, _singletonScope, scopeContext, nestedScope,
+                _factories, _decorators, _wrappers, _singletonScope, _scopeContext, nestedScope,
                 _disposed, _resolvedDefaultDelegates, _resolvedKeyedDelegates, _resolutionState);
         }
 
-        /// <summary>Synonym to <see cref="OpenScope"/>.</summary>
-        /// <returns>Container with new current scope.</returns>
+        /// <summary>Alternative name for<see cref="OpenScope"/>.</summary> <returns>Container with new opened scope.</returns>
         public Container BeginScope()
         {
             return OpenScope();
@@ -135,7 +136,7 @@ namespace DryIoc
             if (_openedScope != null)
             {
                 var openedScope = _openedScope;
-                _scopeContext.SetCurrent(current => 
+                _scopeContext.SetCurrent(current =>
                     current.ThrowIf(current != openedScope, Error.UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE).Parent);
 
                 _openedScope.Dispose();
@@ -228,7 +229,7 @@ namespace DryIoc
 
                 default:
                     var selector = condition != null ? (Rules.FactorySelectorRule)
-                         (factories => factories.Select(x => x.Value).FirstOrDefault(condition)) : 
+                         (factories => factories.Select(x => x.Value).FirstOrDefault(condition)) :
                          (factories => factories.Select(x => x.Value).FirstOrDefault());
                     var factory = GetServiceFactoryOrDefault(serviceType, serviceKey, selector, retryForOpenGeneric: true);
                     return factory != null;
@@ -1828,159 +1829,6 @@ namespace DryIoc
         #endregion
     }
 
-    public static class Error
-    {
-        public static readonly string UNABLE_TO_RESOLVE_SERVICE =
-            "Unable to resolve {0}." + Environment.NewLine +
-            "Please register service OR adjust container resolution rules.";
-
-        public static readonly string EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE =
-            "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
-
-        public static readonly string UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE =
-            "Unable to register not a factory provider for open-generic service {0}.";
-
-        public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE =
-            "Unable to register open-generic implementation {0} with non-generic service {1}.";
-
-        public static readonly string UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS =
-            "Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}.";
-
-        public static readonly string USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS =
-            "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
-            "Consider to register generic type definition {1} instead.";
-
-        public static readonly string USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS =
-            "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
-            "Consider to register generic type definition {1} instead.";
-
-        public static readonly string EXPECTED_SINGLE_DEFAULT_FACTORY =
-            "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
-            "Please identify service with key, or metadata OR set Rules to return single registered factory.";
-
-        public static readonly string EXPECTED_NON_ABSTRACT_IMPL_TYPE =
-            "Expecting not abstract and not interface implementation type, but found {0}.";
-
-        public static readonly string NO_PUBLIC_CONSTRUCTOR_DEFINED =
-            "There is no public constructor defined for {0}.";
-
-        public static readonly string UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE =
-            "Unspecified how to select single constructor for implementation type {0} with {1} public constructors.";
-
-        public static readonly string CONSTRUCTOR_MISSES_SOME_PARAMETERS =
-            "Constructor [{0}] of {1} misses some arguments required for {2} dependency.";
-
-        public static readonly string UNABLE_TO_SELECT_CONSTRUCTOR =
-            "Unable to select single constructor from {0} available in {1}." + Environment.NewLine +
-            "Please provide constructor selector when registering service.";
-
-        public static readonly string EXPECTED_FUNC_WITH_MULTIPLE_ARGS =
-            "Expecting Func with one or more arguments but found {0}.";
-
-        public static readonly string EXPECTED_CLOSED_GENERIC_SERVICE_TYPE =
-            "Expecting closed-generic service type but found {0}.";
-
-        public static readonly string RECURSIVE_DEPENDENCY_DETECTED =
-            "Recursive dependency is detected when resolving" + Environment.NewLine + "{0}.";
-
-        public static readonly string SCOPE_IS_DISPOSED =
-            "Scope is disposed and scoped instances are no longer available.";
-
-        public static readonly string CONTAINER_IS_GARBAGE_COLLECTED =
-            "Container is no longer available (has been garbage-collected).";
-
-        public static readonly string REGISTERING_WITH_DUPLICATE_SERVICE_KEY =
-            "Service {0} with the same key \"{1}\" is already registered as {2}.";
-
-        public static readonly string WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY =
-            "Wrapper {0} can wrap single service type only, but found many. You should specify service type selector in wrapper setup.";
-
-        public static readonly string CANT_CREATE_DECORATOR_EXPR =
-            "Unable to create decorator expression for: {0}.";
-
-        public static readonly string UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE =
-            "Unable to match service with any open-generic implementation {0} implemented types {1} when resolving {2}.";
-
-        public static readonly string UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE =
-            "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}.";
-
-        public static readonly string UNABLE_TO_SELECT_CTOR_USING_SELECTOR =
-            "Unable to get constructor of {0} using provided constructor selector.";
-
-        public static readonly string UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS =
-            "Unable to find constructor with all resolvable parameters when resolving {0}.";
-
-        public static readonly string UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS =
-            "Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine +
-            "and the rest of parameters resolvable from Container when resolving: {1}.";
-
-        public static readonly string REGISTERED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE =
-            "Registered factory delegate returns service {0} is not assignable to {2}.";
-
-        public static readonly string REGISTERED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE =
-            "Registered instance {0} is not assignable to serviceType {1}.";
-
-        public static readonly string WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE =
-            "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}.";
-
-        public static readonly string INJECTED_VALUE_IS_OF_DIFFERENT_TYPE =
-            "Injected value {0} is not assignable to {2}.";
-
-        public static readonly string UNABLE_TO_FIND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD =
-            "Unable to find writable property or field \"{0}\" when resolving: {1}.";
-
-        public static readonly string UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE =
-            "Unable to register any of implementation {0} implemented services {1}.";
-
-        public static readonly string PUSHING_TO_REQUEST_WITHOUT_FACTORY =
-            "Pushing next info {0} to request not yet resolved to factory: {1}";
-
-        public static readonly string TARGET_WAS_ALREADY_DISPOSED =
-            "Target of type {0} was already disposed in {1}.";
-
-        public static readonly string CONTAINER_IS_DISPOSED =
-            "Container {0} is disposed and its operations are no longer available.";
-
-        public static readonly string UNMATCHED_GENERIC_PARAM_CONSTRAINTS =
-            "Service type does not match registered open-generic implementation constraints {0} when resolving {1}.";
-
-        public static readonly string NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED =
-            "Non-generic wrapper {0} should specify wrapped service selector when registered.";
-
-        public static readonly string CANT_RESOLVE_REUSE_WRAPPER =
-            "Unable to resolve reuse wrapper {0} for: {1}";
-
-        public static readonly string DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN =
-            "Dependency {0} has shorter reuse lifespan ({1}) than its parent ({2}): {3}.\n" +
-            "You can turn off this exception by setting container Rules.ThrowIfDepenedencyHasShorterReuseLifespan to false.";
-
-        public static readonly string WEAKREF_REUSE_WRAPPER_GCED =
-            "Service with WeakReference reuse wrapper is garbage collected now, and no longer available.";
-
-        public static readonly string INSTANCE_FACTORY_IS_NULL =
-            "Instance factory is null when resolving: {0}";
-
-        public static readonly string SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD =
-            "Service of {0} is not assignable from factory method {2} when resolving: {3}.";
-
-        public static readonly string FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD =
-            "Unable to use null factory object with factory method {0} when resolving: {1}.";
-
-        public static readonly string FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC =
-            "Factory instance provided {0} But factory method is static {1} when resolving: {2}.";
-
-        public static readonly string NO_CURRENT_SCOPE =
-            "No current scope available: probably you are resolving scoped service outside of scope.";
-
-        public static readonly string NOT_DIRECT_SCOPE_PARENT =
-            "Unable to Open Scope from not a direct parent container.";
-
-        public static readonly string NO_OPEN_THREAD_SCOPE = 
-            "Unable to find open thread scope in {0}. Please OpenScope with {0} to make sure thread reuse work.";
-
-        public static readonly string UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE = "Unable to dispose not a current opened scope.";
-    }
-
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
     public static class Registrator
     {
@@ -2945,7 +2793,7 @@ namespace DryIoc
         #endregion
 
         #region Resolution Scope
-        
+
         public static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "resolutionScope");
 
         // TODO: remove.
@@ -4603,7 +4451,7 @@ namespace DryIoc
     {
         public static readonly object ROOT_SCOPE_NAME = typeof(ThreadLocalScopeContext);
 
-        public object RootScopeName { get { return ROOT_SCOPE_NAME; }}
+        public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
 
         public IScope GetCurrentOrDefault()
         {
@@ -4739,7 +4587,7 @@ namespace DryIoc
 
         /// <summary>Specifies to store single service instance per resolution root created by <see cref="Resolver"/> methods.</summary>
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
-        
+
         /// <summary>Ensuring single service instance per Thread.</summary>
         public static readonly IReuse InThreadScope = new ThreadLocalScopeReuse();
     }
@@ -5240,92 +5088,262 @@ namespace DryIoc
     [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable")]
     public class ContainerException : InvalidOperationException
     {
+        public readonly int Error;
+
+        public static ContainerException Of(Throw.Check check, int code, 
+            object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
+            Exception inner = null)
+        {
+            string message = null;
+            if (code != -1)
+                message = string.Format(DryIoc.Error.Messages[code], Print(arg0), Print(arg1), Print(arg2), Print(arg3));
+            else
+            {
+                switch (check) // handle default code
+                {
+                    case Throw.Check.InvalidCondition:
+                        code = DryIoc.Error.INVALID_CONDITION;
+                        message = string.Format(DryIoc.Error.Messages[code], Print(arg0), Print(arg0.GetType()));
+                        break;
+                    case Throw.Check.IsNull:
+                        code = DryIoc.Error.IS_NULL;
+                        message = string.Format(DryIoc.Error.Messages[code], Print(arg0.GetType()));
+                        break;
+                    case Throw.Check.IsNotOfType:
+                        code = DryIoc.Error.IS_NOT_OF_TYPE;
+                        message = string.Format(DryIoc.Error.Messages[code], Print(arg0), Print(arg1));
+                        break;
+                    case Throw.Check.TypeIsNotOfType:
+                        code = DryIoc.Error.TYPE_IS_NOT_OF_TYPE;
+                        message = string.Format(DryIoc.Error.Messages[code], Print(arg0), Print(arg1));
+                        break;
+                }
+            }
+
+            return inner == null
+                ? new ContainerException(code, message)
+                : new ContainerException(code, message, inner);
+        }
+
         /// <summary>Creates exception with message describing cause and context of error.</summary>
         /// <param name="message">Error message.</param>
-        public ContainerException(string message) : base(message) { }
+        public ContainerException(int error, string message) : base(message)
+        {
+            Error = error;            
+        }
 
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
         /// <param name="message">Error message.</param>
         /// <param name="innerException">Underlying system/leading exception.</param>
-        public ContainerException(string message, Exception innerException) : base(message, innerException) { }
+        public ContainerException(int error, string message, Exception innerException) : base(message, innerException)
+        {
+            Error = error;
+        }
+
+        protected static string Print(object arg)
+        {
+            return new StringBuilder().Print(arg).ToString();
+        }
     }
 
-    /// <summary>Enables more clean error message formatting, and exception throwing.</summary>
+    public static class Error
+    {
+        public static readonly int First = 0;
+        public static int Last = First;
+        private static int _() { return Last++; }
+
+        public static readonly int
+            INVALID_CONDITION = _(),
+            IS_NULL = _(),
+            IS_NOT_OF_TYPE = _(),
+            TYPE_IS_NOT_OF_TYPE = _(),
+
+            UNABLE_TO_RESOLVE_SERVICE = _(),
+            EXPECTED_SINGLE_DEFAULT_FACTORY = _(),
+
+            EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE = _(),
+            UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE = _(),
+            UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE = _(),
+            UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS = _(),
+            USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS = _(),
+            USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS = _(),
+            EXPECTED_NON_ABSTRACT_IMPL_TYPE = _(),
+            NO_PUBLIC_CONSTRUCTOR_DEFINED = _(),
+            UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE = _(),
+            UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE = _(),
+            CONSTRUCTOR_MISSES_SOME_PARAMETERS = _(),
+            UNABLE_TO_SELECT_CONSTRUCTOR = _(),
+            EXPECTED_FUNC_WITH_MULTIPLE_ARGS = _(),
+            EXPECTED_CLOSED_GENERIC_SERVICE_TYPE = _(),
+            RECURSIVE_DEPENDENCY_DETECTED = _(),
+            SCOPE_IS_DISPOSED = _(),
+            WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY = _(),
+            UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE = _(),
+            UNABLE_TO_SELECT_CTOR_USING_SELECTOR = _(),
+            UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS = _(),
+            UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS = _(),
+            REGISTERED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE = _(),
+            INJECTED_VALUE_IS_OF_DIFFERENT_TYPE = _(),
+            REGISTERED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE = _(),
+            UNABLE_TO_FIND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD = _(),
+            UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE = _(),
+            PUSHING_TO_REQUEST_WITHOUT_FACTORY = _(),
+            TARGET_WAS_ALREADY_DISPOSED = _(),
+            UNMATCHED_GENERIC_PARAM_CONSTRAINTS = _(),
+            NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED = _(),
+            DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN = _(),
+            WEAKREF_REUSE_WRAPPER_GCED = _(),
+            INSTANCE_FACTORY_IS_NULL = _(),
+            SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD = _(),
+            FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD = _(),
+            FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC = _(),
+            NO_OPEN_THREAD_SCOPE = _(),
+
+            CONTAINER_IS_GARBAGE_COLLECTED = _(),
+            CANT_CREATE_DECORATOR_EXPR = _(),
+            REGISTERING_WITH_DUPLICATE_SERVICE_KEY = _(),
+            NO_CURRENT_SCOPE = _(),
+            CONTAINER_IS_DISPOSED = _(),
+            UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE = _(),
+            NOT_DIRECT_SCOPE_PARENT = _(),
+            CANT_RESOLVE_REUSE_WRAPPER = _(),
+            WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE = _();
+
+        public static string[] Messages = new string[Last - First];
+
+        static Error()
+        {
+            var _ = Messages;
+
+            _[INVALID_CONDITION] =                      "Argument {0} of type {1} has invalid condition.";
+            _[IS_NULL] =                                "Argument of type {0} is null.";
+            _[IS_NOT_OF_TYPE] =                         "Argument {0} is not of type {1}.";
+            _[TYPE_IS_NOT_OF_TYPE] =                    "Type argument {0} is not assignable from type {1}.";
+
+            _[UNABLE_TO_RESOLVE_SERVICE] =              "Unable to resolve {0}." + Environment.NewLine + "Please register service OR adjust container resolution rules.";
+            _[EXPECTED_SINGLE_DEFAULT_FACTORY] =        "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + 
+                                                        Environment.NewLine + "Please identify service with key, or metadata OR set Rules to return single registered factory.";
+            
+            _[EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE] = "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
+            _[UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE] = "Unable to register not a factory provider for open-generic service {0}.";
+            _[UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE] = "Unable to register open-generic implementation {0} with non-generic service {1}.";
+            _[UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS] = "Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}.";
+            _[USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS] = "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + 
+                                                        Environment.NewLine + "Consider to register generic type definition {1} instead.";
+            _[USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS] = "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + 
+                                                        Environment.NewLine + "Consider to register generic type definition {1} instead.";
+            _[EXPECTED_NON_ABSTRACT_IMPL_TYPE] = "Expecting not abstract and not interface implementation type, but found {0}.";
+            _[NO_PUBLIC_CONSTRUCTOR_DEFINED] = "There is no public constructor defined for {0}.";
+            _[UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE] = "Unspecified how to select single constructor for implementation type {0} with {1} public constructors.";
+            _[CONSTRUCTOR_MISSES_SOME_PARAMETERS] = "Constructor [{0}] of {1} misses some arguments required for {2} dependency.";
+            _[UNABLE_TO_SELECT_CONSTRUCTOR] = "Unable to select single constructor from {0} available in {1}." + 
+                                                        Environment.NewLine + "Please provide constructor selector when registering service.";
+            _[EXPECTED_FUNC_WITH_MULTIPLE_ARGS] =       "Expecting Func with one or more arguments but found {0}.";
+            _[EXPECTED_CLOSED_GENERIC_SERVICE_TYPE] =   "Expecting closed-generic service type but found {0}.";
+            _[RECURSIVE_DEPENDENCY_DETECTED] =          "Recursive dependency is detected when resolving" + Environment.NewLine + "{0}.";
+            _[SCOPE_IS_DISPOSED] =                      "Scope is disposed and scoped instances are no longer available.";
+            _[WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY] =   "Wrapper {0} can wrap single service type only, but found many. You should specify service type selector in wrapper setup.";
+            _[UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE] = "Unable to match service with any open-generic implementation {0} implemented types {1} when resolving {2}.";
+            _[UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE] = "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}.";
+            _[UNABLE_TO_SELECT_CTOR_USING_SELECTOR] = "Unable to get constructor of {0} using provided constructor selector.";
+            _[UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS] = "Unable to find constructor with all resolvable parameters when resolving {0}.";
+            _[UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS] = "Unable to find constructor with all parameters matching Func signature {0} " + 
+                                            Environment.NewLine + "and the rest of parameters resolvable from Container when resolving: {1}.";
+            _[REGISTERED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE] = "Registered factory delegate returns service {0} is not assignable to {2}.";
+            _[REGISTERED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE] = "Registered instance {0} is not assignable to serviceType {1}.";
+            _[INJECTED_VALUE_IS_OF_DIFFERENT_TYPE] = "Injected value {0} is not assignable to {2}.";
+            _[ UNABLE_TO_FIND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD] = "Unable to find writable property or field \"{0}\" when resolving: {1}.";
+            _[UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE] = "Unable to register any of implementation {0} implemented services {1}.";
+            _[PUSHING_TO_REQUEST_WITHOUT_FACTORY] = "Pushing next info {0} to request not yet resolved to factory: {1}";
+            _[TARGET_WAS_ALREADY_DISPOSED] = "Target of type {0} was already disposed in {1}.";
+            _[UNMATCHED_GENERIC_PARAM_CONSTRAINTS] = "Service type does not match registered open-generic implementation constraints {0} when resolving {1}.";
+            _[NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED] = "Non-generic wrapper {0} should specify wrapped service selector when registered.";
+            _[DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN] = "Dependency {0} has shorter reuse lifespan ({1}) than its parent ({2}): {3}.\n" +
+                                             "You can turn off this exception by setting container Rules.ThrowIfDepenedencyHasShorterReuseLifespan to false.";
+            _[WEAKREF_REUSE_WRAPPER_GCED] = "Service with WeakReference reuse wrapper is garbage collected now, and no longer available.";
+            _[INSTANCE_FACTORY_IS_NULL] = "Instance factory is null when resolving: {0}";
+            _[SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD] = "Service of {0} is not assignable from factory method {2} when resolving: {3}.";
+            _[FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD] = "Unable to use null factory object with factory method {0} when resolving: {1}.";
+            _[FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC] = "Factory instance provided {0} But factory method is static {1} when resolving: {2}.";
+            _[NOT_DIRECT_SCOPE_PARENT] =                "Unable to Open Scope from not a direct parent container.";
+            _[NO_OPEN_THREAD_SCOPE] =                   "Unable to find open thread scope in {0}. Please OpenScope with {0} to make sure thread reuse work.";
+            
+            _[CONTAINER_IS_DISPOSED] =                  "Container {0} is disposed and its operations are no longer available.";
+            _[CONTAINER_IS_GARBAGE_COLLECTED] =         "Container is no longer available (has been garbage-collected).";
+            _[CANT_CREATE_DECORATOR_EXPR] =             "Unable to create decorator expression for: {0}.";
+            _[REGISTERING_WITH_DUPLICATE_SERVICE_KEY] = "Service {0} with the same key \"{1}\" is already registered as {2}.";
+            _[NO_CURRENT_SCOPE] =                       "No current scope available: probably you are resolving scoped service outside of scope.";
+            _[UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE] =  "Unable to dispose not a current opened scope.";
+            _[NOT_DIRECT_SCOPE_PARENT] =                "Unable to Open Scope from not a direct parent container.";
+            _[CANT_RESOLVE_REUSE_WRAPPER] =             "Unable to resolve reuse wrapper {0} for: {1}";
+            _[WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE] =  "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}.";   
+        }
+    }
+
+    /// <summary>Enables more clean error message formatting and a bit of code contracts.</summary>
     public static partial class Throw
     {
-        public static Func<string, Exception> GetException = message => new ContainerException(message);
-        public static Func<string, Exception, Exception> GetExceptionWithInnerOne = (message, innerEx) => new ContainerException(message, innerEx);
+        public enum Check { No, InvalidCondition, IsNull, IsNotOfType, TypeIsNotOfType, OperationThrows }
 
-        public static Func<object, string> PrintArg = x => new StringBuilder().Print(x).ToString();
+        public delegate Exception GetMatchedExceptionHandler(Check check, int error, object arg0, object arg1, object arg2, object arg3, Exception inner);
 
-        public static T ThrowIf<T>(this T arg0, bool throwCondition, string message = null, object arg1 = null, object arg2 = null, object arg3 = null)
-        {
-            if (!throwCondition) return arg0;
-            throw GetException(message == null
-                ? Format(IMVALID_CONDITION, arg0, typeof(T))
-                : Format(message, arg0, arg1, arg2, arg3));
-        }
+        public static GetMatchedExceptionHandler GetMatchedException = ContainerException.Of;
 
-        public static T ThrowIfNull<T>(this T arg, string message = null, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null) where T : class
-        {
-            if (arg != null) return arg;
-            throw GetException(message == null ? Format(IS_NULL, typeof(T)) : Format(message, arg0, arg1, arg2, arg3));
-        }
-
-        public static T ThrowIfNotOf<T>(this T arg0, Type arg1, string message = null, object arg2 = null, object arg3 = null) where T : class
-        {
-            if (arg1.IsTypeOf(arg0)) return arg0;
-            throw GetException(message == null ? Format(IS_NOT_OF_TYPE, arg0, arg1) : Format(message, arg0, arg1, arg2, arg3));
-        }
-
-        public static Type ThrowIfNotOf(this Type arg0, Type arg1, string message = null, object arg2 = null, object arg3 = null)
-        {
-            if (arg1.IsAssignableTo(arg0)) return arg0;
-            throw GetException(message == null ? Format(TYPE_IS_NOT_OF_TYPE, arg0, arg1) : Format(message, arg0, arg1, arg2, arg3));
-        }
-
-        public static void If(bool throwCondition, string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
+        public static void If(bool throwCondition, int error = -1, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition) return;
-            throw GetException(Format(message, arg0, arg1, arg2, arg3));
+            throw GetMatchedException(Check.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
         }
 
-        /// <summary>Invokes operation in try block and catches <typeparamref name="TEx"/> if thrown in operation.
-        /// Then re-throws configured exception with wrapping <typeparamref name="TEx"/> as inner exception,
-        /// otherwise returns operation result.</summary>
-        /// <typeparam name="TEx">Exception to catch from operation.</typeparam>
-        /// <typeparam name="T">Operation result type.</typeparam>
-        /// <param name="operation">Operation to be invoked.</param>
-        /// <param name="message">Error message format string.</param><param name="arg0">Format arg0</param><param name="arg1">Format arg1</param>
-        /// <param name="arg2">Format arg2</param><param name="arg3">Format arg3</param>
-        /// <returns>Result of operation if no expected <typeparamref name="TEx"/> was thrown.</returns>
-        public static T IfThrows<TEx, T>(Func<T> operation, string message, object arg0 = null, object arg1 = null,
+        public static T ThrowIf<T>(this T arg0, bool throwCondition, int error = -1, object arg1 = null, object arg2 = null, object arg3 = null)
+        {
+            if (!throwCondition) return arg0;
+            throw GetMatchedException(Check.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
+        }
+
+        public static T ThrowIf<T>(this T arg0, Func<T, bool> throwCondition, int error = -1, object arg1 = null, object arg2 = null, object arg3 = null)
+        {
+            if (!throwCondition(arg0)) return arg0;
+            throw GetMatchedException(Check.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
+        }
+
+        public static T ThrowIfNull<T>(this T arg, int error = -1, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null) 
+            where T : class
+        {
+            if (arg != null) return arg;
+            throw GetMatchedException(Check.IsNull, error, arg0, arg1, arg2, arg3, null);
+        }
+
+        public static T ThrowIfNotOf<T>(this T arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null) 
+            where T : class
+        {
+            if (arg1.IsTypeOf(arg0)) return arg0;
+            throw GetMatchedException(Check.IsNotOfType, error, arg0, arg1, arg2, arg3, null);
+        }
+
+        public static Type ThrowIfNotOf(this Type arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
+        {
+            if (arg1.IsAssignableTo(arg0)) return arg0;
+            throw GetMatchedException(Check.TypeIsNotOfType, error, arg0, arg1, arg2, arg3, null);
+        }
+
+        public static T IfThrows<TEx, T>(Func<T> operation, int error, object arg0 = null, object arg1 = null,
             object arg2 = null, object arg3 = null) where TEx : Exception
         {
             try { return operation(); }
-            catch (TEx ex) { throw GetExceptionWithInnerOne(Format(message, arg0, arg1, arg2, arg3), ex); }
+            catch (TEx ex) { throw GetMatchedException(Check.OperationThrows, error, arg0, arg1, arg2, arg3, ex); }
         }
 
-        public static void Error(string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
+        public static void Error(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            throw GetException(Format(message, arg0, arg1, arg2, arg3));
+            throw GetMatchedException(Check.No, error, arg0, arg1, arg2, arg3, null);
         }
 
-        public static T Instead<T>(string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
+        public static T Instead<T>(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            throw GetException(Format(message, arg0, arg1, arg2, arg3));
+            throw GetMatchedException(Check.No, error, arg0, arg1, arg2, arg3, null);
         }
-
-        private static string Format(this string message, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
-        {
-            return string.Format(message, PrintArg(arg0), PrintArg(arg1), PrintArg(arg2), PrintArg(arg3));
-        }
-
-        private static readonly string IS_NULL = "Argument of type {0} is null.";
-        private static readonly string IMVALID_CONDITION = "Argument {0} of type {1} has invalid condition.";
-        private static readonly string IS_NOT_OF_TYPE = "Argument {0} is not of type {1}.";
-        private static readonly string TYPE_IS_NOT_OF_TYPE = "Type argument {0} is not assignable from type {1}.";
     }
 
     /// <summary>Contains helper methods to work with Type: for instance to find Type implemented base types and interfaces, etc.</summary>

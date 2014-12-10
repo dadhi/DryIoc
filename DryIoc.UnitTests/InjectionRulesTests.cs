@@ -4,6 +4,8 @@ using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
+#pragma warning disable 0649 // Field '...' is never assigned to, and will always have its default value null
+
 namespace DryIoc.UnitTests
 {
     [TestFixture]
@@ -486,9 +488,7 @@ namespace DryIoc.UnitTests
             public IService PWithBackingField { get { return _fPrivate; } }
             // ReSharper restore UnassignedReadonlyField
 
-            // ReSharper disable UnassignedField.Compiler
             internal IService _fPrivate;
-            // ReSharper restore UnassignedField.Compiler
 
             public IService P { get; set; }
             public IService PWithPrivateSetter { get; internal set; }

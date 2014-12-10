@@ -15,8 +15,7 @@ namespace DryIoc.UnitTests
             var factories = HashTree<Type, Factory>.Empty;
             container.Register<ILogger>(new FactoryProvider(request =>
             {
-                var parent = request.GetNonWrapperParentOrEmpty();
-                Throw.If(parent.IsEmpty, "{0} should be resolved only as dependency in other service.", request.ServiceType);
+                var parent = request.GetNonWrapperParentOrEmpty().ThrowIf(p => p.IsEmpty);
                 var typeArg = parent.ImplementationType ?? parent.ServiceType;
 
                 var factory = factories.GetValueOrDefault(typeArg);
@@ -41,8 +40,7 @@ namespace DryIoc.UnitTests
             var factories = HashTree<Type, Factory>.Empty;
             container.Register<ILogger>(new FactoryProvider(request =>
             {
-                var parent = request.GetNonWrapperParentOrEmpty();
-                Throw.If(parent.IsEmpty, "{0} should be resolved only as dependency in other service.", request.ServiceType);
+                var parent = request.GetNonWrapperParentOrEmpty().ThrowIf(p => p.IsEmpty);
                 var typeArg = parent.ImplementationType ?? parent.ServiceType;
 
                 var factory = factories.GetValueOrDefault(typeArg);

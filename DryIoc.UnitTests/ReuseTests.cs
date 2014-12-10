@@ -231,6 +231,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Client>());
 
+            Assert.That(ex.Error, Is.EqualTo(Error.DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN));
             Assert.That(ex.Message, Is.StringContaining(
                 "Dependency DryIoc.UnitTests.FastLogger: DryIoc.UnitTests.ILogger as parameter \"logger\" " +
                 "has shorter reuse lifespan (ResolutionScopeReuse:10) than its parent (SingletonReuse:1000)"));

@@ -68,7 +68,7 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Returns new container with new rules.</returns>
         public static Container WithAttributedModel(this Container container)
         {
-            return container.WithRules(rules => rules.WithAttributedModel());
+            return container.With(rules => rules.WithAttributedModel());
         }
 
         /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
@@ -179,7 +179,7 @@ namespace DryIoc.MefAttributedModel
             return constructors.Length == 1 
                 ? constructors[0]
                 : constructors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
-                    .ThrowIfNull(Error.UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE, implementationType);
+                    .ThrowIfNull(Error.NO_SINGLE_CTOR_WITH_IMPORTING_ATTR, implementationType);
         }
 
         private static ParameterServiceInfo GetImportedParameter(ParameterInfo parameter, Request request)
@@ -232,7 +232,7 @@ namespace DryIoc.MefAttributedModel
             var metadata = meta.Metadata;
             var factory = registry.GetAllServiceFactories(reflectedType)
                 .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
-                .ThrowIfNull(Error.UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA, reflectedType, metadata, request);
+                .ThrowIfNull(Error.NOT_FIND_DEPENDENCY_WITH_METADATA, reflectedType, metadata, request);
 
             return factory.Key;
         }
@@ -328,7 +328,7 @@ namespace DryIoc.MefAttributedModel
             if (info.FactoryType == FactoryType.Decorator)
                 info.ReuseType = null;
 
-            info.Exports.ThrowIfNull(Error.EXPORT_IS_REQUIRED, implementationType);
+            info.Exports.ThrowIfNull(Error.NO_EXPORT, implementationType);
             return info;
         }
 
@@ -370,7 +370,7 @@ namespace DryIoc.MefAttributedModel
                 .Select(t => new ExportInfo(t, attribute.ContractName ?? attribute.ContractKey))
                 .ToArray();
             
-            Throw.If(exports.Length == 0, Error.EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES,
+            Throw.If(exports.Length == 0, Error.NO_TYPES_IN_EXPORT_ALL,
                 implementationType, allContractTypes);
 
             var currentExports = currentInfo.Exports;
@@ -465,38 +465,80 @@ namespace DryIoc.MefAttributedModel
 
     public static class Error
     {
-        public static readonly string UNABLE_TO_FIND_SINGLE_CONSTRUCTOR_WITH_IMPORTING_ATTRIBUTE =
-            "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}.";
+        public readonly static int FIRST_ERROR_CODE = 100;
 
-        public static readonly string UNABLE_TO_FIND_DEPENDENCY_WITH_METADATA =
-            "Unable to resolve dependency {0} with metadata [{1}] in {2}";
+        public readonly static IList<string> Messages = new List<string>();
 
-        public static readonly string UNSUPPORTED_MULTIPLE_METADATA =
-            "Multiple associated metadata found while exporting {0}." + Environment.NewLine +
-            "Only single metadata is supported per implementation type, please remove the rest.";
+        public static readonly int
+            NO_SINGLE_CTOR_WITH_IMPORTING_ATTR,
+            NOT_FIND_DEPENDENCY_WITH_METADATA,
+            UNSUPPORTED_MULTIPLE_METADATA,
+            UNSUPPORTED_MULTIPLE_FACTORY_TYPES,
+            NO_EXPORT,
+            NO_TYPES_IN_EXPORT_ALL,
+            UNSUPPORTED_REUSE_TYPE,
+            UNSUPPORTED_REUSE_WRAPPER_TYPE,
+            NO_WRAPPED_TYPE_EXPORTED_WRAPPER,
+            WRAPPED_ARG_INDEX_OUT_OF_BOUNDS;
 
-        public static readonly string UNSUPPORTED_MULTIPLE_FACTORY_TYPES =
-            "Found multiple factory types associated with exported {0}. " +
-            "Only single ExportAs.. attribute is supported, please remove the rest.";
+        static Error()
+        {
+            _(ref NO_SINGLE_CTOR_WITH_IMPORTING_ATTR,   "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}.");
+            _(ref NOT_FIND_DEPENDENCY_WITH_METADATA,    "Unable to resolve dependency {0} with metadata [{1}] in {2}");
+            _(ref UNSUPPORTED_MULTIPLE_METADATA,        "Multiple associated metadata found while exporting {0}." + Environment.NewLine + 
+                                                        "Only single metadata is supported per implementation type, please remove the rest.");
+            _(ref UNSUPPORTED_MULTIPLE_FACTORY_TYPES,   "Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest.");
+            _(ref NO_EXPORT,                            "At least one Export attributed should be defined for {0}.");
+            _(ref NO_TYPES_IN_EXPORT_ALL,               "Unable to get contract types for implementation {0} because all of its implemented types where filtered out: {1}");
+            _(ref UNSUPPORTED_REUSE_TYPE,               "Attributed model does not support reuse type {0}.");
+            _(ref UNSUPPORTED_REUSE_WRAPPER_TYPE,       "Attributed model does not support reuse wrapper type {0}.");
+            _(ref NO_WRAPPED_TYPE_EXPORTED_WRAPPER,     "Exported non-generic wrapper type {0} requires wrapped service type to be specified, but it is null " +
+                                                        "and instead generic argument index is set to {1}.");
+            _(ref WRAPPED_ARG_INDEX_OUT_OF_BOUNDS,      "Exported generic wrapper type {0} specifies generic argument index {1} outside of argument list size.");
 
-        public static readonly string EXPORT_IS_REQUIRED =
-            "At least one Export attributed should be defined for {0}.";
+            SetupThrow();
+        }
 
-        public static readonly string EXPORT_ALL_EXPORTS_EMPTY_LIST_OF_TYPES =
-            "Unable to get contract types for implementation {0} cause all of its implemented types where filtered out: {1}";
+        internal static string Get(int error)
+        {
+            return Messages[error - FIRST_ERROR_CODE];
+        }
 
-        public static readonly string UNSUPPORTED_REUSE_TYPE =
-            "Attributed model does not support reuse type {0}.";
+        private static void _(ref int error, string message)
+        {
+            if (error == 0)
+            {
+                Messages.Add(message);
+                error = FIRST_ERROR_CODE + Messages.Count - 1;
+            }
+        }
 
-        public static readonly string UNSUPPORTED_REUSE_WRAPPER_TYPE =
-            "Attributed model does not support reuse wrapper type {0}.";
+        // Setup Throw to use AttributedModelException for corresponding error code and fallback to original Exception otherwise.
+        private static void SetupThrow()
+        {
+            var original = Throw.GetMatchedException;
+            Throw.GetMatchedException = (check, error, arg0, arg1, arg2, arg3, inner) => 
+                0 <= error - FIRST_ERROR_CODE && error - FIRST_ERROR_CODE < Messages.Count
+                ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner)
+                : original(check, error, arg0, arg1, arg2, arg3, inner);
+        }
+    }
 
-        public static readonly string EXPORTED_NONGENERIC_WRAPPER_NO_WRAPPED_TYPE =
-            "Exported non-generic wrapper type {0} requires wrapped service type to be specified, but it is null, " +
-            "and instead generic argument index is set to {1}.";
+    public class AttributedModelException : ContainerException
+    {
+        public new static AttributedModelException Of(Throw.Check check, int error,
+            object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
+            Exception inner = null)
+        {
+            var message = string.Format(MefAttributedModel.Error.Get(error), Print(arg0), Print(arg1), Print(arg2), Print(arg3));
+            return inner == null
+                ? new AttributedModelException(error, message)
+                : new AttributedModelException(error, message, inner);
+        }
 
-        public static readonly string EXPORTED_GENERIC_WRAPPER_BAD_ARG_INDEX =
-            "Exported generic wrapper type {0} specifies generic argument index {1} outside of argument list size.";
+        public AttributedModelException(int error, string message) : base(error, message) {}
+
+        public AttributedModelException(int error, string message, Exception innerException) : base(error, message, innerException) {}
     }
 
     /// <summary>Converts provided literal into valid C# code. Used for generating registration code 
@@ -699,11 +741,11 @@ namespace DryIoc.MefAttributedModel
                 return WrappedServiceType;
 
             wrapperType.ThrowIf(!wrapperType.IsClosedGeneric(),
-                Error.EXPORTED_NONGENERIC_WRAPPER_NO_WRAPPED_TYPE, WrappedServiceTypeGenericArgIndex);
+                Error.NO_WRAPPED_TYPE_EXPORTED_WRAPPER, WrappedServiceTypeGenericArgIndex);
 
             var typeArgs = wrapperType.GetGenericParamsAndArgs();
             wrapperType.ThrowIf(WrappedServiceTypeGenericArgIndex > typeArgs.Length - 1,
-                Error.EXPORTED_GENERIC_WRAPPER_BAD_ARG_INDEX, WrappedServiceTypeGenericArgIndex);
+                Error.WRAPPED_ARG_INDEX_OUT_OF_BOUNDS, WrappedServiceTypeGenericArgIndex);
 
             return typeArgs[WrappedServiceTypeGenericArgIndex];
         }

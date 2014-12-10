@@ -154,8 +154,10 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             var container = new Container();
 
-            Assert.Throws<ContainerException>(() =>
+            var ex = Assert.Throws<AttributedModelException>(() =>
                 container.RegisterExports(typeof(OneWithManyMeta)));
+            Assert.AreEqual(ex.Error, Error.UNSUPPORTED_MULTIPLE_METADATA);
+
         }
 
         [Test]
@@ -164,8 +166,9 @@ namespace DryIoc.MefAttributedModel.UnitTests
             GivenAssemblyWithExportedTypes();
             WhenIRegisterAllExportedTypes();
 
-            Assert.Throws<ContainerException>(
+            var ex = Assert.Throws<AttributedModelException>(
                 () => _container.Resolve<ServiceWithMultipleCostructors>());
+            Assert.AreEqual(ex.Error, Error.NO_SINGLE_CTOR_WITH_IMPORTING_ATTR);
         }
 
         #region Implementation
