@@ -1,6 +1,8 @@
 DryIoc is small, fast, capable IoC Container for .NET
 =====================================================
 
+[![Build status](https://ci.appveyor.com/api/projects/status/jfq01d9wcs4vcwpf/branch/default)](https://ci.appveyor.com/project/MaksimVolkau/dryioc/branch/default)
+
 [Autofac]: https://code.google.com/p/autofac/
 [MEF]: http://mef.codeplex.com/
 [DryIoc]: https://www.nuget.org/packages/DryIoc/
@@ -13,28 +15,30 @@ DryIoc is small, fast, capable IoC Container for .NET
 [v2.0]: https://bitbucket.org/dadhi/dryioc/wiki/Home
 
 * Designed for low-ceremony use, performance and extensibility.
-* Supports .NET 3.5, 4.0, 4.5 _([PCL] is available in v2.0 pre-release packages)_
+* Supports .NET 3.5, 4.0, 4.5, _([PCL] in v2.0)_.
 * Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
 * Extensions: [MefAttributedModel] as [code][DryIoc.MefAttributedModel] or [dll][DryIoc.MefAttributedModel.dll].
-* [Docs are in a Wiki][Wiki] _(currently being updated for v2)_
-* Latest stable version is **1.4.1** [![Build status](https://ci.appveyor.com/api/projects/status/jfq01d9wcs4vcwpf/branch/default)](https://ci.appveyor.com/project/MaksimVolkau/dryioc/branch/default)
-* __[v2.0] pre-release packages:__ `PM> Install-Package DryIoc -IncludePrerelease`
+* [Wiki documentation][Wiki] _(being updated for v2.0)_
+* __v1.4.1__ is stable: `PM> Install-Package DryIoc` 
+* __[v2.0]__ is coming soon: `PM> Install-Package DryIoc -IncludePrerelease`
 
-#### Fast
-* On par with fastest containers listed in [IoC Container Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
+#### Benchmarks
+* Very fast in [Performance Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
+* Supports a lot in [Features Benchmark](http://featuretests.apphb.com/DependencyInjection.html) _(v2.0)_.
+
+#### Performance
 * General use-cases optimized for max speed.
 * Call-stack depth preserved as shallow as possible.
 * Memory footprint preserved as low as possible.
 
-#### Small
+#### Code/Library
 * Minimal setup requires single source file: *Container.cs*. 
-* No more than 2500 lines of code including comments.
 * Code written to be readable.
-* Uses [Caliburn.Micro](http://caliburnmicro.codeplex.com/) alike approach for customization.
+* Public API fully documented _(v2.0)_.
 
-#### Reliable
+#### Reliability
 * Unit-tested with 100% coverage.
-* Thread-safe: registrations and resolutions could be done in parallel without corrupting container state. 
+* Thread-safe (lock-free in _v2.0_): registrations and resolutions could be done in parallel without corrupting container state. 
 * Recursive dependency detection (cycle in object graph).
 * Error handling with `ContainerException` inherited from `InvalidOperationException` to filter container related exceptions.
 * Throws exceptions as early as possible. 
