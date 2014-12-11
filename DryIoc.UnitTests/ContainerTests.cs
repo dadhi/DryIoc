@@ -48,8 +48,10 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(named: "some");
             container.Register<IService, Service>(named: "another");
 
-            Assert.Throws<ContainerException>(() =>
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
+
+            Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
         }
 
         [Test]
@@ -249,8 +251,10 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));
 
-            Assert.Throws<ContainerException>(() =>
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve(typeof(IService)));
+
+            Assert.AreEqual(ex.Error, Error.EXPECTED_SINGLE_DEFAULT_FACTORY);
         }
 
         [Test]
@@ -306,8 +310,10 @@ namespace DryIoc.UnitTests
             container.Register<IService, AnotherService>();
             container.Register<IService, DisposableService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
 
-            Assert.Throws<ContainerException>(() =>
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
+
+            Assert.AreEqual(ex.Error, Error.EXPECTED_SINGLE_DEFAULT_FACTORY);
         }
 
         [Test]

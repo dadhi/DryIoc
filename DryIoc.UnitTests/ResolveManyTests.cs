@@ -65,11 +65,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var items = container.ResolveMany<IService>(result: Resolver.ManyResult.AllItemsResolvedIntoFixedArray).ToArray();
+            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AllItemsResolvedIntoFixedArray).ToArray();
             Assert.That(items.Count(), Is.EqualTo(0));
 
             container.Register<IService, Service>();
-            items = container.ResolveMany<IService>(result: Resolver.ManyResult.AllItemsResolvedIntoFixedArray).ToArray();
+            items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AllItemsResolvedIntoFixedArray).ToArray();
             Assert.That(items.Count(), Is.EqualTo(0));
         }
 
@@ -78,7 +78,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var items = container.ResolveMany<IService>(result: Resolver.ManyResult.AllItemsResolvedIntoFixedArray).ToArray();
+            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AllItemsResolvedIntoFixedArray).ToArray();
             Assert.That(items.Count(), Is.EqualTo(0));
 
             container.Register<IService, Service>();
@@ -108,7 +108,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(named: 1);
             container.Register<IService, AnotherService>(named: '1');
 
-            IEnumerable<object> result = container.ResolveMany<object>(typeof(IService), Resolver.ManyResult.AllItemsResolvedIntoFixedArray);
+            IEnumerable<object> result = container.ResolveMany<object>(typeof(IService), ResolveManyBehavior.AllItemsResolvedIntoFixedArray);
             var items = result.ToArray();
 
             Assert.That(items.Length, Is.EqualTo(2));

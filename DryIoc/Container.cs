@@ -1979,7 +1979,7 @@ namespace DryIoc
                 atLeastOneRegistered = true;
             }
 
-            Throw.If(!atLeastOneRegistered, Error.UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE, implementationType, implementedTypes);
+            Throw.If(!atLeastOneRegistered, Error.NO_SERVICE_TYPE_TO_REGISTER_ALL, implementationType, implementedTypes);
         }
 
         /// <summary>Registers single registration for all implemented public interfaces and base classes.</summary>
@@ -2034,7 +2034,7 @@ namespace DryIoc
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
             Func<IResolver, object> checkedDelegate = r => factoryDelegate(r)
-                .ThrowIfNotOf(serviceType, Error.REGISTERED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, r);
+                .ThrowIfNotOf(serviceType, Error.REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, r);
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
@@ -2222,16 +2222,13 @@ namespace DryIoc
             return (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType);
         }
 
-        /// <summary>Specifies result of <see cref="Resolver.ResolveMany{TService}"/>: either dynamic(lazy) or fixed view.</summary>
-        public enum ManyResult { EachItemLazyResolved, AllItemsResolvedIntoFixedArray }
-
         /// <summary>Returns all registered services instances including all keyed and default registrations.
-        /// Use <paramref name="result"/> to return either all registered services at the moment of resolve (dynamic fresh view) or
+        /// Use <paramref name="behavior"/> to return either all registered services at the moment of resolve (dynamic fresh view) or
         /// the same services that were returned with first <see cref="ResolveMany{TService}"/> call (fixed view).</summary>
         /// <typeparam name="TService">Return collection item type. It denotes registered service type if <paramref name="requiredServiceType"/> is not specified.</typeparam>
         /// <param name="resolver">Usually <see cref="Container"/> object.</param>
         /// <param name="requiredServiceType">(optional) Denotes registered service type. Should be assignable to <typeparamref name="TService"/>.</param>
-        /// <param name="result">(optional) Specifies new registered services awareness. Aware by default.</param>
+        /// <param name="behavior">(optional) Specifies new registered services awareness. Aware by default.</param>
         /// <returns>Result collection of services.</returns>
         /// <remarks>The same result could be achieved by directly calling:
         /// <code lang="cs"><![CDATA[
@@ -2241,9 +2238,9 @@ namespace DryIoc
         /// ]]></code>
         /// </remarks>
         public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver,
-            Type requiredServiceType = null, ManyResult result = ManyResult.EachItemLazyResolved)
+            Type requiredServiceType = null, ResolveManyBehavior behavior = ResolveManyBehavior.EachItemLazyResolved)
         {
-            return result == ManyResult.EachItemLazyResolved
+            return behavior == ResolveManyBehavior.EachItemLazyResolved
                 ? resolver.Resolve<LazyEnumerable<TService>>(requiredServiceType)
                 : resolver.Resolve<IEnumerable<TService>>(requiredServiceType);
         }
@@ -2265,6 +2262,9 @@ namespace DryIoc
             return instance;
         }
     }
+
+    /// <summary>Specifies result of <see cref="Resolver.ResolveMany{TService}"/>: either dynamic(lazy) or fixed view.</summary>
+    public enum ResolveManyBehavior { EachItemLazyResolved, AllItemsResolvedIntoFixedArray }
 
     /// <summary>Provides information required for service resolution: service type, 
     /// and optional <see cref="ServiceInfoDetails"/>: key, what to do if service unresolved, and required service type.</summary>
@@ -3228,7 +3228,7 @@ namespace DryIoc
         public virtual void ValidateBeforeRegistration(Type serviceType, IRegistry registry)
         {
             Throw.If(serviceType.IsGenericDefinition() && !ProvidesFactoryForRequest,
-                Error.UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE, serviceType);
+                Error.REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER, serviceType);
         }
 
         /// <summary>Method applied for factory provider, returns new factory per request.</summary>
@@ -3447,7 +3447,7 @@ namespace DryIoc
         /// <param name="serviceType">Service type to register instance for.</param> <param name="_">(ignored).</param>
         public override void ValidateBeforeRegistration(Type serviceType, IRegistry _)
         {
-            _instance.ThrowIfNotOf(serviceType, Error.REGISTERED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE, serviceType);
+            _instance.ThrowIfNotOf(serviceType, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE, serviceType);
         }
 
         /// <summary>Adds instance to resolution cache and returns it wrapped in expression.</summary>
@@ -3821,7 +3821,7 @@ namespace DryIoc
                     return new[] { PropertyOrFieldServiceInfo.Of(field).WithDetails(details, r) };
 
                 return Throw.Instead<IEnumerable<PropertyOrFieldServiceInfo>>(
-                    Error.UNABLE_TO_FIND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD, name, r);
+                    Error.NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD, name, r);
             });
         }
 
@@ -3895,12 +3895,12 @@ namespace DryIoc
             if (!implType.IsGenericDefinition())
             {
                 if (implType.IsOpenGeneric())
-                    Throw.Error(Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS,
+                    Throw.Error(Error.REG_NOT_A_GENERIC_TYPEDEF_IMPL_TYPE,
                         implType, implType.GetGenericDefinitionOrNull());
 
                 if (implType != serviceType && serviceType != typeof(object) &&
                     Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1)
-                    Throw.Error(Error.EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE, implType, serviceType);
+                    Throw.Error(Error.IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE, implType, serviceType);
             }
             else if (implType != serviceType)
             {
@@ -3911,20 +3911,20 @@ namespace DryIoc
 
                     var implTypeArgs = implType.GetGenericParamsAndArgs();
                     Throw.If(!implementedOpenGenericTypes.Any(t => t.ContainsAllGenericParameters(implTypeArgs)),
-                        Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS,
+                        Error.REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS,
                         implType, serviceType, implementedOpenGenericTypes);
                 }
                 else if (implType.IsGeneric() && serviceType.IsOpenGeneric())
-                    Throw.Error(Error.USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS,
+                    Throw.Error(Error.REG_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE,
                         serviceType, serviceType.GetGenericDefinitionOrNull());
                 else
-                    Throw.Error(Error.UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, implType, serviceType);
+                    Throw.Error(Error.REG_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, implType, serviceType);
             }
 
             if (registry.Rules.Constructor == null && Rules.Constructor == null)
             {
                 var publicCtorCount = implType.GetAllConstructors().Count();
-                Throw.If(publicCtorCount != 1, Error.UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE, implType, publicCtorCount);
+                Throw.If(publicCtorCount != 1, Error.NO_CTOR_SELECTOR_FOR_IMPL_WITH_MULTIPLE_CTORS, implType, publicCtorCount);
             }
         }
 
@@ -3949,7 +3949,7 @@ namespace DryIoc
             {
                 closedImplType = Throw.IfThrows<ArgumentException, Type>(
                    () => _implementationType.MakeGenericType(closedTypeArgs),
-                   Error.UNMATCHED_GENERIC_PARAM_CONSTRAINTS, _implementationType, request);
+                   Error.NOT_MATCHED_GENERIC_PARAM_CONSTRAINTS, _implementationType, request);
             }
 
             var factory = new ReflectionFactory(closedImplType, Reuse, Rules, Setup);
@@ -4064,7 +4064,7 @@ namespace DryIoc
 
             var ctors = implType.GetAllConstructors().ToArrayOrSelf();
             Throw.If(ctors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implType);
-            Throw.If(ctors.Length > 1, Error.UNABLE_TO_SELECT_CONSTRUCTOR, ctors.Length, implType);
+            Throw.If(ctors.Length > 1, Error.UNABLE_TO_SELECT_CTOR, ctors.Length, implType);
             return ctors[0];
         }
 
@@ -4164,11 +4164,11 @@ namespace DryIoc
             }
 
             resultImplTypeArgs = resultImplTypeArgs.ThrowIfNull(
-                Error.UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, implType, implementedTypes, request);
+                Error.NOT_MATCHED_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, implType, implementedTypes, request);
 
             var unmatchedArgIndex = Array.IndexOf(resultImplTypeArgs, null);
             if (unmatchedArgIndex != -1)
-                Throw.Error(Error.UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
+                Throw.Error(Error.NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
                     implType, openImplTypeParams[unmatchedArgIndex], request);
 
             return resultImplTypeArgs;
@@ -5126,6 +5126,7 @@ namespace DryIoc
         }
 
         /// <summary>Creates exception with message describing cause and context of error.</summary>
+        /// <param name="error"></param>
         /// <param name="message">Error message.</param>
         public ContainerException(int error, string message) : base(message)
         {
@@ -5134,6 +5135,7 @@ namespace DryIoc
 
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
+        /// <param name="error"></param>
         /// <param name="message">Error message.</param>
         /// <param name="innerException">Underlying system/leading exception.</param>
         public ContainerException(int error, string message, Exception innerException) : base(message, innerException)
@@ -5149,135 +5151,138 @@ namespace DryIoc
 
     public static class Error
     {
-        public static readonly int First = 0;
-        public static int Last = First;
-        private static int _() { return Last++; }
+        public readonly static int FIRST_ERROR_CODE = 0;
+
+        public readonly static IList<string> Messages = new List<string>();
 
         public static readonly int
-            INVALID_CONDITION = _(),
-            IS_NULL = _(),
-            IS_NOT_OF_TYPE = _(),
-            TYPE_IS_NOT_OF_TYPE = _(),
+            INVALID_CONDITION,
+            IS_NULL,
+            IS_NOT_OF_TYPE,
+            TYPE_IS_NOT_OF_TYPE,
 
-            UNABLE_TO_RESOLVE_SERVICE = _(),
-            EXPECTED_SINGLE_DEFAULT_FACTORY = _(),
-
-            EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE = _(),
-            UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE = _(),
-            UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE = _(),
-            UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS = _(),
-            USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS = _(),
-            USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS = _(),
-            EXPECTED_NON_ABSTRACT_IMPL_TYPE = _(),
-            NO_PUBLIC_CONSTRUCTOR_DEFINED = _(),
-            UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE = _(),
-            UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE = _(),
-            CONSTRUCTOR_MISSES_SOME_PARAMETERS = _(),
-            UNABLE_TO_SELECT_CONSTRUCTOR = _(),
-            EXPECTED_FUNC_WITH_MULTIPLE_ARGS = _(),
-            EXPECTED_CLOSED_GENERIC_SERVICE_TYPE = _(),
-            RECURSIVE_DEPENDENCY_DETECTED = _(),
-            SCOPE_IS_DISPOSED = _(),
-            WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY = _(),
-            UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE = _(),
-            UNABLE_TO_SELECT_CTOR_USING_SELECTOR = _(),
-            UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS = _(),
-            UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS = _(),
-            REGISTERED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE = _(),
-            INJECTED_VALUE_IS_OF_DIFFERENT_TYPE = _(),
-            REGISTERED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE = _(),
-            UNABLE_TO_FIND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD = _(),
-            UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE = _(),
-            PUSHING_TO_REQUEST_WITHOUT_FACTORY = _(),
-            TARGET_WAS_ALREADY_DISPOSED = _(),
-            UNMATCHED_GENERIC_PARAM_CONSTRAINTS = _(),
-            NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED = _(),
-            DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN = _(),
-            WEAKREF_REUSE_WRAPPER_GCED = _(),
-            INSTANCE_FACTORY_IS_NULL = _(),
-            SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD = _(),
-            FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD = _(),
-            FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC = _(),
-            NO_OPEN_THREAD_SCOPE = _(),
-
-            CONTAINER_IS_GARBAGE_COLLECTED = _(),
-            CANT_CREATE_DECORATOR_EXPR = _(),
-            REGISTERING_WITH_DUPLICATE_SERVICE_KEY = _(),
-            NO_CURRENT_SCOPE = _(),
-            CONTAINER_IS_DISPOSED = _(),
-            UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE = _(),
-            NOT_DIRECT_SCOPE_PARENT = _(),
-            CANT_RESOLVE_REUSE_WRAPPER = _(),
-            WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE = _();
-
-        public static string[] Messages = new string[Last - First];
+            UNABLE_TO_RESOLVE_SERVICE,
+            EXPECTED_SINGLE_DEFAULT_FACTORY,
+            IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE,
+            REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER,
+            REG_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE,
+            REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS,
+            REG_NOT_A_GENERIC_TYPEDEF_IMPL_TYPE,
+            REG_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE,
+            EXPECTED_NON_ABSTRACT_IMPL_TYPE,
+            NO_PUBLIC_CONSTRUCTOR_DEFINED,
+            NO_CTOR_SELECTOR_FOR_IMPL_WITH_MULTIPLE_CTORS,
+            NOT_MATCHED_IMPL_BASE_TYPES_WITH_SERVICE_TYPE,
+            CTOR_IS_MISSING_SOME_PARAMETERS,
+            UNABLE_TO_SELECT_CTOR,
+            EXPECTED_FUNC_WITH_MULTIPLE_ARGS,
+            EXPECTED_CLOSED_GENERIC_SERVICE_TYPE,
+            RECURSIVE_DEPENDENCY_DETECTED,
+            SCOPE_IS_DISPOSED,
+            WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY,
+            NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
+            UNABLE_TO_SELECT_CTOR_USING_SELECTOR,
+            UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS,
+            UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS,
+            REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE,
+            INJECTED_VALUE_IS_OF_DIFFERENT_TYPE,
+            REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE,
+            NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD,
+            NO_SERVICE_TYPE_TO_REGISTER_ALL,
+            PUSHING_TO_REQUEST_WITHOUT_FACTORY,
+            TARGET_WAS_ALREADY_DISPOSED,
+            NOT_MATCHED_GENERIC_PARAM_CONSTRAINTS,
+            NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED,
+            DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN,
+            WEAKREF_REUSE_WRAPPER_GCED,
+            INSTANCE_FACTORY_IS_NULL,
+            SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD,
+            FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD,
+            FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC,
+            NO_OPEN_THREAD_SCOPE,
+            CONTAINER_IS_GARBAGE_COLLECTED,
+            CANT_CREATE_DECORATOR_EXPR,
+            REGISTERING_WITH_DUPLICATE_SERVICE_KEY,
+            NO_CURRENT_SCOPE,
+            CONTAINER_IS_DISPOSED,
+            UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE,
+            NOT_DIRECT_SCOPE_PARENT,
+            CANT_RESOLVE_REUSE_WRAPPER,
+            WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE;
 
         static Error()
         {
-            var _ = Messages;
+            // auto defaults
+            _(ref INVALID_CONDITION,                                "Argument {0} of type {1} has invalid condition.");
+            _(ref IS_NULL,                                          "Argument of type {0} is null.");
+            _(ref IS_NOT_OF_TYPE,                                   "Argument {0} is not of type {1}.");
+            _(ref TYPE_IS_NOT_OF_TYPE,                              "Type argument {0} is not assignable from type {1}.");
 
-            _[INVALID_CONDITION] =                      "Argument {0} of type {1} has invalid condition.";
-            _[IS_NULL] =                                "Argument of type {0} is null.";
-            _[IS_NOT_OF_TYPE] =                         "Argument {0} is not of type {1}.";
-            _[TYPE_IS_NOT_OF_TYPE] =                    "Type argument {0} is not assignable from type {1}.";
+            // specific
+            _(ref UNABLE_TO_RESOLVE_SERVICE,                        "Unable to resolve {0}." + Environment.NewLine + "Please register service OR adjust container resolution rules.");
+            _(ref EXPECTED_SINGLE_DEFAULT_FACTORY,                  "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine + 
+                                                                    "Please identify service with key, or metadata OR set Rules to return single registered factory.");
+            _(ref IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE,              "Implementation type {0} should be assignable to service type {1} but it is not.");
+            _(ref REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER,        "Unable to register not a factory provider for open-generic service {0}.");
+            _(ref REG_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE,   "Unable to register open-generic implementation {0} with non-generic service {1}.");
+            _(ref REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS,  "Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}.");
+            _(ref REG_NOT_A_GENERIC_TYPEDEF_IMPL_TYPE,              "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine + 
+                                                                    "Consider to register generic type definition {1} instead.");
+            _(ref REG_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE,           "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine + 
+                                                                    "Consider to register generic type definition {1} instead.");
+            _(ref EXPECTED_NON_ABSTRACT_IMPL_TYPE,                  "Expecting not abstract and not interface implementation type, but found {0}.");
+            _(ref NO_PUBLIC_CONSTRUCTOR_DEFINED,                    "There is no public constructor defined for {0}.");
+            _(ref NO_CTOR_SELECTOR_FOR_IMPL_WITH_MULTIPLE_CTORS,    "Unspecified how to select single constructor for implementation type {0} with {1} public constructors.");
+            _(ref CTOR_IS_MISSING_SOME_PARAMETERS,                  "Constructor [{0}] of {1} misses some arguments required for {2} dependency.");
+            _(ref UNABLE_TO_SELECT_CTOR,                            "Unable to select single constructor from {0} available in {1}." + Environment.NewLine + 
+                                                                    "Please provide constructor selector when registering service.");
+            _(ref EXPECTED_FUNC_WITH_MULTIPLE_ARGS,                 "Expecting Func with one or more arguments but found {0}.");
+            _(ref EXPECTED_CLOSED_GENERIC_SERVICE_TYPE,             "Expecting closed-generic service type but found {0}.");
+            _(ref RECURSIVE_DEPENDENCY_DETECTED,                    "Recursive dependency is detected when resolving" + Environment.NewLine + "{0}.");
+            _(ref SCOPE_IS_DISPOSED,                                "Scope is disposed and scoped instances are no longer available.");
+            _(ref WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY,             "Wrapper {0} can wrap single service type only, but found many. You should specify service type selector in wrapper setup.");
+            _(ref NOT_MATCHED_IMPL_BASE_TYPES_WITH_SERVICE_TYPE,    "Unable to match service with any open-generic implementation {0} implemented types {1} when resolving {2}.");
+            _(ref NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,  "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}.");
+            _(ref UNABLE_TO_SELECT_CTOR_USING_SELECTOR,             "Unable to get constructor of {0} using provided constructor selector.");
+            _(ref UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS,     "Unable to find constructor with all resolvable parameters when resolving {0}.");
+            _(ref UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS,  "Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine + 
+                                                                    "and the rest of parameters resolvable from Container when resolving: {1}.");
+            _(ref REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE,     "Registered factory delegate returns service {0} is not assignable to {2}.");
+            _(ref REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE,         "Registered instance {0} is not assignable to serviceType {1}.");
+            _(ref INJECTED_VALUE_IS_OF_DIFFERENT_TYPE,              "Injected value {0} is not assignable to {2}.");
+            _(ref NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD,  "Unable to find writable property or field \"{0}\" when resolving: {1}.");
+            _(ref NO_SERVICE_TYPE_TO_REGISTER_ALL,                  "Unable to register any of implementation {0} implemented services {1}.");
+            _(ref PUSHING_TO_REQUEST_WITHOUT_FACTORY,               "Pushing next info {0} to request not yet resolved to factory: {1}");
+            _(ref TARGET_WAS_ALREADY_DISPOSED,                      "Target of type {0} was already disposed in {1}.");
+            _(ref NOT_MATCHED_GENERIC_PARAM_CONSTRAINTS,            "Service type does not match registered open-generic implementation constraints {0} when resolving {1}.");
+            _(ref NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED,    "Non-generic wrapper {0} should specify wrapped service selector when registered.");
+            _(ref DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN,            "Dependency {0} has shorter reuse lifespan ({1}) than its parent ({2}): {3}.\n" +
+                                                                    "You can turn off this exception by setting container Rules.ThrowIfDepenedencyHasShorterReuseLifespan to false.");
+            _(ref WEAKREF_REUSE_WRAPPER_GCED,                       "Service with WeakReference reuse wrapper is garbage collected now, and no longer available.");
+            _(ref INSTANCE_FACTORY_IS_NULL,                         "Instance factory is null when resolving: {0}");
+            _(ref SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD,    "Service of {0} is not assignable from factory method {2} when resolving: {3}.");
+            _(ref FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD,            "Unable to use null factory object with factory method {0} when resolving: {1}.");
+            _(ref FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC,        "Factory instance provided {0} But factory method is static {1} when resolving: {2}.");
+            _(ref NOT_DIRECT_SCOPE_PARENT,                          "Unable to Open Scope from not a direct parent container.");
+            _(ref NO_OPEN_THREAD_SCOPE,                             "Unable to find open thread scope in {0}. Please OpenScope with {0} to make sure thread reuse work.");
+            _(ref CONTAINER_IS_DISPOSED,                            "Container {0} is disposed and its operations are no longer available.");
+            _(ref CONTAINER_IS_GARBAGE_COLLECTED,                   "Container is no longer available (has been garbage-collected).");
+            _(ref CANT_CREATE_DECORATOR_EXPR,                       "Unable to create decorator expression for: {0}.");
+            _(ref REGISTERING_WITH_DUPLICATE_SERVICE_KEY,           "Service {0} with the same key \"{1}\" is already registered as {2}.");
+            _(ref NO_CURRENT_SCOPE,                                 "No current scope available: probably you are resolving scoped service outside of scope.");
+            _(ref UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE,            "Unable to dispose not a current opened scope.");
+            _(ref NOT_DIRECT_SCOPE_PARENT,                          "Unable to Open Scope from not a direct parent container.");
+            _(ref CANT_RESOLVE_REUSE_WRAPPER,                       "Unable to resolve reuse wrapper {0} for: {1}");
+            _(ref WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE,        "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}.");   
+        }
 
-            _[UNABLE_TO_RESOLVE_SERVICE] =              "Unable to resolve {0}." + Environment.NewLine + "Please register service OR adjust container resolution rules.";
-            _[EXPECTED_SINGLE_DEFAULT_FACTORY] =        "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + 
-                                                        Environment.NewLine + "Please identify service with key, or metadata OR set Rules to return single registered factory.";
-            
-            _[EXPECTED_IMPL_TYPE_ASSIGNABLE_TO_SERVICE_TYPE] = "Expecting implementation type {0} to be assignable to service type {1} but it is not.";
-            _[UNABLE_TO_REGISTER_NON_FACTORY_PROVIDER_FOR_OPEN_GENERIC_SERVICE] = "Unable to register not a factory provider for open-generic service {0}.";
-            _[UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE] = "Unable to register open-generic implementation {0} with non-generic service {1}.";
-            _[UNABLE_TO_REGISTER_OPEN_GENERIC_IMPL_CAUSE_SERVICE_DOES_NOT_SPECIFY_ALL_TYPE_ARGS] = "Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}.";
-            _[USUPPORTED_REGISTRATION_OF_NON_GENERIC_IMPL_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS] = "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + 
-                                                        Environment.NewLine + "Consider to register generic type definition {1} instead.";
-            _[USUPPORTED_REGISTRATION_OF_NON_GENERIC_SERVICE_TYPE_DEFINITION_BUT_WITH_GENERIC_ARGS] = "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + 
-                                                        Environment.NewLine + "Consider to register generic type definition {1} instead.";
-            _[EXPECTED_NON_ABSTRACT_IMPL_TYPE] = "Expecting not abstract and not interface implementation type, but found {0}.";
-            _[NO_PUBLIC_CONSTRUCTOR_DEFINED] = "There is no public constructor defined for {0}.";
-            _[UNSPECIFIED_HOWTO_SELECT_CONSTRUCTOR_FOR_IMPLTYPE] = "Unspecified how to select single constructor for implementation type {0} with {1} public constructors.";
-            _[CONSTRUCTOR_MISSES_SOME_PARAMETERS] = "Constructor [{0}] of {1} misses some arguments required for {2} dependency.";
-            _[UNABLE_TO_SELECT_CONSTRUCTOR] = "Unable to select single constructor from {0} available in {1}." + 
-                                                        Environment.NewLine + "Please provide constructor selector when registering service.";
-            _[EXPECTED_FUNC_WITH_MULTIPLE_ARGS] =       "Expecting Func with one or more arguments but found {0}.";
-            _[EXPECTED_CLOSED_GENERIC_SERVICE_TYPE] =   "Expecting closed-generic service type but found {0}.";
-            _[RECURSIVE_DEPENDENCY_DETECTED] =          "Recursive dependency is detected when resolving" + Environment.NewLine + "{0}.";
-            _[SCOPE_IS_DISPOSED] =                      "Scope is disposed and scoped instances are no longer available.";
-            _[WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY] =   "Wrapper {0} can wrap single service type only, but found many. You should specify service type selector in wrapper setup.";
-            _[UNABLE_TO_MATCH_IMPL_BASE_TYPES_WITH_SERVICE_TYPE] = "Unable to match service with any open-generic implementation {0} implemented types {1} when resolving {2}.";
-            _[UNABLE_TO_FIND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE] = "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}.";
-            _[UNABLE_TO_SELECT_CTOR_USING_SELECTOR] = "Unable to get constructor of {0} using provided constructor selector.";
-            _[UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS] = "Unable to find constructor with all resolvable parameters when resolving {0}.";
-            _[UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS] = "Unable to find constructor with all parameters matching Func signature {0} " + 
-                                            Environment.NewLine + "and the rest of parameters resolvable from Container when resolving: {1}.";
-            _[REGISTERED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE] = "Registered factory delegate returns service {0} is not assignable to {2}.";
-            _[REGISTERED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE] = "Registered instance {0} is not assignable to serviceType {1}.";
-            _[INJECTED_VALUE_IS_OF_DIFFERENT_TYPE] = "Injected value {0} is not assignable to {2}.";
-            _[ UNABLE_TO_FIND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD] = "Unable to find writable property or field \"{0}\" when resolving: {1}.";
-            _[UNABLE_TO_REGISTER_ALL_FOR_ANY_IMPLEMENTED_TYPE] = "Unable to register any of implementation {0} implemented services {1}.";
-            _[PUSHING_TO_REQUEST_WITHOUT_FACTORY] = "Pushing next info {0} to request not yet resolved to factory: {1}";
-            _[TARGET_WAS_ALREADY_DISPOSED] = "Target of type {0} was already disposed in {1}.";
-            _[UNMATCHED_GENERIC_PARAM_CONSTRAINTS] = "Service type does not match registered open-generic implementation constraints {0} when resolving {1}.";
-            _[NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED] = "Non-generic wrapper {0} should specify wrapped service selector when registered.";
-            _[DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN] = "Dependency {0} has shorter reuse lifespan ({1}) than its parent ({2}): {3}.\n" +
-                                             "You can turn off this exception by setting container Rules.ThrowIfDepenedencyHasShorterReuseLifespan to false.";
-            _[WEAKREF_REUSE_WRAPPER_GCED] = "Service with WeakReference reuse wrapper is garbage collected now, and no longer available.";
-            _[INSTANCE_FACTORY_IS_NULL] = "Instance factory is null when resolving: {0}";
-            _[SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD] = "Service of {0} is not assignable from factory method {2} when resolving: {3}.";
-            _[FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD] = "Unable to use null factory object with factory method {0} when resolving: {1}.";
-            _[FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC] = "Factory instance provided {0} But factory method is static {1} when resolving: {2}.";
-            _[NOT_DIRECT_SCOPE_PARENT] =                "Unable to Open Scope from not a direct parent container.";
-            _[NO_OPEN_THREAD_SCOPE] =                   "Unable to find open thread scope in {0}. Please OpenScope with {0} to make sure thread reuse work.";
-            
-            _[CONTAINER_IS_DISPOSED] =                  "Container {0} is disposed and its operations are no longer available.";
-            _[CONTAINER_IS_GARBAGE_COLLECTED] =         "Container is no longer available (has been garbage-collected).";
-            _[CANT_CREATE_DECORATOR_EXPR] =             "Unable to create decorator expression for: {0}.";
-            _[REGISTERING_WITH_DUPLICATE_SERVICE_KEY] = "Service {0} with the same key \"{1}\" is already registered as {2}.";
-            _[NO_CURRENT_SCOPE] =                       "No current scope available: probably you are resolving scoped service outside of scope.";
-            _[UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE] =  "Unable to dispose not a current opened scope.";
-            _[NOT_DIRECT_SCOPE_PARENT] =                "Unable to Open Scope from not a direct parent container.";
-            _[CANT_RESOLVE_REUSE_WRAPPER] =             "Unable to resolve reuse wrapper {0} for: {1}";
-            _[WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE] =  "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}.";   
+        private static void _(ref int error, string message)
+        {
+            if (error == 0)
+            {
+                Messages.Add(message);
+                error = FIRST_ERROR_CODE + Messages.Count - 1;
+            }
         }
     }
 
