@@ -993,7 +993,7 @@ namespace DryIoc
             {
                 index = x.IndexOf(item);
                 if (index == -1)
-                    index = (x = x.AppendOrUpdate(item)).Length - 1;
+                    index = (x = x.Append(item)).Length - 1;
                 return x;
             });
             return index;
@@ -1064,24 +1064,23 @@ namespace DryIoc
         #endregion
     }
 
-    //TODO: Complete and check.
     /// <summary>Immutable array based on wide hash tree, where each node is sub-array with predefined size: 32 is by default.
     /// Array supports only append, no remove.</summary>
     /// <typeparam name="T">Array item type.</typeparam>
-    public class AppendableArraySimplified<T>
+    public class AppendableArray<T>
     {
         /// <summary>Empty/default value to start from.</summary>
-        public static readonly AppendableArraySimplified<T> Empty = new AppendableArraySimplified<T>(0);
+        public static readonly AppendableArray<T> Empty = new AppendableArray<T>(0);
 
         /// <summary>Number of items in array.</summary>
         public readonly int Length;
 
         /// <summary>Appends value and returns new array.</summary>
         /// <param name="value">Value to append.</param> <returns>New array.</returns>
-        public virtual AppendableArraySimplified<T> Append(T value)
+        public virtual AppendableArray<T> Append(T value)
         {
             return Length < NODE_ARRAY_SIZE
-                ? new AppendableArraySimplified<T>(Length + 1, _items.AppendOrUpdate(value))
+                ? new AppendableArray<T>(Length + 1, _items.AppendOrUpdate(value))
                 : new AppendableArrayTree(Length, HashTree<int, T[]>.Empty.AddOrUpdate(0, _items)).Append(value);
         }
 
@@ -1093,6 +1092,13 @@ namespace DryIoc
             return _items[index];
         }
 
+        /// <summary>Returns index of first equal value in array if found, or -1 otherwise.</summary>
+        /// <param name="value">Value to look for.</param> <returns>Index of first equal value, or -1 otherwise.</returns>
+        public virtual int IndexOf(T value)
+        {
+            return _items.IndexOf(x => ReferenceEquals(x, value) || Equals(x, value));
+        }
+
         #region Implementation
 
         /// <summary>Node array size. When the item added to same node, array will be copied. 
@@ -1101,18 +1107,18 @@ namespace DryIoc
 
         private readonly T[] _items;
 
-        private AppendableArraySimplified(int length, T[] items = null)
+        private AppendableArray(int length, T[] items = null)
         {
             Length = length;
             _items = items;
         }
 
-        private sealed class AppendableArrayTree : AppendableArraySimplified<T>
+        private sealed class AppendableArrayTree : AppendableArray<T>
         {
             private const int NODE_ARRAY_BIT_MASK = NODE_ARRAY_SIZE - 1; // for length 32 will be 11111 binary.
             private const int NODE_ARRAY_BIT_COUNT = 5;                  // number of set bits in NODE_ARRAY_BIT_MASK.
 
-            public override AppendableArraySimplified<T> Append(T value)
+            public override AppendableArray<T> Append(T value)
             {
                 return new AppendableArrayTree(Length + 1,
                     _tree.AddOrUpdate(Length >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
@@ -1123,86 +1129,24 @@ namespace DryIoc
                 return _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BIT_MASK];
             }
 
-            public AppendableArrayTree(int length, HashTree<int, T[]> tree)
-                : base(length)
+            public override int IndexOf(T value)
+            {
+                foreach (var node in _tree.Enumerate())
+                {
+                    var indexInNode = node.Value.IndexOf(x => ReferenceEquals(x, value) || Equals(x, value));
+                    if (indexInNode != -1)
+                        return node.Key << NODE_ARRAY_BIT_COUNT | indexInNode;
+                }
+
+                return -1;
+            }
+
+            public AppendableArrayTree(int length, HashTree<int, T[]> tree) : base(length)
             {
                 _tree = tree;
             }
 
             private readonly HashTree<int, T[]> _tree;
-        }
-
-        #endregion
-    }
-
-    /// <summary>Immutable array based on wide hash tree, where each node is sub-array with predefined size: 32 is by default.
-    /// Array supports only append, no remove.</summary>
-    /// <typeparam name="T">Array item type.</typeparam>
-    public sealed class AppendableArray<T>
-    {
-        /// <summary>Empty/default value to start from.</summary>
-        public static readonly AppendableArray<T> Empty = new AppendableArray<T>();
-
-        /// <summary>Number of items in array.</summary>
-        public readonly int Length;
-
-        /// <summary>Appends value, or updates value at specified index.</summary>
-        /// <param name="value">Value to append.</param> 
-        /// <param name="index">(optional) If specified, says where to update.</param>
-        /// <returns>New array with appended value.</returns>
-        public AppendableArray<T> AppendOrUpdate(T value, int index = -1)
-        {
-            return index == -1 || index >= Length
-                ? new AppendableArray<T>(Length + 1,
-                    _tree.AddOrUpdate(Length >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append))
-                : new AppendableArray<T>(Length,
-                    _tree.AddOrUpdate(index >> NODE_ARRAY_BIT_COUNT, new[] { value },
-                        (oldValue, newValue) => oldValue.AppendOrUpdate(newValue[0], index & NODE_ARRAY_BIT_MASK)));
-        }
-
-        /// <summary>Returns index of first equal value in array if found, or -1 otherwise.</summary>
-        /// <param name="value">Value to look for.</param> <returns>Index of first equal value, or -1 otherwise.</returns>
-        public int IndexOf(T value)
-        {
-            foreach (var node in _tree.Enumerate())
-            {
-                var indexInNode = node.Value.IndexOf(x => ReferenceEquals(x, value) || Equals(x, value));
-                if (indexInNode != -1)
-                    return node.Key << NODE_ARRAY_BIT_COUNT | indexInNode;
-            }
-
-            return -1;
-        }
-
-        /// <summary>Returns item stored at specified index.
-        /// Method relies on underlying array for index range checking.</summary>
-        /// <param name="index">Index to look for item.</param>
-        /// <returns>Found item, or <see cref="ArgumentOutOfRangeException"/> exception otherwise.</returns>
-        public T Get(int index)
-        {
-            return _treeHasSingleNode ? _tree.Value[index]
-                : _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BIT_MASK];
-        }
-
-        #region Implementation
-
-        /// <summary>Node array size. When the item added to same node, array will be copied. 
-        /// So if array is too big performance will degrade. Should be power of two: e.g. 2, 4, 8, 16, 32...</summary>
-        internal const int NODE_ARRAY_SIZE = 32;
-
-        private const int NODE_ARRAY_BIT_MASK = NODE_ARRAY_SIZE - 1; // for length 32 will be 11111 binary.
-        private const int NODE_ARRAY_BIT_COUNT = 5;                  // number of set bits in NODE_ARRAY_BIT_MASK.
-
-        private readonly HashTree<int, T[]> _tree;
-        private readonly bool _treeHasSingleNode;
-
-        private AppendableArray() : this(0, HashTree<int, T[]>.Empty) { }
-
-        private AppendableArray(int length, HashTree<int, T[]> tree)
-        {
-            Length = length;
-            _tree = tree;
-            _treeHasSingleNode = length <= NODE_ARRAY_SIZE;
         }
 
         #endregion

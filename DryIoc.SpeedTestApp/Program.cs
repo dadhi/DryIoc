@@ -610,9 +610,9 @@ namespace DryIoc.SpeedTestApp
             var treeTime = Stopwatch.StartNew();
 
             for (var i = 0; i < keys.Length; i++)
-                Interlocked.Exchange(ref store, store.AppendOrUpdate(ignored + i));
+                Interlocked.Exchange(ref store, store.Append(ignored + i));
 
-            Interlocked.Exchange(ref store, store.AppendOrUpdate(value));
+            Interlocked.Exchange(ref store, store.Append(value));
 
             treeTime.Stop();
             GC.Collect();
