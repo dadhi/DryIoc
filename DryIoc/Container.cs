@@ -25,18 +25,18 @@ THE SOFTWARE.
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 
 namespace DryIoc
 {
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
-    public sealed partial class Container : IRegistry, IDisposable
+    public sealed partial class Container : IRegistry
     {
         /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
         public readonly Request EmptyRequest;
@@ -44,7 +44,7 @@ namespace DryIoc
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
         /// <param name="rules">(optional) Rules to modify container default resolution behavior. 
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
-        /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadLocalScopeContext"/>.</param>
+        /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadScopeContext"/>.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
             : this(rules ?? Rules.Default,
             Ref.Of(HashTree<Type, object>.Empty),
@@ -54,7 +54,7 @@ namespace DryIoc
 
         /// <summary>Creates new container with configured rules.</summary>
         /// <param name="configure">Delegate gets <see cref="DryIoc.Rules.Default"/> as input and may return configured rules.</param>
-        /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadLocalScopeContext"/>.</param>
+        /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadScopeContext"/>.</param>
         public Container(Func<Rules, Rules> configure, IScopeContext scopeContext = null)
             : this(configure.ThrowIfNull()(Rules.Default) ?? Rules.Default, scopeContext) { }
 
@@ -71,7 +71,7 @@ namespace DryIoc
         }
 
         /// <summary>Creates new container with new opened scope and set this scope as current in provided/inherited context.</summary>
-        /// <param name="scopeName">(optional) Name for opened scope to allow reuse to identify the scope.</param>
+        /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
         /// <returns>New container with different current scope.</returns>
         /// <example><code lang="cs"><![CDATA[
         /// using (var scoped = container.OpenScope())
@@ -80,12 +80,12 @@ namespace DryIoc
         ///     handler.Handle(data);
         /// }
         /// ]]></code></example>
-        public Container OpenScope(object scopeName = null)
+        public Container OpenScope(object name = null)
         {
             ThrowIfContainerDisposed();
 
-            scopeName = scopeName ?? (_openedScope == null ? _scopeContext.RootScopeName : null);
-            var nestedScope = new Scope(scopeName, _openedScope);
+            name = name ?? (_openedScope == null ? _scopeContext.RootScopeName : null);
+            var nestedScope = new Scope(name, _openedScope);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             _scopeContext.SetCurrent(current =>
@@ -174,8 +174,12 @@ namespace DryIoc
 
         #region Static state
 
-        internal static readonly ParameterExpression RegistryWeakRefParamExpr = Expression.Parameter(typeof(RegistryWeakRef), "regWeakRef");
+        public static readonly ParameterExpression StateParamExpr = Expression.Parameter(typeof(AppendableArray<object>), "state");
+
+        internal static readonly ParameterExpression RegistryWeakRefParamExpr = Expression.Parameter(typeof(RegistryWeakRef), "regRef");
         public static readonly Expression RegistryExpr = Expression.Property(RegistryWeakRefParamExpr, "Target");
+
+        public static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "scope");
 
         #endregion
 
@@ -423,7 +427,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var resultService = factoryDelegate(request.State.Items, _registryWeakRef, request.ResolutionScope);
+            var resultService = factoryDelegate(request.State.Items, _registryWeakRef, null);
 
             // Safe to cache factory only after it is evaluated without errors.
             _resolvedKeyedDelegates.Swap(_ => _.AddOrUpdate(serviceType,
@@ -459,7 +463,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var resultService = factoryDelegate(request.State.Items, _registryWeakRef, request.ResolutionScope);
+            var resultService = factoryDelegate(request.State.Items, _registryWeakRef, null);
             _resolvedDefaultDelegates.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
             return resultService;
         }
@@ -833,11 +837,7 @@ namespace DryIoc
                         : factorySelector(new[] { new KeyValuePair<object, Factory>(serviceKey, factory) });
                 }
 
-                var condition = factorySelector != null ? (Func<KV<object, Factory>, bool>)
-                      (x => x.Key is DefaultKey) :
-                      (x => x.Key is DefaultKey && x.Value.RegistryID == _registryID);
-
-                var defaultFactories = factories.Enumerate().Where(condition).ToArray();
+                var defaultFactories = factories.Enumerate().Where(x => x.Key is DefaultKey).ToArray();
                 if (defaultFactories.Length != 0)
                     return factorySelector != null
                         ? factorySelector(defaultFactories.Select(kv => new KeyValuePair<object, Factory>(kv.Key, kv.Value)))
@@ -894,7 +894,7 @@ namespace DryIoc
             _singletonScope = singletonScope;
 
             _openedScope = openedScope;
-            _scopeContext = scopeContext ?? new ThreadLocalScopeContext();
+            _scopeContext = scopeContext ?? new ThreadScopeContext();
 
             _disposed = disposed;
 
@@ -973,8 +973,6 @@ namespace DryIoc
     /// <summary>Holds service expression cache, and state items passed to <see cref="FactoryDelegate"/> in resolution root.</summary>
     public sealed class ResolutionState : IDisposable
     {
-        public static readonly ParameterExpression StateParamExpr = Expression.Parameter(typeof(AppendableArray<object>), "state");
-
         public ResolutionState()
             : this(AppendableArray<object>.Empty, HashTree<int, Expression>.Empty, HashTree<int, Expression>.Empty) { }
 
@@ -1008,7 +1006,7 @@ namespace DryIoc
             if (itemExpr == null)
             {
                 var indexExpr = Expression.Constant(itemIndex, typeof(int));
-                itemExpr = Expression.Convert(Expression.Call(StateParamExpr, _getItemMethod, indexExpr), itemType);
+                itemExpr = Expression.Convert(Expression.Call(Container.StateParamExpr, _getItemMethod, indexExpr), itemType);
                 Interlocked.Exchange(ref _itemsExpressions, _itemsExpressions.AddOrUpdate(itemIndex, itemExpr));
             }
             return itemExpr;
@@ -1108,17 +1106,6 @@ namespace DryIoc
                 : _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BIT_MASK];
         }
 
-        // TODO: Consider optimization
-        public readonly Func<int, T> GetValue;
-        private T GetInSingleNodeArray(int index)
-        {
-            return _tree.Value[index];
-        }
-        private T GetInMultiNodeArray(int index)
-        {
-            return _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BIT_MASK];
-        }
-
         #region Implementation
 
         /// <summary>Node array size. When the item added to same node, array will be copied. 
@@ -1138,7 +1125,6 @@ namespace DryIoc
             Length = length;
             _tree = tree;
             _treeHasSingleNode = length <= NODE_ARRAY_SIZE;
-            GetValue = length <= NODE_ARRAY_SIZE ? (Func<int, T>)GetInSingleNodeArray : GetInMultiNodeArray;
         }
 
         #endregion
@@ -1185,7 +1171,7 @@ namespace DryIoc
             if (expression.Type.IsValueType())
                 expression = Expression.Convert(expression, typeof(object));
             return Expression.Lambda<FactoryDelegate>(expression,
-                ResolutionState.StateParamExpr, Container.RegistryWeakRefParamExpr, Request.ScopeParamExpr);
+                Container.StateParamExpr, Container.RegistryWeakRefParamExpr, Container.ScopeParamExpr);
         }
 
         /// <summary>First wraps the input service creation expression into lambda expression and
@@ -1528,7 +1514,7 @@ namespace DryIoc
                 var serviceRequest = r.Push(serviceType, request.ServiceKey);
                 var serviceFactory = request.Registry.ResolveFactory(serviceRequest);
                 var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
-                return serviceExpr == null ? null : Expression.New(wrapperCtor, serviceExpr, Request.ScopeParamExpr);
+                return serviceExpr == null ? null : Expression.New(wrapperCtor, serviceExpr, Container.ScopeParamExpr);
             });
         }
 
@@ -1609,7 +1595,7 @@ namespace DryIoc
 
         public ConstructorSelector Constructor { get { return _injectionRules.Constructor; } }
 
-        public ParameterProvider Parameters { get { return _injectionRules.Parameters; } }
+        public ParameterSelector Parameters { get { return _injectionRules.Parameters; } }
 
         public PropertiesAndFieldsSelector PropertiesAndFields { get { return _injectionRules.PropertiesAndFields; } }
 
@@ -1617,7 +1603,7 @@ namespace DryIoc
         /// <returns>New rules with specified <see cref="InjectionRules"/>.</returns>
         public Rules With(
             ConstructorSelector constructor = null,
-            ParameterProvider parameters = null,
+            ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             return new Rules(this)
@@ -1760,7 +1746,7 @@ namespace DryIoc
         /// <returns>New injection rules or <see cref="Default"/>.</returns>
         public static InjectionRules With(
             ConstructorSelector constructor = null,
-            ParameterProvider parameters = null,
+            ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             return constructor == null && parameters == null && propertiesAndFields == null
@@ -1792,9 +1778,9 @@ namespace DryIoc
             return With(_ => FactoryMethod.Of(factoryMethod));
         }
 
-        public static implicit operator InjectionRules(ParameterProvider provider)
+        public static implicit operator InjectionRules(ParameterSelector selector)
         {
-            return With(parameters: provider);
+            return With(parameters: selector);
         }
 
         public static implicit operator InjectionRules(PropertiesAndFieldsSelector selector)
@@ -1807,7 +1793,7 @@ namespace DryIoc
 
         /// <summary>Specifies how constructor parameters should be resolved: 
         /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
-        public ParameterProvider Parameters { get; private set; }
+        public ParameterSelector Parameters { get; private set; }
 
         /// <summary>Specifies what <see cref="ServiceInfo"/> should be used when resolving property or field.</summary>
         public PropertiesAndFieldsSelector PropertiesAndFields { get; private set; }
@@ -1818,7 +1804,7 @@ namespace DryIoc
 
         private InjectionRules(
             ConstructorSelector constructor = null,
-            ParameterProvider parameters = null,
+            ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             Constructor = constructor;
@@ -1902,18 +1888,18 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
-        /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
+        /// <param name="inject">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
-            InjectionRules rules = null, FactorySetup setup = null,
+            InjectionRules inject = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
             where TImplementation : TService
         {
-            rules = (rules ?? InjectionRules.Default).With(withConstructor);
-            var factory = new ReflectionFactory(typeof(TImplementation), reuse, rules, setup);
+            inject = (inject ?? InjectionRules.Default).With(withConstructor);
+            var factory = new ReflectionFactory(typeof(TImplementation), reuse, inject, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
 
@@ -1922,17 +1908,17 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
-        /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
+        /// <param name="inject">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) Factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="named">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TServiceAndImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
-            InjectionRules rules = null, FactorySetup setup = null,
+            InjectionRules inject = null, FactorySetup setup = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
         {
-            rules = (rules ?? InjectionRules.Default).With(withConstructor);
-            var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, rules, setup);
+            inject = (inject ?? InjectionRules.Default).With(withConstructor);
+            var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, inject, setup);
             registrator.Register(factory, typeof(TServiceAndImplementation), named, ifAlreadyRegistered);
         }
 
@@ -2792,18 +2778,6 @@ namespace DryIoc
 
         #endregion
 
-        #region Resolution Scope
-
-        public static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "resolutionScope");
-
-        // TODO: remove.
-        public IScope ResolutionScope
-        {
-            get { return _scope.Value; }
-        }
-
-        #endregion
-
         /// <summary>Reference to resolved items and cached factory expressions. 
         /// Used to propagate the state from resolution root, probably from another container (request creator).</summary>
         public ResolutionState State
@@ -3346,7 +3320,7 @@ namespace DryIoc
         {
             var reuseExpr = request.State.GetOrAddItemExpression(reuse);
             var registryExpr = Container.RegistryExpr;
-            var getScopeExpr = Expression.Call(reuseExpr, _getScopeMethod, registryExpr, Request.ScopeParamExpr);
+            var getScopeExpr = Expression.Call(reuseExpr, _getScopeMethod, registryExpr, Container.ScopeParamExpr);
 
             var serviceType = serviceExpr.Type;
             var factoryIDExpr = Expression.Constant(FactoryID);
@@ -3386,15 +3360,15 @@ namespace DryIoc
         protected Expression GetInstantiatedScopedServiceExpressionOrDefault(Expression serviceExpr, IReuse reuse, Request request, Type requiredWrapperType = null)
         {
             var factoryDelegate = serviceExpr.CompileToDelegate(request.Registry.Rules);
-            var _ = request.ResolutionScope;
-            var scope = reuse.GetScope(request.Registry, ref _); // TODO: need to save _ back to request.
+            IScope ignored = null;
+            var scope = reuse.GetScope(request.Registry, ref ignored);
 
             var wrappers = Setup.ReuseWrappers;
             var serviceType = serviceExpr.Type;
             if (wrappers == null || wrappers.Length == 0)
             {
                 return request.State.GetOrAddItemExpression(
-                    scope.GetOrAdd(FactoryID, () => factoryDelegate(request.State.Items, request.RegistryWeakRef, request.ResolutionScope)),
+                    scope.GetOrAdd(FactoryID, () => factoryDelegate(request.State.Items, request.RegistryWeakRef, null)),
                     serviceType);
             }
 
@@ -3406,7 +3380,7 @@ namespace DryIoc
             }
 
             var wrappedService = scope.GetOrAdd(FactoryID,
-                () => factoryDelegate(request.State.Items, request.RegistryWeakRef, request.ResolutionScope));
+                () => factoryDelegate(request.State.Items, request.RegistryWeakRef, null));
 
             for (var i = wrappers.Length - 1; i >= 0; --i)
             {
@@ -3468,17 +3442,12 @@ namespace DryIoc
     }
 
     public delegate FactoryMethod ConstructorSelector(Request request);
-    public delegate ParameterServiceInfo ParameterProvider(ParameterInfo parameter, Request request);
+    public delegate ParameterServiceInfo ParameterSelector(ParameterInfo parameter, Request request);
     public delegate IEnumerable<PropertyOrFieldServiceInfo> PropertiesAndFieldsSelector(Request request);
 
     /// <summary>Contains alternative rules to select constructor in implementation type registered with <see cref="ReflectionFactory"/>.</summary>
     public static partial class Constructor
     {
-        public static ConstructorSelector Of(Func<Request, MethodInfo> getMethod)
-        {
-            return r => FactoryMethod.Of(getMethod(r));
-        }
-
         /// <summary>Searches for constructor with all resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving as service and as Func&lt;TArgs..., TService&gt;.</summary>
         public static ConstructorSelector WithAllResolvableArguments = request =>
@@ -3550,59 +3519,59 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>DSL for specifying <see cref="ParameterProvider"/> injection rules.</summary>
+    /// <summary>DSL for specifying <see cref="ParameterSelector"/> injection rules.</summary>
     public static partial class Parameters
     {
         /// <summary>Specifies to return default details <see cref="ServiceInfoDetails.Default"/> for all parameters.</summary>
-        public static ParameterProvider Of = (p, req) => null;
+        public static ParameterSelector Of = (p, req) => null;
 
         /// <summary>Specifies that all parameters could be set to default if unresolved.</summary>
-        public static ParameterProvider DefaultIfUnresolved = ((p, req) =>
+        public static ParameterSelector DefaultIfUnresolved = ((p, req) =>
             ParameterServiceInfo.Of(p).WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, req));
 
-        public static ParameterProvider OverrideWith(this ParameterProvider source, ParameterProvider other)
+        public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other)
         {
             return source == null || source == Of ? other ?? Of
                 : other == null || other == Of ? source
-                : (parameter, req) => other(parameter, req) ?? source(parameter, req);
+                : (p, req) => other(p, req) ?? source(p, req);
         }
 
-        public static ParameterProvider Condition(this ParameterProvider source, Func<ParameterInfo, bool> condition,
+        public static ParameterSelector Condition(this ParameterSelector source, Func<ParameterInfo, bool> condition,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
             return source.WithDetails(condition, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
         }
 
-        public static ParameterProvider Name(this ParameterProvider source, string name,
+        public static ParameterSelector Name(this ParameterSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
             return source.Condition(p => p.Name.Equals(name), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
-        public static ParameterProvider Name(this ParameterProvider source, string name, Func<IResolver, object> getValue)
+        public static ParameterSelector Name(this ParameterSelector source, string name, Func<IResolver, object> getValue)
         {
             return source.WithDetails(p => p.Name.Equals(name), ServiceInfoDetails.Of(getValue));
         }
 
-        public static ParameterProvider Name(this ParameterProvider source, string name, object value)
+        public static ParameterSelector Name(this ParameterSelector source, string name, object value)
         {
             return source.Name(name, _ => value);
         }
 
-        public static ParameterProvider Type(this ParameterProvider source, Type type,
+        public static ParameterSelector Type(this ParameterSelector source, Type type,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
             type.ThrowIfNull();
             return source.Condition(p => type.IsAssignableTo(p.ParameterType), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
-        public static ParameterProvider Type(this ParameterProvider source, Type type, Func<IResolver, object> getValue)
+        public static ParameterSelector Type(this ParameterSelector source, Type type, Func<IResolver, object> getValue)
         {
             type.ThrowIfNull();
             return source.WithDetails(p => type.IsAssignableTo(p.ParameterType), ServiceInfoDetails.Of(getValue));
         }
 
-        public static ParameterProvider Type(this ParameterProvider source, Type type, object value)
+        public static ParameterSelector Type(this ParameterSelector source, Type type, object value)
         {
             return source.Type(type, _ => value);
         }
@@ -3614,7 +3583,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private static ParameterProvider WithDetails(this ParameterProvider source, Func<ParameterInfo, bool> condition,
+        private static ParameterSelector WithDetails(this ParameterSelector source, Func<ParameterInfo, bool> condition,
             ServiceInfoDetails details)
         {
             condition.ThrowIfNull();
@@ -4447,9 +4416,9 @@ namespace DryIoc
         void SetCurrent(Func<IScope, IScope> update);
     }
 
-    public sealed class ThreadLocalScopeContext : IScopeContext, IDisposable
+    public sealed class ThreadScopeContext : IScopeContext, IDisposable
     {
-        public static readonly object ROOT_SCOPE_NAME = typeof(ThreadLocalScopeContext);
+        public static readonly object ROOT_SCOPE_NAME = typeof(ThreadScopeContext);
 
         public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
 
@@ -4494,6 +4463,7 @@ namespace DryIoc
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
     public sealed class SingletonReuse : IReuse
     {
+        /// <summary>Related lifespan value associated with reuse.</summary>
         public static readonly int LIFESPAN = 1000;
 
         /// <summary>Relative to other reuses lifespan value.</summary>
@@ -4506,6 +4476,7 @@ namespace DryIoc
             return registry.SingletonScope;
         }
 
+        /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
         public override string ToString() { return GetType().Name + ":" + Lifespan; }
     }
 
@@ -4513,62 +4484,67 @@ namespace DryIoc
     /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
     public sealed class CurrentScopeReuse : IReuse
     {
+        /// <summary>Related lifespan value associated with reuse.</summary>
         public static readonly int LIFESPAN = 100;
+
+        /// <summary>Name to find current scope or parent with equal name.</summary>
+        public readonly object Name;
 
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return LIFESPAN; } }
 
-        /// <summary>Return container current scope.</summary>
-        /// <returns>Located scope.</returns>
-        public IScope GetScope(IRegistry registry, ref IScope resolutionScope)
+        /// <summary>Creates reuse optionally specifying its name.</summary> 
+        /// <param name="name">(optional) Used to find matching current scope or parent.</param>
+        public CurrentScopeReuse(object name = null)
         {
-            return registry.CurrentScope;
+            Name = name;
         }
 
-        public override string ToString() { return GetType().Name + ":" + Lifespan; }
+        /// <summary>Returns container current scope or if <see cref="Name"/> specified: current scope or its parent with corresponding name.</summary>
+        /// <param name="registry">Registry to get current scope from.</param>
+        /// <param name="resolutionScope">Scope associated with resolution root.</param>
+        /// <returns>Found current scope or its parent.</returns>
+        /// <exception cref="ContainerException">with the code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/> if <see cref="Name"/> specified but
+        /// no matching scope or its parent found.</exception>
+        public IScope GetScope(IRegistry registry, ref IScope resolutionScope)
+        {
+            if (Name == null) 
+                return registry.CurrentScope;
+            
+            var scope = registry.CurrentScope;
+            while (scope != null && !Equals(Name, scope.Name))
+                scope = scope.Parent;
+            return scope.ThrowIfNull(Error.NO_MATCHED_SCOPE_FOUND, Name);
+        }
+
+        /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
+        public override string ToString()
+        {
+            var s = GetType().Name + ":" + Lifespan;
+            if (Name != null)
+                s += new StringBuilder(", Name:").Print(Name);                
+            return s;
+        }
     }
 
     /// <summary>Represents services created once per resolution root (when some of Resolve methods called).</summary>
     /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
     public sealed class ResolutionScopeReuse : IReuse
     {
+        /// <summary>Related lifespan value associated with reuse.</summary>
         public static readonly int LIFESPAN = 10;
 
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return LIFESPAN; } }
 
-        /// <summary>Creates or returns already created resolution root bound scope</summary>
+        /// <summary>Creates or returns already created resolution root scope.</summary>
         /// <returns>Created or existing scope.</returns>
         public IScope GetScope(IRegistry _, ref IScope resolutionScope)
         {
             return resolutionScope ?? (resolutionScope = new Scope());
         }
 
-        public override string ToString() { return GetType().Name + ":" + Lifespan; }
-    }
-
-    /// <summary>Represents services that have single instance per Thread.
-    /// The reuse requires <see cref="Container.OpenScope"/> to be called with <see cref="ThreadLocalScopeContext.ROOT_SCOPE_NAME"/>
-    /// scope available.</summary>
-    public sealed class ThreadLocalScopeReuse : IReuse
-    {
-        /// <summary>The same lifespan as for <see cref="CurrentScopeReuse"/> cause the reuse is bound to current scope.</summary>
-        public int Lifespan { get { return CurrentScopeReuse.LIFESPAN; } }
-
-        /// <summary>Searches and returns root scope in ambient context with name <see cref="ThreadLocalScopeContext.ROOT_SCOPE_NAME"/>,
-        /// otherwise throws.</summary>
-        /// <param name="registry">To get current scope from.</param> <param name="resolutionScope">(ignored)</param>
-        /// <returns>Found scope.</returns>
-        /// <exception cref="ContainerException">If no matching root scope found.</exception>
-        public IScope GetScope(IRegistry registry, ref IScope resolutionScope)
-        {
-            var scope = registry.CurrentScope;
-            while (scope != null && scope.Name != ThreadLocalScopeContext.ROOT_SCOPE_NAME)
-                scope = scope.Parent;
-            return scope.ThrowIfNull(Error.NO_OPEN_THREAD_SCOPE, typeof(ThreadLocalScopeContext).Name);
-        }
-
-        /// <summary>Pretty prints scope to refer in exception.</summary> <returns></returns>
+        /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
         public override string ToString() { return GetType().Name + ":" + Lifespan; }
     }
 
@@ -4589,7 +4565,7 @@ namespace DryIoc
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
 
         /// <summary>Ensuring single service instance per Thread.</summary>
-        public static readonly IReuse InThreadScope = new ThreadLocalScopeReuse();
+        public static readonly IReuse InThreadScope = new CurrentScopeReuse(ThreadScopeContext.ROOT_SCOPE_NAME);
     }
 
     /// <summary>Alternative reuse perspective/notation.</summary>
@@ -4599,7 +4575,7 @@ namespace DryIoc
         public static readonly IReuse InContainer = new SingletonReuse();
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
-        public static readonly IReuse InThreadScope = new ThreadLocalScopeReuse();
+        public static readonly IReuse InThreadScope = new CurrentScopeReuse(ThreadScopeContext.ROOT_SCOPE_NAME);
         // NOTE: Do we need InAppDomain/static, or in InProcess?
     }
 
@@ -5208,7 +5184,8 @@ namespace DryIoc
             UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE,
             NOT_DIRECT_SCOPE_PARENT,
             CANT_RESOLVE_REUSE_WRAPPER,
-            WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE;
+            WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE,
+            NO_MATCHED_SCOPE_FOUND;
 
         static Error()
         {
@@ -5271,9 +5248,9 @@ namespace DryIoc
             _(ref REGISTERING_WITH_DUPLICATE_SERVICE_KEY,           "Service {0} with the same key \"{1}\" is already registered as {2}.");
             _(ref NO_CURRENT_SCOPE,                                 "No current scope available: probably you are resolving scoped service outside of scope.");
             _(ref UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE,            "Unable to dispose not a current opened scope.");
-            _(ref NOT_DIRECT_SCOPE_PARENT,                          "Unable to Open Scope from not a direct parent container.");
             _(ref CANT_RESOLVE_REUSE_WRAPPER,                       "Unable to resolve reuse wrapper {0} for: {1}");
-            _(ref WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE,        "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}.");   
+            _(ref WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE,        "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}.");
+            _(ref NO_MATCHED_SCOPE_FOUND,                           "Unable to find scope with matching name \"{0}\" in current scope reuse."); 
         }
 
         private static void _(ref int error, string message)

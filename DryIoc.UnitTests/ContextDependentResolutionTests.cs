@@ -89,24 +89,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<object>(new FactoryProvider(request => null));
 
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<object>());
-        }
-
-        [Test, Ignore("Not supported")]
-        public void Delegate_factory_may_resolve_different_objects_depending_on_request()
-        {
-            var container = new Container();
-            var root = "root";
-            var dependency = "dependency";
-            //container.RegisterDelegate(r => r.Parent.IsEmpty ? root : dependency);
-            container.Register<StrUser>();
-
-            var service = container.Resolve<string>();
-            Assert.That(service, Is.EqualTo(root));
-
-            var client = container.Resolve<StrUser>();
-            Assert.That(client.Dependency, Is.EqualTo(dependency));
+            var ex = Assert.Throws<ContainerException>(() => container.Resolve<object>());
+            Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
         }
     }
 

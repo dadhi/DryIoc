@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Web;
 using DryIoc.UnitTests.CUT;
@@ -310,7 +309,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_can_use_execution_flow_context()
         {
-            var container = new Container(scopeContext: new ExecutionFlowScopeContext());
+            var container = new Container(scopeContext: new ReuseInCurrentScopeTests.ExecutionFlowScopeContext());
             
             container.Register<SomeRoot>(Reuse.InCurrentScope);
             container.Register<SomeDep>(Reuse.InCurrentScope);
@@ -348,38 +347,6 @@ namespace DryIoc.UnitTests
             public SomeRoot(SomeDep dep)
             {
                 Dep = dep;
-            }
-        }
-
-        public sealed class ExecutionFlowScopeContext : IScopeContext
-        {
-            public static readonly object ROOT_SCOPE_NAME = typeof(ExecutionFlowScopeContext);
-
-            public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
-
-            public IScope GetCurrentOrDefault()
-            {
-                var scope = (Remote<IScope>)CallContext.LogicalGetData(_key);
-                return scope == null ? null : scope.Value;
-            }
-
-            public void SetCurrent(Func<IScope, IScope> update)
-            {
-                var oldScope = GetCurrentOrDefault();
-                var newScope = update.ThrowIfNull()(oldScope);
-                CallContext.LogicalSetData(_key, new Remote<IScope>(newScope));
-            }
-
-            private static readonly string _key = typeof(ExecutionFlowScopeContext).Name;
-        }
-
-        public sealed class Remote<T> : MarshalByRefObject
-        {
-            public readonly T Value;
-
-            public Remote(T value)
-            {
-                Value = value;
             }
         }
 

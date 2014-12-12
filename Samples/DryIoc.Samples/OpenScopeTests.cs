@@ -59,7 +59,7 @@ namespace DryIoc.Samples
             container.Register<ISessionFactory, TestSessionFactory>();
 
             container.Register<ISession>(Reuse.InCurrentScope,
-                rules: InjectionRules.With(r => FactoryMethod.Of(r.Resolve<ISessionFactory>(), f => f.OpenSession())));
+                inject: InjectionRules.With(r => FactoryMethod.Of(r.Resolve<ISessionFactory>(), f => f.OpenSession())));
 
             ISession scopeOneSession;
             using (var scoped = container.OpenScope())
