@@ -84,7 +84,7 @@ namespace DryIoc.Samples
             }
 
             // Step 2 - Add resolution rule for creating factory on resolve.
-            var rules = Rules.Default.With(request =>
+            var rules = Rules.Default.WithResolveNotRegisteredService(request =>
             {
                 List<KeyValuePair<object, RegistrationInfo>> regs;
                 if (!lazyRegIndex.TryGetValue(request.ServiceType.FullName, out regs))

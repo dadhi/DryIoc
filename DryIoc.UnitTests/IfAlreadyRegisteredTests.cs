@@ -12,7 +12,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateRegistered);
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateDefault);
 
             var service = container.Resolve<IService>();
 
@@ -24,7 +24,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(named: EnumKey.Some);
-            container.Register<IService, AnotherService>(named: EnumKey.Some, ifAlreadyRegistered: IfAlreadyRegistered.UpdateRegistered);
+            container.Register<IService, AnotherService>(named: EnumKey.Some, ifAlreadyRegistered: IfAlreadyRegistered.UpdateDefault);
 
             var service = container.Resolve<IService>(EnumKey.Some);
 
@@ -37,7 +37,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, DisposableService>();
-            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateRegistered);
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateDefault);
 
             var services = container.Resolve<IService[]>();
 

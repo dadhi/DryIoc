@@ -38,6 +38,7 @@ namespace DryIoc.MefAttributedModel
     {
         ///<summary>Default reuse policy is Singleton, the same as in MEF.</summary>
         public static Type DefaultReuseType = typeof(SingletonReuse);
+        public static IReuse DefaultReuse = Reuse.Singleton;
 
         /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/> 
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
@@ -252,14 +253,14 @@ namespace DryIoc.MefAttributedModel
                 var implementationType = import.ImplementationType ?? serviceType;
 
                 var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
-                var reuse = GetReuseByType(reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType);
+                var reuse = reuseAttr == null ? DefaultReuse : reuseAttr.Reuse;
 
                 var withConstructor = import.WithConstructor == null ? null
                     : (Func<Type, ConstructorInfo>)(t => t.GetConstructorOrNull(args: import.WithConstructor));
 
                 registry.Register(serviceType, implementationType,
                     reuse, withConstructor, null, Setup.With(metadata: import.Metadata),
-                    serviceKey, IfAlreadyRegistered.KeepRegistered);
+                    serviceKey, IfAlreadyRegistered.KeepDefault);
             }
 
             return ServiceInfoDetails.Of(serviceType, serviceKey);
@@ -818,6 +819,8 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Implementation of <see cref="IReuse"/>. Could be null to specify transient or no reuse.</summary>
         public readonly Type ReuseType;
 
+        public IReuse Reuse;
+
         /// <summary>Create attribute with specified type implementing <see cref="IReuse"/>.</summary>
         /// <param name="reuseType">Could be null to specify transient or no reuse.</param>
         public ReuseAttribute(Type reuseType)
@@ -840,7 +843,10 @@ namespace DryIoc.MefAttributedModel
 
     public class CurrentScopeReuseAttribute : ReuseAttribute
     {
-        public CurrentScopeReuseAttribute() : base(typeof(CurrentScopeReuse)) { }
+        public CurrentScopeReuseAttribute(string scopeA = null) : base(typeof (CurrentScopeReuse))
+        {
+            Reuse = new CurrentScopeReuse(scopeA);
+        }
     }
 
     public class ResolutionScopeReuseAttribute : ReuseAttribute

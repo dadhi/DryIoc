@@ -279,28 +279,34 @@ namespace DryIoc.UnitTests
         [Test]
         public void Working_with_HttpScopeContext()
         {
-            var root = new Container();
-            root.Register<SomeRoot>(Reuse.InCurrentScope);
-            root.Register<SomeDep>(Reuse.InCurrentScope);
+            var root = new Container(scopeContext: new HttpScopeContext());
+            root.Register<SomeRoot>(WebReuse.InHttpContext);
+            root.Register<SomeDep>(WebReuse.InHttpContext);
 
             SomeDep savedOutside;
-            using (var scoped = root.OpenScope(new HttpScopeContext()))
+            using (var scoped = root.OpenScope())
             {
-                var firstRoot = scoped.Resolve<SomeRoot>();
-                var otherRoot = scoped.Resolve<SomeRoot>();
+                var a = scoped.Resolve<SomeRoot>();
+                var b = scoped.Resolve<SomeRoot>();
 
-                Assert.That(firstRoot, Is.SameAs(otherRoot));
+                Assert.That(a, Is.SameAs(b));
 
-                savedOutside = firstRoot.Dep;
+                using (var nested = scoped.OpenScope())
+                {
+                    var aa = nested.Resolve<SomeRoot>();
+                    Assert.AreSame(aa, a);
+                }
+
+                savedOutside = a.Dep;
             }
 
-            using (var scoped = root.OpenScope(new HttpScopeContext()))
+            using (var scoped = root.OpenScope())
             {
-                var firstRoot = scoped.Resolve<SomeRoot>();
-                var otherRoot = scoped.Resolve<SomeRoot>();
+                var a = scoped.Resolve<SomeRoot>();
+                var b = scoped.Resolve<SomeRoot>();
 
-                Assert.That(firstRoot, Is.SameAs(otherRoot));
-                Assert.That(firstRoot.Dep, Is.Not.SameAs(savedOutside));
+                Assert.That(a, Is.SameAs(b));
+                Assert.That(a.Dep, Is.Not.SameAs(savedOutside));
             }
 
             Assert.That(savedOutside.IsDisposed, Is.True);
@@ -348,6 +354,11 @@ namespace DryIoc.UnitTests
             {
                 Dep = dep;
             }
+        }
+
+        public static class WebReuse
+        {
+            public static readonly CurrentScopeReuse InHttpContext = new CurrentScopeReuse(HttpScopeContext.ROOT_SCOPE_NAME);
         }
 
         public sealed class HttpScopeContext : IScopeContext

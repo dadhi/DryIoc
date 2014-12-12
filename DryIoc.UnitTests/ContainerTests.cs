@@ -283,7 +283,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepDefault);
 
             var service = container.Resolve<IService>();
 
@@ -295,7 +295,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(named: "a");
-            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepDefault);
 
             var service = container.Resolve<IService>();
 
@@ -308,7 +308,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>();
-            container.Register<IService, DisposableService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
+            container.Register<IService, DisposableService>(ifAlreadyRegistered: IfAlreadyRegistered.KeepDefault);
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
@@ -321,7 +321,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(named: "a");
-            container.Register<IService, AnotherService>(named: "a", ifAlreadyRegistered: IfAlreadyRegistered.KeepRegistered);
+            container.Register<IService, AnotherService>(named: "a", ifAlreadyRegistered: IfAlreadyRegistered.KeepDefault);
 
             var service = container.Resolve<IService>("a");
 

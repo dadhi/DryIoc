@@ -75,35 +75,45 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             GC.KeepAlive(serviceRef);
         }
-    }
 
-    [Export, TransientReuse]
-    public class ServiceWithReuseAttribute {}
-
-    [Export, SingletonReuse]
-    public class ServiceWithSingletonReuse { }
-
-    [Export, CurrentScopeReuse]
-    public class ServiceWithCurrentScopeReuse { }
-
-    [Export, ResolutionScopeReuse]
-    public class ServiceWithResolutionScopeReuse { }
-
-    [Export, ResolutionScopeReuse]
-    public class UserOfServiceWithResolutionScopeReuse
-    {
-        public ServiceWithResolutionScopeReuse One { get; set; }
-        public ServiceWithResolutionScopeReuse Another { get; set; }
-
-        public UserOfServiceWithResolutionScopeReuse(
-            ServiceWithResolutionScopeReuse one,
-            ServiceWithResolutionScopeReuse another)
+        [Test]
+        public void Support_for_named_current_scope_reuse()
         {
-            One = one;
-            Another = another;
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(WithNamedCurrentScope));
         }
-    }
 
-    [Export, ReuseWrappers(typeof(WeakReference))]
-    public class SharedWithReuseWrapper {}
+        [Export, TransientReuse]
+        public class ServiceWithReuseAttribute { }
+
+        [Export, SingletonReuse]
+        public class ServiceWithSingletonReuse { }
+
+        [Export, CurrentScopeReuse]
+        public class ServiceWithCurrentScopeReuse { }
+
+        [Export, ResolutionScopeReuse]
+        public class ServiceWithResolutionScopeReuse { }
+
+        [Export, ResolutionScopeReuse]
+        public class UserOfServiceWithResolutionScopeReuse
+        {
+            public ServiceWithResolutionScopeReuse One { get; set; }
+            public ServiceWithResolutionScopeReuse Another { get; set; }
+
+            public UserOfServiceWithResolutionScopeReuse(
+                ServiceWithResolutionScopeReuse one,
+                ServiceWithResolutionScopeReuse another)
+            {
+                One = one;
+                Another = another;
+            }
+        }
+
+        [Export, ReuseWrappers(typeof(WeakReference))]
+        public class SharedWithReuseWrapper { }
+
+        [Export, CurrentScopeReuse("Scope A")]
+        public class WithNamedCurrentScope { }
+    }
 }

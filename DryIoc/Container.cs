@@ -109,7 +109,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var parentRegistry = _registryWeakRef;
-            return new Container(Rules.With(childRequest =>
+            return new Container(Rules.WithResolveNotRegisteredService(childRequest =>
             {
                 var childRequestWithParentRegistry = childRequest.ReplaceRegistryWith(parentRegistry);
                 var factory = childRequestWithParentRegistry.Registry.ResolveFactory(childRequestWithParentRegistry);
@@ -174,12 +174,12 @@ namespace DryIoc
 
         #region Static state
 
-        public static readonly ParameterExpression StateParamExpr = Expression.Parameter(typeof(AppendableArray<object>), "state");
+        internal static readonly ParameterExpression StateParamExpr = Expression.Parameter(typeof(AppendableArray<object>), "state");
 
         internal static readonly ParameterExpression RegistryWeakRefParamExpr = Expression.Parameter(typeof(RegistryWeakRef), "regRef");
-        public static readonly Expression RegistryExpr = Expression.Property(RegistryWeakRefParamExpr, "Target");
+        internal static readonly Expression RegistryExpr = Expression.Property(RegistryWeakRefParamExpr, "Target");
 
-        public static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "scope");
+        internal static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "scope");
 
         #endregion
 
@@ -508,20 +508,20 @@ namespace DryIoc
                 factory = GetServiceFactoryOrDefault(serviceTypeGenericDef, request.ServiceKey, Rules.FactorySelector);
                 if (factory != null && (factory = factory.GetFactoryForRequestOrDefault(request)) != null)
                 {   // Important to register produced factory, at least for recursive dependency check
-                    Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.UpdateRegistered);
+                    Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.UpdateDefault);
                     return factory;
                 }
             }
 
             // Try unregistered resolution rules.
-            var rulesForUnregistered = Rules.ForUnregisteredService;
+            var rulesForUnregistered = Rules.ResolveNotRegisteredService;
             if (rulesForUnregistered != null && rulesForUnregistered.Length != 0)
                 for (var i = 0; i < rulesForUnregistered.Length; i++)
                 {
                     var ruleFactory = rulesForUnregistered[i].Invoke(request);
                     if (ruleFactory != null)
                     {
-                        Register(ruleFactory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.UpdateRegistered);
+                        Register(ruleFactory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.UpdateDefault);
                         return ruleFactory;
                     }
                 }
@@ -760,9 +760,9 @@ namespace DryIoc
                     {
                         switch (ifAlreadyRegistered)
                         {
-                            case IfAlreadyRegistered.KeepRegistered:
+                            case IfAlreadyRegistered.KeepDefault:
                                 return oldValue;
-                            case IfAlreadyRegistered.UpdateRegistered:
+                            case IfAlreadyRegistered.UpdateDefault:
                                 _resolvedDefaultDelegates.Swap(x1 => x1.RemoveOrUpdate(serviceType));
                                 return factory;
                             default:
@@ -781,9 +781,9 @@ namespace DryIoc
 
                     switch (ifAlreadyRegistered)
                     {
-                        case IfAlreadyRegistered.KeepRegistered:
+                        case IfAlreadyRegistered.KeepDefault:
                             return oldValue;
-                        case IfAlreadyRegistered.UpdateRegistered:
+                        case IfAlreadyRegistered.UpdateDefault:
                             _resolvedDefaultDelegates.Swap(__ => __.RemoveOrUpdate(serviceType));
                             return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.AddOrUpdate(oldEntry.LastDefaultKey, factory));
                         default: // just add another default factory
@@ -804,8 +804,8 @@ namespace DryIoc
 
                     var oldEntry = ((FactoriesEntry)oldValue);
                     return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
-                        ifAlreadyRegistered == IfAlreadyRegistered.KeepRegistered ? oldFactory
-                        : ifAlreadyRegistered == IfAlreadyRegistered.UpdateRegistered ? factory
+                        ifAlreadyRegistered == IfAlreadyRegistered.KeepDefault ? oldFactory
+                        : ifAlreadyRegistered == IfAlreadyRegistered.UpdateDefault ? factory
                         : Throw.Instead<Factory>(Error.REGISTERING_WITH_DUPLICATE_SERVICE_KEY, serviceType, serviceKey, oldFactory)));
                 }));
             }
@@ -970,17 +970,22 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>Holds service expression cache, and state items passed to <see cref="FactoryDelegate"/> in resolution root.</summary>
+    /// <summary>Holds service expression cache, and state items to be passed to <see cref="FactoryDelegate"/> in resolution root.</summary>
     public sealed class ResolutionState : IDisposable
     {
+        /// <summary>Creates resolution state.</summary>
         public ResolutionState()
             : this(AppendableArray<object>.Empty, HashTree<int, Expression>.Empty, HashTree<int, Expression>.Empty) { }
 
+        /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
         public AppendableArray<object> Items
         {
             get { return _items; }
         }
 
+        /// <summary>Adds item if it is not already added to state, returns added or existing item index.</summary>
+        /// <param name="item">Item to find in existing items with <see cref="object.Equals(object, object)"/> or add if not found.</param>
+        /// <returns>Index of found or added item.</returns>
         public int GetOrAddItem(object item)
         {
             var index = -1;
@@ -994,11 +999,14 @@ namespace DryIoc
             return index;
         }
 
+        /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings), 
+        /// otherwise invokes <see cref="GetOrAddItem"/> and wraps access to added item (by returned index) into expression: state => state.Get(index).</summary>
+        /// <param name="item">Item to wrap or to add.</param> <param name="itemType">(optional) Specific type of item, otherwise item <see cref="object.GetType()"/>.</param>
+        /// <returns>Returns constant or state access expression for added items.</returns>
         public Expression GetOrAddItemExpression(object item, Type itemType = null)
         {
             itemType = itemType ?? item.GetType();
-            if (itemType.IsPrimitive() || itemType.IsEnum() ||
-                itemType == typeof(string) || itemType == typeof(Type))
+            if (itemType.IsPrimitiveOrArrayOfPrimitives() || itemType == typeof(string) || itemType == typeof(Type))
                 return Expression.Constant(item, itemType);
 
             var itemIndex = GetOrAddItem(item);
@@ -1056,8 +1064,78 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>Immutable array based on wide hash tree, 
-    /// where each node is sub-array with predefined size: 32 is by default.
+    //TODO: Complete and check.
+    /// <summary>Immutable array based on wide hash tree, where each node is sub-array with predefined size: 32 is by default.
+    /// Array supports only append, no remove.</summary>
+    /// <typeparam name="T">Array item type.</typeparam>
+    public class AppendableArraySimplified<T>
+    {
+        /// <summary>Empty/default value to start from.</summary>
+        public static readonly AppendableArraySimplified<T> Empty = new AppendableArraySimplified<T>(0);
+
+        /// <summary>Number of items in array.</summary>
+        public readonly int Length;
+
+        /// <summary>Appends value and returns new array.</summary>
+        /// <param name="value">Value to append.</param> <returns>New array.</returns>
+        public virtual AppendableArraySimplified<T> Append(T value)
+        {
+            return Length < NODE_ARRAY_SIZE
+                ? new AppendableArraySimplified<T>(Length + 1, _items.AppendOrUpdate(value))
+                : new AppendableArrayTree(Length, HashTree<int, T[]>.Empty.AddOrUpdate(0, _items)).Append(value);
+        }
+
+        /// <summary>Returns item stored at specified index. Method relies on underlying array for index range checking.</summary>
+        /// <param name="index">Index to look for item.</param> <returns>Found item.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">from underlying node array.</exception>
+        public virtual T Get(int index)
+        {
+            return _items[index];
+        }
+
+        #region Implementation
+
+        /// <summary>Node array size. When the item added to same node, array will be copied. 
+        /// So if array is too big performance will degrade. Should be power of two: e.g. 2, 4, 8, 16, 32...</summary>
+        internal const int NODE_ARRAY_SIZE = 32;
+
+        private readonly T[] _items;
+
+        private AppendableArraySimplified(int length, T[] items = null)
+        {
+            Length = length;
+            _items = items;
+        }
+
+        private sealed class AppendableArrayTree : AppendableArraySimplified<T>
+        {
+            private const int NODE_ARRAY_BIT_MASK = NODE_ARRAY_SIZE - 1; // for length 32 will be 11111 binary.
+            private const int NODE_ARRAY_BIT_COUNT = 5;                  // number of set bits in NODE_ARRAY_BIT_MASK.
+
+            public override AppendableArraySimplified<T> Append(T value)
+            {
+                return new AppendableArrayTree(Length + 1,
+                    _tree.AddOrUpdate(Length >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
+            }
+
+            public override T Get(int index)
+            {
+                return _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BIT_MASK];
+            }
+
+            public AppendableArrayTree(int length, HashTree<int, T[]> tree)
+                : base(length)
+            {
+                _tree = tree;
+            }
+
+            private readonly HashTree<int, T[]> _tree;
+        }
+
+        #endregion
+    }
+
+    /// <summary>Immutable array based on wide hash tree, where each node is sub-array with predefined size: 32 is by default.
     /// Array supports only append, no remove.</summary>
     /// <typeparam name="T">Array item type.</typeparam>
     public sealed class AppendableArray<T>
@@ -1130,8 +1208,12 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Wraps <see cref="IRegistry"/> WeakReference with more specialized exceptions on access to GCed or disposed registry.</summary>
     public sealed class RegistryWeakRef
     {
+        /// <summary>Retrieves registry object if it is not GCed or disposed</summary>
+        /// <exception cref="ContainerException">With code <see cref="Error.CONTAINER_IS_GARBAGE_COLLECTED"/>.</exception>
+        /// <exception cref="ContainerException">With code <see cref="Error.CONTAINER_IS_DISPOSED"/>.</exception>
         public IRegistry Target
         {
             get
@@ -1141,6 +1223,7 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Creates weak reference wrapper over passed registry object.</summary> <param name="registry">Object to wrap.</param>
         public RegistryWeakRef(IRegistry registry)
         {
             _ref = new WeakReference(registry);
@@ -1202,7 +1285,7 @@ namespace DryIoc
     /// <summary>Adds to Container support for:
     /// <list type="bullet">
     /// <item>Open-generic services</item>
-    /// <item>Service generics wrappers and arrays using <see cref="Rules.ForUnregisteredService"/> extension point.
+    /// <item>Service generics wrappers and arrays using <see cref="Rules.ResolveNotRegisteredService"/> extension point.
     /// Supported wrappers include: Func of <see cref="FuncTypes"/>, Lazy, Many, IEnumerable, arrays, Meta, KeyValuePair, DebugExpression.
     /// All wrapper factories are added into collection <see cref="Wrappers"/> and searched by <see cref="ResolveWrappers"/>
     /// unregistered resolution rule.</item>
@@ -1286,7 +1369,7 @@ namespace DryIoc
         }
 
         /// <summary>Unregistered/fallback wrapper resolution rule.</summary>
-        public static readonly Rules.ResolveUnregisteredServiceRule ResolveWrappers = request =>
+        public static readonly Rules.ResolveNotRegisteredServiceRule ResolveWrappers = request =>
         {
             var serviceType = request.ServiceType;
             var itemType = serviceType.GetElementTypeOrNull();
@@ -1586,17 +1669,20 @@ namespace DryIoc
     public sealed partial class Rules
     {
         /// <summary>No rules specified.</summary>
-        /// <remarks>Rules <see cref="ForUnregisteredService"/> are empty too.</remarks>
+        /// <remarks>Rules <see cref="ResolveNotRegisteredService"/> are empty too.</remarks>
         public static readonly Rules Empty = new Rules();
 
         /// <summary>Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
         /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.</summary>
-        public static readonly Rules Default = Empty.With(WrappersSupport.ResolveWrappers);
+        public static readonly Rules Default = Empty.WithResolveNotRegisteredService(WrappersSupport.ResolveWrappers);
 
+        /// <summary>Shorthand to <see cref="InjectionRules.Constructor"/></summary>
         public ConstructorSelector Constructor { get { return _injectionRules.Constructor; } }
 
+        /// <summary>Shorthand to <see cref="InjectionRules.Parameters"/></summary>
         public ParameterSelector Parameters { get { return _injectionRules.Parameters; } }
 
+        /// <summary>Shorthand to <see cref="InjectionRules.PropertiesAndFields"/></summary>
         public PropertiesAndFieldsSelector PropertiesAndFields { get { return _injectionRules.PropertiesAndFields; } }
 
         /// <summary>Returns new instance of the rules with specified <see cref="InjectionRules"/>.</summary>
@@ -1615,18 +1701,33 @@ namespace DryIoc
             };
         }
 
+        /// <summary>Defines single factory selector delegate.</summary>
+        /// <param name="factories">Registered factories with corresponding key to select from.</param>
+        /// <returns>Single selected factory, or null if unable to select.</returns>
         public delegate Factory FactorySelectorRule(IEnumerable<KeyValuePair<object, Factory>> factories);
+        
+        /// <summary>Gets single factory selector rule. Null by default.</summary>
         public FactorySelectorRule FactorySelector { get; private set; }
+
+        /// <summary>Sets <see cref="FactorySelector"/></summary> 
+        /// <param name="rule">Delegate to set, could be null to use default approach.</param> <returns>New rules.</returns>
         public Rules WithFactorySelector(FactorySelectorRule rule)
         {
             return new Rules(this) { FactorySelector = rule };
         }
 
-        public delegate Factory ResolveUnregisteredServiceRule(Request request);
-        public ResolveUnregisteredServiceRule[] ForUnregisteredService { get; private set; }
-        public Rules With(params ResolveUnregisteredServiceRule[] rules)
+        /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.</summary> 
+        /// <param name="request">Request to return factory for</param> <returns>Factory to resolve request, or null if unable to resolve.</returns>
+        public delegate Factory ResolveNotRegisteredServiceRule(Request request);
+
+        /// <summary>Gets rules for resolving not-registered services. Null by default.</summary>
+        public ResolveNotRegisteredServiceRule[] ResolveNotRegisteredService { get; private set; }
+
+        /// <summary>Sets the <see cref="ResolveNotRegisteredService"/> rules</summary>
+        /// <param name="rules">Rules to set, may be null or empty for no rules.</param> <returns>New Rules.</returns>
+        public Rules WithResolveNotRegisteredService(params ResolveNotRegisteredServiceRule[] rules)
         {
-            return new Rules(this) { ForUnregisteredService = rules };
+            return new Rules(this) { ResolveNotRegisteredService = rules };
         }
 
         /// <summary>Turns on/off exception throwing when dependency has shorter reuse lifespan than its parent.</summary>
@@ -1640,8 +1741,15 @@ namespace DryIoc
             return new Rules(this) { ThrowIfDepenedencyHasShorterReuseLifespan = throwIfDepenedencyHasShorterReuseLifespan };
         }
 
+        /// <summary>Defines mapping from registered reuse to what will be actually used.</summary>
+        /// <param name="reuse">Service registered reuse</param> <param name="request">Context.</param> <returns>Mapped result reuse to use.</returns>
         public delegate IReuse ReuseMappingRule(IReuse reuse, Request request);
+
+        /// <summary>Gets rule to retrieve actual reuse from registered one. May be null, so the registered reuse will be used.
+        /// Could be used to specify different reuse container wide, for instance <see cref="Reuse.Singleton"/> instead of <see cref="Reuse.Transient"/>.</summary>
         public ReuseMappingRule ReuseMapping { get; private set; }
+
+        /// <summary>Sets the <see cref="ReuseMapping"/> rule.</summary> <param name="rule">Rule to set, may be null.</param> <returns>New rules.</returns>
         public Rules WithReuseMapping(ReuseMappingRule rule)
         {
             return new Rules(this) { ReuseMapping = rule };
@@ -1661,7 +1769,7 @@ namespace DryIoc
         private Rules(Rules copy)
         {
             FactorySelector = copy.FactorySelector;
-            ForUnregisteredService = copy.ForUnregisteredService;
+            ResolveNotRegisteredService = copy.ResolveNotRegisteredService;
             ThrowIfDepenedencyHasShorterReuseLifespan = copy.ThrowIfDepenedencyHasShorterReuseLifespan;
             ReuseMapping = copy.ReuseMapping;
             _injectionRules = copy._injectionRules;
@@ -1763,29 +1871,41 @@ namespace DryIoc
                 : new InjectionRules(r => getConstructor(r.ImplementationType), Parameters, PropertiesAndFields);
         }
 
+        /// <summary>Creates rules with only <see cref="Constructor"/> specified.</summary>
+        /// <param name="constructor">To use.</param> <returns>New rules.</returns>
         public static implicit operator InjectionRules(ConstructorSelector constructor)
         {
             return With(constructor);
         }
 
+
+        /// <summary>Creates rules with only <see cref="Constructor"/> specified.</summary>
+        /// <param name="factoryMethod">To return from <see cref="Constructor"/>.</param> <returns>New rules.</returns>
         public static implicit operator InjectionRules(FactoryMethod factoryMethod)
         {
             return With(_ => factoryMethod);
         }
 
+        /// <summary>Creates rules with only <see cref="Constructor"/> specified.</summary>
+        /// <param name="factoryMethod">To create <see cref="FactoryMethod"/> and return it from <see cref="Constructor"/>.</param> 
+        /// <returns>New rules.</returns>
         public static implicit operator InjectionRules(MethodInfo factoryMethod)
         {
             return With(_ => FactoryMethod.Of(factoryMethod));
         }
 
-        public static implicit operator InjectionRules(ParameterSelector selector)
+        /// <summary>Creates rules with only <see cref="Parameters"/> specified.</summary>
+        /// <param name="parameters">To use.</param> <returns>New rules.</returns>
+        public static implicit operator InjectionRules(ParameterSelector parameters)
         {
-            return With(parameters: selector);
+            return With(parameters: parameters);
         }
 
-        public static implicit operator InjectionRules(PropertiesAndFieldsSelector selector)
+        /// <summary>Creates rules with only <see cref="PropertiesAndFields"/> specified.</summary>
+        /// <param name="propertiesAndFields">To use.</param> <returns>New rules.</returns>
+        public static implicit operator InjectionRules(PropertiesAndFieldsSelector propertiesAndFields)
         {
-            return With(propertiesAndFields: selector);
+            return With(propertiesAndFields: propertiesAndFields);
         }
 
         /// <summary>Returns delegate to select constructor based on provided request.</summary>
@@ -2250,7 +2370,13 @@ namespace DryIoc
     }
 
     /// <summary>Specifies result of <see cref="Resolver.ResolveMany{TService}"/>: either dynamic(lazy) or fixed view.</summary>
-    public enum ResolveManyBehavior { EachItemLazyResolved, AllItemsResolvedIntoFixedArray }
+    public enum ResolveManyBehavior
+    {
+        /// <summary>Lazy/dynamic item resolve.</summary>
+        EachItemLazyResolved,
+        /// <summary>Fixed array of item at time of resolve, newly registered/removed services won't be listed.</summary>
+        AllItemsResolvedIntoFixedArray
+    }
 
     /// <summary>Provides information required for service resolution: service type, 
     /// and optional <see cref="ServiceInfoDetails"/>: key, what to do if service unresolved, and required service type.</summary>
@@ -2794,8 +2920,10 @@ namespace DryIoc
         /// <summary>Factory found in container to resolve this request.</summary>
         public readonly Factory ResolvedFactory;
 
+        /// <summary>List of specified arguments to use instead of resolving them.</summary>
         public readonly KV<bool[], ParameterExpression[]> FuncArgs;
 
+        /// <summary>Weak reference to registry.</summary>
         public readonly RegistryWeakRef RegistryWeakRef;
 
         /// <summary>Provides access to container/registry currently bound to request. By default it is registry initiated request by calling resolve method,
@@ -2981,7 +3109,15 @@ namespace DryIoc
     }
 
     /// <summary>Type of services supported by Container.</summary>
-    public enum FactoryType { Service, Decorator, Wrapper };
+    public enum FactoryType
+    {
+        /// <summary>(default) Defines normal service factory</summary>
+        Service,
+        /// <summary>Defines decorator factory</summary>
+        Decorator, 
+        /// <summary>Defines wrapper factory.</summary>
+        Wrapper
+    };
 
     /// <summary>Base class to store optional <see cref="Factory"/> settings.</summary>
     public abstract class FactorySetup
@@ -2996,6 +3132,7 @@ namespace DryIoc
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
 
+        // TODO: Use it.
         public virtual Func<Request, bool> Condition { get { return null; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
@@ -3316,7 +3453,7 @@ namespace DryIoc
 
         private static readonly MethodInfo _getScopeMethod = typeof(IReuse).GetSingleDeclaredMethodOrNull("GetScope");
 
-        protected Expression GetScopedServiceExpressionOrDefault(Expression serviceExpr, IReuse reuse, Request request, Type requiredWrapperType = null)
+        private Expression GetScopedServiceExpressionOrDefault(Expression serviceExpr, IReuse reuse, Request request, Type requiredWrapperType = null)
         {
             var reuseExpr = request.State.GetOrAddItemExpression(reuse);
             var registryExpr = Container.RegistryExpr;
@@ -3727,7 +3864,7 @@ namespace DryIoc
             return property.CanWrite && !property.IsIndexer() // first checks that property is assignable in general and not indexer
                 && (include == Include.NonPrimitive || include == Include.All || property.IsPublic())
                 && (include == Include.Public || include == Include.All ||
-                !property.PropertyType.IsPrimitive(TypeTools.IsPrimitiveFlags.ObjectType | TypeTools.IsPrimitiveFlags.StringType));
+                !property.PropertyType.IsPrimitiveOrArrayOfPrimitives(t => t == typeof(object) || t == typeof(string)));
         }
 
         /// <summary>Returns true if field matches the <see cref="Include"/> provided, or false otherwise.</summary>
@@ -3738,7 +3875,7 @@ namespace DryIoc
         {
             return !field.IsInitOnly && !field.IsBackingField()
                 && (include == Include.Public || include == Include.All ||
-                !field.FieldType.IsPrimitive(TypeTools.IsPrimitiveFlags.ObjectType | TypeTools.IsPrimitiveFlags.StringType));
+                !field.FieldType.IsPrimitiveOrArrayOfPrimitives(t => t == typeof(object) || t == typeof(string)));
         }
 
         /// <summary>Returns true if field is backing field for property.</summary>
@@ -4670,7 +4807,7 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>Wrapper for shared reused service object, that allow client (but no to container) to
+    /// <summary>Wrapper for shared reused service object, that allow client (but not container) to
     /// disposed service object or renew it: so the next resolve will create new service.</summary>
     public class ExplicitlyDisposable : IReneweable
     {
@@ -4874,9 +5011,19 @@ namespace DryIoc
         void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request parentOrEmpty);
     }
 
-    // TODO: Handle Throw
+    
     /// <summary>Specifies options to handle situation when registering some service already present in the registry.</summary>
-    public enum IfAlreadyRegistered { Throw, ThrowIfDuplicateKey, KeepRegistered, UpdateRegistered }
+    public enum IfAlreadyRegistered
+    {
+        // TODO: Handle Throw
+        Throw, 
+        /// <summary>Defines to throw if registration with the same non-default key already exist.</summary>
+        ThrowIfDuplicateKey,
+        /// <summary>Registration of new default service will be silently rejected.</summary>
+        KeepDefault, 
+        /// <summary>Registration of new default service will replace existing one.</summary>
+        UpdateDefault
+    }
 
     /// <summary>Defines operations that for changing registry, and checking if something exist in registry.</summary>
     public interface IRegistrator
@@ -4928,7 +5075,7 @@ namespace DryIoc
 
         ResolutionState ResolutionState { get; }
 
-        /// <summary>Searches for requested factory in registry, and then using <see cref="DryIoc.Rules.ForUnregisteredService"/>.</summary>
+        /// <summary>Searches for requested factory in registry, and then using <see cref="DryIoc.Rules.ResolveNotRegisteredService"/>.</summary>
         /// <param name="request">Factory lookup info.</param>
         /// <returns>Found factory, otherwise null if <see cref="Request.IfUnresolved"/> is set to <see cref="IfUnresolved.ReturnDefault"/>.</returns>
         Factory ResolveFactory(Request request);
@@ -5515,23 +5662,15 @@ namespace DryIoc
             return obj != null && obj.GetType().IsAssignableTo(type);
         }
 
-        /// <summary>Flags to specify what else consider as primitive object in <see cref="TypeTools.IsPrimitive"/> method.</summary>
-        [Flags]
-        public enum IsPrimitiveFlags { None = 0, ObjectType = 1, StringType = 2 }
-
-        /// <summary>Returns true if provided type is primitive object in .Net terms and considered as primitive based
-        /// on <see cref="IsPrimitiveFlags"/>, or false - otherwise. If provided type is array, method will check
-        /// array's item type.</summary>
-        /// <param name="type">Type to check.</param>
-        /// <param name="flags">Specifies what additional types consider as primitives.</param>
-        /// <returns>True if check succeeded, false - otherwise.</returns>
-        public static bool IsPrimitive(this Type type, IsPrimitiveFlags flags = IsPrimitiveFlags.None)
+        /// <summary>Returns true if provided type IsPitmitive in .Net terms or an array of primitive types.</summary>
+        /// <param name="type">Type to check.</param> <param name="includeOther">Allows to include other types.</param>
+        /// <returns>Check result.</returns>
+        public static bool IsPrimitiveOrArrayOfPrimitives(this Type type, Func<Type, bool> includeOther = null)
         {
             var typeInfo = type.GetTypeInfo();
             return typeInfo.IsPrimitive || typeInfo.IsEnum
-                || type == typeof(object) && (flags & IsPrimitiveFlags.ObjectType) == IsPrimitiveFlags.ObjectType
-                || type == typeof(string) && (flags & IsPrimitiveFlags.StringType) == IsPrimitiveFlags.StringType
-                || typeInfo.IsArray && typeInfo.GetElementType().IsPrimitive(flags);
+                || includeOther != null && includeOther(type)
+                || typeInfo.IsArray && typeInfo.GetElementType().IsPrimitiveOrArrayOfPrimitives(includeOther);
         }
 
         /// <summary>Returns all attributes defined on <param name="type"></param>.</summary>
@@ -5953,6 +6092,7 @@ namespace DryIoc
             return AddOrUpdate(key.GetHashCode(), key, value, update);
         }
 
+        // TODO:
         public HashTree<K, V> Update(K key, Update<V> update)
         {
             var value = GetValueOrDefault(key);
