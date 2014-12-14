@@ -38,14 +38,14 @@ namespace DryIoc.MefAttributedModel
     {
         ///<summary>Default reuse policy is Singleton, the same as in MEF.</summary>
         public static Type DefaultReuseType = typeof(SingletonReuse);
-        public static IReuse DefaultReuse = Reuse.Singleton;
 
         /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/> 
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
-        public static readonly HashTree<Type, IReuse> SupportedReuseTypes = HashTree<Type, IReuse>.Empty
-            .AddOrUpdate(typeof(SingletonReuse), Reuse.Singleton)
-            .AddOrUpdate(typeof(CurrentScopeReuse), Reuse.InCurrentScope)
-            .AddOrUpdate(typeof(ResolutionScopeReuse), Reuse.InResolutionScope);
+        public static readonly HashTree<Type, Func<string, IReuse>> SupportedReuseTypes =
+            HashTree<Type, Func<string, IReuse>>.Empty
+            .AddOrUpdate(typeof(SingletonReuse), _ => Reuse.Singleton)
+            .AddOrUpdate(typeof(CurrentScopeReuse), Reuse.InCurrentNamedScope)
+            .AddOrUpdate(typeof(ResolutionScopeReuse), _ => Reuse.InResolutionScope);
 
         /// <summary>Map of supported reuse wrapper types, so that specified in <see cref="ReuseWrappersAttribute"/> type
         /// could be mapped to corresponding provider in <see cref="ReuseWrapper"/></summary>
@@ -153,10 +153,12 @@ namespace DryIoc.MefAttributedModel
         /// Returns null (transient or no reuse) if null provided reuse type.</summary>
         /// <param name="reuseType">Reuse type to find in supported.</param>
         /// <returns>Supported reuse object.</returns>
-        public static IReuse GetReuseByType(Type reuseType)
+        public static IReuse GetReuse(Type reuseType, string name = null)
         {
             return reuseType == null ? null
-                : SupportedReuseTypes.GetValueOrDefault(reuseType).ThrowIfNull(Error.UNSUPPORTED_REUSE_TYPE, reuseType);
+                : SupportedReuseTypes.GetValueOrDefault(reuseType)
+                .ThrowIfNull(Error.UNSUPPORTED_REUSE_TYPE, reuseType)
+                .Invoke(name);
         }
 
         /// <summary>Returns reuse wrapper object: corresponding member of <see cref="ReuseWrapper"/>.
@@ -253,7 +255,9 @@ namespace DryIoc.MefAttributedModel
                 var implementationType = import.ImplementationType ?? serviceType;
 
                 var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
-                var reuse = reuseAttr == null ? DefaultReuse : reuseAttr.Reuse;
+                var reuseType = reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType;
+                var reuseName = reuseAttr == null ? null : reuseAttr.ReuseName;
+                var reuse = GetReuse(reuseType, reuseName);
 
                 var withConstructor = import.WithConstructor == null ? null
                     : (Func<Type, ConstructorInfo>)(t => t.GetConstructorOrNull(args: import.WithConstructor));
@@ -300,7 +304,9 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is ReuseAttribute)
                 {
-                    info.ReuseType = ((ReuseAttribute)attribute).ReuseType;
+                    var reuseAttribute = ((ReuseAttribute)attribute);
+                    info.ReuseType = reuseAttribute.ReuseType;
+                    info.ReuseName = reuseAttribute.ReuseName;
                 }
                 else if (attribute is ReuseWrappersAttribute)
                 {
@@ -464,12 +470,16 @@ namespace DryIoc.MefAttributedModel
         #endregion
     }
 
+    /// <summary>Defines error codes and messages for <see cref="AttributedModelException"/>.</summary>
     public static class Error
     {
+        /// <summary>Codes are starting from this value.</summary>
         public readonly static int FIRST_ERROR_CODE = 100;
 
+        /// <summary>Error messages for corresponding codes.</summary>
         public readonly static IList<string> Messages = new List<string>();
 
+#pragma warning disable 1591 // Missing XML-comment
         public static readonly int
             NO_SINGLE_CTOR_WITH_IMPORTING_ATTR,
             NOT_FIND_DEPENDENCY_WITH_METADATA,
@@ -481,6 +491,7 @@ namespace DryIoc.MefAttributedModel
             UNSUPPORTED_REUSE_WRAPPER_TYPE,
             NO_WRAPPED_TYPE_EXPORTED_WRAPPER,
             WRAPPED_ARG_INDEX_OUT_OF_BOUNDS;
+#pragma warning restore 1591
 
         static Error()
         {
@@ -525,6 +536,7 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
+    /// <summary>Specific exception type to be thrown by MefAttributedModel extension. Check <see cref="Error"/> for possible error cases.</summary>
     public class AttributedModelException : ContainerException
     {
         public new static AttributedModelException Of(Throw.Check check, int error,
@@ -602,6 +614,7 @@ namespace DryIoc.MefAttributedModel
         public string ImplementationTypeFullName;
 
         public Type ReuseType;
+        public string ReuseName;
         public Type[] ReuseWrapperTypes;
 
         public bool HasMetadataAttribute;
@@ -612,7 +625,8 @@ namespace DryIoc.MefAttributedModel
 
         public Factory CreateFactory(InjectionRules rules = null)
         {
-            return new ReflectionFactory(ImplementationType, AttributedModel.GetReuseByType(ReuseType), rules, GetSetup());
+            var reuse = AttributedModel.GetReuse(ReuseType, ReuseName);
+            return new ReflectionFactory(ImplementationType, reuse, rules, GetSetup());
         }
 
         /// <summary>Create factory setup from DTO data.</summary>
@@ -691,11 +705,13 @@ namespace DryIoc.MefAttributedModel
     public sealed class ExportInfo
     {
         public Type ServiceType;
+ 
         public string ServiceTypeFullName;
 
         public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
 
-        public ExportInfo() { } // Default constructor is usually required by deserializer.
+        /// <summary>Default constructor is usually required by deserializer.</summary>
+        public ExportInfo() { } 
 
         public ExportInfo(Type serviceType, object serviceKey = null)
         {
@@ -818,19 +834,22 @@ namespace DryIoc.MefAttributedModel
     {
         /// <summary>Implementation of <see cref="IReuse"/>. Could be null to specify transient or no reuse.</summary>
         public readonly Type ReuseType;
-
-        public IReuse Reuse;
+        
+        /// <summary>Optional name, valid only for <see cref="CurrentScopeReuse"/>.</summary>
+        public readonly string ReuseName;
 
         /// <summary>Create attribute with specified type implementing <see cref="IReuse"/>.</summary>
         /// <param name="reuseType">Could be null to specify transient or no reuse.</param>
-        public ReuseAttribute(Type reuseType)
+        /// <param name="reuseName">(optional) Name is valid only for <see cref="CurrentScopeReuse"/> and will be ignored by the rest of reuse types.</param>
+        public ReuseAttribute(Type reuseType, string reuseName = null)
         {
-            if (reuseType != null)
-                (typeof(IReuse)).ThrowIfNotOf(reuseType);
+            if (reuseType != null) (typeof(IReuse)).ThrowIfNotOf(reuseType);
             ReuseType = reuseType;
+            ReuseName = reuseName;
         }
     }
 
+    /// <summary>Declaring the <see cref="Reuse.Transient"/> for exported service.</summary>
     public class TransientReuseAttribute : ReuseAttribute
     {
         public TransientReuseAttribute() : base(null) { }
@@ -843,10 +862,7 @@ namespace DryIoc.MefAttributedModel
 
     public class CurrentScopeReuseAttribute : ReuseAttribute
     {
-        public CurrentScopeReuseAttribute(string scopeA = null) : base(typeof (CurrentScopeReuse))
-        {
-            Reuse = new CurrentScopeReuse(scopeA);
-        }
+        public CurrentScopeReuseAttribute(string reuseName = null) : base(typeof(CurrentScopeReuse), reuseName) {}
     }
 
     public class ResolutionScopeReuseAttribute : ReuseAttribute

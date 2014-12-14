@@ -77,10 +77,31 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Support_for_named_current_scope_reuse()
+        public void When_no_named_current_scope_reuse_Then_it_should_throw()
         {
             var container = new Container().WithAttributedModel();
             container.RegisterExports(typeof(WithNamedCurrentScope));
+
+            using (var scoped = container.OpenScope())
+            {
+                var ex = Assert.Throws<ContainerException>(() => 
+                    scoped.Resolve<WithNamedCurrentScope>());
+
+                Assert.AreEqual(ex.Error, DryIoc.Error.NO_MATCHED_SCOPE_FOUND);
+            }
+        }
+
+        [Test]
+        public void When_there_is_corresponding_named_current_scope_Then_it_should_resolve()
+        {
+            var container = new Container().WithAttributedModel();
+            container.RegisterExports(typeof(WithNamedCurrentScope));
+
+            using (var scoped = container.OpenScope("ScopeA"))
+            {
+                var service = scoped.Resolve<WithNamedCurrentScope>();
+                Assert.AreSame(service, scoped.Resolve<WithNamedCurrentScope>());
+            }
         }
 
         [Export, TransientReuse]
@@ -113,7 +134,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Export, ReuseWrappers(typeof(WeakReference))]
         public class SharedWithReuseWrapper { }
 
-        [Export, CurrentScopeReuse("Scope A")]
+        [Export, CurrentScopeReuse("ScopeA")]
         public class WithNamedCurrentScope { }
     }
 }

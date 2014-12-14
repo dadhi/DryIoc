@@ -4642,11 +4642,20 @@ namespace DryIoc
         /// <summary>Specifies to store single service instance per current/open scope created with <see cref="Container.OpenScope"/>.</summary>
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
 
+        /// <summary>Return current scope reuse with specific name to match with scope.
+        /// If name is not specified then function returns <see cref="InCurrentScope"/>.</summary>
+        /// <param name="name">(optional) Name to match with scope.</param>
+        /// <returns>Created current scope reuse.</returns>
+        public static IReuse InCurrentNamedScope(object name = null)
+        {
+            return name == null ? InCurrentScope : new CurrentScopeReuse(name);
+        }
+
         /// <summary>Specifies to store single service instance per resolution root created by <see cref="Resolver"/> methods.</summary>
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
 
         /// <summary>Ensuring single service instance per Thread.</summary>
-        public static readonly IReuse InThreadScope = new CurrentScopeReuse(ThreadScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InThreadScope = InCurrentNamedScope(ThreadScopeContext.ROOT_SCOPE_NAME);
     }
 
     /// <summary>Alternative reuse perspective/notation.</summary>
@@ -4656,7 +4665,11 @@ namespace DryIoc
         public static readonly IReuse InContainer = new SingletonReuse();
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
         public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
-        public static readonly IReuse InThreadScope = new CurrentScopeReuse(ThreadScopeContext.ROOT_SCOPE_NAME);
+        public static IReuse InCurrentScopeWithName(object name = null)
+        {
+            return name == null ? InCurrentScope : new CurrentScopeReuse(name);
+        }
+        public static readonly IReuse InThreadScope = InCurrentScopeWithName(ThreadScopeContext.ROOT_SCOPE_NAME);
         // NOTE: Do we need InAppDomain/static, or in InProcess?
     }
 
@@ -5222,6 +5235,7 @@ namespace DryIoc
 
         public readonly static IList<string> Messages = new List<string>();
 
+#pragma warning disable 1591 // Missing XML-comment
         public static readonly int
             INVALID_CONDITION,
             IS_NULL,
@@ -5277,6 +5291,7 @@ namespace DryIoc
             CANT_RESOLVE_REUSE_WRAPPER,
             WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE,
             NO_MATCHED_SCOPE_FOUND;
+#pragma warning restore 1591
 
         static Error()
         {

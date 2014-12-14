@@ -358,7 +358,7 @@ namespace DryIoc.UnitTests
 
         public static class WebReuse
         {
-            public static readonly CurrentScopeReuse InHttpContext = new CurrentScopeReuse(HttpScopeContext.ROOT_SCOPE_NAME);
+            public static readonly IReuse InHttpContext = Reuse.InCurrentNamedScope(HttpScopeContext.ROOT_SCOPE_NAME);
         }
 
         public sealed class HttpScopeContext : IScopeContext

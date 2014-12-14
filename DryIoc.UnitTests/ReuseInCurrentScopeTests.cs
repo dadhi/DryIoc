@@ -151,7 +151,7 @@ namespace DryIoc.UnitTests
         public void Reuse_can_select_scope_with_specific_name()
         {
             var container = new Container(scopeContext: new ExecutionFlowScopeContext());
-            container.Register<Blah>(new CurrentScopeReuse(1));
+            container.Register<Blah>(Reuse.InCurrentNamedScope(1));
 
             using (var s1 = container.OpenScope(1))
             {
@@ -171,7 +171,7 @@ namespace DryIoc.UnitTests
         public void If_not_matched_name_found_then_current_scope_reuse_should_Throw()
         {
             var container = new Container(scopeContext: new ExecutionFlowScopeContext());
-            container.Register<Blah>(new CurrentScopeReuse(name: 1));
+            container.Register<Blah>(Reuse.InCurrentNamedScope(1));
 
             using (var s1 = container.OpenScope())
             {
@@ -184,7 +184,7 @@ namespace DryIoc.UnitTests
         public void If_no_scope_opened_And_not_matched_name_found_then_resolving_should_Throw()
         {
             var container = new Container(scopeContext: new ExecutionFlowScopeContext());
-            container.Register<Blah>(new CurrentScopeReuse(name: 1));
+            container.Register<Blah>(Reuse.InCurrentNamedScope(1));
             
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Blah>());
             Assert.That(ex.Error, Is.EqualTo(Error.NO_CURRENT_SCOPE));
