@@ -1090,9 +1090,10 @@ namespace DryIoc
         /// <param name="value">Value to look for.</param> <returns>Index of first equal value, or -1 otherwise.</returns>
         public virtual int IndexOf(T value)
         {
-            if (Length == 0)
+            if (_items == null || _items.Length == 0)
                 return -1;
-            for (var i = 0; i < Length; ++i)
+
+            for (var i = 0; i < _items.Length; ++i)
             {
                 var item = _items[i];
                 if (ReferenceEquals(item, value) || Equals(item, value))
