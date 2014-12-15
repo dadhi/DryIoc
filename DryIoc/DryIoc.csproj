@@ -39,11 +39,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Container.cs" />
-    <Compile Include="net40\Lazy.cs" />
-    <Compile Include="net45\ThreadTools.cs" />
+    <Compile Include="Polyfill-net40.cs" />
+    <Compile Include="Polyfill-net45.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="net45\TypeInfo.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -67,7 +67,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Appends attributed model rules to passed container using <see cref="WithAttributedModel(DryIoc.Rules)"/>.</summary>
         /// <param name="container">Source container to apply attributed model importing rules to.</param>
         /// <returns>Returns new container with new rules.</returns>
-        public static Container WithAttributedModel(this Container container)
+        public static IContainer WithAttributedModel(this Container container)
         {
             return container.With(rules => rules.WithAttributedModel());
         }
@@ -128,9 +128,7 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Lazy collection of registration info DTOs.</returns>
         public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
-            return assemblies.SelectMany(_getAssemblyTypes)
-                .Select(GetRegistrationInfoOrDefault)
-                .Where(info => info != null);
+            return assemblies.SelectMany(Polyfill.GetTypesFrom).Select(GetRegistrationInfoOrDefault).Where(x => x != null);
         }
 
         /// <summary>Creates registration info DTO for provided type. To find this info checks type attributes:
@@ -152,13 +150,14 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Returns reuse object by mapping provided type to <see cref="SupportedReuseTypes"/>.
         /// Returns null (transient or no reuse) if null provided reuse type.</summary>
         /// <param name="reuseType">Reuse type to find in supported.</param>
+        /// <param name="reuseName">(optional) Reuse name to match with scope name.</param>
         /// <returns>Supported reuse object.</returns>
-        public static IReuse GetReuse(Type reuseType, string name = null)
+        public static IReuse GetReuse(Type reuseType, string reuseName = null)
         {
             return reuseType == null ? null
                 : SupportedReuseTypes.GetValueOrDefault(reuseType)
                 .ThrowIfNull(Error.UNSUPPORTED_REUSE_TYPE, reuseType)
-                .Invoke(name);
+                .Invoke(reuseName);
         }
 
         /// <summary>Returns reuse wrapper object: corresponding member of <see cref="ReuseWrapper"/>.
@@ -230,7 +229,7 @@ namespace DryIoc.MefAttributedModel
             if (meta == null)
                 return null;
 
-            var registry = request.Registry;
+            var registry = request.Container;
             reflectedType = registry.GetWrappedServiceType(reflectedType);
             var metadata = meta.Metadata;
             var factory = registry.GetAllServiceFactories(reflectedType)
@@ -246,7 +245,7 @@ namespace DryIoc.MefAttributedModel
             if (import == null)
                 return null;
 
-            var registry = request.Registry;
+            var registry = request.Container;
             serviceType = import.ContractType ?? registry.GetWrappedServiceType(serviceType);
             var serviceKey = import.ContractKey;
 
@@ -436,9 +435,6 @@ namespace DryIoc.MefAttributedModel
             }
             return exports;
         }
-
-        private static readonly Func<Assembly, IEnumerable<Type>> _getAssemblyTypes =
-            ExpressionTools.GetMethodDelegateOrNull<Assembly, IEnumerable<Type>>("GetTypes").ThrowIfNull();
 
         private static void RegisterFactoryMethods(IRegistrator registrator, RegistrationInfo factoryInfo)
         {

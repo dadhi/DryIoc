@@ -59,7 +59,7 @@ namespace DryIoc.Samples
             container.Register<ISessionFactory, TestSessionFactory>();
 
             container.Register<ISession>(Reuse.InCurrentScope,
-                inject: InjectionRules.With(r => FactoryMethod.Of(r.Resolve<ISessionFactory>(), f => f.OpenSession())));
+                with: FactoryMethod.Of(r => r.Resolve<ISessionFactory>(), f => f.OpenSession()));
 
             ISession scopeOneSession;
             using (var scoped = container.OpenScope())
@@ -190,11 +190,11 @@ namespace DryIoc.Samples
 
             var service = container.Resolve<ServiceWithFuncConstructorDependency>();
 
-            var scope = container.BeginScope();
+            var scope = container.OpenScope();
             var first = service.GetScopedService();
             scope.Dispose();
 
-            scope = container.BeginScope();
+            scope = container.OpenScope();
             var second = service.GetScopedService();
             scope.Dispose();
 

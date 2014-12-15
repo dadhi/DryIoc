@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -119,6 +120,39 @@ namespace DryIoc.IssuesTests
             public YGoodness Goodness { get; set; }
         }
 
-        public class YGoodness { }    
+        public class YGoodness { }
+
+        public sealed class ExecutionFlowScopeContext : IScopeContext
+        {
+            public static readonly object ROOT_SCOPE_NAME = typeof(ExecutionFlowScopeContext);
+
+            public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
+
+            public IScope GetCurrentOrDefault()
+            {
+                var scope = (Remote<IScope>)CallContext.LogicalGetData(_key);
+                return scope == null ? null : scope.Value;
+            }
+
+            public void SetCurrent(Func<IScope, IScope> update)
+            {
+                var oldScope = GetCurrentOrDefault();
+                var newScope = update.ThrowIfNull()(oldScope);
+                CallContext.LogicalSetData(_key, new Remote<IScope>(newScope));
+            }
+
+            private static readonly string _key = typeof(ExecutionFlowScopeContext).Name;
+        }
+
+        public sealed class Remote<T> : MarshalByRefObject
+        {
+            public readonly T Value;
+
+            public Remote(T value)
+            {
+                Value = value;
+            }
+        }
+
     }
 }

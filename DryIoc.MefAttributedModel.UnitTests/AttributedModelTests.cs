@@ -186,7 +186,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
         private Assembly _assembly;
 
-        private Container _container;
+        private IContainer _container;
 
         #endregion
     }

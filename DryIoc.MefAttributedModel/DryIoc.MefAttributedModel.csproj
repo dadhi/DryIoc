@@ -38,7 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AttributedModel.cs" />
-    <Compile Include="net40\ExportImportAttributes.cs" />
+    <Compile Include="Polyfill-net40.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -20,7 +20,7 @@ namespace DryIoc.IssuesTests
             WeakReference @ref;
             var c = new Container();
             c.Register<ITest, Test>();
-            var cx = c.BeginScope();
+            var cx = c.OpenScope();
             RunTheTest(out @ref, cx);
             //cx.Dispose();
             GC.Collect();
@@ -33,7 +33,7 @@ namespace DryIoc.IssuesTests
             WeakReference @ref;
             var c = new Container();
             c.Register<ITest, Test>(Reuse.InCurrentScope);
-            var cx = c.BeginScope();
+            var cx = c.OpenScope();
             var scopeRef = new WeakReference(cx);
 
             RunTheTest(out @ref, cx);

@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(named: "another");
-            container.Register<ClientWithAssignedProperty>(inject: PropertiesAndFields.Of.Name("Prop", serviceKey: "another"));
+            container.Register<ClientWithAssignedProperty>(with: PropertiesAndFields.Of.Name("Prop", serviceKey: "another"));
 
             var client = container.Resolve<ClientWithAssignedProperty>();
 

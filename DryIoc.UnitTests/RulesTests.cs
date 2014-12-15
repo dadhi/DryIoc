@@ -151,7 +151,7 @@ namespace DryIoc.UnitTests
             if (import == null)
                 return null;
 
-            var registry = request.Registry;
+            var registry = request.Container;
             var serviceType = parameter.ParameterType;
             serviceType = registry.GetWrappedServiceType(serviceType);
             var metadata = import.Metadata;
