@@ -1127,9 +1127,16 @@ namespace DryIoc
             {
                 foreach (var node in _tree.Enumerate())
                 {
-                    var indexInNode = node.Value.IndexOf(x => ReferenceEquals(x, value) || Equals(x, value));
-                    if (indexInNode != -1)
-                        return node.Key << NODE_ARRAY_BIT_COUNT | indexInNode;
+                    var array = node.Value;
+
+                    if (array == null || array.Length == 0)
+                        continue;
+                    for (var i = 0; i < array.Length; ++i)
+                    {
+                        var item = array[i];
+                        if (ReferenceEquals(item, value) || Equals(item, value))
+                            return node.Key << NODE_ARRAY_BIT_COUNT | i;
+                    }
                 }
 
                 return -1;
