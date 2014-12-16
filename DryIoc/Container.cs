@@ -6143,7 +6143,7 @@ namespace DryIoc
             return new Enumerator(this);
         }
 
-        public struct Enumerator : IEnumerator<KV<K, V>>, IDisposable, IEnumerator
+        public struct Enumerator : IEnumerator<KV<K, V>>
         {
             private readonly HashTree<K, V> _tree;
             private HashTree<K, V>[] _parents;
@@ -6172,9 +6172,10 @@ namespace DryIoc
             {
                 if (_conflicts != null)
                 {
-                    for (var i = _currentConflictIndex; i < _t.Conflicts.Length; i++)
+                    if (_currentConflictIndex < _conflicts.Length)
                     {
-                        _current = _t.Conflicts[i];
+                        _current = _conflicts[_currentConflictIndex];
+                        _currentConflictIndex++;
                         return true;
                     }
                 }
@@ -6191,8 +6192,8 @@ namespace DryIoc
                     {
                         _t = _parents[_parentCount--];
                         _current = new KV<K, V>(_t.Key, _t.Value);
-                        _currentConflictIndex = -1;
                         _conflicts = _t.Conflicts;
+                        _currentConflictIndex = 0;
                         _t = _t.Right;
                         return true;
                     }

@@ -31,7 +31,7 @@ namespace DryIoc.SpeedTestApp
             var key = typeof(IntTreeTests.DictVsMap);
             var value = "hey";
 
-            var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(10000).ToArray();
+            var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(100).ToArray();
 
             var tree = HashTree<Type, string>.Empty;
 
@@ -40,6 +40,7 @@ namespace DryIoc.SpeedTestApp
             Console.WriteLine("Tree - " + treeAddTime);
             Console.WriteLine();
 
+            Console.WriteLine(tree.Enumerate().Count());
             Measure("Current",
                 () =>
                 {
@@ -49,6 +50,12 @@ namespace DryIoc.SpeedTestApp
                     }
                 });
 
+            int i = 0;
+            foreach (var kv in tree)
+            {
+                i++;
+            }
+            Console.WriteLine(i);
             Measure("Optimized",
                 () =>
                 {
