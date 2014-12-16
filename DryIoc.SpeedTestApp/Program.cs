@@ -22,11 +22,11 @@ namespace DryIoc.SpeedTestApp
 		    //CompareHashTreeEnumeration();
 		    //CompareMethodArgumentPassing();
 		    //CompareTypesForEquality(typeof(string));
-		    CompareAppendableArrayIndexOf();
+		    CompareHashTreeEnumerators();
 			Console.ReadKey();
 		}
 
-        private static void CompareAppendableArrayIndexOf()
+        private static void CompareHashTreeEnumerators()
         {
             var key = typeof(IntTreeTests.DictVsMap);
             var value = "hey";
