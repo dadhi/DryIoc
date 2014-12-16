@@ -6134,7 +6134,91 @@ namespace DryIoc
                         for (var i = 0; i < t.Conflicts.Length; i++)
                             yield return t.Conflicts[i];
                     t = t.Right;
+                    }
+            }
+        }
+
+        public Enumerator GetEnumerator()
+        {
+            return new Enumerator(this);
+        }
+
+        public struct Enumerator : IEnumerator<KV<K, V>>, IDisposable, IEnumerator
+        {
+            private readonly HashTree<K, V> _tree;
+            private HashTree<K, V>[] _parents;
+            private int _parentCount;
+            private HashTree<K, V> _t;
+            private KV<K, V> _current;
+            private int _currentConflictIndex;
+            private KV<K, V>[] _conflicts;
+
+            public Enumerator(HashTree<K, V> tree)
+            {
+                _tree = tree;
+                _parents = new HashTree<K, V>[_tree.Height];
+                _parentCount = -1;
+                _currentConflictIndex = 0;
+                _t = _tree;
+                _current = default(KV<K, V>);
+                _conflicts = null;
+            }
+
+            public void Dispose()
+            {
+            }
+
+            public bool MoveNext()
+            {
+                if (_conflicts != null)
+                {
+                    for (var i = _currentConflictIndex; i < _t.Conflicts.Length; i++)
+                    {
+                        _current = _t.Conflicts[i];
+                        return true;
+                    }
                 }
+
+
+                while (!_t.IsEmpty || _parentCount != -1)
+                {
+                    if (!_t.IsEmpty)
+                    {
+                        _parents[++_parentCount] = _t;
+                        _t = _t.Left;
+                    }
+                    else
+                    {
+                        _t = _parents[_parentCount--];
+                        _current = new KV<K, V>(_t.Key, _t.Value);
+                        _currentConflictIndex = -1;
+                        _conflicts = _t.Conflicts;
+                        _t = _t.Right;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            public void Reset()
+            {
+                _parents = new HashTree<K, V>[_tree.Height];
+                _parentCount = -1;
+                _currentConflictIndex = 0;
+                _t = _tree;
+                _current = default(KV<K, V>);
+                _conflicts = null;
+            }
+
+            public KV<K, V> Current
+            {
+                get { return _current; }
+            }
+
+            object IEnumerator.Current
+            {
+                get { return _current; }
             }
         }
 
