@@ -31,7 +31,7 @@ namespace DryIoc.SpeedTestApp
             var key = typeof(IntTreeTests.DictVsMap);
             var value = "hey";
 
-            var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(100).ToArray();
+            var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(10).ToArray();
 
             var tree = HashTree<Type, string>.Empty;
 
@@ -77,7 +77,7 @@ namespace DryIoc.SpeedTestApp
 
             var sw = Stopwatch.StartNew();
 
-            for (var i = 0; i < 1000000; i++)
+            for (var i = 0; i < 10000000; i++)
             {
                 action();
             }
