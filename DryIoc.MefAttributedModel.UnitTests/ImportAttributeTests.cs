@@ -154,7 +154,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var service = container.Resolve<ServiceWithPropWithPrivateSetter>();
 
-            Assert.That(service.PropWithPrivateSetter, Is.InstanceOf<Service>());
+            Assert.That(service.PropWithInternalSetter, Is.InstanceOf<Service>());
         }
 
         [Test]
@@ -289,7 +289,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             // ReSharper disable UnusedAutoPropertyAccessor.Local
             [Import]
-            public IService PropWithPrivateSetter { get; internal set; }
+            public IService PropWithInternalSetter { get; internal set; }
             // ReSharper restore UnusedAutoPropertyAccessor.Local
         }
 

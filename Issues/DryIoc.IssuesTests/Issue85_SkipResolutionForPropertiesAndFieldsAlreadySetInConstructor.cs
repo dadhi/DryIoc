@@ -4,6 +4,9 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
+    /// <summary>
+    /// On hold. Here is the workaround with FactoryMethod.
+    /// </summary>
     class Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor
     {
         [Test]
@@ -12,7 +15,9 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(named: "another");
-            container.Register<ClientWithAssignedProperty>(with: PropertiesAndFields.Of.Name("Prop", serviceKey: "another"));
+            container.Register<ClientWithAssignedProperty>(with: InjectionRules.With(
+                FactoryMethod.Of(() => ClientWithAssignedProperty.Create(default(IService))),    
+                propertiesAndFields: PropertiesAndFields.Of.Name("Prop", serviceKey: "another")));
 
             var client = container.Resolve<ClientWithAssignedProperty>();
 
@@ -31,6 +36,11 @@ namespace DryIoc.IssuesTests
             public ClientWithAssignedProperty(IService prop)
             {
                 Prop = prop;
+            }
+
+            public static ClientWithAssignedProperty Create(IService prop)
+            {
+                return new ClientWithAssignedProperty(prop);
             }
         }
     }

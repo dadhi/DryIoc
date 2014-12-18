@@ -108,6 +108,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\MetadataTests.cs">
       <Link>MetadataTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\NewTests.cs">
+      <Link>NewTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\NoMemoryLeaksTests.cs">
       <Link>NoMemoryLeaksTests.cs</Link>
     </Compile>

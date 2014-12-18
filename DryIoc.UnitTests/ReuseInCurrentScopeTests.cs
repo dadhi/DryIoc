@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.Remoting.Messaging;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -145,81 +144,6 @@ namespace DryIoc.UnitTests
             var serviceInOuterScope = container.Resolve<Func<IService>>()();
 
             Assert.That(serviceInNestedScope, Is.SameAs(serviceInOuterScope));
-        }
-
-        [Test]
-        public void Reuse_can_select_scope_with_specific_name()
-        {
-            var container = new Container(scopeContext: new ExecutionFlowScopeContext());
-            container.Register<Blah>(Reuse.InCurrentNamedScope(1));
-
-            using (var s1 = container.OpenScope(1))
-            {
-                var blah1 = s1.Resolve<Blah>();
-
-                using (var s2 = s1.OpenScope(2))
-                {
-                    var blah2 = s2.Resolve<Blah>();
-                    Assert.AreSame(blah1, blah2);
-                }
-
-                Assert.AreSame(blah1, s1.Resolve<Blah>());
-            }
-        }
-
-        [Test]
-        public void If_not_matched_name_found_then_current_scope_reuse_should_Throw()
-        {
-            var container = new Container(scopeContext: new ExecutionFlowScopeContext());
-            container.Register<Blah>(Reuse.InCurrentNamedScope(1));
-
-            using (var s1 = container.OpenScope())
-            {
-                var ex = Assert.Throws<ContainerException>(() => s1.Resolve<Blah>());
-                Assert.That(ex.Error, Is.EqualTo(Error.NO_MATCHED_SCOPE_FOUND));
-            }
-        }
-
-        [Test]
-        public void If_no_scope_opened_And_not_matched_name_found_then_resolving_should_Throw()
-        {
-            var container = new Container(scopeContext: new ExecutionFlowScopeContext());
-            container.Register<Blah>(Reuse.InCurrentNamedScope(1));
-            
-            var ex = Assert.Throws<ContainerException>(() => container.Resolve<Blah>());
-            Assert.That(ex.Error, Is.EqualTo(Error.NO_CURRENT_SCOPE));
-        }
-
-        public sealed class ExecutionFlowScopeContext : IScopeContext
-        {
-            public static readonly object ROOT_SCOPE_NAME = typeof(ExecutionFlowScopeContext);
-
-            public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
-
-            public IScope GetCurrentOrDefault()
-            {
-                var scope = (Remote<IScope>)CallContext.LogicalGetData(_key);
-                return scope == null ? null : scope.Value;
-            }
-
-            public void SetCurrent(Func<IScope, IScope> update)
-            {
-                var oldScope = GetCurrentOrDefault();
-                var newScope = update.ThrowIfNull()(oldScope);
-                CallContext.LogicalSetData(_key, new Remote<IScope>(newScope));
-            }
-
-            private static readonly string _key = typeof(ExecutionFlowScopeContext).Name;
-        }
-
-        public sealed class Remote<T> : MarshalByRefObject
-        {
-            public readonly T Value;
-
-            public Remote(T value)
-            {
-                Value = value;
-            }
         }
 
         internal class Blah

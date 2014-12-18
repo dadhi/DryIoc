@@ -301,7 +301,7 @@ namespace DryIoc.UnitTests
         public void When_using_ReflectionFactory_alone_Then_resolving_service_with_not_enough_type_args_should_Throw()
         {
             var factory = new ReflectionFactory(typeof(BananaSplit<,>));
-            var container = new Container();
+            IContainer container = new Container();
             Assert.Throws<ContainerException>(() =>
                 factory.GetFactoryForRequestOrDefault(container.EmptyRequest.Push(typeof(Banana<int>))));
         }

@@ -9,7 +9,7 @@ namespace DryIoc.Samples
         [Test]
         public void Resolve_mock_for_non_registered_service()
         {
-            var container = new Container(Rules.Default.WithResolveNotRegisteredService(request =>
+            var container = new Container(Rules.Default.WithNotRegisteredServiceResolvers(request =>
             {
                 if (!request.ServiceType.IsAbstract)
                     return null; // Mock interface or abstract class only.
@@ -24,7 +24,7 @@ namespace DryIoc.Samples
         [Test]
         public void Inject_mock_for_non_registered_service()
         {
-            var container = new Container(Rules.Default.WithResolveNotRegisteredService(request =>
+            var container = new Container(Rules.Default.WithNotRegisteredServiceResolvers(request =>
             {
                 if (!request.ServiceType.IsAbstract)
                     return null; // Mock interface or abstract class only.

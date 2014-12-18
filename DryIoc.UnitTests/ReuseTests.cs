@@ -312,31 +312,6 @@ namespace DryIoc.UnitTests
             Assert.That(savedOutside.IsDisposed, Is.True);
         }
 
-        [Test]
-        public void I_can_use_execution_flow_context()
-        {
-            var container = new Container(scopeContext: new ReuseInCurrentScopeTests.ExecutionFlowScopeContext());
-            
-            container.Register<SomeRoot>(Reuse.InCurrentScope);
-            container.Register<SomeDep>(Reuse.InCurrentScope);
-
-            SomeDep outerDep;
-            using (var scoped = container.OpenScope())
-            {
-                outerDep = scoped.Resolve<SomeRoot>().Dep;
-                Assert.That(outerDep, Is.SameAs(scoped.Resolve<SomeRoot>().Dep));
-            }
-
-            using (var scoped = container.OpenScope())
-            {
-                Assert.That(scoped.Resolve<SomeRoot>().Dep,
-                    Is.SameAs(scoped.Resolve<SomeRoot>().Dep));
-                Assert.That(outerDep, Is.Not.SameAs(scoped.Resolve<SomeRoot>().Dep));
-            }
-
-            Assert.That(outerDep.IsDisposed, Is.True);
-        }
-
         internal class SomeDep : IDisposable
         {
             public bool IsDisposed { get; private set; }

@@ -113,7 +113,6 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < registrationInfo.Exports.Length; i++)
             {
                 var export = registrationInfo.Exports[i];
-
                 registrator.Register(factory, export.ServiceType,
                     export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
             }

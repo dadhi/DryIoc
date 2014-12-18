@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Linq;
 using NUnit.Framework;
+
 // ReSharper disable MemberHidesStaticFromOuterClass
 
 namespace DryIoc.Samples
@@ -111,49 +113,34 @@ namespace DryIoc.Samples
         public void Can_override_registrations_in_open_scope()
         {
             var container = new Container();
+            var scopeName = "blah";
+
+            // two client versions: root and scoped
             container.Register<IClient, Client>();
+            container.Register<IClient, ClientScoped>(named: scopeName);
+            
+            // uses
+            container.Register<IServ, Serv>(Reuse.Singleton);
+            
+            // two dependency versions:
             container.Register<IDep, Dep>();
-            container.Register<IServ, Serv>(Shared.InContainer);
+            container.Register<IDep, DepScoped>(named: scopeName);
 
             var client = container.Resolve<IClient>();
+            
             Assert.That(client, Is.InstanceOf<Client>());
             Assert.That(client.Dep, Is.InstanceOf<Dep>());
             Assert.That(client.Serv, Is.InstanceOf<Serv>());
 
-            using (var scoped = container.OpenScope())
+            using (var scoped = container.OpenScope(scopeName, rules => 
+                rules.WithFactorySelector(factories =>
+                {
+                    var factory = factories.FirstOrDefault(f => scopeName.Equals(f.Key)).Value;
+                    return factory;
+                })))
             {
-                scoped.Register<IClient, ClientScoped>(named: "scoped");
-                scoped.Register<IDep, DepScoped>(named: "scoped");
+                var scopedClient = scoped.Resolve<IClient>(scopeName);
 
-                var scopedClient = scoped.Resolve<IClient>("scoped");
-                Assert.That(scopedClient, Is.InstanceOf<ClientScoped>());
-                Assert.That(scopedClient.Dep, Is.InstanceOf<DepScoped>());
-                Assert.That(scopedClient.Serv, Is.InstanceOf<Serv>());
-            }
-
-            client = container.Resolve<IClient>();
-            Assert.That(client, Is.InstanceOf<Client>());
-        }
-
-        [Test, Ignore]
-        public void Can_override_registrations_in_open_scope_OLDONE()
-        {
-            var container = new Container();
-            container.Register<IClient, Client>();
-            container.Register<IDep, Dep>();
-            container.Register<IServ, Serv>(Shared.InContainer);
-
-            var client = container.Resolve<IClient>();
-            Assert.That(client, Is.InstanceOf<Client>());
-            Assert.That(client.Dep, Is.InstanceOf<Dep>());
-            Assert.That(client.Serv, Is.InstanceOf<Serv>());
-
-            using (var scoped = container.OpenScope())
-            {
-                scoped.Register<IClient, ClientScoped>();
-                scoped.Register<IDep, DepScoped>();
-
-                var scopedClient = scoped.Resolve<IClient>();
                 Assert.That(scopedClient, Is.InstanceOf<ClientScoped>());
                 Assert.That(scopedClient.Dep, Is.InstanceOf<DepScoped>());
                 Assert.That(scopedClient.Serv, Is.InstanceOf<Serv>());
