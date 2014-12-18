@@ -11,7 +11,7 @@ DryIoc is small, fast, capable IoC Container for .NET
 [DryIoc.MefAttributedModel]: https://www.nuget.org/packages/DryIoc.MefAttributedModel/
 [DryIoc.dll]: https://www.nuget.org/packages/DryIoc.dll/
 [DryIoc.MefAttributedModel.dll]: https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll/
-[Wiki]: https://bitbucket.org/dadhi/dryioc/wiki/Home
+[WikiHome]: https://bitbucket.org/dadhi/dryioc/wiki/Home
 [MefAttributedModel]: https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel
 [PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
 [v2.0]: https://bitbucket.org/dadhi/dryioc/wiki/Home
@@ -20,9 +20,9 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Supports .NET 3.5, 4.0, 4.5, _([PCL] in v2.0)_.
 * Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
 * Extensions: [MefAttributedModel] as [code][DryIoc.MefAttributedModel] or [dll][DryIoc.MefAttributedModel.dll].
-* [Wiki documentation][Wiki] _(being updated for v2.0)_
+* [Wiki documentation][WikiHome] _(being updated for v2.0)_
 * __v1.4.1__ is stable: `PM> Install-Package DryIoc` 
-* __[v2.0]__ is coming soon: `PM> Install-Package DryIoc -IncludePrerelease`
+* __[v2.0]__ is coming soon: `PM> Install-Package DryIoc -Pre`
 
 #### Benchmarks
 * Very fast in [Performance Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
@@ -40,7 +40,7 @@ DryIoc is small, fast, capable IoC Container for .NET
 
 #### Reliability
 * Unit-tested with 100% coverage.
-* Thread-safe (lock-free in _v2.0_): registrations and resolutions could be done in parallel without corrupting container state. 
+* Thread-safe (lock-free in _v2.0_): registrations and resolutions could be made in parallel without corrupting container state. 
 * Recursive dependency detection (cycle in object graph).
 * Error handling with `ContainerException` inherited from `InvalidOperationException` to filter container related exceptions.
 * Throws exceptions as early as possible. 
@@ -48,6 +48,11 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Resolving as `DebugExpression<T>` to find underlying expression used for instance creation.
 
 #### Features
+* Instance lifetime control or *Reuse* in DryIoc terms ([wiki](https://bitbucket.org/dadhi/dryioc/wiki/ReuseAndScopes)) :
+    * Nested disposable scopes and ambient scope context.
+    * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`, or define your own.
+    * Changing default reuse type per container with  `Rules.ReuseMapping`.
+    * Control over storing of reused objects with Wrappers: `WeakReference`, `Disposable`, and more.
 * Constructor, property and field injection. *You can select What and Where to inject.*
 * Delegate factory registration.
 * Auto-registration via __MefAttributedModel__ extension (see below).
@@ -66,11 +71,6 @@ DryIoc is small, fast, capable IoC Container for .NET
     * Func with parameters to specify constructor arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
     * Registration of user-defined wrappers.
 * Generic wrappers and multiple implementations could be nested, e.g. `Meta<SomeMetadata, Func<ISomeService>>[]`.
-* Instance lifetime control (*instance reuse* in DryIoc terms):
-    * `Transient`, `Singleton`, `InCurrentScope`, `InResolutionScope`.
-    * Custom reuse by implementing `IReuse`. Check `DryIoc.UnitTests.ThreadReuse` for example.
-    * Nested disposable scopes of reuse.
-    * Disposing of `Singleton` on Container dispose.
 * [Decorators](http://en.wikipedia.org/wiki/Decorator_pattern). 
 * Context-based implementation selection.
 * Unregistered service resolution via `ResolutionRules`.
