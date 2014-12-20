@@ -534,7 +534,7 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Specific exception type to be thrown by MefAttributedModel extension. Check <see cref="Error"/> for possible error cases.</summary>
     public class AttributedModelException : ContainerException
     {
-        public new static AttributedModelException Of(Throw.Check check, int error,
+        public new static AttributedModelException Of(ErrorCheck errorCheck, int error,
             object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
             Exception inner = null)
         {

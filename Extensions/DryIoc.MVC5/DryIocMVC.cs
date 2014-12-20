@@ -35,7 +35,7 @@ namespace DryIoc.MVC5
     {
         public static IContainer WithMvcSupport(this IContainer container)
         {
-            container = container.ThrowIfNull().With(scopeContext: new HttpScopeContext());
+            container = container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext());
             DependencyResolver.SetResolver(new DryIocDependencyResolver(container));
             return container.RegisterControllers().ResolveFilterAttributeFilterProviders();
         }
@@ -99,12 +99,12 @@ namespace DryIoc.MVC5
 
     public static class Reuse
     {
-        public static readonly IReuse InHttpContext = DryIoc.Reuse.InCurrentNamedScope(HttpScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InHttpContext = DryIoc.Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
     }
 
-    public sealed class HttpScopeContext : IScopeContext
+    public sealed class HttpContextScopeContext : IScopeContext
     {
-        public static readonly object ROOT_SCOPE_NAME = typeof(HttpScopeContext);
+        public static readonly object ROOT_SCOPE_NAME = typeof(HttpContextScopeContext);
 
         public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
 

@@ -2,7 +2,7 @@
 
 namespace DryIoc.IssuesTests
 {
-    [TestFixture, Ignore("Not supported")]
+    [TestFixture, Explicit("Not supported")]
     public class Issue61_PropagateRequestToResolveInRegisteredDelegate
     {
         [Test]

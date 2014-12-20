@@ -109,7 +109,7 @@ namespace DryIoc.Samples
 
         #endregion
 
-        [Test, Ignore]
+        [Test]
         public void Can_override_registrations_in_open_scope()
         {
             var container = new Container();
@@ -133,11 +133,11 @@ namespace DryIoc.Samples
             Assert.That(client.Serv, Is.InstanceOf<Serv>());
 
             using (var scoped = container.OpenScope(scopeName, rules => 
-                rules.WithFactorySelector(factories =>
-                {
-                    var factory = factories.FirstOrDefault(f => scopeName.Equals(f.Key)).Value;
-                    return factory;
-                })))
+                rules.WithFactorySelector((t, k, fs) => 
+                    k == null
+                    ?  fs.FirstOrDefault(f => f.Key.Equals(scopeName)).Value 
+                    ?? fs.FirstOrDefault(f => f.Key.Equals(null)).Value
+                    :  fs.FirstOrDefault(f => f.Key.Equals(k)).Value)))
             {
                 var scopedClient = scoped.Resolve<IClient>(scopeName);
 

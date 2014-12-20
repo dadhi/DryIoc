@@ -74,10 +74,10 @@ namespace DryIoc.UnitTests
             container.Register<IService, AnotherService>();
             container.Register<IService, DisposableService>(named: 2);
 
-            container.Unregister(typeof(IService), DefaultKey.Default.Next());
+            container.Unregister(typeof(IService), DefaultKey.Value.Next());
 
-            Assert.IsFalse(container.IsRegistered(typeof(IService), DefaultKey.Default.Next()));
-            Assert.IsTrue(container.IsRegistered(typeof(IService), DefaultKey.Default));
+            Assert.IsFalse(container.IsRegistered(typeof(IService), DefaultKey.Value.Next()));
+            Assert.IsTrue(container.IsRegistered(typeof(IService), DefaultKey.Value));
             Assert.IsTrue(container.IsRegistered(typeof(IService), 2));
         }
 
@@ -114,7 +114,7 @@ namespace DryIoc.UnitTests
             container.Unregister<IService>(named: 'a');
 
             Assert.That(container.IsRegistered<IService>(named: 'a'), Is.False);
-            Assert.That(container.IsRegistered<IService>(DefaultKey.Default), Is.True);
+            Assert.That(container.IsRegistered<IService>(DefaultKey.Value), Is.True);
         }
 
         [Test]

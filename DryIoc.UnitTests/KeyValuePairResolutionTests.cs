@@ -74,8 +74,8 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<KeyValuePair<object, IService>[]>();
 
             Assert.That(pairs.Length, Is.EqualTo(2));
-            Assert.That(pairs[0].Key, Is.EqualTo(DefaultKey.Default));
-            Assert.That(pairs[1].Key, Is.EqualTo(DefaultKey.Default.Next()));
+            Assert.That(pairs[0].Key, Is.EqualTo(DefaultKey.Value));
+            Assert.That(pairs[1].Key, Is.EqualTo(DefaultKey.Value.Next()));
         }
 
         [Test]
@@ -88,8 +88,8 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<LazyEnumerable<KeyValuePair<object, IService>>>();
 
             Assert.That(pairs.Count(), Is.EqualTo(2));
-            Assert.That(pairs.First().Key, Is.EqualTo(DefaultKey.Default));
-            Assert.That(pairs.Last().Key, Is.EqualTo(DefaultKey.Default.Next()));
+            Assert.That(pairs.First().Key, Is.EqualTo(DefaultKey.Value));
+            Assert.That(pairs.Last().Key, Is.EqualTo(DefaultKey.Value.Next()));
         }
 
         [Test]
@@ -102,7 +102,7 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<IEnumerable<KeyValuePair<object, IService>>>().ToArray();
 
             Assert.That(pairs.Length, Is.EqualTo(2));
-            Assert.That(pairs[0].Key, Is.EqualTo(DefaultKey.Default));
+            Assert.That(pairs[0].Key, Is.EqualTo(DefaultKey.Value));
             Assert.That(pairs[1].Key, Is.EqualTo("Yeah!"));
         }
 
@@ -116,7 +116,7 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<KeyValuePair<DefaultKey, IService>[]>();
 
             Assert.That(pairs.Length, Is.EqualTo(1));
-            Assert.That(pairs[0].Key, Is.EqualTo(DefaultKey.Default));
+            Assert.That(pairs[0].Key, Is.EqualTo(DefaultKey.Value));
         }
 
         [Test]
@@ -157,7 +157,7 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<KeyValuePair<object, Func<IService>>[]>();
 
             Assert.That(pairs.Length, Is.EqualTo(3));
-            CollectionAssert.AreEquivalent(new object[] { DefaultKey.Default, "another", EnumKey.Some }, pairs.Select(p => p.Key));
+            CollectionAssert.AreEquivalent(new object[] { DefaultKey.Value, "another", EnumKey.Some }, pairs.Select(p => p.Key));
         }
     }
 }

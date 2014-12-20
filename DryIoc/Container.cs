@@ -225,9 +225,9 @@ namespace DryIoc
                     return decorators != null && (condition == null || decorators.Any(condition));
 
                 default:
-                    var selector = condition != null ? (Rules.FactorySelectorRule)
-                         (factories => factories.Select(x => x.Value).FirstOrDefault(condition)) :
-                         (factories => factories.Select(x => x.Value).FirstOrDefault());
+                    Rules.FactorySelectorRule selector = (t, k, factories) => factories.FirstOrDefault(
+                        f => f.Key.Equals(k) && (condition == null || condition(f.Value))).Value;
+
                     var factory = GetServiceFactoryOrDefault(serviceType, serviceKey, selector, retryForOpenGeneric: true);
                     return factory != null;
             }
@@ -300,7 +300,7 @@ namespace DryIoc
 
                                 if (entry is Factory)   // return false to remove entry
                                 {
-                                    var keep = serviceKey != null && !DefaultKey.Default.Equals(serviceKey)
+                                    var keep = serviceKey != null && !DefaultKey.Value.Equals(serviceKey)
                                         || condition != null && !condition((Factory)entry);
                                     if (!keep) removedFactoryOrFactories = entry;
                                     return keep;
@@ -334,7 +334,7 @@ namespace DryIoc
                                         oldFactories.Enumerate().Select(__ => __.Value).Except(
                                         newFactories.Enumerate().Select(__ => __.Value)).ToArray();
 
-                                    if (newFactories.Height == 1 && newFactories.Key.Equals(DefaultKey.Default))
+                                    if (newFactories.Height == 1 && newFactories.Key.Equals(DefaultKey.Value))
                                         remainingEntry = newFactories.Value; // replace entry with single remaining default factory
                                     else
                                     {   // update last default key if current default key was removed
@@ -562,7 +562,7 @@ namespace DryIoc
                 entry = _factories.Value.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
 
             return entry == null ? Enumerable.Empty<KV<object, Factory>>()
-                : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Default, (Factory)entry) }
+                : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Value, (Factory)entry) }
                 : ((FactoriesEntry)entry).Factories.Enumerate();
         }
 
@@ -787,17 +787,17 @@ namespace DryIoc
                                 return factory;
                             default:
                                 _defaultFactoryDelegatesCache.Swap(x1 => x1.RemoveOrUpdate(serviceType));
-                                return new FactoriesEntry(DefaultKey.Default.Next(),
+                                return new FactoriesEntry(DefaultKey.Value.Next(),
                                     HashTree<object, Factory>.Empty
-                                        .AddOrUpdate(DefaultKey.Default, (Factory)oldValue)
-                                        .AddOrUpdate(DefaultKey.Default.Next(), factory));
+                                        .AddOrUpdate(DefaultKey.Value, (Factory)oldValue)
+                                        .AddOrUpdate(DefaultKey.Value.Next(), factory));
                         }
                     }
 
                     // otherwise, when already have some keyed factories registered.
                     var oldEntry = ((FactoriesEntry)oldValue);
                     if (oldEntry.LastDefaultKey == null) // there was not default registration, add the first one.
-                        return new FactoriesEntry(DefaultKey.Default, oldEntry.Factories.AddOrUpdate(DefaultKey.Default, factory));
+                        return new FactoriesEntry(DefaultKey.Value, oldEntry.Factories.AddOrUpdate(DefaultKey.Value, factory));
 
                     switch (ifAlreadyRegistered)
                     {
@@ -820,7 +820,7 @@ namespace DryIoc
                 _factories.Swap(x => x.AddOrUpdate(serviceType, newEntry, (oldValue, _) =>
                 {
                     if (oldValue is Factory) // if registered is default, just add it to new entry
-                        return new FactoriesEntry(DefaultKey.Default, newEntry.Factories.AddOrUpdate(DefaultKey.Default, (Factory)oldValue));
+                        return new FactoriesEntry(DefaultKey.Value, newEntry.Factories.AddOrUpdate(DefaultKey.Value, (Factory)oldValue));
 
                     var oldEntry = ((FactoriesEntry)oldValue);
                     return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
@@ -837,35 +837,33 @@ namespace DryIoc
             var entry = _factories.Value.GetValueOrDefault(serviceType);
             if (entry == null && retryForOpenGeneric && serviceType.IsClosedGeneric())
                 entry = _factories.Value.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
+            if (entry == null)
+                return null;
 
-            if (entry != null)
+            if (factorySelector != null)
             {
-                if (entry is Factory)
-                {
-                    if (serviceKey != null && !DefaultKey.Default.Equals(serviceKey))
-                        return null;
-                    var factory = (Factory)entry;
-                    return factorySelector != null
-                        ? factorySelector(new[] { new KeyValuePair<object, Factory>(DefaultKey.Default, factory) })
-                        : factory;
-                }
-
-                var factories = ((FactoriesEntry)entry).Factories;
-                if (serviceKey != null)
-                {
-                    var factory = factories.GetValueOrDefault(serviceKey);
-                    return factorySelector != null
-                        ? factorySelector(new[] { new KeyValuePair<object, Factory>(serviceKey, factory) })
-                        : factory;
-                }
-
-                var defaultFactories = factories.Enumerate().Where(x => x.Key is DefaultKey).ToArray();
-                if (defaultFactories.Length != 0)
-                    return factorySelector != null
-                        ? factorySelector(defaultFactories.Select(kv => new KeyValuePair<object, Factory>(kv.Key, kv.Value)))
-                        : defaultFactories.Length == 1 ? defaultFactories[0].Value
-                        : Throw.Instead<Factory>(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
+                var allFactories = entry is Factory
+                    ? new[] { new KeyValuePair<object, Factory>(DefaultKey.Value, (Factory)entry) }
+                    : ((FactoriesEntry)entry).Factories.Enumerate()
+                        .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value)).ToArray();
+                var factory = factorySelector(serviceType, serviceKey, allFactories);
+                return factory;
             }
+
+            if (entry is Factory)
+                return serviceKey != null && !DefaultKey.Value.Equals(serviceKey) ? null : (Factory)entry;
+
+            var factories = ((FactoriesEntry)entry).Factories;
+            if (serviceKey != null)
+                return factories.GetValueOrDefault(serviceKey);
+
+            var defaultFactories = factories.Enumerate()
+                .Where(x => x.Key is DefaultKey).ToArray();
+
+            if (defaultFactories.Length != 0)
+                return defaultFactories.Length == 1
+                    ? defaultFactories[0].Value
+                    : Throw.Instead<Factory>(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
 
             return null;
         }
@@ -925,7 +923,7 @@ namespace DryIoc
             _resolutionStateCache = resolutionStateCache ?? new ResolutionStateCache();
 
             _containerWeakRef = new ContainerWeakRef(this);
-            _emptyRequest = Request.CreateEmpty(_containerWeakRef);
+            _emptyRequest = Request.CreateEmpty(_containerWeakRef, new WeakReference(_resolutionStateCache));
         }
 
         #endregion
@@ -936,7 +934,7 @@ namespace DryIoc
     public sealed class DefaultKey
     {
         /// <summary>Default value.</summary>
-        public static readonly DefaultKey Default = new DefaultKey(0);
+        public static readonly DefaultKey Value = new DefaultKey(0);
 
         /// <summary>Returns next default key with increased <see cref="RegistrationOrder"/>.</summary>
         /// <returns>New key.</returns>
@@ -949,11 +947,12 @@ namespace DryIoc
         public readonly int RegistrationOrder;
 
         /// <summary>Compares keys based on registration order.</summary>
-        /// <param name="other">Key to compare with.</param>
+        /// <param name="key">Key to compare with.</param>
         /// <returns>True if keys have the same order.</returns>
-        public override bool Equals(object other)
+        public override bool Equals(object key)
         {
-            return other is DefaultKey && ((DefaultKey)other).RegistrationOrder == RegistrationOrder;
+            return key == null 
+                || key is DefaultKey && ((DefaultKey)key).RegistrationOrder == RegistrationOrder;
         }
 
         /// <summary>Returns registration order as hash.</summary> <returns>Hash code.</returns>
@@ -970,7 +969,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private static DefaultKey[] _keyPool = { Default };
+        private static DefaultKey[] _keyPool = { Value };
 
         private DefaultKey(int registrationOrder)
         {
@@ -1670,7 +1669,9 @@ namespace DryIoc
         /// <summary>Defines single factory selector delegate.</summary>
         /// <param name="factories">Registered factories with corresponding key to select from.</param>
         /// <returns>Single selected factory, or null if unable to select.</returns>
-        public delegate Factory FactorySelectorRule(IEnumerable<KeyValuePair<object, Factory>> factories);
+        public delegate Factory FactorySelectorRule(
+            Type serviceType, object serviceKey,
+            KeyValuePair<object, Factory>[] factories);
 
         /// <summary>Rules to select single matched factory default and keyed registered factory/factories. 
         /// Selectors applied in specified array order, until first returns not null <see cref="Factory"/>.
@@ -2852,13 +2853,15 @@ namespace DryIoc
     /// Request implements <see cref="IResolver"/> interface on top of provided container, which could be use by delegate factories.</summary>
     public sealed class Request : IResolver
     {
-        /// <summary>Creates empty request associated with provided <paramref name="containerWeakRef"/>.
+        /// <summary>Creates empty request associated with provided <paramref name="container"/>.
         /// Every resolution will start from this request by pushing service information into, and then resolving it.</summary>
-        /// <param name="containerWeakRef">Reference to container issued the request. Could be changed later with <see cref="SwitchContainer"/> method.</param>
+        /// <param name="container">Reference to container issued the request. Could be changed later with <see cref="SwitchContainer"/> method.</param>
+        /// <param name="resolutionStatCache">Separate reference to resolution cache. It is separate because container may be
+        /// switched independently in during request resolution in container parent-child setup.</param>
         /// <returns>New empty request.</returns>
-        public static Request CreateEmpty(ContainerWeakRef containerWeakRef)
+        public static Request CreateEmpty(ContainerWeakRef container, WeakReference resolutionStatCache)
         {
-            return new Request(null, containerWeakRef, new WeakReference(containerWeakRef.Target.ResolutionStateCache), null, null, null);
+            return new Request(null, container, resolutionStatCache, null, null, null);
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="ServiceInfo"/> in such a request.</summary>
@@ -3123,7 +3126,8 @@ namespace DryIoc
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
 
-        // TODO: Use it.
+        // TODO: Use it. Currently used only by decorator.
+        /// <summary>Predicate to check if factory could be used for resolved request.</summary>
         public virtual Func<Request, bool> Condition { get { return null; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
@@ -3567,8 +3571,21 @@ namespace DryIoc
         private readonly object _instance;
     }
 
+    /// <summary>Declares delegate to get single factory method or constructor for resolved request.</summary>
+    /// <param name="request">Request to resolve.</param>
+    /// <returns>Factory method wrapper over constructor or method.</returns>
     public delegate FactoryMethod FactoryMethodSelector(Request request);
+
+    /// <summary>Specifies how to get parameter info for injected parameter and resolved request</summary>
+    /// <remarks>Request is for parameter method owner not for parameter itself.</remarks>
+    /// <param name="parameter">Parameter to inject.</param>
+    /// <param name="request">Request for parameter method/constructor owner.</param>
+    /// <returns>Service info describing how to inject parameter.</returns>
     public delegate ParameterServiceInfo ParameterSelector(ParameterInfo parameter, Request request);
+
+    /// <summary>Specifies what properties or fields to inject and how.</summary>
+    /// <param name="request">Request for property/field owner.</param>
+    /// <returns>Corresponding service info for each property/field to be injected.</returns>
     public delegate IEnumerable<PropertyOrFieldServiceInfo> PropertiesAndFieldsSelector(Request request);
 
     /// <summary>Contains alternative rules to select constructor in implementation type registered with <see cref="ReflectionFactory"/>.</summary>
@@ -4172,7 +4189,7 @@ namespace DryIoc
                             .ThrowIfNotOf(memberRequest.ServiceType, Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, memberRequest));
 
                     var memberExpr = factory == null ? null : factory.GetExpressionOrDefault(memberRequest);
-                    if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault) 
+                    if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault)
                         return null;
                     if (memberExpr != null)
                         bindings.Add(Expression.Bind(memberInfo.Member, memberExpr));
@@ -4640,6 +4657,9 @@ namespace DryIoc
         /// <summary>Specifies to store single service instance per <see cref="Container"/>.</summary>
         public static readonly IReuse Singleton = new SingletonReuse();
 
+        /// <summary>Specifies to store single service instance per resolution root created by <see cref="Resolver"/> methods.</summary>
+        public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
+
         /// <summary>Specifies to store single service instance per current/open scope created with <see cref="Container.OpenScope"/>.</summary>
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
 
@@ -4651,9 +4671,6 @@ namespace DryIoc
         {
             return name == null ? InCurrentScope : new CurrentScopeReuse(name);
         }
-
-        /// <summary>Specifies to store single service instance per resolution root created by <see cref="Resolver"/> methods.</summary>
-        public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
 
         /// <summary>Ensuring single service instance per Thread.</summary>
         public static readonly IReuse InThreadScope = InCurrentNamedScope(ThreadScopeContext.ROOT_SCOPE_NAME);
@@ -5198,41 +5215,48 @@ namespace DryIoc
     [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable")]
     public class ContainerException : InvalidOperationException
     {
+        /// <summary>Error code of exception, possible values are listed in <see cref="Error"/> class.</summary>
         public readonly int Error;
 
-        public static ContainerException Of(Throw.Check check, int code,
+        /// <summary>Creates exception object optionally providing <paramref name="inner"/> exception.</summary>
+        /// <param name="errorCheck">Type of check</param>
+        /// <param name="errorCode">Error code, check <see cref="Error"/> for possible values.</param>
+        /// <param name="arg0">Arguments for formatted message.</param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
+        /// <param name="inner">(optional) Inner exception</param>
+        /// <returns>Created exception.</returns>
+        public static ContainerException Of(ErrorCheck errorCheck, int errorCode,
             object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
             Exception inner = null)
         {
             string message = null;
-            if (code != -1)
-                message = string.Format(DryIoc.Error.Messages[code], Print(arg0), Print(arg1), Print(arg2), Print(arg3));
+            if (errorCode != -1)
+                message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1), Print(arg2), Print(arg3));
             else
             {
-                switch (check) // handle default code
+                switch (errorCheck) // handle default code
                 {
-                    case Throw.Check.InvalidCondition:
-                        code = DryIoc.Error.INVALID_CONDITION;
-                        message = string.Format(DryIoc.Error.Messages[code], Print(arg0), Print(arg0.GetType()));
+                    case ErrorCheck.InvalidCondition:
+                        errorCode = DryIoc.Error.INVALID_CONDITION;
+                        message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg0.GetType()));
                         break;
-                    case Throw.Check.IsNull:
-                        code = DryIoc.Error.IS_NULL;
-                        message = string.Format(DryIoc.Error.Messages[code], Print(arg0.GetType()));
+                    case ErrorCheck.IsNull:
+                        errorCode = DryIoc.Error.IS_NULL;
+                        message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0.GetType()));
                         break;
-                    case Throw.Check.IsNotOfType:
-                        code = DryIoc.Error.IS_NOT_OF_TYPE;
-                        message = string.Format(DryIoc.Error.Messages[code], Print(arg0), Print(arg1));
+                    case ErrorCheck.IsNotOfType:
+                        errorCode = DryIoc.Error.IS_NOT_OF_TYPE;
+                        message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1));
                         break;
-                    case Throw.Check.TypeIsNotOfType:
-                        code = DryIoc.Error.TYPE_IS_NOT_OF_TYPE;
-                        message = string.Format(DryIoc.Error.Messages[code], Print(arg0), Print(arg1));
+                    case ErrorCheck.TypeIsNotOfType:
+                        errorCode = DryIoc.Error.TYPE_IS_NOT_OF_TYPE;
+                        message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1));
                         break;
                 }
             }
 
             return inner == null
-                ? new ContainerException(code, message)
-                : new ContainerException(code, message, inner);
+                ? new ContainerException(errorCode, message)
+                : new ContainerException(errorCode, message, inner);
         }
 
         /// <summary>Creates exception with message describing cause and context of error.</summary>
@@ -5255,16 +5279,20 @@ namespace DryIoc
             Error = error;
         }
 
+        /// <summary>Prints argument for formatted message.</summary> <param name="arg">To print.</param> <returns>Printed string.</returns>
         protected static string Print(object arg)
         {
             return new StringBuilder().Print(arg).ToString();
         }
     }
 
+    /// <summary>Defines error codes and error messages for all DryIoc exceptions (DryIoc extensions may define their own.)</summary>
     public static class Error
     {
+        /// <summary>First error code to identify error range for other possible error code definitions.</summary>
         public readonly static int FIRST_ERROR_CODE = 0;
 
+        /// <summary>List of error messages indexed with code.</summary>
         public readonly static IList<string> Messages = new List<string>();
 
 #pragma warning disable 1591 // Missing XML-comment
@@ -5401,68 +5429,110 @@ namespace DryIoc
         }
     }
 
+    /// <summary>Checked error condition, possible error sources.</summary>
+    public enum ErrorCheck
+    {
+        /// <summary>Unspecified, just throw.</summary>
+        Unspecified,
+
+        /// <summary>Predicate evaluated to false.</summary>
+        InvalidCondition,
+
+        /// <summary>Checked object is null.</summary>
+        IsNull,
+
+        /// <summary>Checked object is of unexpected type.</summary>
+        IsNotOfType,
+
+        /// <summary>Checked type is not assignable to expected type</summary>
+        TypeIsNotOfType,
+
+        /// <summary>Invoked operation throw, it is source of inner exception.</summary>
+        OperationThrows
+    }
+
     /// <summary>Enables more clean error message formatting and a bit of code contracts.</summary>
     public static partial class Throw
     {
-        public enum Check { No, InvalidCondition, IsNull, IsNotOfType, TypeIsNotOfType, OperationThrows }
+        /// <summary>Declares mapping between <see cref="ErrorCheck"/> type and <paramref name="error"/> code to specific <see cref="Exception"/>.</summary>
+        /// <returns>Returns mapped exception.</returns>
+        public delegate Exception GetMatchedExceptionHandler(ErrorCheck errorCheck, int error, object arg0, object arg1, object arg2, object arg3, Exception inner);
 
-        public delegate Exception GetMatchedExceptionHandler(Check check, int error, object arg0, object arg1, object arg2, object arg3, Exception inner);
-
+        /// <summary>Returns matched exception (to check type and error code). By default return <see cref="ContainerException"/>.</summary>
         public static GetMatchedExceptionHandler GetMatchedException = ContainerException.Of;
 
+        /// <summary>Throws matched exception if throw condition is true.</summary>
+        /// <param name="throwCondition">Condition to be evaluated, throws if result is true, otherwise - does nothing.</param>
+        /// <param name="error">Error code to match to exception thrown.</param>
+        /// <param name="arg0">Arguments to formatted message.</param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
         public static void If(bool throwCondition, int error = -1, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition) return;
-            throw GetMatchedException(Check.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
+            throw GetMatchedException(ErrorCheck.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
         }
 
+        /// <summary>Throws matched exception if throw condition is true. Otherwise return source <paramref name="arg0"/>.</summary>
+        /// <typeparam name="T">Type of source <paramref name="arg0"/>.</typeparam>
+        /// <param name="arg0">In case of exception <paramref name="arg0"/> will be used as first argument in formatted message.</param>
+        /// <param name="throwCondition">Condition to be evaluated, throws if result is true, otherwise - does nothing.</param>
+        /// <param name="error">Error code to match to exception thrown.</param>
+        /// <param name="arg1">Rest of arguments to formatted message.</param> <param name="arg2"></param> <param name="arg3"></param>
+        /// <returns><paramref name="arg0"/> if throw condition is false.</returns>
         public static T ThrowIf<T>(this T arg0, bool throwCondition, int error = -1, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition) return arg0;
-            throw GetMatchedException(Check.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
+            throw GetMatchedException(ErrorCheck.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
         }
 
+        /// <summary>Throws matched exception if throw condition is true. Passes <see cref="arg0"/> to condition. 
+        /// Enables fluent syntax at cast of delegate creation. Otherwise return source <paramref name="arg0"/>.</summary>
+        /// <typeparam name="T">Type of source <paramref name="arg0"/>.</typeparam>
+        /// <param name="arg0">In case of exception <paramref name="arg0"/> will be used as first argument in formatted message.</param>
+        /// <param name="throwCondition">Condition to be evaluated, throws if result is true, otherwise - does nothing.</param>
+        /// <param name="error">Error code to match to exception thrown.</param>
+        /// <param name="arg1">Rest of arguments to formatted message.</param> <param name="arg2"></param> <param name="arg3"></param>
+        /// <returns><paramref name="arg0"/> if throw condition is false.</returns>
         public static T ThrowIf<T>(this T arg0, Func<T, bool> throwCondition, int error = -1, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition(arg0)) return arg0;
-            throw GetMatchedException(Check.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
+            throw GetMatchedException(ErrorCheck.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
         }
 
         public static T ThrowIfNull<T>(this T arg, int error = -1, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
             where T : class
         {
             if (arg != null) return arg;
-            throw GetMatchedException(Check.IsNull, error, arg0, arg1, arg2, arg3, null);
+            throw GetMatchedException(ErrorCheck.IsNull, error, arg0, arg1, arg2, arg3, null);
         }
 
         public static T ThrowIfNotOf<T>(this T arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
             where T : class
         {
             if (arg1.IsTypeOf(arg0)) return arg0;
-            throw GetMatchedException(Check.IsNotOfType, error, arg0, arg1, arg2, arg3, null);
+            throw GetMatchedException(ErrorCheck.IsNotOfType, error, arg0, arg1, arg2, arg3, null);
         }
 
         public static Type ThrowIfNotOf(this Type arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
         {
             if (arg1.IsAssignableTo(arg0)) return arg0;
-            throw GetMatchedException(Check.TypeIsNotOfType, error, arg0, arg1, arg2, arg3, null);
+            throw GetMatchedException(ErrorCheck.TypeIsNotOfType, error, arg0, arg1, arg2, arg3, null);
         }
 
         public static T IfThrows<TEx, T>(Func<T> operation, int error, object arg0 = null, object arg1 = null,
             object arg2 = null, object arg3 = null) where TEx : Exception
         {
             try { return operation(); }
-            catch (TEx ex) { throw GetMatchedException(Check.OperationThrows, error, arg0, arg1, arg2, arg3, ex); }
+            catch (TEx ex) { throw GetMatchedException(ErrorCheck.OperationThrows, error, arg0, arg1, arg2, arg3, ex); }
         }
 
         public static void Error(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            throw GetMatchedException(Check.No, error, arg0, arg1, arg2, arg3, null);
+            throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
 
         public static T Instead<T>(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            throw GetMatchedException(Check.No, error, arg0, arg1, arg2, arg3, null);
+            throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
     }
 
@@ -5470,8 +5540,7 @@ namespace DryIoc
     public static class TypeTools
     {
         /// <summary>Flags for <see cref="GetImplementedTypes"/> method.</summary>
-        [Flags]
-        public enum IncludeFlags { None = 0, SourceType = 1, ObjectType = 2 }
+        [Flags] public enum IncludeFlags { None = 0, SourceType = 1, ObjectType = 2 }
 
         /// <summary>Returns all interfaces and all base types (in that order) implemented by <paramref name="sourceType"/>.
         /// Specify <paramref name="includeFlags"/> to include <paramref name="sourceType"/> itself as first item and 
@@ -5972,12 +6041,17 @@ namespace DryIoc
     /// <summary>Tools for expressions, that are not supported out-of-box.</summary>
     public static class ExpressionTools
     {
+        /// <summary>Extracts method info from method call expression.
+        /// It is allow to use type-safe method declaration instead of string method name.</summary>
+        /// <param name="expression">Lambda wrapping method call.</param>
+        /// <returns>Found method info or null if lambda body is not method call.</returns>
         public static MethodInfo GetMethodOrNull(LambdaExpression expression)
         {
             var callExpr = expression.Body as MethodCallExpression;
             return callExpr == null ? null : callExpr.Method;
         }
 
+        //TODO: Use for type-safe property injection specification.
         public static MemberInfo GetPropertyNameOrNull<T>(Expression<Func<T, object>> expression)
         {
             var body = expression.Body;
@@ -5985,15 +6059,23 @@ namespace DryIoc
             return member == null ? null : member.Member;
         }
 
-        public static Func<T, TReturn> GetMethodDelegateOrNull<T, TReturn>(string methodName)
+        /// <summary>Creates and returns delegate calling method without parameters.</summary>
+        /// <typeparam name="TOwner">Method owner type.</typeparam>
+        /// <typeparam name="TReturn">Method return type.</typeparam>
+        /// <param name="methodName">Method name to find.</param>
+        /// <returns>Created delegate or null, if no method with such name is found.</returns>
+        public static Func<TOwner, TReturn> GetMethodDelegateOrNull<TOwner, TReturn>(string methodName)
         {
-            var methodInfo = typeof(T).GetDeclaredMethodOrNull(methodName);
+            var methodInfo = typeof(TOwner).GetDeclaredMethodOrNull(methodName);
             if (methodInfo == null) return null;
-            var thisExpr = Expression.Parameter(typeof(T), "_");
-            var methodExpr = Expression.Lambda<Func<T, TReturn>>(Expression.Call(thisExpr, methodInfo), thisExpr);
+            var thisExpr = Expression.Parameter(typeof(TOwner), "_");
+            var methodExpr = Expression.Lambda<Func<TOwner, TReturn>>(Expression.Call(thisExpr, methodInfo), thisExpr);
             return methodExpr.Compile();
         }
 
+        /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
+        /// <param name="type">Type to get default value of.</param>
+        /// <returns>Default value expression.</returns>
         public static Expression GetDefaultValueExpression(this Type type)
         {
             return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), (Expression[])null);

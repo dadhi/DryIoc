@@ -23,7 +23,7 @@ namespace DryIoc.UnitTests
         public void Can_inject_singleton_service_from_parent_container()
         {
             var parent = new Container();
-            parent.Register(typeof(IFruit), typeof(Melon), Reuse.Singleton);
+            parent.Register(typeof(IFruit), typeof(Mango), Reuse.Singleton);
 
             var child = parent.CreateChildContainer();
             child.Register(typeof(IJuice), typeof(FruitJuice));
@@ -38,7 +38,7 @@ namespace DryIoc.UnitTests
         public void Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent()
         {
             var parent = new Container();
-            parent.Register(typeof(IFruit), typeof(Melon), Reuse.Singleton);
+            parent.Register(typeof(IFruit), typeof(Mango), Reuse.Singleton);
 
             var child = parent.CreateChildContainer();
             child.Register(typeof(IJuice), typeof(FruitJuice));
@@ -49,20 +49,42 @@ namespace DryIoc.UnitTests
             Assert.That(parentFruit, Is.SameAs(childJuice.Fruit));
         }
 
-        [Test, Ignore]
-        public void Can_inject_current_scope_service_from_parent_container_After_it_was_resolved_from_parent()
+        [Test]
+        public void Context_scope_is_not_copied_to_child_container_created_from_opened_scope()
         {
-            var parent = new Container();
-            parent.Register(typeof(IFruit), typeof(Melon), Reuse.InCurrentScope);
-            var scoped = parent.OpenScope();
+            var container = new Container();
+            container.Register<IFruit, Mango>(Reuse.InCurrentScope);
 
-            var child = scoped.CreateChildContainer();
-            child.Register(typeof(IJuice), typeof(FruitJuice));
+            using (var scoped = container.OpenScope())
+            {
+                var child = container.CreateChildContainer();
+                child.Register<IJuice, FruitJuice>();
 
-            var parentFruit = scoped.Resolve<IFruit>();
-            var childJuice = child.Resolve<IJuice>();
+                scoped.Resolve<IFruit>();
+                
+                var ex = Assert.Throws<ContainerException>(() => child.Resolve<IJuice>());
+                Assert.AreEqual(ex.Error, Error.NO_CURRENT_SCOPE);
+            }
+        }
 
-            Assert.That(parentFruit, Is.SameAs(childJuice.Fruit));
+        [Test]
+        public void Can_inject_current_scope_service_from_parent_container_After_it_was_resolved_from_parent2()
+        {
+            var container = new Container();
+            container.Register<IFruit, Mango>(Reuse.InCurrentScope);
+
+            var child = container.CreateChildContainer();
+            child.Register<IJuice, FruitJuice>();
+
+            using (var scoped = child.OpenScope())
+            {
+                var parentFruit = scoped.Resolve<IFruit>();
+                var childJuice = child.Resolve<IJuice>();
+
+                Assert.That(parentFruit, Is.SameAs(childJuice.Fruit));
+            }
+
+            Assert.That(() => child.Resolve<IJuice>(), Throws.InstanceOf<ContainerException>());
         }
     }
 
@@ -70,7 +92,7 @@ namespace DryIoc.UnitTests
 
     public interface IFruit { }
     public class Orange : IFruit { }
-    public class Melon : IFruit { }
+    public class Mango : IFruit { }
 
     public interface IJuice
     {
