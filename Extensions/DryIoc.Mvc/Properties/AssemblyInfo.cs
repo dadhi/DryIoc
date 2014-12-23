@@ -1,6 +1,6 @@
 ﻿using System.Reflection;
 
-[assembly: AssemblyTitle("DryIoc.MVC5")]
+[assembly: AssemblyTitle("DryIoc.Mvc")]
 [assembly: AssemblyDescription("DryIoc is small, fast, capable IoC container.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]

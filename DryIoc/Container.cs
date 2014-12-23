@@ -529,7 +529,7 @@ namespace DryIoc
                 factory = GetServiceFactoryOrDefault(serviceTypeGenericDef, request.ServiceKey, Rules.FactorySelector);
                 if (factory != null && (factory = factory.GetFactoryForRequestOrDefault(request)) != null)
                 {   // Important to register produced factory, at least for recursive dependency check
-                    Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.UpdateDefault);
+                    Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.Update);
                     return factory;
                 }
             }
@@ -541,7 +541,7 @@ namespace DryIoc
                     var ruleFactory = resolvers[i](request);
                     if (ruleFactory != null)
                     {
-                        Register(ruleFactory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.UpdateDefault);
+                        Register(ruleFactory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.Update);
                         return ruleFactory;
                     }
                 }
@@ -609,7 +609,7 @@ namespace DryIoc
                         if (i >= openGenericDecoratorIndex && decorator.ProvidesFactoryForRequest)
                         {
                             decorator = decorator.GetFactoryForRequestOrDefault(request);
-                            Register(decorator, serviceType, null, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                            Register(decorator, serviceType, null, IfAlreadyRegistered.AppendDefault);
                         }
 
                         var decoratorExpr = request.StateCache.GetCachedFactoryExpressionOrDefault(decorator.FactoryID);
@@ -773,60 +773,70 @@ namespace DryIoc
         private void AddOrUpdateServiceFactory(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
             if (serviceKey == null)
-            {
-                _factories.Swap(x => x.AddOrUpdate(serviceType, factory, (oldValue, _) =>
+                _factories.Swap(f => f.AddOrUpdate(serviceType, factory, (oldEntry, newEntry) =>
                 {
-                    if (oldValue is Factory) // adding new default to registered default
-                    {
-                        switch (ifAlreadyRegistered)
-                        {
-                            case IfAlreadyRegistered.KeepDefault:
-                                return oldValue;
-                            case IfAlreadyRegistered.UpdateDefault:
-                                _defaultFactoryDelegatesCache.Swap(x1 => x1.RemoveOrUpdate(serviceType));
-                                return factory;
-                            default:
-                                _defaultFactoryDelegatesCache.Swap(x1 => x1.RemoveOrUpdate(serviceType));
-                                return new FactoriesEntry(DefaultKey.Value.Next(),
-                                    HashTree<object, Factory>.Empty
-                                        .AddOrUpdate(DefaultKey.Value, (Factory)oldValue)
-                                        .AddOrUpdate(DefaultKey.Value.Next(), factory));
-                        }
-                    }
-
-                    // otherwise, when already have some keyed factories registered.
-                    var oldEntry = ((FactoriesEntry)oldValue);
-                    if (oldEntry.LastDefaultKey == null) // there was not default registration, add the first one.
-                        return new FactoriesEntry(DefaultKey.Value, oldEntry.Factories.AddOrUpdate(DefaultKey.Value, factory));
+                    var oldFactories = oldEntry as FactoriesEntry;
+                    if (oldFactories != null && oldFactories.LastDefaultKey == null) // no default registered yet
+                        return new FactoriesEntry(DefaultKey.Value,
+                            oldFactories.Factories.AddOrUpdate(DefaultKey.Value, (Factory)newEntry));
 
                     switch (ifAlreadyRegistered)
                     {
-                        case IfAlreadyRegistered.KeepDefault:
-                            return oldValue;
-                        case IfAlreadyRegistered.UpdateDefault:
-                            _defaultFactoryDelegatesCache.Swap(__ => __.RemoveOrUpdate(serviceType));
-                            return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.AddOrUpdate(oldEntry.LastDefaultKey, factory));
-                        default: // just add another default factory
-                            _defaultFactoryDelegatesCache.Swap(__ => __.RemoveOrUpdate(serviceType));
-                            var newDefaultKey = oldEntry.LastDefaultKey.Next();
-                            return new FactoriesEntry(newDefaultKey, oldEntry.Factories.AddOrUpdate(newDefaultKey, factory));
+                        case IfAlreadyRegistered.Throw:
+                            var oldFactory = oldFactories == null ? (Factory)oldEntry
+                                : oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
+                            return Throw.Instead<object>(Error.UNABLE_TO_REGISTER_DUPLICATE_DEFAULT, serviceType, oldFactory);
+                        
+                        case IfAlreadyRegistered.KeepIt:
+                            return oldEntry;
+                        
+                        case IfAlreadyRegistered.Update:
+                            _defaultFactoryDelegatesCache.Swap(_ => _.RemoveOrUpdate(serviceType));
+                            return oldFactories == null ? newEntry :
+                                new FactoriesEntry(oldFactories.LastDefaultKey,
+                                    oldFactories.Factories.AddOrUpdate(oldFactories.LastDefaultKey, (Factory)newEntry));
+                        
+                        default:
+                            _defaultFactoryDelegatesCache.Swap(_ => _.RemoveOrUpdate(serviceType));
+                            if (oldFactories == null)
+                                return new FactoriesEntry(DefaultKey.Value.Next(),
+                                    HashTree<object, Factory>.Empty
+                                        .AddOrUpdate(DefaultKey.Value, (Factory)oldEntry)
+                                        .AddOrUpdate(DefaultKey.Value.Next(), (Factory)newEntry));
+
+                            var newDefaultKey = oldFactories.LastDefaultKey.Next();
+                            return new FactoriesEntry(newDefaultKey,
+                                oldFactories.Factories.AddOrUpdate(newDefaultKey, (Factory)newEntry));
                     }
                 }));
-            }
             else // for non default service key
             {
-                var newEntry = new FactoriesEntry(null, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
+                var factories = new FactoriesEntry(null, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
 
-                _factories.Swap(x => x.AddOrUpdate(serviceType, newEntry, (oldValue, _) =>
+                _factories.Swap(f => f.AddOrUpdate(serviceType, factories, (oldEntry, newEntry) =>
                 {
-                    if (oldValue is Factory) // if registered is default, just add it to new entry
-                        return new FactoriesEntry(DefaultKey.Value, newEntry.Factories.AddOrUpdate(DefaultKey.Value, (Factory)oldValue));
+                    if (oldEntry is Factory) // if registered is default, just add it to new entry
+                        return new FactoriesEntry(DefaultKey.Value,
+                            ((FactoriesEntry)newEntry).Factories.AddOrUpdate(DefaultKey.Value, (Factory)oldEntry));
 
-                    var oldEntry = ((FactoriesEntry)oldValue);
-                    return new FactoriesEntry(oldEntry.LastDefaultKey, oldEntry.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, __) =>
-                        ifAlreadyRegistered == IfAlreadyRegistered.KeepDefault ? oldFactory
-                        : ifAlreadyRegistered == IfAlreadyRegistered.UpdateDefault ? factory
-                        : Throw.Instead<Factory>(Error.REGISTERING_WITH_DUPLICATE_SERVICE_KEY, serviceType, serviceKey, oldFactory)));
+                    var oldFactories = (FactoriesEntry)oldEntry;
+                    return new FactoriesEntry(oldFactories.LastDefaultKey,
+                        oldFactories.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, newFactory) =>
+                        {
+                            switch (ifAlreadyRegistered)
+                            {
+                                case IfAlreadyRegistered.KeepIt:
+                                    return oldFactory;
+
+                                case IfAlreadyRegistered.Update:
+                                    return newFactory;
+
+                                //case IfAlreadyRegistered.Throw:
+                                //case IfAlreadyRegistered.AppendDefault:
+                                default:
+                                    return Throw.Instead<Factory>(Error.UNABLE_TO_REGISTER_DUPLICATE_KEY, serviceType, serviceKey, oldFactory);
+                            }
+                        }));
                 }));
             }
         }
@@ -883,9 +893,9 @@ namespace DryIoc
         private Scope _openedScope;
         private IScopeContext _scopeContext;
 
-        private readonly Ref<HashTree<Type, object>> _factories; // where object is Factory or KeyedFactoriesEntry
-        private readonly Ref<HashTree<Type, Factory[]>> _decorators;
-        private readonly Ref<HashTree<Type, Factory>> _wrappers;
+        private readonly Ref<HashTree<Type, object>> _factories;        // where object is Factory or KeyedFactoriesEntry
+        private readonly Ref<HashTree<Type, Factory[]>> _decorators;    // it may be multiple decorators per service type 
+        private readonly Ref<HashTree<Type, Factory>> _wrappers;        // only single wrapper factory per type is supported
 
 
         private Ref<HashTree<Type, FactoryDelegate>> _defaultFactoryDelegatesCache;
@@ -1052,6 +1062,8 @@ namespace DryIoc
         /// <param name="factoryExpression">Value to cache.</param>
         public void CacheFactoryExpression(int factoryID, Expression factoryExpression)
         {
+            // Not  using Ref here, because if some cache entries will be missed or replaced from another thread, 
+            // it still the cache and does not affect application logic, just performance.
             Interlocked.Exchange(ref _factoryExpressions, _factoryExpressions.AddOrUpdate(factoryID, factoryExpression));
         }
 
@@ -1939,7 +1951,7 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType, Factory factory,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
@@ -1951,7 +1963,7 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TService>(this IRegistrator registrator, Factory factory,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
@@ -1970,7 +1982,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType, Type implementationType,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null, InjectionRules rules = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(implementationType, reuse, rules, setup);
@@ -1989,7 +2001,7 @@ namespace DryIoc
         public static void Register(this IRegistrator registrator,
             Type implementationAndServiceType, IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             InjectionRules rules = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(implementationAndServiceType, reuse, rules, setup);
@@ -2009,25 +2021,12 @@ namespace DryIoc
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             InjectionRules with = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
             where TImplementation : TService
         {
             with = (with ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(typeof(TImplementation), reuse, with, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
-        }
-
-        /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
-        /// <typeparam name="T">Concrete implementation type to instantiate/return.</typeparam>
-        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
-        public static T New<T>(this IContainer container, InjectionRules with = null)
-        {
-            var factory = new ReflectionFactory(typeof(T), null, with, Setup.With(serviceExpressionCaching: false));
-            factory.ValidateBeforeRegistration(typeof(T), container);
-            var request = container.EmptyRequest.Push(ServiceInfo.Of(typeof(T))).ResolveWithFactory(factory);
-            var factoryDelegate = factory.GetDelegateOrDefault(request);
-            var service = factoryDelegate(container.ResolutionStateCache.Items, container.ContainerWeakRef, null);
-            return (T)service;
         }
 
         /// <summary>Registers implementation type <typeparamref name="TServiceAndImplementation"/> with itself as service type.</summary>
@@ -2042,7 +2041,7 @@ namespace DryIoc
         public static void Register<TServiceAndImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             InjectionRules with = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             with = (with ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, with, setup);
@@ -2070,7 +2069,7 @@ namespace DryIoc
         public static void RegisterAll(this IRegistrator registrator, Type implementationType,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             InjectionRules rules = null, FactorySetup setup = null, Func<Type, bool> whereServiceTypes = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(implementationType, reuse, rules, setup);
@@ -2108,7 +2107,7 @@ namespace DryIoc
         public static void RegisterAll<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             InjectionRules rules = null, FactorySetup setup = null, Func<Type, bool> types = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             registrator.RegisterAll(typeof(TImplementation),
                 reuse, withConstructor, rules, setup, types, named, ifAlreadyRegistered);
@@ -2126,7 +2125,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterDelegate<TService>(this IRegistrator registrator,
             Func<IResolver, TService> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             var factory = new DelegateFactory(r => factoryDelegate(r), reuse, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
@@ -2144,7 +2143,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterDelegate(this IRegistrator registrator, Type serviceType,
             Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             Func<IResolver, object> checkedDelegate = r => factoryDelegate(r)
                 .ThrowIfNotOf(serviceType, Error.REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, r);
@@ -2162,7 +2161,7 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterInstance<TService>(this IRegistrator registrator, TService instance, IReuse reuse = null,
-            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             var factory = reuse == null ? (Factory)new InstanceFactory(instance, setup) : new DelegateFactory(_ => instance, reuse, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
@@ -2177,7 +2176,7 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterInstance(this IRegistrator registrator, Type serviceType, object instance, IReuse reuse = null,
-            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.ThrowIfDuplicateKey)
+            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             var factory = reuse == null ? (Factory)new InstanceFactory(instance, setup) : new DelegateFactory(_ => instance, reuse, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
@@ -2373,6 +2372,32 @@ namespace DryIoc
         {
             resolver.ResolvePropertiesAndFields(instance, propertiesAndFields, null);
             return instance;
+        }
+
+        /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
+        /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
+        /// <param name="concreteType">Type to instantiate.</param>
+        /// <param name="with">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        public static object New(this IContainer container, Type concreteType, InjectionRules with = null)
+        {
+            concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UNABLE_TO_NEW_OPEN_GENERIC);
+            var factory = new ReflectionFactory(concreteType, null, with, Setup.With(expressionCaching: false));
+            factory.ValidateBeforeRegistration(concreteType, container);
+            var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).ResolveWithFactory(factory);
+            var factoryDelegate = factory.GetDelegateOrDefault(request);
+            var service = factoryDelegate(container.ResolutionStateCache.Items, container.ContainerWeakRef, null);
+            return service;
+        }
+
+        /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
+        /// <typeparam name="T">Type to instantiate.</typeparam>
+        /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
+        /// <param name="with">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        public static T New<T>(this IContainer container, InjectionRules with = null)
+        {
+            return (T)container.New(typeof(T), with);
         }
     }
 
@@ -3137,7 +3162,7 @@ namespace DryIoc
         public abstract FactoryType FactoryType { get; }
 
         /// <summary>Set to true allows to cache and use cached factored service expression.</summary>
-        public virtual bool ServiceExpressionCaching { get { return false; } }
+        public virtual bool ExpressionCaching { get { return false; } }
 
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
@@ -3158,22 +3183,22 @@ namespace DryIoc
         public static readonly Setup Default = new Setup();
 
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Default"/> setup will be returned.</summary>
-        /// <param name="serviceExpressionCaching">(optional)</param> <param name="reuseWrappers">(optional)</param>
+        /// <param name="expressionCaching">(optional)</param> <param name="reuseWrappers">(optional)</param>
         /// <param name="lazyMetadata">(optional)</param> <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param>
         /// <returns>New setup object or <see cref="Default"/>.</returns>
         public static Setup With(
-            bool serviceExpressionCaching = true, IReuseWrapper[] reuseWrappers = null,
+            bool expressionCaching = true, IReuseWrapper[] reuseWrappers = null,
             Func<object> lazyMetadata = null, object metadata = null)
         {
-            return serviceExpressionCaching && reuseWrappers == null && lazyMetadata == null && metadata == null
-                 ? Default : new Setup(serviceExpressionCaching, reuseWrappers, lazyMetadata, metadata);
+            return expressionCaching && reuseWrappers == null && lazyMetadata == null && metadata == null
+                 ? Default : new Setup(expressionCaching, reuseWrappers, lazyMetadata, metadata);
         }
 
         /// <summary>Default factory type is for service factory.</summary>
         public override FactoryType FactoryType { get { return FactoryType.Service; } }
 
         /// <summary>Set to true allows to cache and use cached factored service expression.</summary>
-        public override bool ServiceExpressionCaching { get { return _serviceExpressionCaching; } }
+        public override bool ExpressionCaching { get { return _expressionCaching; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
         /// or disable disposing with <see cref="ExplicitlyDisposable"/>, etc.</summary>
@@ -3187,16 +3212,17 @@ namespace DryIoc
 
         #region Implementation
 
-        private Setup(bool serviceExpressionCaching = true, IReuseWrapper[] reuseWrappers = null,
+        private Setup(bool expressionCaching = true, 
+            IReuseWrapper[] reuseWrappers = null,
             Func<object> lazyMetadata = null, object metadata = null)
         {
-            _serviceExpressionCaching = serviceExpressionCaching;
+            _expressionCaching = expressionCaching;
             _reuseWrappers = reuseWrappers;
             _lazyMetadata = lazyMetadata;
             _metadata = metadata;
         }
 
-        private readonly bool _serviceExpressionCaching;
+        private readonly bool _expressionCaching;
         private readonly IReuseWrapper[] _reuseWrappers;
         private readonly Func<object> _lazyMetadata;
         private object _metadata;
@@ -3380,7 +3406,7 @@ namespace DryIoc
             var decorator = request.Container.GetDecoratorExpressionOrDefault(request);
             var noOrFuncDecorator = decorator == null || decorator is LambdaExpression;
 
-            var isCacheable = Setup.ServiceExpressionCaching
+            var isCacheable = Setup.ExpressionCaching
                 && noOrFuncDecorator && request.FuncArgs == null && requiredWrapperType == null;
             if (isCacheable)
             {
@@ -5005,14 +5031,14 @@ namespace DryIoc
     /// <summary>Specifies options to handle situation when registering some service already present in the registry.</summary>
     public enum IfAlreadyRegistered
     {
-        // TODO: Handle Throw
+        /// <summary>Appends new default registration or throws registration with the same key.</summary>
+        AppendDefault,
+        /// <summary>Throws if default or registration with the same key is already exist.</summary>
         Throw,
-        /// <summary>Defines to throw if registration with the same non-default key already exist.</summary>
-        ThrowIfDuplicateKey,
-        /// <summary>Registration of new default service will be silently rejected.</summary>
-        KeepDefault,
-        /// <summary>Registration of new default service will replace existing one.</summary>
-        UpdateDefault
+        /// <summary>Keeps old default or keyed registration ignoring new registration: ensures Register-Once semantics.</summary>
+        KeepIt,
+        /// <summary>Updates old registration with one.</summary>
+        Update
     }
 
     /// <summary>Defines operations that for changing registry, and checking if something exist in registry.</summary>
@@ -5234,11 +5260,12 @@ namespace DryIoc
         /// <summary>Error code of exception, possible values are listed in <see cref="Error"/> class.</summary>
         public readonly int Error;
 
-        /// <summary>Creates exception object optionally providing <paramref name="inner"/> exception.</summary>
+        /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and its message,
+        /// optionally with <paramref name="inner"/> exception.</summary>
         /// <param name="errorCheck">Type of check</param>
         /// <param name="errorCode">Error code, check <see cref="Error"/> for possible values.</param>
-        /// <param name="arg0">Arguments for formatted message.</param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
-        /// <param name="inner">(optional) Inner exception</param>
+        /// <param name="arg0">(optional) Arguments for formatted message.</param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
+        /// <param name="inner">(optional) Inner exception.</param>
         /// <returns>Created exception.</returns>
         public static ContainerException Of(ErrorCheck errorCheck, int errorCode,
             object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
@@ -5249,7 +5276,7 @@ namespace DryIoc
                 message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1), Print(arg2), Print(arg3));
             else
             {
-                switch (errorCheck) // handle default code
+                switch (errorCheck) // handle error check when error code is unspecified.
                 {
                     case ErrorCheck.InvalidCondition:
                         errorCode = DryIoc.Error.INVALID_CONDITION;
@@ -5278,7 +5305,7 @@ namespace DryIoc
         /// <summary>Creates exception with message describing cause and context of error.</summary>
         /// <param name="error"></param>
         /// <param name="message">Error message.</param>
-        public ContainerException(int error, string message)
+        protected ContainerException(int error, string message)
             : base(message)
         {
             Error = error;
@@ -5289,7 +5316,7 @@ namespace DryIoc
         /// <param name="error"></param>
         /// <param name="message">Error message.</param>
         /// <param name="innerException">Underlying system/leading exception.</param>
-        public ContainerException(int error, string message, Exception innerException)
+        protected ContainerException(int error, string message, Exception innerException)
             : base(message, innerException)
         {
             Error = error;
@@ -5359,14 +5386,16 @@ namespace DryIoc
             NO_OPEN_THREAD_SCOPE,
             CONTAINER_IS_GARBAGE_COLLECTED,
             CANT_CREATE_DECORATOR_EXPR,
-            REGISTERING_WITH_DUPLICATE_SERVICE_KEY,
+            UNABLE_TO_REGISTER_DUPLICATE_DEFAULT,
+            UNABLE_TO_REGISTER_DUPLICATE_KEY,
             NO_CURRENT_SCOPE,
             CONTAINER_IS_DISPOSED,
             UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE,
             NOT_DIRECT_SCOPE_PARENT,
             CANT_RESOLVE_REUSE_WRAPPER,
             WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE,
-            NO_MATCHED_SCOPE_FOUND;
+            NO_MATCHED_SCOPE_FOUND,
+            UNABLE_TO_NEW_OPEN_GENERIC;
 #pragma warning restore 1591
 
         static Error()
@@ -5427,12 +5456,14 @@ namespace DryIoc
             _(ref CONTAINER_IS_DISPOSED, "Container {0} is disposed and its operations are no longer available.");
             _(ref CONTAINER_IS_GARBAGE_COLLECTED, "Container is no longer available (has been garbage-collected).");
             _(ref CANT_CREATE_DECORATOR_EXPR, "Unable to create decorator expression for: {0}.");
-            _(ref REGISTERING_WITH_DUPLICATE_SERVICE_KEY, "Service {0} with the same key \"{1}\" is already registered as {2}.");
+            _(ref UNABLE_TO_REGISTER_DUPLICATE_DEFAULT, "Service {0} without key is already registered as {2}.");
+            _(ref UNABLE_TO_REGISTER_DUPLICATE_KEY, "Service {0} with the same key \"{1}\" is already registered as {2}.");
             _(ref NO_CURRENT_SCOPE, "No current scope available: probably you are resolving scoped service outside of scope.");
             _(ref UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE, "Unable to dispose not a current opened scope.");
             _(ref CANT_RESOLVE_REUSE_WRAPPER, "Unable to resolve reuse wrapper {0} for: {1}");
             _(ref WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE, "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}.");
             _(ref NO_MATCHED_SCOPE_FOUND, "Unable to find scope with matching name \"{0}\" in current scope reuse.");
+            _(ref UNABLE_TO_NEW_OPEN_GENERIC, "Unable to New not concrete/open-generic type {0}.");
         }
 
         private static void _(ref int error, string message)
@@ -6193,6 +6224,11 @@ namespace DryIoc
             return AddOrUpdate(key.GetHashCode(), key, value, update);
         }
 
+        public HashTree<K, V> Update(K key, Func<V, V> update = null)
+        {
+            return Update(key.GetHashCode(), key, update);
+        }
+
         /// <summary>Searches for key in tree and returns the value if found, or <paramref name="defaultValue"/> otherwise.</summary>
         /// <param name="key">Key to look for.</param> <param name="defaultValue">Value to return if key is not found.</param>
         /// <returns>Found value or <paramref name="defaultValue"/>.</returns>
@@ -6225,28 +6261,35 @@ namespace DryIoc
         /// <returns>Sequence of enumerated key value pairs.</returns>
         public IEnumerable<KV<K, V>> Enumerate()
         {
+            if (Height == 0) 
+                yield break;
+
             var parents = new HashTree<K, V>[Height];
+
+            var tree = this;
             var parentCount = -1;
-            var t = this;
-            while (!t.IsEmpty || parentCount != -1)
+            while (tree.Height != 0 || parentCount != -1)
             {
-                if (!t.IsEmpty)
+                if (tree.Height != 0)
                 {
-                    parents[++parentCount] = t;
-                    t = t.Left;
+                    parents[++parentCount] = tree;
+                    tree = tree.Left;
                 }
                 else
                 {
-                    t = parents[parentCount--];
-                    yield return new KV<K, V>(t.Key, t.Value);
-                    if (t.Conflicts != null)
-                        for (var i = 0; i < t.Conflicts.Length; i++)
-                            yield return t.Conflicts[i];
-                    t = t.Right;
-                    }
+                    tree = parents[parentCount--];
+                    yield return new KV<K, V>(tree.Key, tree.Value);
+
+                    if (tree.Conflicts != null)
+                        for (var i = 0; i < tree.Conflicts.Length; i++)
+                            yield return tree.Conflicts[i];
+
+                    tree = tree.Right;
+                }
             }
         }
 
+        // TODO: Review new enumerator
         public Enumerator GetEnumerator()
         {
             return new Enumerator(this);
@@ -6381,6 +6424,35 @@ namespace DryIoc
             conflicts[i != -1 ? i : Conflicts.Length] =
                 new KV<K, V>(key, i != -1 && update != null ? update(Conflicts[i].Value, value) : value);
             return new HashTree<K, V>(Hash, Key, Value, conflicts, Left, Right);
+        }
+
+        private HashTree<K, V> Update(int hash, K key, Func<V, V> update)
+        {
+            return Height == 0 ? this
+                : (hash == Hash ? UpdateValueAndResolveConflicts(key, update)
+                : (hash < Hash
+                    ? With(Left.Update(hash, key, update), Right)
+                    : With(Left, Right.Update(hash, key, update)))
+                        .KeepBalanced());
+        }
+
+        private HashTree<K, V> UpdateValueAndResolveConflicts(K key, Func<V, V> update)
+        {
+            if (ReferenceEquals(Key, key) || Key.Equals(key))
+                return new HashTree<K, V>(Hash, key, update(Value), Conflicts, Left, Right);
+
+            if (Conflicts == null)
+                return this;
+
+            var i = Conflicts.Length - 1;
+            while (i >= 0 && !Equals(Conflicts[i].Key, Key)) i--;
+            if (i == -1)
+                return this;
+
+            var newConflicts = new KV<K, V>[Conflicts.Length];
+            Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
+            newConflicts[i] = new KV<K, V>(key, update(Conflicts[i].Value));
+            return new HashTree<K, V>(Hash, Key, Value, newConflicts, Left, Right);
         }
 
         private V GetConflictedValueOrDefault(K key, V defaultValue)

@@ -16,7 +16,7 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<ServiceWithDependency>();
             Assert.That(service.Dependency, Is.InstanceOf<Dependency>());
             
-            container.Register<IDependency, Foo1>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateDefault);
+            container.Register<IDependency, Foo1>(ifAlreadyRegistered: IfAlreadyRegistered.Update);
             service = container.Resolve<ServiceWithDependency>();
             Assert.That(service.Dependency, Is.InstanceOf<Dependency>());
         }
@@ -31,7 +31,7 @@ namespace DryIoc.UnitTests
             Assert.That(service.Dependency, Is.InstanceOf<Dependency>());
 
             container = container.WipeCache();
-            container.Register<IDependency, Foo1>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateDefault);
+            container.Register<IDependency, Foo1>(ifAlreadyRegistered: IfAlreadyRegistered.Update);
             service = container.Resolve<ServiceWithDependency>();
             Assert.That(service.Dependency, Is.InstanceOf<Foo1>());
         }
@@ -59,7 +59,7 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<IService>();
             Assert.That(service, Is.InstanceOf<Service>());
 
-            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.UpdateDefault);
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Update);
             service = container.Resolve<IService>();
             Assert.That(service, Is.InstanceOf<AnotherService>());
         }

@@ -7,8 +7,8 @@
     <ProjectGuid>{6936BFF7-6EE1-4A17-BBB7-4941D5F687DB}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.MVC5</RootNamespace>
-    <AssemblyName>DryIoc.MVC5</AssemblyName>
+    <RootNamespace>DryIoc.Mvc</RootNamespace>
+    <AssemblyName>DryIoc.Mvc</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -41,7 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="DryIocMVC.cs" />
+    <Compile Include="DryIocMvc.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\DryIoc\DryIoc.csproj">

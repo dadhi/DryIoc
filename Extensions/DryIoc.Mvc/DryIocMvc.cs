@@ -29,7 +29,7 @@ using System.Reflection;
 using System.Web;
 using System.Web.Mvc;
 
-namespace DryIoc.MVC5
+namespace DryIoc.Mvc
 {
     internal static class MvcExtensions
     {

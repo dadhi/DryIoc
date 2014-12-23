@@ -114,7 +114,7 @@ namespace DryIoc.MefAttributedModel
             {
                 var export = registrationInfo.Exports[i];
                 registrator.Register(factory, export.ServiceType,
-                    export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                    export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendDefault);
             }
 
             if (registrationInfo.IsFactory)
@@ -262,7 +262,7 @@ namespace DryIoc.MefAttributedModel
 
                 registry.Register(serviceType, implementationType,
                     reuse, withConstructor, null, Setup.With(metadata: import.Metadata),
-                    serviceKey, IfAlreadyRegistered.KeepDefault);
+                    serviceKey, IfAlreadyRegistered.KeepIt);
             }
 
             return ServiceInfoDetails.Of(serviceType, serviceKey);
@@ -448,8 +448,8 @@ namespace DryIoc.MefAttributedModel
 
                 var factoryMethod = method;
                 var factoryExport = factoryInfo.Exports[0];
-                var rules = InjectionRules.With(r => FactoryMethod.Of(
-                    factoryMethod, r.Resolve(factoryExport.ServiceType, factoryExport.ServiceKeyInfo.Key, IfUnresolved.ReturnDefault)));
+                var rules = InjectionRules.With(r => FactoryMethod.Of(factoryMethod, 
+                    r.Resolve(factoryExport.ServiceType, factoryExport.ServiceKeyInfo.Key, IfUnresolved.ReturnDefault)));
                 
                 var serviceFactory = serviceInfo.CreateFactory(rules);
 
@@ -457,7 +457,7 @@ namespace DryIoc.MefAttributedModel
                 for (var i = 0; i < serviceExports.Length; i++)
                 {
                     var export = serviceExports[i];
-                    registrator.Register(serviceFactory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.ThrowIfDuplicateKey);
+                    registrator.Register(serviceFactory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendDefault);
                 }
             }
         }
@@ -534,45 +534,64 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Specific exception type to be thrown by MefAttributedModel extension. Check <see cref="Error"/> for possible error cases.</summary>
     public class AttributedModelException : ContainerException
     {
-        public new static AttributedModelException Of(ErrorCheck errorCheck, int error,
+        /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and with message corresponding to code.</summary>
+        /// <param name="errorCheck">Type of check was done.</param> <param name="errorCode">Error code to wrap, <see cref="Error"/> for codes defined.</param>
+        /// <param name="arg0">(optional) Arguments for formatted message.</param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param> 
+        /// <param name="inner">(optional) Inner exception to wrap.</param>
+        /// <returns>Create exception object.</returns>
+        public new static AttributedModelException Of(ErrorCheck errorCheck, int errorCode,
             object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
             Exception inner = null)
         {
-            var message = string.Format(MefAttributedModel.Error.Get(error), Print(arg0), Print(arg1), Print(arg2), Print(arg3));
+            var message = string.Format(MefAttributedModel.Error.Get(errorCode), Print(arg0), Print(arg1), Print(arg2), Print(arg3));
             return inner == null
-                ? new AttributedModelException(error, message)
-                : new AttributedModelException(error, message, inner);
+                ? new AttributedModelException(errorCode, message)
+                : new AttributedModelException(errorCode, message, inner);
         }
 
-        public AttributedModelException(int error, string message) : base(error, message) {}
+        private AttributedModelException(int error, string message) : base(error, message) {}
 
-        public AttributedModelException(int error, string message, Exception innerException) : base(error, message, innerException) {}
+        private AttributedModelException(int error, string message, Exception innerException) : base(error, message, innerException) {}
     }
 
     /// <summary>Converts provided literal into valid C# code. Used for generating registration code 
     /// from <see cref="RegistrationInfo"/> DTOs.</summary>
     public static class PrintCode
     {
+        /// <summary>Prints valid c# Boolean literal: true/false.</summary>
+        /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendBool(this StringBuilder code, bool x)
         {
             return code.Append(x ? "true" : "false");
         }
 
+        /// <summary>Prints valid c# string constant.</summary>
+        /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendString(this StringBuilder code, string x)
         {
             return x == null ? code.Append("null") : code.Append('"').Append(x).Append('"');
         }
 
+        /// <summary>Prints valid c# Type literal: typeof(Namespace.Type).</summary>
+        /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendType(this StringBuilder code, Type x)
         {
             return x == null ? code.Append("null") : code.Append("typeof(").Print(x).Append(')');
         }
 
-        public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object enumValue)
+        /// <summary>Prints valid c# Enum literal: Enum.Value.</summary>
+        /// <param name="code">Code to print to.</param>
+        /// <param name="enumType">Enum type of the value.</param>
+        /// <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
+        public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object x)
         {
-            return code.Print(enumType).Append('.').Append(Enum.GetName(enumType, enumValue));
+            return code.Print(enumType).Append('.').Append(Enum.GetName(enumType, x));
         }
 
+        /// <summary>Prints valid c# literal depending of <paramref name="x"/> type.</summary>
+        /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param>
+        /// <param name="ifNotRecognized">(optional) Delegate to print unrecognized value.</param>
+        /// <returns>Code with appended literal.</returns>
         public static StringBuilder AppendObject(this StringBuilder code, object x, Action<StringBuilder, object> ifNotRecognized = null)
         {
             if (x == null)
@@ -603,21 +622,43 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Serializable DTO of all registration information.</summary>
     public sealed class RegistrationInfo
     {
+        /// <summary>All exports defined for implementation type (registration).</summary>
         public ExportInfo[] Exports;
 
+        /// <summary>Concrete type on what exports are defined: exported type.</summary>
+        /// <remarks>May be null if <see cref="ImplementationTypeFullName"/> specified.</remarks>
         public Type ImplementationType;
+
+        /// <summary>Full name of exported type. Enables type lazy-loading scenario.</summary>
         public string ImplementationTypeFullName;
 
+        /// <summary>One of <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
         public Type ReuseType;
+
+        /// <summary>Name to pass to reuse factory from <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
         public string ReuseName;
+
+        /// <summary>Reuse wrappers defined for exported type <see cref="AttributedModel.SupportedReuseWrapperTypes"/>.</summary>
         public Type[] ReuseWrapperTypes;
 
+        /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
+
+        /// <summary>Factory type to specify <see cref="FactorySetup"/>.</summary>
         public FactoryType FactoryType;
+
+        /// <summary>Not null if exported with <see cref="AsDecoratorAttribute"/>, contains info to <see cref="SetupDecorator"/>.</summary>
         public DecoratorInfo Decorator;
+
+        /// <summary>Not null if exported with <see cref="AsWrapperAttribute"/>, contains info to <see cref="SetupWrapper"/>.</summary>
         public WrapperInfo Wrapper;
+        
+        /// <summary>True if exported with <see cref="AsFactoryAttribute"/>.</summary>
         public bool IsFactory;
 
+        /// <summary>Creates factory out of registration info.</summary>
+        /// <param name="rules">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
+        /// <returns>Created factory.</returns>
         public Factory CreateFactory(InjectionRules rules = null)
         {
             var reuse = AttributedModel.GetReuse(ReuseType, ReuseName);
@@ -656,6 +697,9 @@ namespace DryIoc.MefAttributedModel
                 && other.Exports.SequenceEqual(Exports);
         }
 
+        /// <summary>Generate valid c# code for instantiating of info from its state. Supposed be used in compile-time scenarios.</summary>
+        /// <param name="code">Code to append "new RegistrationInfo(...)" to.</param>
+        /// <returns>Code with "new info".</returns>
         public StringBuilder AppendAsCode(StringBuilder code = null)
         {
             code = code ?? new StringBuilder();
@@ -699,15 +743,22 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Defines DTO for exported service type and key.</summary>
     public sealed class ExportInfo
     {
+        /// <summary>Contract type.</summary>
+        /// <remarks>may be null if <see cref="ServiceTypeFullName"/> specified.</remarks>
         public Type ServiceType;
  
+        /// <summary>Full contract type name. Supposed to be used in lazy-loading scenario.</summary>
         public string ServiceTypeFullName;
 
+        /// <summary>Wrapped contract name or service key. It is wrapped in order to be serializable.</summary>
         public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
 
         /// <summary>Default constructor is usually required by deserializer.</summary>
         public ExportInfo() { } 
 
+        /// <summary>Creates exported info out of type and optional key.</summary>
+        /// <param name="serviceType">Contract type to store.</param>
+        /// <param name="serviceKey">(optional) ContractName string or service key.</param>
         public ExportInfo(Type serviceType, object serviceKey = null)
         {
             ServiceType = serviceType;
@@ -722,6 +773,9 @@ namespace DryIoc.MefAttributedModel
                 && Equals(other.ServiceKeyInfo.Key, ServiceKeyInfo.Key);
         }
 
+        /// <summary>Generates valid c# code to "new <see cref="ExportInfo"/>() { ... };" from its state.</summary>
+        /// <param name="code">Code to append generated code to.</param>
+        /// <returns>Code with appended generated info.</returns>
         public StringBuilder AppendCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
@@ -734,6 +788,7 @@ namespace DryIoc.MefAttributedModel
     public sealed class WrapperInfo
     {
         public Type WrappedServiceType;
+
         public int WrappedServiceTypeGenericArgIndex;
 
         public SetupWrapper GetSetup()
@@ -806,6 +861,9 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
+    /// <summary>
+    ///  TODO: Do we really need it? Or could just throw on no primitive type.
+    /// </summary>
     public sealed class ServiceKeyInfo
     {
         public static readonly ServiceKeyInfo Default = new ServiceKeyInfo();
@@ -844,24 +902,32 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
-    /// <summary>Declaring the <see cref="Reuse.Transient"/> for exported service.</summary>
+    /// <summary>Defines the <see cref="Reuse.Transient"/> for exported service.</summary>
     public class TransientReuseAttribute : ReuseAttribute
     {
+        /// <summary>Creates attribute by specifying null as <see cref="ReuseAttribute.ReuseType"/>.</summary>
         public TransientReuseAttribute() : base(null) { }
     }
 
+    /// <summary>Denotes exported type with <see cref="Reuse.Singleton"/>.</summary>
     public class SingletonReuseAttribute : ReuseAttribute
     {
+        /// <summary>Creates attribute.</summary>
         public SingletonReuseAttribute() : base(typeof(SingletonReuse)) { }
     }
 
+    /// <summary>Denotes exported type with <see cref="Reuse.InCurrentScope"/> or 
+    /// <see cref="Reuse.InCurrentNamedScope"/> if name is specified.</summary>
     public class CurrentScopeReuseAttribute : ReuseAttribute
     {
+        /// <summary>Creates attribute.</summary> <param name="reuseName">(optional)</param>
         public CurrentScopeReuseAttribute(string reuseName = null) : base(typeof(CurrentScopeReuse), reuseName) {}
     }
 
+    /// <summary>Denotes exported type with <see cref="Reuse.InResolutionScope"/>.</summary>
     public class ResolutionScopeReuseAttribute : ReuseAttribute
     {
+        /// <summary>Creates attribute.</summary>
         public ResolutionScopeReuseAttribute() : base(typeof(ResolutionScopeReuse)) { }
     }
 

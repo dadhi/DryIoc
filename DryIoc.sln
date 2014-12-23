@@ -113,7 +113,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.CommonServiceLocator
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.CommonServiceLocator.UnitTests", "Extensions\DryIoc.CommonServiceLocator.UnitTests\DryIoc.CommonServiceLocator.UnitTests.csproj", "{03A6D34D-3062-42F0-ACED-095C3A2657CB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MVC5", "Extensions\DryIoc.MVC5\DryIoc.MVC5.csproj", "{6936BFF7-6EE1-4A17-BBB7-4941D5F687DB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Mvc", "Extensions\DryIoc.Mvc\DryIoc.Mvc.csproj", "{6936BFF7-6EE1-4A17-BBB7-4941D5F687DB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

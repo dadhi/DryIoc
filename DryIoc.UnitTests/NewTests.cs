@@ -41,6 +41,27 @@ namespace DryIoc.UnitTests
             Assert.That(car.Wheels.Paint, Is.EqualTo("decorated"));
         }
 
+        [Test]
+        public void Can_new_instance_of_runtime_known_type()
+        {
+            var container = new Container();
+            container.Register<Wheels>();
+            var car = (Car)container.New(typeof(Car));
+
+            Assert.That(car.Wheels, Is.Not.Null);
+            Assert.That(container.IsRegistered<Car>(), Is.False);
+        }
+
+        [Test]
+        public void New_is_unable_to_create_open_generic_and_should_Throw_instead()
+        {
+            var container = new Container();
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.New(typeof(DoorFor<>)));
+
+            Assert.AreEqual(ex.Error, Error.UNABLE_TO_NEW_OPEN_GENERIC);
+        }
+
         internal class Wheels
         {
             public string Paint;            
@@ -68,6 +89,10 @@ namespace DryIoc.UnitTests
                 wheels.Paint = "decorated";
                 return wheels;
             }
+        }
+
+        internal class DoorFor<T>
+        {
         }
     }
 }
