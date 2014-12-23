@@ -16,14 +16,79 @@ namespace DryIoc.SpeedTestApp
             //CompareIlEmitDynamicMethodVsExpressionCompileSpeed();
             //CompareBitOpVsIsOpSpeed();
             //CompareDirectVsIndirectArrayAccessSpeed();
-            CompareTreeGet();
+            //CompareTreeGet();
             //CompareClosureFieldAccess();
             //DoCompareTryGetVsGetOrDefault();
 		    //CompareHashTreeEnumeration();
 		    //CompareMethodArgumentPassing();
 		    //CompareTypesForEquality(typeof(string));
+		    CompareHashTreeEnumerators();
 			Console.ReadKey();
 		}
+
+        private static void CompareHashTreeEnumerators()
+        {
+            var key = typeof(IntTreeTests.DictVsMap);
+            var value = "hey";
+
+            var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(10).ToArray();
+
+            var tree = HashTree<Type, string>.Empty;
+
+            var treeAddTime = TreeAdd(ref tree, keys, key, value);
+
+            Console.WriteLine("Tree - " + treeAddTime);
+            Console.WriteLine();
+
+            Console.WriteLine(tree.Enumerate().Count());
+            Measure("Current",
+                () =>
+                {
+                    foreach (var kv in tree.Enumerate())
+                    {
+                        
+                    }
+                });
+
+            int i = 0;
+            foreach (var kv in tree)
+            {
+                i++;
+            }
+            Console.WriteLine(i);
+            Measure("Optimized",
+                () =>
+                {
+                    foreach (var kv in tree)
+                    {
+
+                    }
+                });
+
+        }
+
+        private static void Measure(string name, Action action)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            var gcAtStart = GC.CollectionCount(0);
+
+            var sw = Stopwatch.StartNew();
+
+            for (var i = 0; i < 10000000; i++)
+            {
+                action();
+            }
+
+            sw.Stop();
+            var gcAtEnd = GC.CollectionCount(0);
+            Console.WriteLine(name);
+            Console.WriteLine("ElapsedMilliseconds: {0}", sw.ElapsedMilliseconds);
+            Console.WriteLine("GC count: {0}", gcAtEnd - gcAtStart);
+        }
+
 
         private static void CompareTreeGet()
         {
