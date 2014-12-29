@@ -7,7 +7,7 @@ namespace DryIoc.Playground
 {
     public sealed class TypeTree<V> : IEnumerable<TypeTree<V>>
     {
-        public static readonly TypeTree<V> Empty = new TypeTree<V>(HashTree<KV>.Empty);
+        public static readonly TypeTree<V> Empty = new TypeTree<V>(IntTree<KV>.Empty);
 
         public TypeTree<V> AddOrUpdate(Type key, V value)
         {
@@ -32,9 +32,9 @@ namespace DryIoc.Playground
 
         #region Implementation
 
-        private readonly HashTree<KV> _tree;
+        private readonly IntTree<KV> _tree;
 
-        private TypeTree(HashTree<KV> tree)
+        private TypeTree(IntTree<KV> tree)
         {
             _tree = tree;
         }

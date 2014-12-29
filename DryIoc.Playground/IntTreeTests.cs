@@ -13,7 +13,7 @@ namespace DryIoc.Playground
         [Test]
         public void Can_get()
         {
-            var t = HashTree<int>.Empty
+            var t = IntTree<int>.Empty
                 .AddOrUpdate(1, 11)
                 .AddOrUpdate(2, 22)
                 .AddOrUpdate(3, 33);
@@ -26,7 +26,7 @@ namespace DryIoc.Playground
         [Test]
         public void LLCase()
         {
-            var t = HashTree<int>.Empty
+            var t = IntTree<int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(3, 3);
@@ -39,7 +39,7 @@ namespace DryIoc.Playground
         [Test]
         public void TreeRemainsBalancedAfterUnbalancedInsertIntoBalancedTree()
         {
-            var t = HashTree<int>.Empty
+            var t = IntTree<int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(3, 3)
@@ -56,7 +56,7 @@ namespace DryIoc.Playground
         [Test]
         public void LRCase()
         {
-            var t = HashTree<int>.Empty
+            var t = IntTree<int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(3, 2)
                 .AddOrUpdate(4, 3);
@@ -69,7 +69,7 @@ namespace DryIoc.Playground
         [Test]
         public void RRCase()
         {
-            var t = HashTree<int>.Empty
+            var t = IntTree<int>.Empty
                 .AddOrUpdate(3, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(5, 3);
@@ -82,7 +82,7 @@ namespace DryIoc.Playground
         [Test]
         public void RLCase()
         {
-            var t = HashTree<int>.Empty
+            var t = IntTree<int>.Empty
                 .AddOrUpdate(3, 1)
                 .AddOrUpdate(5, 2)
                 .AddOrUpdate(4, 3);
@@ -95,7 +95,7 @@ namespace DryIoc.Playground
         [Test]
         public void Search_in_empty_tree_should_not_throw()
         {
-            var tree = HashTree<int>.Empty;
+            var tree = IntTree<int>.Empty;
 
             Assert.DoesNotThrow(
                 () => tree.GetValueOrDefault(0));
@@ -104,7 +104,7 @@ namespace DryIoc.Playground
         [Test]
         public void For_two_same_added_items_height_should_be_one()
         {
-            var tree = HashTree<string>
+            var tree = IntTree<string>
                 .Empty
                 .AddOrUpdate(1, "x")
                 .AddOrUpdate(1, "y");
@@ -116,7 +116,7 @@ namespace DryIoc.Playground
         public void Enumerated_values_should_be_returned_in_sorted_order()
         {
             var items = Enumerable.Range(0, 10).ToArray();
-            var tree = items.Aggregate(HashTree<int>.Empty, (t, i) => t.AddOrUpdate(i, i));
+            var tree = items.Aggregate(IntTree<int>.Empty, (t, i) => t.AddOrUpdate(i, i));
 
             var enumerated = tree.Enumerate().Select(t => t.Value).ToArray();
 
@@ -126,7 +126,7 @@ namespace DryIoc.Playground
         [Test]
         public void Can_create_tree_with_int_keys()
         {
-            var tree = HashTree<string>.Empty
+            var tree = IntTree<string>.Empty
                 .AddOrUpdate(1, "a")
                 .AddOrUpdate(2, "b")
                 .AddOrUpdate(3, "c");
@@ -139,7 +139,7 @@ namespace DryIoc.Playground
         [Test]
         public void Can_use_HashTree_to_represent_general_HashTree()
         {
-            var tree = HashTree<KeyValuePair<Type, string>[]>.Empty;
+            var tree = IntTree<KeyValuePair<Type, string>[]>.Empty;
 
             var key = typeof(AppendableArrayTests);
             var keyHash = key.GetHashCode();
@@ -231,26 +231,6 @@ namespace DryIoc.Playground
             {
                 Bla = bla;
             }
-        }
-    }
-
-    public class HashConflictingKey<T>
-    {
-        public T Key;
-
-        public HashConflictingKey(T key)
-        {
-            Key = key;
-        }
-
-        public override int GetHashCode()
-        {
-            return 1;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return Equals(Key, ((HashConflictingKey<T>)obj).Key);
         }
     }
 }

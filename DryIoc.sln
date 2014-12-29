@@ -115,6 +115,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.CommonServiceLocator
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Mvc", "Extensions\DryIoc.Mvc\DryIoc.Mvc.csproj", "{6936BFF7-6EE1-4A17-BBB7-4941D5F687DB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Mvc.UnitTests", "Extensions\DryIoc.Mvc.UnitTests\DryIoc.Mvc.UnitTests.csproj", "{ADD26CAE-81BF-4C24-82AF-C9C9F1F95708}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -261,6 +263,10 @@ Global
 		{6936BFF7-6EE1-4A17-BBB7-4941D5F687DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6936BFF7-6EE1-4A17-BBB7-4941D5F687DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6936BFF7-6EE1-4A17-BBB7-4941D5F687DB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ADD26CAE-81BF-4C24-82AF-C9C9F1F95708}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ADD26CAE-81BF-4C24-82AF-C9C9F1F95708}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ADD26CAE-81BF-4C24-82AF-C9C9F1F95708}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ADD26CAE-81BF-4C24-82AF-C9C9F1F95708}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -293,5 +299,6 @@ Global
 		{CCBEDDC4-2415-4424-B810-544AA752004B} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{03A6D34D-3062-42F0-ACED-095C3A2657CB} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{6936BFF7-6EE1-4A17-BBB7-4941D5F687DB} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
+		{ADD26CAE-81BF-4C24-82AF-C9C9F1F95708} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 	EndGlobalSection
 EndGlobal

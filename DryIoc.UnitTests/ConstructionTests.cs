@@ -80,6 +80,36 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_get_factory_registered_with_key()
+        {
+            var container = new Container();
+            container.Register<ServiceFactory>(named: "factory");
+            container.RegisterInstance("parameter");
+            container.Register<IService>(with: FactoryMethod.Of(
+                r => r.Resolve<ServiceFactory>("factory"), 
+                f => f.Create(default(string))));
+
+            var service = container.Resolve<IService>();
+
+            Assert.That(service.Message, Is.EqualTo("parameter"));
+        }
+
+        [Test]
+        public void Can_inject_external_factory_fields()
+        {
+            var container = new Container();
+            container.Register<IService>(with: FactoryMethod.Of(
+                r => r.ResolvePropertiesAndFields(
+                    new PropertyBasedFactory(), 
+                    PropertiesAndFields.Of.The<PropertyBasedFactory>(f => f.Message, "Hey")),
+                f => f.Create()));
+
+            var service = container.Resolve<IService>();
+
+            Assert.That(service.Message, Is.EqualTo("Hey"));
+        }
+
+        [Test]
         public void Should_throw_if_instance_factory_unresolved()
         {
             var container = new Container();
@@ -168,6 +198,16 @@ namespace DryIoc.UnitTests
             public IService Create(string parameter)
             {
                 return new SomeService(parameter);
+            }
+        }
+
+        internal class PropertyBasedFactory
+        {
+            public string Message { get; set; }
+
+            public IService Create()
+            {
+                return new SomeService(Message);
             }
         }
 

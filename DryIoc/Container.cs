@@ -190,7 +190,6 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             factory.ThrowIfNull().ValidateBeforeRegistration(serviceType.ThrowIfNull(), this);
-            factory.RegisteredInto(_containerID);
 
             switch (factory.FactoryType)
             {
@@ -222,7 +221,7 @@ namespace DryIoc
 
                 case FactoryType.Decorator:
                     var decorators = _decorators.Value.GetValueOrDefault(serviceType);
-                    return decorators != null && (condition == null || decorators.Any(condition));
+                    return decorators != null && decorators.Length != 0 && (condition == null || decorators.Any(condition));
 
                 default:
                     Rules.FactorySelectorRule selector = (t, k, factories) => factories.FirstOrDefault(
@@ -243,126 +242,104 @@ namespace DryIoc
         public void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
             ThrowIfContainerDisposed();
-            object removedFactoryOrFactories = null;
+            object removed = null; // Factory or Factory[] or FactoriesEntry
             switch (factoryType)
             {
                 case FactoryType.Wrapper:
-                    if (condition == null)
-                        _wrappers.Swap(_ => _.RemoveOrUpdate(serviceType,
-                            (Factory factory, out Factory remainingFactory) =>
-                            {
-                                removedFactoryOrFactories = factory;
-                                remainingFactory = null;
-                                return false;
-                            }));
-                    else
-                        _wrappers.Swap(_ => _.RemoveOrUpdate(serviceType,
-                            (Factory factory, out Factory remainingFactory) =>
-                            {
-                                remainingFactory = factory;
-                                var removed = condition(factory);
-                                if (removed) removedFactoryOrFactories = factory;
-                                return !removed;
-                            }));
+                    _wrappers.Swap(_ => _.Update(serviceType, null, (factory, _null) =>
+                    {
+                        if (factory != null && condition != null && !condition(factory)) 
+                            return factory;
+                        removed = factory;
+                        return null;
+                    }));
                     break;
                 case FactoryType.Decorator:
-                    if (condition == null)
-                        _decorators.Swap(_ => _.RemoveOrUpdate(serviceType,
-                            (Factory[] factories, out Factory[] remainingFactories) =>
-                            {
-                                removedFactoryOrFactories = factories;
-                                remainingFactories = null;
-                                return false;
-                            }));
-                    else
-                        _decorators.Swap(_ => _.RemoveOrUpdate(serviceType,
-                            (Factory[] factories, out Factory[] remainingFactories) =>
-                            {
-                                remainingFactories = factories.Where(factory => !condition(factory)).ToArray();
-                                removedFactoryOrFactories = factories.Except(remainingFactories).ToArray();
-                                return remainingFactories.Length != 0;
-                            }));
+                    _decorators.Swap(_ => _.Update(serviceType, null, (factories, _null) =>
+                    {
+                        var remaining = condition == null
+                            ? null : factories.Where(factory => !condition(factory)).ToArray();
+                        removed = remaining == null || remaining.Length == 0
+                            ? factories : factories.Except(remaining).ToArray();
+                        return remaining;
+                    }));
                     break;
                 default:
-                    if (serviceKey == null && condition == null)
-                        _factories.Swap(_ => _.RemoveOrUpdate(serviceType,
-                            (object oldEntry, out object newEntry) =>
-                            {
-                                removedFactoryOrFactories = oldEntry;
-                                newEntry = null;
-                                return false;
-                            }));
+                    if (serviceKey == null && condition == null) // simplest case with simplest handling
+                        _factories.Swap(_ => _.Update(serviceType, null, (entry, _null) =>
+                        {
+                            removed = entry;
+                            return null;
+                        }));
                     else
-                        _factories.Swap(_ => _.RemoveOrUpdate(serviceType,
-                            (object entry, out object remainingEntry) =>
+                        _factories.Swap(_ => _.Update(serviceType, null, (entry, _null) =>
+                        {
+                            if (entry == null)
+                                return null;
+
+                            if (entry is Factory)
                             {
-                                remainingEntry = entry; // by default keep old entry
+                                if ((serviceKey != null && !DefaultKey.Value.Equals(serviceKey)) ||
+                                    (condition != null && !condition((Factory)entry)))
+                                    return entry; // keep entry
+                                removed = entry;  // otherwise remove it (the only case if serviceKey == DefaultKey.Value)
+                                return null;
+                            }
 
-                                if (entry is Factory)   // return false to remove entry
-                                {
-                                    var keep = serviceKey != null && !DefaultKey.Value.Equals(serviceKey)
-                                        || condition != null && !condition((Factory)entry);
-                                    if (!keep) removedFactoryOrFactories = entry;
-                                    return keep;
-                                }
+                            var factoriesEntry = (FactoriesEntry)entry;
+                            var oldFactories = factoriesEntry.Factories;
+                            var remainingFactories = HashTree<object, Factory>.Empty;
+                            if (serviceKey == null) // automatically means condition != null
+                            {   // keep factories for which condition is true
+                                foreach (var factory in oldFactories.Enumerate())
+                                    if (!condition(factory.Value))
+                                        remainingFactories = remainingFactories.AddOrUpdate(factory.Key, factory.Value);
+                            }
+                            else// serviceKey is not default, which automatically means condition == null
+                            {   // set to null factory with specified key if its found
+                                remainingFactories = oldFactories;
+                                var factory = oldFactories.GetValueOrDefault(serviceKey);
+                                if (factory != null)
+                                    remainingFactories = oldFactories.Height > 1
+                                        ? oldFactories.Update(serviceKey, null)
+                                        : HashTree<object, Factory>.Empty;
+                            }
 
-                                var factoriesEntry = (FactoriesEntry)entry;
-                                var oldFactories = factoriesEntry.Factories;
-                                var newFactories = oldFactories;
-                                if (serviceKey == null)
-                                {   // remove all factories for which condition is true
-                                    foreach (var f in newFactories.Enumerate())
-                                        if (condition == null || condition(f.Value))
-                                            newFactories = newFactories.RemoveOrUpdate(f.Key);
-                                }
-                                else
-                                {   // remove factory with specified key if its found and condition is true
-                                    var factory = newFactories.GetValueOrDefault(serviceKey);
-                                    if (factory != null && (condition == null || condition(factory)))
-                                        newFactories = newFactories.RemoveOrUpdate(serviceKey);
-                                }
+                            if (remainingFactories.IsEmpty)
+                            {   // if no more remaining factories, then delete the whole entry
+                                removed = entry;
+                                return null; 
+                            }
 
-                                if (newFactories != oldFactories) // if we deleted something then make a cleanup
-                                {
-                                    if (newFactories.IsEmpty)
-                                    {
-                                        removedFactoryOrFactories = entry;
-                                        return false; // if no more remaining factories, then delete the whole entry
-                                    }
+                            removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(f => f.Value).ToArray();
 
-                                    removedFactoryOrFactories =
-                                        oldFactories.Enumerate().Select(__ => __.Value).Except(
-                                        newFactories.Enumerate().Select(__ => __.Value)).ToArray();
-
-                                    if (newFactories.Height == 1 && newFactories.Key.Equals(DefaultKey.Value))
-                                        remainingEntry = newFactories.Value; // replace entry with single remaining default factory
-                                    else
-                                    {   // update last default key if current default key was removed
-                                        var newDefaultKey = factoriesEntry.LastDefaultKey;
-                                        if (newDefaultKey != null && newFactories.GetValueOrDefault(newDefaultKey) == null)
-                                            newDefaultKey = newFactories.Enumerate().Select(x => x.Key).OfType<DefaultKey>()
-                                                .OrderByDescending(key => key.RegistrationOrder).FirstOrDefault();
-                                        remainingEntry = new FactoriesEntry(newDefaultKey, newFactories);
-                                    }
-                                }
-
-                                return true;
-                            }));
+                            if (remainingFactories.Height == 1 && DefaultKey.Value.Equals(remainingFactories.Key))
+                                return remainingFactories.Value; // replace entry with single remaining default factory
+                            
+                            // update last default key if current default key was removed
+                            var newDefaultKey = factoriesEntry.LastDefaultKey;
+                            if (newDefaultKey != null && remainingFactories.GetValueOrDefault(newDefaultKey) == null)
+                                newDefaultKey = remainingFactories.Enumerate().Select(x => x.Key)
+                                    .OfType<DefaultKey>().OrderByDescending(key => key.RegistrationOrder).FirstOrDefault();
+                            return new FactoriesEntry(newDefaultKey, remainingFactories);
+                        }));
                     break;
             }
 
-            // Remove all factories created by FactoryProvider or ReflectionFactory with open-generic implementation type.
-            if (removedFactoryOrFactories != null)
-            {
-                if (removedFactoryOrFactories is Factory)
-                    UnregisterProvidedFactories((Factory)removedFactoryOrFactories, factoryType);
-                else if (removedFactoryOrFactories is FactoriesEntry)
-                    foreach (var f in ((FactoriesEntry)removedFactoryOrFactories).Factories.Enumerate())
-                        UnregisterProvidedFactories(f.Value, factoryType);
-                else if (removedFactoryOrFactories is Factory[])
-                    foreach (var f in ((Factory[])removedFactoryOrFactories))
-                        UnregisterProvidedFactories(f, factoryType);
-            }
+            if (removed != null)
+                UnregisterFactoriesSproutByFactoryProvider(removed, factoryType);
+        }
+
+        private void UnregisterFactoriesSproutByFactoryProvider(object removed, FactoryType factoryType)
+        {
+            if (removed is Factory)
+                UnregisterProvidedFactories((Factory) removed, factoryType);
+            else if (removed is FactoriesEntry)
+                foreach (var f in ((FactoriesEntry) removed).Factories.Enumerate())
+                    UnregisterProvidedFactories(f.Value, factoryType);
+            else if (removed is Factory[])
+                foreach (var f in ((Factory[]) removed))
+                    UnregisterProvidedFactories(f, factoryType);
         }
 
         private void UnregisterProvidedFactories(Factory factory, FactoryType factoryType)
@@ -786,18 +763,16 @@ namespace DryIoc
                             var oldFactory = oldFactories == null ? (Factory)oldEntry
                                 : oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
                             return Throw.Instead<object>(Error.UNABLE_TO_REGISTER_DUPLICATE_DEFAULT, serviceType, oldFactory);
-                        
+
                         case IfAlreadyRegistered.KeepIt:
                             return oldEntry;
-                        
+
                         case IfAlreadyRegistered.Update:
-                            _defaultFactoryDelegatesCache.Swap(_ => _.RemoveOrUpdate(serviceType));
                             return oldFactories == null ? newEntry :
                                 new FactoriesEntry(oldFactories.LastDefaultKey,
                                     oldFactories.Factories.AddOrUpdate(oldFactories.LastDefaultKey, (Factory)newEntry));
-                        
+
                         default:
-                            _defaultFactoryDelegatesCache.Swap(_ => _.RemoveOrUpdate(serviceType));
                             if (oldFactories == null)
                                 return new FactoriesEntry(DefaultKey.Value.Next(),
                                     HashTree<object, Factory>.Empty
@@ -897,11 +872,9 @@ namespace DryIoc
         private readonly Ref<HashTree<Type, Factory[]>> _decorators;    // it may be multiple decorators per service type 
         private readonly Ref<HashTree<Type, Factory>> _wrappers;        // only single wrapper factory per type is supported
 
-
         private Ref<HashTree<Type, FactoryDelegate>> _defaultFactoryDelegatesCache;
         private Ref<HashTree<Type, HashTree<object, FactoryDelegate>>> _keyedFactoryDelegatesCache;
         private ResolutionStateCache _resolutionStateCache;
-
 
         private Container(Rules rules,
             Ref<HashTree<Type, object>> factories,
@@ -961,7 +934,7 @@ namespace DryIoc
         /// <returns>True if keys have the same order.</returns>
         public override bool Equals(object key)
         {
-            return key == null 
+            return key == null
                 || key is DefaultKey && ((DefaultKey)key).RegistrationOrder == RegistrationOrder;
         }
 
@@ -1323,7 +1296,7 @@ namespace DryIoc
             Wrappers = Wrappers.AddOrUpdate(typeof(ResolutionScoped<>),
                 new FactoryProvider(GetResolutionScopedFactoryOrDefault, SetupWrapper.Default));
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(DebugExpression<>),
+            Wrappers = Wrappers.AddOrUpdate(typeof(FactoryExpression<>),
                 new FactoryProvider(_ => new ExpressionFactory(GetDebugExpression), SetupWrapper.Default));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(Func<>),
@@ -1732,11 +1705,11 @@ namespace DryIoc
         public bool ThrowIfDepenedencyHasShorterReuseLifespan { get; private set; }
 
         /// <summary>Returns new rules with <see cref="ThrowIfDepenedencyHasShorterReuseLifespan"/> set to specified value.</summary>
-        /// <param name="throwIfDepenedencyHasShorterReuseLifespan">Setting new value.</param>
+        /// <param name="enable">Setting new value.</param>
         /// <returns>New rules with new setting value.</returns>
-        public Rules EnableThrowIfDepenedencyHasShorterReuseLifespan(bool throwIfDepenedencyHasShorterReuseLifespan)
+        public Rules EnableThrowIfDepenedencyHasShorterReuseLifespan(bool enable)
         {
-            return new Rules(this) { ThrowIfDepenedencyHasShorterReuseLifespan = throwIfDepenedencyHasShorterReuseLifespan };
+            return new Rules(this) { ThrowIfDepenedencyHasShorterReuseLifespan = enable };
         }
 
         /// <summary>Defines mapping from registered reuse to what will be actually used.</summary>
@@ -1834,7 +1807,7 @@ namespace DryIoc
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
-            return Method.DeclaringType + "::[" + Method + "]";
+            return new StringBuilder().Print(Method.DeclaringType).Append("::[").Append(Method).Append("]").ToString();
         }
 
         private FactoryMethod(MethodBase method, object factory = null)
@@ -2099,18 +2072,18 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
-        /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
+        /// <param name="with">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="types">(optional) condition to include selected types only. Default value is <see cref="DefaultServiceTypesForRegisterAll"/></param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterAll<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
-            InjectionRules rules = null, FactorySetup setup = null, Func<Type, bool> types = null,
+            InjectionRules with = null, FactorySetup setup = null, Func<Type, bool> types = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             registrator.RegisterAll(typeof(TImplementation),
-                reuse, withConstructor, rules, setup, types, named, ifAlreadyRegistered);
+                reuse, withConstructor, with, setup, types, named, ifAlreadyRegistered);
         }
 
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
@@ -2315,9 +2288,19 @@ namespace DryIoc
         public static object Resolve(this IResolver resolver, Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
-            return serviceKey == null
+            return serviceKey == null && requiredServiceType == null
                 ? resolver.ResolveDefault(serviceType, ifUnresolved, null)
                 : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, null);
+        }
+
+        /// <summary>Resolve service using provided specification with <paramref name="info"/>. Useful for DryIoc extensions and hooks.</summary>
+        /// <param name="resolver">Container to resolve from</param> <param name="info">Service specification.</param>
+        /// <returns>Resolved service object.</returns>
+        public static object Resolve(this IResolver resolver, IServiceInfo info)
+        {
+            var details = info.Details;
+            return details.GetValue != null ? details.GetValue(resolver)
+                : resolver.Resolve(info.ServiceType, details.ServiceKey, details.IfUnresolved, details.RequiredServiceType);
         }
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
@@ -2486,7 +2469,7 @@ namespace DryIoc
 
             var s = new StringBuilder();
             if (RequiredServiceType != null)
-                s.Append("{required: ").Print(RequiredServiceType);
+                s.Append("{required: ").Print(RequiredServiceType); // TODO omit required when it is the same as service type.
             if (ServiceKey != null)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Print(ServiceKey, "\"");
             if (IfUnresolved != IfUnresolved.Throw)
@@ -2549,8 +2532,8 @@ namespace DryIoc
     {
         /// <summary>Combines service info with details: the main task is to combine service and required service type.</summary>
         /// <typeparam name="T">Type of <see cref="IServiceInfo"/>.</typeparam>
-        /// <param name="info">Source info.</param> <param name="details">Details to combine with info.</param> <param name="request">Owner request.</param>
-        /// <returns>Original source or new combined info.</returns>
+        /// <param name="info">Source info.</param> <param name="details">Details to combine with info.</param> 
+        /// <param name="request">Owner request.</param> <returns>Original source or new combined info.</returns>
         public static T WithDetails<T>(this T info, ServiceInfoDetails details, Request request)
             where T : IServiceInfo
         {
@@ -2774,8 +2757,8 @@ namespace DryIoc
         /// <param name="member">Member is either property or field.</param> <returns>Created info.</returns>
         public static PropertyOrFieldServiceInfo Of(MemberInfo member)
         {
-            return member.ThrowIfNull() is PropertyInfo
-                ? new Property((PropertyInfo)member) : (PropertyOrFieldServiceInfo)new Field((FieldInfo)member);
+            return member.ThrowIfNull() is PropertyInfo ? (PropertyOrFieldServiceInfo)
+                new Property((PropertyInfo)member) : new Field((FieldInfo)member);
         }
 
         /// <summary>The required service type. It will be either <see cref="FieldInfo.FieldType"/> or <see cref="PropertyInfo.PropertyType"/>.</summary>
@@ -2900,7 +2883,7 @@ namespace DryIoc
         /// <param name="resolutionStatCache">Separate reference to resolution cache. It is separate because container may be
         /// switched independently in during request resolution in container parent-child setup.</param>
         /// <returns>New empty request.</returns>
-        public static Request CreateEmpty(ContainerWeakRef container, WeakReference resolutionStatCache)
+        internal static Request CreateEmpty(ContainerWeakRef container, WeakReference resolutionStatCache)
         {
             return new Request(null, container, resolutionStatCache, null, null, null);
         }
@@ -2926,14 +2909,6 @@ namespace DryIoc
         public void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request _)
         {
             Container.ResolvePropertiesAndFields(instance, selectPropertiesAndFields, this);
-        }
-
-        public object Resolve(IServiceInfo info)
-        {
-            var details = info.Details;
-            return details == ServiceInfoDetails.Default || details == ServiceInfoDetails.IfUnresolvedReturnDefault
-                ? Container.ResolveDefault(info.ServiceType, details.IfUnresolved, this)
-                : Container.ResolveKeyed(info.ServiceType, details.ServiceKey, details.IfUnresolved, details.RequiredServiceType, this);
         }
 
         #endregion
@@ -3212,7 +3187,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private Setup(bool expressionCaching = true, 
+        private Setup(bool expressionCaching = true,
             IReuseWrapper[] reuseWrappers = null,
             Func<object> lazyMetadata = null, object metadata = null)
         {
@@ -3338,15 +3313,6 @@ namespace DryIoc
             get { return Setup.FactoryType; }
         }
 
-        /// <summary>ID of container where factory is registered. Used by container parent-child scenarios.</summary>
-        public int ContainerID { get; private set; }
-
-        /// <summary>Sets <see cref="ContainerID"/>.</summary> <param name="containerID">ID to set.</param>
-        public void RegisteredInto(int containerID)
-        {
-            ContainerID = containerID;
-        }
-
         /// <summary>Non-abstract closed service implementation type. 
         /// May be null in such factories as <see cref="DelegateFactory"/>, where it could not be determined
         /// until delegate is invoked.</summary>
@@ -3453,7 +3419,7 @@ namespace DryIoc
                 var parentReuse = request.Parent.ResolvedFactory.Reuse;
                 if (parentReuse != null)
                     Throw.If(reuse.Lifespan < parentReuse.Lifespan,
-                        Error.DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN, request.PrintCurrent(), reuse, parentReuse, request.Parent);
+                        Error.DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN, request.PrintCurrent(), request.Parent, reuse, parentReuse);
             }
         }
 
@@ -3786,108 +3752,93 @@ namespace DryIoc
         /// <summary>Say to not resolve any properties or fields.</summary>
         public static PropertiesAndFieldsSelector Of = request => null;
 
-        /// <summary>
-        /// Public assignable instance members of any type except object, string, primitives types, and arrays of those.
-        /// </summary>
-        public static PropertiesAndFieldsSelector PublicNonPrimitive = All(Include.PublicNonPrimitive);
-
-        /// <summary>Flags to specify visibility of properties and fields to resolve.</summary>
-        public enum Include { PublicNonPrimitive, Public, NonPrimitive, All }
+        /// <summary>Public assignable instance members of any type except object, string, primitives types, and arrays of those.</summary>
+        public static PropertiesAndFieldsSelector PublicNonPrimitive = All(false, false);
 
         public delegate PropertyOrFieldServiceInfo GetInfo(MemberInfo member, Request request);
 
         /// <summary>Generates selector property and field selector with settings specified by parameters.
         /// If all parameters are omitted the return all public not primitive members.</summary>
-        /// <param name="include">(optional) Specifies visibility of members to be resolved. Default is <see cref="Include.PublicNonPrimitive"/>.</param>
-        /// <param name="getInfoOrNull">(optional) Return service info for a member or null to skip it resolution.</param>
+        /// <param name="withNonPublic">(optional) Specifies to include non public members. Will include by default.</param>
+        /// <param name="withPrimitive">(optional) Specifies to include members of primitive types. Will include by default.</param>
+        /// <param name="withFields">(optional) Specifies to include fields as well as properties. Will include by default.</param>
+        /// <param name="ifUnresolved">(optional) Defines ifUnresolved behavior for resolved members.</param>
+        /// <param name="withInfo">(optional) Return service info for a member or null to skip it resolution.</param>
         /// <returns>Result selector composed using provided settings.</returns>
-        public static PropertiesAndFieldsSelector All(Include include, GetInfo getInfoOrNull = null)
+        public static PropertiesAndFieldsSelector All(
+            bool withNonPublic = true, bool withPrimitive = true, bool withFields = true,
+            IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault,
+            GetInfo withInfo = null)
         {
-            var getInfo = getInfoOrNull ?? ((m, req) => PropertyOrFieldServiceInfo.Of(m));
+            GetInfo getInfo = (m, r) => withInfo != null ? withInfo(m, r) :
+                  PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceInfoDetails.Of(ifUnresolved: ifUnresolved), r);
             return r =>
-                r.ImplementationType.GetAll(_ => _.DeclaredProperties).Where(p => p.Match(include)).Select(m => getInfo(m, r)).Concat(
-                r.ImplementationType.GetAll(_ => _.DeclaredFields).Where(f => f.Match(include)).Select(m => getInfo(m, r)));
+            {
+                var properties = r.ImplementationType.GetAll(_ => _.DeclaredProperties)
+                    .Where(p => p.Match(withNonPublic, withPrimitive))
+                    .Select(m => getInfo(m, r));
+                return !withFields ? properties :
+                    properties.Concat(r.ImplementationType.GetAll(_ => _.DeclaredFields)
+                    .Where(f => f.Match(withNonPublic, withPrimitive))
+                    .Select(m => getInfo(m, r)));
+            };
         }
 
-        /// <summary>Compose properties and fields selector using provided settings: 
-        /// in particularly I can change default setting to return null if member is unresolved,
-        /// and exclude properties by name, type (using <see cref="GetPropertyOrFieldType"/>), etc.</summary>
-        /// <param name="ifUnresolved">(optional) Specifies for all members to throw or return default if unresolved, by default does not throw.</param>
-        /// <param name="include">(optional) Specifies visibility of members to be resolved. Default is <see cref="Include.PublicNonPrimitive"/>.</param>
-        /// <returns>Result selector composed using provided settings.</returns>
-        public static PropertiesAndFieldsSelector All(IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, Include include = Include.PublicNonPrimitive)
+        public static PropertiesAndFieldsSelector OverrideWith(this PropertiesAndFieldsSelector s, PropertiesAndFieldsSelector other)
         {
-            var selector = ifUnresolved == IfUnresolved.ReturnDefault
-                ? (GetInfo)null
-                : (m, req) => PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceInfoDetails.Default, req);
-            return All(include, selector);
-        }
-
-        /// <summary>Selects members provided by <paramref name="source"/> excluding members that satisfy condition <paramref name="except"/>.</summary>
-        /// <param name="source">Source selection of properties and fields, 
-        /// could be <see cref="Of"/>, or see <see cref="PublicNonPrimitive"/>, 
-        /// or one created by <see cref="All(DryIoc.PropertiesAndFields.Include,DryIoc.PropertiesAndFields.GetInfo)"/></param>
-        /// <param name="except">(optional) Specifies rule to exclude members, e.g. exclude all fields, or property with specific name or attribute.</param>
-        /// <returns>Result selector composed using provided settings.</returns>
-        public static PropertiesAndFieldsSelector Except(this PropertiesAndFieldsSelector source, Func<MemberInfo, bool> except)
-        {
-            except.ThrowIfNull();
-            return r => source(r).Where(pof => !except(pof.Member));
-        }
-
-        public static PropertiesAndFieldsSelector OverrideWith(this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
-        {
-            return source == null || source == Of ? (other ?? Of)
-                 : other == null || other == Of ? source
+            return s == null || s == Of ? (other ?? Of)
+                 : other == null || other == Of ? s
                  : r =>
                 {
-                    var sourceMembers = source(r).ToArrayOrSelf();
+                    var sourceMembers = s(r).ToArrayOrSelf();
                     var otherMembers = other(r).ToArrayOrSelf();
                     return sourceMembers == null || sourceMembers.Length == 0 ? otherMembers
                         : otherMembers == null || otherMembers.Length == 0 ? sourceMembers
                         : sourceMembers
-                            .Where(s => s != null && otherMembers.All(o => o == null || !s.Member.Name.Equals(o.Member.Name)))
+                            .Where(info => info != null && otherMembers.All(o => o == null || !info.Member.Name.Equals(o.Member.Name)))
                             .Concat(otherMembers);
                 };
         }
 
-        public static PropertiesAndFieldsSelector Condition(this PropertiesAndFieldsSelector source, Func<MemberInfo, bool> condition,
+        public static PropertiesAndFieldsSelector The<T>(this PropertiesAndFieldsSelector s, Expression<Func<T, object>> getterExpression,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, object defaultValue = null)
         {
-            return source.WithDetails(condition, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+            var member = ExpressionTools.GetMemberNameOrNull(getterExpression.ThrowIfNull());
+            return s.OverrideWith(r => new[] { PropertyOrFieldServiceInfo.Of(member)
+                .WithDetails(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue), r) });
         }
 
-        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name,
+        public static PropertiesAndFieldsSelector The<T>(this PropertiesAndFieldsSelector s, Expression<Func<T, object>> getterExpression, Func<IResolver, object> getValue)
+        {
+            var member = ExpressionTools.GetMemberNameOrNull(getterExpression.ThrowIfNull()).ThrowIfNull();
+            return s.OverrideWith(r => new[] { PropertyOrFieldServiceInfo.Of(member).WithDetails(ServiceInfoDetails.Of(getValue), r) });
+        }
+
+        public static PropertiesAndFieldsSelector The<T>(this PropertiesAndFieldsSelector s, Expression<Func<T, object>> getterExpression, object value)
+        {
+            return s.The(getterExpression, new Func<IResolver, object>(_ => value));
+        }
+
+        public static PropertiesAndFieldsSelector The<T>(this PropertiesAndFieldsSelector s, params Expression<Func<T, object>>[] getterExpressions)
+        {
+            var infos = getterExpressions.Select(ExpressionTools.GetMemberNameOrNull).Select(PropertyOrFieldServiceInfo.Of).ToArray();
+            return s.OverrideWith(r => infos);
+        }
+
+        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector s, string name,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, object defaultValue = null)
         {
-            return source.WithDetails(name, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+            return s.WithDetails(name, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
         }
 
-        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name, object value)
+        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector s, string name, object value)
         {
-            return source.WithDetails(name, ServiceInfoDetails.Of(_ => value));
+            return s.WithDetails(name, ServiceInfoDetails.Of(_ => value));
         }
 
-        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name, Func<IResolver, object> getValue)
+        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector s, string name, Func<IResolver, object> getValue)
         {
-            return source.WithDetails(name, ServiceInfoDetails.Of(getValue));
-        }
-
-        public static PropertiesAndFieldsSelector Type(this PropertiesAndFieldsSelector source, Type type,
-            Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, object defaultValue = null)
-        {
-            return source.WithDetails(m => type.IsAssignableTo(m.GetPropertyOrFieldType()),
-                ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
-        }
-
-        public static PropertiesAndFieldsSelector Type(this PropertiesAndFieldsSelector source, Type type, Func<IResolver, object> getValue)
-        {
-            return source.WithDetails(m => type.IsAssignableTo(m.GetPropertyOrFieldType()), ServiceInfoDetails.Of(getValue));
-        }
-
-        public static PropertiesAndFieldsSelector Type(this PropertiesAndFieldsSelector source, Type type, object value)
-        {
-            return source.Type(type, _ => value);
+            return s.WithDetails(name, ServiceInfoDetails.Of(getValue));
         }
 
         #region Tools
@@ -3898,32 +3849,33 @@ namespace DryIoc
         /// <returns>Type of property of field.</returns>
         public static Type GetPropertyOrFieldType(this MemberInfo member)
         {
-            return member is PropertyInfo
-                ? ((PropertyInfo)member).PropertyType
-                : ((FieldInfo)member).FieldType;
+            return member is PropertyInfo ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType;
         }
 
-        /// <summary>Returns true if property matches the <see cref="Include"/> provided, or false otherwise.</summary>
+        /// <summary>Returns true if property matches flags provided.</summary>
         /// <param name="property">Property to match</param>
-        /// <param name="include">(optional) Indicate target properties, if omitted: then <see cref="Include.PublicNonPrimitive"/> by default.</param>
+        /// <param name="withNonPublic">Says to include non public properties.</param>
+        /// <param name="withPrimitive">Says to include properties of primitive type.</param>
         /// <returns>True if property is matched and false otherwise.</returns>
-        public static bool Match(this PropertyInfo property, Include include = Include.PublicNonPrimitive)
+        public static bool Match(this PropertyInfo property, bool withNonPublic = false, bool withPrimitive = false)
         {
             return property.CanWrite && !property.IsIndexer() // first checks that property is assignable in general and not indexer
-                && (include == Include.NonPrimitive || include == Include.All || property.IsPublic())
-                && (include == Include.Public || include == Include.All ||
-                !property.PropertyType.IsPrimitiveOrArrayOfPrimitives(t => t == typeof(object) || t == typeof(string)));
+                && (withNonPublic || property.IsPublic())
+                && (withPrimitive || !property.PropertyType.IsPrimitiveOrArrayOfPrimitives(
+                    t => t == typeof(object) || t == typeof(string)));
         }
 
-        /// <summary>Returns true if field matches the <see cref="Include"/> provided, or false otherwise.</summary>
+        /// <summary>Returns true if field matches flags provided.</summary>
         /// <param name="field">Field to match.</param>
-        /// <param name="include">(optional) Indicate target properties, if omitted: then <see cref="Include.PublicNonPrimitive"/> by default.</param>
+        /// <param name="withNonPublic">Says to include non public fields.</param>
+        /// <param name="withPrimitive">Says to include fields of primitive type.</param>
         /// <returns>True if property is matched and false otherwise.</returns>
-        public static bool Match(this FieldInfo field, Include include = Include.PublicNonPrimitive)
+        public static bool Match(this FieldInfo field, bool withNonPublic = false, bool withPrimitive = false)
         {
             return !field.IsInitOnly && !field.IsBackingField()
-                && (include == Include.Public || include == Include.All ||
-                !field.FieldType.IsPrimitiveOrArrayOfPrimitives(t => t == typeof(object) || t == typeof(string)));
+                && (withNonPublic || field.IsPublic)
+                && (withPrimitive || !field.FieldType.IsPrimitiveOrArrayOfPrimitives(
+                    t => t == typeof(object) || t == typeof(string)));
         }
 
         /// <summary>Returns true if field is backing field for property.</summary>
@@ -3967,27 +3919,14 @@ namespace DryIoc
             {
                 var implementationType = r.ImplementationType;
                 var property = implementationType.GetPropertyOrNull(name);
-                if (property != null && property.Match(Include.All))
+                if (property != null && property.Match(true, true))
                     return new[] { PropertyOrFieldServiceInfo.Of(property).WithDetails(details, r) };
 
                 var field = implementationType.GetFieldOrNull(name);
-                return field != null && field.Match(Include.All)
+                return field != null && field.Match(true, true)
                     ? new[] { PropertyOrFieldServiceInfo.Of(field).WithDetails(details, r) }
                     : Throw.Instead<IEnumerable<PropertyOrFieldServiceInfo>>(Error.NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD, name, r);
             });
-        }
-
-        private static PropertiesAndFieldsSelector WithDetails(this PropertiesAndFieldsSelector source,
-            Func<MemberInfo, bool> condition, ServiceInfoDetails details)
-        {
-            condition.ThrowIfNull();
-            return source.OverrideWith(r =>
-                r.ImplementationType.GetAll(t => t.DeclaredProperties)
-                    .Where(p => p.Match(Include.All) && condition(p))
-                    .Select(p => PropertyOrFieldServiceInfo.Of(p).WithDetails(details, r)).Concat(
-                r.ImplementationType.GetAll(t => t.DeclaredFields)
-                    .Where(f => f.Match(Include.All) && condition(f))
-                    .Select(f => PropertyOrFieldServiceInfo.Of(f).WithDetails(details, r))));
         }
 
         #endregion
@@ -4036,11 +3975,10 @@ namespace DryIoc
         public override void ValidateBeforeRegistration(Type serviceType, IContainer container)
         {
             base.ValidateBeforeRegistration(serviceType, container);
-
-            var implType = _implementationType;
-            if (implType == null)
+            if (_implementationType == null)
                 return;
 
+            var implType = _implementationType;
             if (!implType.IsGenericDefinition())
             {
                 if (implType.IsOpenGeneric())
@@ -4086,7 +4024,9 @@ namespace DryIoc
             var serviceType = request.ServiceType;
             var closedTypeArgs = _implementationType == serviceType.GetGenericDefinitionOrNull()
                 ? serviceType.GetGenericParamsAndArgs()
-                : GetClosedTypeArgsForGenericImplementationType(_implementationType, request);
+                : GetClosedTypeArgsForGenericImplementationTypeOrNull(_implementationType, request);
+            if (closedTypeArgs == null)
+                return null;
 
             Type closedImplType;
             if (request.IfUnresolved == IfUnresolved.ReturnDefault)
@@ -4194,7 +4134,8 @@ namespace DryIoc
                 var method = getMethodOrNull(request);
                 if (method != null && method.Method is MethodInfo)
                 {
-                    Throw.If(method.Method.IsStatic && method.Factory != null, Error.FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC, method.Factory, method, request);
+                    Throw.If(method.Method.IsStatic && method.Factory != null,
+                        Error.FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC, method.Factory, method, request);
 
                     request.ServiceType.ThrowIfNotOf(((MethodInfo)method.Method).ReturnType,
                         Error.SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD, method, request);
@@ -4249,7 +4190,7 @@ namespace DryIoc
                     : Expression.Call(request.StateCache.GetOrAddItemExpression(method.Factory), (MethodInfo)method.Method, paramExprs);
         }
 
-        private static Type[] GetClosedTypeArgsForGenericImplementationType(Type implType, Request request)
+        private static Type[] GetClosedTypeArgsForGenericImplementationTypeOrNull(Type implType, Request request)
         {
             var serviceType = request.ServiceType;
             var serviceTypeArgs = serviceType.GetGenericParamsAndArgs();
@@ -4272,13 +4213,16 @@ namespace DryIoc
                 }
             }
 
-            resultImplTypeArgs = resultImplTypeArgs.ThrowIfNull(
-                Error.NOT_MATCHED_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, implType, implementedTypes, request);
+            if (resultImplTypeArgs == null)
+                return request.IfUnresolved == IfUnresolved.ReturnDefault ? null :
+                    Throw.Instead<Type[]>(Error.NOT_MATCHED_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, 
+                        implType, implementedTypes, request);
 
             var unmatchedArgIndex = Array.IndexOf(resultImplTypeArgs, null);
             if (unmatchedArgIndex != -1)
-                Throw.Error(Error.NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
-                    implType, openImplTypeParams[unmatchedArgIndex], request);
+                return request.IfUnresolved == IfUnresolved.ReturnDefault ? null :
+                    Throw.Instead<Type[]>(Error.NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE, 
+                        implType, openImplTypeParams[unmatchedArgIndex], request);
 
             return resultImplTypeArgs;
         }
@@ -5240,15 +5184,15 @@ namespace DryIoc
     /// <summary>Wraps factory expression created by container internally. May be used for debugging.</summary>
     /// <typeparam name="TService">Service type to resolve.</typeparam>
     [DebuggerDisplay("{Expression}")]
-    public sealed class DebugExpression<TService>
+    public sealed class FactoryExpression<TService>
     {
         /// <summary>Factory expression that Container compiles to delegate.</summary>
-        public readonly Expression<FactoryDelegate> Expression;
+        public readonly Expression<FactoryDelegate> Value;
 
-        /// <summary>Creates wrapper.</summary> <param name="expression">Wrapped expression.</param>
-        public DebugExpression(Expression<FactoryDelegate> expression)
+        /// <summary>Creates wrapper.</summary> <param name="value">Wrapped expression.</param>
+        public FactoryExpression(Expression<FactoryDelegate> value)
         {
-            Expression = expression;
+            Value = value;
         }
     }
 
@@ -5429,7 +5373,7 @@ namespace DryIoc
             _(ref RECURSIVE_DEPENDENCY_DETECTED, "Recursive dependency is detected when resolving" + Environment.NewLine + "{0}.");
             _(ref SCOPE_IS_DISPOSED, "Scope is disposed and scoped instances are no longer available.");
             _(ref WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY, "Wrapper {0} can wrap single service type only, but found many. You should specify service type selector in wrapper setup.");
-            _(ref NOT_MATCHED_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, "Unable to match service with any open-generic implementation {0} implemented types {1} when resolving {2}.");
+            _(ref NOT_MATCHED_IMPL_BASE_TYPES_WITH_SERVICE_TYPE, "Unable to match service with open-generic {0} implementing {1} when resolving {2}.");
             _(ref NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE, "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}.");
             _(ref UNABLE_TO_SELECT_CTOR_USING_SELECTOR, "Unable to get constructor of {0} using provided constructor selector.");
             _(ref UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS, "Unable to find constructor with all resolvable parameters when resolving {0}.");
@@ -5444,8 +5388,9 @@ namespace DryIoc
             _(ref TARGET_WAS_ALREADY_DISPOSED, "Target of type {0} was already disposed in {1}.");
             _(ref NOT_MATCHED_GENERIC_PARAM_CONSTRAINTS, "Service type does not match registered open-generic implementation constraints {0} when resolving {1}.");
             _(ref NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED, "Non-generic wrapper {0} should specify wrapped service selector when registered.");
-            _(ref DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN, "Dependency {0} has shorter reuse lifespan ({1}) than its parent ({2}): {3}.\n" +
-                                                                    "You can turn off this exception by setting container Rules.ThrowIfDepenedencyHasShorterReuseLifespan to false.");
+            _(ref DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN, "Dependency {0} has shorter Reuse lifespan than its parent: {1}.\n" +
+                                                                    "{2} lifetime is shorter than {3}.\n" +
+                                                                    "You may turn Off this error with new Container(rules=>rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false)).");
             _(ref WEAKREF_REUSE_WRAPPER_GCED, "Service with WeakReference reuse wrapper is garbage collected now, and no longer available.");
             _(ref INSTANCE_FACTORY_IS_NULL, "Instance factory is null when resolving: {0}");
             _(ref SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD, "Service of {0} is not assignable from factory method {2} when resolving: {3}.");
@@ -5587,7 +5532,8 @@ namespace DryIoc
     public static class TypeTools
     {
         /// <summary>Flags for <see cref="GetImplementedTypes"/> method.</summary>
-        [Flags] public enum IncludeFlags { None = 0, SourceType = 1, ObjectType = 2 }
+        [Flags]
+        public enum IncludeFlags { None = 0, SourceType = 1, ObjectType = 2 }
 
         /// <summary>Returns all interfaces and all base types (in that order) implemented by <paramref name="sourceType"/>.
         /// Specify <paramref name="includeFlags"/> to include <paramref name="sourceType"/> itself as first item and 
@@ -6090,18 +6036,21 @@ namespace DryIoc
     {
         /// <summary>Extracts method info from method call expression.
         /// It is allow to use type-safe method declaration instead of string method name.</summary>
-        /// <param name="expression">Lambda wrapping method call.</param>
+        /// <param name="methodCall">Lambda wrapping method call.</param>
         /// <returns>Found method info or null if lambda body is not method call.</returns>
-        public static MethodInfo GetMethodOrNull(LambdaExpression expression)
+        public static MethodInfo GetMethodOrNull(LambdaExpression methodCall)
         {
-            var callExpr = expression.Body as MethodCallExpression;
+            var callExpr = methodCall.Body as MethodCallExpression;
             return callExpr == null ? null : callExpr.Method;
         }
 
-        //TODO: Use for type-safe property injection specification.
-        public static MemberInfo GetPropertyNameOrNull<T>(Expression<Func<T, object>> expression)
+        /// <summary>Extracts member info from property or field getter. Enables type-safe property declarations without using strings.</summary>
+        /// <typeparam name="T">Type of member holder.</typeparam>
+        /// <param name="getter">Expected to contain member access: t => t.MyProperty.</param>
+        /// <returns>Extracted member info or null if getter does not contain member access.</returns>
+        public static MemberInfo GetMemberNameOrNull<T>(Expression<Func<T, object>> getter)
         {
-            var body = expression.Body;
+            var body = getter.Body;
             var member = body as MemberExpression ?? ((UnaryExpression)body).Operand as MemberExpression;
             return member == null ? null : member.Member;
         }
@@ -6221,12 +6170,20 @@ namespace DryIoc
         /// <returns>New tree with added or updated key-value.</returns>
         public HashTree<K, V> AddOrUpdate(K key, V value, Update<V> update = null)
         {
-            return AddOrUpdate(key.GetHashCode(), key, value, update);
+            return AddOrUpdate(key.GetHashCode(), key, value, update, updateOnly: false);
         }
 
-        public HashTree<K, V> Update(K key, Func<V, V> update = null)
+        /// <summary>Looks for <paramref name="key"/> and replaces its value with new <paramref name="value"/>, or 
+        /// it may use <paramref name="update"/> for more complex update logic. Returns new tree with updated value,
+        /// or the SAME tree if key is not found.</summary>
+        /// <param name="key">Key to look for.</param>
+        /// <param name="value">New value to replace key value with.</param>
+        /// <param name="update">(optional) Delegate for custom update logic, it gets old and new <paramref name="value"/>
+        /// as inputs and should return updated value as output.</param>
+        /// <returns>New tree with updated value or the SAME tree if no key found.</returns>
+        public HashTree<K, V> Update(K key, V value, Update<V> update = null)
         {
-            return Update(key.GetHashCode(), key, update);
+            return AddOrUpdate(key.GetHashCode(), key, value, update, updateOnly: true);
         }
 
         /// <summary>Searches for key in tree and returns the value if found, or <paramref name="defaultValue"/> otherwise.</summary>
@@ -6261,7 +6218,7 @@ namespace DryIoc
         /// <returns>Sequence of enumerated key value pairs.</returns>
         public IEnumerable<KV<K, V>> Enumerate()
         {
-            if (Height == 0) 
+            if (Height == 0)
                 yield break;
 
             var parents = new HashTree<K, V>[Height];
@@ -6289,101 +6246,6 @@ namespace DryIoc
             }
         }
 
-        // TODO: Review new enumerator
-        public Enumerator GetEnumerator()
-        {
-            return new Enumerator(this);
-        }
-
-        public struct Enumerator : IEnumerator<KV<K, V>>
-        {
-            private readonly HashTree<K, V> _tree;
-            private HashTree<K, V>[] _parents;
-            private int _parentCount;
-            private HashTree<K, V> _t;
-            private KV<K, V> _current;
-            private int _currentConflictIndex;
-            private KV<K, V>[] _conflicts;
-
-            public Enumerator(HashTree<K, V> tree)
-            {
-                _tree = tree;
-                _parents = new HashTree<K, V>[_tree.Height];
-                _parentCount = -1;
-                _currentConflictIndex = 0;
-                _t = _tree;
-                _current = default(KV<K, V>);
-                _conflicts = null;
-            }
-
-            public void Dispose()
-            {
-            }
-
-            public bool MoveNext()
-            {
-                if (_conflicts != null)
-                {
-                    if (_currentConflictIndex < _conflicts.Length)
-                    {
-                        _current = _conflicts[_currentConflictIndex];
-                        _currentConflictIndex++;
-                        return true;
-                    }
-                }
-
-
-                while (!_t.IsEmpty || _parentCount != -1)
-                {
-                    if (!_t.IsEmpty)
-                    {
-                        _parents[++_parentCount] = _t;
-                        _t = _t.Left;
-                    }
-                    else
-                    {
-                        _t = _parents[_parentCount--];
-                        _current = new KV<K, V>(_t.Key, _t.Value);
-                        _conflicts = _t.Conflicts;
-                        _currentConflictIndex = 0;
-                        _t = _t.Right;
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            public void Reset()
-            {
-                _parents = new HashTree<K, V>[_tree.Height];
-                _parentCount = -1;
-                _currentConflictIndex = 0;
-                _t = _tree;
-                _current = default(KV<K, V>);
-                _conflicts = null;
-            }
-
-            public KV<K, V> Current
-            {
-                get { return _current; }
-            }
-
-            object IEnumerator.Current
-            {
-                get { return _current; }
-            }
-        }
-
-        /// <summary>Removes or updates value for specified key, or does nothing if key is not found.
-        /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx </summary>
-        /// <param name="key">Key to look for.</param> <param name="isUpdated">(optional) Delegate to update value, return true from delegate if value is updated.</param>
-        /// <returns>New tree with removed or updated value.</returns>
-        public HashTree<K, V> RemoveOrUpdate(K key, IsUpdated<V> isUpdated = null)
-        {
-            return RemoveOrUpdate(key.GetHashCode(), key, isUpdated);
-        }
-
         #region Implementation
 
         private HashTree() { }
@@ -6399,60 +6261,39 @@ namespace DryIoc
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private HashTree<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update)
+        private HashTree<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update, bool updateOnly)
         {
-            return Height == 0 ? new HashTree<K, V>(hash, key, value, null, Empty, Empty)
-                : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, update)
+            return Height == 0 ? (updateOnly ? this : new HashTree<K, V>(hash, key, value, null, Empty, Empty))
+                : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, update, updateOnly)
                 : (hash < Hash
-                    ? With(Left.AddOrUpdate(hash, key, value, update), Right)
-                    : With(Left, Right.AddOrUpdate(hash, key, value, update)))
-                        .KeepBalanced());
+                    ? With(Left.AddOrUpdate(hash, key, value, update, updateOnly), Right)
+                    : With(Left, Right.AddOrUpdate(hash, key, value, update, updateOnly))).KeepBalanced());
         }
 
-        private HashTree<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update)
+        private HashTree<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update, bool updateOnly)
         {
             if (ReferenceEquals(Key, key) || Key.Equals(key))
                 return new HashTree<K, V>(Hash, key, update == null ? value : update(Value, value), Conflicts, Left, Right);
 
-            if (Conflicts == null)
-                return new HashTree<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
+            if (Conflicts == null) // add only if updateOnly is false.
+                return updateOnly ? this
+                    : new HashTree<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
 
-            var i = Conflicts.Length - 1;
-            while (i >= 0 && !Equals(Conflicts[i].Key, Key)) i--;
-            var conflicts = new KV<K, V>[i != -1 ? Conflicts.Length : Conflicts.Length + 1];
+            var found = Conflicts.Length - 1;
+            while (found >= 0 && !Equals(Conflicts[found].Key, Key)) --found;
+            if (found == -1)
+            {
+                if (updateOnly) return this;
+                var newConflicts = new KV<K, V>[Conflicts.Length + 1];
+                Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
+                newConflicts[Conflicts.Length] = new KV<K, V>(key, value);
+                return new HashTree<K, V>(Hash, Key, Value, newConflicts, Left, Right);
+            }
+
+            var conflicts = new KV<K, V>[Conflicts.Length];
             Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
-            conflicts[i != -1 ? i : Conflicts.Length] =
-                new KV<K, V>(key, i != -1 && update != null ? update(Conflicts[i].Value, value) : value);
+            conflicts[found] = new KV<K, V>(key, update == null ? value : update(Conflicts[found].Value, value));
             return new HashTree<K, V>(Hash, Key, Value, conflicts, Left, Right);
-        }
-
-        private HashTree<K, V> Update(int hash, K key, Func<V, V> update)
-        {
-            return Height == 0 ? this
-                : (hash == Hash ? UpdateValueAndResolveConflicts(key, update)
-                : (hash < Hash
-                    ? With(Left.Update(hash, key, update), Right)
-                    : With(Left, Right.Update(hash, key, update)))
-                        .KeepBalanced());
-        }
-
-        private HashTree<K, V> UpdateValueAndResolveConflicts(K key, Func<V, V> update)
-        {
-            if (ReferenceEquals(Key, key) || Key.Equals(key))
-                return new HashTree<K, V>(Hash, key, update(Value), Conflicts, Left, Right);
-
-            if (Conflicts == null)
-                return this;
-
-            var i = Conflicts.Length - 1;
-            while (i >= 0 && !Equals(Conflicts[i].Key, Key)) i--;
-            if (i == -1)
-                return this;
-
-            var newConflicts = new KV<K, V>[Conflicts.Length];
-            Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
-            newConflicts[i] = new KV<K, V>(key, update(Conflicts[i].Value));
-            return new HashTree<K, V>(Hash, Key, Value, newConflicts, Left, Right);
         }
 
         private V GetConflictedValueOrDefault(K key, V defaultValue)
@@ -6462,81 +6303,6 @@ namespace DryIoc
                     if (Equals(Conflicts[i].Key, key))
                         return Conflicts[i].Value;
             return defaultValue;
-        }
-
-        private HashTree<K, V> RemoveOrUpdate(int hash, K key, IsUpdated<V> isUpdated = null, bool ignoreKey = false)
-        {
-            if (Height == 0)
-                return this;
-
-            HashTree<K, V> result;
-            if (hash == Hash) // found matched Node
-            {
-                if (ignoreKey || Equals(Key, key))
-                {
-                    if (!ignoreKey)
-                    {
-                        V updatedValue;
-                        if (isUpdated != null && isUpdated(Value, out updatedValue))
-                            return new HashTree<K, V>(Hash, Key, updatedValue, Conflicts, Left, Right);
-
-                        if (Conflicts != null)
-                        {
-                            if (Conflicts.Length == 1)
-                                return new HashTree<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, null, Left, Right);
-                            var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
-                            Array.Copy(Conflicts, 1, shrinkedConflicts, 0, shrinkedConflicts.Length);
-                            return new HashTree<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, shrinkedConflicts, Left, Right);
-                        }
-                    }
-
-                    if (Height == 1) // remove node
-                        return Empty;
-
-                    if (Right.IsEmpty)
-                        result = Left;
-                    else if (Left.IsEmpty)
-                        result = Right;
-                    else
-                    {
-                        // we have two children, so remove the next highest node and replace this node with it.
-                        var successor = Right;
-                        while (!successor.Left.IsEmpty) successor = successor.Left;
-                        result = successor.With(Left, Right.RemoveOrUpdate(successor.Hash, default(K), ignoreKey: true));
-                    }
-                }
-                else if (Conflicts != null)
-                {
-                    var index = Conflicts.Length - 1;
-                    while (index >= 0 && !Equals(Conflicts[index].Key, key)) --index;
-                    if (index == -1)        // key is not found in conflicts - just return
-                        return this;
-
-                    V updatedValue;
-                    var conflict = Conflicts[index];
-                    if (isUpdated != null && isUpdated(conflict.Value, out updatedValue))
-                    {
-                        var updatedConflicts = new KV<K, V>[Conflicts.Length];
-                        Array.Copy(Conflicts, 0, updatedConflicts, 0, updatedConflicts.Length);
-                        updatedConflicts[index] = new KV<K, V>(conflict.Key, updatedValue);
-                        return new HashTree<K, V>(Hash, Key, Value, updatedConflicts, Left, Right);
-                    }
-
-                    if (Conflicts.Length == 1)
-                        return new HashTree<K, V>(Hash, Key, Value, null, Left, Right);
-                    var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
-                    var newIndex = 0;
-                    for (var i = 0; i < Conflicts.Length; ++i)
-                        if (i != index) shrinkedConflicts[newIndex++] = Conflicts[i];
-                    return new HashTree<K, V>(Hash, Key, Value, shrinkedConflicts, Left, Right);
-                }
-                else return this; // if key is not matching and no conflicts to lookup - just return
-            }
-            else if (hash < Hash)
-                result = With(Left.RemoveOrUpdate(hash, key, isUpdated, ignoreKey), Right);
-            else
-                result = With(Left, Right.RemoveOrUpdate(hash, key, isUpdated, ignoreKey));
-            return result.KeepBalanced();
         }
 
         private HashTree<K, V> KeepBalanced()
@@ -6559,7 +6325,7 @@ namespace DryIoc
 
         private HashTree<K, V> With(HashTree<K, V> left, HashTree<K, V> right)
         {
-            return new HashTree<K, V>(Hash, Key, Value, Conflicts, left, right);
+            return left == Left && right == Right ? this : new HashTree<K, V>(Hash, Key, Value, Conflicts, left, right);
         }
 
         #endregion

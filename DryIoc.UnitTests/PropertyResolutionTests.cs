@@ -154,7 +154,7 @@ namespace DryIoc.UnitTests
         }
 
         public static readonly PropertiesAndFieldsSelector SelectPropertiesAndFieldsWithImportAttribute =
-            PropertiesAndFields.All(PropertiesAndFields.Include.All, GetImportedPropertiesAndFields);
+            PropertiesAndFields.All(withInfo: GetImportedPropertiesAndFields);
 
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFields(MemberInfo m, Request req)
         {
@@ -166,7 +166,7 @@ namespace DryIoc.UnitTests
 
     #region CUT
 
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
     public class ImportAttribute : Attribute
     {
         public ImportAttribute() { }

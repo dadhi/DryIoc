@@ -8,7 +8,7 @@ namespace DryIoc.IssuesTests
         public void Test()
         {
             var container = new Container();
-            container.Register<FooWithIndexer>(with: PropertiesAndFields.All(IfUnresolved.Throw));
+            container.Register<FooWithIndexer>(with: PropertiesAndFields.All(ifUnresolved: IfUnresolved.Throw));
 
             Assert.DoesNotThrow(() => 
                 container.Resolve<FooWithIndexer>()

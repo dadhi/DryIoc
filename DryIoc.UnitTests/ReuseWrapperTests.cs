@@ -227,13 +227,16 @@ namespace DryIoc.UnitTests
         public void Can_nest_WeakReference_in_ExplicitlyDisposable_reused_in_singleton_scope()
         {
             var container = new Container();
-            container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference, ReuseWrapper.ExplicitlyDisposable }));
+            var service = new DisposableService();
+            container.RegisterInstance<IService>(service, Reuse.Singleton, 
+                Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference, ReuseWrapper.ExplicitlyDisposable }));
 
             var serviceWeakRef = container.Resolve<WeakReference>(typeof(IService));
             var serviceDisposable = container.Resolve<ExplicitlyDisposableProxy<IService>>();
 
             Assert.That(serviceDisposable.Target, Is.SameAs(serviceWeakRef.Target));
+
+            GC.KeepAlive(service);
         }
 
         [Test]

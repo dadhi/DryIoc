@@ -305,6 +305,22 @@ namespace DryIoc.UnitTests
             Assert.Throws<ContainerException>(() =>
                 factory.GetFactoryForRequestOrDefault(container.EmptyRequest.Push(typeof(Banana<int>))));
         }
+
+        [Test] public void Resolving_array_of_generic_implementations_should_select_only_matched_types()
+        {
+            var container = new Container();
+            container.Register(typeof(IBlah<,>), typeof(Blah<,>));
+            container.Register(typeof(IBlah<,>), typeof(AnotherBlah<>));
+
+            var services = container.Resolve<IBlah<int, bool>[]>();
+
+            Assert.That(services.Length, Is.EqualTo(1));
+            Assert.That(services[0], Is.InstanceOf<Blah<int, bool>>());
+        }
+
+        internal interface IBlah<T0, T1> { }
+        internal class Blah<T0, T1> : IBlah<T0, T1> { }
+        internal class AnotherBlah<T> : IBlah<string, T> { }
     }
 
     #region CUT

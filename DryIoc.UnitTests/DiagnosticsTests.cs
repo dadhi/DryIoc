@@ -12,9 +12,9 @@ namespace DryIoc.UnitTests
 			container.Register<ServiceWithDependency>();
 			container.Register<IDependency, Dependency>(Reuse.Singleton);
 
-			var service = container.Resolve<DebugExpression<ServiceWithDependency>>();
+			var service = container.Resolve<FactoryExpression<ServiceWithDependency>>();
 
-			Assert.That(service.Expression.ToString(), Is.StringContaining("=> new ServiceWithDependency("));
+			Assert.That(service.Value.ToString(), Is.StringContaining("=> new ServiceWithDependency("));
 		}
 	}
 }

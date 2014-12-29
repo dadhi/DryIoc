@@ -22,39 +22,44 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Web;
-using System.Web.Mvc;
-
 namespace DryIoc.Mvc
 {
-    internal static class MvcExtensions
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Reflection;
+    using System.Web;
+    using System.Web.Mvc;
+
+    public static class MvcExtensions
     {
-        public static IContainer WithMvcSupport(this IContainer container)
+        public static IContainer WithMvcSupport(this IContainer container, Assembly controllersAssembly = null)
         {
             container = container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext());
-            DependencyResolver.SetResolver(new DryIocDependencyResolver(container));
-            return container.RegisterControllers().ResolveFilterAttributeFilterProviders();
-        }
-
-        public static IContainer RegisterControllers(this IContainer container, params Assembly[] assemblies)
-        {
-            foreach (var type in assemblies.SelectMany(assembly =>
-                Polyfill.GetTypesFrom(assembly).Where(t => !t.IsAbstract && t.IsAssignableTo(typeof(IController)))))
-                container.Register(type, Reuse.InHttpContext);
+            container.RegisterControllers(controllersAssembly ?? Assembly.GetExecutingAssembly());
+            container.SetDryIocDependencyResolver();
+            container.SetDryIocFilterAttributeFilterProvider();
             return container;
         }
 
-        public static IContainer ResolveFilterAttributeFilterProviders(this IContainer container)
+        public static void RegisterControllers(this IContainer container, params Assembly[] assemblies)
+        {
+            foreach (var type in assemblies.SelectMany(assembly =>
+                Polyfill.GetTypesFrom(assembly).Where(t => !t.IsAbstract && t.IsAssignableTo(typeof(IController)))))
+                container.Register(type, Reuse.InRequest);
+        }
+
+        public static void SetDryIocDependencyResolver(this IContainer container)
+        {
+            DependencyResolver.SetResolver(new DryIocDependencyResolver(container));
+        }
+
+        public static void SetDryIocFilterAttributeFilterProvider(this IContainer container)
         {
             var providers = FilterProviders.Providers;
             foreach (var provider in providers.OfType<FilterAttributeFilterProvider>().ToArray())
                 providers.Remove(provider);
             providers.Add(new DryIocFilterAttributeFilterProvider(container));
-            return container;
         }
     }
 
@@ -99,7 +104,7 @@ namespace DryIoc.Mvc
 
     public static class Reuse
     {
-        public static readonly IReuse InHttpContext = DryIoc.Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InRequest = DryIoc.Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
     }
 
     public sealed class HttpContextScopeContext : IScopeContext

@@ -192,7 +192,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly PropertiesAndFieldsSelector _getImportedPropertiesAndFields =
-            PropertiesAndFields.All(PropertiesAndFields.Include.All, GetImportedPropertiesAndFieldsOnly);
+            PropertiesAndFields.All(withInfo: GetImportedPropertiesAndFieldsOnly);
 
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
         {

@@ -20,6 +20,41 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Unregister_unregistered_default_registration_should_not_throw()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+
+            container.Unregister(typeof(IService));
+            container.Unregister(typeof(IService));
+
+            Assert.IsFalse(container.IsRegistered<IService>());
+        }
+
+        [Test]
+        public void Unregister_default_with_default_key_shoud_work()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+
+            container.Unregister(typeof(IService), DefaultKey.Value);
+
+            Assert.IsFalse(container.IsRegistered<IService>());
+        }
+
+        [Test]
+        public void Unregister_unregistered_default_with_default_key_shoud_work()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+
+            container.Unregister(typeof(IService), DefaultKey.Value);
+            container.Unregister(typeof(IService), DefaultKey.Value);
+
+            Assert.IsFalse(container.IsRegistered<IService>());
+        }
+
+        [Test]
         public void Unregister_named_registration_from_default_should_Fail()
         {
             var container = new Container();
@@ -67,6 +102,47 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Unregister_unregistered_default_registrations_with_condition_should_not_throw()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.Register<IService, AnotherService>();
+
+            container.Unregister(typeof(IService), condition: f => f.ImplementationType == typeof(Service));
+            container.Unregister(typeof(IService), condition: f => f.ImplementationType == typeof(Service));
+
+            Assert.IsFalse(container.IsRegistered<IService>(condition: f => f.ImplementationType == typeof(Service)));
+            Assert.IsTrue(container.IsRegistered<IService>(condition: f => f.ImplementationType == typeof(AnotherService)));
+        }
+
+        [Test]
+        public void Unregister_last_default_registrations_with_condition_successful_for_one_of_two_will_keep_the_second_registration()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.Register<IService, AnotherService>();
+
+            container.Unregister(typeof(IService), condition: f => f.ImplementationType == typeof(AnotherService));
+
+            Assert.IsTrue(container.IsRegistered<IService>(condition: f => f.ImplementationType == typeof(Service)));
+            Assert.IsFalse(container.IsRegistered<IService>(condition: f => f.ImplementationType == typeof(AnotherService)));
+        }
+
+        [Test]
+        public void Unregister_unregistered_last_default_registrations_with_condition_should_not_throw()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.Register<IService, AnotherService>();
+
+            container.Unregister(typeof(IService), condition: f => f.ImplementationType == typeof(AnotherService));
+            container.Unregister(typeof(IService), condition: f => f.ImplementationType == typeof(AnotherService));
+
+            Assert.IsTrue(container.IsRegistered<IService>(condition: f => f.ImplementationType == typeof(Service)));
+            Assert.IsFalse(container.IsRegistered<IService>(condition: f => f.ImplementationType == typeof(AnotherService)));
+        }
+
+        [Test]
         public void Unregister_specific_default_from_multiple_defaults_and_named_should_Succeed()
         {
             var container = new Container();
@@ -74,9 +150,27 @@ namespace DryIoc.UnitTests
             container.Register<IService, AnotherService>();
             container.Register<IService, DisposableService>(named: 2);
 
-            container.Unregister(typeof(IService), DefaultKey.Value.Next());
+            var lastDefaultKey = DefaultKey.Value.Next();
+            container.Unregister(typeof(IService), lastDefaultKey);
 
-            Assert.IsFalse(container.IsRegistered(typeof(IService), DefaultKey.Value.Next()));
+            Assert.IsFalse(container.IsRegistered(typeof(IService), lastDefaultKey));
+            Assert.IsTrue(container.IsRegistered(typeof(IService), DefaultKey.Value));
+            Assert.IsTrue(container.IsRegistered(typeof(IService), 2));
+        }
+
+        [Test]
+        public void Unregister_unregistred_specific_default_from_multiple_defaults_and_named_should_not_throw()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.Register<IService, AnotherService>();
+            container.Register<IService, DisposableService>(named: 2);
+
+            var lastDefaultKey = DefaultKey.Value.Next();
+            container.Unregister(typeof(IService), lastDefaultKey);
+            container.Unregister(typeof(IService), lastDefaultKey);
+
+            Assert.IsFalse(container.IsRegistered(typeof(IService), lastDefaultKey));
             Assert.IsTrue(container.IsRegistered(typeof(IService), DefaultKey.Value));
             Assert.IsTrue(container.IsRegistered(typeof(IService), 2));
         }
@@ -87,6 +181,18 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>(named: 1);
 
+            container.Unregister(typeof(IService), named: 1);
+
+            Assert.IsFalse(container.IsRegistered<IService>(named: 1));
+        }
+
+        [Test]
+        public void Unregister_unregistered_named_registration_should_Succeed()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(named: 1);
+
+            container.Unregister(typeof(IService), named: 1);
             container.Unregister(typeof(IService), named: 1);
 
             Assert.IsFalse(container.IsRegistered<IService>(named: 1));
@@ -131,6 +237,18 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Unregister_unregistred_decorator_should_not_throw()
+        {
+            var container = new Container();
+            container.Register<IHandler, LoggingHandlerDecorator>(setup: SetupDecorator.Default);
+
+            container.Unregister<IHandler>(factoryType: FactoryType.Decorator, condition: f => f.ImplementationType == typeof(LoggingHandlerDecorator));
+            container.Unregister<IHandler>(factoryType: FactoryType.Decorator, condition: f => f.ImplementationType == typeof(LoggingHandlerDecorator));
+
+            Assert.IsFalse(container.IsRegistered<IHandler>(factoryType: FactoryType.Decorator));
+        }
+
+        [Test]
         public void Unregister_decorator_with_condition_should_keep_decorator_for_which_condition_is_failed()
         {
             var container = new Container();
@@ -154,6 +272,17 @@ namespace DryIoc.UnitTests
             var container = new Container();
             Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
             
+            container.Unregister(typeof(Lazy<>), factoryType: FactoryType.Wrapper);
+            Assert.IsFalse(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
+        }
+
+        [Test]
+        public void Unregister_of_unregistered_generic_wrapper_should_not_throw()
+        {
+            var container = new Container();
+            Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
+
+            container.Unregister(typeof(Lazy<>), factoryType: FactoryType.Wrapper);
             container.Unregister(typeof(Lazy<>), factoryType: FactoryType.Wrapper);
             Assert.IsFalse(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
         }

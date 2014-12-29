@@ -48,11 +48,11 @@ namespace DryIoc.Playground
 
     public sealed class HashTreeX<K, V> : IEnumerable<KV<K, V>>
     {
-        public static readonly HashTreeX<K, V> Empty = new HashTreeX<K, V>(HashTree<KV<K, V>>.Empty, null);
+        public static readonly HashTreeX<K, V> Empty = new HashTreeX<K, V>(IntTree<KV<K, V>>.Empty, null);
 
         public static HashTreeX<K, V> Using(Func<V, V, V> updateValue = null)
         {
-            return updateValue == null ? Empty : new HashTreeX<K, V>(HashTree<KV<K, V>>.Empty, updateValue);
+            return updateValue == null ? Empty : new HashTreeX<K, V>(IntTree<KV<K, V>>.Empty, updateValue);
         }
 
         public HashTreeX<K, V> AddOrUpdate(K key, V value)
@@ -87,13 +87,13 @@ namespace DryIoc.Playground
 
         #region Implementation
 
-        private HashTreeX(HashTree<KV<K, V>> tree, Func<V, V, V> updateValue)
+        private HashTreeX(IntTree<KV<K, V>> tree, Func<V, V, V> updateValue)
         {
             _tree = tree;
             _updateValue = updateValue;
         }
 
-        private readonly HashTree<KV<K, V>> _tree;
+        private readonly IntTree<KV<K, V>> _tree;
         private readonly Func<V, V, V> _updateValue;
 
         private KV<K, V> UpdateConflicts(KV<K, V> existing, KV<K, V> added)

@@ -27,7 +27,7 @@
             {
                 return Count <= NODE_ARRAY_BITS
                     ? (AppendStore<T>)new ArrayAppendStore(Count + 1, _items.AppendOrUpdate(value))
-                    : new TreeAppendStore(Count + 1, HashTree<T[]>.Empty.AddOrUpdate(0, _items).AddOrUpdate(1, new[] { value }));
+                    : new TreeAppendStore(Count + 1, IntTree<T[]>.Empty.AddOrUpdate(0, _items).AddOrUpdate(1, new[] { value }));
             }
 
             public override object Get(int index)
@@ -43,9 +43,9 @@
 
         private sealed class TreeAppendStore : AppendStore<T>
         {
-            private readonly HashTree<T[]> _tree;
+            private readonly IntTree<T[]> _tree;
 
-            public TreeAppendStore(int count, HashTree<T[]> tree)
+            public TreeAppendStore(int count, IntTree<T[]> tree)
             {
                 Count = count;
                 _tree = tree;

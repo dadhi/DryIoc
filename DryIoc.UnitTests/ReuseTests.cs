@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading;
-using System.Web;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -232,14 +231,15 @@ namespace DryIoc.UnitTests
 
             Assert.That(ex.Error, Is.EqualTo(Error.DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN));
             Assert.That(ex.Message, Is.StringContaining(
-                "Dependency DryIoc.UnitTests.FastLogger: DryIoc.UnitTests.ILogger as parameter \"logger\" " +
-                "has shorter reuse lifespan (ResolutionScopeReuse:10) than its parent (SingletonReuse:1000)"));
+                "Dependency DryIoc.UnitTests.FastLogger: DryIoc.UnitTests.ILogger as parameter \"logger\" has shorter Reuse lifespan than its parent: DryIoc.UnitTests.Client.\n" +
+                "ResolutionScopeReuse:10 lifetime is shorter than SingletonReuse:1000.\n" +
+                "You may turn Off this error with new Container(rules=>rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false))."));
         }
 
         [Test]
         public void Should_Not_throw_if_rule_is_off_and_dependency_lifespan_is_less_than_parents()
         {
-            var container = new Container(rules => rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(throwIfDepenedencyHasShorterReuseLifespan: false));
+            var container = new Container(rules => rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false));
             container.Register<Client>(Reuse.Singleton);
             container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
 
@@ -276,41 +276,6 @@ namespace DryIoc.UnitTests
             Assert.That(service.Value.Dep.IsDisposed, Is.True);
         }
 
-        [Test]
-        public void Working_with_HttpScopeContext()
-        {
-            var root = new Container(scopeContext: new HttpScopeContext());
-            root.Register<SomeRoot>(WebReuse.InHttpContext);
-            root.Register<SomeDep>(WebReuse.InHttpContext);
-
-            SomeDep savedOutside;
-            using (var scoped = root.OpenScope())
-            {
-                var a = scoped.Resolve<SomeRoot>();
-                var b = scoped.Resolve<SomeRoot>();
-
-                Assert.That(a, Is.SameAs(b));
-
-                using (var nested = scoped.OpenScope())
-                {
-                    var aa = nested.Resolve<SomeRoot>();
-                    Assert.AreSame(aa, a);
-                }
-
-                savedOutside = a.Dep;
-            }
-
-            using (var scoped = root.OpenScope())
-            {
-                var a = scoped.Resolve<SomeRoot>();
-                var b = scoped.Resolve<SomeRoot>();
-
-                Assert.That(a, Is.SameAs(b));
-                Assert.That(a.Dep, Is.Not.SameAs(savedOutside));
-            }
-
-            Assert.That(savedOutside.IsDisposed, Is.True);
-        }
 
         internal class SomeDep : IDisposable
         {
@@ -329,42 +294,6 @@ namespace DryIoc.UnitTests
             {
                 Dep = dep;
             }
-        }
-
-        public static class WebReuse
-        {
-            public static readonly IReuse InHttpContext = Reuse.InCurrentNamedScope(HttpScopeContext.ROOT_SCOPE_NAME);
-        }
-
-        public sealed class HttpScopeContext : IScopeContext
-        {
-            public static readonly object ROOT_SCOPE_NAME = typeof(HttpScopeContext);
-
-            public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
-
-            public IScope GetCurrentOrDefault()
-            {
-                var httpContext = HttpContext.Current;
-                return httpContext == null ? _fallbackScope : (IScope)httpContext.Items[ROOT_SCOPE_NAME];
-            }
-
-            public void SetCurrent(Func<IScope, IScope> update)
-            {
-                var currentOrDefault = GetCurrentOrDefault();
-                var newScope = update.ThrowIfNull().Invoke(currentOrDefault);
-                var httpContext = HttpContext.Current;
-                if (httpContext == null)
-                {
-                    _fallbackScope = newScope;
-                }
-                else
-                {
-                    httpContext.Items[ROOT_SCOPE_NAME] = newScope;
-                    _fallbackScope = null;
-                }
-            }
-
-            private IScope _fallbackScope;
         }
 
         // Old example for v1.3.1 

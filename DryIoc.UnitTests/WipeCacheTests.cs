@@ -46,6 +46,7 @@ namespace DryIoc.UnitTests
             Assert.That(service, Is.InstanceOf<Service>());
 
             container.Register<IService, AnotherService>();
+            container = container.WipeCache();
             Assert.Throws<ContainerException>(() => 
                 container.Resolve<IService>());
         }
@@ -60,6 +61,7 @@ namespace DryIoc.UnitTests
             Assert.That(service, Is.InstanceOf<Service>());
 
             container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Update);
+            container = container.WipeCache();
             service = container.Resolve<IService>();
             Assert.That(service, Is.InstanceOf<AnotherService>());
         }
