@@ -7,7 +7,7 @@ namespace DryIoc.Mvc.UnitTests
     public class ReuseInRequestTests
     {
         [Test]
-        public void Working_with_HttpScopeContext()
+        public void Working_with_HttpContext_based_scope_context()
         {
             var root = new Container(scopeContext: new HttpContextScopeContext());
             root.Register<SomeRoot>(Reuse.InRequest);
