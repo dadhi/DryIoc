@@ -47,14 +47,6 @@ namespace DryIoc.MefAttributedModel
             .AddOrUpdate(typeof(CurrentScopeReuse), Reuse.InCurrentNamedScope)
             .AddOrUpdate(typeof(ResolutionScopeReuse), _ => Reuse.InResolutionScope);
 
-        /// <summary>Map of supported reuse wrapper types, so that specified in <see cref="ReuseWrappersAttribute"/> type
-        /// could be mapped to corresponding provider in <see cref="ReuseWrapper"/></summary>
-        public static readonly HashTree<Type, IReuseWrapper> SupportedReuseWrapperTypes = HashTree<Type, IReuseWrapper>.Empty
-            .AddOrUpdate(typeof(WeakReference), ReuseWrapper.WeakReference)
-            .AddOrUpdate(typeof(ExplicitlyDisposable), ReuseWrapper.ExplicitlyDisposable)
-            .AddOrUpdate(typeof(Disposable), ReuseWrapper.Disposable)
-            .AddOrUpdate(typeof(Ref<object>), ReuseWrapper.Ref);
-
         /// <summary>Returns new rules with attributed model importing rules appended.</summary>
         /// <param name="rules">Source rules to append importing rules to.</param>
         /// <returns>New rules with attributed model rules.</returns>
@@ -157,16 +149,6 @@ namespace DryIoc.MefAttributedModel
                 : SupportedReuseTypes.GetValueOrDefault(reuseType)
                 .ThrowIfNull(Error.UNSUPPORTED_REUSE_TYPE, reuseType)
                 .Invoke(reuseName);
-        }
-
-        /// <summary>Returns reuse wrapper object: corresponding member of <see cref="ReuseWrapper"/>.
-        /// Uses <see cref="SupportedReuseWrapperTypes"/> mapping to find it.</summary>
-        /// <param name="reuseWrapperType">Reuse wrapper type to find mapping for.</param>
-        /// <returns>Supported reuse wrapper object.</returns>
-        public static IReuseWrapper GetReuseWrapperByType(Type reuseWrapperType)
-        {
-            return SupportedReuseWrapperTypes.GetValueOrDefault(reuseWrapperType)
-                .ThrowIfNull(Error.UNSUPPORTED_REUSE_WRAPPER_TYPE, reuseWrapperType);
         }
 
         #endregion
@@ -638,7 +620,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Name to pass to reuse factory from <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
         public string ReuseName;
 
-        /// <summary>Reuse wrappers defined for exported type <see cref="AttributedModel.SupportedReuseWrapperTypes"/>.</summary>
+        /// <summary>Reuse wrappers defined for exported type.</summary>
         public Type[] ReuseWrapperTypes;
 
         /// <summary>True if exported type has metadata.</summary>
@@ -678,11 +660,11 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == FactoryType.Decorator)
                 return Decorator == null ? SetupDecorator.Default : Decorator.GetSetup(lazyMetadata);
 
-            IReuseWrapper[] reuseWrappers = null;
-            if (ReuseWrapperTypes != null && ReuseWrapperTypes.Length != 0)
-                reuseWrappers = ReuseWrapperTypes.Select(AttributedModel.GetReuseWrapperByType).ToArray();
+            var setup = lazyMetadata == null ? Setup.Default : Setup.With(lazyMetadata: lazyMetadata);
 
-            return Setup.With(reuseWrappers: reuseWrappers, lazyMetadata: lazyMetadata);
+            return ReuseWrapperTypes == null || ReuseWrapperTypes.Length == 0
+                ? setup
+                : setup.WithReuseWrappers(ReuseWrapperTypes);
         }
 
         public override bool Equals(object obj)
@@ -793,7 +775,7 @@ namespace DryIoc.MefAttributedModel
 
         public SetupWrapper GetSetup()
         {
-            return SetupWrapper.With(getWrappedServiceType: GetWrappedServiceType);
+            return SetupWrapper.With(unwrapServiceType: GetWrappedServiceType);
         }
 
         public override bool Equals(object obj)

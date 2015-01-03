@@ -24,7 +24,7 @@ namespace DryIoc.IssuesTests
 
             container.Register<A>();
             container.RegisterInstance(default(SomeRequest), 
-                Reuse.InCurrentScope, Setup.With(reuseWrappers: new[] { ReuseWrapper.Ref }));
+                Reuse.InCurrentScope, Setup.Default.WithReuseWrappers(typeof(Ref<object>)));
 
             var request1 = Task.Run(async () =>
             {

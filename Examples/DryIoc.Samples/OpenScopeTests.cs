@@ -132,12 +132,8 @@ namespace DryIoc.Samples
             Assert.That(client.Dep, Is.InstanceOf<Dep>());
             Assert.That(client.Serv, Is.InstanceOf<Serv>());
 
-            using (var scoped = container.OpenScope(scopeName, rules => 
-                rules.WithFactorySelector((t, k, fs) => 
-                    k == null
-                    ?  fs.FirstOrDefault(f => f.Key.Equals(scopeName)).Value 
-                    ?? fs.FirstOrDefault(f => f.Key.Equals(null)).Value
-                    :  fs.FirstOrDefault(f => f.Key.Equals(k)).Value)))
+            using (var scoped = container.OpenScope(scopeName, 
+                rules => rules.WithFactorySelector(MapDefaultToKey(scopeName))))
             {
                 var scopedClient = scoped.Resolve<IClient>(scopeName);
 
@@ -149,6 +145,14 @@ namespace DryIoc.Samples
             client = container.Resolve<IClient>();
             Assert.That(client, Is.InstanceOf<Client>());
         }
+
+        private static Rules.FactorySelectorRule MapDefaultToKey(object key)
+        {
+            return (t, k, fs) => k == null
+                ? fs.FirstOrDefault(f => f.Key.Equals(key)).Value
+                ?? fs.FirstOrDefault(f => f.Key.Equals(null)).Value
+                : fs.FirstOrDefault(f => f.Key.Equals(k)).Value;
+    }
 
         [Test]
         public void Services_should_be_different_in_different_scopes()

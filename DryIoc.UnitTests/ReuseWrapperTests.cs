@@ -24,7 +24,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable)));
 
             var service = container.Resolve<DisposableService>();
 
@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
+                    setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable)));
 
                 var service = container.Resolve<IService>();
 
@@ -54,7 +54,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable)));
 
             var wrapperProxy = container.Resolve<ExplicitlyDisposableProxy<IService>>();
             var wrapper = container.Resolve<ExplicitlyDisposable>(typeof(IService));
@@ -69,7 +69,7 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
+                    setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable)));
 
                 var disposable = container.Resolve<ExplicitlyDisposableProxy<object>>(typeof(IService));
                 disposable.DisposeTarget();
@@ -93,7 +93,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable)));
 
             var disposable = container.Resolve<ExplicitlyDisposableProxy<IService>>();
             disposable.DisposeTarget();
@@ -116,7 +116,7 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<DisposableService>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
+                    setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable)));
 
                 container.Register(typeof(ExplicitlyDisposableProxy<>), setup: SetupWrapper.Default);
 
@@ -131,7 +131,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable)));
 
 
             container.Register(typeof(ExplicitlyDisposableProxy<>), setup: SetupWrapper.Default);
@@ -146,7 +146,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference }));
+                setup: Setup.Default.WithReuseWrappers(typeof(WeakReference)));
 
             var serviceWeakRef = container.Resolve<WeakReference>(typeof(IService));
             Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
@@ -162,7 +162,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference }));
+                setup: Setup.Default.WithReuseWrappers(typeof(WeakReference)));
 
             var serviceWeakRef = container.Resolve<WeakReferenceProxy<IService>>();
             Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
@@ -173,11 +173,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable)));
             container.Register<Dependency>(Reuse.InResolutionScope,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable)));
             container.Register<ServiceClient>(Reuse.InCurrentScope,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable }));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable)));
 
             using (var scoped = container.OpenScope())
             {
@@ -196,7 +196,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable, ReuseWrapper.WeakReference }));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable), typeof(WeakReference)));
 
             var service = container.Resolve<IService>();
             var serviceWeakRef = new WeakReference(service);
@@ -215,7 +215,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.ExplicitlyDisposable, ReuseWrapper.WeakReference }));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposable), typeof(WeakReference)));
 
             var serviceWeakRef = container.Resolve<WeakReference>(typeof(IService));
             var serviceDisposable = container.Resolve<ExplicitlyDisposable>(typeof(IService));
@@ -228,8 +228,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             var service = new DisposableService();
-            container.RegisterInstance<IService>(service, Reuse.Singleton, 
-                Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference, ReuseWrapper.ExplicitlyDisposable }));
+            container.RegisterInstance<IService>(service, Reuse.Singleton,
+                Setup.Default.WithReuseWrappers(typeof(WeakReference), typeof(ExplicitlyDisposable)));
 
             var serviceWeakRef = container.Resolve<WeakReference>(typeof(IService));
             var serviceDisposable = container.Resolve<ExplicitlyDisposableProxy<IService>>();
@@ -280,7 +280,7 @@ namespace DryIoc.UnitTests
             {
                 container.Register<Service>();
                 container.Register<ServiceWithParameterAndDependency>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference }));
+                    setup: Setup.Default.WithReuseWrappers(typeof(WeakReference)));
 
                 var func = container.Resolve<Func<bool, WeakReference>>(typeof(ServiceWithParameterAndDependency));
                 var service = func(true).Target;
@@ -295,7 +295,7 @@ namespace DryIoc.UnitTests
 
             container.Register<Service>();
             container.Register<ServiceWithParameterAndDependency>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.Ref }));
+                setup: Setup.Default.WithReuseWrappers(typeof(Ref<object>)));
 
             var func = container.Resolve<Func<bool, Ref<object>>>(typeof(ServiceWithParameterAndDependency));
             var service = func(true);
@@ -312,7 +312,7 @@ namespace DryIoc.UnitTests
 
             container.Register<Service>();
             container.Register<ServiceWithParameterAndDependency>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.Ref }));
+                setup: Setup.Default.WithReuseWrappers(typeof(Ref<object>)));
 
             var func = container.Resolve<Func<bool, RefProxy<ServiceWithParameterAndDependency>>>();
             var service = func(true);
@@ -332,7 +332,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference, ReuseWrapper.ExplicitlyDisposable }));
+                setup: Setup.Default.WithReuseWrappers(typeof(WeakReference), typeof(ExplicitlyDisposable)));
 
             var service = container.Resolve<ExplicitlyDisposableProxy<DisposableService>>();
             service.DisposeTarget();
@@ -349,7 +349,7 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<Service>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.Disposable }));
+                    setup: Setup.Default.WithReuseWrappers(typeof(Disposable)));
 
                 var service = container.Resolve<DisposableProxy<Service>>();
 
@@ -365,7 +365,7 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<Service>(Shared.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: new[] { ReuseWrapper.Disposable }));
+                    setup: Setup.Default.WithReuseWrappers(typeof(Disposable)));
 
                 var renewable = container.Resolve<DisposableProxy<Service>>();
                 var service = renewable.Target;
