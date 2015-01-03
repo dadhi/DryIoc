@@ -49,6 +49,7 @@
   <ItemGroup>
     <Compile Include="Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent.cs" />
     <Compile Include="Issue61_PropagateRequestToResolveInRegisteredDelegate.cs" />
+    <Compile Include="Issue72_SupportAllPossibleFlavorsOfChildNestedContainer.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
@@ -66,8 +67,8 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\DryIoc\DryIoc.csproj">
-      <Project>{ae41df42-6362-4843-84c5-c3c2ab29a3c7}</Project>
+    <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj">
+      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
       <Name>DryIoc</Name>
     </ProjectReference>
   </ItemGroup>

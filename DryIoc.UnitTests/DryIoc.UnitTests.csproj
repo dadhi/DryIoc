@@ -39,6 +39,7 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
     </Reference>
+    <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
@@ -70,6 +71,7 @@
     <Compile Include="EnumerableAndArrayTests.cs" />
     <Compile Include="FuncTests.cs" />
     <Compile Include="OpenGenericsTests.cs" />
+    <Compile Include="StronglyTypeConstructorAndParametersSpecTests.cs" />
     <Compile Include="WrapperTests.cs" />
     <Compile Include="HashTreeTests.cs" />
     <Compile Include="DelegateFactoryTests.cs" />

@@ -160,6 +160,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\SelectConstructorWithAllResolvableArguments.cs">
       <Link>SelectConstructorWithAllResolvableArguments.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\StronglyTypeConstructorAndParametersSpecTests.cs">
+      <Link>StronglyTypeConstructorAndParametersSpecTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\ThrowTests.cs">
       <Link>ThrowTests.cs</Link>
     </Compile>
