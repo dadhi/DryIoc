@@ -26,7 +26,7 @@ namespace DryIoc
 {
     using System.Threading;
 
-    public static partial class Polyfill
+    public static partial class Portable
     {
         static partial void GetCurrentManagedThreadID(ref int threadID)
         {

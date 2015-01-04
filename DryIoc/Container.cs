@@ -257,77 +257,85 @@ namespace DryIoc
                 case FactoryType.Decorator:
                     _decorators.Swap(_ => _.Update(serviceType, null, (factories, _null) =>
                     {
-                        var remaining = condition == null
-                            ? null : factories.Where(factory => !condition(factory)).ToArray();
-                        removed = remaining == null || remaining.Length == 0
-                            ? factories : factories.Except(remaining).ToArray();
+                        var remaining = condition == null ? null : factories.Where(f => !condition(f)).ToArray();
+                        removed = remaining == null || remaining.Length == 0 ? factories : factories.Except(remaining).ToArray();
                         return remaining;
                     }));
                     break;
                 default:
-                    if (serviceKey == null && condition == null) // simplest case with simplest handling
-                        _factories.Swap(_ => _.Update(serviceType, null, (entry, _null) =>
-                        {
-                            removed = entry;
-                            return null;
-                        }));
-                    else
-                        _factories.Swap(_ => _.Update(serviceType, null, (entry, _null) =>
-                        {
-                            if (entry == null)
-                                return null;
-
-                            if (entry is Factory)
-                            {
-                                if ((serviceKey != null && !DefaultKey.Value.Equals(serviceKey)) ||
-                                    (condition != null && !condition((Factory)entry)))
-                                    return entry; // keep entry
-                                removed = entry;  // otherwise remove it (the only case if serviceKey == DefaultKey.Value)
-                                return null;
-                            }
-
-                            var factoriesEntry = (FactoriesEntry)entry;
-                            var oldFactories = factoriesEntry.Factories;
-                            var remainingFactories = HashTree<object, Factory>.Empty;
-                            if (serviceKey == null) // automatically means condition != null
-                            {   // keep factories for which condition is true
-                                foreach (var factory in oldFactories.Enumerate())
-                                    if (!condition(factory.Value))
-                                        remainingFactories = remainingFactories.AddOrUpdate(factory.Key, factory.Value);
-                            }
-                            else// serviceKey is not default, which automatically means condition == null
-                            {   // set to null factory with specified key if its found
-                                remainingFactories = oldFactories;
-                                var factory = oldFactories.GetValueOrDefault(serviceKey);
-                                if (factory != null)
-                                    remainingFactories = oldFactories.Height > 1
-                                        ? oldFactories.Update(serviceKey, null)
-                                        : HashTree<object, Factory>.Empty;
-                            }
-
-                            if (remainingFactories.IsEmpty)
-                            {   // if no more remaining factories, then delete the whole entry
-                                removed = entry;
-                                return null;
-                            }
-
-                            removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(f => f.Value).ToArray();
-
-                            if (remainingFactories.Height == 1 && DefaultKey.Value.Equals(remainingFactories.Key))
-                                return remainingFactories.Value; // replace entry with single remaining default factory
-
-                            // update last default key if current default key was removed
-                            var newDefaultKey = factoriesEntry.LastDefaultKey;
-                            if (newDefaultKey != null && remainingFactories.GetValueOrDefault(newDefaultKey) == null)
-                                newDefaultKey = remainingFactories.Enumerate().Select(x => x.Key)
-                                    .OfType<DefaultKey>().OrderByDescending(key => key.RegistrationOrder).FirstOrDefault();
-                            return new FactoriesEntry(newDefaultKey, remainingFactories);
-                        }));
+                    removed = UnregisterServiceFactory(serviceType, serviceKey, condition);
                     break;
             }
 
             if (removed != null)
                 UnregisterFactoriesSproutByFactoryProvider(removed, factoryType);
+        }
+
+        private object UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
+        {
+            object removed = null;
+            if (serviceKey == null && condition == null) // simplest case with simplest handling
+                _factories.Swap(_ => _.Update(serviceType, null, (entry, _null) =>
+                {
+                    removed = entry;
+                    return null;
+                }));
+            else
+                _factories.Swap(_ => _.Update(serviceType, null, (entry, _null) =>
+                {
+                    if (entry == null)
+                        return null;
+
+                    if (entry is Factory)
+                    {
+                        if ((serviceKey != null && !DefaultKey.Value.Equals(serviceKey)) ||
+                            (condition != null && !condition((Factory) entry)))
+                            return entry; // keep entry
+                        removed = entry; // otherwise remove it (the only case if serviceKey == DefaultKey.Value)
+                        return null;
+                    }
+
+                    var factoriesEntry = (FactoriesEntry) entry;
+                    var oldFactories = factoriesEntry.Factories;
+                    var remainingFactories = HashTree<object, Factory>.Empty;
+                    if (serviceKey == null) // automatically means condition != null
+                    {
+                        // keep factories for which condition is true
+                        foreach (var factory in oldFactories.Enumerate())
+                            if (condition != null && !condition(factory.Value))
+                                remainingFactories = remainingFactories.AddOrUpdate(factory.Key, factory.Value);
+                    }
+                    else // serviceKey is not default, which automatically means condition == null
+                    {
+                        // set to null factory with specified key if its found
+                        remainingFactories = oldFactories;
+                        var factory = oldFactories.GetValueOrDefault(serviceKey);
+                        if (factory != null)
+                            remainingFactories = oldFactories.Height > 1
+                                ? oldFactories.Update(serviceKey, null)
+                                : HashTree<object, Factory>.Empty;
+                    }
+
+                    if (remainingFactories.IsEmpty)
+                    {
+                        // if no more remaining factories, then delete the whole entry
+                        removed = entry;
+                        return null;
+                    }
+
+                    removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(f => f.Value).ToArray();
+
+                    if (remainingFactories.Height == 1 && DefaultKey.Value.Equals(remainingFactories.Key))
+                        return remainingFactories.Value; // replace entry with single remaining default factory
+
+                    // update last default key if current default key was removed
+                    var newDefaultKey = factoriesEntry.LastDefaultKey;
+                    if (newDefaultKey != null && remainingFactories.GetValueOrDefault(newDefaultKey) == null)
+                        newDefaultKey = remainingFactories.Enumerate().Select(x => x.Key)
+                            .OfType<DefaultKey>().OrderByDescending(key => key.RegistrationOrder).FirstOrDefault();
+                    return new FactoriesEntry(newDefaultKey, remainingFactories);
+                }));
+            return removed;
         }
 
         private void UnregisterFactoriesSproutByFactoryProvider(object removed, FactoryType factoryType)
@@ -752,6 +760,9 @@ namespace DryIoc
             if (serviceKey == null)
                 _factories.Swap(f => f.AddOrUpdate(serviceType, factory, (oldEntry, newEntry) =>
                 {
+                    if (oldEntry == null)
+                        return newEntry;
+
                     var oldFactories = oldEntry as FactoriesEntry;
                     if (oldFactories != null && oldFactories.LastDefaultKey == null) // no default registered yet
                         return new FactoriesEntry(DefaultKey.Value,
@@ -790,6 +801,9 @@ namespace DryIoc
 
                 _factories.Swap(f => f.AddOrUpdate(serviceType, factories, (oldEntry, newEntry) =>
                 {
+                    if (oldEntry == null)
+                        return newEntry;
+
                     if (oldEntry is Factory) // if registered is default, just add it to new entry
                         return new FactoriesEntry(DefaultKey.Value,
                             ((FactoriesEntry)newEntry).Factories.AddOrUpdate(DefaultKey.Value, (Factory)oldEntry));
@@ -798,6 +812,9 @@ namespace DryIoc
                     return new FactoriesEntry(oldFactories.LastDefaultKey,
                         oldFactories.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, newFactory) =>
                         {
+                            if (oldFactory == null)
+                                return factory;
+
                             switch (ifAlreadyRegistered)
                             {
                                 case IfAlreadyRegistered.KeepIt:
@@ -2344,9 +2361,9 @@ namespace DryIoc
         /// <returns>Result collection of services.</returns>
         /// <remarks>The same result could be achieved by directly calling:
         /// <code lang="cs"><![CDATA[
-        ///     container.Resolve<Many<IService>>();        // for dynamic result - default behavior
-        ///     container.Resolve<IEnumerable<IService>>(); // for fixed result
-        ///     container.Resolve<IService[]>();            // for fixed result too
+        ///     container.Resolve<LazyEnumerable<IService>>();  // for dynamic result - default behavior
+        ///     container.Resolve<IService[]>();                // for fixed array
+        ///     container.Resolve<IEnumerable<IService>>();     // same as fixed array
         /// ]]></code>
         /// </remarks>
         public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver,
@@ -3940,7 +3957,7 @@ namespace DryIoc
         /// <param name="property">Property check.</param> <returns>Returns result of check.</returns>
         public static bool IsPublic(this PropertyInfo property)
         {
-            return Polyfill.GetPropertySetMethod(property) != null;
+            return Portable.GetPropertySetMethod(property) != null;
         }
 
         /// <summary>Returns true if property is indexer: aka this[].</summary>
@@ -4498,7 +4515,9 @@ namespace DryIoc
                 var item = _items.GetFirstValueByHashOrDefault(id);
                 if (item == null ||
                     item is IReneweable && ((IReneweable)item).MarkedForRenewal)
-                    Ref.Swap(ref _items, items => items.AddOrUpdate(id, item = factory()));
+                    Ref.Swap(ref _items, items => _disposed == 1
+                        ? Throw.Instead<HashTree<int, object>>(Error.SCOPE_IS_DISPOSED)
+                        : items.AddOrUpdate(id, item = factory()));
                 return item;
             }
         }
@@ -4510,23 +4529,20 @@ namespace DryIoc
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
-
-            lock (_syncRoot)
+            
+            if (_items.IsEmpty) return;
+            foreach (var item in _items.Enumerate().Where(x => x.Value is IDisposable))
             {
-                if (_items.IsEmpty) return;
-                foreach (var item in _items.Enumerate().Select(x => x.Value).OfType<IDisposable>())
+                try
                 {
-                    try
-                    {
-                        item.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        DisposingExceptions.AppendOrUpdate(ex);
-                    }
+                    ((IDisposable)item.Value).Dispose();
                 }
-                _items = null;
+                catch (Exception ex)
+                {
+                    DisposingExceptions.AppendOrUpdate(ex);
+                }
             }
+            _items = null;
         }
 
         #region Implementation
@@ -4559,13 +4575,13 @@ namespace DryIoc
 
         public IScope GetCurrentOrDefault()
         {
-            var threadID = Polyfill.GetCurrentManagedThreadID();
+            var threadID = Portable.GetCurrentManagedThreadID();
             return _scopes.Value.GetFirstValueByHashOrDefault(threadID);
         }
 
         public void SetCurrent(Func<IScope, IScope> update)
         {
-            var threadId = Polyfill.GetCurrentManagedThreadID();
+            var threadId = Portable.GetCurrentManagedThreadID();
             _scopes.Swap(scopes => scopes.AddOrUpdate(threadId, update(scopes.GetFirstValueByHashOrDefault(threadId))));
         }
 
@@ -5376,15 +5392,15 @@ namespace DryIoc
         static Error()
         {
             // auto defaults
-            _(ref INVALID_CONDITION, "Argument {0} of type {1} has invalid condition.");
-            _(ref IS_NULL, "Argument of type {0} is null.");
-            _(ref IS_NOT_OF_TYPE, "Argument {0} is not of type {1}.");
-            _(ref TYPE_IS_NOT_OF_TYPE, "Type argument {0} is not assignable from type {1}.");
+            _(ref INVALID_CONDITION,    "Argument {0} of type {1} has invalid condition.");
+            _(ref IS_NULL,              "Argument of type {0} is null.");
+            _(ref IS_NOT_OF_TYPE,       "Argument {0} is not of type {1}.");
+            _(ref TYPE_IS_NOT_OF_TYPE,  "Type argument {0} is not assignable from type {1}.");
 
             // specific
-            _(ref UNABLE_TO_RESOLVE_SERVICE, "Unable to resolve {0}." + Environment.NewLine + "Please register service OR adjust container resolution rules.");
-            _(ref EXPECTED_SINGLE_DEFAULT_FACTORY, "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
-                                                                    "Please identify service with key, or metadata OR set Rules to return single registered factory.");
+            _(ref UNABLE_TO_RESOLVE_SERVICE,                        "Unable to resolve {0}." + Environment.NewLine + "Please register service OR adjust container resolution rules.");
+            _(ref EXPECTED_SINGLE_DEFAULT_FACTORY,                  "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
+                                                                    "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory.");
             _(ref IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE, "Implementation type {0} should be assignable to service type {1} but it is not.");
             _(ref REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER, "Unable to register not a factory provider for open-generic service {0}.");
             _(ref REG_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, "Unable to register open-generic implementation {0} with non-generic service {1}.");
@@ -5682,7 +5698,7 @@ namespace DryIoc
         /// <param name="type">Source type.</param> <returns>Array of generic type arguments (closed/concrete types) and parameters (open).</returns>
         public static Type[] GetGenericParamsAndArgs(this Type type)
         {
-            return Polyfill.GetGenericArguments(type);
+            return Portable.GetGenericArguments(type);
         }
 
         /// <summary>If type is array returns is element type, otherwise returns null.</summary>
@@ -6043,7 +6059,7 @@ namespace DryIoc
         }
     }
 
-    public static partial class Polyfill
+    public static partial class Portable
     {
         public static readonly Func<Assembly, IEnumerable<Type>> GetTypesFrom =
             ExpressionTools.GetMethodDelegateOrNull<Assembly, IEnumerable<Type>>("GetTypes").ThrowIfNull();

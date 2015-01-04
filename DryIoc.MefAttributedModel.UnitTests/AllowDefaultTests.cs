@@ -10,7 +10,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void AllowDefault_could_be_applied_to_parameter()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
 
             container.RegisterExports(typeof(Client));
 
@@ -21,7 +21,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void AllowDefault_could_be_applied_to_property()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
 
             container.RegisterExports(typeof(ClientProp));
 
@@ -32,7 +32,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void AllowDefault_false_applied_to_property_should_Throw()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
 
             container.RegisterExports(typeof(ClientPropThrow));
 
@@ -48,7 +48,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void AllowDefault_dependencies_could_be_nested()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
 
             container.RegisterExports(typeof(ClientNested), typeof(Client));
 

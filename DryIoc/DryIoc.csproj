@@ -39,8 +39,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Container.cs" />
-    <Compile Include="Polyfill-net40.cs" />
-    <Compile Include="Polyfill-net45.cs" />
+    <Compile Include="Ported-net40.cs" />
+    <Compile Include="Ported-net45.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup />

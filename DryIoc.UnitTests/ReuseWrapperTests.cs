@@ -305,6 +305,21 @@ namespace DryIoc.UnitTests
             Assert.That(service, Is.SameAs(service2));
         }
 
+        [Test, Ignore]
+        public void Can_resolve_service_as_Ref_of_IDisposable()
+        {
+            var container = new Container();
+
+            container.Register<IService, DisposableService>(Reuse.InCurrentScope,
+                setup: Setup.Default.WithReuseWrappers(typeof(Ref<object>)));
+
+            IService service;
+            using (container.OpenScope())
+                service = container.Resolve<IService>();
+
+            Assert.IsTrue(((DisposableService)service).IsDisposed);
+        }
+
         [Test]
         public void Can_resolve_service_as_typed_Ref_proxy()
         {

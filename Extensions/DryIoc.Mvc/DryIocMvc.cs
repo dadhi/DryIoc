@@ -31,21 +31,35 @@ namespace DryIoc.Mvc
     using System.Web;
     using System.Web.Mvc;
 
-    public static class MvcExtensions
+    /// <summary>
+    /// <example> <code lang="cs"><![CDATA[
+    /// protected void Application_Start()
+    /// {
+    ///     var container = new Container().WithMvcSupport(typeof(MyMvcApp).Assembly);
+    ///     
+    ///     // Optionally enable support for MEF Export/ImportAttribute with DryIoc.MefAttributedModel package. 
+    ///     // container = container.WithMefAttributedModel();
+    ///     // container.RegisterExports(typeof(MyMvcApp).Assembly);
+    /// 
+    ///     // If required register additional services to container here ...
+    /// }
+    /// ]]></code></example>
+    /// </summary>
+    public static class DryIocMvc
     {
         public static IContainer WithMvcSupport(this IContainer container, Assembly controllersAssembly = null)
         {
             container = container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext());
             container.RegisterControllers(controllersAssembly ?? Assembly.GetExecutingAssembly());
-            container.SetDryIocDependencyResolver();
             container.SetDryIocFilterAttributeFilterProvider();
+            container.SetDryIocDependencyResolver();
             return container;
         }
 
         public static void RegisterControllers(this IContainer container, params Assembly[] assemblies)
         {
             foreach (var type in assemblies.SelectMany(assembly =>
-                Polyfill.GetTypesFrom(assembly).Where(t => !t.IsAbstract && t.IsAssignableTo(typeof(IController)))))
+                Portable.GetTypesFrom(assembly).Where(t => !t.IsAbstract && t.IsAssignableTo(typeof(IController)))))
                 container.Register(type, Reuse.InRequest);
         }
 

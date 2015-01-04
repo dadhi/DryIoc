@@ -22,16 +22,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.Composition;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-
 namespace DryIoc.MefAttributedModel
 {
+    using System;
+    using System.Collections.Generic;
+    using System.ComponentModel.Composition;
+    using System.Diagnostics.CodeAnalysis;
+    using System.Linq;
+    using System.Reflection;
+    using System.Text;
+    
     /// <summary>Implements MEF Attributed Programming Model. 
     /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
     public static class AttributedModel
@@ -41,7 +41,7 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/> 
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
-        public static readonly HashTree<Type, Func<string, IReuse>> SupportedReuseTypes =
+        public static readonly HashTree<Type, Func<string, IReuse>> SupportedReuseTypes = 
             HashTree<Type, Func<string, IReuse>>.Empty
             .AddOrUpdate(typeof(SingletonReuse), _ => Reuse.Singleton)
             .AddOrUpdate(typeof(CurrentScopeReuse), Reuse.InCurrentNamedScope)
@@ -50,18 +50,18 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Returns new rules with attributed model importing rules appended.</summary>
         /// <param name="rules">Source rules to append importing rules to.</param>
         /// <returns>New rules with attributed model rules.</returns>
-        public static Rules WithAttributedModel(this Rules rules)
+        public static Rules WithMefAttributedModel(this Rules rules)
         {
             // hello, Max!!! we are Martians.
             return rules.With(GetImportingConstructor, GetImportedParameter, _getImportedPropertiesAndFields);
         }
 
-        /// <summary>Appends attributed model rules to passed container using <see cref="WithAttributedModel(DryIoc.Rules)"/>.</summary>
+        /// <summary>Appends attributed model rules to passed container.</summary>
         /// <param name="container">Source container to apply attributed model importing rules to.</param>
         /// <returns>Returns new container with new rules.</returns>
-        public static IContainer WithAttributedModel(this Container container)
+        public static IContainer WithMefAttributedModel(this IContainer container)
         {
-            return container.With(rules => rules.WithAttributedModel());
+            return container.With(rules => rules.WithMefAttributedModel());
         }
 
         /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
@@ -119,7 +119,7 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Lazy collection of registration info DTOs.</returns>
         public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
-            return assemblies.SelectMany(Polyfill.GetTypesFrom).Select(GetRegistrationInfoOrDefault).Where(x => x != null);
+            return assemblies.SelectMany(Portable.GetTypesFrom).Select(GetRegistrationInfoOrDefault).Where(x => x != null);
         }
 
         /// <summary>Creates registration info DTO for provided type. To find this info checks type attributes:

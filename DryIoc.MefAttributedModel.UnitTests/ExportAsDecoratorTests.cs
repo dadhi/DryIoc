@@ -75,7 +75,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Decorator_supports_matching_with_service_key()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(FoohHandler), typeof(BlahHandler), typeof(FoohDecorator));
 
             var handler = container.Resolve<IHandler>(BlahFooh.Fooh);

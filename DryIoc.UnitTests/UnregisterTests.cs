@@ -32,6 +32,21 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Unregister_then_register_new_impl_Should_resolve_new_impl()
+        {
+            var container = new Container();
+
+            container.Register<IC, C>();
+
+            container.Unregister<IC>();
+
+            container.Register<IC, C1>();
+
+            var c1 = container.Resolve<IC>();
+            Assert.That(c1, Is.InstanceOf<C1>());
+        }
+
+        [Test]
         public void Unregister_default_with_default_key_shoud_work()
         {
             var container = new Container();
@@ -63,6 +78,37 @@ namespace DryIoc.UnitTests
             container.Unregister(typeof(IService), "named");
 
             Assert.IsTrue(container.IsRegistered<IService>());
+        }
+
+        [Test]
+        public void Unregister_then_register_named_impl_Should_return_new_impl()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(named: "a");
+
+            container.Unregister(typeof(IService), "a");
+
+            container.Register<IService, AnotherService>(named: "a");
+
+            var b = container.Resolve<IService>("a");
+
+            Assert.That(b, Is.InstanceOf<AnotherService>());
+        }
+
+        [Test]
+        public void Unregister_then_register_one_of_named_impl_Should_return_new_impl()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(named: "a");
+            container.Register<IService, AnotherService>(named: "b");
+
+            container.Unregister(typeof(IService), "b");
+
+            container.Register<IService, Service>(named: "b");
+
+            var b = container.Resolve<IService>("b");
+
+            Assert.That(b, Is.InstanceOf<Service>());
         }
 
         [Test]
@@ -298,7 +344,11 @@ namespace DryIoc.UnitTests
 
             Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
         }
-    }
 
-    public class NullHandlerDecorator : IHandler { }
+        internal class NullHandlerDecorator : IHandler { }
+
+        internal interface IC {}
+        internal class C : IC {}
+        internal class C1 : IC {}
+    }
 }

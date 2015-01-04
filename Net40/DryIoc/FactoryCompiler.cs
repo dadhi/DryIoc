@@ -22,14 +22,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-using System;
-using System.Linq.Expressions;
-using System.Reflection;
-using System.Reflection.Emit;
-using System.Threading;
-
 namespace DryIoc
 {
+    using System;
+    using System.Linq.Expressions;
+    using System.Reflection;
+    using System.Reflection.Emit;
+    using System.Threading;
+    
     public static partial class FactoryCompiler
     {
         public const string DYNAMIC_ASSEMBLY_NAME = "DryIoc.DynamicAssemblyWithCompiledFactories";

@@ -129,6 +129,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\RegisterAll.cs">
       <Link>RegisterAll.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\RegisterAssemblyTests.cs">
+      <Link>RegisterAssemblyTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\RegisterWithNonStringServiceKeyTests.cs">
       <Link>RegisterWithNonStringServiceKeyTests.cs</Link>
     </Compile>
@@ -149,6 +152,9 @@
     </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\SelectConstructorWithAllResolvableArguments.cs">
       <Link>SelectConstructorWithAllResolvableArguments.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\StronglyTypeConstructorAndParametersSpecTests.cs">
+      <Link>StronglyTypeConstructorAndParametersSpecTests.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\ThrowTests.cs">
       <Link>ThrowTests.cs</Link>

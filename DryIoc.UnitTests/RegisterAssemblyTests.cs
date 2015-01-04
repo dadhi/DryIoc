@@ -52,7 +52,7 @@ namespace DryIoc.UnitTests
             if (assemblies == null || assemblies.Length == 0)
                 assemblies = new[] { serviceType.GetAssembly() };
 
-            var implementations = assemblies.SelectMany(Polyfill.GetTypesFrom)
+            var implementations = assemblies.SelectMany(Portable.GetTypesFrom)
                 .Where(type => IsImplementationOf(type, serviceType)).ToArray();
 
             for (var i = 0; i < implementations.Length; ++i)

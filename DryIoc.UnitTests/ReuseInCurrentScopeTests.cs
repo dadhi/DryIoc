@@ -1,6 +1,7 @@
 using System;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
+// ReSharper disable MemberHidesStaticFromOuterClass
 
 namespace DryIoc.UnitTests
 {
@@ -146,6 +147,129 @@ namespace DryIoc.UnitTests
             Assert.That(serviceInNestedScope, Is.SameAs(serviceInOuterScope));
         }
 
+        [Test]
+        public void Can_override_registrations_in_open_scope()
+        {
+            var container = new Container();
+            var scopeName = "blah";
+
+            // two client versions: root and scoped
+            container.Register<IClient, Client>();
+            container.Register<IClient, ClientScoped>(named: scopeName);
+
+            // uses
+            container.Register<IServ, Serv>(Reuse.Singleton);
+
+            // two dependency versions:
+            container.Register<IDep, Dep>();
+            container.Register<IDep, DepScoped>(named: scopeName);
+
+            var client = container.Resolve<IClient>();
+
+            Assert.That(client, Is.InstanceOf<Client>());
+            Assert.That(client.Dep, Is.InstanceOf<Dep>());
+            Assert.That(client.Serv, Is.InstanceOf<Serv>());
+
+            using (var scoped = container.OpenScope(scopeName,
+                rules => rules.WithFactorySelector(Rules.MapDefaultToKey(scopeName))))
+            {
+                var scopedClient = scoped.Resolve<IClient>(scopeName);
+
+                Assert.That(scopedClient, Is.InstanceOf<ClientScoped>());
+                Assert.That(scopedClient.Dep, Is.InstanceOf<DepScoped>());
+                Assert.That(scopedClient.Serv, Is.InstanceOf<Serv>());
+            }
+
+            client = container.Resolve<IClient>();
+            Assert.That(client, Is.InstanceOf<Client>());
+        }
+
+        [Test]
+        public void Services_should_be_different_in_different_scopes()
+        {
+            var container = new Container();
+            container.Register<IndependentService>(Shared.InCurrentScope);
+
+            var scope = container.OpenScope();
+            var first = scope.Resolve<IndependentService>();
+            scope.Dispose();
+
+            scope = container.OpenScope();
+            var second = scope.Resolve<IndependentService>();
+            scope.Dispose();
+
+            Assert.That(second, Is.Not.SameAs(first));
+        }
+
+        [Test]
+        public void Factory_should_return_different_service_when_called_in_different_scopes()
+        {
+            var container = new Container();
+
+            container.Register<IService, IndependentService>(Reuse.InCurrentScope);
+            container.Register<ServiceWithFuncConstructorDependency>(Reuse.Singleton);
+
+            var service = container.Resolve<ServiceWithFuncConstructorDependency>();
+
+            var scope = container.OpenScope();
+            var first = service.GetScopedService();
+            scope.Dispose();
+
+            scope = container.OpenScope();
+            var second = service.GetScopedService();
+            scope.Dispose();
+
+            Assert.That(second, Is.Not.SameAs(first));
+        }
+
+        internal class IndependentService : IService { }
+
+        internal class ServiceWithFuncConstructorDependency
+        {
+            public Func<IService> GetScopedService { get; private set; }
+
+            public ServiceWithFuncConstructorDependency(Func<IService> getScopedService)
+            {
+                GetScopedService = getScopedService;
+            }
+        }
+
+        internal interface IDep { }
+        internal interface IServ { }
+        internal interface IClient
+        {
+            IDep Dep { get; }
+            IServ Serv { get; }
+        }
+
+        internal class Client : IClient
+        {
+            public IDep Dep { get; private set; }
+            public IServ Serv { get; private set; }
+
+            public Client(IDep dep, IServ serv)
+            {
+                Dep = dep;
+                Serv = serv;
+            }
+        }
+
+        internal class ClientScoped : IClient
+        {
+            public IDep Dep { get; private set; }
+            public IServ Serv { get; private set; }
+
+            public ClientScoped(IDep dep, IServ serv)
+            {
+                Dep = dep;
+                Serv = serv;
+            }
+        }
+
+        internal class Dep : IDep { }
+        internal class DepScoped : IDep { }
+        internal class Serv : IServ { }
+ 
         internal class Blah
         {
         }

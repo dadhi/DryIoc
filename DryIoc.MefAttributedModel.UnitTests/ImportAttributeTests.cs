@@ -11,7 +11,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Inject_service_as_parameter_of_required_service_type_specified_by_Import_ContractType()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(Client), typeof(Service));
 
             container.Resolve<Client>();
@@ -20,7 +20,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Inject_service_as_Func_of_Service_with_Import_contract_type()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(FuncClient), typeof(Service));
 
             var client = container.Resolve<FuncClient>();
@@ -31,7 +31,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Inject_service_as_Lazy_of_Service_with_Import_contract_type()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(LazyClient), typeof(Service));
 
             var client = container.Resolve<LazyClient>();
@@ -42,7 +42,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Inject_service_as_Lazy_Meta_of_Service_with_Import_contract_type()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(LazyMetaClient), typeof(Service));
 
             var client = container.Resolve<LazyMetaClient>();
@@ -54,7 +54,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Inject_service_as_Func_Array_of_Service_with_Import_contract_type()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(FuncArrayClient), typeof(Service));
 
             var client = container.Resolve<FuncArrayClient>();
@@ -65,7 +65,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Inject_service_as_Func_Array_of_Service_with_Import_contract_key_no_type_specified()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(FuncArrayKeyClient), typeof(Service), typeof(KeyService));
 
             var client = container.Resolve<FuncArrayKeyClient>();
@@ -76,7 +76,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Inject_property_with_default_Import_should_work()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(PropertyClient), typeof(Service));
 
             var client = container.Resolve<PropertyClient>();
@@ -87,7 +87,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Resolve_property_for_already_resolved_instance()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(Service));
 
             var client = new PropertyClient();
@@ -99,7 +99,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Resolving_unregistered_property_marked_by_Import_should_throw()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(Service));
 
             var client = new NamedPropertyClient();
@@ -124,7 +124,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Resolving_registered_property_with_not_assignable_type_should_Throw()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.Register<Service>();
             container.Register<BadTypePropertyClient>();
 
@@ -137,7 +137,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Resolve_custom_generic_wrapper_marked_with_Import()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.Register(typeof(MyWrapper<>), setup: SetupWrapper.Default);
 
             container.RegisterExports(typeof(Service), typeof(CustomWrapperClient));
@@ -149,7 +149,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Could_import_property_with_internal_setter()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(ServiceWithPropWithPrivateSetter), typeof(Service));
 
             var service = container.Resolve<ServiceWithPropWithPrivateSetter>();
@@ -160,7 +160,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void When_resolving_props_and_fields_manually_required_type_should_work()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.Register<Service>();
 
             var client = container.ResolvePropertiesAndFields(new ClientWithGenericWrapperProps());

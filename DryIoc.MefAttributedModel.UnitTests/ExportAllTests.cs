@@ -10,7 +10,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void When_class_public_types_exported_as_singleton_Then_resolving_types_will_return_the_same_instance()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(ISomeDb).GetAssembly());
 
             var someDb = container.Resolve<ISomeDb>();
@@ -35,7 +35,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Individual_Export_is_simply_added_to_ExportAll_settings()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(BothExportAllAndExport));
 
             var named = container.Resolve<INamed>("named");
@@ -48,7 +48,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void If_both_export_and_export_all_specifying_the_same_setup_Then_only_single_will_be_registered()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(WithBothTheSameExports));
 
             Assert.DoesNotThrow(() =>

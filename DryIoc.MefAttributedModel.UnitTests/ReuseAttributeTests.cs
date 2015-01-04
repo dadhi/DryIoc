@@ -10,7 +10,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_specify_any_supported_Reuse_using_attribute()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(ServiceWithReuseAttribute));
 
             var service = container.Resolve<ServiceWithReuseAttribute>();
@@ -22,7 +22,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_specify_singleton_reuse()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(ServiceWithSingletonReuse));
 
             var one = container.Resolve<ServiceWithSingletonReuse>();
@@ -34,7 +34,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_specify_current_scope_reuse()
         {
-            using (var container = new Container().WithAttributedModel().OpenScope()) 
+            using (var container = new Container().WithMefAttributedModel().OpenScope()) 
             { 
                 container.RegisterExports(typeof(ServiceWithCurrentScopeReuse));
 
@@ -53,7 +53,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_specify_resolution_scope_reuse()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(ServiceWithResolutionScopeReuse), typeof(UserOfServiceWithResolutionScopeReuse));
 
             var one = container.Resolve<ServiceWithResolutionScopeReuse>();
@@ -66,7 +66,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_specify_reuse_wrapper_for_exported_service()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(SharedWithReuseWrapper));
 
             var serviceRef = container.Resolve<WeakReference>(typeof(SharedWithReuseWrapper));
@@ -79,7 +79,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void When_no_named_current_scope_reuse_Then_it_should_throw()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(WithNamedCurrentScope));
 
             using (var scoped = container.OpenScope())
@@ -94,7 +94,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void When_there_is_corresponding_named_current_scope_Then_it_should_resolve()
         {
-            var container = new Container().WithAttributedModel();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(WithNamedCurrentScope));
 
             using (var scoped = container.OpenScope("ScopeA"))

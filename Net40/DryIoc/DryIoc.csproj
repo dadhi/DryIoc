@@ -39,8 +39,8 @@
     <Compile Include="..\..\DryIoc\Container.cs">
       <Link>Container.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc\Polyfill-net45.cs">
-      <Link>Polyfill-net45.cs</Link>
+    <Compile Include="..\..\DryIoc\Ported-net45.cs">
+      <Link>Ported-net45.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
