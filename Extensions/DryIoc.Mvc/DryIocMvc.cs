@@ -50,17 +50,14 @@ namespace DryIoc.Mvc
         public static IContainer WithMvcSupport(this IContainer container, Assembly controllersAssembly = null)
         {
             container = container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext());
-            container.RegisterControllers(controllersAssembly ?? Assembly.GetExecutingAssembly());
-            container.SetDryIocFilterAttributeFilterProvider();
-            container.SetDryIocDependencyResolver();
-            return container;
-        }
 
-        public static void RegisterControllers(this IContainer container, params Assembly[] assemblies)
-        {
-            foreach (var type in assemblies.SelectMany(assembly =>
-                Portable.GetTypesFrom(assembly).Where(t => !t.IsAbstract && t.IsAssignableTo(typeof(IController)))))
-                container.Register(type, Reuse.InRequest);
+            container.RegisterFromAssembly<IController>(controllersAssembly ?? Assembly.GetExecutingAssembly());
+
+            container.SetDryIocFilterAttributeFilterProvider();
+
+            container.SetDryIocDependencyResolver();
+
+            return container;
         }
 
         public static void SetDryIocDependencyResolver(this IContainer container)

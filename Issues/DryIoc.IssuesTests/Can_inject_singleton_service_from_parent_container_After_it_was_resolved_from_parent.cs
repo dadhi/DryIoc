@@ -11,7 +11,7 @@ namespace DryIoc.IssuesTests
             var parent = new Container();
             parent.Register(typeof(IFruit), typeof(Melon), Reuse.Singleton);
 
-            var child = parent.CreateChildContainer();
+            var child = parent.CreateChildContainer(shareSingletons: true);
             child.Register(typeof(IJuice), typeof(FruitJuice));
 
             var parentFruit = parent.Resolve<IFruit>();

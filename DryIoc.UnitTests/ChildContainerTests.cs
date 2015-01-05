@@ -35,13 +35,13 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent()
+        public void Can_share_resolved_singletons_from_parent_container()
         {
             var parent = new Container();
-            parent.Register(typeof(IFruit), typeof(Mango), Reuse.Singleton);
+            parent.Register<IFruit, Mango>(Reuse.Singleton);
 
-            var child = parent.CreateChildContainer();
-            child.Register(typeof(IJuice), typeof(FruitJuice));
+            var child = parent.CreateChildContainer(shareSingletons: true);
+            child.Register<IJuice, FruitJuice>();
 
             var parentFruit = parent.Resolve<IFruit>();
             var childJuice = child.Resolve<IJuice>();
@@ -86,28 +86,61 @@ namespace DryIoc.UnitTests
 
             Assert.That(() => child.Resolve<IJuice>(), Throws.InstanceOf<ContainerException>());
         }
-    }
 
-    #region CUT
-
-    public interface IFruit { }
-    public class Orange : IFruit { }
-    public class Mango : IFruit { }
-
-    public interface IJuice
-    {
-        IFruit Fruit { get; }
-    }
-
-    public class FruitJuice : IJuice
-    {
-        public IFruit Fruit { get; set; }
-
-        public FruitJuice(IFruit fruit)
+        [Test]
+        public void Can_fallback_to_parent_and_return_back_to_child()
         {
-            Fruit = fruit;
-        }
-    }
+            var container = new Container();
+            container.Register<FruitJuice>();
+            container.Register<IFruit, Melon>();
 
-    #endregion
+            var childContainer = container.CreateChildContainer();
+            childContainer.Register<IFruit, Orange>();
+
+            Assert.That(container.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
+            Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Orange>());
+        }
+
+        [Test]
+        public void Child_should_throw_if_parent_disposed()
+        {
+            var container = new Container();
+            container.Register<FruitJuice>();
+            container.Register<IFruit, Melon>();
+
+            var childContainer = container.CreateChildContainer();
+            childContainer.Register<IFruit, Orange>();
+
+            container.Dispose();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+            childContainer.Resolve<FruitJuice>());
+
+            Assert.AreEqual(ex.Error, Error.CONTAINER_IS_DISPOSED);
+        }
+
+        #region CUT
+
+        public interface IFruit { }
+        public class Orange : IFruit { }
+        public class Mango : IFruit { }
+        public class Melon : IFruit { }
+
+        public interface IJuice
+        {
+            IFruit Fruit { get; }
+        }
+
+        public class FruitJuice : IJuice
+        {
+            public IFruit Fruit { get; set; }
+
+            public FruitJuice(IFruit fruit)
+            {
+                Fruit = fruit;
+            }
+        }
+
+        #endregion
+    }
 }

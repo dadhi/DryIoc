@@ -155,7 +155,7 @@ namespace DryIoc.UnitTests
 
             var registry = request.Container;
             var serviceType = parameter.ParameterType;
-            serviceType = registry.GetWrappedServiceType(serviceType);
+            serviceType = registry.UnwrapServiceType(serviceType);
             var metadata = import.Metadata;
             var factory = registry.GetAllServiceFactories(serviceType)
                 .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))

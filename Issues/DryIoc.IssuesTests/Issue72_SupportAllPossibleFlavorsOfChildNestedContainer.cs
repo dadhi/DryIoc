@@ -23,14 +23,14 @@ namespace DryIoc.IssuesTests
             var container = new Container(scopeContext: new ExecutionFlowScopeContext());
 
             container.Register<A>();
-            container.RegisterInstance(default(SomeRequest), 
-                Reuse.InCurrentScope, Setup.Default.WithReuseWrappers(typeof(Ref<object>)));
+            container.RegisterInstance(default(SomeRequest),
+                Reuse.InCurrentScope, Setup.Default.WithReuseWrappers(typeof(ReusedRef)));
 
             var request1 = Task.Run(async () =>
             {
                 var request = new SomeRequest();
                 var scope = container.OpenScope();
-                scope.Resolve<RefProxy<SomeRequest>>().Swap(_ => request);
+                scope.Resolve<ReusedRef<SomeRequest>>().Swap(_ => request);
 
                 await Task.Delay(5);//processing request
                 Assert.Same(request, scope.Resolve<A>().Request);
@@ -40,7 +40,7 @@ namespace DryIoc.IssuesTests
             {
                 var request = new SomeRequest();
                 var scope = container.OpenScope();
-                scope.Resolve<RefProxy<SomeRequest>>().Swap(_ => request);
+                scope.Resolve<ReusedRef<SomeRequest>>().Swap(_ => request);
                 await Task.Delay(2);//processing request
                 Assert.Same(request, scope.Resolve<A>().Request);
             });

@@ -231,8 +231,8 @@ namespace DryIoc.UnitTests
 
             Assert.That(ex.Error, Is.EqualTo(Error.DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN));
             Assert.That(ex.Message, Is.StringContaining(
-                "Dependency DryIoc.UnitTests.FastLogger: DryIoc.UnitTests.ILogger as parameter \"logger\" has shorter Reuse lifespan than its parent: DryIoc.UnitTests.Client.\n" +
-                "ResolutionScopeReuse:10 lifetime is shorter than SingletonReuse:1000.\n" +
+                "Dependency DryIoc.UnitTests.FastLogger: DryIoc.UnitTests.ILogger as parameter \"logger\" has shorter Reuse lifespan than its parent: DryIoc.UnitTests.Client." + Environment.NewLine +
+                "ResolutionScopeReuse:10 lifetime is shorter than SingletonReuse:1000." + Environment.NewLine +
                 "You may turn Off this error with new Container(rules=>rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false))."));
         }
 
@@ -266,7 +266,7 @@ namespace DryIoc.UnitTests
         public void Can_disposed_resolution_reused_services()
         {
             var container = new Container();
-            container.Register<SomeDep>(Shared.InResolutionScope);
+            container.Register<SomeDep>(Reuse.InResolutionScope);
             container.Register<SomeRoot>();
 
             var service = container.Resolve<ResolutionScoped<SomeRoot>>();

@@ -188,7 +188,7 @@ namespace DryIoc.UnitTests
         public void Services_should_be_different_in_different_scopes()
         {
             var container = new Container();
-            container.Register<IndependentService>(Shared.InCurrentScope);
+            container.Register<IndependentService>(Reuse.InCurrentScope);
 
             var scope = container.OpenScope();
             var first = scope.Resolve<IndependentService>();

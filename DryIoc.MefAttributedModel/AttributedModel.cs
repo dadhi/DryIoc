@@ -211,7 +211,7 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var registry = request.Container;
-            reflectedType = registry.GetWrappedServiceType(reflectedType);
+            reflectedType = registry.UnwrapServiceType(reflectedType);
             var metadata = meta.Metadata;
             var factory = registry.GetAllServiceFactories(reflectedType)
                 .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
@@ -227,7 +227,7 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var registry = request.Container;
-            serviceType = import.ContractType ?? registry.GetWrappedServiceType(serviceType);
+            serviceType = import.ContractType ?? registry.UnwrapServiceType(serviceType);
             var serviceKey = import.ContractKey;
 
             if (!registry.IsRegistered(serviceType, serviceKey))
@@ -450,67 +450,53 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Defines error codes and messages for <see cref="AttributedModelException"/>.</summary>
     public static class Error
     {
+        /// <summary>Error messages for corresponding codes.</summary>
+        public readonly static IList<string> Messages = new List<string>(20);
+
         /// <summary>Codes are starting from this value.</summary>
         public readonly static int FIRST_ERROR_CODE = 100;
 
-        /// <summary>Error messages for corresponding codes.</summary>
-        public readonly static IList<string> Messages = new List<string>();
-
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
-            NO_SINGLE_CTOR_WITH_IMPORTING_ATTR,
-            NOT_FIND_DEPENDENCY_WITH_METADATA,
-            UNSUPPORTED_MULTIPLE_METADATA,
-            UNSUPPORTED_MULTIPLE_FACTORY_TYPES,
-            NO_EXPORT,
-            NO_TYPES_IN_EXPORT_ALL,
-            UNSUPPORTED_REUSE_TYPE,
-            UNSUPPORTED_REUSE_WRAPPER_TYPE,
-            NO_WRAPPED_TYPE_EXPORTED_WRAPPER,
-            WRAPPED_ARG_INDEX_OUT_OF_BOUNDS;
+            NO_SINGLE_CTOR_WITH_IMPORTING_ATTR  = Of("Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}."),
+            NOT_FIND_DEPENDENCY_WITH_METADATA   = Of("Unable to resolve dependency {0} with metadata [{1}] in {2}"),
+            UNSUPPORTED_MULTIPLE_METADATA       = Of("Multiple associated metadata found while exporting {0}." + Environment.NewLine 
+                                                    + "Only single metadata is supported per implementation type, please remove the rest."),
+            UNSUPPORTED_MULTIPLE_FACTORY_TYPES  = Of("Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
+            NO_EXPORT                           = Of("At least one Export attributed should be defined for {0}."),
+            NO_TYPES_IN_EXPORT_ALL              = Of("Unable to get contract types for implementation {0} because all of its implemented types where filtered out: {1}"),
+            UNSUPPORTED_REUSE_TYPE              = Of("Attributed model does not support reuse type {0}."),
+            UNSUPPORTED_REUSE_WRAPPER_TYPE      = Of("Attributed model does not support reuse wrapper type {0}."),
+            NO_WRAPPED_TYPE_EXPORTED_WRAPPER    = Of("Exported non-generic wrapper type {0} requires wrapped service type to be specified, but it is null "
+                                                    + "and instead generic argument index is set to {1}."),
+            WRAPPED_ARG_INDEX_OUT_OF_BOUNDS     = Of("Exported generic wrapper type {0} specifies generic argument index {1} outside of argument list size.");
 #pragma warning restore 1591
 
-        static Error()
-        {
-            _(ref NO_SINGLE_CTOR_WITH_IMPORTING_ATTR,   "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}.");
-            _(ref NOT_FIND_DEPENDENCY_WITH_METADATA,    "Unable to resolve dependency {0} with metadata [{1}] in {2}");
-            _(ref UNSUPPORTED_MULTIPLE_METADATA,        "Multiple associated metadata found while exporting {0}." + Environment.NewLine + 
-                                                        "Only single metadata is supported per implementation type, please remove the rest.");
-            _(ref UNSUPPORTED_MULTIPLE_FACTORY_TYPES,   "Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest.");
-            _(ref NO_EXPORT,                            "At least one Export attributed should be defined for {0}.");
-            _(ref NO_TYPES_IN_EXPORT_ALL,               "Unable to get contract types for implementation {0} because all of its implemented types where filtered out: {1}");
-            _(ref UNSUPPORTED_REUSE_TYPE,               "Attributed model does not support reuse type {0}.");
-            _(ref UNSUPPORTED_REUSE_WRAPPER_TYPE,       "Attributed model does not support reuse wrapper type {0}.");
-            _(ref NO_WRAPPED_TYPE_EXPORTED_WRAPPER,     "Exported non-generic wrapper type {0} requires wrapped service type to be specified, but it is null " +
-                                                        "and instead generic argument index is set to {1}.");
-            _(ref WRAPPED_ARG_INDEX_OUT_OF_BOUNDS,      "Exported generic wrapper type {0} specifies generic argument index {1} outside of argument list size.");
-
-            SetupThrow();
-        }
-
-        internal static string Get(int error)
+        /// <summary>Returns message by provided error code.</summary>
+        /// <param name="error">Code starting from <see cref="FIRST_ERROR_CODE"/></param> <returns>String message.</returns>
+        public static string GetMessage(int error)
         {
             return Messages[error - FIRST_ERROR_CODE];
         }
 
-        private static void _(ref int error, string message)
-        {
-            if (error == 0)
-            {
-                Messages.Add(message);
-                error = FIRST_ERROR_CODE + Messages.Count - 1;
-            }
-        }
+        #region Implementation
 
-        // Setup Throw to use AttributedModelException for corresponding error code and fallback to original Exception otherwise.
-        private static void SetupThrow()
+        static Error()
         {
             var original = Throw.GetMatchedException;
-            Throw.GetMatchedException = (check, error, arg0, arg1, arg2, arg3, inner) => 
+            Throw.GetMatchedException = (check, error, arg0, arg1, arg2, arg3, inner) =>
                 0 <= error - FIRST_ERROR_CODE && error - FIRST_ERROR_CODE < Messages.Count
-                ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner)
-                : original(check, error, arg0, arg1, arg2, arg3, inner);
+                    ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner)
+                    : original(check, error, arg0, arg1, arg2, arg3, inner);
         }
+
+        private static int Of(string message)
+        {
+            Messages.Add(message);
+            return FIRST_ERROR_CODE + Messages.Count - 1;
+        }
+
+        #endregion
     }
 
     /// <summary>Specific exception type to be thrown by MefAttributedModel extension. Check <see cref="Error"/> for possible error cases.</summary>
@@ -525,7 +511,7 @@ namespace DryIoc.MefAttributedModel
             object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
             Exception inner = null)
         {
-            var message = string.Format(MefAttributedModel.Error.Get(errorCode), Print(arg0), Print(arg1), Print(arg2), Print(arg3));
+            var message = string.Format(MefAttributedModel.Error.GetMessage(errorCode), Print(arg0), Print(arg1), Print(arg2), Print(arg3));
             return inner == null
                 ? new AttributedModelException(errorCode, message)
                 : new AttributedModelException(errorCode, message, inner);

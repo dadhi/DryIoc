@@ -70,6 +70,7 @@
     <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj">
       <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
       <Name>DryIoc</Name>
+      <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
