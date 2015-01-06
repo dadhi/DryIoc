@@ -71,7 +71,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var serviceRef = container.Resolve<ReusedWeakRef>(typeof(SharedWithReuseWrapper));
 
-            Assert.That(serviceRef.Value, Is.InstanceOf<SharedWithReuseWrapper>());
+            Assert.That(serviceRef.Target, Is.InstanceOf<SharedWithReuseWrapper>());
 
             GC.KeepAlive(serviceRef);
         }

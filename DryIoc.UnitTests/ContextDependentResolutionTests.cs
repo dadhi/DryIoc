@@ -83,6 +83,30 @@ namespace DryIoc.UnitTests
             Assert.That(user1.Logger, Is.InstanceOf<PlainLogger>());
         }
 
+        public static class LofFactory
+        {
+            public static ILogger GetLog<T>()
+            {
+                return new Logger<T>();
+            }
+        }
+
+        [Test]
+        public void Can_use_FactoryMethod_to_register_ILogger_with_generic_implementation_dependent_on_parent()
+        {
+            var c = new Container();
+            c.Register<User1>();
+            c.Register<User2>();
+
+            c.Register<ILogger>(with: InjectionRules.With(r => FactoryMethod.Of(
+                typeof(LofFactory).GetDeclaredMethodOrNull("GetLog")
+                .MakeGenericMethod(r.GetNonWrapperParentOrEmpty().ImplementationType))),
+                setup: Setup.With(expressionCaching: false));
+
+            Assert.That(c.Resolve<User2>().Logger, Is.InstanceOf<Logger<User2>>());
+            Assert.That(c.Resolve<User1>().Logger, Is.InstanceOf<Logger<User1>>());
+        }
+
         [Test]
         public void If_FactoryProvider_is_returns_null_factory_it_should_Throw_Unable_to_resolve()
         {
@@ -147,7 +171,7 @@ namespace DryIoc.UnitTests
 
     public class User1
     {
-        public ILogger Logger { get; set; }
+        public ILogger Logger { get; private set; }
 
         public User1(ILogger logger)
         {

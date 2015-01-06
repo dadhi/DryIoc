@@ -24,7 +24,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<DisposableService>(Reuse.Singleton,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedExplicitlyDisposable)));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposableReused)));
 
             var service = container.Resolve<DisposableService>();
 
@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                    setup: Setup.Default.WithReuseWrappers(typeof(ReusedExplicitlyDisposable)));
+                    setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposableReused)));
 
                 var service = container.Resolve<IService>();
 
@@ -54,13 +54,13 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedExplicitlyDisposable)));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposableReused)));
 
-            var wrapperProxy = container.Resolve<ReusedExplicitlyDisposable<IService>>();
-            var wrapper = container.Resolve<ReusedExplicitlyDisposable>(typeof(IService));
+            var wrapperProxy = container.Resolve<ExplicitlyDisposableReused<IService>>();
+            var wrapper = container.Resolve<ExplicitlyDisposableReused>(typeof(IService));
 
-            Assert.That(wrapperProxy.Value, Is.InstanceOf<DisposableService>());
-            Assert.That(wrapperProxy.Value, Is.SameAs(wrapper.Value));
+            Assert.That(wrapperProxy.Target, Is.InstanceOf<DisposableService>());
+            Assert.That(wrapperProxy.Target, Is.SameAs(wrapper.Target));
         }
 
         [Test]
@@ -69,22 +69,22 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                    setup: Setup.Default.WithReuseWrappers(typeof(ReusedExplicitlyDisposable)));
+                    setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposableReused)));
 
-                var disposable = container.Resolve<ReusedExplicitlyDisposable<object>>(typeof(IService));
-                disposable.DisposeValue();
+                var disposable = container.Resolve<ExplicitlyDisposableReused<object>>(typeof(IService));
+                disposable.Dispose();
 
-                Assert.That(disposable.IsValueDisposed, Is.True);
-                //object result = null;
-                //var targetEx = Assert.Throws<ContainerException>(() => result = disposable.Value);
+                Assert.That(disposable.IsDisposed, Is.True);
+                object result = null;
+                var targetEx = Assert.Throws<ContainerException>(() => result = disposable.Target);
 
-                //Assert.That(targetEx.Message, Is.StringContaining(
-                //    "Target of type DryIoc.UnitTests.CUT.DisposableService was already disposed in DryIoc.ExplicitlyDisposable"));
+                Assert.That(targetEx.Message, Is.StringContaining(
+                    "Target of type DryIoc.UnitTests.CUT.DisposableService was already disposed in DryIoc.ExplicitlyDisposable"));
 
-                //var resolveEx = Assert.Throws<ContainerException>(() =>
-                //    container.Resolve<IService>());
-                //Assert.That(resolveEx.Message, Is.EqualTo(targetEx.Message));
-                //GC.KeepAlive(result);
+                var resolveEx = Assert.Throws<ContainerException>(() =>
+                    container.Resolve<IService>());
+                Assert.That(resolveEx.Message, Is.EqualTo(targetEx.Message));
+                GC.KeepAlive(result);
             }
         }
 
@@ -93,21 +93,21 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedExplicitlyDisposable)));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposableReused)));
 
-            var disposable = container.Resolve<ReusedExplicitlyDisposable<IService>>();
-            disposable.DisposeValue();
+            var disposable = container.Resolve<ExplicitlyDisposableReused<IService>>();
+            disposable.Dispose();
 
-            Assert.That(disposable.IsValueDisposed, Is.True);
-            //object result = null;
-            //var targetEx = Assert.Throws<ContainerException>(() => result = disposable.Value);
-            //Assert.That(targetEx.Message, Is.StringContaining(
-            //    "Target of type DryIoc.UnitTests.CUT.DisposableService was already disposed in DryIoc.ExplicitlyDisposable"));
+            Assert.That(disposable.IsDisposed, Is.True);
+            object result = null;
+            var targetEx = Assert.Throws<ContainerException>(() => result = disposable.Target);
+            Assert.That(targetEx.Message, Is.StringContaining(
+                "Target of type DryIoc.UnitTests.CUT.DisposableService was already disposed in DryIoc.ExplicitlyDisposable"));
 
-            //var resolveEx = Assert.Throws<ContainerException>(() =>
-            //    container.Resolve<IService>());
-            //Assert.That(resolveEx.Message, Is.EqualTo(targetEx.Message));
-            //GC.KeepAlive(result);
+            var resolveEx = Assert.Throws<ContainerException>(() =>
+                container.Resolve<IService>());
+            Assert.That(resolveEx.Message, Is.EqualTo(targetEx.Message));
+            GC.KeepAlive(result);
         }
 
         [Test]
@@ -116,13 +116,13 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<DisposableService>(Reuse.InCurrentScope,
-                    setup: Setup.Default.WithReuseWrappers(typeof(ReusedExplicitlyDisposable)));
+                    setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposableReused)));
 
-                container.Register(typeof(ReusedExplicitlyDisposable<>), setup: SetupWrapper.Default);
+                container.Register(typeof(ExplicitlyDisposableReused<>), setup: SetupWrapper.Default);
 
-                var disposable = container.Resolve<ReusedExplicitlyDisposable<IService>>(typeof(DisposableService));
+                var disposable = container.Resolve<ExplicitlyDisposableReused<IService>>(typeof(DisposableService));
 
-                Assert.That(disposable.Value, Is.InstanceOf<DisposableService>());
+                Assert.That(disposable.Target, Is.InstanceOf<DisposableService>());
             }
         }
 
@@ -131,14 +131,14 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<DisposableService>(Reuse.Singleton,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedExplicitlyDisposable)));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposableReused)));
 
 
-            container.Register(typeof(ReusedExplicitlyDisposable<>), setup: SetupWrapper.Default);
+            container.Register(typeof(ExplicitlyDisposableReused<>), setup: SetupWrapper.Default);
 
-            var disposable = container.Resolve<ReusedExplicitlyDisposable<IService>>(typeof(DisposableService));
+            var disposable = container.Resolve<ExplicitlyDisposableReused<IService>>(typeof(DisposableService));
 
-            Assert.That(disposable.Value, Is.InstanceOf<DisposableService>());
+            Assert.That(disposable.Target, Is.InstanceOf<DisposableService>());
         }
 
         [Test, Explicit]
@@ -149,7 +149,7 @@ namespace DryIoc.UnitTests
                 setup: Setup.Default.WithReuseWrappers(typeof(ReusedWeakRef)));
 
             var serviceWeakRef = container.Resolve<ReusedWeakRef>(typeof(IService));
-            Assert.That(serviceWeakRef.Value, Is.InstanceOf<Service>());
+            Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
 
             GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
             GC.KeepAlive(container);
@@ -165,7 +165,7 @@ namespace DryIoc.UnitTests
                 setup: Setup.Default.WithReuseWrappers(typeof(ReusedWeakRef)));
 
             var serviceWeakRef = container.Resolve<ReusedWeakRef<IService>>();
-            Assert.That(serviceWeakRef.Value, Is.InstanceOf<Service>());
+            Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
         }
 
         [Test]
@@ -173,11 +173,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedRef)));
+                setup: Setup.Default.WithReuseWrappers(typeof(RefReused)));
             container.Register<Dependency>(Reuse.InResolutionScope,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedRef)));
+                setup: Setup.Default.WithReuseWrappers(typeof(RefReused)));
             container.Register<ServiceClient>(Reuse.InCurrentScope,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedRef)));
+                setup: Setup.Default.WithReuseWrappers(typeof(RefReused)));
 
             using (var scoped = container.OpenScope())
             {
@@ -185,9 +185,9 @@ namespace DryIoc.UnitTests
                 var dependency = scoped.Resolve<ReusedRef<Dependency>>();
                 var client = scoped.Resolve<ReusedRef<ServiceClient>>();
 
-                Assert.That(service.Value, Is.InstanceOf<Service>());
-                Assert.That(dependency.Value, Is.InstanceOf<Dependency>());
-                Assert.That(client.Value, Is.InstanceOf<ServiceClient>());
+                Assert.That(service.Target, Is.InstanceOf<Service>());
+                Assert.That(dependency.Target, Is.InstanceOf<Dependency>());
+                Assert.That(client.Target, Is.InstanceOf<ServiceClient>());
             }
         }
 
@@ -196,7 +196,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedExplicitlyDisposable), typeof(ReusedWeakRef)));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposableReused), typeof(ReusedWeakRef)));
 
             using (container.OpenScope())
             {
@@ -220,12 +220,12 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedExplicitlyDisposable), typeof(ReusedWeakRef)));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposableReused), typeof(ReusedWeakRef)));
 
             var serviceWeakRef = container.Resolve<ReusedWeakRef>(typeof(IService));
-            var serviceDisposable = container.Resolve<ReusedExplicitlyDisposable>(typeof(IService));
+            var serviceDisposable = container.Resolve<ExplicitlyDisposableReused>(typeof(IService));
 
-            Assert.That(serviceWeakRef.Value, Is.SameAs(serviceDisposable));
+            Assert.That(serviceWeakRef.Target, Is.SameAs(serviceDisposable));
         }
 
         [Test]
@@ -234,7 +234,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             var service = new DisposableService();
             container.RegisterInstance<IService>(service, Reuse.Singleton,
-                Setup.Default.WithReuseWrappers(typeof(ReusedWeakRef), typeof(ReusedExplicitlyDisposable)));
+                Setup.Default.WithReuseWrappers(typeof(ReusedWeakRef), typeof(ExplicitlyDisposableReused)));
 
             Assert.Throws<ContainerException>(() => 
             container.Resolve<ReusedWeakRef>(typeof(IService)));
@@ -269,9 +269,9 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<ReusedExplicitlyDisposable>(typeof(IService)));
+                container.Resolve<ExplicitlyDisposableReused>(typeof(IService)));
 
-            Assert.That(ex.Message, Is.StringContaining("Unable to resolve reuse wrapper DryIoc.ReusedExplicitlyDisposable"));
+            Assert.That(ex.Message, Is.StringContaining("Unable to resolve reuse wrapper DryIoc.ExplicitlyDisposableReused"));
         }
 
         [Test]
@@ -284,7 +284,7 @@ namespace DryIoc.UnitTests
                     setup: Setup.Default.WithReuseWrappers(typeof(ReusedWeakRef)));
 
                 var func = container.Resolve<Func<bool, ReusedWeakRef>>(typeof(ServiceWithParameterAndDependency));
-                var service = func(true).Value;
+                var service = func(true).Target;
                 Assert.That(service, Is.InstanceOf<ServiceWithParameterAndDependency>());
             }
         }
@@ -296,13 +296,13 @@ namespace DryIoc.UnitTests
 
             container.Register<Service>();
             container.Register<ServiceWithParameterAndDependency>(Reuse.Singleton,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedRef)));
+                setup: Setup.Default.WithReuseWrappers(typeof(RefReused)));
 
-            var func = container.Resolve<Func<bool, ReusedRef>>(typeof(ServiceWithParameterAndDependency));
+            var func = container.Resolve<Func<bool, RefReused>>(typeof(ServiceWithParameterAndDependency));
             var service = func(true);
             var service2 = func(true);
 
-            Assert.That(service.Value, Is.InstanceOf<ServiceWithParameterAndDependency>());
+            Assert.That(service.Target, Is.InstanceOf<ServiceWithParameterAndDependency>());
             Assert.That(service, Is.SameAs(service2));
         }
 
@@ -312,7 +312,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedRef)));
+                setup: Setup.Default.WithReuseWrappers(typeof(RefReused)));
 
             IService service;
             using (container.OpenScope())
@@ -328,14 +328,14 @@ namespace DryIoc.UnitTests
 
             container.Register<Service>();
             container.Register<ServiceWithParameterAndDependency>(Reuse.Singleton,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedRef)));
+                setup: Setup.Default.WithReuseWrappers(typeof(RefReused)));
 
             var func = container.Resolve<Func<bool, ReusedRef<ServiceWithParameterAndDependency>>>();
             var service = func(true);
             var service2 = func(true);
 
-            Assert.That(service.Value, Is.InstanceOf<ServiceWithParameterAndDependency>());
-            Assert.That(service.Value, Is.SameAs(service2.Value));
+            Assert.That(service.Target, Is.InstanceOf<ServiceWithParameterAndDependency>());
+            Assert.That(service.Target, Is.SameAs(service2.Target));
 
             var newService = new ServiceWithParameterAndDependency(new Service(), false);
             service.Swap(_ => newService);
@@ -348,10 +348,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<DisposableService>(Reuse.Singleton,
-                setup: Setup.Default.WithReuseWrappers(typeof(ReusedExplicitlyDisposable), typeof(ReusedRef)));
+                setup: Setup.Default.WithReuseWrappers(typeof(ExplicitlyDisposableReused), typeof(RefReused)));
 
-            var service = container.Resolve<ReusedRef<ReusedExplicitlyDisposable<DisposableService>>>();
-            service.Value.DisposeValue();
+            var service = container.Resolve<ReusedRef<ExplicitlyDisposableReused<DisposableService>>>();
+            service.Target.Dispose();
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<DisposableService>());

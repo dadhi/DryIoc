@@ -1351,12 +1351,12 @@ namespace DryIoc
 
             // Reuse wrappers
             Wrappers = Wrappers
-                .AddOrUpdate(typeof(ReusedExplicitlyDisposable), new FactoryProvider(
+                .AddOrUpdate(typeof(ExplicitlyDisposableReused), new FactoryProvider(
                     r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
                     SetupWrapper.With(t => typeof(object)).With(ReusedObjectWrapper.ExplicitlyDisposable)))
 
-                .AddOrUpdate(typeof(ReusedExplicitlyDisposable<>),
-                    new ReflectionFactory(typeof(ReusedExplicitlyDisposable<>), setup: SetupWrapper.Default))
+                .AddOrUpdate(typeof(ExplicitlyDisposableReused<>),
+                    new ReflectionFactory(typeof(ExplicitlyDisposableReused<>), setup: SetupWrapper.Default))
 
                 .AddOrUpdate(typeof(ReusedWeakRef), new FactoryProvider(
                     r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
@@ -1365,7 +1365,7 @@ namespace DryIoc
                  .AddOrUpdate(typeof(ReusedWeakRef<>),
                     new ReflectionFactory(typeof(ReusedWeakRef<>), setup: SetupWrapper.Default))
 
-                .AddOrUpdate(typeof(ReusedRef), new FactoryProvider(
+                .AddOrUpdate(typeof(RefReused), new FactoryProvider(
                     r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
                     SetupWrapper.With(t => typeof(object)).With(ReusedObjectWrapper.Ref)))
 
@@ -2284,21 +2284,21 @@ namespace DryIoc
             registrator.Unregister(typeof(TService), named, factoryType, condition);
         }
 
-        public static void RegisterFromAssembly(this IRegistrator registrator, Type serviceType, params Assembly[] assemblies)
+        public static void RegisterFromAssembly(this IRegistrator registrator, Type serviceType, IReuse reuse = null, params Assembly[] assemblies)
         {
-            if (assemblies == null || assemblies.Length == 0)
+            if (assemblies.IsNullOrEmpty())
                 assemblies = new[] { serviceType.GetAssembly() };
 
-            var implementations = assemblies.SelectMany(Portable.GetTypesFrom)
+            var implementations = assemblies.SelectMany(Portable.GetTypesFromAssembly)
                 .Where(type => IsImplementationOf(type, serviceType)).ToArray();
 
             for (var i = 0; i < implementations.Length; ++i)
-                registrator.Register(serviceType, implementations[i]);
+                registrator.Register(serviceType, implementations[i], reuse);
         }
 
-        public static void RegisterFromAssembly<TService>(this IRegistrator registrator, params Assembly[] assemblies)
+        public static void RegisterFromAssembly<TService>(this IRegistrator registrator, IReuse reuse = null, params Assembly[] assemblies)
         {
-            registrator.RegisterFromAssembly(typeof(TService), assemblies);
+            registrator.RegisterFromAssembly(typeof(TService), reuse, assemblies);
         }
 
         private static bool IsImplementationOf(Type candidateImplType, Type serviceType)
@@ -2308,6 +2308,8 @@ namespace DryIoc
 
             if (candidateImplType == serviceType)
                 return true;
+
+
 
             var implementedTypes = candidateImplType.GetImplementedTypes();
 
@@ -3236,7 +3238,7 @@ namespace DryIoc
         public virtual Func<Request, bool> Condition { get { return null; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
-        /// or disable disposing with <see cref="ReusedExplicitlyDisposable"/>, etc.</summary>
+        /// or disable disposing with <see cref="ExplicitlyDisposableReused"/>, etc.</summary>
         public virtual Type[] ReuseWrappers { get { return null; } }
     }
 
@@ -3272,7 +3274,7 @@ namespace DryIoc
         public override bool ExpressionCaching { get { return _expressionCaching; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
-        /// or disable disposing with <see cref="ReusedExplicitlyDisposable"/>, etc.</summary>
+        /// or disable disposing with <see cref="ExplicitlyDisposableReused"/>, etc.</summary>
         public override Type[] ReuseWrappers { get { return _reuseWrappers; } }
 
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
@@ -4598,9 +4600,9 @@ namespace DryIoc
                     else
                     {
                         var reused = item as IReused;
-                        while (reused != null && !(reused is ReusedExplicitlyDisposable) 
-                            && reused.Value != null && (disposable = reused.Value as IDisposable) == null)
-                            reused = reused.Value as IReused;
+                        while (reused != null && !(reused is IHideDisposeFromContainer) 
+                            && reused.Target != null && (disposable = reused.Target as IDisposable) == null)
+                            reused = reused.Target as IReused;
                         if (disposable != null)
                             disposable.Dispose();
                     }
@@ -4815,12 +4817,12 @@ namespace DryIoc
         {
             public object Wrap(object value)
             {
-                return new ReusedExplicitlyDisposable((value as IDisposable).ThrowIfNull());
+                return new ExplicitlyDisposableReused((value as IDisposable).ThrowIfNull());
             }
 
             public object Unwrap(object wrapper)
             {
-                return (wrapper as ReusedExplicitlyDisposable).ThrowIfNull().Value;
+                return (wrapper as ExplicitlyDisposableReused).ThrowIfNull().Target;
             }
         }
 
@@ -4833,7 +4835,7 @@ namespace DryIoc
 
             public object Unwrap(object wrapper)
             {
-                return (wrapper as ReusedWeakRef).ThrowIfNull().Value.ThrowIfNull(Error.WEAKREF_REUSE_WRAPPER_GCED);
+                return (wrapper as ReusedWeakRef).ThrowIfNull().Target.ThrowIfNull(Error.WEAKREF_REUSE_WRAPPER_GCED);
             }
         }
 
@@ -4841,12 +4843,12 @@ namespace DryIoc
         {
             public object Wrap(object value)
             {
-                return new ReusedRef(value);
+                return new RefReused(value);
             }
 
             public object Unwrap(object wrapper)
             {
-                return (wrapper as ReusedRef).ThrowIfNull().Value;
+                return (wrapper as RefReused).ThrowIfNull().Target;
             }
         }
 
@@ -4857,69 +4859,95 @@ namespace DryIoc
     public interface IReused
     {
         /// <summary>Wrapped value.</summary>
-        object Value { get; }
+        object Target { get; }
     }
 
-    public interface IReused<T>
+    public static class Reused
     {
-        T Value { get; }
+        public static object UnwrapTarget(object target)
+        {
+            while (target is IReused)
+                target = ((IReused)target).Target;
+            return target;
+        }
     }
 
-    /// <summary>Wraps reused service object to prevent container to dispose service object.</summary>
-    public class ReusedExplicitlyDisposable : IReused
-    {
-        public object Value { get; private set; }
+    /// <summary>Marker interface used by Scope to skip dispose for reused disposable object.</summary>
+    public interface IHideDisposeFromContainer { }
 
-        public bool IsValueDisposed
+    /// <summary>Wraps reused service object to prevent container to dispose service object. Intended to work only with <see cref="IDisposable"/> target.</summary>
+    public class ExplicitlyDisposableReused : IReused, IHideDisposeFromContainer
+    {
+        /// <summary>Constructs wrapper by wrapping input target.</summary>
+        /// <param name="target">Disposable target.</param>
+        public ExplicitlyDisposableReused(IDisposable target)
+        {
+            _target = target;
+            _targetType = target.GetType();
+        }
+
+        /// <summary>Wrapped value.</summary>
+        public object Target
+        {
+            get
+            {
+                Throw.If(IsDisposed, Error.TARGET_WAS_ALREADY_DISPOSED, _targetType, typeof(ExplicitlyDisposableReused));
+                return Reused.UnwrapTarget(_target);
+            }
+        }
+
+        /// <summary>True if target was disposed.</summary>
+        public bool IsDisposed
         {
             get { return _disposed == 1; }
         }
 
-        public ReusedExplicitlyDisposable(IDisposable value)
-        {
-            Value = value;
-        }
-
-        public void DisposeValue()
+        /// <summary>Dispose target and mark wrapper as disposed.</summary>
+        public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
-            ((IDisposable)Value).Dispose();
-            Value = null;
+            _target.Dispose();
+            _target = null;
         }
+
+        #region Implementation
 
         private int _disposed;
+        private IDisposable _target;
+        private readonly Type _targetType;
+
+        #endregion
     }
 
-    public class ReusedExplicitlyDisposable<T> : IReused<T>
+    /// <summary>Strongly-typed proxy to <see cref="ExplicitlyDisposableReused"/>.</summary>
+    /// <typeparam name="T">Type of wrapped service.</typeparam>
+    public class ExplicitlyDisposableReused<T>
     {
-        public static explicit operator ReusedExplicitlyDisposable<T>(ReusedExplicitlyDisposable source)
-        {
-            return new ReusedExplicitlyDisposable<T>(source);
-        }
-
-        public T Value
-        {
-            get { return (T)_source.Value; }
-        }
-
-        public ReusedExplicitlyDisposable(ReusedExplicitlyDisposable source)
+        public ExplicitlyDisposableReused(ExplicitlyDisposableReused source)
         {
             _source = source.ThrowIfNull();
-            _source.Value.ThrowIfNotOf(typeof(T));
+            _source.Target.ThrowIfNotOf(typeof(T));
         }
 
-        public bool IsValueDisposed
+        /// <summary>Wrapped value from under all wrappers.</summary>
+        public T Target
         {
-            get { return _source.IsValueDisposed; }
+            get { return (T)_source.Target; }
         }
 
-        public void DisposeValue()
+        /// <summary>True if target was disposed.</summary>
+        public bool IsDisposed
         {
-            _source.DisposeValue();
+            get { return _source.IsDisposed; }
         }
 
-        private readonly ReusedExplicitlyDisposable _source;
+        public void Dispose()
+        {
+            _source.Dispose();
+        }
+
+        private readonly ExplicitlyDisposableReused _source;
     }
 
     /// <summary>Wraps reused object as <see cref="WeakReference"/>. Allow wrapped object to be garbage collected.</summary>
@@ -4929,7 +4957,7 @@ namespace DryIoc
         public readonly WeakReference WeakRef;
 
         /// <summary>Wrapped value, delegates to <see cref="WeakReference.Target"/></summary>
-        public object Value { get { return WeakRef.Target; } }
+        public object Target { get { return WeakRef.Target; } }
 
         /// <summary>Wraps input target into weak reference</summary> <param name="value">Value to wrap.</param>
         public ReusedWeakRef(object value)
@@ -4940,13 +4968,13 @@ namespace DryIoc
 
     /// <summary>Strongly typed version of <see cref="ReusedWeakRef"/>.</summary>
     /// <typeparam name="T">Type of wrapped service. May be another <see cref="IReused"/> wrapper.</typeparam>
-    public class ReusedWeakRef<T> : IReused<T> where T : class
+    public class ReusedWeakRef<T> where T : class
     {
         /// <summary>Source weak reference.</summary>
         public readonly WeakReference WeakRef;
 
         /// <summary>Wrapped value, delegates to <see cref="WeakReference.Target"/></summary>
-        public T Value { get { return WeakRef.Target as T; } }
+        public T Target { get { return WeakRef.Target as T; } }
 
         /// <summary>Constructs strongly typed wrapper from input.</summary> <param name="source">Source wrapper.</param>
         public ReusedWeakRef(ReusedWeakRef source)
@@ -4956,13 +4984,13 @@ namespace DryIoc
     }
 
     /// <summary>Wraps reused object in <see cref="Ref{T}"/></summary>
-    public sealed class ReusedRef : IReused
+    public sealed class RefReused : IReused
     {
         public readonly Ref<object> Ref; 
 
-        public object Value { get { return Ref.Value; } }
+        public object Target { get { return Ref.Value; } }
 
-        public ReusedRef(object value)
+        public RefReused(object value)
         {
             Ref = new Ref<object>(value);
         }
@@ -4970,13 +4998,13 @@ namespace DryIoc
 
     /// <summary>Proxy to <see cref="Ref{T}"/> of <see cref="object"/> with compile-time service type specified by <typeparamref name="T"/>.</summary>
     /// <typeparam name="T">Type of wrapped service.</typeparam>
-    public sealed class ReusedRef<T> : IReused<T> where T : class
+    public sealed class ReusedRef<T> where T : class
     {
-        public readonly ReusedRef Source;
+        public readonly RefReused Source;
 
-        public T Value { get { return (T)Source.Value; } }
+        public T Target { get { return (T)Source.Target; } }
 
-        public ReusedRef(ReusedRef source)
+        public ReusedRef(RefReused source)
         {
             Source = source.ThrowIfNull();
             //Throw.If(!(Source.Value is T));
@@ -5387,7 +5415,7 @@ namespace DryIoc
             NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD = Of("Unable to find writable property or field \"{0}\" when resolving: {1}."),
             NO_SERVICE_TYPE_TO_REGISTER_ALL                 = Of("Unable to register any of implementation {0} implemented services {1}."),
             PUSHING_TO_REQUEST_WITHOUT_FACTORY              = Of("Pushing next info {0} to request not yet resolved to factory: {1}"),
-            TARGET_WAS_ALREADY_DISPOSED                     = Of("Target of type {0} was already disposed in {1}."),
+            TARGET_WAS_ALREADY_DISPOSED                     = Of("Target {0} was already disposed in {1} wrapper."),
             NOT_MATCHED_GENERIC_PARAM_CONSTRAINTS           = Of("Service type does not match registered open-generic implementation constraints {0} when resolving {1}."),
             NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED   = Of("Non-generic wrapper {0} should specify wrapped service selector when registered."),
             DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN           = Of("Dependency {0} has shorter Reuse lifespan than its parent: {1}." + Environment.NewLine 
@@ -6012,9 +6040,10 @@ namespace DryIoc
         }
     }
 
+    /// <summary>Ports some methods from .Net 4.0/4.5</summary>
     public static partial class Portable
     {
-        public static readonly Func<Assembly, IEnumerable<Type>> GetTypesFrom =
+        public static readonly Func<Assembly, IEnumerable<Type>> GetTypesFromAssembly =
             ExpressionTools.GetMethodDelegateOrNull<Assembly, IEnumerable<Type>>("GetTypes").ThrowIfNull();
 
         public static readonly Func<PropertyInfo, MethodInfo> GetPropertySetMethod =

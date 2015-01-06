@@ -26,6 +26,7 @@ namespace DryIoc.Mvc
 {
     using System;
     using System.Collections.Generic;
+    using System.Collections.ObjectModel;
     using System.Linq;
     using System.Reflection;
     using System.Web;
@@ -47,30 +48,30 @@ namespace DryIoc.Mvc
     /// </summary>
     public static class DryIocMvc
     {
-        public static IContainer WithMvcSupport(this IContainer container, Assembly controllersAssembly = null)
+        public static IContainer WithMvcSupport(this IContainer container, params Assembly[] assemblies)
         {
             container = container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext());
+            
+            assemblies = !assemblies.IsNullOrEmpty() ? assemblies : new[] { Assembly.GetExecutingAssembly() };
+            container.RegisterFromAssembly<IController>(WebReuse.InRequest, assemblies);
 
-            container.RegisterFromAssembly<IController>(controllersAssembly ?? Assembly.GetExecutingAssembly());
+            container.SetFilterAttributeFilterProvider(FilterProviders.Providers);
 
-            container.SetDryIocFilterAttributeFilterProvider();
-
-            container.SetDryIocDependencyResolver();
+            DependencyResolver.SetResolver(new DryIocDependencyResolver(container));
 
             return container;
         }
 
-        public static void SetDryIocDependencyResolver(this IContainer container)
+        public static void SetFilterAttributeFilterProvider(this IContainer container, Collection<IFilterProvider> filterProviders)
         {
-            DependencyResolver.SetResolver(new DryIocDependencyResolver(container));
-        }
+            var filterAttributeFilterProviders = filterProviders.OfType<FilterAttributeFilterProvider>().ToArray();
+            for (var i = filterAttributeFilterProviders.Length - 1; i >= 0; --i)
+                filterProviders.RemoveAt(i);
 
-        public static void SetDryIocFilterAttributeFilterProvider(this IContainer container)
-        {
-            var providers = FilterProviders.Providers;
-            foreach (var provider in providers.OfType<FilterAttributeFilterProvider>().ToArray())
-                providers.Remove(provider);
-            providers.Add(new DryIocFilterAttributeFilterProvider(container));
+            var filterProvider = new DryIocAggregatedFilterAttributeFilterProvider(container);
+            filterProviders.Add(filterProvider);
+
+            container.RegisterInstance<IFilterProvider>(filterProvider);
         }
     }
 
@@ -78,7 +79,7 @@ namespace DryIoc.Mvc
     {
         public DryIocDependencyResolver(IResolver resolver)
         {
-            _resolver = resolver.ThrowIfNull();
+            _resolver = resolver;
         }
 
         public object GetService(Type serviceType)
@@ -94,28 +95,27 @@ namespace DryIoc.Mvc
         private readonly IResolver _resolver;
     }
 
-    internal class DryIocFilterAttributeFilterProvider : FilterAttributeFilterProvider
+    internal class DryIocAggregatedFilterAttributeFilterProvider : FilterAttributeFilterProvider
     {
-        public DryIocFilterAttributeFilterProvider(IContainer container)
+        public DryIocAggregatedFilterAttributeFilterProvider(IResolver resolver)
         {
-            _container = container;
-            _container.RegisterInstance<IFilterProvider>(this);
+            _resolver = resolver;
         }
 
         public override IEnumerable<Filter> GetFilters(ControllerContext controllerContext, ActionDescriptor actionDescriptor)
         {
             var filters = base.GetFilters(controllerContext, actionDescriptor).ToArray();
-            foreach (var filter in filters)
-                _container.ResolvePropertiesAndFields(filter.Instance);
+            for (var i = 0; i < filters.Length; i++)
+                _resolver.ResolvePropertiesAndFields(filters[i].Instance);
             return filters;
         }
 
-        private readonly IContainer _container;
+        private readonly IResolver _resolver;
     }
 
-    public static class Reuse
+    public static class WebReuse
     {
-        public static readonly IReuse InRequest = DryIoc.Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
     }
 
     public sealed class HttpContextScopeContext : IScopeContext

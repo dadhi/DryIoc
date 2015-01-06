@@ -1,9 +1,9 @@
-﻿using System;
-using System.Threading.Tasks;
-using NUnit.Framework;
-
-namespace DryIoc.UnitTests
+﻿namespace DryIoc.WebApi.UnitTests
 {
+    using System;
+    using System.Threading.Tasks;
+    using NUnit.Framework;
+
     [TestFixture]
     public class ExecutionFlowScopeContextTests
     {

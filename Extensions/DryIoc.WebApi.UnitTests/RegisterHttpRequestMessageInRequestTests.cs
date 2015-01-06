@@ -1,9 +1,10 @@
 ﻿using System.Threading.Tasks;
-using Xunit;
+using NUnit.Framework;
 
-namespace DryIoc.IssuesTests
+namespace DryIoc.WebApi.UnitTests
 {
-    public class Issue72_SupportAllPossibleFlavorsOfChildNestedContainer
+    [TestFixture]
+    public class RegisterHttpRequestMessageInRequestTests
     {
         public class SomeRequest {}
 
@@ -17,14 +18,14 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        [Fact]
+        [Test]
         public void ScopeTest()
         {
             var container = new Container(scopeContext: new ExecutionFlowScopeContext());
 
             container.Register<A>();
             container.RegisterInstance(default(SomeRequest),
-                Reuse.InCurrentScope, Setup.Default.WithReuseWrappers(typeof(ReusedRef)));
+                WebReuse.InRequest, Setup.Default.WithReuseWrappers(typeof(RefReused)));
 
             var request1 = Task.Run(async () =>
             {
@@ -33,7 +34,7 @@ namespace DryIoc.IssuesTests
                 scope.Resolve<ReusedRef<SomeRequest>>().Swap(_ => request);
 
                 await Task.Delay(5);//processing request
-                Assert.Same(request, scope.Resolve<A>().Request);
+                Assert.AreSame(request, scope.Resolve<A>().Request);
             });
 
             var request2 = Task.Run(async () =>
@@ -42,7 +43,7 @@ namespace DryIoc.IssuesTests
                 var scope = container.OpenScope();
                 scope.Resolve<ReusedRef<SomeRequest>>().Swap(_ => request);
                 await Task.Delay(2);//processing request
-                Assert.Same(request, scope.Resolve<A>().Request);
+                Assert.AreSame(request, scope.Resolve<A>().Request);
             });
 
             Task.WaitAll(request1, request2);

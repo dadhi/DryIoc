@@ -10,8 +10,8 @@ namespace DryIoc.Mvc.UnitTests
         public void Working_with_HttpContext_based_scope_context()
         {
             var root = new Container(scopeContext: new HttpContextScopeContext());
-            root.Register<SomeRoot>(Reuse.InRequest);
-            root.Register<SomeDep>(Reuse.InRequest);
+            root.Register<SomeRoot>(WebReuse.InRequest);
+            root.Register<SomeDep>(WebReuse.InRequest);
 
             SomeDep savedOutside;
             using (var scoped = root.OpenScope())

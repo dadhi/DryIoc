@@ -119,7 +119,7 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Lazy collection of registration info DTOs.</returns>
         public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
-            return assemblies.SelectMany(Portable.GetTypesFrom).Select(GetRegistrationInfoOrDefault).Where(x => x != null);
+            return assemblies.SelectMany(Portable.GetTypesFromAssembly).Select(GetRegistrationInfoOrDefault).Where(x => x != null);
         }
 
         /// <summary>Creates registration info DTO for provided type. To find this info checks type attributes:
