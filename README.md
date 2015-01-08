@@ -25,8 +25,8 @@ DryIoc is small, fast, capable IoC Container for .NET
 * __[v2.0]__ is coming soon: `PM> Install-Package DryIoc -Pre`
 
 #### Benchmarks
-* Very fast in [Performance Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
-* Supports a lot in [Features Benchmark](http://featuretests.apphb.com/DependencyInjection.html) _(v2.0)_.
+* In the top of [Performance Benchmark](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
+* In the top of [Features Benchmark](http://featuretests.apphb.com/DependencyInjection.html) _(v2.0)_.
 
 #### Performance
 * General use-cases optimized for max speed.
@@ -45,36 +45,37 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Error handling with `ContainerException` inherited from `InvalidOperationException` to filter container related exceptions.
 * Throws exceptions as early as possible. 
 * Meaningful error messages with all available information about problem Cause and Context.
-* Resolving as `DebugExpression<T>` to find underlying expression used for instance creation.
+* Resolving as `FactoryExpression<T>` wrapper to look at underlying service creation expression.
 
 #### Features
+
+* Register interface/type mapping, additionally supported registering once, registration update, unregister, is registered check. 
+* Register user-defined delegate factory and register existing instance.
+* Register from assembly(ies) to automatically locate implementation types.
+* Register with arbitrary name or key, multiple default registrations.
+* Resolve and additionally: Try Resolve, ResolveMany.
 * Instance lifetime control or *Reuse* in DryIoc terms ([wiki](https://bitbucket.org/dadhi/dryioc/wiki/ReuseAndScopes)) :
     * Nested disposable scopes and ambient scope context.
     * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`, or define your own.
-    * Changing default reuse type per container with  `Rules.ReuseMapping`.
-    * Control over storing of reused objects with Wrappers: `WeakReference`, `Disposable`, and more.
-* Constructor, property and field injection. *You can select What and Where to inject.*
-* Delegate factory registration.
-* Auto-registration via __MefAttributedModel__ extension (see below).
-* Tools for custom auto-wiring and registration. Check `DryIoc.Samples.AutoWiring` for example.
-* `IsRegistered` check.
+    * Changing default reuse type per container via  `Rules.WithReuseMapping()`.
+    * Control over reused objects behavior via ReuseWrappers: `HiddenDisposable`, `WeakReference`, `Swapable`, `Recyclable`, and user-defined.
 * Open-generics without special syntax.
-* Arbitrary metadata object associated with implementation.
-* Multiple named and unnamed implementations of single service.
-* Multiple services of single implementation.
-* Resolution of multiple implementations as:
-    * `IEnumerable<T>` or `T[]`. *Static view - next resolution woN't see new registrations.*
-    * `Many<T>`. *Dynamic view - next resolution Will see new registrations.*
-    *  [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern). Composite implementation will be exlcuded from itself.
+* Constructor, property and field injection.
+* Static or instance Factory Methods in addition to constructor. Parameter injection is supported the same way as for constructor.
+* Injecting properties/fields into existing object.
+* Creating concrete object without registering it in Container but with injecting its parameters, properties, and fields.
+* Associated metadata object.
 * Generic wrappers:
-    * `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>`.
-    * Func with parameters to specify constructor arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
-    * Registration of user-defined wrappers.
-* Generic wrappers and multiple implementations could be nested, e.g. `Meta<SomeMetadata, Func<ISomeService>>[]`.
-* [Decorators](http://en.wikipedia.org/wiki/Decorator_pattern). 
+    * Of multiple implementations: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and as `I(ReadOnly)Collection|List`.
+    * `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>`, `KeyValuePair<TKey, T>`, and user-defined wrappers.
+    * [Currying](http://en.wikipedia.org/wiki/Currying) over constructor of factory method arguments with: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
+    * Generic wrappers could be nested, e.g. `Meta<SomeMetadata, Func<ISomeService>>[]`.
+* [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern): Composite itself is excluded from result collection.
+* [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern). 
 * Context-based implementation selection.
-* Unregistered service resolution via `ResolutionRules`.
-* Toggling features On/Off via `ContanerSetup`.
+* Unknown service resolution via `Rules.WithUnknownServiceResolvers()`.
 
 #### Extensions
-* [MefAttributedModel] - emulates [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) and enables automatic types discovery and wiring.
+* [MefAttributedModel] - supports [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) and enables automatic types discovery and wiring.
+* [CommonServiceLocator](https://commonservicelocator.codeplex.com/)
+* _Asp.NET support is on the way with V2 ..._
