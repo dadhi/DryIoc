@@ -48,12 +48,11 @@ namespace DryIoc.Mvc
     /// </summary>
     public static class DryIocMvc
     {
-        public static IContainer WithMvcSupport(this IContainer container, params Assembly[] assemblies)
+        public static IContainer WithMvc(this IContainer container, params Assembly[] assemblies)
         {
             container = container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext());
-            
-            assemblies = !assemblies.IsNullOrEmpty() ? assemblies : new[] { Assembly.GetExecutingAssembly() };
-            container.RegisterFromAssembly<IController>(WebReuse.InRequest, assemblies);
+
+            container.RegisterMvcControllers(assemblies);
 
             container.SetFilterAttributeFilterProvider(FilterProviders.Providers);
 
@@ -62,8 +61,16 @@ namespace DryIoc.Mvc
             return container;
         }
 
-        public static void SetFilterAttributeFilterProvider(this IContainer container, Collection<IFilterProvider> filterProviders)
+        public static void RegisterMvcControllers(this IContainer container, Assembly[] assemblies)
         {
+            assemblies = !assemblies.IsNullOrEmpty() ? assemblies : new[] {Assembly.GetExecutingAssembly()};
+            container.RegisterFromAssembly<IController>(WebReuse.InRequest, assemblies);
+        }
+
+        public static void SetFilterAttributeFilterProvider(this IContainer container, Collection<IFilterProvider> filterProviders = null)
+        {
+            filterProviders = filterProviders ?? FilterProviders.Providers;
+
             var filterAttributeFilterProviders = filterProviders.OfType<FilterAttributeFilterProvider>().ToArray();
             for (var i = filterAttributeFilterProviders.Length - 1; i >= 0; --i)
                 filterProviders.RemoveAt(i);
@@ -130,10 +137,10 @@ namespace DryIoc.Mvc
             return httpContext == null ? _fallbackScope : (IScope)httpContext.Items[ROOT_SCOPE_NAME];
         }
 
-        public void SetCurrent(Func<IScope, IScope> update)
+        public void SetCurrent(Func<IScope, IScope> getNewCurrent)
         {
             var currentOrDefault = GetCurrentOrDefault();
-            var newScope = update.ThrowIfNull().Invoke(currentOrDefault);
+            var newScope = getNewCurrent.ThrowIfNull().Invoke(currentOrDefault);
             var httpContext = HttpContext.Current;
             if (httpContext == null)
             {

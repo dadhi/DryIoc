@@ -69,7 +69,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(SharedWithReuseWrapper));
 
-            var serviceRef = container.Resolve<ReusedWeakRef>(typeof(SharedWithReuseWrapper));
+            var serviceRef = container.Resolve<ReuseWeakReference>(typeof(SharedWithReuseWrapper));
 
             Assert.That(serviceRef.Target, Is.InstanceOf<SharedWithReuseWrapper>());
 
@@ -131,7 +131,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             }
         }
 
-        [Export, ReuseWrappers(typeof(ReusedWeakRef))]
+        [Export, ReuseWrappers(typeof(ReuseWeakReference))]
         public class SharedWithReuseWrapper { }
 
         [Export, CurrentScopeReuse("ScopeA")]

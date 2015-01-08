@@ -290,7 +290,7 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is ReuseWrappersAttribute)
                 {
-                    info.ReuseWrapperTypes = ((ReuseWrappersAttribute)attribute).WrapperTypes;
+                    info.ReusedWrappers = ((ReuseWrappersAttribute)attribute).WrapperTypes;
                 }
                 else if (attribute is AsWrapperAttribute)
                 {
@@ -607,7 +607,7 @@ namespace DryIoc.MefAttributedModel
         public string ReuseName;
 
         /// <summary>Reuse wrappers defined for exported type.</summary>
-        public Type[] ReuseWrapperTypes;
+        public Type[] ReusedWrappers;
 
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
@@ -646,11 +646,10 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == FactoryType.Decorator)
                 return Decorator == null ? SetupDecorator.Default : Decorator.GetSetup(lazyMetadata);
 
-            var setup = lazyMetadata == null ? Setup.Default : Setup.With(lazyMetadata: lazyMetadata);
+            if (lazyMetadata == null && ReusedWrappers.IsNullOrEmpty())
+                return Setup.Default;
 
-            return ReuseWrapperTypes == null || ReuseWrapperTypes.Length == 0
-                ? setup
-                : setup.WithReuseWrappers(ReuseWrapperTypes);
+            return Setup.With(lazyMetadata: lazyMetadata, reuseWrappers: ReusedWrappers);
         }
 
         public override bool Equals(object obj)

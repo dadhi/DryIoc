@@ -36,18 +36,23 @@ namespace DryIoc.WebApi
 
     internal static class DryIocWebApi
     {
-        public static IContainer WithWebApiSupport(this IContainer container, HttpConfiguration httpConfiguration, params Assembly[] assemblies)
+        public static IContainer WithWebApi(this IContainer container, HttpConfiguration httpConfiguration, params Assembly[] assemblies)
         {
             container = container.ThrowIfNull().With(scopeContext: new ExecutionFlowScopeContext());
 
-            assemblies = !assemblies.IsNullOrEmpty() ? assemblies : new[] { Assembly.GetExecutingAssembly() };
-            container.RegisterFromAssembly<IHttpController>(WebReuse.InRequest, assemblies);
+            container.RegisterHttpControllers(assemblies);
 
             container.SetFilterProvider(httpConfiguration.Services);
 
             httpConfiguration.DependencyResolver = new DryIocDependencyResolver(container);
 
             return container;
+        }
+
+        public static void RegisterHttpControllers(this IContainer container, Assembly[] assemblies)
+        {
+            assemblies = !assemblies.IsNullOrEmpty() ? assemblies : new[] {Assembly.GetExecutingAssembly()};
+            container.RegisterFromAssembly<IHttpController>(WebReuse.InRequest, assemblies);
         }
 
         public static void SetFilterProvider(this IContainer container, ServicesContainer services)
@@ -158,10 +163,10 @@ namespace DryIoc.WebApi
             return scope == null ? null : scope.Value;
         }
 
-        public void SetCurrent(Func<IScope, IScope> update)
+        public void SetCurrent(Func<IScope, IScope> getNewCurrent)
         {
             var oldScope = GetCurrentOrDefault();
-            var newScope = update.ThrowIfNull()(oldScope);
+            var newScope = getNewCurrent.ThrowIfNull()(oldScope);
             CallContext.LogicalSetData(_key, new Copyable<IScope>(newScope));
         }
 

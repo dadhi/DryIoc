@@ -130,7 +130,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var parent = _containerWeakRef;
-            var childRules = Rules.WithUnknownServiceResolvers(childRequest =>
+            var inheritedRules = Rules.WithUnknownServiceResolvers(childRequest =>
             {
                 var childRequestWithParentContainer = childRequest.SwitchContainer(parent);
                 var factory = childRequestWithParentContainer.Container.ResolveFactory(childRequestWithParentContainer);
@@ -138,11 +138,11 @@ namespace DryIoc
                     : new ExpressionFactory(request => factory.GetExpressionOrDefault(request));
             });
 
-            if (!shareSingletons) 
-                return new Container(childRules);
-            return new Container(childRules,
-                Ref.Of(HashTree<Type, object>.Empty), Ref.Of(HashTree<Type, Factory[]>.Empty), Ref.Of(WrappersSupport.Wrappers),
-                _singletonScope);
+            return !shareSingletons
+                ? new Container(inheritedRules)
+                : new Container(inheritedRules,
+                    Ref.Of(HashTree<Type, object>.Empty), Ref.Of(HashTree<Type, Factory[]>.Empty), Ref.Of(WrappersSupport.Wrappers),
+                    _singletonScope);
         }
 
         /// <summary>Disposes container current scope and that means container itself.</summary>
@@ -508,13 +508,13 @@ namespace DryIoc
         }
 
         /// <summary>Scope associated with container.</summary>
-        IScope IContainer.SingletonScope
+        IScope IScopeProvider.SingletonScope
         {
             get { return _singletonScope; }
         }
 
         /// <summary>Scope associated with containers created by <see cref="Container.OpenScope"/>.</summary>
-        IScope IContainer.CurrentScope
+        IScope IScopeProvider.CurrentScope
         {
             get { return _scopeContext.GetCurrentOrDefault().ThrowIfNull(Error.NO_CURRENT_SCOPE); }
         }
@@ -1351,26 +1351,21 @@ namespace DryIoc
 
             // Reuse wrappers
             Wrappers = Wrappers
-                .AddOrUpdate(typeof(ExplicitlyDisposableReused), new FactoryProvider(
+                .AddOrUpdate(typeof (ReuseHiddenDisposable), new FactoryProvider(
                     r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
-                    SetupWrapper.With(t => typeof(object)).With(ReusedObjectWrapper.ExplicitlyDisposable)))
+                    SetupWrapper.With(t => typeof (object), ReuseWrapperFactory.HiddenDisposable)))
 
-                .AddOrUpdate(typeof(ExplicitlyDisposableReused<>),
-                    new ReflectionFactory(typeof(ExplicitlyDisposableReused<>), setup: SetupWrapper.Default))
-
-                .AddOrUpdate(typeof(ReusedWeakRef), new FactoryProvider(
+                .AddOrUpdate(typeof (ReuseWeakReference), new FactoryProvider(
                     r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
-                    SetupWrapper.With(_ => typeof(object)).With(ReusedObjectWrapper.WeakRef)))
+                    SetupWrapper.With(_ => typeof (object), ReuseWrapperFactory.WeakReference)))
 
-                 .AddOrUpdate(typeof(ReusedWeakRef<>),
-                    new ReflectionFactory(typeof(ReusedWeakRef<>), setup: SetupWrapper.Default))
-
-                .AddOrUpdate(typeof(RefReused), new FactoryProvider(
+                .AddOrUpdate(typeof (ReuseSwapable), new FactoryProvider(
                     r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
-                    SetupWrapper.With(t => typeof(object)).With(ReusedObjectWrapper.Ref)))
+                    SetupWrapper.With(t => typeof (object), ReuseWrapperFactory.Swapable)))
 
-                .AddOrUpdate(typeof(ReusedRef<>),
-                    new ReflectionFactory(typeof(ReusedRef<>), setup: SetupWrapper.Default));
+                .AddOrUpdate(typeof(ReuseRecyclable), new FactoryProvider(
+                    r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
+                    SetupWrapper.With(t => typeof(object), ReuseWrapperFactory.Recyclable)));
         }
 
         /// <summary>Unregistered/fallback wrapper resolution rule.</summary>
@@ -2456,7 +2451,7 @@ namespace DryIoc
         public static object New(this IContainer container, Type concreteType, InjectionRules with = null)
         {
             concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UNABLE_TO_NEW_OPEN_GENERIC);
-            var factory = new ReflectionFactory(concreteType, null, with, Setup.With(expressionCaching: false));
+            var factory = new ReflectionFactory(concreteType, null, with, Setup.With(cacheFactoryExpression: false));
             factory.ValidateBeforeRegistration(concreteType, container);
             var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).ResolveWithFactory(factory);
             var factoryDelegate = factory.GetDelegateOrDefault(request);
@@ -3228,17 +3223,17 @@ namespace DryIoc
         public abstract FactoryType FactoryType { get; }
 
         /// <summary>Set to true allows to cache and use cached factored service expression.</summary>
-        public virtual bool ExpressionCaching { get { return false; } }
+        public virtual bool CacheFactoryExpression { get { return false; } }
 
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
 
-        // TODO: Use it. Currently used only by decorator.
+        // TODO: Use it for Service factory. Currently used by Decorator only.
         /// <summary>Predicate to check if factory could be used for resolved request.</summary>
         public virtual Func<Request, bool> Condition { get { return null; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
-        /// or disable disposing with <see cref="ExplicitlyDisposableReused"/>, etc.</summary>
+        /// or disable disposing with <see cref="ReuseHiddenDisposable"/>, etc.</summary>
         public virtual Type[] ReuseWrappers { get { return null; } }
     }
 
@@ -3248,33 +3243,35 @@ namespace DryIoc
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new Setup();
 
-        public Setup WithReuseWrappers(params Type[] wrapperTypes)
-        {
-            var indexOfNotReused = wrapperTypes.IndexOf(t => !t.IsAssignableTo(typeof(IReused)));
-            Throw.If(indexOfNotReused != -1, Error.REG_REUSED_OBJ_WRAPPER_IS_NOT_IREUSED, indexOfNotReused, wrapperTypes, typeof(IReused));
-            return new Setup(this) { _reuseWrappers = wrapperTypes };
-        }
-
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Default"/> setup will be returned.</summary>
-        /// <param name="expressionCaching">(optional)</param> <param name="reuseWrappers">(optional)</param>
+        /// <param name="cacheFactoryExpression">(optional)</param>
+        /// <param name="reuseWrappers">(optional) Multiple reuse wrappers.</param>
         /// <param name="lazyMetadata">(optional)</param> <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param>
         /// <returns>New setup object or <see cref="Default"/>.</returns>
-        public static Setup With(
-            bool expressionCaching = true, Type[] reuseWrappers = null,
-            Func<object> lazyMetadata = null, object metadata = null)
+        public static Setup With(bool cacheFactoryExpression = true, 
+            Func<object> lazyMetadata = null, object metadata = null,
+            params Type[] reuseWrappers)
         {
-            return expressionCaching && reuseWrappers == null && lazyMetadata == null && metadata == null
-                 ? Default : new Setup(expressionCaching, reuseWrappers, lazyMetadata, metadata);
+            if (cacheFactoryExpression && reuseWrappers == null && lazyMetadata == null && metadata == null) 
+                return Default;
+
+            if (!reuseWrappers.IsNullOrEmpty())
+            {
+                var indexOfNotReused = reuseWrappers.IndexOf(t => !t.IsAssignableTo(typeof(IReuseWrapper)));
+                Throw.If(indexOfNotReused != -1, Error.REG_REUSED_OBJ_WRAPPER_IS_NOT_IREUSED, indexOfNotReused, reuseWrappers, typeof(IReuseWrapper));
+            }
+
+            return new Setup(cacheFactoryExpression, lazyMetadata, metadata, reuseWrappers);
         }
 
         /// <summary>Default factory type is for service factory.</summary>
         public override FactoryType FactoryType { get { return FactoryType.Service; } }
 
         /// <summary>Set to true allows to cache and use cached factored service expression.</summary>
-        public override bool ExpressionCaching { get { return _expressionCaching; } }
+        public override bool CacheFactoryExpression { get { return _cacheFactoryExpression; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
-        /// or disable disposing with <see cref="ExplicitlyDisposableReused"/>, etc.</summary>
+        /// or disable disposing with <see cref="ReuseHiddenDisposable"/>, etc.</summary>
         public override Type[] ReuseWrappers { get { return _reuseWrappers; } }
 
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
@@ -3285,27 +3282,20 @@ namespace DryIoc
 
         #region Implementation
 
-        private Setup(Setup source)
+        private Setup(bool cacheFactoryExpression = true,
+            Func<object> lazyMetadata = null, object metadata = null,
+            Type[] reuseWrappers = null)
         {
-            _expressionCaching = source._expressionCaching;
-            _reuseWrappers = source._reuseWrappers;
-            _lazyMetadata = source._lazyMetadata;
-            _metadata = source._metadata;
-        }
-
-        private Setup(bool expressionCaching = true, Type[] reuseWrappers = null,
-            Func<object> lazyMetadata = null, object metadata = null)
-        {
-            _expressionCaching = expressionCaching;
-            _reuseWrappers = reuseWrappers;
+            _cacheFactoryExpression = cacheFactoryExpression;
             _lazyMetadata = lazyMetadata;
             _metadata = metadata;
+            _reuseWrappers = reuseWrappers;
         }
 
-        private readonly bool _expressionCaching;
-        private Type[] _reuseWrappers;
+        private readonly bool _cacheFactoryExpression;
         private readonly Func<object> _lazyMetadata;
         private object _metadata;
+        private readonly Type[] _reuseWrappers;
 
         #endregion
     }
@@ -3316,19 +3306,16 @@ namespace DryIoc
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
         public static readonly SetupWrapper Default = new SetupWrapper();
 
-        public IReusedObjectWrapper ReusedObjectWrapper { get; private set; }
-
-        public SetupWrapper With(IReusedObjectWrapper reusedObjectWrapper)
-        {
-            return new SetupWrapper(this) {ReusedObjectWrapper = reusedObjectWrapper};
-        }
+        public readonly IReuseWrapperFactory ReuseWrapperFactory;
 
         /// <summary>Creates setup with all settings specified. If all is omitted: then <see cref="Default"/> will be used.</summary>
         /// <param name="unwrapServiceType">Wrapped service selector rule.</param>
+        /// <param name="reuseWrapperFactory"></param>
         /// <returns>New setup with non-default settings or <see cref="Default"/> otherwise.</returns>
-        public static SetupWrapper With(Func<Type, Type> unwrapServiceType = null)
+        public static SetupWrapper With(Func<Type, Type> unwrapServiceType = null, IReuseWrapperFactory reuseWrapperFactory = null)
         {
-            return unwrapServiceType == null ? Default : new SetupWrapper(unwrapServiceType);
+            return unwrapServiceType == null && reuseWrapperFactory == null
+                ? Default : new SetupWrapper(unwrapServiceType, reuseWrapperFactory);
         }
 
         /// <summary>Returns <see cref="DryIoc.FactoryType.Wrapper"/> type.</summary>
@@ -3340,15 +3327,10 @@ namespace DryIoc
 
         #region Implementation
 
-        private SetupWrapper(SetupWrapper source)
-        {
-            UnwrapServiceType = source.UnwrapServiceType;
-            ReusedObjectWrapper = source.ReusedObjectWrapper;
-        }
-
-        private SetupWrapper(Func<Type, Type> getWrappedServiceType = null)
+        private SetupWrapper(Func<Type, Type> getWrappedServiceType = null, IReuseWrapperFactory reuseWrapperFactory = null)
         {
             UnwrapServiceType = getWrappedServiceType ?? GetSingleGenericArgByDefault;
+            ReuseWrapperFactory = reuseWrapperFactory;
         }
 
         private static Type GetSingleGenericArgByDefault(Type wrapperType)
@@ -3490,7 +3472,7 @@ namespace DryIoc
             var decorator = request.Container.GetDecoratorExpressionOrDefault(request);
             var noOrFuncDecorator = decorator == null || decorator is LambdaExpression;
 
-            var isCacheable = Setup.ExpressionCaching
+            var isCacheable = Setup.CacheFactoryExpression
                 && noOrFuncDecorator && request.FuncArgs == null && requiredWrapperType == null;
             if (isCacheable)
             {
@@ -3509,7 +3491,7 @@ namespace DryIoc
                 // then reused instance could be directly inserted into delegate instead of lazy requested from Scope.
                 var canBeInstantiated = reuse is SingletonReuse
                     && (request.Parent.IsEmpty || !request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc()))
-                    && Setup.ReuseWrappers.IndexOf(w => w.IsAssignableTo(typeof(IReneweable))) == -1;
+                    && Setup.ReuseWrappers.IndexOf(w => w.IsAssignableTo(typeof(IRecyclable))) == -1;
 
                 serviceExpr = canBeInstantiated
                     ? GetInstantiatedScopedServiceExpressionOrDefault(serviceExpr, reuse, request, requiredWrapperType)
@@ -3587,15 +3569,15 @@ namespace DryIoc
                     factoryIDExpr, Expression.Lambda<Func<object>>(serviceExpr, null)), serviceType);
 
             // First wrap serviceExpr with wrapper Wrap method.
-            var wrappers = new IReusedObjectWrapper[wrapperTypes.Length];
+            var wrappers = new IReuseWrapperFactory[wrapperTypes.Length];
             for (var i = 0; i < wrapperTypes.Length; ++i) 
             {
                 var wrapperType = wrapperTypes[i];
                 var wrapperFactory = request.Container.GetWrapperFactoryOrDefault(wrapperType).ThrowIfNull();
-                var wrapper = ((SetupWrapper)wrapperFactory.Setup).ReusedObjectWrapper;
+                var wrapper = ((SetupWrapper)wrapperFactory.Setup).ReuseWrapperFactory;
                 
                 serviceExpr = Expression.Call(
-                    request.StateCache.GetOrAddItemExpression(wrapper, typeof(IReusedObjectWrapper)),
+                    request.StateCache.GetOrAddItemExpression(wrapper, typeof(IReuseWrapperFactory)),
                     "Wrap", null, serviceExpr);
 
                 wrappers[i] = wrapper; // save wrapper for later unwrap
@@ -3614,7 +3596,7 @@ namespace DryIoc
                 if (requiredWrapperType != null && requiredWrapperType == wrapperType)
                     return Expression.Convert(getScopedServiceExpr, requiredWrapperType);
 
-                var wrapperExpr = request.StateCache.GetOrAddItemExpression(wrappers[i], typeof(IReusedObjectWrapper));
+                var wrapperExpr = request.StateCache.GetOrAddItemExpression(wrappers[i], typeof(IReuseWrapperFactory));
                 getScopedServiceExpr = Expression.Call(wrapperExpr, "Unwrap", null, getScopedServiceExpr);
             }
 
@@ -3635,12 +3617,12 @@ namespace DryIoc
                     scope.GetOrAdd(FactoryID, () => factoryDelegate(request.StateCache.Items, request.ContainerWeakRef, null)),
                     serviceType);
 
-            var wrappers = new IReusedObjectWrapper[wrapperTypes.Length];
+            var wrappers = new IReuseWrapperFactory[wrapperTypes.Length];
             for (var i = 0; i < wrapperTypes.Length; ++i)
             {
                 var wrapperType = wrapperTypes[i];
                 var wrapperFactory = request.Container.GetWrapperFactoryOrDefault(wrapperType).ThrowIfNull();
-                var wrapper = ((SetupWrapper)wrapperFactory.Setup).ReusedObjectWrapper;
+                var wrapper = ((SetupWrapper)wrapperFactory.Setup).ReuseWrapperFactory;
                 var serviceFactory = factoryDelegate;
                 factoryDelegate = (st, cs, rs) => wrapper.Wrap(serviceFactory(st, cs, rs));
                 wrappers[i] = wrapper;
@@ -4517,16 +4499,6 @@ namespace DryIoc
         object GetOrAdd(int id, Func<object> factory);
     }
 
-    /// <summary>After call to <see cref="MarkForRenew"/> shows <see cref="Scope"/> to create new object on next access.</summary>
-    public interface IReneweable
-    {
-        /// <summary>If set, specifies to consumer code to recreate object.</summary>
-        bool MarkedForRenewal { get; }
-
-        /// <summary>Recycles current object state and marks object for renewal with <see cref="MarkedForRenewal"/></summary>
-        void MarkForRenew();
-    }
-
     /// <summary><see cref="IScope"/> implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
     /// Locking is used internally to ensure that object factory called only once.</summary>
     public sealed class Scope : IScope, IDisposable
@@ -4573,10 +4545,15 @@ namespace DryIoc
             {
                 var item = _items.GetFirstValueByHashOrDefault(id);
                 if (item == null ||
-                    item is IReneweable && ((IReneweable)item).MarkedForRenewal)
+                    item is IRecyclable && ((IRecyclable)item).IsRecycled)
+                {
+                    if (item != null)
+                        DisposeItem(item);
+
                     Ref.Swap(ref _items, items => _disposed == 1
                         ? Throw.Instead<HashTree<int, object>>(Error.SCOPE_IS_DISPOSED)
                         : items.AddOrUpdate(id, item = factory()));
+                }
                 return item;
             }
         }
@@ -4589,30 +4566,33 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
             
-            if (_items.IsEmpty) return;
-            foreach (var item in _items.Enumerate().Select(x => x.Value).Where(x => x is IDisposable || x is IReused))
+            if (!_items.IsEmpty)
+                foreach (var item in _items.Enumerate().Select(x => x.Value).Where(x => x is IDisposable || x is IReuseWrapper))
+                    DisposeItem(item);
+            _items = null;
+        }
+
+        private void DisposeItem(object item)
+        {
+            try
             {
-                try
+                var disposable = item as IDisposable;
+                if (disposable != null)
+                    disposable.Dispose();
+                else
                 {
-                    var disposable = item as IDisposable;
+                    var reused = item as IReuseWrapper;
+                    while (reused != null && !(reused is IHideDisposableFromContainer)
+                           && reused.Target != null && (disposable = reused.Target as IDisposable) == null)
+                        reused = reused.Target as IReuseWrapper;
                     if (disposable != null)
                         disposable.Dispose();
-                    else
-                    {
-                        var reused = item as IReused;
-                        while (reused != null && !(reused is IHideDisposeFromContainer) 
-                            && reused.Target != null && (disposable = reused.Target as IDisposable) == null)
-                            reused = reused.Target as IReused;
-                        if (disposable != null)
-                            disposable.Dispose();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DisposingExceptions.AppendOrUpdate(ex);
                 }
             }
-            _items = null;
+            catch (Exception ex)
+            {
+                DisposingExceptions.AppendOrUpdate(ex);
+            }
         }
 
         #region Implementation
@@ -4634,7 +4614,7 @@ namespace DryIoc
 
         IScope GetCurrentOrDefault();
 
-        void SetCurrent(Func<IScope, IScope> update);
+        void SetCurrent(Func<IScope, IScope> getNewCurrent);
     }
 
     public sealed class ThreadScopeContext : IScopeContext, IDisposable
@@ -4649,10 +4629,10 @@ namespace DryIoc
             return _scopes.Value.GetFirstValueByHashOrDefault(threadID);
         }
 
-        public void SetCurrent(Func<IScope, IScope> update)
+        public void SetCurrent(Func<IScope, IScope> getNewCurrent)
         {
             var threadId = Portable.GetCurrentManagedThreadID();
-            _scopes.Swap(scopes => scopes.AddOrUpdate(threadId, update(scopes.GetFirstValueByHashOrDefault(threadId))));
+            _scopes.Swap(scopes => scopes.AddOrUpdate(threadId, getNewCurrent(scopes.GetFirstValueByHashOrDefault(threadId))));
         }
 
         public void Dispose()
@@ -4679,7 +4659,7 @@ namespace DryIoc
 
         /// <summary>Locates or creates scope where to store reused service objects.</summary>
         /// <returns>Located scope.</returns>
-        IScope GetScope(IContainer container, ref IScope resolutionScope);
+        IScope GetScope(IScopeProvider container, ref IScope resolutionScope);
     }
 
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
@@ -4693,7 +4673,7 @@ namespace DryIoc
 
         /// <summary>Returns container bound Singleton scope.</summary>
         /// <returns>Container singleton scope.</returns>
-        public IScope GetScope(IContainer container, ref IScope resolutionScope)
+        public IScope GetScope(IScopeProvider container, ref IScope resolutionScope)
         {
             return container.SingletonScope;
         }
@@ -4728,7 +4708,7 @@ namespace DryIoc
         /// <returns>Found current scope or its parent.</returns>
         /// <exception cref="ContainerException">with the code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/> if <see cref="Name"/> specified but
         /// no matching scope or its parent found.</exception>
-        public IScope GetScope(IContainer container, ref IScope resolutionScope)
+        public IScope GetScope(IScopeProvider container, ref IScope resolutionScope)
         {
             var scope = container.CurrentScope;
             if (Name == null)
@@ -4760,7 +4740,7 @@ namespace DryIoc
 
         /// <summary>Creates or returns already created resolution root scope.</summary>
         /// <returns>Created or existing scope.</returns>
-        public IScope GetScope(IContainer _, ref IScope resolutionScope)
+        public IScope GetScope(IScopeProvider _, ref IScope resolutionScope)
         {
             return resolutionScope ?? (resolutionScope = new Scope());
         }
@@ -4798,57 +4778,86 @@ namespace DryIoc
         public static readonly IReuse InThreadScope = InCurrentNamedScope(ThreadScopeContext.ROOT_SCOPE_NAME);
     }
 
-    public interface IReusedObjectWrapper
+    /// <summary>Creates <see cref="IReuseWrapper"/> for target and unwraps matching wrapper.</summary>
+    public interface IReuseWrapperFactory
     {
-        object Wrap(object value);
+        /// <summary>Wraps target value into new wrapper.</summary>
+        /// <param name="target">Input value. May be other wrapper.</param> <returns>New wrapper.</returns>
+        object Wrap(object target);
 
+        /// <summary>Unwraps wrapper of supported/matched wrapper type. Otherwise throws.</summary>
+        /// <param name="wrapper">Wrapper to unwrap.</param> <returns>Unwrapped value. May be nested wrapper.</returns>
         object Unwrap(object wrapper);
     }
 
-    public static class ReusedObjectWrapper
+    /// <summary>Listing and implementations of out-of-the-box supported <see cref="IReuseWrapper"/> factories.</summary>
+    public static class ReuseWrapperFactory
     {
-        public static readonly IReusedObjectWrapper ExplicitlyDisposable = new ExplicitlyDisposableWrapper();
-        public static readonly IReusedObjectWrapper WeakRef = new WeakRefWrapper();
-        public static readonly IReusedObjectWrapper Ref = new RefWrapper();
+        /// <summary>Factory for <see cref="ReuseHiddenDisposable"/>.</summary>
+        public static readonly IReuseWrapperFactory HiddenDisposable = new HiddenDisposableFactory();
+
+        /// <summary>Factory for <see cref="ReuseWeakReference"/>.</summary>
+        public static readonly IReuseWrapperFactory WeakReference = new WeakReferenceFactory();
+
+        /// <summary>Factory for <see cref="ReuseSwapable"/>.</summary>
+        public static readonly IReuseWrapperFactory Swapable = new SwapableFactory();
+
+        /// <summary>Factory for <see cref="ReuseRecyclable"/>.</summary>
+        public static readonly IReuseWrapperFactory Recyclable = new RecyclableFactory();
 
         #region Implementation
 
-        private sealed class ExplicitlyDisposableWrapper : IReusedObjectWrapper
+        private sealed class HiddenDisposableFactory : IReuseWrapperFactory
         {
-            public object Wrap(object value)
+            public object Wrap(object target)
             {
-                return new ExplicitlyDisposableReused((value as IDisposable).ThrowIfNull());
+                return new ReuseHiddenDisposable((target as IDisposable).ThrowIfNull());
             }
 
             public object Unwrap(object wrapper)
             {
-                return (wrapper as ExplicitlyDisposableReused).ThrowIfNull().Target;
+                return (wrapper as ReuseHiddenDisposable).ThrowIfNull().Target;
             }
         }
 
-        private sealed class WeakRefWrapper : IReusedObjectWrapper
+        private sealed class WeakReferenceFactory : IReuseWrapperFactory
         {
-            public object Wrap(object value)
+            public object Wrap(object target)
             {
-                return new ReusedWeakRef(value);
+                return new ReuseWeakReference(target);
             }
 
             public object Unwrap(object wrapper)
             {
-                return (wrapper as ReusedWeakRef).ThrowIfNull().Target.ThrowIfNull(Error.WEAKREF_REUSE_WRAPPER_GCED);
+                return (wrapper as ReuseWeakReference).ThrowIfNull().Target.ThrowIfNull(Error.WEAKREF_REUSE_WRAPPER_GCED);
             }
         }
 
-        private sealed class RefWrapper : IReusedObjectWrapper
+        private sealed class SwapableFactory : IReuseWrapperFactory
         {
-            public object Wrap(object value)
+            public object Wrap(object target)
             {
-                return new RefReused(value);
+                return new ReuseSwapable(target);
             }
 
             public object Unwrap(object wrapper)
             {
-                return (wrapper as RefReused).ThrowIfNull().Target;
+                return (wrapper as ReuseSwapable).ThrowIfNull().Target;
+            }
+        }
+
+        private sealed class RecyclableFactory : IReuseWrapperFactory
+        {
+            public object Wrap(object target)
+            {
+                return new ReuseRecyclable(target);
+            }
+
+            public object Unwrap(object wrapper)
+            {
+                var recyclable = (wrapper as ReuseRecyclable).ThrowIfNull();
+                Throw.If(recyclable.IsRecycled, Error.RECYCLABLE_REUSE_WRAPPER_IS_RECYCLED);
+                return recyclable.Target;
             }
         }
 
@@ -4856,31 +4865,36 @@ namespace DryIoc
     }
 
     /// <summary>Defines reused object wrapper.</summary>
-    public interface IReused
+    public interface IReuseWrapper
     {
         /// <summary>Wrapped value.</summary>
         object Target { get; }
     }
 
-    public static class Reused
+    /// <summary>Provides strongly-typed access to wrapped target.</summary>
+    public static class ReuseWrapper
     {
-        public static object UnwrapTarget(object target)
+        /// <summary>Unwraps input until target of <typeparamref name="T"/> is found. Returns found target, otherwise returns null.</summary>
+        /// <typeparam name="T">Target to stop search on.</typeparam>
+        /// <param name="reuseWrapper">Source reused wrapper to get target from.</param>
+        public static T TargetOrDefault<T>(this IReuseWrapper reuseWrapper) where T : class
         {
-            while (target is IReused)
-                target = ((IReused)target).Target;
-            return target;
+            var target = reuseWrapper.ThrowIfNull().Target;
+            while (!(target is T) && (target is IReuseWrapper))
+                target = ((IReuseWrapper)target).Target;
+            return target as T;
         }
     }
 
     /// <summary>Marker interface used by Scope to skip dispose for reused disposable object.</summary>
-    public interface IHideDisposeFromContainer { }
+    public interface IHideDisposableFromContainer { }
 
     /// <summary>Wraps reused service object to prevent container to dispose service object. Intended to work only with <see cref="IDisposable"/> target.</summary>
-    public class ExplicitlyDisposableReused : IReused, IHideDisposeFromContainer
+    public class ReuseHiddenDisposable : IReuseWrapper, IHideDisposableFromContainer
     {
         /// <summary>Constructs wrapper by wrapping input target.</summary>
         /// <param name="target">Disposable target.</param>
-        public ExplicitlyDisposableReused(IDisposable target)
+        public ReuseHiddenDisposable(IDisposable target)
         {
             _target = target;
             _targetType = target.GetType();
@@ -4891,8 +4905,8 @@ namespace DryIoc
         {
             get
             {
-                Throw.If(IsDisposed, Error.TARGET_WAS_ALREADY_DISPOSED, _targetType, typeof(ExplicitlyDisposableReused));
-                return Reused.UnwrapTarget(_target);
+                Throw.If(IsDisposed, Error.TARGET_WAS_ALREADY_DISPOSED, _targetType, typeof(ReuseHiddenDisposable));
+                return _target;
             }
         }
 
@@ -4920,100 +4934,88 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>Strongly-typed proxy to <see cref="ExplicitlyDisposableReused"/>.</summary>
-    /// <typeparam name="T">Type of wrapped service.</typeparam>
-    public class ExplicitlyDisposableReused<T>
-    {
-        public ExplicitlyDisposableReused(ExplicitlyDisposableReused source)
-        {
-            _source = source.ThrowIfNull();
-            _source.Target.ThrowIfNotOf(typeof(T));
-        }
-
-        /// <summary>Wrapped value from under all wrappers.</summary>
-        public T Target
-        {
-            get { return (T)_source.Target; }
-        }
-
-        /// <summary>True if target was disposed.</summary>
-        public bool IsDisposed
-        {
-            get { return _source.IsDisposed; }
-        }
-
-        public void Dispose()
-        {
-            _source.Dispose();
-        }
-
-        private readonly ExplicitlyDisposableReused _source;
-    }
-
     /// <summary>Wraps reused object as <see cref="WeakReference"/>. Allow wrapped object to be garbage collected.</summary>
-    public class ReusedWeakRef : IReused
+    public class ReuseWeakReference : IReuseWrapper
     {
-        /// <summary>Source weak reference.</summary>
-        public readonly WeakReference WeakRef;
+        /// <summary>Provides access to <see cref="WeakReference"/> members.</summary>
+        public readonly WeakReference Ref;
 
         /// <summary>Wrapped value, delegates to <see cref="WeakReference.Target"/></summary>
-        public object Target { get { return WeakRef.Target; } }
+        public object Target { get { return Ref.Target; } }
 
         /// <summary>Wraps input target into weak reference</summary> <param name="value">Value to wrap.</param>
-        public ReusedWeakRef(object value)
+        public ReuseWeakReference(object value)
         {
-            WeakRef = new WeakReference(value);
+            Ref = new WeakReference(value);
         }
     }
 
-    /// <summary>Strongly typed version of <see cref="ReusedWeakRef"/>.</summary>
-    /// <typeparam name="T">Type of wrapped service. May be another <see cref="IReused"/> wrapper.</typeparam>
-    public class ReusedWeakRef<T> where T : class
+    /// <summary>Wraps reused value ref box with ability to Swap it new value. Similar to <see cref="Ref{T}"/>.</summary>
+    public sealed class ReuseSwapable : IReuseWrapper
     {
-        /// <summary>Source weak reference.</summary>
-        public readonly WeakReference WeakRef;
+        /// <summary>Wrapped value.</summary>
+        public object Target { get { return _value; } }
 
-        /// <summary>Wrapped value, delegates to <see cref="WeakReference.Target"/></summary>
-        public T Target { get { return WeakRef.Target as T; } }
-
-        /// <summary>Constructs strongly typed wrapper from input.</summary> <param name="source">Source wrapper.</param>
-        public ReusedWeakRef(ReusedWeakRef source)
+        /// <summary>Constructs ref wrapper.</summary> <param name="value">Wrapped value.</param>
+        public ReuseSwapable(object value)
         {
-            WeakRef = source.ThrowIfNull().WeakRef;
+            _value = value;
         }
+
+        /// <summary>Exchanges currently hold object with <paramref name="getValue"/> result.</summary>
+        /// <param name="getValue">Delegate to produce new object value from current one passed as parameter.</param>
+        /// <returns>Returns old object value the same way as <see cref="Interlocked.Exchange(ref int,int)"/></returns>
+        /// <remarks>Important: <paramref name="getValue"/> delegate may be called multiple times with new value each time, 
+        /// if it was changed in meantime by other concurrently running code.</remarks>
+        public object Swap(Func<object, object> getValue)
+        {
+            return Ref.Swap(ref _value, getValue);
+        }
+
+        /// <summary>Simplified version of Swap ignoring old value.</summary> <param name="newValue">New value.</param> <returns>Old value.</returns>
+        public object Swap(object newValue)
+        {
+            return Interlocked.Exchange(ref _value, newValue);
+        }
+
+        private object _value;
     }
 
-    /// <summary>Wraps reused object in <see cref="Ref{T}"/></summary>
-    public sealed class RefReused : IReused
+    /// <summary>If recycled set to True, that command Scope to create and return new value on next access.</summary>
+    public interface IRecyclable
     {
-        public readonly Ref<object> Ref; 
+        /// <summary>Indicates that value should be recycled.</summary>
+        bool IsRecycled { get; }
 
-        public object Target { get { return Ref.Value; } }
-
-        public RefReused(object value)
-        {
-            Ref = new Ref<object>(value);
-        }
+        /// <summary>Commands to recycle value.</summary>
+        void Recycle();
     }
 
-    /// <summary>Proxy to <see cref="Ref{T}"/> of <see cref="object"/> with compile-time service type specified by <typeparamref name="T"/>.</summary>
-    /// <typeparam name="T">Type of wrapped service.</typeparam>
-    public sealed class ReusedRef<T> where T : class
+    /// <summary>Wraps value with ability to be recycled, so next access to recycle value with create new value from Container.</summary>
+    public class ReuseRecyclable : IReuseWrapper, IRecyclable
     {
-        public readonly RefReused Source;
-
-        public T Target { get { return (T)Source.Target; } }
-
-        public ReusedRef(RefReused source)
+        // Wraps input value.
+        public ReuseRecyclable(object value)
         {
-            Source = source.ThrowIfNull();
-            //Throw.If(!(Source.Value is T));
+            _value = value;
         }
 
-        public T Swap(Func<T, T> getValue)
+        // Returns wrapped value.
+        public object Target
         {
-            return (T)Source.Ref.Swap(x => getValue((T)x));
+            get { return _value; }
         }
+
+        /// <summary>Indicates that value should be recycled.</summary>
+        public bool IsRecycled { get; private set; }
+
+        /// <summary>Commands to recycle value.</summary>
+        public void Recycle()
+        {
+            IsRecycled = true;
+        }
+
+        private readonly object _value;
     }
 
     /// <summary>Specifies what to return when <see cref="IResolver"/> unable to resolve service.</summary>
@@ -5095,9 +5097,23 @@ namespace DryIoc
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
     }
 
+    /// <summary>Provides scopes.</summary>
+    public interface IScopeProvider
+    {
+        /// <summary>Scope associated with container.</summary>
+        IScope SingletonScope { get; }
+
+        /// <summary>Scope associated with containers created by <see cref="Container.OpenScope"/>.
+        /// If container is not created by <see cref="Container.OpenScope"/> then it is the same as <see cref="SingletonScope"/>.</summary>
+        IScope CurrentScope { get; }
+    }
+
+    /// <summary>Provides access to both resolver and scopes to <see cref="FactoryDelegate"/>.</summary>
+    public interface IInFactoryResolver : IResolver, IScopeProvider { }
+
     /// <summary>Exposes operations required for internal registry access. 
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
-    public interface IContainer : IResolver, IRegistrator, IDisposable
+    public interface IContainer : IResolver, IRegistrator, IScopeProvider, IDisposable
     {
         /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
         Request EmptyRequest { get; }
@@ -5110,13 +5126,6 @@ namespace DryIoc
 
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
-
-        /// <summary>Scope associated with container.</summary>
-        IScope SingletonScope { get; }
-
-        /// <summary>Scope associated with containers created by <see cref="Container.OpenScope"/>.
-        /// If container is not created by <see cref="Container.OpenScope"/> then it is the same as <see cref="SingletonScope"/>.</summary>
-        IScope CurrentScope { get; }
 
         /// <summary>Closure for objects required for <see cref="FactoryDelegate"/> invocation.
         /// Accumulates the objects, but could be dropped off without an issue, like cache.</summary>
@@ -5379,8 +5388,8 @@ namespace DryIoc
             IS_NOT_OF_TYPE                                  = Of("Argument {0} is not of type {1}."),
             TYPE_IS_NOT_OF_TYPE                             = Of("Type argument {0} is not assignable from type {1}."),
 
-            UNABLE_TO_RESOLVE_SERVICE                       = Of("Unable to resolve {0}." + Environment.NewLine 
-                                                                + "Please register service OR adjust container resolution rules."),
+            UNABLE_TO_RESOLVE_SERVICE                       = Of("Unable to resolve {0}." + Environment.NewLine
+                                                                + "Please register service, or specify @requiredServiceType while resolving, or add Rules.WithUnknownServiceResolvers(MyRule)."),
             EXPECTED_SINGLE_DEFAULT_FACTORY                 = Of("Expecting single default registration of {0} but found many:" + Environment.NewLine 
                                                                 + "{1}." + Environment.NewLine
                                                                 + "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
@@ -5439,7 +5448,8 @@ namespace DryIoc
             WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE       = Of("Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}."),
             NO_MATCHED_SCOPE_FOUND                          = Of("Unable to find scope with matching name \"{0}\" in current scope reuse."),
             UNABLE_TO_NEW_OPEN_GENERIC                      = Of("Unable to New not concrete/open-generic type {0}."),
-            REG_REUSED_OBJ_WRAPPER_IS_NOT_IREUSED           = Of("Registered reused object wrapper at index {0} of {1} does not implement expected {2} interface.");
+            REG_REUSED_OBJ_WRAPPER_IS_NOT_IREUSED           = Of("Registered reused object wrapper at index {0} of {1} does not implement expected {2} interface."),
+            RECYCLABLE_REUSE_WRAPPER_IS_RECYCLED            = Of("Recyclable wrapper is recycled.");
 #pragma warning restore 1591
 
         private static int Of(string message)
@@ -6381,20 +6391,21 @@ namespace DryIoc
             return new Ref<T>(value);
         }
 
-        /// <summary>First, it evaluates new value using <paramref name="getValue"/> function. 
+        /// <summary>First, it evaluates new value using <paramref name="getNewValue"/> function. 
         /// Second, it checks that original value is not changed. 
-        /// If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getValue"/>).</summary>
+        /// If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getNewValue"/>).</summary>
         /// <typeparam name="T">Type of value to swap.</typeparam>
         /// <param name="value">Reference to change to new value</param>
-        /// <param name="getValue">Delegate to get value from old one: Could be called multiple times to retry attempt with newly updated value.</param>
+        /// <param name="getNewValue">Delegate to get value from old one.</param>
         /// <returns>Old/original value. By analogy with <see cref="Interlocked.Exchange(ref int,int)"/>.</returns>
-        public static T Swap<T>(ref T value, Func<T, T> getValue) where T : class
+        /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
+        public static T Swap<T>(ref T value, Func<T, T> getNewValue) where T : class
         {
             var retryCount = 0;
             while (true)
             {
                 var oldValue = value;
-                var newValue = getValue(oldValue);
+                var newValue = getNewValue(oldValue);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > RETRY_COUNT_UNTIL_THROW)
@@ -6407,7 +6418,7 @@ namespace DryIoc
             "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
     }
 
-    /// <summary>Wrapper that provides optimistic-concurrency <see cref="Swap"/> operation implemented using <see cref="Ref.Swap{T}"/>.</summary>
+    /// <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="Ref.Swap{T}"/>.</summary>
     /// <typeparam name="T">Type of object to wrap.</typeparam>
     public sealed class Ref<T> where T : class
     {
@@ -6421,12 +6432,20 @@ namespace DryIoc
             _value = initialValue;
         }
 
-        /// <summary>Exchanges currently hold object with <paramref name="getValue"/> result: see <see cref="Ref.Swap{T}"/> for details.</summary>
-        /// <param name="getValue">Delegate to produce new object value from current one passed as parameter.</param>
+        /// <summary>Exchanges currently hold object with <paramref name="getNewValue"/> result: see <see cref="Ref.Swap{T}"/> for details.</summary>
+        /// <param name="getNewValue">Delegate to produce new object value from current one passed as parameter.</param>
         /// <returns>Returns old object value the same way as <see cref="Interlocked.Exchange(ref int,int)"/></returns>
-        public T Swap(Func<T, T> getValue)
+        /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
+        public T Swap(Func<T, T> getNewValue)
         {
-            return Ref.Swap(ref _value, getValue);
+            return Ref.Swap(ref _value, getNewValue);
+        }
+
+        /// <summary>Simplified version of Swap ignoring old value.</summary>
+        /// <param name="newValue">New value to set</param> <returns>Old value.</returns>
+        public T Swap(T newValue)
+        {
+            return Interlocked.Exchange(ref _value, newValue);
         }
 
         private T _value;

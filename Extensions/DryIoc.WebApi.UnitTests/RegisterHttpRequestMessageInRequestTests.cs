@@ -25,13 +25,13 @@ namespace DryIoc.WebApi.UnitTests
 
             container.Register<A>();
             container.RegisterInstance(default(SomeRequest),
-                WebReuse.InRequest, Setup.Default.WithReuseWrappers(typeof(RefReused)));
+                WebReuse.InRequest, Setup.With(reuseWrappers: typeof(ReuseSwapable)));
 
             var request1 = Task.Run(async () =>
             {
                 var request = new SomeRequest();
                 var scope = container.OpenScope();
-                scope.Resolve<ReusedRef<SomeRequest>>().Swap(_ => request);
+                scope.Resolve<ReuseSwapable>(typeof(SomeRequest)).Swap(request);
 
                 await Task.Delay(5);//processing request
                 Assert.AreSame(request, scope.Resolve<A>().Request);
@@ -41,7 +41,7 @@ namespace DryIoc.WebApi.UnitTests
             {
                 var request = new SomeRequest();
                 var scope = container.OpenScope();
-                scope.Resolve<ReusedRef<SomeRequest>>().Swap(_ => request);
+                scope.Resolve<ReuseSwapable>(typeof(SomeRequest)).Swap(request);
                 await Task.Delay(2);//processing request
                 Assert.AreSame(request, scope.Resolve<A>().Request);
             });
