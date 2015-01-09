@@ -144,6 +144,26 @@ namespace DryIoc.UnitTests
             Assert.That(ex.Message, Is.StringContaining("Unable to resolve Lazy"));
         }
 
+        [Test]
+        public void Lazy_dependency_is_injected_as_nested_Resolve_method()
+        {
+            var container = new Container();
+            container.Register<Foo>();            
+            container.Register<IDependency, BarDependency>();
+
+            var fooExpr = container.Resolve<FactoryExpression<Foo>>();
+
+            Assert.That(fooExpr.Value.ToString(), Is.StringContaining("Resolve(null, Throw, null)"));
+        }
+
+        internal class BarDependency : IDependency {}
+
+        internal class Foo
+        {
+            public IDependency Dep { get; private set; }
+            public Foo(Lazy<IDependency> dep) { Dep = dep.Value; }
+        }
+
         internal class Me
         {
             public Lazy<Me> Self { get; private set; }
@@ -154,4 +174,5 @@ namespace DryIoc.UnitTests
             }
         }
     }
+
 }

@@ -9,7 +9,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Append_to_end()
         {
-            var store = AppendableArray<string>.Empty;
+            var store = AppendableArray.Empty;
             store = store
                 .Append("a")
                 .Append("b")
@@ -25,7 +25,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Indexed_store_get_or_add()
         {
-            var store = AppendableArray<string>.Empty;
+            var store = AppendableArray.Empty;
 
             store = store
                 .Append("a")
@@ -41,7 +41,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void IndexOf_with_empty_store()
         {
-            var store = AppendableArray<string>.Empty;
+            var store = AppendableArray.Empty;
 
             Assert.AreEqual(-1, store.IndexOf("a"));
         }
@@ -49,7 +49,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void IndexOf_non_existing_item()
         {
-            var store = AppendableArray<string>.Empty;
+            var store = AppendableArray.Empty;
 
             store = store.Append("a");
 
@@ -59,7 +59,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void IndexOf_existing_item()
         {
-            var store = AppendableArray<string>.Empty;
+            var store = AppendableArray.Empty;
 
             store = store
                 .Append("a")
@@ -72,8 +72,8 @@ namespace DryIoc.UnitTests
         [Test]
         public void Append_for_full_node_and_get_node_last_item()
         {
-            var nodeArrayLength = AppendableArray<int>.NODE_ARRAY_SIZE;
-            var array = AppendableArray<int>.Empty;
+            var nodeArrayLength = AppendableArray.NODE_ARRAY_SIZE;
+            var array = AppendableArray.Empty;
             for (var i = 0; i <= nodeArrayLength; i++)
                 array = array.Append(i);
 
@@ -87,7 +87,7 @@ namespace DryIoc.UnitTests
         public void Append_and_get_items_in_multiple_node_array()
         {
             var list = new List<Foo>();
-            var array = AppendableArray<Foo>.Empty;
+            var array = AppendableArray.Empty;
 
             for (var index = 0; index < 129; ++index)
             {
@@ -103,7 +103,7 @@ namespace DryIoc.UnitTests
                 var arrayItem = array.Get(index);
 
                 Assert.AreEqual(index, listItem.Index);
-                Assert.AreEqual(index, arrayItem.Index);
+                Assert.AreEqual(index, ((Foo)arrayItem).Index);
             }
         }
 

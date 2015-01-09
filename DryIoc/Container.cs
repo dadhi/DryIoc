@@ -129,10 +129,10 @@ namespace DryIoc
         public IContainer CreateChildContainer(bool shareSingletons = false)
         {
             ThrowIfContainerDisposed();
-            var parent = _containerWeakRef;
+            var parentContainerWeakRef = _containerWeakRef;
             var inheritedRules = Rules.WithUnknownServiceResolvers(childRequest =>
             {
-                var childRequestWithParentContainer = childRequest.SwitchContainer(parent);
+                var childRequestWithParentContainer = childRequest.SwitchContainer(parentContainerWeakRef);
                 var factory = childRequestWithParentContainer.Container.ResolveFactory(childRequestWithParentContainer);
                 return factory == null ? null 
                     : new ExpressionFactory(request => factory.GetExpressionOrDefault(request));
@@ -192,12 +192,18 @@ namespace DryIoc
 
         #region Static state
 
-        internal static readonly ParameterExpression StateParamExpr = Expression.Parameter(typeof(AppendableArray<object>), "state");
+        internal static readonly ParameterExpression StateParamExpr = Expression.Parameter(typeof(AppendableArray), "state");
 
         internal static readonly ParameterExpression ContainerWeakRefParamExpr = Expression.Parameter(typeof(ContainerWeakRef), "containerRef");
         internal static readonly Expression ContainerExpr = Expression.Property(ContainerWeakRefParamExpr, "Target");
 
         internal static readonly ParameterExpression ScopeParamExpr = Expression.Parameter(typeof(IScope), "scope");
+
+        internal static IContainer ThrowIfContainerGCedOrDisposed(WeakReference containerWeakRef)
+        {
+            var container = (containerWeakRef.Target as IContainer).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
+            return container.ThrowIf(container.IsDisposed, Error.CONTAINER_IS_DISPOSED);
+        }
 
         #endregion
 
@@ -902,7 +908,7 @@ namespace DryIoc
         private static int _lastContainerID;
         private readonly int _containerID;
 
-        private ContainerWeakRef _containerWeakRef;
+        private WeakReference _containerWeakRef;
         private readonly Request _emptyRequest;
         private int _disposed;
 
@@ -947,7 +953,7 @@ namespace DryIoc
             _keyedFactoryDelegatesCache = resolvedKeyedDelegates ?? Ref.Of(HashTree<Type, HashTree<object, FactoryDelegate>>.Empty);
             _resolutionStateCache = resolutionStateCache ?? new ResolutionStateCache();
 
-            _containerWeakRef = new ContainerWeakRef(this);
+            _containerWeakRef = new WeakReference(this);
             _emptyRequest = Request.CreateEmpty(_containerWeakRef, new WeakReference(_resolutionStateCache));
         }
 
@@ -1020,10 +1026,10 @@ namespace DryIoc
     {
         /// <summary>Creates resolution state.</summary>
         public ResolutionStateCache()
-            : this(AppendableArray<object>.Empty, HashTree<int, Expression>.Empty, HashTree<int, Expression>.Empty) { }
+            : this(AppendableArray.Empty, HashTree<int, Expression>.Empty, HashTree<int, Expression>.Empty) { }
 
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
-        public AppendableArray<object> Items
+        public AppendableArray Items
         {
             get { return _items; }
         }
@@ -1085,21 +1091,21 @@ namespace DryIoc
         /// <summary>Removes state items and expression cache.</summary>
         public void Dispose()
         {
-            _items = AppendableArray<object>.Empty;
+            _items = AppendableArray.Empty;
             _itemsExpressions = HashTree<int, Expression>.Empty;
             _factoryExpressions = HashTree<int, Expression>.Empty;
         }
 
         #region Implementation
 
-        private static readonly MethodInfo _getItemMethod = typeof(AppendableArray<object>).GetSingleDeclaredMethodOrNull("Get");
+        private static readonly MethodInfo _getItemMethod = typeof(AppendableArray).GetSingleDeclaredMethodOrNull("Get");
 
-        private AppendableArray<object> _items;
+        private AppendableArray _items;
         private HashTree<int, Expression> _itemsExpressions;
         private HashTree<int, Expression> _factoryExpressions;
 
         private ResolutionStateCache(
-            AppendableArray<object> items,
+            AppendableArray items,
             HashTree<int, Expression> itemsExpressions,
             HashTree<int, Expression> factoryExpressions)
         {
@@ -1113,35 +1119,34 @@ namespace DryIoc
 
     /// <summary>Immutable array based on wide hash tree, where each node is sub-array with predefined size: 32 is by default.
     /// Array supports only append, no remove.</summary>
-    /// <typeparam name="T">Array item type.</typeparam>
-    public class AppendableArray<T>
+    public class AppendableArray
     {
         /// <summary>Empty/default value to start from.</summary>
-        public static readonly AppendableArray<T> Empty = new AppendableArray<T>(0);
+        public static readonly AppendableArray Empty = new AppendableArray(0);
 
         /// <summary>Number of items in array.</summary>
         public readonly int Length;
 
         /// <summary>Appends value and returns new array.</summary>
         /// <param name="value">Value to append.</param> <returns>New array.</returns>
-        public virtual AppendableArray<T> Append(T value)
+        public virtual AppendableArray Append(object value)
         {
             return Length < NODE_ARRAY_SIZE
-                ? new AppendableArray<T>(Length + 1, _items.AppendOrUpdate(value))
-                : new AppendableArrayTree(Length, HashTree<int, T[]>.Empty.AddOrUpdate(0, _items)).Append(value);
+                ? new AppendableArray(Length + 1, _items.AppendOrUpdate(value))
+                : new AppendableArrayTree(Length, HashTree<int, object[]>.Empty.AddOrUpdate(0, _items)).Append(value);
         }
 
         /// <summary>Returns item stored at specified index. Method relies on underlying array for index range checking.</summary>
         /// <param name="index">Index to look for item.</param> <returns>Found item.</returns>
         /// <exception cref="ArgumentOutOfRangeException">from underlying node array.</exception>
-        public virtual T Get(int index)
+        public virtual object Get(int index)
         {
             return _items[index];
         }
 
         /// <summary>Returns index of first equal value in array if found, or -1 otherwise.</summary>
         /// <param name="value">Value to look for.</param> <returns>Index of first equal value, or -1 otherwise.</returns>
-        public virtual int IndexOf(T value)
+        public virtual int IndexOf(object value)
         {
             if (_items == null || _items.Length == 0)
                 return -1;
@@ -1161,31 +1166,31 @@ namespace DryIoc
         /// So if array is too big performance will degrade. Should be power of two: e.g. 2, 4, 8, 16, 32...</summary>
         internal const int NODE_ARRAY_SIZE = 32;
 
-        private readonly T[] _items;
+        private readonly object[] _items;
 
-        private AppendableArray(int length, T[] items = null)
+        private AppendableArray(int length, object[] items = null)
         {
             Length = length;
             _items = items;
         }
 
-        private sealed class AppendableArrayTree : AppendableArray<T>
+        private sealed class AppendableArrayTree : AppendableArray
         {
             private const int NODE_ARRAY_BIT_MASK = NODE_ARRAY_SIZE - 1; // for length 32 will be 11111 binary.
             private const int NODE_ARRAY_BIT_COUNT = 5;                  // number of set bits in NODE_ARRAY_BIT_MASK.
 
-            public override AppendableArray<T> Append(T value)
+            public override AppendableArray Append(object value)
             {
                 return new AppendableArrayTree(Length + 1,
                     _tree.AddOrUpdate(Length >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
             }
 
-            public override T Get(int index)
+            public override object Get(int index)
             {
                 return _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BIT_MASK];
             }
 
-            public override int IndexOf(T value)
+            public override int IndexOf(object value)
             {
                 foreach (var node in _tree.Enumerate())
                 {
@@ -1204,50 +1209,46 @@ namespace DryIoc
                 return -1;
             }
 
-            public AppendableArrayTree(int length, HashTree<int, T[]> tree)
+            public AppendableArrayTree(int length, HashTree<int, object[]> tree)
                 : base(length)
             {
                 _tree = tree;
             }
 
-            private readonly HashTree<int, T[]> _tree;
+            private readonly HashTree<int, object[]> _tree;
         }
 
         #endregion
     }
 
     /// <summary>Wraps <see cref="IContainer"/> WeakReference with more specialized exceptions on access to GCed or disposed container.</summary>
-    public sealed class ContainerWeakRef
+    public struct ContainerWeakRef
     {
-        /// <summary>Retrieves container instance if it is not GCed or disposed</summary>
-        /// <exception cref="ContainerException">With code <see cref="Error.CONTAINER_IS_GARBAGE_COLLECTED"/>.</exception>
-        /// <exception cref="ContainerException">With code <see cref="Error.CONTAINER_IS_DISPOSED"/>.</exception>
-        public IContainer Target
+        public static implicit operator ContainerWeakRef(WeakReference container)
         {
-            get
-            {
-                var container = (_ref.Target as IContainer).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
-                return container.ThrowIf(container.IsDisposed, Error.CONTAINER_IS_DISPOSED);
-            }
+            return new ContainerWeakRef(container);
         }
+
+        /// <summary>Retrieves container instance if it is not GCed or disposed</summary>
+        public IContainer Target { get { return Container.ThrowIfContainerGCedOrDisposed(_container); } }
 
         /// <summary>Creates weak reference wrapper over passed container object.</summary> <param name="container">Object to wrap.</param>
-        public ContainerWeakRef(IContainer container)
+        public ContainerWeakRef(WeakReference container)
         {
-            _ref = new WeakReference(container);
+            _container = container;
         }
 
-        private readonly WeakReference _ref;
+        private WeakReference _container;
     }
 
     /// <summary>The delegate type which is actually used to create service instance by container.
-    /// Delegate instance required to be static with all information supplied by <paramref name="state"/> and <paramref name="resolutionScope"/>
+    /// Delegate instance required to be static with all information supplied by <paramref name="state"/> and <paramref name="scope"/>
     /// parameters. The requirement is due to enable compilation to DynamicMethod in DynamicAssembly, and also to simplify
     /// state management: and so minimize memory leaks.</summary>
     /// <param name="state">All the state items available in resolution root (<see cref="ResolutionStateCache"/>).</param>
-    /// <param name="resolutionScope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
+    /// <param name="scope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
     /// <returns>Created service object.</returns>
-    public delegate object FactoryDelegate(AppendableArray<object> state, ContainerWeakRef containerWeakRef, IScope resolutionScope);
+    public delegate object FactoryDelegate(AppendableArray state, ContainerWeakRef containerWeakRef, IScope scope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
     public static partial class FactoryCompiler
@@ -3105,7 +3106,7 @@ namespace DryIoc
         /// <returns>Request with replaced container.</returns>
         public Request SwitchContainer(ContainerWeakRef containerWeakRef)
         {
-            return new Request(Parent, containerWeakRef.ThrowIfNull(), _stateCacheWeakRef, _scope, ServiceInfo, ResolvedFactory, FuncArgs);
+            return new Request(Parent, containerWeakRef, _stateCacheWeakRef, _scope, ServiceInfo, ResolvedFactory, FuncArgs);
         }
 
         /// <summary>Returns new request with set <see cref="ResolvedFactory"/>.</summary>
@@ -4659,7 +4660,7 @@ namespace DryIoc
 
         /// <summary>Locates or creates scope where to store reused service objects.</summary>
         /// <returns>Located scope.</returns>
-        IScope GetScope(IScopeProvider container, ref IScope resolutionScope);
+        IScope GetScope(IScopeProvider scopeProvider, ref IScope resolutionScope);
     }
 
     /// <summary>Returns container bound scope for storing singleton objects.</summary>

@@ -119,6 +119,21 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(ex.Error, Error.CONTAINER_IS_DISPOSED);
         }
 
+        //[Test]
+        //public void Attach_multiple_parents()
+        //{
+        //    var parent = new Container();
+        //    parent.Register<FruitJuice>();
+        //    parent.Register<IFruit, Melon>();
+
+        //    var container = new Container();
+        //    container.With(rules => rules.WithUnknownServiceResolvers(request =>
+        //    {
+
+        //    }));
+
+        //}
+
         #region CUT
 
         public interface IFruit { }

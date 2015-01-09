@@ -276,7 +276,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_resolve_only_propeties()
+        public void Can_resolve_only_properties()
         {
             var container = new Container();
             container.Register<IService, Service>();
