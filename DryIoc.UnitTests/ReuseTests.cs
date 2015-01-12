@@ -222,7 +222,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_throw_if_rule_specified_and_dependency_lifespan_is_less_than_parents()
         {
-            var container = new Container(rules => rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(true));
+            var container = new Container();
             container.Register<Client>(Reuse.Singleton);
             container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
 
@@ -239,7 +239,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_Not_throw_if_rule_is_off_and_dependency_lifespan_is_less_than_parents()
         {
-            var container = new Container(rules => rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false));
+            var container = new Container(rules => rules.WithoutThrowIfDepenedencyHasShorterReuseLifespan());
             container.Register<Client>(Reuse.Singleton);
             container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
 

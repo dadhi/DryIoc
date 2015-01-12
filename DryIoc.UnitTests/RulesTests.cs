@@ -163,93 +163,104 @@ namespace DryIoc.UnitTests
 
             return ParameterServiceInfo.Of(parameter).WithDetails(ServiceInfoDetails.Of(serviceType, factory.Key), request);
         }
-    }
 
-    #region CUT
-
-    public class SomeService { }
-
-    public class Bla<T>
-    {
-        public string Message { get; set; }
-        public Func<T> Factory { get; set; }
-
-        public Bla(string message)
+        [Test]
+        public void Can_turn_Off_singleton_optimization()
         {
-            Message = message;
+            var container = new Container(r => r.WithoutSingletonOptimization());
+            container.Register<FooHey>(Reuse.Singleton);
+
+            var singleton = container.Resolve<FactoryExpression<FooHey>>();
+
+            Assert.That(singleton.Value.ToString(), Is.StringContaining("GetScope"));
         }
 
-        public Bla(Func<T> factory)
+        #region CUT
+
+        public class SomeService { }
+
+        public class Bla<T>
         {
-            Factory = factory;
-        }
-    }
+            public string Message { get; set; }
+            public Func<T> Factory { get; set; }
 
-    enum FooMetadata { Hey, Blah }
+            public Bla(string message)
+            {
+                Message = message;
+            }
 
-    public interface IFooService
-    {
-    }
-
-    public class FooHey : IFooService
-    {
-    }
-
-    public class FooBlah : IFooService
-    {
-    }
-
-    [AttributeUsage(AttributeTargets.Parameter)]
-    public class ImportWithMetadataAttribute : Attribute
-    {
-        public ImportWithMetadataAttribute(object metadata)
-        {
-            Metadata = metadata.ThrowIfNull();
+            public Bla(Func<T> factory)
+            {
+                Factory = factory;
+            }
         }
 
-        public readonly object Metadata;
-    }
+        enum FooMetadata { Hey, Blah }
 
-    public class FooConsumer
-    {
-        public Lazy<IFooService> Foo { get; set; }
-
-        public FooConsumer([ImportWithMetadata(FooMetadata.Blah)] Lazy<IFooService> foo)
+        public interface IFooService
         {
-            Foo = foo;
         }
-    }
 
-    public class TransientOpenGenericService<T>
-    {
-        public T Value { get; set; }
-    }
-
-    public interface INamedService
-    {
-    }
-
-    public class NamedService : INamedService
-    {
-    }
-
-    public class AnotherNamedService : INamedService
-    {
-    }
-
-    public class ServiceWithImportedCtorParameter
-    {
-        public INamedService NamedDependency { get; set; }
-
-        public ServiceWithImportedCtorParameter([Import("blah")]INamedService namedDependency)
+        public class FooHey : IFooService
         {
-            NamedDependency = namedDependency;
         }
-    }
 
-    class NotRegisteredService
-    {
-    }
+        public class FooBlah : IFooService
+        {
+        }
 
-    #endregion
+        [AttributeUsage(AttributeTargets.Parameter)]
+        public class ImportWithMetadataAttribute : Attribute
+        {
+            public ImportWithMetadataAttribute(object metadata)
+            {
+                Metadata = metadata.ThrowIfNull();
+            }
+
+            public readonly object Metadata;
+        }
+
+        public class FooConsumer
+        {
+            public Lazy<IFooService> Foo { get; set; }
+
+            public FooConsumer([ImportWithMetadata(FooMetadata.Blah)] Lazy<IFooService> foo)
+            {
+                Foo = foo;
+            }
+        }
+
+        public class TransientOpenGenericService<T>
+        {
+            public T Value { get; set; }
+        }
+
+        public interface INamedService
+        {
+        }
+
+        public class NamedService : INamedService
+        {
+        }
+
+        public class AnotherNamedService : INamedService
+        {
+        }
+
+        public class ServiceWithImportedCtorParameter
+        {
+            public INamedService NamedDependency { get; set; }
+
+            public ServiceWithImportedCtorParameter([Import("blah")]INamedService namedDependency)
+            {
+                NamedDependency = namedDependency;
+            }
+        }
+
+        class NotRegisteredService
+        {
+        }
+
+        #endregion
+    }
 }

@@ -86,7 +86,7 @@ namespace DryIoc
                 "GetService", 
                 MethodAttributes.Public | MethodAttributes.Static,
                 typeof(object),
-                new[] { typeof(AppendableArray), typeof(ContainerWeakRef), typeof(IScope) });
+                new[] { typeof(AppendableArray), typeof(IResolverProvider), typeof(IScope) });
 
             factoryExpression.CompileToMethod(methodBuilder);
 
