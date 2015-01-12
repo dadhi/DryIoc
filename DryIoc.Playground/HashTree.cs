@@ -4,6 +4,8 @@ using System.Collections.Generic;
 
 namespace DryIoc.Playground
 {
+    public delegate bool IsUpdated<V>(V oldValue, out V updatedValue);
+
     /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.</summary>
     public sealed class HashTree<K, V>
     {
