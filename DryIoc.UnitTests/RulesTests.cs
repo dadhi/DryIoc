@@ -172,7 +172,7 @@ namespace DryIoc.UnitTests
 
             var singleton = container.Resolve<FactoryExpression<FooHey>>();
 
-            Assert.That(singleton.Value.ToString(), Is.StringContaining("GetScope"));
+            Assert.That(singleton.Value.ToString(), Is.StringContaining("SingletonScope"));
         }
 
         #region CUT
