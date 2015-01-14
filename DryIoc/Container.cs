@@ -380,6 +380,7 @@ namespace DryIoc
                     UnregisterProvidedFactories(f, factoryType);
         }
 
+        // TODO: Replace with factory Dispose?
         private void UnregisterProvidedFactories(Factory factory, FactoryType factoryType)
         {
             if (factory != null && factory.ProvidesFactoryForRequest && !factory.ProvidedFactories.IsEmpty)
@@ -1336,62 +1337,59 @@ namespace DryIoc
         {
             Wrappers = HashTree<Type, Factory>.Empty;
 
-            var arrayFactory = new FactoryProvider(_ =>
-                new ExpressionFactory(GetArrayExpression), SetupWrapper.Default);
-
+            // Register array and its collection/list interfaces.
+            var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: SetupWrapper.Default);
             var arrayInterfaces = typeof(object[]).GetImplementedInterfaces()
                 .Where(t => t.IsGeneric()).Select(t => t.GetGenericDefinitionOrNull());
-
             foreach (var arrayInterface in arrayInterfaces)
-                Wrappers = Wrappers.AddOrUpdate(arrayInterface, arrayFactory);
+                Wrappers = Wrappers.AddOrUpdate(arrayInterface, arrayExpr);
 
             Wrappers = Wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
-                new FactoryProvider(r => NestedInFuncWithArgs(r) ? null : new ExpressionFactory(GetLazyEnumerableExpression),
-                    SetupWrapper.Default));
+                new ExpressionFactory(GetLazyEnumerableExpressionOrDefault,
+                    setup: SetupWrapper.Default));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(Lazy<>),
-                new FactoryProvider(r => NestedInFuncWithArgs(r) ? null : new ExpressionFactory(GetLazyExpression),
-                    SetupWrapper.Default));
+                new ExpressionFactory(GetLazyExpressionOrDefault, setup: SetupWrapper.Default));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
-                new FactoryProvider(GetKeyValuePairFactoryOrDefault,
-                    SetupWrapper.With(t => t.GetGenericParamsAndArgs()[1])));
+                new ExpressionFactory(GetKeyValuePairExpressionOrDefault,
+                    setup: SetupWrapper.With(t => t.GetGenericParamsAndArgs()[1])));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(Meta<,>),
-                new FactoryProvider(GetMetaFactoryOrDefault,
-                    SetupWrapper.With(t => t.GetGenericParamsAndArgs()[0])));
+                new ExpressionFactory(GetMetaExpressionOrDefault,
+                    setup: SetupWrapper.With(t => t.GetGenericParamsAndArgs()[0])));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(ResolutionScoped<>),
-                new FactoryProvider(GetResolutionScopedFactoryOrDefault, SetupWrapper.Default));
+                new ExpressionFactory(GetResolutionScopedExpressionOrDefault, setup: SetupWrapper.Default));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(FactoryExpression<>),
-                new FactoryProvider(_ => new ExpressionFactory(GetDebugExpression), SetupWrapper.Default));
+                new ExpressionFactory(GetFactoryExpression, setup: SetupWrapper.Default));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(Func<>),
-                new FactoryProvider(_ => new ExpressionFactory(GetFuncExpression), SetupWrapper.Default));
+                new ExpressionFactory(GetFuncExpression, setup: SetupWrapper.Default));
 
             for (var i = 0; i < FuncTypes.Length; i++)
-                Wrappers = Wrappers.AddOrUpdate(FuncTypes[i], new FactoryProvider(
-                    r => new ExpressionFactory(GetFuncExpression),
-                    SetupWrapper.With(t => t.GetGenericParamsAndArgs().Last())));
+                Wrappers = Wrappers.AddOrUpdate(FuncTypes[i],
+                    new ExpressionFactory(GetFuncExpression,
+                        setup: SetupWrapper.With(t => t.GetGenericParamsAndArgs().Last())));
 
             // Reuse wrappers
             Wrappers = Wrappers
-                .AddOrUpdate(typeof(ReuseHiddenDisposable), new FactoryProvider(
-                    r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
-                    SetupWrapper.With(t => typeof(object), ReuseWrapperFactory.HiddenDisposable)))
+                .AddOrUpdate(typeof(ReuseHiddenDisposable), 
+                    new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
+                        setup: SetupWrapper.With(t => typeof(object), ReuseWrapperFactory.HiddenDisposable)))
 
-                .AddOrUpdate(typeof(ReuseWeakReference), new FactoryProvider(
-                    r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
-                    SetupWrapper.With(_ => typeof(object), ReuseWrapperFactory.WeakReference)))
+                .AddOrUpdate(typeof(ReuseWeakReference),
+                    new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
+                        setup: SetupWrapper.With(_ => typeof(object), ReuseWrapperFactory.WeakReference)))
 
-                .AddOrUpdate(typeof(ReuseSwapable), new FactoryProvider(
-                    r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
-                    SetupWrapper.With(t => typeof(object), ReuseWrapperFactory.Swapable)))
+                .AddOrUpdate(typeof(ReuseSwapable),
+                    new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
+                        setup: SetupWrapper.With(t => typeof(object), ReuseWrapperFactory.Swapable)))
 
-                .AddOrUpdate(typeof(ReuseRecyclable), new FactoryProvider(
-                    r => new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault),
-                    SetupWrapper.With(t => typeof(object), ReuseWrapperFactory.Recyclable)));
+                .AddOrUpdate(typeof(ReuseRecyclable),
+                    new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
+                        setup: SetupWrapper.With(t => typeof(object), ReuseWrapperFactory.Recyclable)));
         }
 
         /// <summary>Unregistered/fallback wrapper resolution rule.</summary>
@@ -1456,8 +1454,11 @@ namespace DryIoc
         private static readonly MethodInfo _resolveManyMethod =
             typeof(IResolver).GetSingleDeclaredMethodOrNull("ResolveMany").ThrowIfNull();
 
-        private static Expression GetLazyEnumerableExpression(Request request)
+        private static Expression GetLazyEnumerableExpressionOrDefault(Request request)
         {
+            if (IsNestedInFuncWithArgs(request))
+                return null;
+
             var wrapperType = request.ServiceType;
             var itemServiceType = wrapperType.GetGenericParamsAndArgs()[0];
             var itemRequiredServiceType = request.Container.UnwrapServiceType(request.RequiredServiceType ?? itemServiceType);
@@ -1483,8 +1484,11 @@ namespace DryIoc
             .GetDeclaredMethodOrNull("Resolve", typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type)).ThrowIfNull();
 
         // Result: r => new Lazy<TService>(() => r.Resolver.Resolve<TService>(key, ifUnresolved, requiredType));
-        private static Expression GetLazyExpression(Request request)
+        private static Expression GetLazyExpressionOrDefault(Request request)
         {
+            if (IsNestedInFuncWithArgs(request))
+                return null;
+
             var wrapperType = request.ServiceType;
             var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
             var wrapperCtor = wrapperType.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(serviceType));
@@ -1503,7 +1507,7 @@ namespace DryIoc
             return Expression.New(wrapperCtor, factoryExpr);
         }
 
-        private static bool NestedInFuncWithArgs(Request request)
+        private static bool IsNestedInFuncWithArgs(Request request)
         {
             return !request.Parent.IsEmpty && request.Parent.Enumerate()
                 .TakeWhile(r => r.ResolvedFactory.FactoryType == FactoryType.Wrapper)
@@ -1529,7 +1533,7 @@ namespace DryIoc
             return serviceExpr == null ? null : Expression.Lambda(funcType, serviceExpr, funcArgExprs);
         }
 
-        private static Expression GetDebugExpression(Request request)
+        private static Expression GetFactoryExpression(Request request)
         {
             var ctor = request.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
             var serviceType = request.ServiceType.GetGenericParamsAndArgs()[0];
@@ -1539,7 +1543,7 @@ namespace DryIoc
             return expr == null ? null : Expression.New(ctor, request.StateCache.GetOrAddItemExpression(expr.WrapIntoFactoryExpression()));
         }
 
-        private static Factory GetKeyValuePairFactoryOrDefault(Request request)
+        private static Expression GetKeyValuePairExpressionOrDefault(Request request)
         {
             var typeArgs = request.ServiceType.GetGenericParamsAndArgs();
             var serviceKeyType = typeArgs[0];
@@ -1549,21 +1553,19 @@ namespace DryIoc
                 return null;
 
             var serviceType = typeArgs[1];
-            return new ExpressionFactory(pairRequest =>
-            {
-                var serviceRequest = pairRequest.Push(serviceType, serviceKey);
-                var serviceFactory = request.Container.ResolveFactory(serviceRequest);
-                var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
-                if (serviceExpr == null)
-                    return null;
-                var pairCtor = pairRequest.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
-                var keyExpr = pairRequest.StateCache.GetOrAddItemExpression(serviceKey, serviceKeyType);
-                var pairExpr = Expression.New(pairCtor, keyExpr, serviceExpr);
-                return pairExpr;
-            });
+            var serviceRequest = request.Push(serviceType, serviceKey);
+            var serviceFactory = request.Container.ResolveFactory(serviceRequest);
+            var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
+            if (serviceExpr == null)
+                return null;
+            
+            var pairCtor = request.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
+            var keyExpr = request.StateCache.GetOrAddItemExpression(serviceKey, serviceKeyType);
+            var pairExpr = Expression.New(pairCtor, keyExpr, serviceExpr);
+            return pairExpr;
         }
 
-        private static Factory GetMetaFactoryOrDefault(Request request)
+        private static Expression GetMetaExpressionOrDefault(Request request)
         {
             var typeArgs = request.ServiceType.GetGenericParamsAndArgs();
             var metadataType = typeArgs[1];
@@ -1597,36 +1599,30 @@ namespace DryIoc
             if (resultMetadata == null)
                 return null;
 
-            return new ExpressionFactory(req =>
-            {
-                var serviceRequest = req.Push(serviceType, serviceKey);
-                var serviceFactory = container.ResolveFactory(serviceRequest);
-                var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
-                if (serviceExpr == null)
-                    return null;
-                var metaCtor = req.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
-                var metadataExpr = req.StateCache.GetOrAddItemExpression(resultMetadata, metadataType);
-                var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
-                return metaExpr;
-            });
+            var serviceRequest = request.Push(serviceType, serviceKey);
+            var serviceFactory = container.ResolveFactory(serviceRequest);
+            var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
+            if (serviceExpr == null)
+                return null;
+            var metaCtor = request.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
+            var metadataExpr = request.StateCache.GetOrAddItemExpression(resultMetadata, metadataType);
+            var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
+            return metaExpr;
         }
 
-        private static Factory GetResolutionScopedFactoryOrDefault(Request request)
+        private static Expression GetResolutionScopedExpressionOrDefault(Request request)
         {
             if (!request.Parent.IsEmpty)
                 return null; // wrapper is only valid for resolution root.
 
-            return new ExpressionFactory(r =>
-            {
-                var wrapperType = request.ServiceType;
-                var wrapperCtor = wrapperType.GetSingleConstructorOrNull();
+            var wrapperType = request.ServiceType;
+            var wrapperCtor = wrapperType.GetSingleConstructorOrNull();
 
-                var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
-                var serviceRequest = r.Push(serviceType, request.ServiceKey);
-                var serviceFactory = request.Container.ResolveFactory(serviceRequest);
-                var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
-                return serviceExpr == null ? null : Expression.New(wrapperCtor, serviceExpr, Container.ResolutionScopeParamExpr);
-            });
+            var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
+            var serviceRequest = request.Push(serviceType, request.ServiceKey);
+            var serviceFactory = request.Container.ResolveFactory(serviceRequest);
+            var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
+            return serviceExpr == null ? null : Expression.New(wrapperCtor, serviceExpr, Container.ResolutionScopeParamExpr);
         }
 
         private static Expression GetReusedObjectWrapperExpressionOrDefault(Request request)
@@ -3441,8 +3437,7 @@ namespace DryIoc
     /// <item>Through reflection - <see cref="ReflectionFactory"/></item>
     /// <item>Using custom delegate - <see cref="DelegateFactory"/></item>
     /// <item>Using custom expression - <see cref="ExpressionFactory"/></item>
-    /// <item>Just use pre-created instance - <see cref="InstanceFactory"/></item>
-    /// <item>To dynamically provide factory based on Request - <see cref="FactoryProvider"/></item>
+    /// <item>Wraps externally created instance - <see cref="InstanceFactory"/></item>
     /// </list>
     /// For all of the types Factory should provide result as <see cref="Expression"/> and <see cref="FactoryDelegate"/>.
     /// Factories are supposed to be immutable as the results Cache is handled separately by <see cref="ResolutionStateCache"/>.
@@ -3473,14 +3468,6 @@ namespace DryIoc
         /// until delegate is invoked.</summary>
         public virtual Type ImplementationType { get { return null; } }
 
-        /// <summary>Indicates that Factory is factory provider and client should call <see cref="GetFactoryForRequestOrDefault"/>
-        /// to get concrete factory.</summary>
-        public virtual bool ProvidesFactoryForRequest { get { return false; } }
-
-        // TODO: May be move all provider related stuff into separate interface to stop polluting Factory.
-        /// <summary>Tracks factories created by <see cref="GetFactoryForRequestOrDefault"/>.</summary>
-        public virtual HashTree<int, KV<Type, object>> ProvidedFactories { get { return HashTree<int, KV<Type, object>>.Empty; } }
-
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
         /// <param name="reuse">(optional)</param>
         /// <param name="setup">(optional)</param>
@@ -3499,6 +3486,14 @@ namespace DryIoc
             Throw.If(serviceType.IsGenericDefinition() && !ProvidesFactoryForRequest,
                 Error.REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER, serviceType);
         }
+
+        /// <summary>Indicates that Factory is factory provider and client should call <see cref="GetFactoryForRequestOrDefault"/>
+        /// to get concrete factory.</summary>
+        public virtual bool ProvidesFactoryForRequest { get { return false; } }
+
+        // TODO: May be move all provider related stuff into separate interface to stop polluting Factory.
+        /// <summary>Tracks factories created by <see cref="GetFactoryForRequestOrDefault"/>.</summary>
+        public virtual HashTree<int, KV<Type, object>> ProvidedFactories { get { return HashTree<int, KV<Type, object>>.Empty; } }
 
         /// <summary>Method applied for factory provider, returns new factory per request.</summary>
         /// <param name="request">Request to resolve.</param> <returns>Returns new factory per request.</returns>
@@ -3538,10 +3533,7 @@ namespace DryIoc
             }
 
             var serviceExpr = noOrFuncDecorator ? CreateExpressionOrDefault(request) : decorator;
-            if (serviceExpr == null)
-                return null;
-
-            if (reuse != null)
+            if (serviceExpr != null && reuse != null)
             {
                 // When singleton scope, and no Func in request chain, and no renewable wrapper used,
                 // then reused instance could be directly inserted into delegate instead of lazy requested from Scope.
@@ -3552,9 +3544,12 @@ namespace DryIoc
                 serviceExpr = canBeInstantiated
                     ? GetInstantiatedScopedServiceExpressionOrDefault(serviceExpr, reuse, request, requiredWrapperType)
                     : GetScopedServiceExpressionOrDefault(serviceExpr, reuse, request, requiredWrapperType);
+            }
 
-                if (serviceExpr == null)
-                    return null;
+            if (serviceExpr == null)
+            {
+                Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
+                return null;
             }
 
             if (isCacheable)
@@ -4496,53 +4491,6 @@ namespace DryIoc
         }
 
         private readonly Func<IResolver, object> _factoryDelegate;
-    }
-
-    /// <summary>Creates/provides <see cref="Factory"/> based on <see cref="Request"/> for enabling context-dependent scenarios.</summary>
-    public sealed class FactoryProvider : Factory
-    {
-        public override bool ProvidesFactoryForRequest { get { return true; } }
-
-        /// <summary>Tracks factories created by <see cref="GetFactoryForRequestOrDefault"/>.</summary>
-        public override HashTree<int, KV<Type, object>> ProvidedFactories { get { return _providedFactories.Value; } }
-
-        /// <summary>Constructs factory provides out of factory creation delegate and optional setup shared by all
-        /// provided factories.</summary>
-        /// <param name="provideFactoryOrDefault">Delegate to create factory base on request.</param>
-        /// <param name="setup">(optional) Setup to share between created factories if factory does not specify its own.</param>
-        public FactoryProvider(Func<Request, Factory> provideFactoryOrDefault, FactorySetup setup = null)
-            : base(setup: setup)
-        {
-            _provideFactoryOrDefault = provideFactoryOrDefault.ThrowIfNull();
-            _providedFactories = Ref.Of(HashTree<int, KV<Type, object>>.Empty);
-        }
-
-        /// <summary>Creates new factory. Tracks created factory instance inside provider so it could be unregistered when 
-        /// provider is unregistered itself.</summary>
-        /// <param name="request">Request to base result upon.</param>
-        /// <returns>Created factory or not if not able to create factory for request.</returns>
-        public override Factory GetFactoryForRequestOrDefault(Request request)
-        {
-            var factory = _provideFactoryOrDefault(request);
-            if (factory != null && factory.Setup == DryIoc.Setup.Default)
-                factory.Setup = Setup; // propagate provider setup if it is not specified by client.
-            if (factory != null)
-                _providedFactories.Swap(_ => _.AddOrUpdate(factory.FactoryID,
-                    new KV<Type, object>(request.ServiceType, request.ServiceKey)));
-            return factory;
-        }
-
-        public override Expression CreateExpressionOrDefault(Request request)
-        {
-            throw new NotSupportedException();
-        }
-
-        #region Implementation
-
-        private readonly Func<Request, Factory> _provideFactoryOrDefault;
-        private Ref<HashTree<int, KV<Type, object>>> _providedFactories;
-
-        #endregion
     }
 
     /// <summary>Lazy object storage that will create object with provided factory on first access, 

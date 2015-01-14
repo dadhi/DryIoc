@@ -45,7 +45,6 @@
   <ItemGroup>
     <Compile Include="AutoWiring.cs" />
     <Compile Include="ConstructorSelectionTests.cs" />
-    <Compile Include="LazyImplementationTypeLoading.cs" />
     <Compile Include="LazyRegistrationInfoStepByStep.cs" />
     <Compile Include="OpenScopeTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

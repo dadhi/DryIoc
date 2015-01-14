@@ -79,40 +79,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void I_should_be_able_to_manually_register_open_generic_singletons_and_resolve_them_directly()
-        {
-            var container = new Container();
-
-            container.Register(
-                typeof(IService<>),
-                new FactoryProvider(request => new ReflectionFactory(
-                    typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericParamsAndArgs()),
-                    Reuse.Singleton)));
-
-            var service1 = container.Resolve<IService<int>>();
-            var service2 = container.Resolve<IService<int>>();
-
-            Assert.That(service1, Is.SameAs(service2));
-        }
-
-        [Test]
-        public void I_should_be_able_to_manually_register_open_generic_singletons_and_resolve_then_as_dependency()
-        {
-            var container = new Container();
-            container.Register(typeof(ServiceWithTwoSameGenericDependencies));
-
-            container.Register(
-                typeof(IService<>),
-                new FactoryProvider(request => new ReflectionFactory(
-                    typeof(Service<>).MakeGenericType(request.ServiceType.GetGenericParamsAndArgs()),
-                    Reuse.Singleton)));
-
-            var service = container.Resolve<ServiceWithTwoSameGenericDependencies>();
-
-            Assert.That(service.Service1, Is.SameAs(service.Service2));
-        }
-
-        [Test]
         public void You_can_specify_rules_to_resolve_last_registration_from_multiple_available()
         {
             var container = new Container(Rules.Default.WithFactorySelector(

@@ -189,7 +189,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<Func<bool, LazyEnumerable<IServiceWithParameterAndDependency>>>());
 
-            Assert.That(ex.Message, Is.StringContaining("Unable to resolve DryIoc.LazyEnumerable"));
+            Assert.That(ex.Message, Is.StringContaining("Unable to resolve wrapper DryIoc.LazyEnumerable"));
         }
 
 	    [Test, Explicit]

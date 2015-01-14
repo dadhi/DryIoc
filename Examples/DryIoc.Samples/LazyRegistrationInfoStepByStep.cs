@@ -7,6 +7,10 @@ using NUnit.Framework;
 
 namespace DryIoc.Samples
 {
+    public interface IAddin
+    {
+    }
+
     [TestFixture]
     public class LazyRegistrationInfoStepByStep
     {
