@@ -50,7 +50,7 @@ goto:eof
 :Check
 
 if %ERRORLEVEL% EQU 123 (
-	echo:"* Strange MSBuild error 123 could be ignored."
+	echo:"* Strange MSBuild error 123 that could be ignored."
 	exit /b
 )
 
