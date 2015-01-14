@@ -1,4 +1,6 @@
-﻿using NUnit.Framework;
+﻿using System;
+using System.Linq;
+using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
@@ -17,6 +19,20 @@ namespace DryIoc.UnitTests
             var juice = child.Resolve<IJuice>();
 
             Assert.That(juice, Is.InstanceOf<FruitJuice>());
+        }
+
+        [Test]
+        public void Can_resolve_service_wrapper_from_parent_container()
+        {
+            var parent = new Container();
+            parent.Register(typeof(IFruit), typeof(Orange));
+
+            var child = parent.CreateChildContainer();
+            child.Register(typeof(IJuice), typeof(FruitJuice));
+
+            var juice = child.Resolve<Func<IJuice>>();
+
+            Assert.That(juice, Is.InstanceOf<Func<IJuice>>());
         }
 
         [Test]
@@ -119,20 +135,65 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(ex.Error, Error.CONTAINER_IS_DISPOSED);
         }
 
-        //[Test]
-        //public void Attach_multiple_parents()
-        //{
-        //    var parent = new Container();
-        //    parent.Register<FruitJuice>();
-        //    parent.Register<IFruit, Melon>();
+        [Test]
+        public void Attach_multiple_parents_with_single_rule()
+        {
+            IContainer parent = new Container();
+            parent.Register<FruitJuice>();
 
-        //    var container = new Container();
-        //    container.With(rules => rules.WithUnknownServiceResolvers(request =>
-        //    {
+            IContainer anotherParent = new Container();
+            anotherParent.Register<IFruit, Melon>();
 
-        //    }));
+            var container = new Container();
 
-        //}
+            var attachParents = AttachParents(parent, anotherParent);
+            var childContainer = container.With(rules => rules.WithUnknownServiceResolver(attachParents));
+
+            Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
+        }
+
+        [Test]
+        public void Can_attach_and_detach_parent_with_rule()
+        {
+            IContainer parent = new Container();
+            parent.Register<FruitJuice>();
+            parent.Register<IFruit, Melon>();
+
+            var container = new Container();
+            container.Register<IFruit, Orange>();
+
+            var attachParentsRule = AttachParents(parent);
+            var childContainer = container.With(rules => rules.WithUnknownServiceResolver(attachParentsRule));
+
+            Assert.That(parent.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
+            Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Orange>());
+
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<FruitJuice>());
+        }
+
+        private static Rules.UnknownServiceResolver AttachParents(params IContainer[] parents)
+        {
+            var parentRefs = parents.Select(p => p.ContainerWeakRef).ToArray();
+            return childRequest =>
+            {
+                Factory factory = null;
+                for (var i = 0; i < parentRefs.Length && factory == null; i++)
+                {
+                    var parent = parentRefs[i];
+                    var parentRequest = childRequest.SwitchContainer(parent);
+
+                    // enable continue next container if factory is not found in first;
+                    if (parentRequest.IfUnresolved != IfUnresolved.ReturnDefault)
+                        parentRequest = parentRequest.UpdateServiceInfo(info =>
+                            ServiceInfo.Of(info.ServiceType, ifUnresolved: IfUnresolved.ReturnDefault).InheritInfo(info));
+
+                    factory = parent.GetTarget().ResolveFactory(parentRequest);
+                }
+
+                return factory == null ? null : new ExpressionFactory(r => factory.GetExpressionOrDefault(r));
+            };
+        }
 
         #region CUT
 
