@@ -84,8 +84,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return new Container(Rules,
-                _factories, _decorators, _wrappers, null/*singletonScope*/, _scopeContext, _openedScope, _disposed,
-                _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionStateCache);
+                _factories, _decorators, _wrappers, null/*singletonScope*/, _scopeContext, _openedScope, _disposed, _resolutionCache);
         }
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
@@ -96,8 +95,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             return new Container(Rules,
                 Ref.Of(_factories.Value), Ref.Of(_decorators.Value), Ref.Of(_wrappers.Value),
-                _singletonScope, _scopeContext, _openedScope, _disposed,
-                _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionStateCache);
+                _singletonScope, _scopeContext, _openedScope, _disposed, _resolutionCache);
         }
 
         /// <summary>Creates new container with new opened scope and set this scope as current in provided/inherited context.</summary>
@@ -123,9 +121,8 @@ namespace DryIoc
                 nestedOpenedScope.ThrowIf(scope != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT));
 
             var rules = configure == null ? Rules : configure(Rules);
-            return new Container(rules,
-                _factories, _decorators, _wrappers, _singletonScope, _scopeContext, nestedOpenedScope,
-                _disposed, _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionStateCache);
+            return new Container(rules, _factories, _decorators, _wrappers, _singletonScope, _scopeContext, 
+                nestedOpenedScope, _disposed, _resolutionCache);
         }
 
         /// <summary>Creates child container using the same rules as its created from.
@@ -178,13 +175,8 @@ namespace DryIoc
             _decorators.Swap(_ => HashTree<Type, Factory[]>.Empty);
             _wrappers.Swap(_ => HashTree<Type, Factory>.Empty);
 
-            _defaultFactoryDelegatesCache = Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
-            _keyedFactoryDelegatesCache = Ref.Of(HashTree<Type, HashTree<object, FactoryDelegate>>.Empty);
-
-            _resolutionStateCache.Dispose();
-            _resolutionStateCache = null;
-
-            _containerWeakRef = null;
+            _resolutionCache.Dispose();
+            //_containerWeakRef = null; // TOOD Dispose instead.
 
             Rules = Rules.Empty;
         }
@@ -393,10 +385,7 @@ namespace DryIoc
 
         object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request parentOrEmpty)
         {
-            var factoryDelegate = _defaultFactoryDelegatesCache.Value.GetValueOrDefault(serviceType);
-            return factoryDelegate != null
-                ? factoryDelegate(_resolutionStateCache.Items, _containerWeakRef, null)
-                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, parentOrEmpty);
+            return _resolutionCache.CallDefaultFactoryDelegate(serviceType, ifUnresolved, parentOrEmpty, _containerWeakRef);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType,
@@ -423,10 +412,10 @@ namespace DryIoc
 
             FactoryDelegate factoryDelegate;
 
-            var factoryDelegates = _keyedFactoryDelegatesCache.Value.GetValueOrDefault(serviceType);
+            var factoryDelegates = _resolutionCache._keyedFactoryDelegates.GetValueOrDefault(serviceType);
             if (factoryDelegates != null &&
                 (factoryDelegate = factoryDelegates.GetValueOrDefault(cacheServiceKey)) != null)
-                return factoryDelegate(_resolutionStateCache.Items, _containerWeakRef, null);
+                return factoryDelegate(_resolutionCache.State, _containerWeakRef, null);
 
             var request = (parentOrEmpty ?? _emptyRequest).Push(serviceType, serviceKey, ifUnresolved, requiredServiceType);
 
@@ -435,11 +424,12 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var resultService = factoryDelegate(request.StateCache.Items, _containerWeakRef, null);
+            var resultService = factoryDelegate(request.ResolutionCache.State, _containerWeakRef, null);
 
             // Safe to cache factory only after it is evaluated without errors.
-            _keyedFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(serviceType,
-                (factoryDelegates ?? HashTree<object, FactoryDelegate>.Empty).AddOrUpdate(cacheServiceKey, factoryDelegate)));
+            _resolutionCache._keyedFactoryDelegates =
+            _resolutionCache._keyedFactoryDelegates.AddOrUpdate(serviceType,
+                (factoryDelegates ?? HashTree<object, FactoryDelegate>.Empty).AddOrUpdate(cacheServiceKey, factoryDelegate));
 
             return resultService;
         }
@@ -479,20 +469,12 @@ namespace DryIoc
             }
         }
 
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrEmpty)
+        private object ResolveDefaultFactoryDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrEmpty)
         {
             ThrowIfContainerDisposed();
-
             var request = (parentOrEmpty ?? _emptyRequest).Push(serviceType, ifUnresolved: ifUnresolved);
-
             var factory = ((IContainer)this).ResolveFactory(request);
-            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
-            if (factoryDelegate == null)
-                return null;
-
-            var resultService = factoryDelegate(request.StateCache.Items, _containerWeakRef, null);
-            _defaultFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
-            return resultService;
+            return factory == null ? null : factory.GetDelegateOrDefault(request);
         }
 
         private void ThrowIfContainerDisposed()
@@ -543,9 +525,9 @@ namespace DryIoc
             get { return _scopeContext.GetCurrentOrDefault().ThrowIfNull(Error.NO_CURRENT_SCOPE); }
         }
 
-        ResolutionStateCache IContainer.ResolutionStateCache
+        ResolutionCache IContainer.ResolutionCache
         {
-            get { return _resolutionStateCache; }
+            get { return _resolutionCache; }
         }
 
         Factory IContainer.ResolveFactory(Request request)
@@ -643,7 +625,7 @@ namespace DryIoc
                             Register(decorator, serviceType, null, IfAlreadyRegistered.AppendDefault);
                         }
 
-                        var decoratorExpr = request.StateCache.GetCachedFactoryExpressionOrDefault(decorator.FactoryID);
+                        var decoratorExpr = request.ResolutionCache.GetCachedFactoryExpressionOrDefault(decorator.FactoryID);
                         if (decoratorExpr == null)
                         {
                             decoratorRequest = decoratorRequest.WithFuncArgs(decoratorFuncType);
@@ -654,7 +636,7 @@ namespace DryIoc
                             decoratorExpr = !decoratedArgWasUsed ? decoratorExpr // case of replacing decorator.
                                 : Expression.Lambda(decoratorFuncType, decoratorExpr, decoratorRequest.FuncArgs.Value);
 
-                            request.StateCache.CacheFactoryExpression(decorator.FactoryID, decoratorExpr);
+                            request.ResolutionCache.CacheFactoryExpression(decorator.FactoryID, decoratorExpr);
                         }
 
                         if (resultDecorator == null || !(decoratorExpr is LambdaExpression))
@@ -935,9 +917,7 @@ namespace DryIoc
         private readonly Ref<HashTree<Type, Factory[]>> _decorators;    // it may be multiple decorators per service type 
         private readonly Ref<HashTree<Type, Factory>> _wrappers;        // only single wrapper factory per type is supported
 
-        private Ref<HashTree<Type, FactoryDelegate>> _defaultFactoryDelegatesCache;
-        private Ref<HashTree<Type, HashTree<object, FactoryDelegate>>> _keyedFactoryDelegatesCache;
-        private ResolutionStateCache _resolutionStateCache;
+        private ResolutionCache _resolutionCache;
 
         private Container(Rules rules,
             Ref<HashTree<Type, object>> factories,
@@ -947,9 +927,7 @@ namespace DryIoc
             IScopeContext scopeContext = null,
             Scope openedScope = null,
             int disposed = 0,
-            Ref<HashTree<Type, FactoryDelegate>> resolvedDefaultDelegates = null,
-            Ref<HashTree<Type, HashTree<object, FactoryDelegate>>> resolvedKeyedDelegates = null,
-            ResolutionStateCache resolutionStateCache = null)
+            ResolutionCache resolutionCache = null)
         {
             Rules = rules;
 
@@ -964,12 +942,10 @@ namespace DryIoc
             _decorators = decorators;
             _wrappers = wrappers;
 
-            _defaultFactoryDelegatesCache = resolvedDefaultDelegates ?? Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
-            _keyedFactoryDelegatesCache = resolvedKeyedDelegates ?? Ref.Of(HashTree<Type, HashTree<object, FactoryDelegate>>.Empty);
-            _resolutionStateCache = resolutionStateCache ?? new ResolutionStateCache();
+            _resolutionCache = resolutionCache ?? new ResolutionCache();
 
             _containerWeakRef = new ContainerWeakRef(this);
-            _emptyRequest = Request.CreateEmpty(_containerWeakRef, new WeakReference(_resolutionStateCache));
+            _emptyRequest = Request.CreateEmpty(_containerWeakRef, new WeakReference(_resolutionCache));
         }
 
         #endregion
@@ -1037,16 +1013,17 @@ namespace DryIoc
     }
 
     /// <summary>Holds service expression cache, and state items to be passed to <see cref="FactoryDelegate"/> in resolution root.</summary>
-    public sealed class ResolutionStateCache : IDisposable
+    public sealed class ResolutionCache : IDisposable
     {
         /// <summary>Creates resolution state.</summary>
-        public ResolutionStateCache()
-            : this(AppendableArray.Empty, HashTree<int, Expression>.Empty, HashTree<int, Expression>.Empty) { }
+        public ResolutionCache() : this(
+            AppendableArray.Empty, HashTree<int, Expression>.Empty, HashTree<int, Expression>.Empty,
+            HashTree<Type, FactoryDelegate>.Empty, HashTree<Type, HashTree<object, FactoryDelegate>>.Empty) { }
 
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
-        public AppendableArray Items
+        public AppendableArray State
         {
-            get { return _items; }
+            get { return _state; }
         }
 
         /// <summary>Adds item if it is not already added to state, returns added or existing item index.</summary>
@@ -1055,7 +1032,7 @@ namespace DryIoc
         public int GetOrAddItem(object item)
         {
             var index = -1;
-            Ref.Swap(ref _items, x =>
+            Ref.Swap(ref _state, x =>
             {
                 index = x.IndexOf(item);
                 if (index == -1)
@@ -1076,12 +1053,12 @@ namespace DryIoc
                 return Expression.Constant(item, itemType);
 
             var itemIndex = GetOrAddItem(item);
-            var itemExpr = _itemsExpressions.GetFirstValueByHashOrDefault(itemIndex);
+            var itemExpr = _stateExpressions.GetFirstValueByHashOrDefault(itemIndex);
             if (itemExpr == null)
             {
                 var indexExpr = Expression.Constant(itemIndex, typeof(int));
                 itemExpr = Expression.Convert(Expression.Call(Container.StateParamExpr, _getItemMethod, indexExpr), itemType);
-                Interlocked.Exchange(ref _itemsExpressions, _itemsExpressions.AddOrUpdate(itemIndex, itemExpr));
+                Interlocked.Exchange(ref _stateExpressions, _stateExpressions.AddOrUpdate(itemIndex, itemExpr));
             }
             return itemExpr;
         }
@@ -1106,30 +1083,57 @@ namespace DryIoc
         /// <summary>Removes state items and expression cache.</summary>
         public void Dispose()
         {
-            _items = AppendableArray.Empty;
-            _itemsExpressions = HashTree<int, Expression>.Empty;
+            _state = AppendableArray.Empty;
+            _stateExpressions = HashTree<int, Expression>.Empty;
             _factoryExpressions = HashTree<int, Expression>.Empty;
+            _defaultFactoryDelegates = HashTree<Type, FactoryDelegate>.Empty;
+            _keyedFactoryDelegates = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
         }
 
         #region Implementation
 
         private static readonly MethodInfo _getItemMethod = typeof(AppendableArray).GetSingleDeclaredMethodOrNull("Get");
 
-        private AppendableArray _items;
-        private HashTree<int, Expression> _itemsExpressions;
+        private AppendableArray _state;
+        private HashTree<int, Expression> _stateExpressions;
         private HashTree<int, Expression> _factoryExpressions;
+        private HashTree<Type, FactoryDelegate> _defaultFactoryDelegates;
+        public HashTree<Type, HashTree<object, FactoryDelegate>> _keyedFactoryDelegates;
 
-        private ResolutionStateCache(
-            AppendableArray items,
-            HashTree<int, Expression> itemsExpressions,
-            HashTree<int, Expression> factoryExpressions)
+        private ResolutionCache(
+            AppendableArray state,
+            HashTree<int, Expression> stateExpressions,
+            HashTree<int, Expression> factoryExpressions,
+            HashTree<Type, FactoryDelegate> defaultFactoryDelegates,
+            HashTree<Type, HashTree<object, FactoryDelegate>> keyedFactoryDelegates)
         {
-            _items = items;
-            _itemsExpressions = itemsExpressions;
+            _state = state;
+            _stateExpressions = stateExpressions;
             _factoryExpressions = factoryExpressions;
+            _defaultFactoryDelegates = defaultFactoryDelegates;
+            _keyedFactoryDelegates = keyedFactoryDelegates;
         }
 
         #endregion
+
+        public object CallDefaultFactoryDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrEmpty, ContainerWeakRef containerWeakRef)
+        {
+            return (_defaultFactoryDelegates.GetValueOrDefault(serviceType)
+                ?? ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved, parentOrEmpty, containerWeakRef))(_state, containerWeakRef, null);
+        }
+
+        private FactoryDelegate ResolveAndCacheFactoryDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrEmpty, ContainerWeakRef containerWeakRef)
+        {
+            var container = containerWeakRef.GetTarget(); // may throw container is disposed or GC collected.
+            var request = (parentOrEmpty ?? container.EmptyRequest).Push(serviceType, ifUnresolved: ifUnresolved);
+            var factory = container.ResolveFactory(request);
+            var factoryDelegate = factory != null ? factory.GetDelegateOrDefault(request) : null;
+            if (factoryDelegate != null)
+                Interlocked.Exchange(ref _defaultFactoryDelegates, _defaultFactoryDelegates.AddOrUpdate(serviceType, factoryDelegate));
+            return factoryDelegate ?? EmptyFactoryDelegate;
+        }
+
+        private static object EmptyFactoryDelegate(AppendableArray state, IResolverProvider r, IScope s) { return null; }
     }
 
     /// <summary>Immutable array based on wide hash tree, where each node is sub-array with predefined size: 32 is by default.
@@ -1255,20 +1259,20 @@ namespace DryIoc
         /// <summary>Retrieves container instance if it is not GCed or disposed</summary>
         public IContainer GetTarget()
         {
-            var container = (_container.Target as IContainer).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
+            var container = (_containerRef.Target as IContainer).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
             return container.ThrowIf(container.IsDisposed, Error.CONTAINER_IS_DISPOSED);
         }
 
         /// <summary>Creates weak reference wrapper over passed container object.</summary> <param name="container">Object to wrap.</param>
-        public ContainerWeakRef(IContainer container) { _container = new WeakReference(container); }
-        private readonly WeakReference _container;
+        public ContainerWeakRef(IContainer container) { _containerRef = new WeakReference(container); }
+        private readonly WeakReference _containerRef;
     }
 
     /// <summary>The delegate type which is actually used to create service instance by container.
     /// Delegate instance required to be static with all information supplied by <paramref name="state"/> and <paramref name="scope"/>
     /// parameters. The requirement is due to enable compilation to DynamicMethod in DynamicAssembly, and also to simplify
     /// state management and minimizes memory leaks.</summary>
-    /// <param name="state">All the state items available in resolution root (<see cref="ResolutionStateCache"/>).</param>
+    /// <param name="state">All the state items available in resolution root (<see cref="ResolutionCache"/>).</param>
     /// <param name="r">Provides access to <see cref="IResolver"/> implementation to enable nested/dynamic resolve inside:
     /// registered delegate factory, <see cref="Lazy{T}"/>, and <see cref="LazyEnumerable{TService}"/>.</param>
     /// <param name="scope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
@@ -1470,9 +1474,9 @@ namespace DryIoc
 
             var callResolveManyExpr = Expression.Call(Container.ResolverExpr, _resolveManyMethod,
                 Expression.Constant(itemServiceType), 
-                request.StateCache.GetOrAddItemExpression(request.ServiceKey),
+                request.ResolutionCache.GetOrAddItemExpression(request.ServiceKey),
                 Expression.Constant(itemRequiredServiceType),
-                request.StateCache.GetOrAddItemExpression(compositeParentKey));
+                request.ResolutionCache.GetOrAddItemExpression(compositeParentKey));
 
             var getServicesExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemServiceType }, callResolveManyExpr);
 
@@ -1491,7 +1495,7 @@ namespace DryIoc
 
             var serviceKeyExp = request.ServiceKey == null
                 ? Expression.Constant(null, typeof(object))
-                : request.StateCache.GetOrAddItemExpression(request.ServiceKey);
+                : request.ResolutionCache.GetOrAddItemExpression(request.ServiceKey);
 
             var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved);
             var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
@@ -1536,7 +1540,7 @@ namespace DryIoc
             var serviceRequest = request.Push(serviceType);
             var factory = request.Container.ResolveFactory(serviceRequest);
             var expr = factory == null ? null : factory.GetExpressionOrDefault(serviceRequest);
-            return expr == null ? null : Expression.New(ctor, request.StateCache.GetOrAddItemExpression(expr.WrapIntoFactoryExpression()));
+            return expr == null ? null : Expression.New(ctor, request.ResolutionCache.GetOrAddItemExpression(expr.WrapIntoFactoryExpression()));
         }
 
         private static Factory GetKeyValuePairFactoryOrDefault(Request request)
@@ -1557,7 +1561,7 @@ namespace DryIoc
                 if (serviceExpr == null)
                     return null;
                 var pairCtor = pairRequest.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
-                var keyExpr = pairRequest.StateCache.GetOrAddItemExpression(serviceKey, serviceKeyType);
+                var keyExpr = pairRequest.ResolutionCache.GetOrAddItemExpression(serviceKey, serviceKeyType);
                 var pairExpr = Expression.New(pairCtor, keyExpr, serviceExpr);
                 return pairExpr;
             });
@@ -1605,7 +1609,7 @@ namespace DryIoc
                 if (serviceExpr == null)
                     return null;
                 var metaCtor = req.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
-                var metadataExpr = req.StateCache.GetOrAddItemExpression(resultMetadata, metadataType);
+                var metadataExpr = req.ResolutionCache.GetOrAddItemExpression(resultMetadata, metadataType);
                 var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
                 return metaExpr;
             });
@@ -1784,7 +1788,7 @@ namespace DryIoc
         }
 
         /// <summary>Allow to instantiate singletons during resolution (but not inside of Func). Instantiated singletons
-        /// will be copied to <see cref="ResolutionStateCache"/> for faster access.</summary>
+        /// will be copied to <see cref="ResolutionCache"/> for faster access.</summary>
         public bool SingletonOptimization { get; private set; }
 
         /// <summary>Disables <see cref="SingletonOptimization"/></summary>
@@ -2499,7 +2503,7 @@ namespace DryIoc
             factory.ValidateBeforeRegistration(concreteType, container);
             var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).ResolveWithFactory(factory);
             var factoryDelegate = factory.GetDelegateOrDefault(request);
-            var service = factoryDelegate(container.ResolutionStateCache.Items, container.ContainerWeakRef, null);
+            var service = factoryDelegate(container.ResolutionCache.State, container.ContainerWeakRef, null);
             return service;
         }
 
@@ -3004,7 +3008,7 @@ namespace DryIoc
     }
 
     /// <summary>Contains resolution stack with information about resolved service and factory for it,
-    /// Additionally request is playing role of resolution context, containing <see cref="ResolutionStateCache"/>, and
+    /// Additionally request is playing role of resolution context, containing <see cref="ResolutionCache"/>, and
     /// weak reference to <see cref="IContainer"/>. That the all required information for resolving services.
     /// Request implements <see cref="IResolver"/> interface on top of provided container, which could be use by delegate factories.</summary>
     public sealed class Request : IResolver
@@ -3052,9 +3056,9 @@ namespace DryIoc
 
         /// <summary>Reference to resolved items and cached factory expressions. 
         /// Used to propagate the state from resolution root, probably from another container (request creator).</summary>
-        public ResolutionStateCache StateCache
+        public ResolutionCache ResolutionCache
         {
-            get { return (_stateCacheWeakRef.Target as ResolutionStateCache).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
+            get { return (_stateCacheWeakRef.Target as ResolutionCache).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED); }
         }
 
         /// <summary>Previous request in dependency chain. It <see cref="IsEmpty"/> for resolution root.</summary>
@@ -3445,7 +3449,7 @@ namespace DryIoc
     /// <item>To dynamically provide factory based on Request - <see cref="FactoryProvider"/></item>
     /// </list>
     /// For all of the types Factory should provide result as <see cref="Expression"/> and <see cref="FactoryDelegate"/>.
-    /// Factories are supposed to be immutable as the results Cache is handled separately by <see cref="ResolutionStateCache"/>.
+    /// Factories are supposed to be immutable as the results Cache is handled separately by <see cref="ResolutionCache"/>.
     /// Each created factory has an unique ID set in <see cref="FactoryID"/>.</summary>
     public abstract class Factory
     {
@@ -3532,7 +3536,7 @@ namespace DryIoc
                 && noOrFuncDecorator && request.FuncArgs == null && requiredWrapperType == null;
             if (isCacheable)
             {
-                var cachedServiceExpr = request.StateCache.GetCachedFactoryExpressionOrDefault(FactoryID);
+                var cachedServiceExpr = request.ResolutionCache.GetCachedFactoryExpressionOrDefault(FactoryID);
                 if (cachedServiceExpr != null)
                     return decorator == null ? cachedServiceExpr : Expression.Invoke(decorator, cachedServiceExpr);
             }
@@ -3558,7 +3562,7 @@ namespace DryIoc
             }
 
             if (isCacheable)
-                request.StateCache.CacheFactoryExpression(FactoryID, serviceExpr);
+                request.ResolutionCache.CacheFactoryExpression(FactoryID, serviceExpr);
 
             if (noOrFuncDecorator && decorator != null)
                 serviceExpr = Expression.Invoke(decorator, serviceExpr);
@@ -3630,7 +3634,7 @@ namespace DryIoc
                 var wrapper = ((SetupWrapper)wrapperFactory.Setup).ReuseWrapperFactory;
 
                 serviceExpr = Expression.Call(
-                    request.StateCache.GetOrAddItemExpression(wrapper, typeof(IReuseWrapperFactory)),
+                    request.ResolutionCache.GetOrAddItemExpression(wrapper, typeof(IReuseWrapperFactory)),
                     "Wrap", null, serviceExpr);
 
                 wrappers[i] = wrapper; // save wrapper for later unwrap
@@ -3649,7 +3653,7 @@ namespace DryIoc
                 if (requiredWrapperType != null && requiredWrapperType == wrapperType)
                     return Expression.Convert(getScopedServiceExpr, requiredWrapperType);
 
-                var wrapperExpr = request.StateCache.GetOrAddItemExpression(wrappers[i], typeof(IReuseWrapperFactory));
+                var wrapperExpr = request.ResolutionCache.GetOrAddItemExpression(wrappers[i], typeof(IReuseWrapperFactory));
                 getScopedServiceExpr = Expression.Call(wrapperExpr, "Unwrap", null, getScopedServiceExpr);
             }
 
@@ -3666,8 +3670,8 @@ namespace DryIoc
             var wrapperTypes = Setup.ReuseWrappers;
             var serviceType = serviceExpr.Type;
             if (wrapperTypes == null || wrapperTypes.Length == 0)
-                return request.StateCache.GetOrAddItemExpression(
-                    scope.GetOrAdd(FactoryID, () => factoryDelegate(request.StateCache.Items, request.ContainerWeakRef, null)),
+                return request.ResolutionCache.GetOrAddItemExpression(
+                    scope.GetOrAdd(FactoryID, () => factoryDelegate(request.ResolutionCache.State, request.ContainerWeakRef, null)),
                     serviceType);
 
             var wrappers = new IReuseWrapperFactory[wrapperTypes.Length];
@@ -3682,18 +3686,18 @@ namespace DryIoc
             }
 
             var wrappedService = scope.GetOrAdd(FactoryID,
-                () => factoryDelegate(request.StateCache.Items, request.ContainerWeakRef, null));
+                () => factoryDelegate(request.ResolutionCache.State, request.ContainerWeakRef, null));
 
             for (var i = wrapperTypes.Length - 1; i >= 0; --i)
             {
                 var wrapperType = wrapperTypes[i];
                 if (requiredWrapperType == wrapperType)
-                    return request.StateCache.GetOrAddItemExpression(wrappedService, requiredWrapperType);
+                    return request.ResolutionCache.GetOrAddItemExpression(wrappedService, requiredWrapperType);
                 wrappedService = wrappers[i].Unwrap(wrappedService);
             }
 
             return requiredWrapperType != null ? null
-                : request.StateCache.GetOrAddItemExpression(wrappedService, serviceType);
+                : request.ResolutionCache.GetOrAddItemExpression(wrappedService, serviceType);
         }
 
         #endregion
@@ -3730,7 +3734,7 @@ namespace DryIoc
         /// <param name="request">Request to resolve.</param> <returns>Instance wrapped in expression.</returns>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            return request.StateCache.GetOrAddItemExpression(_instance);
+            return request.ResolutionCache.GetOrAddItemExpression(_instance);
         }
 
         /// <summary>Returns instance as-is wrapped in <see cref="FactoryDelegate"/>. It happens when instance is directly resolved from container.</summary>
@@ -4271,7 +4275,7 @@ namespace DryIoc
 
                             var defaultValue = paramInfo.Details.DefaultValue;
                             paramExpr = defaultValue != null
-                                ? paramRequest.StateCache.GetOrAddItemExpression(defaultValue)
+                                ? paramRequest.ResolutionCache.GetOrAddItemExpression(defaultValue)
                                 : paramRequest.ServiceType.GetDefaultValueExpression();
                         }
                     }
@@ -4350,7 +4354,7 @@ namespace DryIoc
                 ? SetPropertiesAndFields(Expression.New((ConstructorInfo)method.Method, paramExprs), request)
                 : method.Method.IsStatic
                     ? Expression.Call((MethodInfo)method.Method, paramExprs)
-                    : Expression.Call(request.StateCache.GetOrAddItemExpression(method.Factory), (MethodInfo)method.Method, paramExprs);
+                    : Expression.Call(request.ResolutionCache.GetOrAddItemExpression(method.Factory), (MethodInfo)method.Method, paramExprs);
         }
 
         private static Type[] GetClosedTypeArgsForGenericImplementationTypeOrNull(Type implType, Request request)
@@ -4467,7 +4471,7 @@ namespace DryIoc
         /// <returns>Created delegate call expression.</returns>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            var factoryDelegateExpr = request.StateCache.GetOrAddItemExpression(_factoryDelegate);
+            var factoryDelegateExpr = request.ResolutionCache.GetOrAddItemExpression(_factoryDelegate);
             return Expression.Convert(Expression.Invoke(factoryDelegateExpr, Container.ResolverExpr), request.ServiceType);
         }
 
@@ -4489,7 +4493,7 @@ namespace DryIoc
             if (reuse == null)
                 return (state, r, scope) => _factoryDelegate(r.Resolver);
 
-            var reuseIndex = request.StateCache.GetOrAddItem(reuse);
+            var reuseIndex = request.ResolutionCache.GetOrAddItem(reuse);
             return (state, r, scope) => ((IReuse)state.Get(reuseIndex))
                 .GetScope(r.Resolver, ref scope)
                 .GetOrAdd(FactoryID, () => _factoryDelegate(r.Resolver));
@@ -4750,7 +4754,7 @@ namespace DryIoc
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Expression of type <see cref="IScope"/>.</returns>
         /// <remarks>Result expression should be static: should Not create closure on any objects. 
-        /// If you require to reference some item from outside, put it into <see cref="Request.StateCache"/>.</remarks>
+        /// If you require to reference some item from outside, put it into <see cref="Request.ResolutionCache"/>.</remarks>
         Expression GetScopeExpression(Expression resolverWithScopesExpr, Expression resolutionScopeExpr, Request request);
     }
 
@@ -4826,7 +4830,7 @@ namespace DryIoc
         {
             return Expression.Call(typeof(CurrentScopeReuse), "GetNameMatchingScope", null,
                 Expression.Property(resolverWithScopesExpr, "CurrentScope"),
-                request.StateCache.GetOrAddItemExpression(Name, typeof(object)));
+                request.ResolutionCache.GetOrAddItemExpression(Name, typeof(object)));
         }
 
         /// <summary>Returns current scope, or current scope parent matched by name, 
@@ -5290,7 +5294,7 @@ namespace DryIoc
 
         /// <summary>Closure for objects required for <see cref="FactoryDelegate"/> invocation.
         /// Accumulates the objects, but could be dropped off without an issue, like cache.</summary>
-        ResolutionStateCache ResolutionStateCache { get; }
+        ResolutionCache ResolutionCache { get; }
 
         /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
