@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_should_be_able_to_add_rule_to_resolve_not_registered_service()
         {
-            var container = new Container(Rules.Default.WithUnknownServiceResolvers(request =>
+            var container = new Container(Rules.Default.WithUnknownServiceResolver(request =>
                 !request.ServiceType.IsValueType() && !request.ServiceType.IsAbstract()
                     ? new ReflectionFactory(request.ServiceType)
                     : null));

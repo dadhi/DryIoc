@@ -327,5 +327,25 @@ namespace DryIoc.UnitTests
 
             Assert.That(service, Is.InstanceOf<Service>());
         }
+
+        [Test, Ignore]
+        public void Can_numerate_factories_per_contanier_based_on_resolution_order()
+        {
+            var container = new Container(rules => rules
+                .WithFactoryNumerationPerContainer()
+                .WithoutSingletonOptimization());
+
+            container.Register<XX>(Reuse.Singleton);
+            container.Register<YY>(Reuse.Singleton);
+            container.Register<ZZ>(Reuse.Singleton);
+
+            StringAssert.Contains("1", container.Resolve<FactoryExpression<ZZ>>().Value.ToString());
+            StringAssert.Contains("2", container.Resolve<FactoryExpression<XX>>().Value.ToString());
+            StringAssert.Contains("1", container.Resolve<FactoryExpression<YY>>().Value.ToString());
+        }
+
+        internal class XX {}
+        internal class YY {}
+        internal class ZZ {}
     }
 }
