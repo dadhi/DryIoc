@@ -55,7 +55,7 @@ namespace DryIoc
         public Container(Func<Rules, Rules> configure, IScopeContext scopeContext = null)
             : this(configure.ThrowIfNull()(Rules.Default) ?? Rules.Default, scopeContext) { }
 
-        /// <summary>Shares all of container state except Cache and specifies new rules.</summary>
+        /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
         /// <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>
         /// <returns>New container.</returns>
@@ -132,7 +132,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var parentContainerWeakRef = _containerWeakRef;
-            var inheritedRules = Rules.WithUnknownServiceResolver(childRequest =>
+            var inheritedRules = Rules.WithUnknownServiceResolvers(childRequest =>
             {
                 var childRequestWithParentContainer = childRequest.SwitchContainer(parentContainerWeakRef);
                 var factory = childRequestWithParentContainer.Container.ResolveFactory(childRequestWithParentContainer);
@@ -551,12 +551,15 @@ namespace DryIoc
             }
 
             var resolvers = Rules.UnknownServiceResolvers;
-            if (!resolvers.IsNullOrEmpty())
+            if (resolvers != null && resolvers.Length != 0)
                 for (var i = 0; i < resolvers.Length; i++)
                 {
                     var ruleFactory = resolvers[i](request);
                     if (ruleFactory != null)
+                    {
+                        Register(ruleFactory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.Update);
                         return ruleFactory;
+                    }
                 }
 
             Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
@@ -716,7 +719,7 @@ namespace DryIoc
                         if (((SetupDecorator)initializerFactory.Setup).Condition(request))
                         {
                             var decoratorRequest =
-                                request.UpdateServiceInfo(_ =>  ServiceInfo.Of(initializerActionType))
+                                request.ReplaceServiceInfoWith(ServiceInfo.Of(initializerActionType))
                                     .ResolveWithFactory(initializerFactory);
                             var actionExpr = initializerFactory.GetExpressionOrDefault(decoratorRequest);
                             if (actionExpr != null)
@@ -734,7 +737,7 @@ namespace DryIoc
                 for (var i = 0; i < funcDecoratorFactories.Length; i++)
                 {
                     var decoratorFactory = funcDecoratorFactories[i];
-                    var decoratorRequest = request.UpdateServiceInfo(_ => ServiceInfo.Of(decoratorFuncType)).ResolveWithFactory(decoratorFactory);
+                    var decoratorRequest = request.ReplaceServiceInfoWith(ServiceInfo.Of(decoratorFuncType)).ResolveWithFactory(decoratorFactory);
                     if (((SetupDecorator)decoratorFactory.Setup).Condition(request))
                     {
                         var funcExpr = decoratorFactory.GetExpressionOrDefault(decoratorRequest);
@@ -1681,7 +1684,7 @@ namespace DryIoc
 
         /// <summary>Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
         /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.</summary>
-        public static readonly Rules Default = Empty.WithUnknownServiceResolver(WrappersSupport.ResolveWrappers);
+        public static readonly Rules Default = Empty.WithUnknownServiceResolvers(WrappersSupport.ResolveWrappers);
 
         /// <summary>Shorthand to <see cref="InjectionRules.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _injectionRules.FactoryMethod; } }
@@ -1747,20 +1750,11 @@ namespace DryIoc
         /// <summary>Gets rules for resolving not-registered services. Null by default.</summary>
         public UnknownServiceResolver[] UnknownServiceResolvers { get; private set; }
 
-        /// <summary>Appends resolver to current unknown service resolvers.</summary>
-        /// <param name="rule">Rule to append.</param> <returns>New Rules.</returns>
-        public Rules WithUnknownServiceResolver(UnknownServiceResolver rule)
+        /// <summary>Sets the <see cref="UnknownServiceResolvers"/> rules</summary>
+        /// <param name="rules">Rules to set, may be null or empty for no rules.</param> <returns>New Rules.</returns>
+        public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules)
         {
-            return new Rules(this) { UnknownServiceResolvers = UnknownServiceResolvers.AppendOrUpdate(rule) };
-        }
-
-        /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
-        /// If no resolver was found then <see cref="UnknownServiceResolvers"/> will stay the same instance, 
-        /// so it could be check for remove success or fail.</summary>
-        /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
-        public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule)
-        {
-            return new Rules(this) { UnknownServiceResolvers = UnknownServiceResolvers.Remove(rule) };
+            return new Rules(this) { UnknownServiceResolvers = rules };
         }
 
         /// <summary>Turns on/off exception throwing when dependency has shorter reuse lifespan than its parent.</summary>
@@ -1798,13 +1792,6 @@ namespace DryIoc
             return new Rules(this) { SingletonOptimization = false };
         }
 
-        public bool FactoryNumerationPerContainer { get; private set; }
-
-        public Rules WithFactoryNumerationPerContainer()
-        {
-            return new Rules(this) { FactoryNumerationPerContainer = true };
-        }
-
         #region Implementation
 
         private InjectionRules _injectionRules;
@@ -1824,7 +1811,6 @@ namespace DryIoc
             ThrowIfDepenedencyHasShorterReuseLifespan = copy.ThrowIfDepenedencyHasShorterReuseLifespan;
             ReuseMapping = copy.ReuseMapping;
             SingletonOptimization = copy.SingletonOptimization;
-            FactoryNumerationPerContainer = copy.FactoryNumerationPerContainer;
             _injectionRules = copy._injectionRules;
             _compilationToDynamicAssemblyEnabled = copy._compilationToDynamicAssemblyEnabled;
         }
@@ -2703,11 +2689,9 @@ namespace DryIoc
 
         /// <summary>Enables propagation/inheritance of info between dependency and its owner: 
         /// for instance <see cref="ServiceInfoDetails.RequiredServiceType"/> for wrappers.</summary>
-        /// <param name="dependency">Dependency info.</param>
-        /// <param name="owner">Dependency holder/owner info.</param>
-        /// <param name="shouldInheritServiceKey">(optional) Self-explanatory. Usually set to true for wrapper and decorator info.</param>
+        /// <param name="dependency">Dependency info.</param> <param name="owner">Dependency holder/owner info.</param> <param name="ownerSetup">Dependency owner type.</param>
         /// <returns>Either input dependency info, or new info with properties inherited from the owner.</returns>
-        public static IServiceInfo InheritInfo(this IServiceInfo dependency, IServiceInfo owner, bool shouldInheritServiceKey = false)
+        public static IServiceInfo InheritDependencyFromOwnerInfo(this IServiceInfo dependency, IServiceInfo owner, FactorySetup ownerSetup)
         {
             var ownerDetails = owner.Details;
             if (ownerDetails == null || ownerDetails == ServiceInfoDetails.Default)
@@ -2720,7 +2704,7 @@ namespace DryIoc
                 : ownerDetails.IfUnresolved;
 
             // Use dependency key if it's non default, otherwise and if owner is not service, the
-            var serviceKey = dependencyDetails.ServiceKey == null && shouldInheritServiceKey
+            var serviceKey = dependencyDetails.ServiceKey == null && ownerSetup.FactoryType != FactoryType.Service
                 ? ownerDetails.ServiceKey
                 : dependencyDetails.ServiceKey;
 
@@ -3109,8 +3093,7 @@ namespace DryIoc
                 return new Request(this, ContainerWeakRef, _stateCacheWeakRef, new Ref<IScope>(), info.ThrowIfNull(), null);
 
             ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info.ThrowIfNull(), this);
-            FactorySetup ownerSetup = ResolvedFactory.Setup;
-            var inheritedInfo = info.InheritInfo(ServiceInfo, ownerSetup.FactoryType != FactoryType.Service);
+            var inheritedInfo = info.InheritDependencyFromOwnerInfo(ServiceInfo, ResolvedFactory.Setup);
             return new Request(this, ContainerWeakRef, _stateCacheWeakRef, _scope, inheritedInfo, null, FuncArgs);
         }
 
@@ -3128,11 +3111,11 @@ namespace DryIoc
         }
 
         /// <summary>Allow to switch current service info to new one: for instance it is used be decorators.</summary>
-        /// <param name="getInfo">Gets new info to switch to.</param>
+        /// <param name="info">New info to switch to.</param>
         /// <returns>New request with new info but the rest intact: e.g. <see cref="ResolvedFactory"/>.</returns>
-        public Request UpdateServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
+        public Request ReplaceServiceInfoWith(IServiceInfo info)
         {
-            return new Request(Parent, ContainerWeakRef, _stateCacheWeakRef, _scope, getInfo(ServiceInfo), ResolvedFactory, FuncArgs);
+            return new Request(Parent, ContainerWeakRef, _stateCacheWeakRef, _scope, info, ResolvedFactory, FuncArgs);
         }
 
         /// <summary>Returns new request with parameter expressions created for <paramref name="funcType"/> input arguments.
@@ -3171,8 +3154,6 @@ namespace DryIoc
         {
             if (IsEmpty || (ResolvedFactory != null && ResolvedFactory.FactoryID == factory.FactoryID))
                 return this; // resolving only once, no need to check recursion again.
-
-
 
             if (factory.FactoryType == FactoryType.Service)
                 for (var p = Parent; !p.IsEmpty; p = p.Parent)
@@ -3481,7 +3462,6 @@ namespace DryIoc
         /// to get concrete factory.</summary>
         public virtual bool ProvidesFactoryForRequest { get { return false; } }
 
-        // TODO: May be move all provider related stuff into separate interface to stop polluting Factory.
         /// <summary>Tracks factories created by <see cref="GetFactoryForRequestOrDefault"/>.</summary>
         public virtual HashTree<int, KV<Type, object>> ProvidedFactories { get { return HashTree<int, KV<Type, object>>.Empty; } }
 
@@ -3612,6 +3592,8 @@ namespace DryIoc
 
         private static int _lastFactoryID;
         private FactorySetup _setup;
+
+        //private static readonly MethodInfo _getScopeMethod = typeof(IReuse).GetSingleDeclaredMethodOrNull("GetScope");
 
         private Expression GetScopedServiceExpressionOrDefault(Expression serviceExpr, IReuse reuse, Request request, Type requiredWrapperType = null)
         {
@@ -4208,9 +4190,8 @@ namespace DryIoc
             }
 
             var factory = new ReflectionFactory(closedImplType, Reuse, Rules, Setup);
-            _providedFactories.Swap(_ => _.AddOrUpdate(
-                key: factory.FactoryID,
-                value: new KV<Type, object>(serviceType, request.ServiceKey)));
+            _providedFactories.Swap(_ => _.AddOrUpdate(factory.FactoryID,
+                new KV<Type, object>(serviceType, request.ServiceKey)));
             return factory;
         }
 
@@ -5553,13 +5534,13 @@ namespace DryIoc
 
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
-            INVALID_CONDITION =     Of("Argument {0} of type {1} has invalid condition."),
-            IS_NULL =               Of("Argument of type {0} is null."),
-            IS_NOT_OF_TYPE =        Of("Argument {0} is not of type {1}."),
-            TYPE_IS_NOT_OF_TYPE =   Of("Type argument {0} is not assignable from type {1}."),
+            INVALID_CONDITION = Of("Argument {0} of type {1} has invalid condition."),
+            IS_NULL = Of("Argument of type {0} is null."),
+            IS_NOT_OF_TYPE = Of("Argument {0} is not of type {1}."),
+            TYPE_IS_NOT_OF_TYPE = Of("Type argument {0} is not assignable from type {1}."),
 
             UNABLE_TO_RESOLVE_SERVICE = Of("Unable to resolve {0}." + Environment.NewLine
-                                                                + "Please register service, or specify @requiredServiceType while resolving, or add Rules.WithUnknownServiceResolver(MyRule)."),
+                                                                + "Please register service, or specify @requiredServiceType while resolving, or add Rules.WithUnknownServiceResolvers(MyRule)."),
             EXPECTED_SINGLE_DEFAULT_FACTORY = Of("Expecting single default registration of {0} but found many:" + Environment.NewLine
                                                                 + "{1}." + Environment.NewLine
                                                                 + "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
@@ -5648,7 +5629,7 @@ namespace DryIoc
         TypeIsNotOfType,
 
         /// <summary>Invoked operation throw, it is source of inner exception.</summary>
-        OperationThrows,
+        OperationThrows
     }
 
     /// <summary>Enables more clean error message formatting and a bit of code contracts.</summary>
@@ -5730,11 +5711,6 @@ namespace DryIoc
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
 
-        /// <summary>Throws <paramref name="error"/> instead of returning value of <typeparamref name="T"/>. 
-        /// Supposed to be used in expression that require some return value.</summary>
-        /// <typeparam name="T"></typeparam> <param name="error"></param>
-        /// <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
-        /// <returns>Does not return, throws instead.</returns>
         public static T Instead<T>(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
@@ -6130,34 +6106,6 @@ namespace DryIoc
                 if (predicate(source[i]))
                     return i;
             return -1;
-        }
-
-        /// <summary>Produces new array without item at specified <paramref name="index"/>. 
-        /// Will return <paramref name="source"/> array if index is out of bounds, or source is null/empty.</summary>
-        /// <typeparam name="T">Type of array item.</typeparam>
-        /// <param name="source">Input array.</param> <param name="index">Index if item to remove.</param>
-        /// <returns>New array with removed item at index, or input source array if index is not in array.</returns>
-        public static T[] RemoveAt<T>(this T[] source, int index)
-        {
-            if (source == null || source.Length == 0 || index < 0 || index >= source.Length)
-                return source;
-            if (index == 0 && source.Length == 1)
-                return new T[0];
-            var result = new T[source.Length - 1];
-            if (index != 0)
-                Array.Copy(source, 0, result, 0, index);
-            if (index != result.Length)
-                Array.Copy(source, index + 1, result, index, result.Length - index);
-            return result;
-        }
-
-        /// <summary>Looks for item in array using equality comparison, and returns new array with found item remove, or original array if not item found.</summary>
-        /// <typeparam name="T">Type of array item.</typeparam>
-        /// <param name="source">Input array.</param> <param name="value">Value to find and remove.</param>
-        /// <returns>New array with value removed or original array if value is not found.</returns>
-        public static T[] Remove<T>(this T[] source, T value)
-        {
-            return source.RemoveAt(source.IndexOf(x => Equals(x, value)));
         }
     }
 

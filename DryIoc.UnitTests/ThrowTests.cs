@@ -61,7 +61,7 @@ namespace DryIoc.UnitTests
             Exception loggedError = null;
             Action<Exception> logError = ex => { loggedError = ex; };
 
-            Throw.GetMatchedException = (check, e, arg0, arg1, arg2, arg3, inner) =>
+            Throw.GetMatchedException = (check, e, arg0, arg1, arg2, arg3, inner) => 
             {
                 logError(error);
                 return error;
