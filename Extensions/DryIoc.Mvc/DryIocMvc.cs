@@ -31,6 +31,7 @@ namespace DryIoc.Mvc
     using System.Reflection;
     using System.Web;
     using System.Web.Mvc;
+    using System.Web.Compilation;
 
     /// <summary>
     /// <example> <code lang="cs"><![CDATA[
@@ -48,11 +49,30 @@ namespace DryIoc.Mvc
     /// </summary>
     public static class DryIocMvc
     {
-        public static IContainer WithMvc(this IContainer container, params Assembly[] assemblies)
+        public static IEnumerable<Assembly> GetReferencedAssemblies()
+        {
+            return BuildManager.GetReferencedAssemblies().OfType<Assembly>()
+                .Where(a => !a.IsDynamic && !a.GlobalAssemblyCache);
+        }
+
+        /// <summary>Creates new container from original one with <see cref="HttpContextScopeContext"/>.
+        /// Then registers MVC controllers in container, 
+        /// sets <see cref="DryIocAggregatedFilterAttributeFilterProvider"/> as filter provider,
+        /// and at last sets container as <see cref="DependencyResolver"/>.</summary>
+        /// <param name="container">Original container.</param>
+        /// <param name="controllerAssembliesProvider">(optional) By default uses <see cref="GetReferencedAssemblies"/>.</param>
+        /// <returns>New container with applied Web context.</returns>
+        public static IContainer WithMvc(this IContainer container, IEnumerable<Assembly> controllerAssembliesProvider = null)
+        {
+            controllerAssembliesProvider = controllerAssembliesProvider ?? GetReferencedAssemblies();
+            return container.WithMvc(controllerAssembliesProvider.SelectMany(Portable.GetTypesFromAssembly));
+        }
+
+        public static IContainer WithMvc(this IContainer container, IEnumerable<Type> controllerTypesProvider)
         {
             container = container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext());
 
-            container.RegisterMvcControllers(assemblies);
+            container.RegisterMvcControllers(controllerTypesProvider);
 
             container.SetFilterAttributeFilterProvider(FilterProviders.Providers);
 
@@ -61,10 +81,9 @@ namespace DryIoc.Mvc
             return container;
         }
 
-        public static void RegisterMvcControllers(this IContainer container, Assembly[] assemblies)
+        public static void RegisterMvcControllers(this IContainer container, IEnumerable<Type> controllerTypesProvider)
         {
-            assemblies = !assemblies.IsNullOrEmpty() ? assemblies : new[] {Assembly.GetExecutingAssembly()};
-            container.RegisterFromAssembly<IController>(WebReuse.InRequest, assemblies);
+            container.RegisterBatch<IController>(controllerTypesProvider.ThrowIfNull(), WebReuse.InRequest);
         }
 
         public static void SetFilterAttributeFilterProvider(this IContainer container, Collection<IFilterProvider> filterProviders = null)

@@ -11,7 +11,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterFromAssembly<IBlah>();
+            container.RegisterBatch<IBlah>(new[] { typeof(Blah), typeof(AnotherBlah) });
 
             var services = container.Resolve<IBlah[]>();
 
@@ -25,7 +25,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterFromAssembly(typeof(IBlah<,>));
+            container.RegisterBatch(typeof(IBlah<,>), new[] { typeof(IBlah<,>).GetAssembly() });
 
             var services = container.Resolve<IBlah<string, bool>[]>();
 

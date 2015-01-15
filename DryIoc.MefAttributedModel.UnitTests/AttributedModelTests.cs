@@ -176,7 +176,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         private void WhenIRegisterAllExportedTypes()
         {
             _container = new Container().WithMefAttributedModel();
-            _container.RegisterExports(_assembly);
+            _container.RegisterExports(new[] { _assembly });
         }
 
         private void GivenAssemblyWithExportedTypes()

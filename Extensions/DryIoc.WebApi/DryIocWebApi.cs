@@ -36,11 +36,16 @@ namespace DryIoc.WebApi
 
     internal static class DryIocWebApi
     {
-        public static IContainer WithWebApi(this IContainer container, HttpConfiguration httpConfiguration, params Assembly[] assemblies)
+        public static IContainer WithWebApi(this IContainer container, HttpConfiguration httpConfiguration, IEnumerable<Assembly> controllerAssembliesProvider)
+        {
+            return container.WithWebApi(httpConfiguration, controllerAssembliesProvider.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly));
+        }
+
+        public static IContainer WithWebApi(this IContainer container, HttpConfiguration httpConfiguration, IEnumerable<Type> controllerTypesProvider)
         {
             container = container.ThrowIfNull().With(scopeContext: new ExecutionFlowScopeContext());
 
-            container.RegisterHttpControllers(assemblies);
+            container.RegisterHttpControllers(controllerTypesProvider);
 
             container.SetFilterProvider(httpConfiguration.Services);
 
@@ -49,10 +54,9 @@ namespace DryIoc.WebApi
             return container;
         }
 
-        public static void RegisterHttpControllers(this IContainer container, Assembly[] assemblies)
+        public static void RegisterHttpControllers(this IContainer container, IEnumerable<Type> controllerTypeProviders)
         {
-            assemblies = !assemblies.IsNullOrEmpty() ? assemblies : new[] {Assembly.GetExecutingAssembly()};
-            container.RegisterFromAssembly<IHttpController>(WebReuse.InRequest, assemblies);
+            container.RegisterBatch<IHttpController>(controllerTypeProviders.ThrowIfNull(), WebReuse.InRequest);
         }
 
         public static void SetFilterProvider(this IContainer container, ServicesContainer services)

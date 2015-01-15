@@ -21,7 +21,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.Performance
 			for (int i = 0; i < times; i++)
 			{
 				var container = new Container();
-				container.RegisterExports(currentAssembly);
+				container.RegisterExports(new [] { currentAssembly });
 			}
 
 			stopwatch.Stop();

@@ -130,24 +130,46 @@ namespace DryIoc
 
         /// <summary>Creates child container using the same rules as its created from.
         /// Additionally child container will fallback for not registered service to it parent.</summary>
+        /// <param name="shareSingletons">If set allow to share singletons from parent container.</param>
         /// <returns>New child container.</returns>
         public IContainer CreateChildContainer(bool shareSingletons = false)
         {
             ThrowIfContainerDisposed();
-            var parentContainerWeakRef = _containerWeakRef;
-            var inheritedRules = Rules.WithUnknownServiceResolver(childRequest =>
-            {
-                var childRequestWithParentContainer = childRequest.SwitchContainer(parentContainerWeakRef);
-                var factory = childRequestWithParentContainer.Container.ResolveFactory(childRequestWithParentContainer);
-                return factory == null ? null
-                    : new ExpressionFactory(request => factory.GetExpressionOrDefault(request));
-            });
-
+            var newRules = Rules.WithUnknownServiceResolver(ResolveFromParents(this));
             return !shareSingletons
-                ? new Container(inheritedRules)
-                : new Container(inheritedRules,
+                ? new Container(newRules)
+                : new Container(newRules,
                     Ref.Of(HashTree<Type, object>.Empty), Ref.Of(HashTree<Type, Factory[]>.Empty), Ref.Of(WrappersSupport.Wrappers),
                     _singletonScope);
+        }
+
+        /// <summary>The rule to fallback to multiple parent containers in order to resolve service unresolved in rule owner.</summary>
+        /// <param name="parents">One or many container to resolve from if service is not resolved from original container.</param>
+        /// <returns>New rule with fallback to resolve service from specified parent containers.</returns>
+        /// <remarks>There are two options to detach parents link: 1st - save original container before linking to parents and use it; 
+        /// 2nd - save rule returned by this method and then remove saved rule from container using <see cref="DryIoc.Rules.WithoutUnknownServiceResolver"/>.</remarks>
+        public static Rules.UnknownServiceResolver ResolveFromParents(params IContainer[] parents)
+        {
+            var parentWeakRefs = parents.ThrowIf(ArrayTools.IsNullOrEmpty).Select(p => p.ContainerWeakRef).ToArray();
+            return request =>
+            {
+                Factory factory = null;
+                for (var i = 0; i < parentWeakRefs.Length && factory == null; i++)
+                {
+                    var parentWeakRef = parentWeakRefs[i];
+                    var parentRequest = request.SwitchContainer(parentWeakRef);
+
+                    // Enable continue to  next container if factory is not found in first;
+                    if (parentRequest.IfUnresolved != IfUnresolved.ReturnDefault)
+                        parentRequest = parentRequest.UpdateServiceInfo(info =>
+                            ServiceInfo.Of(info.ServiceType, ifUnresolved: IfUnresolved.ReturnDefault).InheritInfo(info));
+
+                    var parent = parentWeakRef.GetTarget();
+                    factory = parent.ResolveFactory(parentRequest);
+                }
+
+                return factory == null ? null : new ExpressionFactory(r => factory.GetExpressionOrDefault(r));
+            };
         }
 
         /// <summary>Disposes container current scope and that means container itself.</summary>
@@ -1254,15 +1276,21 @@ namespace DryIoc
         }
 
         /// <summary>Retrieves container instance if it is not GCed or disposed</summary>
-        public IContainer GetTarget()
+        public IContainer GetTarget(bool tryGet = false)
         {
-            var container = (_container.Target as IContainer).ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED);
-            return container.ThrowIf(container.IsDisposed, Error.CONTAINER_IS_DISPOSED);
+            var container = _weakref.Target as IContainer;
+            if (container == null)
+            {
+                Throw.If(!tryGet, Error.CONTAINER_IS_GARBAGE_COLLECTED);
+                return null;
+            }
+            
+            return container.ThrowIf(container.IsDisposed && !tryGet, Error.CONTAINER_IS_DISPOSED);
         }
 
         /// <summary>Creates weak reference wrapper over passed container object.</summary> <param name="container">Object to wrap.</param>
-        public ContainerWeakRef(IContainer container) { _container = new WeakReference(container); }
-        private readonly WeakReference _container;
+        public ContainerWeakRef(IContainer container) { _weakref = new WeakReference(container); }
+        private readonly WeakReference _weakref;
     }
 
     /// <summary>The delegate type which is actually used to create service instance by container.
@@ -2311,29 +2339,35 @@ namespace DryIoc
         /// and registers all of them in container with specified <paramref name="reuse"/> policy.</summary>
         /// <param name="registrator">Usually <see cref="Container"/> or any other <see cref="IRegistrator"/> implementation.</param>
         /// <param name="serviceType">Service type to look implementations for.</param>
+        /// <param name="typeProvider">Provides types to peek implementation type from and register.</param>
         /// <param name="reuse">(optional)Reuse policy, Transient if not specified.</param>
-        /// <param name="assemblies">One or more assemblies to scan for implementation types.</param>
-        public static void RegisterFromAssembly(this IRegistrator registrator, Type serviceType, IReuse reuse = null, params Assembly[] assemblies)
+        public static void RegisterBatch(this IRegistrator registrator, Type serviceType,  IEnumerable<Type> typeProvider, IReuse reuse = null)
         {
-            if (assemblies.IsNullOrEmpty())
-                assemblies = new[] { serviceType.GetAssembly() };
-
-            var implementations = assemblies.SelectMany(Portable.GetTypesFromAssembly)
-                .Where(type => IsImplementationOf(type, serviceType)).ToArray();
-
-            for (var i = 0; i < implementations.Length; ++i)
-                registrator.Register(serviceType, implementations[i], reuse);
+            var implTypes = typeProvider.ThrowIfNull().Where(type => IsImplementationOf(type, serviceType)).ToArray();
+            for (var i = 0; i < implTypes.Length; ++i)
+                registrator.Register(serviceType, implTypes[i], reuse);
         }
 
         /// <summary>Scans provided assemblies for implementation types of specified <typeparamref name="TService"/>
         /// and registers all of them in container with specified <paramref name="reuse"/> policy.</summary>
         /// <typeparam name="TService">Service type to look implementations for.</typeparam>
         /// <param name="registrator">Usually <see cref="Container"/> or any other <see cref="IRegistrator"/> implementation.</param>
+        /// <param name="typeProvider">Provides types to peek implementation type from and register.</param>
         /// <param name="reuse">(optional)Reuse policy, Transient if not specified.</param>
-        /// <param name="assemblies">One or more assemblies to scan for implementation types.</param>
-        public static void RegisterFromAssembly<TService>(this IRegistrator registrator, IReuse reuse = null, params Assembly[] assemblies)
+        public static void RegisterBatch<TService>(this IRegistrator registrator, IEnumerable<Type> typeProvider, IReuse reuse = null)
         {
-            registrator.RegisterFromAssembly(typeof(TService), reuse, assemblies);
+            registrator.RegisterBatch(typeof(TService), typeProvider, reuse);
+        }
+
+        /// <summary>Scans provided assemblies for implementation types of specified service type.
+        /// and registers all of them in container with specified <paramref name="reuse"/> policy.</summary>
+        /// <param name="serviceType">Service type to look implementations for.</param>
+        /// <param name="registrator">Usually <see cref="Container"/> or any other <see cref="IRegistrator"/> implementation.</param>
+        /// <param name="assemblyProvider">Provides assembly to scan for implementation types and register them for service.</param>
+        /// <param name="reuse">(optional)Reuse policy, Transient if not specified.</param>
+        public static void RegisterBatch(this IRegistrator registrator, Type serviceType, IEnumerable<Assembly> assemblyProvider, IReuse reuse = null)
+        {
+            registrator.RegisterBatch(serviceType, assemblyProvider.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly));
         }
 
         private static bool IsImplementationOf(Type candidateImplType, Type serviceType)
@@ -2343,8 +2377,6 @@ namespace DryIoc
 
             if (candidateImplType == serviceType)
                 return true;
-
-
 
             var implementedTypes = candidateImplType.GetImplementedTypes();
 
@@ -5275,6 +5307,7 @@ namespace DryIoc
 
         /// <summary>Creates child container using the same rules as its created from.
         /// Additionally child container will fallback for not registered service to it parent.</summary>
+        /// <param name="shareSingletons">If set allow to share singletons from parent container.</param>
         /// <returns>New child container.</returns>
         IContainer CreateChildContainer(bool shareSingletons = false);
 

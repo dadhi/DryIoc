@@ -67,21 +67,29 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
         /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>.</summary>
         /// <param name="registrator">Container to register types into.</param>
+        /// <param name="typeProvider">Provides types to peek exported implementation types from.</param>
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> typeProvider)
+        {
+            registrator.RegisterExports(typeProvider.ThrowIfNull().Select(GetRegistrationInfoOrDefault).Where(regInfo => regInfo != null));
+        }
+
+        /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
+        /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>.</summary>
+        /// <param name="registrator">Container to register types into.</param>
         /// <param name="types">Implementation types to register.</param>
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
         {
-            registrator.RegisterExports(types
-                .Select(GetRegistrationInfoOrDefault).Where(info => info != null));
+            registrator.RegisterExports((IEnumerable<Type>)types);
         }
         
         /// <summary>First scans (<see cref="Scan"/>) provided assemblies to find types annotated with
         /// <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>.
         /// Then registers found types into registrator/container.</summary>
         /// <param name="registrator">Container to register into</param>
-        /// <param name="assemblies">Assemblies to scan for implementation types.</param>
-        public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies)
+        /// <param name="assemblyProvider">Provides assemblies to scan for exported implementation types.</param>
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<Assembly> assemblyProvider)
         {
-            registrator.RegisterExports(Scan(assemblies));
+            registrator.RegisterExports(Scan(assemblyProvider));
         }
 
         /// <summary>Registers new factories into registrator/container based on provided registration infos, which
@@ -115,11 +123,11 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Scans assemblies to find concrete type annotated with <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>
         /// attributes, and create serializable DTO with all information required for registering of exported types.</summary>
-        /// <param name="assemblies">Assemblies to scan.</param>
+        /// <param name="assemblyProvider">Assemblies to scan.</param>
         /// <returns>Lazy collection of registration info DTOs.</returns>
-        public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
+        public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblyProvider)
         {
-            return assemblies.SelectMany(Portable.GetTypesFromAssembly).Select(GetRegistrationInfoOrDefault).Where(x => x != null);
+            return assemblyProvider.SelectMany(Portable.GetTypesFromAssembly).Select(GetRegistrationInfoOrDefault).Where(x => x != null);
         }
 
         /// <summary>Creates registration info DTO for provided type. To find this info checks type attributes:
