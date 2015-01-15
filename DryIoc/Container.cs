@@ -118,7 +118,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
 
             scopeName = scopeName ?? (_openedScope == null ? _scopeContext.RootScopeName : null);
-            var nestedOpenedScope = new Scope(scopeName, _openedScope);
+            var nestedOpenedScope = new Scope(_openedScope, scopeName);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             _scopeContext.SetCurrent(scope =>
@@ -4526,10 +4526,10 @@ namespace DryIoc
 
     /// <summary>Lazy object storage that will create object with provided factory on first access, 
     /// then will be returning the same object for subsequent access.</summary>
-    public interface IScope
+    public interface IScope : IDisposable
     {
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
-        Scope Parent { get; }
+        IScope Parent { get; }
 
         /// <summary>Optional name object associated with scope.</summary>
         object Name { get; }
@@ -4543,10 +4543,10 @@ namespace DryIoc
 
     /// <summary><see cref="IScope"/> implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
     /// Locking is used internally to ensure that object factory called only once.</summary>
-    public sealed class Scope : IScope, IDisposable
+    public sealed class Scope : IScope
     {
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
-        public Scope Parent { get; private set; }
+        public IScope Parent { get; private set; }
 
         /// <summary>Optional name object associated with scope.</summary>
         public object Name { get; private set; }
@@ -4561,12 +4561,12 @@ namespace DryIoc
         public Exception[] DisposingExceptions;
 
         /// <summary>Create scope with optional parent and name.</summary>
-        /// <param name="name">(optional) Associated name object, e.g. <see cref="IScopeContext.RootScopeName"/></param> 
         /// <param name="parent">(optional) Parent in scope stack.</param>
-        public Scope(object name = null, Scope parent = null)
+        /// <param name="name">(optional) Associated name object, e.g. <see cref="IScopeContext.RootScopeName"/></param>
+        public Scope(IScope parent = null, object name = null)
         {
-            Name = name;
             Parent = parent;
+            Name = name;
         }
 
         /// <summary>Provides access to <see cref="GetOrAdd"/> method for reflection client.</summary>
@@ -4665,7 +4665,8 @@ namespace DryIoc
         /// <param name="getNewCurrent">Delegate to change the scope.</param>
         /// <remarks>Important: <paramref name="getNewCurrent"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
-        void SetCurrent(Func<IScope, IScope> getNewCurrent);
+        /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
+        IScope SetCurrent(Func<IScope, IScope> getNewCurrent);
     }
 
     /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
@@ -4689,11 +4690,13 @@ namespace DryIoc
         /// <param name="getNewCurrent">Delegate to change the scope given current one (or null).</param>
         /// <remarks>Important: <paramref name="getNewCurrent"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
-        public void SetCurrent(Func<IScope, IScope> getNewCurrent)
+        public IScope SetCurrent(Func<IScope, IScope> getNewCurrent)
         {
             var threadId = Portable.GetCurrentManagedThreadID();
-            Ref.Swap(ref _scopes, scopes => 
-                scopes.AddOrUpdate(threadId, getNewCurrent(scopes.GetValueOrDefault(threadId) as IScope)));
+            IScope newScope = null;
+            Ref.Swap(ref _scopes, scopes =>
+                scopes.AddOrUpdate(threadId, newScope = getNewCurrent(scopes.GetValueOrDefault(threadId) as IScope)));
+            return newScope;
         }
 
         /// <summary>Disposed all stored/tracked scopes and empties internal scope storage.</summary>

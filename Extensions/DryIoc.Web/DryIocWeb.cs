@@ -4,6 +4,7 @@ namespace DryIoc.Web
 {
     using System;
     using System.Threading;
+    using System.Collections;
     using System.Web;
     using Microsoft.Web.Infrastructure.DynamicModuleHelper;
 
@@ -28,17 +29,25 @@ namespace DryIoc.Web
 
         public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
 
-        public IScope GetCurrentOrDefault()
+        public HttpContextScopeContext(Func<IDictionary> getContextItems = null)
         {
-            return (IScope)HttpContext.Current.Items[RootScopeName];
+            _getContextItems = getContextItems ?? (() => HttpContext.Current.Items);
         }
 
-        public void SetCurrent(Func<IScope, IScope> getNewCurrent)
+        public IScope GetCurrentOrDefault()
+        {
+            return _getContextItems()[RootScopeName] as IScope;
+        }
+
+        public IScope SetCurrent(Func<IScope, IScope> getNewCurrent)
         {
             var currentScope = GetCurrentOrDefault();
             var newScope = getNewCurrent.ThrowIfNull()(currentScope);
-            HttpContext.Current.Items[ROOT_SCOPE_NAME] = newScope;
+            _getContextItems()[ROOT_SCOPE_NAME] = newScope;
+            return newScope;
         }
+
+        private readonly Func<IDictionary> _getContextItems;
     }
 
     public static class HttpModuleInitializer
