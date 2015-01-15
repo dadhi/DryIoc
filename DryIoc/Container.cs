@@ -74,30 +74,32 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return new Container(Rules,
-                _factories, _decorators, _wrappers, _singletonScope, _scopeContext, _openedScope, _disposed
-                /*skip cache*/);
+                _factories, _decorators, _wrappers, _singletonScope, _scopeContext, _openedScope, _disposed /*drop cache*/);
         }
 
-        /// <summary>Creates new container with whole state shared with original except singletons.</summary>
+        /// <summary>Creates new container with state shared with original except singletons and cache.
+        /// Dropping cache is required because singletons are cached in resolution state.</summary>
         /// <returns>New container with empty Singleton Scope.</returns>
-        public IContainer WithoutSingletons()
+        public IContainer WithoutSingletonsAndCache()
         {
             ThrowIfContainerDisposed();
             return new Container(Rules,
-                _factories, _decorators, _wrappers, null/*singletonScope*/, _scopeContext, _openedScope, _disposed,
-                _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionStateCache);
+                _factories, _decorators, _wrappers, null/*singletonScope*/, _scopeContext, _openedScope, _disposed /*drop cache*/);
         }
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
         /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
+        /// <param name="preserveCache">(optional) If set preserves cache if you know what to do.</param>
         /// <returns>New container with copy of all registrations.</returns>
-        public IContainer WithRegistrationsCopy()
+        public IContainer WithRegistrationsCopy(bool preserveCache = false)
         {
             ThrowIfContainerDisposed();
-            return new Container(Rules,
-                Ref.Of(_factories.Value), Ref.Of(_decorators.Value), Ref.Of(_wrappers.Value),
-                _singletonScope, _scopeContext, _openedScope, _disposed,
-                _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionStateCache);
+            return preserveCache
+                ? new Container(Rules, Ref.Of(_factories.Value), Ref.Of(_decorators.Value), Ref.Of(_wrappers.Value),
+                    _singletonScope, _scopeContext, _openedScope, _disposed)
+                : new Container(Rules, Ref.Of(_factories.Value), Ref.Of(_decorators.Value), Ref.Of(_wrappers.Value),
+                    _singletonScope, _scopeContext, _openedScope, _disposed,
+                    _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionStateCache);
         }
 
         /// <summary>Creates new container with new opened scope and set this scope as current in provided/inherited context.</summary>
@@ -5285,12 +5287,13 @@ namespace DryIoc
 
         /// <summary>Creates new container with whole state shared with original except singletons.</summary>
         /// <returns>New container with empty Singleton Scope.</returns>
-        IContainer WithoutSingletons();
+        IContainer WithoutSingletonsAndCache();
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
         /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
+        /// <param name="preserveCache">(optional) If set preserves cache if you know what to do.</param>
         /// <returns>New container with copy of all registrations.</returns>
-        IContainer WithRegistrationsCopy();
+        IContainer WithRegistrationsCopy(bool preserveCache = false);
 
         /// <summary>Creates new container with new opened scope and set this scope as current in provided/inherited context.</summary>
         /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
@@ -6368,6 +6371,120 @@ namespace DryIoc
     /// <param name="newValue">New value passed to Update.. method.</param>
     /// <returns>Changed value.</returns>
     public delegate V Update<V>(V oldValue, V newValue);
+
+    public sealed class IntKeyTree
+    {
+        /// <summary>Empty tree to start with. The <see cref="Height"/> of the empty tree is 0.</summary>
+        public static readonly IntKeyTree Empty = new IntKeyTree();
+
+        /// <summary>Key.</summary>
+        public readonly int Key;
+
+        /// <summary>Value.</summary>
+        public readonly object Value;
+
+        /// <summary>Left subtree/branch, or empty.</summary>
+        public readonly IntKeyTree Left;
+
+        /// <summary>Right subtree/branch, or empty.</summary>
+        public readonly IntKeyTree Right;
+
+        /// <summary>Height of longest subtree/branch. It is 0 for empty tree, and 1 for single node tree.</summary>
+        public readonly int Height;
+
+        /// <summary>Returns true is tree is empty.</summary>
+        public bool IsEmpty { get { return Height == 0; } }
+
+        public IntKeyTree AddOrUpdate(int key, object value)
+        {
+            return AddOrUpdate(key, value, false);
+        }
+
+        public IntKeyTree Update(int key, object value)
+        {
+            return AddOrUpdate(key, value, true);
+        }
+
+        public object GetValueOrDefault(int key)
+        {
+            var t = this;
+            while (t.Height != 0 && t.Key != key)
+                t = key < t.Key ? t.Left : t.Right;
+            return t.Height != 0 ? t.Value : null;
+        }
+
+        public IEnumerable<IntKeyTree> Enumerate()
+        {
+            if (Height == 0)
+                yield break;
+
+            var parents = new IntKeyTree[Height];
+
+            var tree = this;
+            var parentCount = -1;
+            while (tree.Height != 0 || parentCount != -1)
+            {
+                if (tree.Height != 0)
+                {
+                    parents[++parentCount] = tree;
+                    tree = tree.Left;
+                }
+                else
+                {
+                    tree = parents[parentCount--];
+                    yield return tree;
+                    tree = tree.Right;
+                }
+            }
+        }
+
+        #region Implementation
+
+        private IntKeyTree() { }
+
+        private IntKeyTree(int key, object value, IntKeyTree left, IntKeyTree right)
+        {
+            Key = key;
+            Value = value;
+            Left = left;
+            Right = right;
+            Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
+        }
+
+        private IntKeyTree AddOrUpdate(int key, object value, bool updateOnly)
+        {
+            return Height == 0 ? (updateOnly ? this : new IntKeyTree(key, value, Empty, Empty)) // if not found and updateOnly returning current tree.
+                : (key == Key ? new IntKeyTree(key, value, Left, Right) // actual update
+                : (key < Key
+                    ? With(Left.AddOrUpdate(key, value, updateOnly), Right)
+                    : With(Left, Right.AddOrUpdate(key, value, updateOnly))).KeepBalanced());
+        }
+
+        private IntKeyTree KeepBalanced()
+        {
+            var delta = Left.Height - Right.Height;
+            return delta >= 2 ? With(Left.Right.Height - Left.Left.Height == 1 ? Left.RotateLeft() : Left, Right).RotateRight()
+                : (delta <= -2 ? With(Left, Right.Left.Height - Right.Right.Height == 1 ? Right.RotateRight() : Right).RotateLeft()
+                : this);
+        }
+
+        private IntKeyTree RotateRight()
+        {
+            return Left.With(Left.Left, With(Left.Right, Right));
+        }
+
+        private IntKeyTree RotateLeft()
+        {
+            return Right.With(With(Left, Right.Left), Right.Right);
+        }
+
+        private IntKeyTree With(IntKeyTree left, IntKeyTree right)
+        {
+            return left == Left && right == Right ? this : new IntKeyTree(Key, Value, left, right);
+        }
+
+        #endregion
+    }
 
     /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.</summary>
     public sealed class HashTree<K, V>

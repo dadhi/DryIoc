@@ -194,6 +194,33 @@ namespace DryIoc.UnitTests
                 detachedChild.Resolve<FruitJuice>());
         }
 
+        [Test]
+        public void Without_singletons_should_work_with()
+        {
+            var container = new Container();
+            container.Register<Melon>(Reuse.Singleton);
+            var melon = container.Resolve<Melon>();
+
+            var withoutSingletons = container.WithoutSingletonsAndCache(); // automatically drop cache
+            var melonAgain = withoutSingletons.Resolve<Melon>();
+
+            Assert.AreNotSame(melon, melonAgain);
+        }
+
+        [Test]
+        public void With_registration_copy()
+        {
+            var container = new Container();
+            container.Register<IFruit, Melon>();
+            var melon = container.Resolve<IFruit>();
+            Assert.That(melon, Is.InstanceOf<Melon>());
+
+            var withRegistrationsCopy = container.WithRegistrationsCopy().WithoutCache();
+            withRegistrationsCopy.Register<IFruit, Orange>(ifAlreadyRegistered: IfAlreadyRegistered.Update);
+            var orange = withRegistrationsCopy.Resolve<IFruit>();
+            Assert.That(orange, Is.InstanceOf<Orange>());
+        }
+
         #region CUT
 
         public interface IFruit { }
