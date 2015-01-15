@@ -1065,8 +1065,7 @@ namespace DryIoc
     public sealed class ResolutionStateCache : IDisposable
     {
         /// <summary>Creates resolution state.</summary>
-        public ResolutionStateCache()
-            : this(AppendableArray.Empty, HashTree<int, Expression>.Empty, HashTree<int, Expression>.Empty) { }
+        public ResolutionStateCache() : this(AppendableArray.Empty, IntKeyTree.Empty, IntKeyTree.Empty) { }
 
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
         public AppendableArray Items
@@ -1101,21 +1100,21 @@ namespace DryIoc
                 return Expression.Constant(item, itemType);
 
             var itemIndex = GetOrAddItem(item);
-            var itemExpr = _itemsExpressions.GetFirstValueByHashOrDefault(itemIndex);
+            var itemExpr = _itemsExpressions.GetValueOrDefault(itemIndex);
             if (itemExpr == null)
             {
                 var indexExpr = Expression.Constant(itemIndex, typeof(int));
                 itemExpr = Expression.Convert(Expression.Call(Container.StateParamExpr, _getItemMethod, indexExpr), itemType);
                 Interlocked.Exchange(ref _itemsExpressions, _itemsExpressions.AddOrUpdate(itemIndex, itemExpr));
             }
-            return itemExpr;
+            return (Expression)itemExpr;
         }
 
         /// <summary>Searches and returns cached factory expression, or null if not found.</summary>
         /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
         public Expression GetCachedFactoryExpressionOrDefault(int factoryID)
         {
-            return _factoryExpressions.GetFirstValueByHashOrDefault(factoryID);
+            return _factoryExpressions.GetValueOrDefault(factoryID) as Expression;
         }
 
         /// <summary>Adds factory expression to cache identified by factory ID (<see cref="Factory.FactoryID"/>).</summary>
@@ -1132,8 +1131,8 @@ namespace DryIoc
         public void Dispose()
         {
             _items = AppendableArray.Empty;
-            _itemsExpressions = HashTree<int, Expression>.Empty;
-            _factoryExpressions = HashTree<int, Expression>.Empty;
+            _itemsExpressions = IntKeyTree.Empty;
+            _factoryExpressions = IntKeyTree.Empty;
         }
 
         #region Implementation
@@ -1141,13 +1140,10 @@ namespace DryIoc
         private static readonly MethodInfo _getItemMethod = typeof(AppendableArray).GetSingleDeclaredMethodOrNull("Get");
 
         private AppendableArray _items;
-        private HashTree<int, Expression> _itemsExpressions;
-        private HashTree<int, Expression> _factoryExpressions;
+        private IntKeyTree _itemsExpressions;
+        private IntKeyTree _factoryExpressions;
 
-        private ResolutionStateCache(
-            AppendableArray items,
-            HashTree<int, Expression> itemsExpressions,
-            HashTree<int, Expression> factoryExpressions)
+        private ResolutionStateCache(AppendableArray items, IntKeyTree itemsExpressions, IntKeyTree factoryExpressions)
         {
             _items = items;
             _itemsExpressions = itemsExpressions;
@@ -1173,7 +1169,7 @@ namespace DryIoc
         {
             return Length < NODE_ARRAY_SIZE
                 ? new AppendableArray(Length + 1, _items.AppendOrUpdate(value))
-                : new AppendableArrayTree(Length, HashTree<int, object[]>.Empty.AddOrUpdate(0, _items)).Append(value);
+                : new AppendableArrayTree(Length, IntKeyTree.Empty.AddOrUpdate(0, _items)).Append(value);
         }
 
         /// <summary>Returns item stored at specified index. Method relies on underlying array for index range checking.</summary>
@@ -1221,41 +1217,42 @@ namespace DryIoc
 
             public override AppendableArray Append(object value)
             {
-                return new AppendableArrayTree(Length + 1,
-                    _tree.AddOrUpdate(Length >> NODE_ARRAY_BIT_COUNT, new[] { value }, ArrayTools.Append));
+                var key = Length >> NODE_ARRAY_BIT_COUNT;
+                var nodeItems = _tree.GetValueOrDefault(key) as object[];
+                return new AppendableArrayTree(Length + 1, _tree.AddOrUpdate(key, nodeItems.AppendOrUpdate(value)));
             }
 
             public override object Get(int index)
             {
-                return _tree.GetFirstValueByHashOrDefault(index >> NODE_ARRAY_BIT_COUNT)[index & NODE_ARRAY_BIT_MASK];
+                return ((object[])_tree.GetValueOrDefault(index >> NODE_ARRAY_BIT_COUNT))[index & NODE_ARRAY_BIT_MASK];
             }
 
             public override int IndexOf(object value)
             {
                 foreach (var node in _tree.Enumerate())
                 {
-                    var array = node.Value;
-
-                    if (array == null || array.Length == 0)
-                        continue;
-                    for (var i = 0; i < array.Length; ++i)
+                    var nodeItems = (object[])node.Value;
+                    if (!nodeItems.IsNullOrEmpty())
                     {
-                        var item = array[i];
-                        if (ReferenceEquals(item, value) || Equals(item, value))
-                            return node.Key << NODE_ARRAY_BIT_COUNT | i;
+                        for (var i = 0; i < nodeItems.Length; ++i)
+                        {
+                            var item = nodeItems[i];
+                            if (ReferenceEquals(item, value) || Equals(item, value))
+                                return node.Key << NODE_ARRAY_BIT_COUNT | i;
+                        }
                     }
                 }
 
                 return -1;
             }
 
-            public AppendableArrayTree(int length, HashTree<int, object[]> tree)
+            public AppendableArrayTree(int length, IntKeyTree tree)
                 : base(length)
             {
                 _tree = tree;
             }
 
-            private readonly HashTree<int, object[]> _tree;
+            private readonly IntKeyTree _tree;
         }
 
         #endregion
@@ -4588,7 +4585,7 @@ namespace DryIoc
 
             lock (_syncRoot)
             {
-                var item = _items.GetFirstValueByHashOrDefault(id);
+                var item = _items.GetValueOrDefault(id);
                 if (item == null ||
                     item is IRecyclable && ((IRecyclable)item).IsRecycled)
                 {
@@ -4596,7 +4593,7 @@ namespace DryIoc
                         DisposeItem(item);
 
                     Ref.Swap(ref _items, items => _disposed == 1
-                        ? Throw.Instead<HashTree<int, object>>(Error.SCOPE_IS_DISPOSED)
+                        ? Throw.Instead<IntKeyTree>(Error.SCOPE_IS_DISPOSED)
                         : items.AddOrUpdate(id, item = factory()));
                 }
                 return item;
@@ -4619,7 +4616,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private HashTree<int, object> _items = HashTree<int, object>.Empty;
+        private IntKeyTree _items = IntKeyTree.Empty;
         private int _disposed;
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
@@ -4685,8 +4682,7 @@ namespace DryIoc
         /// <returns>Found scope or null.</returns>
         public IScope GetCurrentOrDefault()
         {
-            var threadID = Portable.GetCurrentManagedThreadID();
-            return _scopes.Value.GetFirstValueByHashOrDefault(threadID);
+            return _scopes.GetValueOrDefault(Portable.GetCurrentManagedThreadID()) as IScope;
         }
 
         /// <summary>Change current scope for the calling Thread.</summary>
@@ -4696,22 +4692,23 @@ namespace DryIoc
         public void SetCurrent(Func<IScope, IScope> getNewCurrent)
         {
             var threadId = Portable.GetCurrentManagedThreadID();
-            _scopes.Swap(scopes => scopes.AddOrUpdate(threadId, getNewCurrent(scopes.GetFirstValueByHashOrDefault(threadId))));
+            Ref.Swap(ref _scopes, scopes => 
+                scopes.AddOrUpdate(threadId, getNewCurrent(scopes.GetValueOrDefault(threadId) as IScope)));
         }
 
         /// <summary>Disposed all stored/tracked scopes and empties internal scope storage.</summary>
         public void Dispose()
         {
-            _scopes.Swap(scopes =>
+            Ref.Swap(ref _scopes, scopes =>
             {
                 if (!scopes.IsEmpty)
                     foreach (var scope in scopes.Enumerate().Where(scope => scope.Value is IDisposable))
                         ((IDisposable)scope.Value).Dispose();
-                return HashTree<int, IScope>.Empty;
+                return IntKeyTree.Empty;
             });
         }
 
-        private readonly Ref<HashTree<int, IScope>> _scopes = Ref.Of(HashTree<int, IScope>.Empty);
+        private IntKeyTree _scopes = IntKeyTree.Empty;
     }
 
     /// <summary>Reuse goal is to locate or create scope where reused objects will be stored.</summary>
@@ -6254,7 +6251,9 @@ namespace DryIoc
         {
             var resultID = -1;
             GetCurrentManagedThreadID(ref resultID);
-            return resultID != -1 ? resultID : _getEnvCurrentManagedThreadId();
+            if (resultID == -1) 
+                resultID = _getEnvCurrentManagedThreadId();
+            return resultID;
         }
 
         static partial void GetCurrentManagedThreadID(ref int threadID);
@@ -6551,20 +6550,6 @@ namespace DryIoc
                 t = hash < t.Hash ? t.Left : t.Right;
             return t.Height != 0 && (ReferenceEquals(key, t.Key) || key.Equals(t.Key))
                 ? t.Value : t.GetConflictedValueOrDefault(key, defaultValue);
-        }
-
-        /// <summary>Searches by hash directly instead of key, and return last value added for key corresponding to the hash, 
-        /// or <paramref name="defaultValue"/>. In a tree single hash code could have multiple (conflicted) keys, here the rest of
-        /// conflicted key values are ignored.</summary>
-        /// <param name="hash">Hash to look for.</param> <param name="defaultValue">Value to return if hash is not found.</param>
-        /// <returns>Found value for unique key, or for last added conflicted key.</returns>
-        /// <remarks>Use the method if you know that hash is truly unique, it will perform faster than <see cref="GetValueOrDefault"/>.</remarks>
-        public V GetFirstValueByHashOrDefault(int hash, V defaultValue = default(V))
-        {
-            var t = this;
-            while (t.Height != 0 && t.Hash != hash)
-                t = hash < t.Hash ? t.Left : t.Right;
-            return t.Height != 0 ? t.Value : defaultValue;
         }
 
         /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
