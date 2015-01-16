@@ -398,12 +398,11 @@ namespace DryIoc
                     UnregisterProvidedFactories(f, factoryType);
         }
 
-        // TODO: Replace with factory Dispose?
         private void UnregisterProvidedFactories(Factory factory, FactoryType factoryType)
         {
-            if (factory != null && factory.ProvidesFactoryForRequest && !factory.ProvidedFactories.IsEmpty)
-                foreach (var f in factory.ProvidedFactories.Enumerate())
-                    Unregister(f.Value.Key, f.Value.Value, factoryType, null);
+            if (factory != null && factory.Provider != null)
+                foreach (var f in factory.Provider.ProvidedFactoriesServiceTypeKey)
+                    Unregister(f.Key, f.Value, factoryType, null);
         }
 
         #endregion
@@ -564,8 +563,8 @@ namespace DryIoc
         Factory IContainer.ResolveFactory(Request request)
         {
             var factory = GetServiceFactoryOrDefault(request.ServiceType, request.ServiceKey, Rules.FactorySelector);
-            if (factory != null && factory.ProvidesFactoryForRequest)
-                factory = factory.GetFactoryForRequestOrDefault(request);
+            if (factory != null && factory.Provider != null)
+                factory = factory.Provider.ProvideConcreteFactory(request);
             if (factory != null)
                 return factory;
 
@@ -574,7 +573,7 @@ namespace DryIoc
             if (serviceTypeGenericDef != null)
             {
                 factory = GetServiceFactoryOrDefault(serviceTypeGenericDef, request.ServiceKey, Rules.FactorySelector);
-                if (factory != null && (factory = factory.GetFactoryForRequestOrDefault(request)) != null)
+                if (factory != null && (factory = factory.Provider.ProvideConcreteFactory(request)) != null)
                 {   // Important to register produced factory, at least for recursive dependency check
                     Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.Update);
                     return factory;
@@ -650,9 +649,9 @@ namespace DryIoc
                     if (((SetupDecorator)decorator.Setup).Condition(request))
                     {
                         // Cache closed generic registration produced by open-generic decorator.
-                        if (i >= openGenericDecoratorIndex && decorator.ProvidesFactoryForRequest)
+                        if (i >= openGenericDecoratorIndex && decorator.Provider != null)
                         {
-                            decorator = decorator.GetFactoryForRequestOrDefault(request);
+                            decorator = decorator.Provider.ProvideConcreteFactory(request);
                             Register(decorator, serviceType, null, IfAlreadyRegistered.AppendDefault);
                         }
 
@@ -1412,8 +1411,8 @@ namespace DryIoc
                 serviceType = typeof(IEnumerable<>).MakeGenericType(itemType);
 
             var factory = request.Container.GetWrapperFactoryOrDefault(serviceType);
-            if (factory != null && factory.ProvidesFactoryForRequest)
-                factory = factory.GetFactoryForRequestOrDefault(request);
+            if (factory != null && factory.Provider != null)
+                factory = factory.Provider.ProvideConcreteFactory(request);
 
             return factory;
         };
@@ -3447,6 +3446,18 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Facility for creating concrete factories from some template/prototype. Example: 
+    /// creating closed-generic type reflection factory from registered open-generic prototype factory.</summary>
+    public interface IConcreteFactoryProvider
+    {
+        /// <summary>Returns factories created by <see cref="ProvideConcreteFactory"/> so far.</summary>
+        IEnumerable<KV<Type, object>> ProvidedFactoriesServiceTypeKey { get; }
+
+        /// <summary>Method applied for factory provider, returns new factory per request.</summary>
+        /// <param name="request">Request to resolve.</param> <returns>Returns new factory per request.</returns>
+        Factory ProvideConcreteFactory(Request request);
+    }
+
     /// <summary>Base class for different ways to instantiate service: 
     /// <list type="bullet">
     /// <item>Through reflection - <see cref="ReflectionFactory"/></item>
@@ -3483,6 +3494,10 @@ namespace DryIoc
         /// until delegate is invoked.</summary>
         public virtual Type ImplementationType { get { return null; } }
 
+        /// <summary>Indicates that Factory is factory provider and 
+        /// consumer should call <see cref="IConcreteFactoryProvider.ProvideConcreteFactory"/>  to get concrete factory.</summary>
+        public virtual IConcreteFactoryProvider Provider { get { return null; } }
+
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
         /// <param name="reuse">(optional)</param>
         /// <param name="setup">(optional)</param>
@@ -3498,21 +3513,9 @@ namespace DryIoc
         /// <param name="container">Container to register factory in.</param>
         public virtual void ValidateRegistration(Type serviceType, IContainer container)
         {
-            Throw.If(serviceType.IsGenericDefinition() && !ProvidesFactoryForRequest,
+            Throw.If(serviceType.IsGenericDefinition() && Provider == null,
                 Error.REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER, serviceType);
         }
-
-        /// <summary>Indicates that Factory is factory provider and client should call <see cref="GetFactoryForRequestOrDefault"/>
-        /// to get concrete factory.</summary>
-        public virtual bool ProvidesFactoryForRequest { get { return false; } }
-
-        // TODO: May be move all provider related stuff into separate interface to stop polluting Factory.
-        /// <summary>Tracks factories created by <see cref="GetFactoryForRequestOrDefault"/>.</summary>
-        public virtual HashTree<int, KV<Type, object>> ProvidedFactories { get { return HashTree<int, KV<Type, object>>.Empty; } }
-
-        /// <summary>Method applied for factory provider, returns new factory per request.</summary>
-        /// <param name="request">Request to resolve.</param> <returns>Returns new factory per request.</returns>
-        public virtual Factory GetFactoryForRequestOrDefault(Request request) { return null; }
 
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
         /// If <paramref name="request"/> has <see cref="Request.FuncArgs"/> specified, they could be used in expression.</summary>
@@ -4111,14 +4114,8 @@ namespace DryIoc
         /// <summary>Non-abstract service implementation type. May be open generic.</summary>
         public override Type ImplementationType { get { return _implementationType; } }
 
-        /// <summary>True for open-generic implementation type.</summary>
-        public override bool ProvidesFactoryForRequest { get { return _providedFactories != null; } }
-
-        /// <summary>Tracks factories created by <see cref="GetFactoryForRequestOrDefault"/>.</summary>
-        public override HashTree<int, KV<Type, object>> ProvidedFactories
-        {
-            get { return _providedFactories == null ? HashTree<int, KV<Type, object>>.Empty : _providedFactories.Value; }
-        }
+        /// <summary>Provides closed-generic factory for registered open-generic variant.</summary>
+        public override IConcreteFactoryProvider Provider { get { return _provider; } }
 
         /// <summary>Injection rules set for Constructor, Parameters, Properties and Fields.</summary>
         public readonly InjectionRules Rules;
@@ -4136,7 +4133,7 @@ namespace DryIoc
                 implementationType.ThrowIf(implementationType.IsAbstract(), Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE);
 
             if (implementationType != null && implementationType.IsGenericDefinition())
-                _providedFactories = Ref.Of(HashTree<int, KV<Type, object>>.Empty);
+                _provider = new CloseGenericFactoryProvider(this);
         }
 
         /// <summary>Before registering factory checks that ImplementationType is assignable, Or
@@ -4185,39 +4182,6 @@ namespace DryIoc
                 var publicCtorCount = implType.GetAllConstructors().Count();
                 Throw.If(publicCtorCount != 1, Error.NO_CTOR_SELECTOR_FOR_IMPL_WITH_MULTIPLE_CTORS, implType, publicCtorCount);
             }
-        }
-
-        /// <summary>Given factory with open-generic implementation type creates factory with closed type with type 
-        /// arguments provided by service type.</summary>
-        /// <param name="request"><see cref="Request"/> with service type which provides concrete type arguments.</param>
-        /// <returns>Factory with the same setup and reuse but with closed concrete implementation type.</returns>
-        public override Factory GetFactoryForRequestOrDefault(Request request)
-        {
-            var serviceType = request.ServiceType;
-            var closedTypeArgs = _implementationType == serviceType.GetGenericDefinitionOrNull()
-                ? serviceType.GetGenericParamsAndArgs()
-                : GetClosedTypeArgsForGenericImplementationTypeOrNull(_implementationType, request);
-            if (closedTypeArgs == null)
-                return null;
-
-            Type closedImplType;
-            if (request.IfUnresolved == IfUnresolved.ReturnDefault)
-            {
-                try { closedImplType = _implementationType.MakeGenericType(closedTypeArgs); }
-                catch { return null; }
-            }
-            else
-            {
-                closedImplType = Throw.IfThrows<ArgumentException, Type>(
-                   () => _implementationType.MakeGenericType(closedTypeArgs),
-                   Error.NOT_MATCHED_GENERIC_PARAM_CONSTRAINTS, _implementationType, request);
-            }
-
-            var factory = new ReflectionFactory(closedImplType, Reuse, Rules, Setup);
-            _providedFactories.Swap(_ => _.AddOrUpdate(
-                key: factory.FactoryID,
-                value: new KV<Type, object>(serviceType, request.ServiceKey)));
-            return factory;
         }
 
         /// <summary>Creates service expression, so for registered implementation type "Service", 
@@ -4296,7 +4260,55 @@ namespace DryIoc
         #region Implementation
 
         private readonly Type _implementationType;
-        private readonly Ref<HashTree<int, KV<Type, object>>> _providedFactories;
+        private readonly CloseGenericFactoryProvider _provider;
+
+        private sealed class CloseGenericFactoryProvider : IConcreteFactoryProvider
+        {
+            public IEnumerable<KV<Type, object>> ProvidedFactoriesServiceTypeKey
+            {
+                get { return _providedFactories.Value.IsEmpty
+                    ? Enumerable.Empty<KV<Type, object>>()
+                    : _providedFactories.Value.Enumerate().Select(_ => _.Value); }
+            }
+
+            public CloseGenericFactoryProvider(ReflectionFactory factory) { _factory = factory; }
+
+            public Factory ProvideConcreteFactory(Request request)
+            {
+                var serviceType = request.ServiceType;
+                var implType = _factory._implementationType;
+                var closedTypeArgs = implType == serviceType.GetGenericDefinitionOrNull()
+                    ? serviceType.GetGenericParamsAndArgs()
+                    : GetClosedTypeArgsForGenericImplementationTypeOrNull(implType, request);
+                if (closedTypeArgs == null)
+                    return null;
+
+                Type closedImplType;
+                if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+                {
+                    try { closedImplType = implType.MakeGenericType(closedTypeArgs); }
+                    catch { return null; }
+                }
+                else
+                {
+                    closedImplType = Throw.IfThrows<ArgumentException, Type>(
+                       () => implType.MakeGenericType(closedTypeArgs),
+                       Error.NOT_MATCHED_GENERIC_PARAM_CONSTRAINTS, implType, request);
+                }
+
+                var factory = new ReflectionFactory(closedImplType, _factory.Reuse, _factory.Rules, _factory.Setup);
+                _providedFactories.Swap(_ => _.AddOrUpdate(
+                    key: factory.FactoryID,
+                    value: new KV<Type, object>(serviceType, request.ServiceKey)));
+                return factory;
+
+            }
+
+            private readonly ReflectionFactory _factory;
+
+            private readonly Ref<HashTree<int, KV<Type, object>>>
+                _providedFactories = Ref.Of(HashTree<int, KV<Type, object>>.Empty);
+        }
 
         private FactoryMethod GetFactoryMethodOrDefault(Request request)
         {
