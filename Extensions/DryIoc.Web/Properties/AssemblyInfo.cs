@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using System.Runtime.CompilerServices;
 
 [assembly: AssemblyTitle("DryIoc.Web")]
 [assembly: AssemblyDescription("ASP.NET Extension for DryIoc providing InRequest scope and infrastructure")]
@@ -12,3 +13,5 @@
 [assembly: AssemblyVersion("2.0.0")]
 [assembly: AssemblyFileVersion("2.0.0")]
 [assembly: AssemblyInformationalVersion("2.0.0")]
+
+[assembly: InternalsVisibleTo("DryIoc.Web.UnitTests")]

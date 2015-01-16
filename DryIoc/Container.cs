@@ -213,12 +213,6 @@ namespace DryIoc
             Rules = Rules.Empty;
         }
 
-        /// <summary>Prints container ID to identify it among others.</summary> <returns>Printed info.</returns>
-        public override string ToString()
-        {
-            return "{ContainerID=" + _containerID + "}";
-        }
-
         #region Static state
 
         internal static readonly ParameterExpression StateParamExpr = Expression.Parameter(typeof(AppendableArray), "state");
@@ -243,7 +237,7 @@ namespace DryIoc
         public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
             ThrowIfContainerDisposed();
-            factory.ThrowIfNull().ValidateBeforeRegistration(serviceType.ThrowIfNull(), this);
+            factory.ThrowIfNull().ValidateRegistration(serviceType.ThrowIfNull(), this);
 
             switch (factory.FactoryType)
             {
@@ -538,10 +532,16 @@ namespace DryIoc
             get { return _disposed == 1; }
         }
 
-        /// <summary>ID to identify container.</summary>
-        public int ContainerID
+        /// <summary>Scope associated with container.</summary>
+        IScope IResolverWithScopes.SingletonScope
         {
-            get { return _containerID; }
+            get { return _singletonScope; }
+        }
+
+        /// <summary>Scope associated with containers created by <see cref="Container.OpenScope"/>.</summary>
+        IScope IResolverWithScopes.CurrentScope
+        {
+            get { return _scopeContext.GetCurrentOrDefault().ThrowIfNull(Error.NO_CURRENT_SCOPE); }
         }
 
         /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
@@ -554,18 +554,6 @@ namespace DryIoc
         ContainerWeakRef IContainer.ContainerWeakRef
         {
             get { return _containerWeakRef; }
-        }
-
-        /// <summary>Scope associated with container.</summary>
-        IScope IResolverWithScopes.SingletonScope
-        {
-            get { return _singletonScope; }
-        }
-
-        /// <summary>Scope associated with containers created by <see cref="Container.OpenScope"/>.</summary>
-        IScope IResolverWithScopes.CurrentScope
-        {
-            get { return _scopeContext.GetCurrentOrDefault().ThrowIfNull(Error.NO_CURRENT_SCOPE); }
         }
 
         ResolutionStateCache IContainer.ResolutionStateCache
@@ -945,9 +933,6 @@ namespace DryIoc
 
         #region Implementation
 
-        private static int _lastContainerID;
-        private readonly int _containerID;
-
         private ContainerWeakRef _containerWeakRef;
         private readonly Request _emptyRequest;
         private int _disposed;
@@ -978,7 +963,6 @@ namespace DryIoc
         {
             Rules = rules;
 
-            _containerID = Interlocked.Increment(ref _lastContainerID);
             _disposed = disposed;
 
             _singletonScope = singletonScope ?? new Scope();
@@ -2523,7 +2507,7 @@ namespace DryIoc
         {
             concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UNABLE_TO_NEW_OPEN_GENERIC);
             var factory = new ReflectionFactory(concreteType, null, with, Setup.With(cacheFactoryExpression: false));
-            factory.ValidateBeforeRegistration(concreteType, container);
+            factory.ValidateRegistration(concreteType, container);
             var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).ResolveWithFactory(factory);
             var factoryDelegate = factory.GetDelegateOrDefault(request);
             var service = factoryDelegate(container.ResolutionStateCache.Items, container.ContainerWeakRef, null);
@@ -3512,7 +3496,7 @@ namespace DryIoc
         /// <summary>Validates that factory is OK for registered service type.</summary>
         /// <param name="serviceType">Service type to register factory for.</param>
         /// <param name="container">Container to register factory in.</param>
-        public virtual void ValidateBeforeRegistration(Type serviceType, IContainer container)
+        public virtual void ValidateRegistration(Type serviceType, IContainer container)
         {
             Throw.If(serviceType.IsGenericDefinition() && !ProvidesFactoryForRequest,
                 Error.REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER, serviceType);
@@ -3747,7 +3731,7 @@ namespace DryIoc
 
         /// <summary>Throw if instance is not of registered service type.</summary>
         /// <param name="serviceType">Service type to register instance for.</param> <param name="_">(ignored).</param>
-        public override void ValidateBeforeRegistration(Type serviceType, IContainer _)
+        public override void ValidateRegistration(Type serviceType, IContainer _)
         {
             _instance.ThrowIfNotOf(serviceType, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE, serviceType);
         }
@@ -4160,9 +4144,9 @@ namespace DryIoc
         /// Then checks that there is defined constructor selector for implementation type with multiple/no constructors.</summary>
         /// <param name="serviceType">Service type to register factory with.</param>
         /// <param name="container">Container to register factory in.</param>
-        public override void ValidateBeforeRegistration(Type serviceType, IContainer container)
+        public override void ValidateRegistration(Type serviceType, IContainer container)
         {
-            base.ValidateBeforeRegistration(serviceType, container);
+            base.ValidateRegistration(serviceType, container);
             if (_implementationType == null)
                 return;
 
@@ -4662,11 +4646,11 @@ namespace DryIoc
 
         /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and
         /// should return new current scope.</summary>
-        /// <param name="getNewCurrent">Delegate to change the scope.</param>
-        /// <remarks>Important: <paramref name="getNewCurrent"/> may be called multiple times in concurrent environment.
+        /// <param name="getNewCurrentScope">Delegate to change the scope.</param>
+        /// <remarks>Important: <paramref name="getNewCurrentScope"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
         /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
-        IScope SetCurrent(Func<IScope, IScope> getNewCurrent);
+        IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope);
     }
 
     /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
@@ -4687,15 +4671,15 @@ namespace DryIoc
         }
 
         /// <summary>Change current scope for the calling Thread.</summary>
-        /// <param name="getNewCurrent">Delegate to change the scope given current one (or null).</param>
-        /// <remarks>Important: <paramref name="getNewCurrent"/> may be called multiple times in concurrent environment.
+        /// <param name="getNewCurrentScope">Delegate to change the scope given current one (or null).</param>
+        /// <remarks>Important: <paramref name="getNewCurrentScope"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
-        public IScope SetCurrent(Func<IScope, IScope> getNewCurrent)
+        public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
         {
             var threadId = Portable.GetCurrentManagedThreadID();
             IScope newScope = null;
             Ref.Swap(ref _scopes, scopes =>
-                scopes.AddOrUpdate(threadId, newScope = getNewCurrent(scopes.GetValueOrDefault(threadId) as IScope)));
+                scopes.AddOrUpdate(threadId, newScope = getNewCurrentScope(scopes.GetValueOrDefault(threadId) as IScope)));
             return newScope;
         }
 
@@ -5152,7 +5136,6 @@ namespace DryIoc
     {
         /// <summary>Specifies to throw <see cref="ContainerException"/> if no service found.</summary>
         Throw, 
-        
         /// <summary>Specifies to return default value instead of throwing error.</summary>
         ReturnDefault
     }
@@ -5602,7 +5585,7 @@ namespace DryIoc
             RECYCLABLE_REUSE_WRAPPER_IS_RECYCLED = Of("Recyclable wrapper is recycled.");
 #pragma warning restore 1591
 
-        private static int Of(string message)
+        public static int Of(string message)
         {
             Messages.Add(message);
             return FIRST_ERROR_CODE + Messages.Count - 1;
@@ -5614,19 +5597,14 @@ namespace DryIoc
     {
         /// <summary>Unspecified, just throw.</summary>
         Unspecified,
-
         /// <summary>Predicate evaluated to false.</summary>
         InvalidCondition,
-
         /// <summary>Checked object is null.</summary>
         IsNull,
-
         /// <summary>Checked object is of unexpected type.</summary>
         IsNotOfType,
-
         /// <summary>Checked type is not assignable to expected type</summary>
         TypeIsNotOfType,
-
         /// <summary>Invoked operation throw, it is source of inner exception.</summary>
         OperationThrows,
     }

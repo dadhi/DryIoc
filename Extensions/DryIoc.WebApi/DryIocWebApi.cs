@@ -167,10 +167,10 @@ namespace DryIoc.WebApi
             return scope == null ? null : scope.Value;
         }
 
-        public IScope SetCurrent(Func<IScope, IScope> getNewCurrent)
+        public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
         {
             var oldScope = GetCurrentOrDefault();
-            var newScope = getNewCurrent.ThrowIfNull()(oldScope);
+            var newScope = getNewCurrentScope.ThrowIfNull()(oldScope);
             CallContext.LogicalSetData(_key, new Copyable<IScope>(newScope));
             return newScope;
         }

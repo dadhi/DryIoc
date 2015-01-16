@@ -1,4 +1,4 @@
-﻿[assembly: System.Web.PreApplicationStartMethod(typeof(DryIoc.Web.HttpModuleInitializer), "Initialize")]
+﻿[assembly: System.Web.PreApplicationStartMethod(typeof(DryIoc.Web.DryIocHttpModuleInitializer), "Initialize")]
 
 namespace DryIoc.Web
 {
@@ -16,22 +16,19 @@ namespace DryIoc.Web
         }
     }
 
-    public static class WebReuse
-    {
-        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
-    }
-
     /// <summary>Stores current scope in <see cref="HttpContext.Items"/>.</summary>
     /// <remarks>Stateless context, so could be created multiple times and used from different places without side-effects.</remarks>
     public sealed class HttpContextScopeContext : IScopeContext
     {
+        public static Func<IDictionary> GetContextItemsDefault = () => HttpContext.Current.Items;
+
         public static readonly object ROOT_SCOPE_NAME = typeof(HttpContextScopeContext);
 
         public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
 
         public HttpContextScopeContext(Func<IDictionary> getContextItems = null)
         {
-            _getContextItems = getContextItems ?? (() => HttpContext.Current.Items);
+            _getContextItems = getContextItems ?? GetContextItemsDefault;
         }
 
         public IScope GetCurrentOrDefault()
@@ -39,18 +36,22 @@ namespace DryIoc.Web
             return _getContextItems()[RootScopeName] as IScope;
         }
 
-        public IScope SetCurrent(Func<IScope, IScope> getNewCurrent)
+        public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
         {
-            var currentScope = GetCurrentOrDefault();
-            var newScope = getNewCurrent.ThrowIfNull()(currentScope);
-            _getContextItems()[ROOT_SCOPE_NAME] = newScope;
-            return newScope;
+            var newCurrentScope = getNewCurrentScope.ThrowIfNull()(GetCurrentOrDefault());
+            _getContextItems()[ROOT_SCOPE_NAME] = newCurrentScope;
+            return newCurrentScope;
         }
 
         private readonly Func<IDictionary> _getContextItems;
     }
 
-    public static class HttpModuleInitializer
+    public static class WebReuse
+    {
+        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
+    }
+
+    public static class DryIocHttpModuleInitializer
     {
         public static void Initialize()
         {
@@ -63,18 +64,24 @@ namespace DryIoc.Web
 
     public class DryIocHttpModule : IHttpModule
     {
+        /// <summary>Initializes a module and prepares it to handle requests. </summary>
+        /// <param name="context">An <see cref="T:System.Web.HttpApplication"/> that provides access to the methods, properties, and events common to all application objects within an ASP.NET application </param>
         void IHttpModule.Init(HttpApplication context)
         {
-            context.BeginRequest += (sender, eventArgs) =>
+            context.BeginRequest += (sender, _) =>
             {
-                var application = (sender as HttpApplication).ThrowIfNull();
-                // TODO: Put new OpenedScope into application.Context.
+                var app = sender as HttpApplication;
+                var scopeContext = new HttpContextScopeContext();
+                scopeContext.SetCurrent(current => 
+                    new Scope(current.ThrowIf(current != null, Error.Of("Someone set root context scope before you.")), 
+                        HttpContextScopeContext.ROOT_SCOPE_NAME));
             };
-            
-            context.EndRequest += (sender, eventArgs) =>
+            context.EndRequest += (sender, _) =>
             {
-                var application = (sender as HttpApplication).ThrowIfNull();
-                // TODO: Get OpenedScope from application.Context and Dispose it.
+                var app = sender as HttpApplication;
+                var scopeContext = new HttpContextScopeContext();
+                var scope = scopeContext.GetCurrentOrDefault().ThrowIfNull(Error.Of("No root opened scope found."));
+                scope.ThrowIf(scope.Parent != null).Dispose();
             };
         }
 

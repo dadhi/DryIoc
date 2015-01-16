@@ -280,7 +280,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_resolve_service_as_typed_Ref_proxy()
+        public void Can_resolve_service_as_swapable()
         {
             var container = new Container();
 
@@ -299,6 +299,20 @@ namespace DryIoc.UnitTests
             service.Swap(newService);
             var getNew = container.Resolve<Func<bool, ServiceWithParameterAndDependency>>();
             Assert.That(getNew(true), Is.SameAs(newService));
+        }
+
+        [Test]
+        public void Can_resolve_as_swapable_and_swap_based_on_current_value()
+        {
+            var container = new Container();
+            container.Register<Service>(Reuse.Singleton, setup: Setup.With(reuseWrappers: typeof(ReuseSwapable)));
+
+            var service = container.Resolve<ReuseSwapable>(typeof(Service));
+
+            var another = new Service();
+            service.Swap(current => another);
+
+            Assert.AreSame(another, container.Resolve<Service>());
         }
 
         [Test]

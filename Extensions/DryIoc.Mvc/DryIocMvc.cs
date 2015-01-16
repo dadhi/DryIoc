@@ -156,10 +156,10 @@ namespace DryIoc.Mvc
             return httpContext == null ? _fallbackScope : (IScope)httpContext.Items[ROOT_SCOPE_NAME];
         }
 
-        public IScope SetCurrent(Func<IScope, IScope> getNewCurrent)
+        public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
         {
             var currentOrDefault = GetCurrentOrDefault();
-            var newScope = getNewCurrent.ThrowIfNull().Invoke(currentOrDefault);
+            var newScope = getNewCurrentScope.ThrowIfNull().Invoke(currentOrDefault);
             var httpContext = HttpContext.Current;
             if (httpContext == null)
             {

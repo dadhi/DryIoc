@@ -297,15 +297,6 @@ namespace DryIoc.UnitTests
                 container.Register(typeof(Closed<>).GetBaseType(), typeof(Closed<>)));
         }
 
-        [Test]
-        public void When_using_ReflectionFactory_alone_Then_resolving_service_with_not_enough_type_args_should_Throw()
-        {
-            var factory = new ReflectionFactory(typeof(BananaSplit<,>));
-            IContainer container = new Container();
-            Assert.Throws<ContainerException>(() =>
-                factory.GetFactoryForRequestOrDefault(container.EmptyRequest.Push(typeof(Banana<int>))));
-        }
-
         [Test] public void Resolving_array_of_generic_implementations_should_select_only_matched_types()
         {
             var container = new Container();
