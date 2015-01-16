@@ -141,6 +141,27 @@ namespace DryIoc.UnitTests
             Assert.That(singleton.Value.ToString(), Is.StringContaining("SingletonScope"));
         }
 
+        [Test]
+        public void Can_hook_and_verify_registered_factories_ID()
+        {
+            var factoryIDs = new Dictionary<Type, string>();
+            var container = new Container(rules => rules
+                .WithoutSingletonOptimization()
+                .WithBeforeFactoryRegistrationHook((f, t, k) => factoryIDs[t] = f.FactoryID.ToString()));
+
+            container.Register<XX>(Reuse.Singleton);
+            container.Register<YY>(Reuse.Singleton);
+            container.Register<ZZ>(Reuse.Singleton);
+
+            StringAssert.Contains(factoryIDs[typeof(ZZ)], container.Resolve<FactoryExpression<ZZ>>().Value.ToString());
+            StringAssert.Contains(factoryIDs[typeof(YY)], container.Resolve<FactoryExpression<YY>>().Value.ToString());
+            StringAssert.Contains(factoryIDs[typeof(XX)], container.Resolve<FactoryExpression<XX>>().Value.ToString());
+        }
+
+        internal class XX { }
+        internal class YY { }
+        internal class ZZ { }
+
         #region CUT
 
         public class SomeService { }

@@ -237,7 +237,11 @@ namespace DryIoc
         public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
             ThrowIfContainerDisposed();
-            factory.ThrowIfNull().ValidateRegistration(serviceType.ThrowIfNull(), this);
+            factory.ThrowIfNull().BeforeRegistrationCheck(this, serviceType.ThrowIfNull(), serviceKey);
+
+            var handler = Rules.BeforeFactoryRegistrationHook;
+            if (handler != null)
+                handler(factory, serviceType, serviceKey);
 
             switch (factory.FactoryType)
             {
@@ -1800,11 +1804,13 @@ namespace DryIoc
             return new Rules(this) { SingletonOptimization = false };
         }
 
-        public bool FactoryNumerationPerContainer { get; private set; }
+        public delegate void BeforeFactoryRegistrationHandler(Factory factory, Type serviceType, object optServiceKey);
 
-        public Rules WithFactoryNumerationPerContainer()
+        public BeforeFactoryRegistrationHandler BeforeFactoryRegistrationHook { get; private set; }
+
+        public Rules WithBeforeFactoryRegistrationHook(BeforeFactoryRegistrationHandler hook)
         {
-            return new Rules(this) { FactoryNumerationPerContainer = true };
+            return new Rules(this) { BeforeFactoryRegistrationHook = hook };
         }
 
         #region Implementation
@@ -1826,7 +1832,7 @@ namespace DryIoc
             ThrowIfDepenedencyHasShorterReuseLifespan = copy.ThrowIfDepenedencyHasShorterReuseLifespan;
             ReuseMapping = copy.ReuseMapping;
             SingletonOptimization = copy.SingletonOptimization;
-            FactoryNumerationPerContainer = copy.FactoryNumerationPerContainer;
+            BeforeFactoryRegistrationHook = copy.BeforeFactoryRegistrationHook;
             _injectionRules = copy._injectionRules;
             _compilationToDynamicAssemblyEnabled = copy._compilationToDynamicAssemblyEnabled;
         }
@@ -2506,7 +2512,7 @@ namespace DryIoc
         {
             concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UNABLE_TO_NEW_OPEN_GENERIC);
             var factory = new ReflectionFactory(concreteType, null, with, Setup.With(cacheFactoryExpression: false));
-            factory.ValidateRegistration(concreteType, container);
+            factory.BeforeRegistrationCheck(container, concreteType, null);
             var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).ResolveWithFactory(factory);
             var factoryDelegate = factory.GetDelegateOrDefault(request);
             var service = factoryDelegate(container.ResolutionStateCache.Items, container.ContainerWeakRef, null);
@@ -3471,7 +3477,7 @@ namespace DryIoc
     public abstract class Factory
     {
         /// <summary>Unique factory id generated from static seed.</summary>
-        public readonly int FactoryID;
+        public int FactoryID { get; private set; }
 
         /// <summary>Reuse policy for factory created services.</summary>
         public readonly IReuse Reuse;
@@ -3509,9 +3515,10 @@ namespace DryIoc
         }
 
         /// <summary>Validates that factory is OK for registered service type.</summary>
-        /// <param name="serviceType">Service type to register factory for.</param>
         /// <param name="container">Container to register factory in.</param>
-        public virtual void ValidateRegistration(Type serviceType, IContainer container)
+        /// <param name="serviceType">Service type to register factory for.</param>
+        /// <param name="serviceKey">Service key to register factory with.</param>
+        public virtual void BeforeRegistrationCheck(IContainer container, Type serviceType, object serviceKey)
         {
             Throw.If(serviceType.IsGenericDefinition() && Provider == null,
                 Error.REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER, serviceType);
@@ -3733,8 +3740,10 @@ namespace DryIoc
         }
 
         /// <summary>Throw if instance is not of registered service type.</summary>
-        /// <param name="serviceType">Service type to register instance for.</param> <param name="_">(ignored).</param>
-        public override void ValidateRegistration(Type serviceType, IContainer _)
+        /// <param name="container">(ignored)</param>
+        /// <param name="serviceType">Service type to register instance for.</param>
+        /// <param name="serviceKey">(ignored).</param>
+        public override void BeforeRegistrationCheck(IContainer container, Type serviceType, object serviceKey)
         {
             _instance.ThrowIfNotOf(serviceType, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE, serviceType);
         }
@@ -4139,11 +4148,12 @@ namespace DryIoc
         /// <summary>Before registering factory checks that ImplementationType is assignable, Or
         /// in case of open generics, compatible with <paramref name="serviceType"/>. 
         /// Then checks that there is defined constructor selector for implementation type with multiple/no constructors.</summary>
-        /// <param name="serviceType">Service type to register factory with.</param>
         /// <param name="container">Container to register factory in.</param>
-        public override void ValidateRegistration(Type serviceType, IContainer container)
+        /// <param name="serviceType">Service type to register factory with.</param>
+        /// <param name="serviceKey">(ignored)</param>
+        public override void BeforeRegistrationCheck(IContainer container, Type serviceType, object serviceKey)
         {
-            base.ValidateRegistration(serviceType, container);
+            base.BeforeRegistrationCheck(container, serviceType, serviceKey);
             if (_implementationType == null)
                 return;
 
