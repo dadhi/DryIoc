@@ -66,14 +66,14 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Creating concrete object without registering it in Container but with injecting its parameters, properties, and fields.
 * Associated metadata object.
 * Generic wrappers:
-    * Of multiple implementations: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and as `I(ReadOnly)Collection|List`.
+    * Of multiple implementations: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and `I(ReadOnly)Collection|List`.
     * `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>`, `KeyValuePair<TKey, T>`, and user-defined wrappers.
-    * [Currying](http://en.wikipedia.org/wiki/Currying) over constructor of factory method arguments with: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
+    * [Currying](http://en.wikipedia.org/wiki/Currying) over constructor or factory method arguments with: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
     * Generic wrappers could be nested, e.g. `Meta<SomeMetadata, Func<ISomeService>>[]`.
 * [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern): Composite itself is excluded from result collection.
-* [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern). 
+* [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern) and Initializer support. 
 * Context-based implementation selection.
-* Unknown service resolution via `Rules.WithUnknownServiceResolvers()`.
+* Unknown service resolution via `Rules.WithUnknownServiceResolver()`.
 
 #### Extensions
 * [MefAttributedModel] - supports [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) and enables automatic types discovery and wiring.
