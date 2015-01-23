@@ -9,7 +9,7 @@ namespace DryIoc.UnitTests.CUT
 
 	public class ServiceWithInstanceCount : IService
 	{
-	    public static int InstanceCount { get; set; }
+		public static int InstanceCount { get; set; }
 
 		public ServiceWithInstanceCount()
 		{
@@ -17,18 +17,18 @@ namespace DryIoc.UnitTests.CUT
 		}
 	}
 
-    public class ServiceWithInstanceCountWithStringParam : IService
-    {
-        public static int InstanceCount { get; set; }
+	public class ServiceWithInstanceCountWithStringParam : IService
+	{
+		public static int InstanceCount { get; set; }
 
-        public string Message { get; set; }
+		public string Message { get; set; }
 
-        public ServiceWithInstanceCountWithStringParam(string message)
-        {
-            Message = message;
-            ++InstanceCount;
-        }
-    }
+		public ServiceWithInstanceCountWithStringParam(string message)
+		{
+			Message = message;
+			++InstanceCount;
+		}
+	}
 
 	public class Service : IService { }
 
@@ -36,9 +36,9 @@ namespace DryIoc.UnitTests.CUT
 
 	public class ServiceWithDependency : IService
 	{
-	    public IDependency Dependency { get; private set; }
+		public IDependency Dependency { get; private set; }
 
-	    public ServiceWithDependency(IDependency dependency)
+		public ServiceWithDependency(IDependency dependency)
 		{
 			Dependency = dependency;
 		}
@@ -46,9 +46,9 @@ namespace DryIoc.UnitTests.CUT
 
 	public class AnotherServiceWithDependency : IService
 	{
-	    public IDependency Dependency { get; private set; }
+		public IDependency Dependency { get; private set; }
 
-	    public AnotherServiceWithDependency(IDependency dependency)
+		public AnotherServiceWithDependency(IDependency dependency)
 		{
 			Dependency = dependency;
 		}
@@ -56,9 +56,9 @@ namespace DryIoc.UnitTests.CUT
 
 	public class ServiceWithSingletonDependency : IService
 	{
-	    public ISingleton Singleton { get; private set; }
+		public ISingleton Singleton { get; private set; }
 
-	    public ServiceWithSingletonDependency(ISingleton singleton)
+		public ServiceWithSingletonDependency(ISingleton singleton)
 		{
 			Singleton = singleton;
 		}
@@ -66,55 +66,55 @@ namespace DryIoc.UnitTests.CUT
 
 	public class ServiceWithEnumerableDependencies : IService
 	{
-	    public IEnumerable<IDependency> Foos { get; private set; }
+		public IEnumerable<IDependency> Foos { get; private set; }
 
-	    public ServiceWithEnumerableDependencies(IEnumerable<IDependency> foos)
+		public ServiceWithEnumerableDependencies(IEnumerable<IDependency> foos)
 		{
 			Foos = foos;
 		}
 	}
 
-    public class ServiceWithManyDependencies : IService
-    {
-        public IEnumerable<IDependency> Foos { get; private set; }
-
-        public ServiceWithManyDependencies(LazyEnumerable<IDependency> foos)
-        {
-            Foos = foos;
-        }
-    }
-
-    public class ServiceWithLazyDependency : IService
+	public class ServiceWithManyDependencies : IService
 	{
-	    public Lazy<IDependency> LazyOne { get; private set; }
+		public IEnumerable<IDependency> Foos { get; private set; }
 
-	    public ServiceWithLazyDependency(Lazy<IDependency> lazyOne)
+		public ServiceWithManyDependencies(LazyEnumerable<IDependency> foos)
+		{
+			Foos = foos;
+		}
+	}
+
+	public class ServiceWithLazyDependency : IService
+	{
+		public Lazy<IDependency> LazyOne { get; private set; }
+
+		public ServiceWithLazyDependency(Lazy<IDependency> lazyOne)
 		{
 			LazyOne = lazyOne;
 		}
 	}
 
-    public class AnotherServiceWithLazyDependency : IService
-    {
-        public Lazy<IDependency> LazyOne { get; private set; }
+	public class AnotherServiceWithLazyDependency : IService
+	{
+		public Lazy<IDependency> LazyOne { get; private set; }
 
-        public AnotherServiceWithLazyDependency(Lazy<IDependency> lazyOne)
-        {
-            LazyOne = lazyOne;
-        }
-    }
+		public AnotherServiceWithLazyDependency(Lazy<IDependency> lazyOne)
+		{
+			LazyOne = lazyOne;
+		}
+	}
 
-    public class ServiceClient
-    {
-        public IService Service { get; private set; }
+	public class ServiceClient
+	{
+		public IService Service { get; private set; }
 
-        public ServiceClient(IService service)
-        {
-            Service = service;
-        }
-    }
+		public ServiceClient(IService service)
+		{
+			Service = service;
+		}
+	}
 
-    public interface IAbstractService { }
+	public interface IAbstractService { }
 
 	public abstract class AbstractService : IAbstractService
 	{
@@ -192,9 +192,9 @@ namespace DryIoc.UnitTests.CUT
 		}
 	}
 
-    public interface ICloneable {}
+	public interface ICloneable {}
 
-    public interface IService<T>
+	public interface IService<T>
 	{
 		T Dependency { get; set; }
 	}
@@ -217,9 +217,9 @@ namespace DryIoc.UnitTests.CUT
 
 	public class ServiceWithGenericDependency<T> : IService<T>
 	{
-	    public T Dependency { get; set; }
+		public T Dependency { get; set; }
 
-	    public ServiceWithGenericDependency(T dependency)
+		public ServiceWithGenericDependency(T dependency)
 		{
 			Dependency = dependency;
 		}
@@ -383,102 +383,145 @@ namespace DryIoc.UnitTests.CUT
 		}
 	}
 
-    public class ComplexCreativity
-    {
-        public int Blah { get; set; }
-        public string Name { get; set; }
+	public class ComplexCreativity
+	{
+		public int Blah { get; set; }
+		public string Name { get; set; }
 
-        public ComplexCreativity(string name)
-        {
-            Name = name;
-        }
+		public ComplexCreativity(string name)
+		{
+			Name = name;
+		}
 
-        public ComplexCreativity(int blah)
-        {
-            Blah = blah;
-        }
+		public ComplexCreativity(int blah)
+		{
+			Blah = blah;
+		}
 
-        public ComplexCreativity()
-        {
-        }
-    }
+		public ComplexCreativity()
+		{
+		}
+	}
 
-    public interface ITransientService
-    {
-    }
+	public interface ITransientService
+	{
+	}
 
-    public interface ISingletonService
-    {
-    }
+	public interface ISingletonService
+	{
+	}
 
-    public class ServiceWithMultipleCostructors
-    {
-        public ITransientService Transient { get; private set; }
-        public ISingletonService Singleton { get; private set; }
+	public class ServiceWithMultipleCostructors
+	{
+		public ITransientService Transient { get; private set; }
+		public ISingletonService Singleton { get; private set; }
 
-        public ServiceWithMultipleCostructors(ISingletonService singleton)
-        {
-            Singleton = singleton;
-        }
+		public ServiceWithMultipleCostructors(ISingletonService singleton)
+		{
+			Singleton = singleton;
+		}
 
-        public ServiceWithMultipleCostructors(ITransientService transient)
-        {
-            Transient = transient;
-        }
-    }
+		public ServiceWithMultipleCostructors(ITransientService transient)
+		{
+			Transient = transient;
+		}
+	}
 
-    public interface IBar { }
+	public interface IBar { }
 
-    public class Bar : IBar { }
+	public class Bar : IBar { }
 
-    public interface IFuh
-    {
-        IBar Bar { get; set; }
-    }
+	public interface IFuh
+	{
+		IBar Bar { get; set; }
+	}
 
-    public class Fuh : IFuh
-    {
-        public IBar Bar { get; set; }
+	public class Fuh : IFuh
+	{
+		public IBar Bar { get; set; }
 
-        public Fuh(IBar bar)
-        {
-            Bar = bar;
-        }
-    }
+		public Fuh(IBar bar)
+		{
+			Bar = bar;
+		}
+	}
 
-    public class DisposableService : IService, IDisposable
-    {
-        public bool IsDisposed;
+	public class DisposableService : IService, IDisposable
+	{
+		public bool IsDisposed;
 
-        public void Dispose()
-        {
-            IsDisposed = true;
-        }
-    }
+		public void Dispose()
+		{
+			IsDisposed = true;
+		}
+	}
 
-    public enum EnumKey { Some };
+	public enum EnumKey { Some };
 
-    public class Log {}
+	public class Log {}
 
-    public class Consumer
-    {
-        public Account Account { get; set; }
-        public Log Log { get; set; }
+	public class Consumer
+	{
+		public Account Account { get; set; }
+		public Log Log { get; set; }
 
-        public Consumer(Account account, Log log)
-        {
-            Account = account;
-            Log = log;
-        }
-    }
+		public Consumer(Account account, Log log)
+		{
+			Account = account;
+			Log = log;
+		}
+	}
 
-    public class Account
-    {
-        public Log Log { get; set; }
+	public class Account
+	{
+		public Log Log { get; set; }
 
-        public Account(Log log)
-        {
-            Log = log;
-        }
-    }
+		public Account(Log log)
+		{
+			Log = log;
+		}
+	}
+	
+	public class UseLogger1{
+		public ILogger Resolved {
+			get;
+			set;
+		}
+
+		public UseLogger1(ILogger logger){Resolved = logger;}
+	}
+	
+	public class UseLogger2{
+		public ILogger Resolved {
+			get;
+			set;
+		}
+
+		public UseLogger2(ILogger logger){Resolved = logger;}
+	}
+	
+	public class Logger1:ILogger{
+		public string Log(string message){ return null;	}
+	}
+	
+	public class Logger2:ILogger{
+		public string Log(string message){ return null;	}
+	}
+	
+	public interface IContext
+	{
+		string Data{get;set;}
+	}
+	
+	public class Context1:IContext{
+
+		public string Data {get;set;}
+		
+	}
+	
+	public class Context2:IContext{
+
+		public string Data {get;set;}
+		
+	}
 }
