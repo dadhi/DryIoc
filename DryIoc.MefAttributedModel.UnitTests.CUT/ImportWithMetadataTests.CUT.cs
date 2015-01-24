@@ -5,17 +5,17 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
     public enum FooMetadata { Hey, Blah, NotFound }
 
-    [ExportAll, WithMetadata(FooMetadata.Hey)]
+    [ExportMany, WithMetadata(FooMetadata.Hey)]
     public class FooHey : IFooService
     {
     }
 
-    [ExportAll, WithMetadata(FooMetadata.Blah)]
+    [ExportMany, WithMetadata(FooMetadata.Blah)]
     public class FooBlah : IFooService
     {
     }
 
-    [ExportAll]
+    [ExportMany]
     public class FooConsumer
     {
         public Lazy<IFooService> Foo { get; set; }
@@ -26,7 +26,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll]
+    [ExportMany]
     public class FooConsumerNotFound
     {
         public IFooService Foo { get; set; }

@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ExportAllTests
+    public class ExportManyTests
     {
         [Test]
         public void When_class_public_types_exported_as_singleton_Then_resolving_types_will_return_the_same_instance()
@@ -20,7 +20,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void ExportAll_should_respect_ContractName()
+        public void ExportMany_should_respect_ContractName()
         {
             var container = new Container();
             container.RegisterExports(typeof(NamedOne));
@@ -33,10 +33,10 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Individual_Export_is_simply_added_to_ExportAll_settings()
+        public void Individual_Export_is_simply_added_to_ExportMany_settings()
         {
             var container = new Container().WithMefAttributedModel();
-            container.RegisterExports(typeof(BothExportAllAndExport));
+            container.RegisterExports(typeof(BothExportManyAndExport));
 
             var named = container.Resolve<INamed>("named");
             Assert.That(named, Is.Not.Null);
@@ -56,18 +56,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
     }
 
-    [ExportAll, Export]
+    [ExportMany, Export]
     public class WithBothTheSameExports {}
 
     public interface IOne {}
 
     public interface INamed {}
 
-    [ExportAll(ContractName = "blah")]
+    [ExportMany(ContractName = "blah")]
     public class NamedOne : INamed, IOne {}
 
-    [Export("named", typeof(INamed)), ExportAll]
-    public class BothExportAllAndExport : INamed, IOne
+    [Export("named", typeof(INamed)), ExportMany]
+    public class BothExportManyAndExport : INamed, IOne
     {
     }
 }

@@ -6,22 +6,22 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportAll(ContractName = "fast"), WithMetadata(2)]
+    [ExportMany(ContractName = "fast"), WithMetadata(2)]
     public class FastHandler : IHandler
     {
     }
 
-    [ExportAll(ContractName = "slow"), WithMetadata(1)]
+    [ExportMany(ContractName = "slow"), WithMetadata(1)]
     public class SlowHandler : IHandler
     {
     }
 
-    [ExportAll(ContractName = "transact"), WithMetadata(1)]
+    [ExportMany(ContractName = "transact"), WithMetadata(1)]
     public class TransactHandler : IHandler
     {
     }
 
-    [ExportAll, AsDecorator(ContractName = "slow")]
+    [ExportMany, AsDecorator(ContractName = "slow")]
     public class LoggingHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -32,7 +32,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, AsDecorator, WithMetadata(2)]
+    [ExportMany, AsDecorator, WithMetadata(2)]
     public class RetryHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -43,7 +43,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, AsDecorator(ContractName = "transact"), WithMetadata(1)]
+    [ExportMany, AsDecorator(ContractName = "transact"), WithMetadata(1)]
     public class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -73,7 +73,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll, AsDecorator]
+    [ExportMany, AsDecorator]
     public class DecoratorWithFastHandlerImport : IHandler
     {
         public IHandler Handler { get; set; }
@@ -87,12 +87,12 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [ExportWithKey(BlahFooh.Blah, typeof(IHandler))]
     public class BlahHandler : IHandler { }
 
-    [ExportAll(ContractKey = BlahFooh.Fooh)]
+    [ExportMany(ContractKey = BlahFooh.Fooh)]
     public class FoohHandler : IHandler { }
 
     public enum BlahFooh { Blah, Fooh }
 
-    [ExportAll, AsDecorator(ContractKey = BlahFooh.Fooh)]
+    [ExportMany, AsDecorator(ContractKey = BlahFooh.Fooh)]
     public class FoohDecorator : IHandler
     {
         public IHandler Handler { get; set; }

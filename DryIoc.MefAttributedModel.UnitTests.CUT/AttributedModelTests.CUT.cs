@@ -5,10 +5,10 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
     public interface IService { }
 
-    [ExportAll]
+    [ExportMany]
     public class Service : IService { }
 
-    [ExportAll]
+    [ExportMany]
     public class AnotherService : IService { }
 
     public interface ITransientService
@@ -232,7 +232,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportAll]
+    [ExportMany]
     public class DbMan : ISomeDb, IAnotherDb
     {
     }
@@ -245,7 +245,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportAll(Except = new []{ typeof(IAnotherDb) })]
+    [ExportMany(Except = new []{ typeof(IAnotherDb) })]
     public class DbMan<T> : ISomeDb<T>, IAnotherDb
     {
     }

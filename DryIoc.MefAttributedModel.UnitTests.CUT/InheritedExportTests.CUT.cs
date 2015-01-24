@@ -19,7 +19,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     public interface IMultiExported { }
 
     [Export("a")]
-    [ExportAll(ContractName = "c")]
+    [ExportMany(ContractName = "c")]
     [Export("b")]
     public class MultiExported : IMultiExported { }
 }

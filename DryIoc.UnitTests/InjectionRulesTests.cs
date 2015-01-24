@@ -229,7 +229,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(with: PropertiesAndFields.PublicNonPrimitive);
+            container.RegisterMany<ClientWithPropsAndFields>(with: PropertiesAndFields.PublicNonPrimitive);
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -243,7 +243,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(with: 
+            container.RegisterMany<ClientWithPropsAndFields>(with: 
                 PropertiesAndFields.Of.The<ClientWithPropsAndFields>(x => x.PWithInternalSetter));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
@@ -256,7 +256,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(with: PropertiesAndFields.Of.The<ClientWithPropsAndFields>(x => x.PInternal));
+            container.RegisterMany<ClientWithPropsAndFields>(with: PropertiesAndFields.Of.The<ClientWithPropsAndFields>(x => x.PInternal));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -268,7 +268,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(with: PropertiesAndFields.Of.Name("_fPrivate"));
+            container.RegisterMany<ClientWithPropsAndFields>(with: PropertiesAndFields.Of.Name("_fPrivate"));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -282,7 +282,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(named: "another");
 
-            container.RegisterAll<ClientWithPropsAndFields>(with: 
+            container.RegisterMany<ClientWithPropsAndFields>(with: 
                 PropertiesAndFields.All(withFields: false).The<ClientWithPropsAndFields>(_ => _.PInternal, serviceKey: "another"));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
@@ -299,7 +299,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterAll<ClientWithPropsAndFields>(with: PropertiesAndFields.Of.Name("FReadonly"));
+            container.RegisterMany<ClientWithPropsAndFields>(with: PropertiesAndFields.Of.Name("FReadonly"));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<ClientWithPropsAndFields>());

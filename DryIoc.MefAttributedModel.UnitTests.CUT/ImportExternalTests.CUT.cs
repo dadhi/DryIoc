@@ -53,7 +53,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         Green
     };
 
-    [ExportAll]
+    [ExportMany]
     public class MyCode
     {
         public ExternalTool Tool { get; set; }
@@ -68,7 +68,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll]
+    [ExportMany]
     public class ServiceWithFieldAndProperty
     {
         [ImportExternal(typeof(AnotherService), contractKey: "blah")]
@@ -100,7 +100,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportAll]
+    [ExportMany]
     public class WithUnregisteredExternalEdependency
     {
         public ExternalTool Tool { get; set; }

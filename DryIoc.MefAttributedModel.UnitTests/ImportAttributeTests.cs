@@ -170,7 +170,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
         #region CUT
 
-        [ExportAll, WithMetadata("blah")]
+        [ExportMany, WithMetadata("blah")]
         public class Service : IService { }
 
         [Export]

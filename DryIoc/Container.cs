@@ -237,7 +237,7 @@ namespace DryIoc
         public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
             ThrowIfContainerDisposed();
-            factory.ThrowIfNull().BeforeRegistrationCheck(this, serviceType.ThrowIfNull(), serviceKey);
+            factory.ThrowIfNull().CheckBeforeRegistration(this, serviceType.ThrowIfNull(), serviceKey);
 
             var handler = Rules.BeforeFactoryRegistrationHook;
             if (handler != null)
@@ -2112,9 +2112,9 @@ namespace DryIoc
         }
 
         /// <summary>Returns true if type is public and not an object type. 
-        /// Provides default setting for <see cref="RegisterAll"/> "types" parameter. </summary>
+        /// Provides default setting for <see cref="RegisterMany"/> "types" parameter. </summary>
         /// <param name="type">Type to check.</param> <returns>True for matched type, false otherwise.</returns>
-        public static bool DefaultServiceTypesForRegisterAll(Type type)
+        public static bool DefaultServiceTypesForRegisterMany(Type type)
         {
             return type.IsPublicOrNestedPublic() && type != typeof(object);
         }
@@ -2126,10 +2126,10 @@ namespace DryIoc
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
         /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
-        /// <param name="whereServiceTypes">(optional) condition to include selected types only. Default value is <see cref="DefaultServiceTypesForRegisterAll"/></param>
+        /// <param name="whereServiceTypes">(optional) condition to include selected types only. Default value is <see cref="DefaultServiceTypesForRegisterMany"/></param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        public static void RegisterAll(this IRegistrator registrator, Type implementationType,
+        public static void RegisterMany(this IRegistrator registrator, Type implementationType,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             InjectionRules rules = null, FactorySetup setup = null, Func<Type, bool> whereServiceTypes = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
@@ -2138,7 +2138,7 @@ namespace DryIoc
             var factory = new ReflectionFactory(implementationType, reuse, rules, setup);
 
             var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeFlags.SourceType);
-            var serviceTypes = implementedTypes.Where(whereServiceTypes ?? DefaultServiceTypesForRegisterAll);
+            var serviceTypes = implementedTypes.Where(whereServiceTypes ?? DefaultServiceTypesForRegisterMany);
             if (implementationType.IsGenericDefinition())
             {
                 var implTypeArgs = implementationType.GetGenericParamsAndArgs();
@@ -2157,6 +2157,133 @@ namespace DryIoc
             Throw.If(!atLeastOneRegistered, Error.NO_SERVICE_TYPE_TO_REGISTER_ALL, implementationType, implementedTypes);
         }
 
+        //public sealed class RegisterManyConvention // TODO Use it instead of many parameters below
+        //{
+        //    public static readonly RegisterManyConvention Default = new RegisterManyConvention();
+
+        //    public RegisterManyConvention Of<TService>(IReuse reuse, InjectionRules rules = null, FactorySetup setup = null,
+        //        object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+        //    {
+        //        return new RegisterManyConvention((r, st, it) => 
+        //        {
+        //            if (st == typeof(TService))
+        //                r.Register(st, it, reuse, null, rules, setup, named, ifAlreadyRegistered);
+        //            else 
+        //                _registration();
+        //        });
+        //    }
+
+        //    public static void RegisterAsTransientByDefault(IRegistrator r, Type serviceType, Type implementationType) 
+        //    {
+        //        return () => r.Register(serviceType, implementationType);
+        //    }
+
+        //    internal void Apply(IRegistrator r, Type serviceType, Type implementationType) 
+        //    {
+        //        _registration();
+        //    }
+
+        //    private readonly Action<IRegistrator, Type, Type> _registration; 
+
+        //    private RegisterManyConvention(Action<IRegistrator, Type, Type> registration = null)
+        //    {
+        //        _registration = registration ?? RegisterAsTransientByDefault;
+        //    }
+        //}
+
+        //public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> types, Func<RegisterManyConvention, RegisterManyConvention> convention = null)
+        //{
+        //    convention = convention ?? RegisterManyConvention.Default;
+
+        //    foreach (var implType in types))
+        //    {
+        //        if (implType.IsAbstract())
+        //            continue;
+
+        //        var serviceTypes = implType.GetImplementedTypes();
+        //        if (serviceTypes.IsNullOrEmpty()) // type does not implement anything, so may be resolved only as itself
+        //        {
+        //            if (implType.IsPublicOrNestedPublic())
+        //                convention.Apply();
+        //        }
+        //        else if (implType.IsGenericDefinition())
+        //        {
+        //            Factory factory = null; // single factory for many service types.
+        //            var implTypeArgs = implType.GetGenericParamsAndArgs();
+        //            foreach (var serviceType in serviceTypes
+        //                .Where(st => st.ContainsAllGenericParameters(implTypeArgs))
+        //                .Select(st => st.GetGenericDefinitionOrNull()))
+        //                    registrator.Register(serviceType,
+        //                        factory ?? (factory = new ReflectionFactory(implType, reuse, setup: setup)),
+        //                        ifAlreadyRegistered: ifAlreadyRegistered);
+        //        }
+        //        else
+        //        {
+        //            Factory factory = null; // single factory for many service types.
+        //            for (var i = 0; i < serviceTypes.Length; ++i)
+        //            {
+        //                var serviceType = serviceTypes[i];
+        //                if (condition == null || condition(serviceType, implType))
+        //                    registrator.Register(serviceType,
+        //                        factory ?? (factory = new ReflectionFactory(implType, reuse, setup: setup)),
+        //                        ifAlreadyRegistered: ifAlreadyRegistered);
+        //            }
+        //        }
+        //        }
+        //    }
+        //}
+
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> types, Func<Type, Type, bool> condition = null, 
+            IReuse reuse = null, FactorySetup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+        {
+            foreach (var implType in types)
+            {
+                if (implType.IsAbstract())
+                    continue;
+
+                var serviceTypes = implType.GetImplementedTypes();
+                if (serviceTypes.IsNullOrEmpty()) // type does not implement anything, so may be resolved only as itself
+                {
+                    if (implType.IsPublicOrNestedPublic() &&
+                        (condition == null || condition(implType, implType))) // register concrete type
+                        registrator.Register(implType, implType, 
+                            reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered);
+                    continue;
+                }
+
+                Factory factory = null; // single factory for many service types.
+                if (implType.IsGenericDefinition())
+                {
+                    var implTypeArgs = implType.GetGenericParamsAndArgs();
+                    foreach (var serviceType in serviceTypes
+                        .Where(st => st.ContainsAllGenericParameters(implTypeArgs))
+                        .Select(st => st.GetGenericDefinitionOrNull()))
+                        if (condition == null || condition(serviceType, implType))
+                            registrator.Register(serviceType,
+                                factory ?? (factory = new ReflectionFactory(implType, reuse, setup: setup)),
+                                ifAlreadyRegistered: ifAlreadyRegistered);
+                }
+                else 
+                {
+                    for (var i = 0; i < serviceTypes.Length; ++i)
+                    {
+                        var serviceType = serviceTypes[i];
+                        if (condition == null || condition(serviceType, implType))
+                            registrator.Register(serviceType,
+                                factory ?? (factory = new ReflectionFactory(implType, reuse, setup: setup)),
+                                ifAlreadyRegistered: ifAlreadyRegistered);
+                    }
+                }
+            }
+        }
+
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> assemblies, Func<Type, Type, bool> condition = null, 
+            IReuse reuse = null, FactorySetup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+        {
+            var types = assemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
+            registrator.RegisterMany(types, condition, reuse, setup, ifAlreadyRegistered);
+        }
+
         /// <summary>Registers single registration for all implemented public interfaces and base classes.</summary>
         /// <typeparam name="TImplementation">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
@@ -2164,15 +2291,15 @@ namespace DryIoc
         /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
         /// <param name="with">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
-        /// <param name="types">(optional) condition to include selected types only. Default value is <see cref="DefaultServiceTypesForRegisterAll"/></param>
+        /// <param name="types">(optional) condition to include selected types only. Default value is <see cref="DefaultServiceTypesForRegisterMany"/></param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        public static void RegisterAll<TImplementation>(this IRegistrator registrator,
+        public static void RegisterMany<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             InjectionRules with = null, FactorySetup setup = null, Func<Type, bool> types = null,
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
-            registrator.RegisterAll(typeof(TImplementation),
+            registrator.RegisterMany(typeof(TImplementation),
                 reuse, withConstructor, with, setup, types, named, ifAlreadyRegistered);
         }
 
@@ -2322,58 +2449,6 @@ namespace DryIoc
         {
             registrator.Unregister(typeof(TService), named, factoryType, condition);
         }
-
-        /// <summary>Scans provided assemblies for implementation types of specified <paramref name="serviceType"/>
-        /// and registers all of them in container with specified <paramref name="reuse"/> policy.</summary>
-        /// <param name="registrator">Usually <see cref="Container"/> or any other <see cref="IRegistrator"/> implementation.</param>
-        /// <param name="serviceType">Service type to look implementations for.</param>
-        /// <param name="typeProvider">Provides types to peek implementation type from and register.</param>
-        /// <param name="reuse">(optional)Reuse policy, Transient if not specified.</param>
-        public static void RegisterBatch(this IRegistrator registrator, Type serviceType,  IEnumerable<Type> typeProvider, IReuse reuse = null)
-        {
-            var implTypes = typeProvider.ThrowIfNull().Where(type => IsImplementationOf(type, serviceType)).ToArray();
-            for (var i = 0; i < implTypes.Length; ++i)
-                registrator.Register(serviceType, implTypes[i], reuse);
-        }
-
-        /// <summary>Scans provided assemblies for implementation types of specified <typeparamref name="TService"/>
-        /// and registers all of them in container with specified <paramref name="reuse"/> policy.</summary>
-        /// <typeparam name="TService">Service type to look implementations for.</typeparam>
-        /// <param name="registrator">Usually <see cref="Container"/> or any other <see cref="IRegistrator"/> implementation.</param>
-        /// <param name="typeProvider">Provides types to peek implementation type from and register.</param>
-        /// <param name="reuse">(optional)Reuse policy, Transient if not specified.</param>
-        public static void RegisterBatch<TService>(this IRegistrator registrator, IEnumerable<Type> typeProvider, IReuse reuse = null)
-        {
-            registrator.RegisterBatch(typeof(TService), typeProvider, reuse);
-        }
-
-        /// <summary>Scans provided assemblies for implementation types of specified service type.
-        /// and registers all of them in container with specified <paramref name="reuse"/> policy.</summary>
-        /// <param name="serviceType">Service type to look implementations for.</param>
-        /// <param name="registrator">Usually <see cref="Container"/> or any other <see cref="IRegistrator"/> implementation.</param>
-        /// <param name="assemblyProvider">Provides assembly to scan for implementation types and register them for service.</param>
-        /// <param name="reuse">(optional)Reuse policy, Transient if not specified.</param>
-        public static void RegisterBatch(this IRegistrator registrator, Type serviceType, IEnumerable<Assembly> assemblyProvider, IReuse reuse = null)
-        {
-            registrator.RegisterBatch(serviceType, assemblyProvider.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly));
-        }
-
-        private static bool IsImplementationOf(Type candidateImplType, Type serviceType)
-        {
-            if (candidateImplType.IsAbstract() || !serviceType.IsPublicOrNestedPublic())
-                return false;
-
-            if (candidateImplType == serviceType)
-                return true;
-
-            var implementedTypes = candidateImplType.GetImplementedTypes();
-
-            var found = !serviceType.IsOpenGeneric()
-                ? implementedTypes.Contains(serviceType)
-                : implementedTypes.Any(t => t.GetGenericDefinitionOrNull() == serviceType);
-
-            return found;
-        }
     }
 
     /// <summary>Defines convenient extension methods for <see cref="IResolver"/>.</summary>
@@ -2512,7 +2587,7 @@ namespace DryIoc
         {
             concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UNABLE_TO_NEW_OPEN_GENERIC);
             var factory = new ReflectionFactory(concreteType, null, with, Setup.With(cacheFactoryExpression: false));
-            factory.BeforeRegistrationCheck(container, concreteType, null);
+            factory.CheckBeforeRegistration(container, concreteType, null);
             var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).ResolveWithFactory(factory);
             var factoryDelegate = factory.GetDelegateOrDefault(request);
             var service = factoryDelegate(container.ResolutionStateCache.Items, container.ContainerWeakRef, null);
@@ -3518,7 +3593,7 @@ namespace DryIoc
         /// <param name="container">Container to register factory in.</param>
         /// <param name="serviceType">Service type to register factory for.</param>
         /// <param name="serviceKey">Service key to register factory with.</param>
-        public virtual void BeforeRegistrationCheck(IContainer container, Type serviceType, object serviceKey)
+        public virtual void CheckBeforeRegistration(IContainer container, Type serviceType, object serviceKey)
         {
             Throw.If(serviceType.IsGenericDefinition() && Provider == null,
                 Error.REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER, serviceType);
@@ -3743,7 +3818,7 @@ namespace DryIoc
         /// <param name="container">(ignored)</param>
         /// <param name="serviceType">Service type to register instance for.</param>
         /// <param name="serviceKey">(ignored).</param>
-        public override void BeforeRegistrationCheck(IContainer container, Type serviceType, object serviceKey)
+        public override void CheckBeforeRegistration(IContainer container, Type serviceType, object serviceKey)
         {
             _instance.ThrowIfNotOf(serviceType, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE, serviceType);
         }
@@ -4151,9 +4226,9 @@ namespace DryIoc
         /// <param name="container">Container to register factory in.</param>
         /// <param name="serviceType">Service type to register factory with.</param>
         /// <param name="serviceKey">(ignored)</param>
-        public override void BeforeRegistrationCheck(IContainer container, Type serviceType, object serviceKey)
+        public override void CheckBeforeRegistration(IContainer container, Type serviceType, object serviceKey)
         {
-            base.BeforeRegistrationCheck(container, serviceType, serviceKey);
+            base.CheckBeforeRegistration(container, serviceType, serviceKey);
             if (_implementationType == null)
                 return;
 
@@ -4289,7 +4364,7 @@ namespace DryIoc
                 var implType = _factory._implementationType;
                 var closedTypeArgs = implType == serviceType.GetGenericDefinitionOrNull()
                     ? serviceType.GetGenericParamsAndArgs()
-                    : GetClosedTypeArgsForGenericImplementationTypeOrNull(implType, request);
+                    : GetClosedTypeArgsOrNullForOpenGenericType(implType, request);
                 if (closedTypeArgs == null)
                     return null;
 
@@ -4385,53 +4460,53 @@ namespace DryIoc
                     : Expression.Call(request.StateCache.GetOrAddItemExpression(method.Factory), (MethodInfo)method.Method, paramExprs);
         }
 
-        private static Type[] GetClosedTypeArgsForGenericImplementationTypeOrNull(Type implType, Request request)
+        private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(Type implType, Request request)
         {
             var serviceType = request.ServiceType;
             var serviceTypeArgs = serviceType.GetGenericParamsAndArgs();
-            var serviceTypeGenericDef = serviceType.GetGenericDefinitionOrNull().ThrowIfNull();
+            var serviceOpenGenericType = serviceType.GetGenericDefinitionOrNull().ThrowIfNull(); // TODO May be not generic
 
-            var openImplTypeParams = implType.GetGenericParamsAndArgs();
+            var implTypeParams = implType.GetGenericParamsAndArgs();
             var implementedTypes = implType.GetImplementedTypes();
 
-            Type[] resultImplTypeArgs = null;
-            for (var i = 0; resultImplTypeArgs == null && i < implementedTypes.Length; i++)
+            Type[] implTypeArgs = null;
+            for (var i = 0; i < implementedTypes.Length && implTypeArgs == null; ++i)
             {
                 var implementedType = implementedTypes[i];
                 if (implementedType.IsOpenGeneric() &&
-                    implementedType.GetGenericDefinitionOrNull() == serviceTypeGenericDef)
+                    implementedType.GetGenericDefinitionOrNull() == serviceOpenGenericType)
                 {
-                    var matchedTypeArgs = new Type[openImplTypeParams.Length];
+                    var matchedTypeArgs = new Type[implTypeParams.Length];
                     if (MatchServiceWithImplementedTypeArgs(ref matchedTypeArgs,
-                        openImplTypeParams, implementedType.GetGenericParamsAndArgs(), serviceTypeArgs))
-                        resultImplTypeArgs = matchedTypeArgs;
+                        implTypeParams, implementedType.GetGenericParamsAndArgs(), serviceTypeArgs))
+                        implTypeArgs = matchedTypeArgs;
                 }
             }
 
-            if (resultImplTypeArgs == null)
+            if (implTypeArgs == null)
                 return request.IfUnresolved == IfUnresolved.ReturnDefault ? null :
                     Throw.Instead<Type[]>(Error.NOT_MATCHED_IMPL_BASE_TYPES_WITH_SERVICE_TYPE,
                         implType, implementedTypes, request);
 
-            var unmatchedArgIndex = Array.IndexOf(resultImplTypeArgs, null);
+            var unmatchedArgIndex = Array.IndexOf(implTypeArgs, null);
             if (unmatchedArgIndex != -1)
                 return request.IfUnresolved == IfUnresolved.ReturnDefault ? null :
                     Throw.Instead<Type[]>(Error.NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
-                        implType, openImplTypeParams[unmatchedArgIndex], request);
+                        implType, implTypeParams[unmatchedArgIndex], request);
 
-            return resultImplTypeArgs;
+            return implTypeArgs;
         }
 
         private static bool MatchServiceWithImplementedTypeArgs(ref Type[] matchedServiceArgs,
-            Type[] openImplementationParams, Type[] openImplementedParams, Type[] closedServiceArgs)
+            Type[] implParams, Type[] serviceParams, Type[] serviceArgs)
         {
-            for (var i = 0; i < openImplementedParams.Length; i++)
+            for (var i = 0; i < serviceParams.Length; i++)
             {
-                var openImplementedParam = openImplementedParams[i];
-                var closedServiceArg = closedServiceArgs[i];
-                if (openImplementedParam.IsGenericParameter)
+                var serviceGenericParam = serviceParams[i];
+                var closedServiceArg = serviceArgs[i];
+                if (serviceGenericParam.IsGenericParameter)
                 {
-                    var matchedIndex = openImplementationParams.IndexOf(t => t.Name == openImplementedParam.Name);
+                    var matchedIndex = implParams.IndexOf(serviceGenericParam.Equals);                    
                     if (matchedIndex != -1)
                     {
                         if (matchedServiceArgs[matchedIndex] == null)
@@ -4440,14 +4515,14 @@ namespace DryIoc
                             return false; // more than one closedServiceArg is matching with single openArg
                     }
                 }
-                else if (openImplementedParam != closedServiceArg)
+                else if (serviceGenericParam != closedServiceArg)
                 {
-                    if (!openImplementedParam.IsOpenGeneric() ||
-                        openImplementedParam.GetGenericDefinitionOrNull() != closedServiceArg.GetGenericDefinitionOrNull())
+                    if (!serviceGenericParam.IsOpenGeneric() ||
+                        serviceGenericParam.GetGenericDefinitionOrNull() != closedServiceArg.GetGenericDefinitionOrNull())
                         return false; // openArg and closedArg are different types
 
-                    if (!MatchServiceWithImplementedTypeArgs(ref matchedServiceArgs, openImplementationParams,
-                        openImplementedParam.GetGenericParamsAndArgs(), closedServiceArg.GetGenericParamsAndArgs()))
+                    if (!MatchServiceWithImplementedTypeArgs(ref matchedServiceArgs, implParams,
+                        serviceGenericParam.GetGenericParamsAndArgs(), closedServiceArg.GetGenericParamsAndArgs()))
                         return false; // nested match failed due either one of above reasons.
                 }
             }
@@ -5786,23 +5861,56 @@ namespace DryIoc
 
         /// <summary>Returns true if <paramref name="type"/> contains all generic parameters from <paramref name="genericParameters"/>.</summary>
         /// <param name="type">Expected to be open-generic type.</param>
-        /// <param name="genericParameters">Generic parameter type to look in.</param>
+        /// <param name="genericParameters">Generic parameters type to look in.</param>
         /// <returns>Returns true if contains and false otherwise.</returns>
-        public static bool ContainsAllGenericParameters(this Type type, Type[] genericParameters)
+        public static bool ContainsAllGenericParameters(this Type type, Type[] genericParams)
         {
-            if (!type.IsOpenGeneric())
+            if (!type.IsOpenGeneric()) // TODO Need additional test for that
                 return false;
 
-            var paramNames = new string[genericParameters.Length];
-            for (var i = 0; i < genericParameters.Length; i++)
-                paramNames[i] = genericParameters[i].Name;
+            SetToNullGenericParametersReferencedInConstraints(genericParams);
 
-            SetNamesFoundInGenericParametersToNull(paramNames, type.GetGenericParamsAndArgs());
+            var paramNames = new string[genericParams.Length];
+            for (var i = 0; i < genericParams.Length; i++)
+                if (genericParams[i] != null)
+                    paramNames[i] = genericParams[i].Name;
+
+            SetToNullNamesFoundInGenericParameters(paramNames, type.GetGenericParamsAndArgs());
 
             for (var i = 0; i < paramNames.Length; i++)
                 if (paramNames[i] != null)
                     return false;
             return true;
+        }
+
+        private static void SetToNullGenericParametersReferencedInConstraints(Type[] genericParams)
+        {
+            for (int i = 0; i < genericParams.Length; i++)
+            {
+                var genericParam = genericParams[i];
+                if (genericParam == null)
+                    continue;
+
+                var genericConstraints = genericParam.GetGenericParameterConstraints();
+                for (int j = 0; j < genericConstraints.Length; j++)
+                {
+                    var genericConstraint = genericConstraints[j];
+                    if (genericConstraint.IsOpenGeneric())
+                    {
+                        var constraintGenericParams = genericConstraint.GetGenericParamsAndArgs();
+                        for (int k = 0; k < constraintGenericParams.Length; k++)
+                        {
+                            var constraintGenericParam = constraintGenericParams[k];
+                            if (constraintGenericParam != genericParam)
+                            {
+                                var genericParamIndex = genericParams.IndexOf(constraintGenericParam.Equals);
+                                if (genericParamIndex != -1)
+                                    genericParams[genericParamIndex] = null;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>Returns true if type is generic.</summary><param name="type">Type to check.</param> <returns>True if type generic.</returns>
@@ -5811,7 +5919,7 @@ namespace DryIoc
             return type.GetTypeInfo().IsGenericType;
         }
 
-        /// <summary>Returns true if type if generic type definition (open type).</summary><param name="type">Type to check.</param>
+        /// <summary>Returns true if type is generic type definition (open type).</summary><param name="type">Type to check.</param>
         /// <returns>True if type is open type: generic type definition.</returns>
         public static bool IsGenericDefinition(this Type type)
         {
@@ -6016,7 +6124,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private static void SetNamesFoundInGenericParametersToNull(string[] names, Type[] genericParameters)
+        private static void SetToNullNamesFoundInGenericParameters(string[] names, Type[] genericParameters)
         {
             for (var i = 0; i < genericParameters.Length; i++)
             {
@@ -6028,7 +6136,7 @@ namespace DryIoc
                         names[matchingTargetArgIndex] = null;
                 }
                 else if (sourceTypeArg.IsOpenGeneric())
-                    SetNamesFoundInGenericParametersToNull(names, sourceTypeArg.GetGenericParamsAndArgs());
+                    SetToNullNamesFoundInGenericParameters(names, sourceTypeArg.GetGenericParamsAndArgs());
             }
         }
 
