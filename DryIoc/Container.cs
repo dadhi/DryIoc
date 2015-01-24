@@ -750,7 +750,7 @@ namespace DryIoc
                         if (((SetupDecorator)initializerFactory.Setup).Condition(request))
                         {
                             var decoratorRequest =
-                                request.UpdateServiceInfo(_ =>  ServiceInfo.Of(initializerActionType))
+                                request.UpdateServiceInfo(_ => ServiceInfo.Of(initializerActionType))
                                     .ResolveWithFactory(initializerFactory);
                             var actionExpr = initializerFactory.GetExpressionOrDefault(decoratorRequest);
                             if (actionExpr != null)
@@ -1270,7 +1270,7 @@ namespace DryIoc
                 Throw.If(!tryGet, Error.CONTAINER_IS_GARBAGE_COLLECTED);
                 return null;
             }
-            
+
             return container.ThrowIf(container.IsDisposed && !tryGet, Error.CONTAINER_IS_DISPOSED);
         }
 
@@ -1389,7 +1389,7 @@ namespace DryIoc
 
             // Reuse wrappers
             Wrappers = Wrappers
-                .AddOrUpdate(typeof(ReuseHiddenDisposable), 
+                .AddOrUpdate(typeof(ReuseHiddenDisposable),
                     new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
                         setup: SetupWrapper.With(t => typeof(object), ReuseWrapperFactory.HiddenDisposable)))
 
@@ -1484,7 +1484,7 @@ namespace DryIoc
                 compositeParentKey = parent.ServiceKey;
 
             var callResolveManyExpr = Expression.Call(Container.ResolverExpr, _resolveManyMethod,
-                Expression.Constant(itemServiceType), 
+                Expression.Constant(itemServiceType),
                 request.StateCache.GetOrAddItemExpression(request.ServiceKey),
                 Expression.Constant(itemRequiredServiceType),
                 request.StateCache.GetOrAddItemExpression(compositeParentKey));
@@ -1572,7 +1572,7 @@ namespace DryIoc
             var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
                 return null;
-            
+
             var pairCtor = request.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
             var keyExpr = request.StateCache.GetOrAddItemExpression(serviceKey, serviceKeyType);
             var pairExpr = Expression.New(pairCtor, keyExpr, serviceExpr);
@@ -1651,10 +1651,10 @@ namespace DryIoc
             var reuse = request.Container.Rules.ReuseMapping == null ? serviceFactory.Reuse
                 : request.Container.Rules.ReuseMapping(serviceFactory.Reuse, serviceRequest);
 
-            if (reuse != null && serviceFactory.Setup.ReuseWrappers.IndexOf(wrapperType.Equals) != -1)
+            if (reuse != null && serviceFactory.Setup.ReuseWrappers.IndexOf(wrapperType) != -1)
                 return serviceFactory.GetExpressionOrDefault(serviceRequest, wrapperType);
             Throw.If(request.IfUnresolved == IfUnresolved.Throw,
-                Error.CANT_RESOLVE_REUSE_WRAPPER, wrapperType, serviceRequest);
+                Error.UNABLE_TO_RESOLVE_REUSE_WRAPPER, wrapperType, serviceRequest);
             return null;
         }
 
@@ -2111,8 +2111,7 @@ namespace DryIoc
             registrator.Register(factory, typeof(TServiceAndImplementation), named, ifAlreadyRegistered);
         }
 
-        /// <summary>Returns true if type is public and not an object type. 
-        /// Provides default setting for <see cref="RegisterMany"/> "types" parameter. </summary>
+        /// <summary>Returns true if type is public and not an object type. Provides default setting for RegisterMany.</summary>
         /// <param name="type">Type to check.</param> <returns>True for matched type, false otherwise.</returns>
         public static bool DefaultServiceTypesForRegisterMany(Type type)
         {
@@ -2233,7 +2232,7 @@ namespace DryIoc
         //    }
         //}
 
-        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> types, Func<Type, Type, bool> condition = null, 
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> types, Func<Type, Type, bool> condition = null,
             IReuse reuse = null, FactorySetup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             foreach (var implType in types)
@@ -2246,7 +2245,7 @@ namespace DryIoc
                 {
                     if (implType.IsPublicOrNestedPublic() &&
                         (condition == null || condition(implType, implType))) // register concrete type
-                        registrator.Register(implType, implType, 
+                        registrator.Register(implType, implType,
                             reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered);
                     continue;
                 }
@@ -2263,7 +2262,7 @@ namespace DryIoc
                                 factory ?? (factory = new ReflectionFactory(implType, reuse, setup: setup)),
                                 ifAlreadyRegistered: ifAlreadyRegistered);
                 }
-                else 
+                else
                 {
                     for (var i = 0; i < serviceTypes.Length; ++i)
                     {
@@ -2277,7 +2276,7 @@ namespace DryIoc
             }
         }
 
-        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> assemblies, Func<Type, Type, bool> condition = null, 
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> assemblies, Func<Type, Type, bool> condition = null,
             IReuse reuse = null, FactorySetup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
         {
             var types = assemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
@@ -3481,9 +3480,7 @@ namespace DryIoc
 
         private static Type GetSingleGenericArgByDefault(Type wrapperType)
         {
-            wrapperType.ThrowIf(!wrapperType.IsClosedGeneric(),
-                Error.NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED);
-
+            wrapperType.ThrowIf(!wrapperType.IsClosedGeneric(), Error.NO_WRAPPED_TYPE_FOR_NON_GENERIC_WRAPPER);
             var typeArgs = wrapperType.GetGenericParamsAndArgs();
             Throw.If(typeArgs.Length != 1, Error.WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY, wrapperType);
             return typeArgs[0];
@@ -3891,7 +3888,7 @@ namespace DryIoc
                         return x.Params.Except(
                             x.Params.Where(p =>
                             {
-                                var inputArgIndex = funcArgs.IndexOf(t => t == p.ParameterType);
+                                var inputArgIndex = funcArgs.IndexOf(p.ParameterType);
                                 if (inputArgIndex == -1 || inputArgIndex == inputArgCount ||
                                     (matchedIndecesMask & inputArgIndex << 1) != 0)
                                     // input argument was already matched by another parameter
@@ -4351,9 +4348,12 @@ namespace DryIoc
         {
             public IEnumerable<KV<Type, object>> ProvidedFactoriesServiceTypeKey
             {
-                get { return _providedFactories.Value.IsEmpty
-                    ? Enumerable.Empty<KV<Type, object>>()
-                    : _providedFactories.Value.Enumerate().Select(_ => _.Value); }
+                get
+                {
+                    return _providedFactories.Value.IsEmpty
+                        ? Enumerable.Empty<KV<Type, object>>()
+                        : _providedFactories.Value.Enumerate().Select(_ => _.Value);
+                }
             }
 
             public CloseGenericFactoryProvider(ReflectionFactory factory) { _factory = factory; }
@@ -4378,7 +4378,7 @@ namespace DryIoc
                 {
                     closedImplType = Throw.IfThrows<ArgumentException, Type>(
                        () => implType.MakeGenericType(closedTypeArgs),
-                       Error.NOT_MATCHED_GENERIC_PARAM_CONSTRAINTS, implType, request);
+                       Error.NO_MATCHED_GENERIC_PARAM_CONSTRAINTS, implType, request);
                 }
 
                 var factory = new ReflectionFactory(closedImplType, _factory.Reuse, _factory.Rules, _factory.Setup);
@@ -4467,62 +4467,92 @@ namespace DryIoc
             var serviceOpenGenericType = serviceType.GetGenericDefinitionOrNull().ThrowIfNull(); // TODO May be not generic
 
             var implTypeParams = implType.GetGenericParamsAndArgs();
+            var implTypeArgs = new Type[implTypeParams.Length];
+
             var implementedTypes = implType.GetImplementedTypes();
 
-            Type[] implTypeArgs = null;
-            for (var i = 0; i < implementedTypes.Length && implTypeArgs == null; ++i)
+            var matchFound = false;
+            for (var i = 0; !matchFound && i < implementedTypes.Length; ++i)
             {
                 var implementedType = implementedTypes[i];
                 if (implementedType.IsOpenGeneric() &&
                     implementedType.GetGenericDefinitionOrNull() == serviceOpenGenericType)
                 {
-                    var matchedTypeArgs = new Type[implTypeParams.Length];
-                    if (MatchServiceWithImplementedTypeArgs(ref matchedTypeArgs,
-                        implTypeParams, implementedType.GetGenericParamsAndArgs(), serviceTypeArgs))
-                        implTypeArgs = matchedTypeArgs;
+                    matchFound = MatchServiceWithImplementedTypeParams(
+                        implTypeArgs, implTypeParams, implementedType.GetGenericParamsAndArgs(), serviceTypeArgs);
                 }
             }
 
-            if (implTypeArgs == null)
-                return request.IfUnresolved == IfUnresolved.ReturnDefault ? null :
-                    Throw.Instead<Type[]>(Error.NOT_MATCHED_IMPL_BASE_TYPES_WITH_SERVICE_TYPE,
+            if (!matchFound)
+                return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                    : Throw.Instead<Type[]>(Error.NO_MATCHED_IMPLEMENTED_TYPES_WITH_SERVICE_TYPE,
                         implType, implementedTypes, request);
 
-            var unmatchedArgIndex = Array.IndexOf(implTypeArgs, null);
-            if (unmatchedArgIndex != -1)
-                return request.IfUnresolved == IfUnresolved.ReturnDefault ? null :
-                    Throw.Instead<Type[]>(Error.NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
-                        implType, implTypeParams[unmatchedArgIndex], request);
+            // check constraints
+            for (var i = 0; i < implTypeParams.Length; i++)
+            {
+                var implTypeArg = implTypeArgs[i];
+                if (implTypeArg == null) continue;
+
+                var implTypeParam = implTypeParams[i];
+                var implTypeParamConstraints = implTypeParam.GetGenericParameterConstraints();
+                if (implTypeParamConstraints.IsNullOrEmpty()) continue;
+
+                var constraintMatchFound = false;
+                for (var j = 0; !constraintMatchFound && j < implTypeParamConstraints.Length; ++j)
+                {
+                    var implTypeParamConstraint = implTypeParamConstraints[j];
+                    if (implTypeParamConstraint != implTypeArg &&
+                        implTypeParamConstraint.IsOpenGeneric() && implTypeArg.IsGeneric())
+                    {
+                        constraintMatchFound = MatchServiceWithImplementedTypeParams(
+                            implTypeArgs, implTypeParams,
+                            implTypeParamConstraint.GetGenericParamsAndArgs(),
+                            implTypeArg.GetGenericParamsAndArgs());
+                    }
+                }
+
+                if (!constraintMatchFound)
+                {
+                    // TODO What to do? Add test to get here
+                }
+            }
+
+            var notMatchedIndex = Array.IndexOf(implTypeArgs, null);
+            if (notMatchedIndex != -1) // TODO add rule for using closed constraint if specified, check if its concrete type probably?
+                return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                    : Throw.Instead<Type[]>(Error.NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
+                        implType, implTypeParams[notMatchedIndex], request);
 
             return implTypeArgs;
         }
 
-        private static bool MatchServiceWithImplementedTypeArgs(ref Type[] matchedServiceArgs,
-            Type[] implParams, Type[] serviceParams, Type[] serviceArgs)
+        private static bool MatchServiceWithImplementedTypeParams(
+            Type[] matchedImplArgs, Type[] implParams, Type[] implementedParams, Type[] serviceArgs)
         {
-            for (var i = 0; i < serviceParams.Length; i++)
+            for (var i = 0; i < implementedParams.Length; i++)
             {
-                var serviceGenericParam = serviceParams[i];
-                var closedServiceArg = serviceArgs[i];
-                if (serviceGenericParam.IsGenericParameter)
+                var serviceArg = serviceArgs[i];
+                var implementedParam = implementedParams[i];
+                if (implementedParam.IsGenericParameter)
                 {
-                    var matchedIndex = implParams.IndexOf(serviceGenericParam.Equals);                    
-                    if (matchedIndex != -1)
+                    var paramIndex = implParams.IndexOf(implementedParam);
+                    if (paramIndex != -1)
                     {
-                        if (matchedServiceArgs[matchedIndex] == null)
-                            matchedServiceArgs[matchedIndex] = closedServiceArg;
-                        else if (matchedServiceArgs[matchedIndex] != closedServiceArg)
-                            return false; // more than one closedServiceArg is matching with single openArg
+                        if (matchedImplArgs[paramIndex] == null)
+                            matchedImplArgs[paramIndex] = serviceArg;
+                        else if (matchedImplArgs[paramIndex] != serviceArg)
+                            return false; // more than one service type arg is matching with single impl type param
                     }
                 }
-                else if (serviceGenericParam != closedServiceArg)
+                else if (implementedParam != serviceArg)
                 {
-                    if (!serviceGenericParam.IsOpenGeneric() ||
-                        serviceGenericParam.GetGenericDefinitionOrNull() != closedServiceArg.GetGenericDefinitionOrNull())
-                        return false; // openArg and closedArg are different types
+                    if (!implementedParam.IsOpenGeneric() ||
+                        implementedParam.GetGenericDefinitionOrNull() != serviceArg.GetGenericDefinitionOrNull())
+                        return false; // type param and arg are of different types
 
-                    if (!MatchServiceWithImplementedTypeArgs(ref matchedServiceArgs, implParams,
-                        serviceGenericParam.GetGenericParamsAndArgs(), closedServiceArg.GetGenericParamsAndArgs()))
+                    if (!MatchServiceWithImplementedTypeParams(matchedImplArgs, implParams,
+                        implementedParam.GetGenericParamsAndArgs(), serviceArg.GetGenericParamsAndArgs()))
                         return false; // nested match failed due either one of above reasons.
                 }
             }
@@ -5232,7 +5262,7 @@ namespace DryIoc
     public enum IfUnresolved
     {
         /// <summary>Specifies to throw <see cref="ContainerException"/> if no service found.</summary>
-        Throw, 
+        Throw,
         /// <summary>Specifies to return default value instead of throwing error.</summary>
         ReturnDefault
     }
@@ -5611,75 +5641,126 @@ namespace DryIoc
         /// <summary>List of error messages indexed with code.</summary>
         public readonly static IList<string> Messages = new List<string>(100);
 
-#pragma warning disable 1591 // Missing XML-comment
+#pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
-            INVALID_CONDITION =     Of("Argument {0} of type {1} has invalid condition."),
-            IS_NULL =               Of("Argument of type {0} is null."),
-            IS_NOT_OF_TYPE =        Of("Argument {0} is not of type {1}."),
-            TYPE_IS_NOT_OF_TYPE =   Of("Type argument {0} is not assignable from type {1}."),
+            INVALID_CONDITION = Of("Argument {0} of type {1} has invalid condition."),
+            IS_NULL = Of("Argument of type {0} is null."),
+            IS_NOT_OF_TYPE = Of("Argument {0} is not of type {1}."),
+            TYPE_IS_NOT_OF_TYPE = Of("Type argument {0} is not assignable from type {1}."),
 
-            UNABLE_TO_RESOLVE_SERVICE = Of("Unable to resolve {0}." + Environment.NewLine
-                                                                + "Please register service, or specify @requiredServiceType while resolving, or add Rules.WithUnknownServiceResolver(MyRule)."),
-            EXPECTED_SINGLE_DEFAULT_FACTORY = Of("Expecting single default registration of {0} but found many:" + Environment.NewLine
-                                                                + "{1}." + Environment.NewLine
-                                                                + "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
-            IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE = Of("Implementation type {0} should be assignable to service type {1} but it is not."),
-            REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER = Of("Unable to register not a factory provider for open-generic service {0}."),
-            REG_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE = Of("Unable to register open-generic implementation {0} with non-generic service {1}."),
-            REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS = Of("Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}."),
-            REG_NOT_A_GENERIC_TYPEDEF_IMPL_TYPE = Of("Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine
-                                                                + "Consider to register generic type definition {1} instead."),
-            REG_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE = Of("Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine
-                                                                + "Consider to register generic type definition {1} instead."),
-            EXPECTED_NON_ABSTRACT_IMPL_TYPE = Of("Expecting not abstract and not interface implementation type, but found {0}."),
-            NO_PUBLIC_CONSTRUCTOR_DEFINED = Of("There is no public constructor defined for {0}."),
-            NO_CTOR_SELECTOR_FOR_IMPL_WITH_MULTIPLE_CTORS = Of("Unspecified how to select single constructor for implementation type {0} with {1} public constructors."),
-            NOT_MATCHED_IMPL_BASE_TYPES_WITH_SERVICE_TYPE = Of("Unable to match service with open-generic {0} implementing {1} when resolving {2}."),
-            CTOR_IS_MISSING_SOME_PARAMETERS = Of("Constructor [{0}] of {1} misses some arguments required for {2} dependency."),
-            UNABLE_TO_SELECT_CTOR = Of("Unable to select single constructor from {0} available in {1}." + Environment.NewLine
-                                                                + "Please provide constructor selector when registering service."),
-            EXPECTED_FUNC_WITH_MULTIPLE_ARGS = Of("Expecting Func with one or more arguments but found {0}."),
-            EXPECTED_CLOSED_GENERIC_SERVICE_TYPE = Of("Expecting closed-generic service type but found {0}."),
-            RECURSIVE_DEPENDENCY_DETECTED = Of("Recursive dependency is detected when resolving" + Environment.NewLine + "{0}."),
-            SCOPE_IS_DISPOSED = Of("Scope is disposed and scoped instances are no longer available."),
-            WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY = Of("Wrapper {0} can wrap single service type only, but found many. You should specify service type selector in wrapper setup."),
-            NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE = Of("Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}."),
-            UNABLE_TO_SELECT_CTOR_USING_SELECTOR = Of("Unable to get constructor of {0} using provided constructor selector."),
-            UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS = Of("Unable to find constructor with all resolvable parameters when resolving {0}."),
-            UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS = Of("Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine
-                                                                + "and the rest of parameters resolvable from Container when resolving: {1}."),
-            REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE = Of("Registered factory delegate returns service {0} is not assignable to {2}."),
-            INJECTED_VALUE_IS_OF_DIFFERENT_TYPE = Of("Injected value {0} is not assignable to {2}."),
-            REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE = Of("Registered instance {0} is not assignable to serviceType {1}."),
-            NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD = Of("Unable to find writable property or field \"{0}\" when resolving: {1}."),
-            NO_SERVICE_TYPE_TO_REGISTER_ALL = Of("Unable to register any of implementation {0} implemented services {1}."),
-            PUSHING_TO_REQUEST_WITHOUT_FACTORY = Of("Pushing next info {0} to request not yet resolved to factory: {1}"),
-            TARGET_WAS_ALREADY_DISPOSED = Of("Target {0} was already disposed in {1} wrapper."),
-            NOT_MATCHED_GENERIC_PARAM_CONSTRAINTS = Of("Service type does not match registered open-generic implementation constraints {0} when resolving {1}."),
-            NON_GENERIC_WRAPPER_NO_WRAPPED_TYPE_SPECIFIED = Of("Non-generic wrapper {0} should specify wrapped service selector when registered."),
-            DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN = Of("Dependency {0} has shorter Reuse lifespan than its parent: {1}." + Environment.NewLine
-                                                                + "{2} lifetime is shorter than {3}." + Environment.NewLine
-                                                                + "You may turn Off this error with new Container(rules=>rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false))."),
-            WEAKREF_REUSE_WRAPPER_GCED = Of("Service with WeakReference reuse wrapper is garbage collected now, and no longer available."),
-            INSTANCE_FACTORY_IS_NULL = Of("Instance factory is null when resolving: {0}"),
-            SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD = Of("Service of {0} is not assignable from factory method {2} when resolving: {3}."),
-            FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD = Of("Unable to use null factory object with factory method {0} when resolving: {1}."),
-            FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC = Of("Factory instance provided {0} But factory method is static {1} when resolving: {2}."),
-            NO_OPEN_THREAD_SCOPE = Of("Unable to find open thread scope in {0}. Please OpenScope with {0} to make sure thread reuse work."),
-            CONTAINER_IS_GARBAGE_COLLECTED = Of("Container is no longer available (has been garbage-collected)."),
-            CANT_CREATE_DECORATOR_EXPR = Of("Unable to create decorator expression for: {0}."),
-            UNABLE_TO_REGISTER_DUPLICATE_DEFAULT = Of("Service {0} without key is already registered as {2}."),
-            UNABLE_TO_REGISTER_DUPLICATE_KEY = Of("Service {0} with the same key \"{1}\" is already registered as {2}."),
-            NO_CURRENT_SCOPE = Of("No current scope available: probably you are resolving scoped service outside of scope."),
-            CONTAINER_IS_DISPOSED = Of("Container {0} is disposed and its operations are no longer available."),
-            UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE = Of("Unable to dispose not a current opened scope."),
-            NOT_DIRECT_SCOPE_PARENT = Of("Unable to Open Scope from not a direct parent container."),
-            CANT_RESOLVE_REUSE_WRAPPER = Of("Unable to resolve reuse wrapper {0} for: {1}"),
-            WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE = Of("Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}."),
-            NO_MATCHED_SCOPE_FOUND = Of("Unable to find scope with matching name \"{0}\" in current scope reuse."),
-            UNABLE_TO_NEW_OPEN_GENERIC = Of("Unable to New not concrete/open-generic type {0}."),
-            REG_REUSED_OBJ_WRAPPER_IS_NOT_IREUSED = Of("Registered reused object wrapper at index {0} of {1} does not implement expected {2} interface."),
-            RECYCLABLE_REUSE_WRAPPER_IS_RECYCLED = Of("Recyclable wrapper is recycled.");
+            UNABLE_TO_RESOLVE_SERVICE = 
+                Of("Unable to resolve {0}." + Environment.NewLine + "Please register service, or specify @requiredServiceType while resolving, or add Rules.WithUnknownServiceResolver(MyRule)."),
+            EXPECTED_SINGLE_DEFAULT_FACTORY = 
+                Of("Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine 
+                + "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
+            IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE = 
+                Of("Implementation type {0} should be assignable to service type {1} but it is not."),
+            REG_OPEN_GENERIC_REQUIRE_FACTORY_PROVIDER = 
+                Of("Unable to register not a factory provider for open-generic service {0}."),
+            REG_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE = 
+                Of("Unable to register open-generic implementation {0} with non-generic service {1}."),
+            REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS = 
+                Of("Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}."),
+            REG_NOT_A_GENERIC_TYPEDEF_IMPL_TYPE = 
+                Of("Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine
+                + "Consider to register generic type definition {1} instead."),
+            REG_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE =
+                Of("Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine
+                + "Consider to register generic type definition {1} instead."),
+            EXPECTED_NON_ABSTRACT_IMPL_TYPE =
+                Of("Expecting not abstract and not interface implementation type, but found {0}."),
+            NO_PUBLIC_CONSTRUCTOR_DEFINED =
+                Of("There is no public constructor defined for {0}."),
+            NO_CTOR_SELECTOR_FOR_IMPL_WITH_MULTIPLE_CTORS =
+                Of("Unspecified how to select single constructor for implementation type {0} with {1} public constructors."),
+            NO_MATCHED_IMPLEMENTED_TYPES_WITH_SERVICE_TYPE =
+                Of("Unable to match service with open-generic {0} implementing {1} when resolving {2}."),
+            CTOR_IS_MISSING_SOME_PARAMETERS = 
+                Of("Constructor [{0}] of {1} misses some arguments required for {2} dependency."),
+            UNABLE_TO_SELECT_CTOR = 
+                Of("Unable to select single constructor from {0} available in {1}." + Environment.NewLine
+                + "Please provide constructor selector when registering service."),
+            EXPECTED_FUNC_WITH_MULTIPLE_ARGS = 
+                Of("Expecting Func with one or more arguments but found {0}."),
+            EXPECTED_CLOSED_GENERIC_SERVICE_TYPE = 
+                Of("Expecting closed-generic service type but found {0}."),
+            RECURSIVE_DEPENDENCY_DETECTED = 
+                Of("Recursive dependency is detected when resolving" + Environment.NewLine + "{0}."),
+            SCOPE_IS_DISPOSED = 
+                Of("Scope is disposed and scoped instances are no longer available."),
+            WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY = 
+                Of("Wrapper {0} can wrap single service type only, but found many. You should specify service type selector in wrapper setup."),
+            NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE = 
+                Of("Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}."),
+            UNABLE_TO_SELECT_CTOR_USING_SELECTOR = 
+                Of("Unable to get constructor of {0} using provided constructor selector."),
+            UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS = 
+                Of("Unable to find constructor with all resolvable parameters when resolving {0}."),
+            UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS = 
+                Of("Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine
+                + "and the rest of parameters resolvable from Container when resolving: {1}."),
+            REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE = 
+                Of("Registered factory delegate returns service {0} is not assignable to {2}."),
+            INJECTED_VALUE_IS_OF_DIFFERENT_TYPE = 
+                Of("Injected value {0} is not assignable to {2}."),
+            REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE = 
+                Of("Registered instance {0} is not assignable to serviceType {1}."),
+            NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD = 
+                Of("Unable to find writable property or field \"{0}\" when resolving: {1}."),
+            NO_SERVICE_TYPE_TO_REGISTER_ALL = 
+                Of("Unable to register any of implementation {0} implemented services {1}."),
+            PUSHING_TO_REQUEST_WITHOUT_FACTORY = 
+                Of("Pushing next info {0} to request not yet resolved to factory: {1}"),
+            TARGET_WAS_ALREADY_DISPOSED = 
+                Of("Target {0} was already disposed in {1} wrapper."),
+            NO_MATCHED_GENERIC_PARAM_CONSTRAINTS = 
+                Of("Service type does not match registered open-generic implementation constraints {0} when resolving {1}."),
+            NO_WRAPPED_TYPE_FOR_NON_GENERIC_WRAPPER = 
+                Of("Non-generic wrapper {0} should specify wrapped service selector when registered."),
+            DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN = 
+                Of("Dependency {0} has shorter Reuse lifespan than its parent: {1}." + Environment.NewLine
+                + "{2} lifetime is shorter than {3}." + Environment.NewLine
+                + "You may turn Off this error with new Container(rules=>rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false))."),
+            WEAKREF_REUSE_WRAPPER_GCED = 
+                Of("Service with WeakReference reuse wrapper is garbage collected now, and no longer available."),
+            INSTANCE_FACTORY_IS_NULL = 
+                Of("Instance factory is null when resolving: {0}."),
+            SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD = 
+                Of("Service of {0} is not assignable from factory method {2} when resolving: {3}."),
+            FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD = 
+                Of("Unable to use null factory object with factory method {0} when resolving: {1}."),
+            FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC = 
+                Of("Factory instance provided {0} But factory method is static {1} when resolving: {2}."),
+            NO_OPEN_THREAD_SCOPE =
+                Of("Unable to find open thread scope in {0}. Please OpenScope with {0} to make sure thread reuse work."),
+            CONTAINER_IS_GARBAGE_COLLECTED = 
+                Of("Container is no longer available (has been garbage-collected)."),
+            CANT_CREATE_DECORATOR_EXPR = 
+                Of("Unable to create decorator expression for: {0}."),
+            UNABLE_TO_REGISTER_DUPLICATE_DEFAULT = 
+                Of("Service {0} without key is already registered as {2}."),
+            UNABLE_TO_REGISTER_DUPLICATE_KEY = 
+                Of("Service {0} with the same key \"{1}\" is already registered as {2}."),
+            NO_CURRENT_SCOPE = 
+                Of("No current scope available: probably you are resolving scoped service outside of scope."),
+            CONTAINER_IS_DISPOSED = 
+                Of("Container {0} is disposed and its operations are no longer available."),
+            UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE = 
+                Of("Unable to dispose not a current opened scope."),
+            NOT_DIRECT_SCOPE_PARENT = 
+                Of("Unable to Open Scope from not a direct parent container."),
+            UNABLE_TO_RESOLVE_REUSE_WRAPPER = 
+                Of("Unable to resolve reuse wrapper {0} for: {1}"),
+            WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE = 
+                Of("Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}."),
+            NO_MATCHED_SCOPE_FOUND = 
+                Of("Unable to find scope with matching name \"{0}\" in current scope reuse."),
+            UNABLE_TO_NEW_OPEN_GENERIC = 
+                Of("Unable to New not concrete/open-generic type {0}."),
+            REG_REUSED_OBJ_WRAPPER_IS_NOT_IREUSED = 
+                Of("Registered reused object wrapper at index {0} of {1} does not implement expected {2} interface."),
+            RECYCLABLE_REUSE_WRAPPER_IS_RECYCLED = 
+                Of("Recyclable wrapper is recycled.");
 #pragma warning restore 1591
 
         public static int Of(string message)
@@ -5859,9 +5940,9 @@ namespace DryIoc
             return type.GetTypeInfo().ImplementedInterfaces.ToArrayOrSelf();
         }
 
-        /// <summary>Returns true if <paramref name="type"/> contains all generic parameters from <paramref name="genericParameters"/>.</summary>
+        /// <summary>Returns true if <paramref name="type"/> contains all generic parameters from <paramref name="genericParams"/>.</summary>
         /// <param name="type">Expected to be open-generic type.</param>
-        /// <param name="genericParameters">Generic parameters type to look in.</param>
+        /// <param name="genericParams">Generic parameters type to look in.</param>
         /// <returns>Returns true if contains and false otherwise.</returns>
         public static bool ContainsAllGenericParameters(this Type type, Type[] genericParams)
         {
@@ -5892,7 +5973,7 @@ namespace DryIoc
                     continue;
 
                 var genericConstraints = genericParam.GetGenericParameterConstraints();
-                for (int j = 0; j < genericConstraints.Length; j++)
+                for (var j = 0; j < genericConstraints.Length; j++)
                 {
                     var genericConstraint = genericConstraints[j];
                     if (genericConstraint.IsOpenGeneric())
@@ -5903,7 +5984,7 @@ namespace DryIoc
                             var constraintGenericParam = constraintGenericParams[k];
                             if (constraintGenericParam != genericParam)
                             {
-                                var genericParamIndex = genericParams.IndexOf(constraintGenericParam.Equals);
+                                var genericParamIndex = genericParams.IndexOf(constraintGenericParam);
                                 if (genericParamIndex != -1)
                                     genericParams[genericParamIndex] = null;
                             }
@@ -6212,11 +6293,19 @@ namespace DryIoc
         /// <returns>Index of item for which predicate returns true, or -1 otherwise.</returns>
         public static int IndexOf<T>(this T[] source, Func<T, bool> predicate)
         {
-            if (source == null || source.Length == 0)
-                return -1;
-            for (var i = 0; i < source.Length; ++i)
-                if (predicate(source[i]))
-                    return i;
+            if (source != null && source.Length != 0)
+                for (var i = 0; i < source.Length; ++i)
+                    if (predicate(source[i]))
+                        return i;
+            return -1;
+        }
+
+        public static int IndexOf<T>(this T[] source, T value)
+        {
+            if (source != null && source.Length != 0)
+                for (var i = 0; i < source.Length; ++i)
+                    if (Equals(source[i], value))
+                        return i;
             return -1;
         }
 
@@ -6245,7 +6334,7 @@ namespace DryIoc
         /// <returns>New array with value removed or original array if value is not found.</returns>
         public static T[] Remove<T>(this T[] source, T value)
         {
-            return source.RemoveAt(source.IndexOf(x => Equals(x, value)));
+            return source.RemoveAt(source.IndexOf(value));
         }
     }
 
@@ -6362,7 +6451,7 @@ namespace DryIoc
         {
             var resultID = -1;
             GetCurrentManagedThreadID(ref resultID);
-            if (resultID == -1) 
+            if (resultID == -1)
                 resultID = _getEnvCurrentManagedThreadId();
             return resultID;
         }

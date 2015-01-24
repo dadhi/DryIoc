@@ -313,102 +313,43 @@ namespace DryIoc.UnitTests
         internal class Blah<T0, T1> : IBlah<T0, T1> { }
         internal class AnotherBlah<T> : IBlah<string, T> { }
 
-        [Test, Ignore]
+        [Test]
         public void Can_register_complex_generic_implementation()
         {
             var container = new Container();
             container.Register(typeof(ICommandHandler<>), typeof(UpdateCommandHandler<,>));
 
-            ICommandHandler<UpdateCommand<SpecialEntity>>
-                handler = new UpdateCommandHandler<SpecialEntity, UpdateCommand<SpecialEntity>>();
+            var handler = container.Resolve<ICommandHandler<UpdateCommand<SpecialEntity>>>();
 
-            container.Resolve<ICommandHandler<UpdateCommand<SpecialEntity>>>();
+            Assert.IsNotNull(handler);
         }
 
         [Test]
-        public void Can_expand_generic_params_with_constraints()
+        public void Can_register_complex_generic_implementation_2()
         {
-            var implType = typeof(UpdateCommandHandler<,>);
-            var genericParams = implType.GetGenericParamsAndArgs();
-            for (int i = 0; i < genericParams.Length; i++)
-            {
-                var genericParam = genericParams[i];
-                if (genericParam == null) 
-                    continue;
-                
-                var genericConstraints = genericParam.GetGenericParameterConstraints();
-                for (int j = 0; j < genericConstraints.Length; j++)
-                {
-                    var genericConstraint = genericConstraints[j];
-                    if (genericConstraint.IsOpenGeneric())
-                    {
-                        var constraintGenericParams = genericConstraint.GetGenericParamsAndArgs();
-                        for (int k = 0; k < constraintGenericParams.Length; k++)
-                        {
-                            var constraintGenericParam = constraintGenericParams[k];
-                            if (constraintGenericParam != genericParam)
-                            {
-                                var genericParamIndex = genericParams.IndexOf(constraintGenericParam.Equals);
-                                if (genericParamIndex != -1)
-                                    genericParams[genericParamIndex] = null;
-                            }
-                        }
-                    }
-                }
-            }
+            var container = new Container();
+            container.Register(typeof(ICommandHandler<>), typeof(ReplayCommandHandler<,>));
+
+            var handler = container.Resolve<ICommandHandler<UpdateCommand<SpecialEntity>>>();
+
+            Assert.IsNotNull(handler);
         }
 
-        [Test]
-        public void Match_impl_generic_params_with_service_generic_args()
-        {
-            var implType = typeof(UpdateCommandHandler<,>);
-            var servType = typeof(ICommandHandler<UpdateCommand<SpecialEntity>>);
-
-            var implParams = implType.GetGenericParamsAndArgs();
-            var implArgs = new Type[implParams.Length];
-            var implArgsUnmatchedCount = implParams.Length;
-
-            var servArgs = servType.GetGenericParamsAndArgs();
-            var servOpenType = servType.GetGenericTypeDefinition();
-            var servParams = servOpenType.GetGenericParamsAndArgs();
-
-            for (var i = 0; i < servParams.Length; ++i)
-            {
-                var servParam = servParams[i];
-                var matchedParamIndex = implParams.IndexOf(t => t.Name == servParam.Name);
-                if (matchedParamIndex != -1)
-                {
-                    var servArg = servArgs[i];
-                    implArgs[matchedParamIndex] = servArg;
-                    if (--implArgsUnmatchedCount == 0)
-                        break;
-
-                    var implParam = implParams[matchedParamIndex];
-                    var implParamContstraints = implParam.GetGenericParameterConstraints();
-                    if (!implParamContstraints.IsNullOrEmpty())
-                    {
-                        for (var j = 0; j < implParamContstraints.Length; ++j)
-                        {
-                            var implParamContstraint = implParamContstraints[j];
-                            if (implParamContstraint.IsOpenGeneric())
-                            {
-                                var constraintParams = implParamContstraint.GetGenericParamsAndArgs();
-
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        public interface ICommandHandler<TCmd> { }
+        public interface ICommandHandler<TCmd> {}
         public class SpecialEntity { }
         public class UpdateCommand<TEntity> { }
 
         public class UpdateCommandHandler<TEntity, TCommand> : ICommandHandler<TCommand>
             where TEntity : SpecialEntity
             where TCommand : UpdateCommand<TEntity>
+        {}
+
+        public class ReplayCommand<T> { }
+        public class ReplayCommandHandler<TEntity, TCommand> : ICommandHandler<TCommand>
+            where TEntity : SpecialEntity
+            where TCommand : ReplayCommand<SpecialEntity>
         { }
+
     }
 
     #region CUT
