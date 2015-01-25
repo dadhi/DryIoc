@@ -16,7 +16,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [ExportWithKey(ServiceKey.One, typeof(IService))]
     public class KeyService : IService { }
 
-    [ExportAll(ContractKey = ServiceKey.OtherOne)]
+    [ExportMany(ContractKey = ServiceKey.OtherOne)]
     public class OtherKeyService : IService { }
 
     public enum ServiceKey { One, OtherOne }

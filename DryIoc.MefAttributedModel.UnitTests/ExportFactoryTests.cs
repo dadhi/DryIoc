@@ -111,7 +111,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
     }
 
-    [ExportAll, AsFactory]
+    [ExportMany, AsFactory]
     public class FruitFactory
     {
         [Export]

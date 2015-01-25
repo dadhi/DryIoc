@@ -83,7 +83,8 @@ namespace DryIoc.Mvc
 
         public static void RegisterMvcControllers(this IContainer container, IEnumerable<Type> controllerTypesProvider)
         {
-            container.RegisterBatch<IController>(controllerTypesProvider.ThrowIfNull(), WebReuse.InRequest);
+            //container.RegisterBatch<IController>(controllerTypesProvider.ThrowIfNull(), WebReuse.InRequest);
+            container.RegisterMany(controllerTypesProvider.ThrowIfNull(), _ => _.Of<IController>());
         }
 
         public static void SetFilterAttributeFilterProvider(this IContainer container, Collection<IFilterProvider> filterProviders = null)

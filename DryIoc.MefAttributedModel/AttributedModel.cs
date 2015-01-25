@@ -65,7 +65,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
-        /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>.</summary>
+        /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.</summary>
         /// <param name="registrator">Container to register types into.</param>
         /// <param name="typeProvider">Provides types to peek exported implementation types from.</param>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> typeProvider)
@@ -74,7 +74,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
-        /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>.</summary>
+        /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.</summary>
         /// <param name="registrator">Container to register types into.</param>
         /// <param name="types">Implementation types to register.</param>
         public static void RegisterExports(this IRegistrator registrator, params Type[] types)
@@ -83,7 +83,7 @@ namespace DryIoc.MefAttributedModel
         }
         
         /// <summary>First scans (<see cref="Scan"/>) provided assemblies to find types annotated with
-        /// <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>.
+        /// <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.
         /// Then registers found types into registrator/container.</summary>
         /// <param name="registrator">Container to register into</param>
         /// <param name="assemblyProvider">Provides assemblies to scan for exported implementation types.</param>
@@ -121,7 +121,7 @@ namespace DryIoc.MefAttributedModel
                 RegisterFactoryMethods(registrator, registrationInfo);
         }
 
-        /// <summary>Scans assemblies to find concrete type annotated with <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>
+        /// <summary>Scans assemblies to find concrete type annotated with <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>
         /// attributes, and create serializable DTO with all information required for registering of exported types.</summary>
         /// <param name="assemblyProvider">Assemblies to scan.</param>
         /// <returns>Lazy collection of registration info DTOs.</returns>
@@ -131,7 +131,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Creates registration info DTO for provided type. To find this info checks type attributes:
-        /// <see cref="ExportAttribute"/>, or <see cref="ExportAllAttribute"/>.
+        /// <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.
         /// If type is not concrete or is value type, then return null.</summary>
         /// <param name="implementationType">Type to convert into registration info.</param>
         /// <returns>Created DTO.</returns>
@@ -281,9 +281,9 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.Exports = GetExportsFromExportAttribute((ExportAttribute)attribute, info, implementationType);
                 }
-                else if (attribute is ExportAllAttribute)
+                else if (attribute is ExportManyAttribute)
                 {
-                    info.Exports = GetExportsFromExportAllAttribute((ExportAllAttribute)attribute, info, implementationType);
+                    info.Exports = GetExportsFromExportManyAttribute((ExportManyAttribute)attribute, info, implementationType);
                 }
                 else if (attribute is PartCreationPolicyAttribute)
                 {
@@ -330,7 +330,7 @@ namespace DryIoc.MefAttributedModel
         private static bool IsExportDefined(Attribute[] attributes)
         {
             return attributes.Length != 0 
-                && attributes.IndexOf(a => a is ExportAttribute || a is ExportAllAttribute) != -1 
+                && attributes.IndexOf(a => a is ExportAttribute || a is ExportManyAttribute) != -1 
                 && attributes.IndexOf(a => a is PartNotDiscoverableAttribute) == -1;
         }
 
@@ -348,7 +348,7 @@ namespace DryIoc.MefAttributedModel
             return exports;
         }
 
-        private static ExportInfo[] GetExportsFromExportAllAttribute(ExportAllAttribute attribute,
+        private static ExportInfo[] GetExportsFromExportManyAttribute(ExportManyAttribute attribute,
             RegistrationInfo currentInfo, Type implementationType)
         {
             var allContractTypes = attribute.GetContractTypes(implementationType);
@@ -357,7 +357,7 @@ namespace DryIoc.MefAttributedModel
             {
                 var implTypeArgs = implementationType.GetGenericParamsAndArgs();
                 allContractTypes = allContractTypes
-                    .Where(t => t.ContainsAllGenericParameters(implTypeArgs))
+                    .Where(t => t.ContainsAllGenericTypeParameters(implTypeArgs))
                     .Select(t => t.GetGenericDefinitionOrNull());
             }
 
@@ -933,10 +933,10 @@ namespace DryIoc.MefAttributedModel
 
     /// <summary>Specifies to export all implemented contract types automatically.</summary>
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-    public class ExportAllAttribute : Attribute
+    public class ExportManyAttribute : Attribute
     {
         /// <summary>Default rule to check that type could be exported.</summary>
-        public static Func<Type, bool> ExportedContractTypes = Registrator.DefaultServiceTypesForRegisterAll;
+        public static Func<Type, bool> ExportedContractTypes = Registrator.DefaultServiceTypesForRegisterMany;
 
         /// <summary>Specifies service key if <see cref="ContractName"/> is not specified.</summary>
         public object ContractKey { get; set; }

@@ -258,7 +258,7 @@ namespace DryIoc.UnitTests
         public void Registering_all_of_implemented_services_should_register_only_those_containing_all_impl_generic_args()
         {
             var container = new Container();
-            container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
+            container.RegisterMany(typeof(IceCreamSource<>), Reuse.Singleton);
 
             container.Resolve<IceCreamSource<bool>>();
             container.Resolve<IceCream<bool>>();
@@ -271,7 +271,7 @@ namespace DryIoc.UnitTests
         public void Given_singleton_registered_Then_resolving_non_generic_service_as_Many_should_succeed()
         {
             var container = new Container();
-            container.RegisterAll(typeof(IceCreamSource<>), Reuse.Singleton);
+            container.RegisterMany(typeof(IceCreamSource<>), Reuse.Singleton);
 
             var disposable = container.Resolve<LazyEnumerable<IDisposable>>().ToArray();
 
@@ -312,7 +312,64 @@ namespace DryIoc.UnitTests
         internal interface IBlah<T0, T1> { }
         internal class Blah<T0, T1> : IBlah<T0, T1> { }
         internal class AnotherBlah<T> : IBlah<string, T> { }
-    }
+
+        [Test]
+        public void Can_match_generic_parameter_from_constraint()
+        {
+            var container = new Container();
+            container.Register(typeof(ICommandHandler<>), typeof(UpdateCommandHandler<,>));
+
+            var handler = container.Resolve<ICommandHandler<UpdateCommand<SpecialEntity>>>();
+
+            Assert.IsInstanceOf<UpdateCommandHandler<SpecialEntity, UpdateCommand<SpecialEntity>>>(handler);
+        }
+
+        internal interface ICommandHandler<TCmd> { }
+        internal class SpecialEntity { }
+        internal class UpdateCommand<TEntity> { }
+
+        internal class UpdateCommandHandler<TEntity, TCommand> : ICommandHandler<TCommand>
+            where TEntity : SpecialEntity
+            where TCommand : UpdateCommand<TEntity>
+        { }
+
+        [Test]
+        public void Should_throw_if_generic_service_is_not_implemented_in_impl_type()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.Register(typeof(X<>), typeof(Y<>)));
+
+            Assert.AreEqual(ex.Error, Error.IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
+        }
+
+        internal interface IRecurrable<T> { }
+        internal class Y<T> { }
+        internal class X<T> : Y<T> where T : IRecurrable<T> { }
+
+        [Test]
+        public void Resgitration_throws_if_service_does_not_provide_all_generic_parameters()
+        {
+            var container = new Container();
+            
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.Register(typeof(ICommandHandler<>), typeof(ReplayCommandHandler<,>)));
+
+            Assert.AreEqual(ex.Error, Error.REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS);
+        }
+
+        internal class ReplayCommand<T> { }
+        internal class ReplayCommandHandler<TEntity, TCommand> : ICommandHandler<TCommand>
+            where TCommand : ReplayCommand<SpecialEntity>
+        { }
+
+        [Test]
+        public void Can_use_closed_service_with_open_generic_impl_if_contraints_provide_the_type()
+        {
+            
+        }
+
 
     #region CUT
 
@@ -396,4 +453,5 @@ namespace DryIoc.UnitTests
     public class BuzzDiffArgCount<T1, T2> : IFizz<Wrap<T2>, T1> { }
 
     #endregion
+    }
 }
