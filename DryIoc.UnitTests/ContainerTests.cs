@@ -351,16 +351,22 @@ namespace DryIoc.UnitTests
         [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_singleton()
         {
-            var c = new Container();
+            IContainer c = new Container();
             // before request
-            c.Register<IContext, Context1>(Reuse.Singleton);
+            c.Register<IContext, Context1>(Reuse.Singleton, 
+                setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable));
             var r1 = c.Resolve<IContext>();
             r1.Data = "before";
 
-            c.Register<IContext, Context2>(Reuse.Singleton);
+            c.Register<IContext, Context2>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace,
+                setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable));
+            c.Resolve<ReuseRecyclable>(typeof(IContext)).Recycle();
+
             var r2 = c.Resolve<IContext>();
-            Assert.AreEqual(r1, r2);
-            Assert.AreEqual("before", r2.Data);
+            var r3 = c.Resolve<IContext>();
+            Assert.AreNotEqual(r1, r2);
+            Assert.AreEqual(r2, r3);
+            Assert.AreEqual(null, r2.Data);
         }
     }
 }

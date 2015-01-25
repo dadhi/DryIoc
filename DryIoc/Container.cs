@@ -830,17 +830,23 @@ namespace DryIoc
                         return new FactoriesEntry(DefaultKey.Value,
                             oldFactories.Factories.AddOrUpdate(DefaultKey.Value, (Factory)newEntry));
 
+                    var oldFactory = oldFactories == null ? (Factory)oldEntry : null;
+
                     switch (ifAlreadyRegistered)
                     {
                         case IfAlreadyRegistered.Throw:
-                            var oldFactory = oldFactories == null ? (Factory)oldEntry
-                                : oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
+                            oldFactory = oldFactory ?? oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
                             return Throw.Instead<object>(Error.UNABLE_TO_REGISTER_DUPLICATE_DEFAULT, serviceType, oldFactory);
 
                         case IfAlreadyRegistered.KeepIt:
                             return oldEntry;
 
                         case IfAlreadyRegistered.Replace:
+                            // Register factory with the same ID as the old one.
+                            oldFactory = oldFactory ?? oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
+                            if (oldFactory != null)
+                                ((Factory)newEntry).FactoryID = oldFactory.FactoryID;
+
                             return oldFactories == null ? newEntry :
                                 new FactoriesEntry(oldFactories.LastDefaultKey,
                                     oldFactories.Factories.AddOrUpdate(oldFactories.LastDefaultKey, (Factory)newEntry));
@@ -3530,7 +3536,7 @@ namespace DryIoc
     public abstract class Factory
     {
         /// <summary>Unique factory id generated from static seed.</summary>
-        public int FactoryID { get; private set; }
+        public int FactoryID { get; set; }
 
         /// <summary>Reuse policy for factory created services.</summary>
         public readonly IReuse Reuse;
@@ -5101,6 +5107,8 @@ namespace DryIoc
     /// <summary>Provides strongly-typed access to wrapped target.</summary>
     public static class ReuseWrapper
     {
+        public static readonly Type Recyclable = typeof(ReuseRecyclable);
+
         /// <summary>Unwraps input until target of <typeparamref name="T"/> is found. Returns found target, otherwise returns null.</summary>
         /// <typeparam name="T">Target to stop search on.</typeparam>
         /// <param name="reuseWrapper">Source reused wrapper to get target from.</param>
