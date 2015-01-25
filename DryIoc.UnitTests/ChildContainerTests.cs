@@ -216,7 +216,7 @@ namespace DryIoc.UnitTests
             Assert.That(melon, Is.InstanceOf<Melon>());
 
             var withRegistrationsCopy = container.WithRegistrationsCopy().WithoutCache();
-            withRegistrationsCopy.Register<IFruit, Orange>(ifAlreadyRegistered: IfAlreadyRegistered.Update);
+            withRegistrationsCopy.Register<IFruit, Orange>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             var orange = withRegistrationsCopy.Resolve<IFruit>();
             Assert.That(orange, Is.InstanceOf<Orange>());
         }

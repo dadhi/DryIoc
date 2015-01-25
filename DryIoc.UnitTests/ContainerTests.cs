@@ -237,7 +237,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register(typeof(IService), typeof(Service), named: "blah");
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Register(typeof(IService), typeof(AnotherService), named: "blah"));
 
             Assert.That(ex.Message, Is.StringContaining("IService with the same key \"blah\""));
@@ -327,40 +327,40 @@ namespace DryIoc.UnitTests
 
             Assert.That(service, Is.InstanceOf<Service>());
         }
-        
-        		[Test]
-		[ExpectedException(typeof(ContainerException))]
-		[Description("https://github.com/ashmind/net-feature-tests/issues/23")]
-		public void ReRegister_dependency_of_singleton(){
-			var c = new Container();
-			c.Register<ILogger,Logger1>();
-			c.Register<UseLogger1,UseLogger1>(Reuse.Singleton);
-			var u11 = c.Resolve<UseLogger1>();
-			c.Register<UseLogger2,UseLogger2>(Reuse.Singleton);
-			c.Register<ILogger,Logger2>();
-			
-			var u12  = c.Resolve<UseLogger1>();
-			
-			Assert.IsTrue(u11==u12);
-			Assert.IsInstanceOf(typeof(Logger1),u12.Resolved);
-			
-			var u2 =  c.Resolve<UseLogger2>();
-		}
-		
-		[Test]
-		[Description("https://github.com/ashmind/net-feature-tests/issues/23")]
-		public void ReRegister_singleton(){
-			var c = new Container();
-			// before request
-			c.Register<IContext,Context1>(Reuse.Singleton);
-			var r1  = c.Resolve<IContext>();
-			r1.Data = "before";
-			
-			c.Register<IContext,Context2>(Reuse.Singleton);
-			var r2  = c.Resolve<IContext>();
-			
-			Assert.AreEqual(r1,r2);
-			Assert.AreEqual("before",r2.Data);
-		}
+
+        [Test]
+        [ExpectedException(typeof(ContainerException))]
+        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        public void ReRegister_dependency_of_singleton()
+        {
+            var c = new Container();
+            c.Register<ILogger, Logger1>();
+            c.Register<UseLogger1>(Reuse.Singleton);
+            var u11 = c.Resolve<UseLogger1>();
+
+            c.Register<UseLogger2>(Reuse.Singleton);
+            c.Register<ILogger, Logger2>();
+            var u12 = c.Resolve<UseLogger1>();
+            Assert.IsTrue(u11 == u12);
+            Assert.IsInstanceOf(typeof(Logger1), u12.Resolved);
+
+            c.Resolve<UseLogger2>();
+        }
+
+        [Test]
+        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        public void ReRegister_singleton()
+        {
+            var c = new Container();
+            // before request
+            c.Register<IContext, Context1>(Reuse.Singleton);
+            var r1 = c.Resolve<IContext>();
+            r1.Data = "before";
+
+            c.Register<IContext, Context2>(Reuse.Singleton);
+            var r2 = c.Resolve<IContext>();
+            Assert.AreEqual(r1, r2);
+            Assert.AreEqual("before", r2.Data);
+        }
     }
 }
