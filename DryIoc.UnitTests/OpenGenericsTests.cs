@@ -314,43 +314,62 @@ namespace DryIoc.UnitTests
         internal class AnotherBlah<T> : IBlah<string, T> { }
 
         [Test]
-        public void Can_register_complex_generic_implementation()
+        public void Can_match_generic_parameter_from_constraint()
         {
             var container = new Container();
             container.Register(typeof(ICommandHandler<>), typeof(UpdateCommandHandler<,>));
 
             var handler = container.Resolve<ICommandHandler<UpdateCommand<SpecialEntity>>>();
 
-            Assert.IsNotNull(handler);
+            Assert.IsInstanceOf<UpdateCommandHandler<SpecialEntity, UpdateCommand<SpecialEntity>>>(handler);
         }
 
-        [Test]
-        public void Can_register_complex_generic_implementation_2()
-        {
-            var container = new Container();
-            container.Register(typeof(ICommandHandler<>), typeof(ReplayCommandHandler<,>));
+        internal interface ICommandHandler<TCmd> { }
+        internal class SpecialEntity { }
+        internal class UpdateCommand<TEntity> { }
 
-            var handler = container.Resolve<ICommandHandler<UpdateCommand<SpecialEntity>>>();
-
-            Assert.IsNotNull(handler);
-        }
-
-        public interface ICommandHandler<TCmd> {}
-        public class SpecialEntity { }
-        public class UpdateCommand<TEntity> { }
-
-        public class UpdateCommandHandler<TEntity, TCommand> : ICommandHandler<TCommand>
+        internal class UpdateCommandHandler<TEntity, TCommand> : ICommandHandler<TCommand>
             where TEntity : SpecialEntity
             where TCommand : UpdateCommand<TEntity>
-        {}
+        { }
 
-        public class ReplayCommand<T> { }
-        public class ReplayCommandHandler<TEntity, TCommand> : ICommandHandler<TCommand>
-            where TEntity : SpecialEntity
+        [Test]
+        public void Should_throw_if_generic_service_is_not_implemented_in_impl_type()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.Register(typeof(X<>), typeof(Y<>)));
+
+            Assert.AreEqual(ex.Error, Error.IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
+        }
+
+        internal interface IRecurrable<T> { }
+        internal class Y<T> { }
+        internal class X<T> : Y<T> where T : IRecurrable<T> { }
+
+        [Test]
+        public void Resgitration_throws_if_service_does_not_provide_all_generic_parameters()
+        {
+            var container = new Container();
+            
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.Register(typeof(ICommandHandler<>), typeof(ReplayCommandHandler<,>)));
+
+            Assert.AreEqual(ex.Error, Error.REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS);
+        }
+
+        internal class ReplayCommand<T> { }
+        internal class ReplayCommandHandler<TEntity, TCommand> : ICommandHandler<TCommand>
             where TCommand : ReplayCommand<SpecialEntity>
         { }
 
-    }
+        [Test]
+        public void Can_use_closed_service_with_open_generic_impl_if_contraints_provide_the_type()
+        {
+            
+        }
+
 
     #region CUT
 
@@ -434,4 +453,5 @@ namespace DryIoc.UnitTests
     public class BuzzDiffArgCount<T1, T2> : IFizz<Wrap<T2>, T1> { }
 
     #endregion
+    }
 }

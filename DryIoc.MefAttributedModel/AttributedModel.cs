@@ -357,7 +357,7 @@ namespace DryIoc.MefAttributedModel
             {
                 var implTypeArgs = implementationType.GetGenericParamsAndArgs();
                 allContractTypes = allContractTypes
-                    .Where(t => t.ContainsAllGenericParameters(implTypeArgs))
+                    .Where(t => t.ContainsAllGenericTypeParameters(implTypeArgs))
                     .Select(t => t.GetGenericDefinitionOrNull());
             }
 

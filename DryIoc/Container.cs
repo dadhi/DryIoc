@@ -2142,7 +2142,7 @@ namespace DryIoc
             {
                 var implTypeArgs = implementationType.GetGenericParamsAndArgs();
                 serviceTypes = serviceTypes
-                    .Where(t => t.ContainsAllGenericParameters(implTypeArgs))
+                    .Where(t => t.ContainsAllGenericTypeParameters(implTypeArgs))
                     .Select(t => t.GetGenericDefinitionOrNull());
             }
 
@@ -2210,7 +2210,7 @@ namespace DryIoc
         //            Factory factory = null; // single factory for many service types.
         //            var implTypeArgs = implType.GetGenericParamsAndArgs();
         //            foreach (var serviceType in serviceTypes
-        //                .Where(st => st.ContainsAllGenericParameters(implTypeArgs))
+        //                .Where(st => st.ContainsAllGenericTypeParameters(implTypeArgs))
         //                .Select(st => st.GetGenericDefinitionOrNull()))
         //                    registrator.Register(serviceType,
         //                        factory ?? (factory = new ReflectionFactory(implType, reuse, setup: setup)),
@@ -2255,7 +2255,7 @@ namespace DryIoc
                 {
                     var implTypeArgs = implType.GetGenericParamsAndArgs();
                     foreach (var serviceType in serviceTypes
-                        .Where(st => st.ContainsAllGenericParameters(implTypeArgs))
+                        .Where(st => st.ContainsAllGenericTypeParameters(implTypeArgs))
                         .Select(st => st.GetGenericDefinitionOrNull()))
                         if (condition == null || condition(serviceType, implType))
                             registrator.Register(serviceType,
@@ -4244,13 +4244,24 @@ namespace DryIoc
             {
                 if (serviceType.IsGenericDefinition())
                 {
+                    var implTypeParams = implType.GetGenericParamsAndArgs();
                     var implementedTypes = implType.GetImplementedTypes();
-                    var implementedOpenGenericTypes = implementedTypes.Where(t => t.GetGenericDefinitionOrNull() == serviceType);
+                    
+                    var implementedTypeFound = false;
+                    var containsAllTypeParams = false;
+                    for (var i = 0; !containsAllTypeParams && i < implementedTypes.Length; ++i)
+                    {
+                        var implementedType = implementedTypes[i];
+                        implementedTypeFound = implementedType.GetGenericDefinitionOrNull() == serviceType;
+                        containsAllTypeParams = implementedTypeFound && implementedType.ContainsAllGenericTypeParameters(implTypeParams);
+                    }
+ 
+                    if (!implementedTypeFound)
+                        Throw.Error(Error.IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE, implType, serviceType);
 
-                    var implTypeArgs = implType.GetGenericParamsAndArgs();
-                    Throw.If(!implementedOpenGenericTypes.Any(t => t.ContainsAllGenericParameters(implTypeArgs)),
-                        Error.REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS,
-                        implType, serviceType, implementedOpenGenericTypes);
+                    if (!containsAllTypeParams)
+                        Throw.Error(Error.REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS,
+                            implType, serviceType, implementedTypes.Where(t => t.GetGenericDefinitionOrNull() == serviceType));
                 }
                 else if (implType.IsGeneric() && serviceType.IsOpenGeneric())
                     Throw.Error(Error.REG_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE,
@@ -5944,7 +5955,7 @@ namespace DryIoc
         /// <param name="type">Expected to be open-generic type.</param>
         /// <param name="genericParams">Generic parameters type to look in.</param>
         /// <returns>Returns true if contains and false otherwise.</returns>
-        public static bool ContainsAllGenericParameters(this Type type, Type[] genericParams)
+        public static bool ContainsAllGenericTypeParameters(this Type type, Type[] genericParams)
         {
             if (!type.IsOpenGeneric()) // TODO Need additional test for that
                 return false;
