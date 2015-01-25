@@ -344,8 +344,20 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(ex.Error, Error.IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
         }
 
+        [Test]
+        public void Should_handle_recurred_constraint_pattern()
+        {
+            var container = new Container();
+            container.Register(typeof(Y<>), typeof(X<>));
+
+            var yz = container.Resolve<Y<Z>>();
+        
+            Assert.IsInstanceOf<X<Z>>(yz);
+        }
+
         internal interface IRecurrable<T> { }
         internal class Y<T> { }
+        internal class Z : IRecurrable<Z> { }
         internal class X<T> : Y<T> where T : IRecurrable<T> { }
 
         [Test]
@@ -364,94 +376,87 @@ namespace DryIoc.UnitTests
             where TCommand : ReplayCommand<SpecialEntity>
         { }
 
-        [Test]
-        public void Can_use_closed_service_with_open_generic_impl_if_contraints_provide_the_type()
+        #region CUT
+
+        public class LazyOne<T>
         {
-            
+            public Func<T> LazyValue { get; set; }
+            public T Value { get; set; }
+
+            public LazyOne(T initValue)
+            {
+                Value = initValue;
+            }
+
+            public LazyOne(Func<T> lazyValue)
+            {
+                LazyValue = lazyValue;
+            }
         }
 
-
-    #region CUT
-
-    public class LazyOne<T>
-    {
-        public Func<T> LazyValue { get; set; }
-        public T Value { get; set; }
-
-        public LazyOne(T initValue)
+        internal interface IGeneric<T>
         {
-            Value = initValue;
+            T Service { get; }
         }
 
-        public LazyOne(Func<T> lazyValue)
+        internal class GenericWithConstraint<T> : IGeneric<T>
+            where T : IService, new()
         {
-            LazyValue = lazyValue;
+            public T Service { get; private set; }
+
+            public GenericWithConstraint(T service)
+            {
+                Service = service;
+            }
         }
-    }
 
-    internal interface IGeneric<T>
-    {
-        T Service { get; }
-    }
-
-    internal class GenericWithConstraint<T> : IGeneric<T>
-        where T : IService, new()
-    {
-        public T Service { get; private set; }
-
-        public GenericWithConstraint(T service)
+        internal class AnotherGenericWithConstraint<T> : IGeneric<T>
         {
-            Service = service;
+            public T Service { get; private set; }
+
+            public AnotherGenericWithConstraint(T service)
+            {
+                Service = service;
+            }
         }
-    }
 
-    internal class AnotherGenericWithConstraint<T> : IGeneric<T>
-    {
-        public T Service { get; private set; }
+        internal class Blah { }
 
-        public AnotherGenericWithConstraint(T service)
+        public interface IDouble<T1, T2> { }
+
+        public class Double<T1, T2> : IDouble<T2, T1> { }
+
+        public class DoubleNested<T1, T2> : IDouble<Nested<T2>, T1> { }
+
+        public class DoubleMultiNested<T1, T2> : IDouble<T2, Nested<IDouble<Nested<T1>, T2>>> { }
+
+        public class Nested<T> { }
+
+        public class BananaSplit<T1, T2> : Banana<T1>, IceCream<T2> { }
+
+        public class Banana<T> { }
+
+        public interface IceCream<T> { }
+
+        public class IceCreamSource<T> : IceCream<T>, IDisposable
         {
-            Service = service;
+            public void Dispose()
+            {
+            }
         }
-    }
 
-    internal class Blah { }
+        public class Open<T> { }
 
-    public interface IDouble<T1, T2> { }
+        public class Closed<T> : Open<T> { }
 
-    public class Double<T1, T2> : IDouble<T2, T1> { }
+        public class Wrap<T> { }
 
-    public class DoubleNested<T1, T2> : IDouble<Nested<T2>, T1> { }
+        public class Wrap<T1, T2> { }
 
-    public class DoubleMultiNested<T1, T2> : IDouble<T2, Nested<IDouble<Nested<T1>, T2>>> { }
+        public interface IFizz<T1, T2> { }
 
-    public class Nested<T> { }
+        public class BuzzDiffArgCount<T1, T2> : IFizz<Wrap<T2>, T1> { }
 
-    public class BananaSplit<T1, T2> : Banana<T1>, IceCream<T2> { }
-
-    public class Banana<T> { }
-
-    public interface IceCream<T> { }
-
-    public class IceCreamSource<T> : IceCream<T>, IDisposable
-    {
-        public void Dispose()
-        {
-        }
-    }
-
-    public class Open<T> { }
-
-    public class Closed<T> : Open<T> { }
-
-    public class Wrap<T> { }
-
-    public class Wrap<T1, T2> { }
-
-    public interface IFizz<T1, T2> { }
-
-    public class BuzzDiffArgCount<T1, T2> : IFizz<Wrap<T2>, T1> { }
-
-    #endregion
+        #endregion
     }
 }

@@ -579,7 +579,7 @@ namespace DryIoc
                 factory = GetServiceFactoryOrDefault(serviceTypeGenericDef, request.ServiceKey, Rules.FactorySelector);
                 if (factory != null && (factory = factory.Provider.ProvideConcreteFactory(request)) != null)
                 {   // Important to register produced factory, at least for recursive dependency check
-                    Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.Update);
+                    Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.Replace);
                     return factory;
                 }
             }
@@ -840,7 +840,7 @@ namespace DryIoc
                         case IfAlreadyRegistered.KeepIt:
                             return oldEntry;
 
-                        case IfAlreadyRegistered.Update:
+                        case IfAlreadyRegistered.Replace:
                             return oldFactories == null ? newEntry :
                                 new FactoriesEntry(oldFactories.LastDefaultKey,
                                     oldFactories.Factories.AddOrUpdate(oldFactories.LastDefaultKey, (Factory)newEntry));
@@ -882,7 +882,7 @@ namespace DryIoc
                                 case IfAlreadyRegistered.KeepIt:
                                     return oldFactory;
 
-                                case IfAlreadyRegistered.Update:
+                                case IfAlreadyRegistered.Replace:
                                     return newFactory;
 
                                 //case IfAlreadyRegistered.Throw:
@@ -2689,7 +2689,7 @@ namespace DryIoc
 
             var s = new StringBuilder();
             if (RequiredServiceType != null)
-                s.Append("{required: ").Print(RequiredServiceType); // TODO omit required when it is the same as service type.
+                s.Append("{required: ").Print(RequiredServiceType);
             if (ServiceKey != null)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Print(ServiceKey, "\"");
             if (IfUnresolved != IfUnresolved.Throw)
@@ -2760,21 +2760,9 @@ namespace DryIoc
             var serviceType = info.ServiceType;
             var wrappedServiceType = request.Container.UnwrapServiceType(serviceType);
             var requiredServiceType = details == null ? null : details.RequiredServiceType;
-            if (requiredServiceType == null)
+            if (requiredServiceType != null)
             {
-                if (wrappedServiceType != serviceType &&  // it is a wrapper
-                    wrappedServiceType != typeof(object)) // and wrapped type is not an object, which is least specific.
-                {
-                    // wrapper should always have a specific service type
-                    details = details == null
-                        ? ServiceInfoDetails.Of(wrappedServiceType)
-                        : ServiceInfoDetails.Of(wrappedServiceType, details.ServiceKey, details.IfUnresolved);
-                }
-            }
-            else // if required type was provided, check that it is assignable to service(wrapped)type.
-            {
-                wrappedServiceType.ThrowIfNotOf(requiredServiceType,
-                    Error.WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE, request);
+                wrappedServiceType.ThrowIfNotOf(requiredServiceType, Error.WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE, request);
                 if (wrappedServiceType == serviceType) // if Not a wrapper, 
                 {
                     serviceType = requiredServiceType; // override service type with required one
@@ -2783,7 +2771,7 @@ namespace DryIoc
             }
 
             return serviceType == info.ServiceType && (details == null || details == info.Details)
-                ? info // if service type unchanged and details absent, or the same: return original info.
+                ? info // if service type unchanged and details absent, or details are the same return original info.
                 : (T)info.Create(serviceType, details); // otherwise: create new.
         }
 
@@ -3107,7 +3095,7 @@ namespace DryIoc
         /// <returns>New empty request.</returns>
         internal static Request CreateEmpty(ContainerWeakRef container, WeakReference resolutionStatCache)
         {
-            return new Request(null, container, resolutionStatCache, null, null, null);
+            return new Request(null, container, resolutionStatCache, null, null);
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="ServiceInfo"/> in such a request.</summary>
@@ -3135,7 +3123,7 @@ namespace DryIoc
 
         public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey)
         {
-            return Container.ResolveMany(serviceType, serviceKey, requiredServiceType, compositeParentKey /*, this*/);
+            return Container.ResolveMany(serviceType, serviceKey, requiredServiceType, compositeParentKey);
         }
 
         #endregion
@@ -3192,12 +3180,11 @@ namespace DryIoc
         public Request Push(IServiceInfo info)
         {
             if (IsEmpty)
-                return new Request(this, ContainerWeakRef, _stateCacheWeakRef, new Ref<IScope>(), info.ThrowIfNull(), null);
+                return new Request(this, ContainerWeakRef, _stateCacheWeakRef, info.ThrowIfNull(), null);
 
             ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info.ThrowIfNull(), this);
-            FactorySetup ownerSetup = ResolvedFactory.Setup;
-            var inheritedInfo = info.InheritInfo(ServiceInfo, ownerSetup.FactoryType != FactoryType.Service);
-            return new Request(this, ContainerWeakRef, _stateCacheWeakRef, _scope, inheritedInfo, null, FuncArgs);
+            var inheritedInfo = info.InheritInfo(ServiceInfo, ResolvedFactory.Setup.FactoryType != FactoryType.Service);
+            return new Request(this, ContainerWeakRef, _stateCacheWeakRef, inheritedInfo, null, FuncArgs);
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls <see cref="Push(DryIoc.IServiceInfo)"/>.</summary>
@@ -3218,7 +3205,7 @@ namespace DryIoc
         /// <returns>New request with new info but the rest intact: e.g. <see cref="ResolvedFactory"/>.</returns>
         public Request UpdateServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
-            return new Request(Parent, ContainerWeakRef, _stateCacheWeakRef, _scope, getInfo(ServiceInfo), ResolvedFactory, FuncArgs);
+            return new Request(Parent, ContainerWeakRef, _stateCacheWeakRef, getInfo(ServiceInfo), ResolvedFactory, FuncArgs);
         }
 
         /// <summary>Returns new request with parameter expressions created for <paramref name="funcType"/> input arguments.
@@ -3238,7 +3225,7 @@ namespace DryIoc
 
             var isArgUsed = new bool[funcArgExprs.Length];
             var funcArgExpr = new KV<bool[], ParameterExpression[]>(isArgUsed, funcArgExprs);
-            return new Request(Parent, ContainerWeakRef, _stateCacheWeakRef, _scope, ServiceInfo, ResolvedFactory, funcArgExpr);
+            return new Request(Parent, ContainerWeakRef, _stateCacheWeakRef, ServiceInfo, ResolvedFactory, funcArgExpr);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container, 
@@ -3247,7 +3234,7 @@ namespace DryIoc
         /// <returns>Request with replaced container.</returns>
         public Request SwitchContainer(ContainerWeakRef containerWeakRef)
         {
-            return new Request(Parent, containerWeakRef, _stateCacheWeakRef, _scope, ServiceInfo, ResolvedFactory, FuncArgs);
+            return new Request(Parent, containerWeakRef, _stateCacheWeakRef, ServiceInfo, ResolvedFactory, FuncArgs);
         }
 
         /// <summary>Returns new request with set <see cref="ResolvedFactory"/>.</summary>
@@ -3258,14 +3245,12 @@ namespace DryIoc
             if (IsEmpty || (ResolvedFactory != null && ResolvedFactory.FactoryID == factory.FactoryID))
                 return this; // resolving only once, no need to check recursion again.
 
-
-
             if (factory.FactoryType == FactoryType.Service)
                 for (var p = Parent; !p.IsEmpty; p = p.Parent)
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID,
                         Error.RECURSIVE_DEPENDENCY_DETECTED, Print(factory.FactoryID));
 
-            return new Request(Parent, ContainerWeakRef, _stateCacheWeakRef, _scope, ServiceInfo, factory, FuncArgs);
+            return new Request(Parent, ContainerWeakRef, _stateCacheWeakRef, ServiceInfo, factory, FuncArgs);
         }
 
         /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
@@ -3328,22 +3313,18 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(Request parent,
-            ContainerWeakRef containerWeakRef, WeakReference stateCacheWeakRef,
-            Ref<IScope> scope, IServiceInfo serviceInfo, Factory resolvedFactory,
-            KV<bool[], ParameterExpression[]> funcArgs = null)
+        internal Request(Request parent, ContainerWeakRef containerWeakRef, WeakReference stateCacheWeakRef, 
+            IServiceInfo serviceInfo, Factory resolvedFactory, KV<bool[], ParameterExpression[]> funcArgs = null)
         {
             Parent = parent;
             ContainerWeakRef = containerWeakRef;
             _stateCacheWeakRef = stateCacheWeakRef;
-            _scope = scope;
             ServiceInfo = serviceInfo;
             ResolvedFactory = resolvedFactory;
             FuncArgs = funcArgs;
         }
 
         private readonly WeakReference _stateCacheWeakRef;
-        private readonly Ref<IScope> _scope;
 
         #endregion
     }
@@ -4475,7 +4456,7 @@ namespace DryIoc
         {
             var serviceType = request.ServiceType;
             var serviceTypeArgs = serviceType.GetGenericParamsAndArgs();
-            var serviceOpenGenericType = serviceType.GetGenericDefinitionOrNull().ThrowIfNull(); // TODO May be not generic
+            var serviceOpenGenericType = serviceType.GetGenericDefinitionOrNull().ThrowIfNull();
 
             var implTypeParams = implType.GetGenericParamsAndArgs();
             var implTypeArgs = new Type[implTypeParams.Length];
@@ -4503,11 +4484,11 @@ namespace DryIoc
             for (var i = 0; i < implTypeParams.Length; i++)
             {
                 var implTypeArg = implTypeArgs[i];
-                if (implTypeArg == null) continue;
+                if (implTypeArg == null) continue; // skip yet unknown type arg
 
                 var implTypeParam = implTypeParams[i];
                 var implTypeParamConstraints = implTypeParam.GetGenericParameterConstraints();
-                if (implTypeParamConstraints.IsNullOrEmpty()) continue;
+                if (implTypeParamConstraints.IsNullOrEmpty()) continue; // skip case with no constraints
 
                 var constraintMatchFound = false;
                 for (var j = 0; !constraintMatchFound && j < implTypeParamConstraints.Length; ++j)
@@ -4522,15 +4503,10 @@ namespace DryIoc
                             implTypeArg.GetGenericParamsAndArgs());
                     }
                 }
-
-                if (!constraintMatchFound)
-                {
-                    // TODO What to do? Add test to get here
-                }
             }
 
             var notMatchedIndex = Array.IndexOf(implTypeArgs, null);
-            if (notMatchedIndex != -1) // TODO add rule for using closed constraint if specified, check if its concrete type probably?
+            if (notMatchedIndex != -1)
                 return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
                     : Throw.Instead<Type[]>(Error.NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
                         implType, implTypeParams[notMatchedIndex], request);
@@ -5334,8 +5310,8 @@ namespace DryIoc
         Throw,
         /// <summary>Keeps old default or keyed registration ignoring new registration: ensures Register-Once semantics.</summary>
         KeepIt,
-        /// <summary>Updates old registration with one.</summary>
-        Update
+        /// <summary>Replaces old registration with new one.</summary>
+        Replace
     }
 
     /// <summary>Defines operations that for changing registry, and checking if something exist in registry.</summary>
@@ -5957,7 +5933,7 @@ namespace DryIoc
         /// <returns>Returns true if contains and false otherwise.</returns>
         public static bool ContainsAllGenericTypeParameters(this Type type, Type[] genericParams)
         {
-            if (!type.IsOpenGeneric()) // TODO Need additional test for that
+            if (!type.IsOpenGeneric())
                 return false;
 
             SetToNullGenericParametersReferencedInConstraints(genericParams);
@@ -6299,7 +6275,7 @@ namespace DryIoc
         /// <summary>Calls predicate on each item in <paramref name="source"/> array until predicate returns true,
         /// then method will return this item index, or if predicate returns false for each item, method will return -1.</summary>
         /// <typeparam name="T">Type of array items.</typeparam>
-        /// <param name="source">Source array to operate: if null or empty, then method will return -1.</param>
+        /// <param name="source">Source array: if null or empty, then method will return -1.</param>
         /// <param name="predicate">Delegate to evaluate on each array item until delegate returns true.</param>
         /// <returns>Index of item for which predicate returns true, or -1 otherwise.</returns>
         public static int IndexOf<T>(this T[] source, Func<T, bool> predicate)
@@ -6311,6 +6287,11 @@ namespace DryIoc
             return -1;
         }
 
+        /// <summary>Looks up for item in source array equal to provided value, and returns its index, or -1 if not found.</summary>
+        /// <typeparam name="T">Type of array items.</typeparam>
+        /// <param name="source">Source array: if null or empty, then method will return -1.</param>
+        /// <param name="value">Value to look up.</param>
+        /// <returns>Index of item equal to value, or -1 item is not found.</returns>
         public static int IndexOf<T>(this T[] source, T value)
         {
             if (source != null && source.Length != 0)

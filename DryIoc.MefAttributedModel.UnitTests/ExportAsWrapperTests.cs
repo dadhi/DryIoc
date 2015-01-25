@@ -58,7 +58,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Exporting_generic_wrapper_with_wrong_generic_arg_index_should_throw_meaningful_exception()
         {
-            var container = new Container();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(MyFactoryWrapperExportedWithWrongIndex<>), typeof(Service));
 
             var ex = Assert.Throws<AttributedModelException>(() => 
@@ -66,7 +66,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.AreEqual(ex.Error, Error.WRAPPED_ARG_INDEX_OUT_OF_BOUNDS);
             Assert.That(ex.Message, Is.StringContaining(
-                "Exported generic wrapper type DryIoc.MefAttributedModel.UnitTests.ExportAsWrapperTests.MyFactoryWrapperExportedWithWrongIndex<DryIoc.MefAttributedModel.UnitTests.CUT.IService> specifies generic argument index 1 outside of argument list size"));
+                "Exported generic wrapper type DryIoc.MefAttributedModel.UnitTests.ExportAsWrapperTests.MyFactoryWrapperExportedWithWrongIndex<DryIoc.MefAttributedModel.UnitTests.CUT.IService> " 
+                + "specifies generic argument index 1 outside of argument list size"));
         }
 
         [Export, AsWrapper(typeof(IService))]

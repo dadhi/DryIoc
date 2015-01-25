@@ -768,7 +768,7 @@ namespace DryIoc.MefAttributedModel
 
         public SetupWrapper GetSetup()
         {
-            return SetupWrapper.With(unwrapServiceType: GetWrappedServiceType);
+            return SetupWrapper.With(UnwrapServiceType);
         }
 
         public override bool Equals(object obj)
@@ -777,7 +777,7 @@ namespace DryIoc.MefAttributedModel
             return other != null && other.WrappedServiceTypeGenericArgIndex == WrappedServiceTypeGenericArgIndex;
         }
 
-        private Type GetWrappedServiceType(Type wrapperType)
+        private Type UnwrapServiceType(Type wrapperType)
         {
             if (WrappedServiceType != null)
                 return WrappedServiceType;
