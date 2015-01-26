@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -230,10 +231,6 @@ namespace DryIoc.UnitTests
                 container.Resolve<Client>());
 
             Assert.That(ex.Error, Is.EqualTo(Error.DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN));
-            Assert.That(ex.Message, Is.StringContaining(
-                "Dependency DryIoc.UnitTests.FastLogger: DryIoc.UnitTests.ILogger as parameter \"logger\" has shorter Reuse lifespan than its parent: DryIoc.UnitTests.Client." + Environment.NewLine +
-                "ResolutionScopeReuse:10 lifetime is shorter than SingletonReuse:1000." + Environment.NewLine +
-                "You may turn Off this error with new Container(rules=>rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false))."));
         }
 
         [Test]
@@ -276,6 +273,34 @@ namespace DryIoc.UnitTests
             Assert.That(service.Value.Dep.IsDisposed, Is.True);
         }
 
+        [Test]
+        public void Should_dispose_all_singletons_despite_exception_in_first_dispose()
+        {
+            IContainer container = new Container();
+            container.Register<A>(Reuse.Singleton);
+            container.Register<B>(Reuse.Singleton);
+
+            container.Resolve<A>();
+            var b = container.Resolve<B>();
+
+            container.Dispose();
+            Assert.IsTrue(b.IsDisposed);
+            Assert.IsTrue(container.SingletonScope.DisposingExceptions.OfType<DivideByZeroException>().Any());
+        }
+
+        internal class A : IDisposable {
+            public void Dispose()
+            {
+                throw new DivideByZeroException();
+            }
+        }
+        internal class B : IDisposable {
+            public bool IsDisposed;
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
 
         internal class SomeDep : IDisposable
         {
@@ -295,33 +320,6 @@ namespace DryIoc.UnitTests
                 Dep = dep;
             }
         }
-
-        // Old example for v1.3.1 
-        //public sealed class HttpContextReuse : IReuse
-        //{
-        //    public static readonly HttpContextReuse Instance = new HttpContextReuse();
-
-        //    public static T GetOrAddToContext<T>(int factoryID, Func<T> factory)
-        //    {
-        //        var key = KEY_UNIQUE_PREFIX + factoryID;
-        //        var items = HttpContext.Current.Items;
-        //        lock (_locker)
-        //            if (!items.Contains(key))
-        //                items[key] = factory();
-        //        return (T)items[key];
-        //    }
-
-        //    public Expression Of(Request request, IRegistry registry, int factoryID, Expression factoryExpr)
-        //    {
-        //        return Expression.Call(_getOrAddToContextMethod.MakeGenericMethod(factoryExpr.Type),
-        //            Expression.Constant(factoryID),        // use factoryID (unique per Container) as service ID.
-        //            Expression.Lambda(factoryExpr, null)); // pass Func<TService> to create service only when not found in context.
-        //    }
-
-        //    private static readonly object _locker = new object();
-        //    private readonly MethodInfo _getOrAddToContextMethod = typeof(HttpContextReuse).GetMethod("GetOrAddToContext");
-        //    private const string KEY_UNIQUE_PREFIX = "DryIocHCR#";
-        //}
 
         #region CUT
 

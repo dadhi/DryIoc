@@ -36,10 +36,10 @@ namespace DryIoc.UnitTests
             container.RegisterMany<Someberry>(Reuse.Singleton);
 
             var product = container.Resolve<IProduct>();
-            var productExpr = container.Resolve<FactoryExpression<IProduct>>();
+            //var productExpr = container.Resolve<FactoryExpression<IProduct>>();
 
             var berry = container.Resolve<ISome>();
-            var someExpr = container.Resolve<FactoryExpression<ISome>>();
+            //var someExpr = container.Resolve<FactoryExpression<ISome>>();
 
             Assert.That(product, Is.SameAs(berry));
         }

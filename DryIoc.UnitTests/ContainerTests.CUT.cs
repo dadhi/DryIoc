@@ -481,14 +481,34 @@ namespace DryIoc.UnitTests.CUT
             Log = log;
         }
     }
-    
+
+    public interface ILogger {}
+
+    public class FastLogger : ILogger
+    {
+        public string Log(string message)
+        {
+            return message;
+        }
+    }
+
+    public class Client
+    {
+        public ILogger Logger { get; set; }
+
+        public Client(ILogger logger)
+        {
+            Logger = logger;
+        }
+    }
+
     public class UseLogger1{
-		public ILogger Resolved {
+		public ILogger Logger {
 			get;
 			set;
 		}
 
-		public UseLogger1(ILogger logger){Resolved = logger;}
+		public UseLogger1(ILogger logger){Logger = logger;}
 	}
 	
 	public class UseLogger2{

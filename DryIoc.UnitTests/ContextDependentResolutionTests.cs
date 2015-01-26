@@ -28,88 +28,109 @@ namespace DryIoc.UnitTests
             Assert.That(c.Resolve<User2>().Logger, Is.InstanceOf<Logger<User2>>());
             Assert.That(c.Resolve<User1>().Logger, Is.InstanceOf<Logger<User1>>());
         }
-    }
 
-    #region CUT
-
-    public interface ILogger
-    {
-        string Log(string message);
-    }
-
-    public class Logger<T> : ILogger
-    {
-        public string Log(string message)
+        [Test, Ignore("Not implemented yet: Need to provide request into condition somehow")]
+        public void Can_select_what_factory_to_use_as_dependency_and_what_as_resolution_root()
         {
-            return typeof(T) + ": " + message;
-        }
-    }
+            var container = new Container();
+            container.Register<IX, A>(setup: Setup.With(condition: request => !request.IsEmpty));
+            container.Register<IX, B>(setup: Setup.With(condition: request => request.IsEmpty));
+            container.Register<Y>();
 
-    public class PlainLogger : ILogger
-    {
-        public string Log(string message)
+            var y = container.Resolve<Y>();
+            Assert.IsInstanceOf<B>(y.X);
+        }
+
+        internal interface IX { }
+        internal class A : IX { }
+        internal class B : IX { }
+        internal class Y
         {
-            return message;
+            public IX X;
+            public Y(IX x) { X = x; }
         }
-    }
 
-    public class FastLogger : ILogger
-    {
-        public string Log(string message)
+        #region CUT
+
+        public interface ILogger
         {
-            return message;
+            string Log(string message);
         }
-    }
 
-    public class Client
-    {
-        public ILogger Logger { get; set; }
-
-        public Client(ILogger logger)
+        public class Logger<T> : ILogger
         {
-            Logger = logger;
+            public string Log(string message)
+            {
+                return typeof(T) + ": " + message;
+            }
         }
-    }
 
-    public class ClientOfClient
-    {
-        public Client Client { get; set; }
-
-        public ClientOfClient(Client client)
+        public class PlainLogger : ILogger
         {
-            Client = client;
+            public string Log(string message)
+            {
+                return message;
+            }
         }
-    }
 
-    public class User1
-    {
-        public ILogger Logger { get; private set; }
-
-        public User1(ILogger logger)
+        public class FastLogger : ILogger
         {
-            Logger = logger;
+            public string Log(string message)
+            {
+                return message;
+            }
         }
-    }
 
-    public class User2
-    {
-        public ILogger Logger { get; set; }
-
-        public User2(ILogger logger)
+        public class Client
         {
-            Logger = logger;
+            public ILogger Logger { get; set; }
+
+            public Client(ILogger logger)
+            {
+                Logger = logger;
+            }
         }
-    }
 
-    public class StrUser
-    {
-        public string Dependency { get; private set; }
-
-        public StrUser(string dependency)
+        public class ClientOfClient
         {
-            Dependency = dependency;
-        }
-    }
+            public Client Client { get; set; }
 
-    #endregion
+            public ClientOfClient(Client client)
+            {
+                Client = client;
+            }
+        }
+
+        public class User1
+        {
+            public ILogger Logger { get; private set; }
+
+            public User1(ILogger logger)
+            {
+                Logger = logger;
+            }
+        }
+
+        public class User2
+        {
+            public ILogger Logger { get; set; }
+
+            public User2(ILogger logger)
+            {
+                Logger = logger;
+            }
+        }
+
+        public class StrUser
+        {
+            public string Dependency { get; private set; }
+
+            public StrUser(string dependency)
+            {
+                Dependency = dependency;
+            }
+        }
+
+        #endregion
+    }
 }

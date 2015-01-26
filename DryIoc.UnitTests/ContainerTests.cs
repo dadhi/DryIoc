@@ -329,25 +329,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [ExpectedException(typeof(ContainerException))]
-        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
-        public void ReRegister_dependency_of_singleton()
-        {
-            var c = new Container();
-            c.Register<ILogger, Logger1>();
-            c.Register<UseLogger1>(Reuse.Singleton);
-            var u11 = c.Resolve<UseLogger1>();
-
-            c.Register<UseLogger2>(Reuse.Singleton);
-            c.Register<ILogger, Logger2>();
-            var u12 = c.Resolve<UseLogger1>();
-            Assert.IsTrue(u11 == u12);
-            Assert.IsInstanceOf(typeof(Logger1), u12.Resolved);
-
-            c.Resolve<UseLogger2>();
-        }
-
-        [Test]
         [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_singleton()
         {
@@ -367,6 +348,34 @@ namespace DryIoc.UnitTests
             Assert.AreNotEqual(r1, r2);
             Assert.AreEqual(r2, r3);
             Assert.AreEqual(null, r2.Data);
+        }
+
+        [Test]
+        [Ignore("To be passed it should be way remove UseLogger1 expresssion and delegate cache, better in sync with Recycling")]
+        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        public void ReRegister_dependency_of_singleton()
+        {
+            var c = new Container();
+            c.Register<ILogger, Logger1>();
+            c.Register<UseLogger1>(Reuse.Singleton, setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable));
+            var u11 = c.Resolve<UseLogger1>();
+
+            c.Register<ILogger, Logger2>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            // It is a already resolved singleton,
+            // so it should not be affected by new ILogger registration.
+            // To change that, you may recycle singleton to re-create it with new ILogger.
+            var u12 = c.Resolve<UseLogger1>();      
+            Assert.AreSame(u11, u12);
+            Assert.IsInstanceOf<Logger1>(u12.Logger);
+
+            c.Resolve<ReuseRecyclable>(typeof(UseLogger1)).Recycle();
+            var u13 = c.Resolve<UseLogger1>();
+            Assert.AreNotSame(u12, u13);
+            Assert.IsInstanceOf<Logger2>(u13.Logger);
+
+            c.Register<UseLogger2>(Reuse.Singleton); // uses ILogger
+            c.Resolve<UseLogger2>();
         }
     }
 }
