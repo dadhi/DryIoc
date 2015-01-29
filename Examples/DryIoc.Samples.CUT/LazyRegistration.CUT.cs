@@ -2,6 +2,6 @@
 
 namespace DryIoc.Samples.CUT
 {
-    [ExportAll]
+    [ExportMany]
     public class SomeThing : IThing {}
 }

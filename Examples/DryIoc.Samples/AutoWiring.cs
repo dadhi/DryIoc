@@ -31,27 +31,18 @@ namespace DryIoc.Samples
         public void Convention_setup_example()
         {
             var container = new Container();
-
-            var implementingClasses =
-                Assembly.GetExecutingAssembly() // from current executing assembly, or you can select any other assembly
-                .GetTypes().Where(type =>
-                    type.IsPublic &&                    // get public types 
-                    !type.IsAbstract &&                 // which are not interfaces nor abstract
-                    type.GetInterfaces().Length != 0);  // which implementing some interface(s)
-
-            foreach (var implementingClass in implementingClasses)
+            container.RegisterMany(new[] { Assembly.GetExecutingAssembly() }, (r, types, type, proceed) =>
             {
-                if (implementingClass == typeof(AnotherPlugin))
-                {
-                    // Specific registration for some specific type
-                    container.Register(implementingClass, Reuse.Transient);
-                }
+                if (type == typeof(AnotherPlugin)) // custom registration of specific type
+                    r.Register<AnotherPlugin>(Reuse.Singleton);
                 else
-                {   // By default register type with all of its interfaces as services. 
-                    // Register with Singleton reuse.
-                    container.RegisterAll(implementingClass, Reuse.Singleton, whereServiceTypes: t => t.IsInterface);
-                }
-            }
+                    proceed(types, type);
+            });
+
+            var plugin = container.Resolve<IPlugin>(typeof(AnotherPlugin));
+            Assert.NotNull(plugin);
+            Assert.AreSame(plugin, container.Resolve<AnotherPlugin>());
+            Assert.AreEqual(2, container.Resolve<IPlugin[]>().Length);
         }
     }
 

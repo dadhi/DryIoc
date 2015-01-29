@@ -647,7 +647,7 @@ namespace DryIoc
                         if (i >= openGenericDecoratorIndex && decorator.Provider != null)
                         {
                             decorator = decorator.Provider.ProvideConcreteFactory(request);
-                            Register(decorator, serviceType, null, IfAlreadyRegistered.AppendDefault);
+                            Register(decorator, serviceType, null, IfAlreadyRegistered.AppendNotKeyed);
                         }
 
                         var decoratorExpr = request.StateCache.GetCachedFactoryExpressionOrDefault(decorator.FactoryID);
@@ -2026,7 +2026,7 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType, Factory factory,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
         }
@@ -2038,7 +2038,7 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void Register<TService>(this IRegistrator registrator, Factory factory,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
         }
@@ -2057,7 +2057,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         public static void Register(this IRegistrator registrator, Type serviceType, Type implementationType,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null, InjectionRules rules = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(implementationType, reuse, rules, setup);
@@ -2076,7 +2076,7 @@ namespace DryIoc
         public static void Register(this IRegistrator registrator,
             Type implementationAndServiceType, IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             InjectionRules rules = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(implementationAndServiceType, reuse, rules, setup);
@@ -2096,7 +2096,7 @@ namespace DryIoc
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             InjectionRules with = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
             where TImplementation : TService
         {
             with = (with ?? InjectionRules.Default).With(withConstructor);
@@ -2116,7 +2116,7 @@ namespace DryIoc
         public static void Register<TServiceAndImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
             InjectionRules with = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             with = (with ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, with, setup);
@@ -2134,22 +2134,19 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="implementationType">Service implementation type. Concrete and open-generic class are supported.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
         /// <param name="rules">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
-        /// <param name="whereServiceTypes">(optional) condition to include selected types only. Default value is <see cref="DefaultServiceTypesForRegisterMany"/></param>
+        /// <param name="whatServiceTypes">(optional) condition to include selected types only. Default value is <see cref="DefaultServiceTypesForRegisterMany"/></param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterMany(this IRegistrator registrator, Type implementationType,
-            IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
-            InjectionRules rules = null, FactorySetup setup = null, Func<Type, bool> whereServiceTypes = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            IReuse reuse = null, InjectionRules rules = null, FactorySetup setup = null, Func<Type, bool> whatServiceTypes = null,
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
-            rules = (rules ?? InjectionRules.Default).With(withConstructor);
             var factory = new ReflectionFactory(implementationType, reuse, rules, setup);
 
             var implementedTypes = implementationType.GetImplementedTypes(TypeTools.IncludeFlags.SourceType);
-            var serviceTypes = implementedTypes.Where(whereServiceTypes ?? DefaultServiceTypesForRegisterMany);
+            var serviceTypes = implementedTypes.Where(whatServiceTypes ?? DefaultServiceTypesForRegisterMany);
             if (implementationType.IsGenericDefinition())
             {
                 var implTypeArgs = implementationType.GetGenericParamsAndArgs();
@@ -2168,150 +2165,90 @@ namespace DryIoc
             Throw.If(!atLeastOneRegistered, Error.NO_SERVICE_TYPE_TO_REGISTER_ALL, implementationType, implementedTypes);
         }
 
-        //public sealed class RegisterManyConvention // TODO Use it instead of many parameters below
-        //{
-        //    public static readonly RegisterManyConvention Default = new RegisterManyConvention();
-
-        //    public RegisterManyConvention Of<TService>(IReuse reuse, InjectionRules rules = null, FactorySetup setup = null,
-        //        object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
-        //    {
-        //        return new RegisterManyConvention((r, st, it) => 
-        //        {
-        //            if (st == typeof(TService))
-        //                r.Register(st, it, reuse, null, rules, setup, named, ifAlreadyRegistered);
-        //            else 
-        //                _registration();
-        //        });
-        //    }
-
-        //    public static void RegisterAsTransientByDefault(IRegistrator r, Type serviceType, Type implementationType) 
-        //    {
-        //        return () => r.Register(serviceType, implementationType);
-        //    }
-
-        //    internal void Apply(IRegistrator r, Type serviceType, Type implementationType) 
-        //    {
-        //        _registration();
-        //    }
-
-        //    private readonly Action<IRegistrator, Type, Type> _registration; 
-
-        //    private RegisterManyConvention(Action<IRegistrator, Type, Type> registration = null)
-        //    {
-        //        _registration = registration ?? RegisterAsTransientByDefault;
-        //    }
-        //}
-
-        //public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> types, Func<RegisterManyConvention, RegisterManyConvention> convention = null)
-        //{
-        //    convention = convention ?? RegisterManyConvention.Default;
-
-        //    foreach (var implType in types))
-        //    {
-        //        if (implType.IsAbstract())
-        //            continue;
-
-        //        var serviceTypes = implType.GetImplementedTypes();
-        //        if (serviceTypes.IsNullOrEmpty()) // type does not implement anything, so may be resolved only as itself
-        //        {
-        //            if (implType.IsPublicOrNestedPublic())
-        //                convention.Apply();
-        //        }
-        //        else if (implType.IsGenericDefinition())
-        //        {
-        //            Factory factory = null; // single factory for many service types.
-        //            var implTypeArgs = implType.GetGenericParamsAndArgs();
-        //            foreach (var serviceType in serviceTypes
-        //                .Where(st => st.ContainsAllGenericTypeParameters(implTypeArgs))
-        //                .Select(st => st.GetGenericDefinitionOrNull()))
-        //                    registrator.Register(serviceType,
-        //                        factory ?? (factory = new ReflectionFactory(implType, reuse, setup: setup)),
-        //                        ifAlreadyRegistered: ifAlreadyRegistered);
-        //        }
-        //        else
-        //        {
-        //            Factory factory = null; // single factory for many service types.
-        //            for (var i = 0; i < serviceTypes.Length; ++i)
-        //            {
-        //                var serviceType = serviceTypes[i];
-        //                if (condition == null || condition(serviceType, implType))
-        //                    registrator.Register(serviceType,
-        //                        factory ?? (factory = new ReflectionFactory(implType, reuse, setup: setup)),
-        //                        ifAlreadyRegistered: ifAlreadyRegistered);
-        //            }
-        //        }
-        //        }
-        //    }
-        //}
-
-        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> types, Func<Type, Type, bool> condition = null,
-            IReuse reuse = null, FactorySetup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
-        {
-            foreach (var implType in types)
-            {
-                if (implType.IsAbstract())
-                    continue;
-
-                var serviceTypes = implType.GetImplementedTypes();
-                if (serviceTypes.IsNullOrEmpty()) // type does not implement anything, so may be resolved only as itself
-                {
-                    if (implType.IsPublicOrNestedPublic() &&
-                        (condition == null || condition(implType, implType))) // register concrete type
-                        registrator.Register(implType, implType,
-                            reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered);
-                    continue;
-                }
-
-                Factory factory = null; // single factory for many service types.
-                if (implType.IsGenericDefinition())
-                {
-                    var implTypeArgs = implType.GetGenericParamsAndArgs();
-                    foreach (var serviceType in serviceTypes
-                        .Where(st => st.ContainsAllGenericTypeParameters(implTypeArgs))
-                        .Select(st => st.GetGenericDefinitionOrNull()))
-                        if (condition == null || condition(serviceType, implType))
-                            registrator.Register(serviceType,
-                                factory ?? (factory = new ReflectionFactory(implType, reuse, setup: setup)),
-                                ifAlreadyRegistered: ifAlreadyRegistered);
-                }
-                else
-                {
-                    for (var i = 0; i < serviceTypes.Length; ++i)
-                    {
-                        var serviceType = serviceTypes[i];
-                        if (condition == null || condition(serviceType, implType))
-                            registrator.Register(serviceType,
-                                factory ?? (factory = new ReflectionFactory(implType, reuse, setup: setup)),
-                                ifAlreadyRegistered: ifAlreadyRegistered);
-                    }
-                }
-            }
-        }
-
-        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> assemblies, Func<Type, Type, bool> condition = null,
-            IReuse reuse = null, FactorySetup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
-        {
-            var types = assemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
-            registrator.RegisterMany(types, condition, reuse, setup, ifAlreadyRegistered);
-        }
-
-        /// <summary>Registers single registration for all implemented public interfaces and base classes.</summary>
+                /// <summary>Registers single registration for all implemented public interfaces and base classes.</summary>
         /// <typeparam name="TImplementation">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="withConstructor">(optional) strategy to select constructor when multiple available.</param>
         /// <param name="with">(optional) specifies <see cref="InjectionRules"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="types">(optional) condition to include selected types only. Default value is <see cref="DefaultServiceTypesForRegisterMany"/></param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterMany<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, Func<Type, ConstructorInfo> withConstructor = null,
-            InjectionRules with = null, FactorySetup setup = null, Func<Type, bool> types = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            IReuse reuse = null, InjectionRules with = null, FactorySetup setup = null, Func<Type, bool> types = null,
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
-            registrator.RegisterMany(typeof(TImplementation),
-                reuse, withConstructor, with, setup, types, named, ifAlreadyRegistered);
+            registrator.RegisterMany(typeof(TImplementation), reuse, with, setup, types, named, ifAlreadyRegistered);
+        }
+
+        public delegate void RegisterManyAction(IRegistrator r, Type[] validServiceTypes, Type implType, Action<Type[], Type> proceed);
+
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes, 
+            RegisterManyAction customAction = null)
+        {
+            Action<Type[], Type> proceed = (st, it) =>
+            {
+                var factory = new ReflectionFactory(it);
+                for (var i = 0; i < st.Length; i++)
+                    registrator.Register(st[i], factory);
+            };
+
+            foreach (var implType in implTypes)
+            {
+                if (implType.IsAbstract())
+                    continue;
+
+                var serviceTypes = implType.GetImplementedTypes();
+                Type[] validServiceTypes = null;
+                if (serviceTypes.IsNullOrEmpty()) 
+                {
+                    if (implType.IsPublicOrNestedPublic()) // type does not implement anything, so may be resolved only as itself
+                        validServiceTypes = new[] { implType };
+                }
+                else if (implType.IsGenericDefinition())
+                {
+                    var implTypeArgs = implType.GetGenericParamsAndArgs();
+                    validServiceTypes = serviceTypes
+                        .Where(t => t.ContainsAllGenericTypeParameters(implTypeArgs))
+                        .Select(t => t.GetGenericDefinitionOrNull())
+                        .ToArray();
+                }
+                else
+                {
+                    validServiceTypes = serviceTypes;
+                }
+
+                if (validServiceTypes.IsNullOrEmpty())
+                    continue;
+
+                if (customAction == null)
+                    proceed(validServiceTypes, implType);
+                else
+                    customAction(registrator, validServiceTypes, implType, proceed);
+            }
+        }
+
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies, 
+            RegisterManyAction customAction = null)
+        {
+            registrator.RegisterMany(implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly), customAction);
+        }
+
+        public static void RegisterMany(this IRegistrator registrator, Type serviceType, IEnumerable<Type> implTypes,
+            IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
+        {
+            registrator.RegisterMany(implTypes, (r, serviceTypes, implType, proceed) =>
+            {
+                if (serviceTypes.IndexOf(serviceType) != -1)
+                    r.Register(serviceType, implType, reuse, ifAlreadyRegistered: ifAlreadyRegistered);
+            });
+        }
+
+        public static void RegisterMany(this IRegistrator registrator, Type serviceType, IEnumerable<Assembly> assemblies,
+            IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
+        {
+            var implTypes = assemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
+            registrator.RegisterMany(serviceType, implTypes, reuse, ifAlreadyRegistered);
         }
 
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
@@ -2326,7 +2263,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterDelegate<TService>(this IRegistrator registrator,
             Func<IResolver, TService> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             var factory = new DelegateFactory(r => factoryDelegate(r), reuse, setup);
             registrator.Register(factory, typeof(TService), named, ifAlreadyRegistered);
@@ -2344,7 +2281,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterDelegate(this IRegistrator registrator, Type serviceType,
             Func<IResolver, object> factoryDelegate, IReuse reuse = null, FactorySetup setup = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             Func<IResolver, object> checkedDelegate = r => factoryDelegate(r)
                 .ThrowIfNotOf(serviceType, Error.REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, r);
@@ -2362,7 +2299,7 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterInstance<TService>(this IRegistrator registrator, TService instance, IReuse reuse = null,
-            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             var factory = reuse == null
                 ? (Factory)new InstanceFactory(instance, setup)
@@ -2379,7 +2316,7 @@ namespace DryIoc
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterInstance(this IRegistrator registrator, Type serviceType, object instance, IReuse reuse = null,
-            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendDefault)
+            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             var factory = reuse == null
                 ? (Factory)new InstanceFactory(instance, setup)
@@ -4507,7 +4444,7 @@ namespace DryIoc
                 if (implTypeArg == null) continue; // skip yet unknown type arg
 
                 var implTypeParam = implTypeParams[i];
-                var implTypeParamConstraints = implTypeParam.GetGenericParameterConstraints();
+                var implTypeParamConstraints = implTypeParam.GetGenericParamConstraints();
                 if (implTypeParamConstraints.IsNullOrEmpty()) continue; // skip case with no constraints
 
                 var constraintMatchFound = false;
@@ -5333,7 +5270,7 @@ namespace DryIoc
     public enum IfAlreadyRegistered
     {
         /// <summary>Appends new default registration or throws registration with the same key.</summary>
-        AppendDefault,
+        AppendNotKeyed,
         /// <summary>Throws if default or registration with the same key is already exist.</summary>
         Throw,
         /// <summary>Keeps old default or keyed registration ignoring new registration: ensures Register-Once semantics.</summary>
@@ -5987,7 +5924,7 @@ namespace DryIoc
                 if (genericParam == null)
                     continue;
 
-                var genericConstraints = genericParam.GetGenericParameterConstraints();
+                var genericConstraints = genericParam.GetGenericParamConstraints();
                 for (var j = 0; j < genericConstraints.Length; j++)
                 {
                     var genericConstraint = genericConstraints[j];
@@ -6044,11 +5981,19 @@ namespace DryIoc
             return type != null && type.GetTypeInfo().IsGenericType ? type.GetGenericTypeDefinition() : null;
         }
 
-        /// <summary>Return generic type parameters and arguments in order they specified. If type is not generic, returns empty array.</summary>
+        /// <summary>Returns generic type parameters and arguments in order they specified. If type is not generic, returns empty array.</summary>
         /// <param name="type">Source type.</param> <returns>Array of generic type arguments (closed/concrete types) and parameters (open).</returns>
         public static Type[] GetGenericParamsAndArgs(this Type type)
         {
             return Portable.GetGenericArguments(type);
+        }
+
+        /// <summary>Returns array of interface and base class constraints for provider generic parameter type.</summary>
+        /// <param name="type">Generic parameter type.</param>
+        /// <returns>Array of interface and base class constraints.</returns>
+        public static Type[] GetGenericParamConstraints(this Type type)
+        {
+            return type.GetTypeInfo().GetGenericParameterConstraints();
         }
 
         /// <summary>If type is array returns is element type, otherwise returns null.</summary>

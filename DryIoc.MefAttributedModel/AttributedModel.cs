@@ -114,7 +114,7 @@ namespace DryIoc.MefAttributedModel
             {
                 var export = registrationInfo.Exports[i];
                 registrator.Register(factory, export.ServiceType,
-                    export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendDefault);
+                    export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
             }
 
             if (registrationInfo.IsFactory)
@@ -274,9 +274,9 @@ namespace DryIoc.MefAttributedModel
         {
             var info = new RegistrationInfo { ImplementationType = implementationType, ReuseType = DefaultReuseType };
 
-            for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
+            for (var attrIndex = 0; attrIndex < attributes.Length; attrIndex++)
             {
-                var attribute = attributes[attributeIndex];
+                var attribute = attributes[attrIndex];
                 if (attribute is ExportAttribute)
                 {
                     info.Exports = GetExportsFromExportAttribute((ExportAttribute)attribute, info, implementationType);
@@ -382,11 +382,9 @@ namespace DryIoc.MefAttributedModel
         {
             Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
             resultInfo.FactoryType = FactoryType.Wrapper;
-            resultInfo.Wrapper = new WrapperInfo
-            {
-                WrappedServiceType = attribute.WrappedContractType,
-                WrappedServiceTypeGenericArgIndex = attribute.ContractTypeGenericArgIndex
-            };
+            resultInfo.Wrapper = new WrapperInfo { 
+                WrappedServiceType = attribute.WrappedContractType, 
+                WrappedServiceTypeGenericArgIndex = attribute.ContractTypeGenericArgIndex };
         }
 
         private static void PopulateDecoratorInfoFromAttribute(RegistrationInfo resultInfo, AsDecoratorAttribute attribute,
@@ -394,7 +392,10 @@ namespace DryIoc.MefAttributedModel
         {
             Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
             resultInfo.FactoryType = FactoryType.Decorator;
-            resultInfo.Decorator = new DecoratorInfo(attribute.ConditionType, attribute.ContractName ?? attribute.ContractKey);
+            resultInfo.Decorator = new DecoratorInfo {
+                DecoratedServiceConditionType = attribute.ConditionType,
+                DecoratedServiceKeyInfo = ServiceKeyInfo.Of(attribute.ContractName ?? attribute.ContractKey)
+            };
         }
 
         private static Attribute[] GetAllExportRelatedAttributes(Type type)
@@ -447,7 +448,7 @@ namespace DryIoc.MefAttributedModel
                 for (var i = 0; i < serviceExports.Length; i++)
                 {
                     var export = serviceExports[i];
-                    registrator.Register(serviceFactory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendDefault);
+                    registrator.Register(serviceFactory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
                 }
             }
         }
@@ -762,21 +763,40 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Describes <see cref="SetupWrapper"/> in serializable way.</summary>
     public sealed class WrapperInfo
     {
+        /// <summary>Concrete wrapped type for non generic wrapper</summary>
         public Type WrappedServiceType;
 
+        /// <summary>Index of wrapped type argument in open-generic wrapper.</summary>
         public int WrappedServiceTypeGenericArgIndex;
 
+        /// <summary>Creates Wrapper setup from this info.</summary> <returns>Setup.</returns>
         public SetupWrapper GetSetup()
         {
             return SetupWrapper.With(UnwrapServiceType);
         }
 
+        /// <summary>Used to compare wrappers info for equality.</summary> <param name="obj">Other info to compare.</param>
+        /// <returns>True if equal</returns>
         public override bool Equals(object obj)
         {
             var other = obj as WrapperInfo;
-            return other != null && other.WrappedServiceTypeGenericArgIndex == WrappedServiceTypeGenericArgIndex;
+            return other != null 
+                && other.WrappedServiceType == WrappedServiceType
+                && other.WrappedServiceTypeGenericArgIndex == WrappedServiceTypeGenericArgIndex;
         }
 
+        /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
+        /// <param name="code">Code to append to.</param> <returns>Code with appended info code.</returns>
+        public StringBuilder AppendAsCode(StringBuilder code = null)
+        {
+            return (code ?? new StringBuilder())
+                .Append(@"Wrapper = new WrapperInfo(")
+                .AppendType(WrappedServiceType).Append(", ")
+                .AppendObject(WrappedServiceTypeGenericArgIndex).Append(")");
+        }
+
+        /// <summary>Function to be used as delegate for unwrapping service type from wrapper using this info.</summary>
+        /// <param name="wrapperType">Source Wrapper to to unwrap.</param> <returns>Unwrapped service type.</returns>
         private Type UnwrapServiceType(Type wrapperType)
         {
             if (WrappedServiceType != null)
@@ -793,46 +813,48 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
+    /// <summary>Provides serializable info about Decorator setup.</summary>
     public sealed class DecoratorInfo
     {
-        public DecoratorInfo() { }
+        /// <summary>Type of condition to match decorated type.</summary>
+        public Type DecoratedServiceConditionType;
 
-        public DecoratorInfo(Type conditionType = null, object serviceKey = null)
-        {
-            ConditionType = conditionType;
-            ServiceKeyInfo = ServiceKeyInfo.Of(serviceKey);
-        }
+        /// <summary>Decorated service key info. Info wrapper is required for serialization.</summary>
+        public ServiceKeyInfo DecoratedServiceKeyInfo;
 
-        public Type ConditionType;
-        public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
-
+        /// <summary>Converts info to corresponding decorator setup.</summary>
+        /// <param name="lazyMetadata">(optional) Metadata that may be associated by decorator.</param> <returns>Setup.</returns>
         public SetupDecorator GetSetup(Func<object> lazyMetadata = null)
         {
-            if (ConditionType != null)
-                return SetupDecorator.With(((IDecoratorCondition)Activator.CreateInstance(ConditionType)).CanApply);
+            if (DecoratedServiceConditionType != null)
+                return SetupDecorator.With(((IDecoratorCondition)Activator.CreateInstance(DecoratedServiceConditionType)).Match);
 
-            if (ServiceKeyInfo != ServiceKeyInfo.Default || lazyMetadata != null)
+            if (DecoratedServiceKeyInfo != ServiceKeyInfo.Default || lazyMetadata != null)
                 return SetupDecorator.With(request =>
-                    (ServiceKeyInfo.Key == null || Equals(ServiceKeyInfo.Key, request.ServiceKey)) &&
+                    (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, request.ServiceKey)) &&
                     (lazyMetadata == null || Equals(lazyMetadata(), request.ResolvedFactory.Setup.Metadata)));
 
             return SetupDecorator.Default;
         }
 
+        /// <summary>Compares this info to other info for equality.</summary> <param name="obj">Other info to compare.</param>
+        /// <returns>true if equal.</returns>
         public override bool Equals(object obj)
         {
             var other = obj as DecoratorInfo;
             return other != null
-                && other.ConditionType == ConditionType
-                && Equals(other.ServiceKeyInfo.Key, ServiceKeyInfo.Key);
+                && other.DecoratedServiceConditionType == DecoratedServiceConditionType
+                && Equals(other.DecoratedServiceKeyInfo.Key, DecoratedServiceKeyInfo.Key);
         }
 
+        /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
+        /// <param name="code">Code to append to.</param> <returns>Code with appended info code.</returns>
         public StringBuilder AppendAsCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
                 .Append(@"Decorator = new DecoratorInfo(")
-                .AppendType(ConditionType).Append(", ")
-                .AppendObject(ServiceKeyInfo.Key).Append(")");
+                .AppendType(DecoratedServiceConditionType).Append(", ")
+                .AppendObject(DecoratedServiceKeyInfo.Key).Append(")");
         }
     }
 
@@ -978,19 +1000,26 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
+    /// <summary>Specifies that exported service is decorator of services of <see cref="ExportAttribute.ContractType"/>.</summary>
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class AsDecoratorAttribute : Attribute
     {
         /// <summary>If <see cref="ContractName"/> specified, it has more priority over <see cref="ContractKey"/>. </summary>
         public string ContractName { get; set; }
 
-        public object ContractKey { get; set; }
+        /// <summary>Is type assignable to <see cref="IDecoratorCondition"/> to create condition for matching decorated type.</summary>
         public Type ConditionType { get; set; }
+        
+        /// <summary>Contract key of decorated type.</summary>
+        public object ContractKey { get; set; }
     }
 
+    /// <summary>Applies to decorated service request.</summary>
     public interface IDecoratorCondition
     {
-        bool CanApply(Request request);
+        /// <summary>Returns true if decorated service specified by request is the one to be decorated.</summary>
+        /// <param name="request">Request of decorated service.</param> <returns>True if matched.</returns>
+        bool Match(Request request);
     }
 
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible"), AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property)]
@@ -1026,6 +1055,7 @@ namespace DryIoc.MefAttributedModel
 
         public readonly object Metadata;
     }
+
 
     [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property)]
     public class ImportExternalAttribute : Attribute

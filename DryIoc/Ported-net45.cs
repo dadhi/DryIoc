@@ -100,6 +100,7 @@ namespace System.Reflection
         public bool IsEnum { get { return _type.IsEnum; } }
 
         public Type GetElementType() { return _type.GetElementType(); }
+        public Type[] GetGenericParameterConstraints() { return _type.GetGenericParameterConstraints(); }
 
         public bool IsAssignableFrom(TypeInfo typeInfo) { return _type.IsAssignableFrom(typeInfo.AsType()); }
 

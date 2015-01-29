@@ -66,7 +66,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
         public class Condition : IDecoratorCondition
         {
-            public bool CanApply(Request request)
+            public bool Match(Request request)
             {
                 return request.ImplementationType == typeof(SlowHandler);
             }

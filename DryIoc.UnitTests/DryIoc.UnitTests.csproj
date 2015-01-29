@@ -48,6 +48,7 @@
     <Compile Include="IfUnresolvedTests.cs" />
     <Compile Include="InitializerTests.cs" />
     <Compile Include="NewTests.cs" />
+    <Compile Include="RegisterManyTests.cs" />
     <Compile Include="RequiredServiceTypeTests.cs" />
     <Compile Include="ResolveManyTests.cs" />
     <Compile Include="ReuseWrapperTests.cs" />
@@ -79,7 +80,6 @@
     <Compile Include="DecoratorConditionTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PropertyResolutionTests.cs" />
-    <Compile Include="RegisterAll.cs" />
     <Compile Include="ChildContainerTests.cs" />
     <Compile Include="ReuseInCurrentScopeTests.cs" />
     <Compile Include="ReuseTests.cs" />

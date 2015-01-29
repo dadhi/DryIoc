@@ -92,11 +92,11 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_register_generic_service_with_implementations_found_in_assemblies()
+        public void Can_register_generic_service_Only_with_its_implementations_found_in_assemblies()
         {
             var container = new Container();
 
-            container.RegisterMany(new[] { typeof(IBlah<,>).GetAssembly() }, (st, _) => st == typeof(IBlah<,>));
+            container.RegisterMany(typeof(IBlah<,>), new[] { typeof(IBlah<,>).GetAssembly() });
 
             var services = container.Resolve<IBlah<string, bool>[]>();
 
@@ -112,5 +112,21 @@ namespace DryIoc.UnitTests
         public interface IBlah<T0, T1> { }
         public class Blah<T0, T1> : IBlah<T0, T1> { }
         public class AnotherBlah<T> : IBlah<string, T> { }
+
+	    [Test]
+	    public void Can_register_something_from_assembly_as_singleton()
+	    {
+	        var container = new Container();
+
+	        container.RegisterMany(
+	            new[] { GetType().GetAssembly() },
+	            (r, serviceTypes, implType, proceed) => // for only A and its implementations
+	            {
+	                if (serviceTypes.IndexOf(typeof(A)) != -1)
+	                    r.Register(typeof(A), implType, Reuse.Singleton);
+	            });
+	    }
+
+	    internal class A {}
 	}
 }

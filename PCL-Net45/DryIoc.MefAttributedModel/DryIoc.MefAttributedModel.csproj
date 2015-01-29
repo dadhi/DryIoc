@@ -39,8 +39,8 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel\AttributedModel.cs">
       <Link>AttributedModel.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel\Polyfill-net40.cs">
-      <Link>Polyfill-net40.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel\Ported-net40.cs">
+      <Link>Ported-net40.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>

@@ -118,6 +118,6 @@ namespace DryIoc.Samples
 
     public interface IFrog {}
 
-    [ExportAll]
+    [ExportMany]
     class Frog : IFrog { }
 }

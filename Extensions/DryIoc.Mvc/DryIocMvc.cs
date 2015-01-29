@@ -68,11 +68,11 @@ namespace DryIoc.Mvc
             return container.WithMvc(controllerAssembliesProvider.SelectMany(Portable.GetTypesFromAssembly));
         }
 
-        public static IContainer WithMvc(this IContainer container, IEnumerable<Type> controllerTypesProvider)
+        public static IContainer WithMvc(this IContainer container, IEnumerable<Type> controllerTypes)
         {
             container = container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext());
 
-            container.RegisterMvcControllers(controllerTypesProvider);
+            container.RegisterMvcControllers(controllerTypes);
 
             container.SetFilterAttributeFilterProvider(FilterProviders.Providers);
 
@@ -81,10 +81,9 @@ namespace DryIoc.Mvc
             return container;
         }
 
-        public static void RegisterMvcControllers(this IContainer container, IEnumerable<Type> controllerTypesProvider)
+        public static void RegisterMvcControllers(this IContainer container, IEnumerable<Type> controllerTypes)
         {
-            //container.RegisterBatch<IController>(controllerTypesProvider.ThrowIfNull(), WebReuse.InRequest);
-            container.RegisterMany(controllerTypesProvider.ThrowIfNull(), _ => _.Of<IController>());
+            container.RegisterMany(typeof(IController), controllerTypes.ThrowIfNull(), WebReuse.InRequest);
         }
 
         public static void SetFilterAttributeFilterProvider(this IContainer container, Collection<IFilterProvider> filterProviders = null)

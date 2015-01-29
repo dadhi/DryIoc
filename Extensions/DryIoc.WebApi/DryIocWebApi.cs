@@ -56,7 +56,7 @@ namespace DryIoc.WebApi
 
         public static void RegisterHttpControllers(this IContainer container, IEnumerable<Type> controllerTypeProviders)
         {
-            container.RegisterBatch<IHttpController>(controllerTypeProviders.ThrowIfNull(), WebReuse.InRequest);
+            container.RegisterMany(typeof(IHttpController), controllerTypeProviders.ThrowIfNull(), WebReuse.InRequest);
         }
 
         public static void SetFilterProvider(this IContainer container, ServicesContainer services)
