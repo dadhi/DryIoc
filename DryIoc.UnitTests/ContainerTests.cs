@@ -350,8 +350,34 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(null, r2.Data);
         }
 
+        [Test][Ignore]
+        public void ReRegister_transient_with_key()
+        {
+            var c = new Container();
+            c.Register<ILogger, Logger1>(named: "a");
+            Assert.IsInstanceOf<Logger1>(c.Resolve<ILogger>("a"));
+
+            c.Register<ILogger, Logger2>(named: "a", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            Assert.IsInstanceOf<Logger2>(c.Resolve<ILogger>("a"));
+        }
+
         [Test]
-        [Ignore("To be passed it should be way remove UseLogger1 expresssion and delegate cache, better in sync with Recycling")]
+        [Ignore]
+        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        public void ReRegister_dependency_of_transient()
+        {
+            var c = new Container();
+            c.Register<ILogger, Logger1>();
+            c.Register<UseLogger1>();
+            var u11 = c.Resolve<UseLogger1>();
+            Assert.IsInstanceOf<Logger1>(u11.Logger);
+
+            c.Register<ILogger, Logger2>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            Assert.IsInstanceOf<Logger2>(u11.Logger);
+        }
+
+        [Test]
+        [Ignore("To be passed it should be way remove UseLogger1 expression and delegate cache, better in sync with Recycling")]
         [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_dependency_of_singleton()
         {

@@ -53,6 +53,10 @@
       <Name>DryIoc.Mvc</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\DryIoc.Web\DryIoc.Web.csproj">
+      <Project>{3af3b3b0-a5da-45d0-91c7-7a9e96716fab}</Project>
+      <Name>DryIoc.Web</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

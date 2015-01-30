@@ -7,7 +7,7 @@ namespace DryIoc.Web.UnitTests
     public class HttpContextScopeContextTests
     {
         [Test]
-        public void Can_open_scope_without_container_if_stateless_context()
+        public void Can_open_scope_without_container_for_stateless_context()
         {
             var fakeContextItems = new Dictionary<object, object>();
 

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using DryIoc.Web;
 using NUnit.Framework;
 
 namespace DryIoc.Mvc.UnitTests
@@ -9,7 +11,8 @@ namespace DryIoc.Mvc.UnitTests
         [Test]
         public void Working_with_HttpContext_based_scope_context()
         {
-            var root = new Container(scopeContext: new HttpContextScopeContext());
+            var fakeItems = new Dictionary<object, object>();
+            var root = new Container(scopeContext: new HttpContextScopeContext(() => fakeItems));
             root.Register<SomeRoot>(WebReuse.InRequest);
             root.Register<SomeDep>(WebReuse.InRequest);
 

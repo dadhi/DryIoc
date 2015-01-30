@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Web;
 using NUnit.Framework;
@@ -8,6 +9,30 @@ namespace DryIoc.Web.UnitTests
     [TestFixture]
     public class DryIocWebTests
     {
+        [Test]
+        public void Can_create_container_with_HttpContext_reuse_context()
+        {
+            var original = new Container();
+
+            var fakeItems = new Dictionary<object, object>();
+            var container = original.WithWebReuseInRequest(() => fakeItems);
+            
+            container.Register<Me>(WebReuse.InRequest);
+            using (var c = container.OpenScope())
+            {
+                var me = container.Resolve<Me>();
+                Assert.AreSame(me, container.Resolve<Me>());
+
+                using (c.OpenScope())
+                    Assert.AreSame(me, container.Resolve<Me>());
+            }
+
+            Assert.AreEqual(Error.NO_CURRENT_SCOPE,
+                Assert.Throws<ContainerException>(() => container.Resolve<Me>()).Error);
+        }
+
+        internal class Me {}
+
         [Test]
         public void Can_init_module_initializer_without_errors()
         {
@@ -29,9 +54,19 @@ namespace DryIoc.Web.UnitTests
             app.RaiseBeginRequest();
             app.RaiseEndRequest();
         }
+
+        [Test]
+        public void Disposing_module_does_nothing_and_does_not_throw()
+        {
+            IHttpModule module = new DryIocHttpModule();
+            var app = new FakeHttpApplication(module);
+            app.RaiseBeginRequest();
+            app.RaiseEndRequest();
+            module.Dispose();
+        }
     }
 
-    public class FakeHttpApplication : HttpApplication
+    internal class FakeHttpApplication : HttpApplication
     {
         public FakeHttpApplication(IHttpModule httpModule)
         {
@@ -43,7 +78,9 @@ namespace DryIoc.Web.UnitTests
         {
             var httpRequest = new HttpRequest(default(string), "http://ignored.net", default(string));
             var httpResponse = new HttpResponse(default(TextWriter));
+            
             HttpContext.Current = new HttpContext(httpRequest, httpResponse);
+            _appContextInfo.SetValue(this, HttpContext.Current);
 
             Events[_eventBeginRequest].ThrowIfNull().DynamicInvoke(this, null);
         }
@@ -63,6 +100,9 @@ namespace DryIoc.Web.UnitTests
         private static readonly object 
             _eventBeginRequest = typeof(HttpApplication).GetField("EventBeginRequest", BindingFlags.NonPublic | BindingFlags.Static).ThrowIfNull().GetValue(null),
             _eventEndRequestKey = typeof(HttpApplication).GetField("EventEndRequest", BindingFlags.NonPublic | BindingFlags.Static).ThrowIfNull().GetValue(null);
+
+        private static readonly FieldInfo 
+            _appContextInfo = typeof(HttpApplication).GetField("_context", BindingFlags.Instance | BindingFlags.NonPublic).ThrowIfNull();
 
         private readonly IHttpModule _httpModule;
     }

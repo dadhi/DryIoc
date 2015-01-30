@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -96,7 +97,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterMany(typeof(IBlah<,>), new[] { typeof(IBlah<,>).GetAssembly() });
+            container.RegisterMany(new[] { typeof(IBlah<,>).GetAssembly() }, typeof(IBlah<,>));
 
             var services = container.Resolve<IBlah<string, bool>[]>();
 
@@ -128,5 +129,36 @@ namespace DryIoc.UnitTests
 	    }
 
 	    internal class A {}
+
+	    [Test]
+	    public void Register_many_should_skip_Compiler_generated_classes()
+	    {
+	        var container = new Container();
+
+	        container.RegisterMany(new[] { GetType().GetAssembly()}, (registrator, types, type, proceed) =>
+	        {
+                Assert.False(type.FullName.Contains("DisplayClass"));
+	        });
+	    }
+
+        internal class MyClass
+        {
+            public string Message;
+
+            public void Handle(string message)
+            {
+                Message = message;
+            }
+        }
+
+        internal class MyHandler
+        {
+            public Action Handler { get; private set; }
+
+            public MyHandler(MyClass handler)
+            {
+                Handler = () => handler.Handle("Nope!");
+            }
+        }
 	}
 }

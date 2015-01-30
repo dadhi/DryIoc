@@ -29,26 +29,29 @@ namespace DryIoc.Mvc
     using System.Collections.ObjectModel;
     using System.Linq;
     using System.Reflection;
-    using System.Web;
+    using System.Runtime.InteropServices;
     using System.Web.Mvc;
     using System.Web.Compilation;
+    using Web;
 
     /// <summary>
     /// <example> <code lang="cs"><![CDATA[
     /// protected void Application_Start()
     /// {
-    ///     var container = new Container().WithMvcSupport(typeof(MyMvcApp).Assembly);
+    ///     var container = new Container().WithMvc();
     ///     
     ///     // Optionally enable support for MEF Export/ImportAttribute with DryIoc.MefAttributedModel package. 
     ///     // container = container.WithMefAttributedModel();
-    ///     // container.RegisterExports(typeof(MyMvcApp).Assembly);
+    ///     // container.RegisterExports(new[] { typeof(MyMvcApp).Assembly });
     /// 
-    ///     // If required register additional services to container here ...
+    ///     // Additional registrations go here ...
     /// }
     /// ]]></code></example>
     /// </summary>
     public static class DryIocMvc
     {
+        /// <summary>Returns all referenced assemblies except from GAC and dynamic.</summary>
+        /// <returns>Assemblies.</returns>
         public static IEnumerable<Assembly> GetReferencedAssemblies()
         {
             return BuildManager.GetReferencedAssemblies().OfType<Assembly>()
@@ -60,19 +63,13 @@ namespace DryIoc.Mvc
         /// sets <see cref="DryIocAggregatedFilterAttributeFilterProvider"/> as filter provider,
         /// and at last sets container as <see cref="DependencyResolver"/>.</summary>
         /// <param name="container">Original container.</param>
-        /// <param name="controllerAssembliesProvider">(optional) By default uses <see cref="GetReferencedAssemblies"/>.</param>
+        /// <param name="controllerAssemblies">(optional) By default uses <see cref="GetReferencedAssemblies"/>.</param>
         /// <returns>New container with applied Web context.</returns>
-        public static IContainer WithMvc(this IContainer container, IEnumerable<Assembly> controllerAssembliesProvider = null)
-        {
-            controllerAssembliesProvider = controllerAssembliesProvider ?? GetReferencedAssemblies();
-            return container.WithMvc(controllerAssembliesProvider.SelectMany(Portable.GetTypesFromAssembly));
-        }
-
-        public static IContainer WithMvc(this IContainer container, IEnumerable<Type> controllerTypes)
+        public static IContainer WithMvc(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             container = container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext());
 
-            container.RegisterMvcControllers(controllerTypes);
+            container.RegisterMvcControllers(controllerAssemblies);
 
             container.SetFilterAttributeFilterProvider(FilterProviders.Providers);
 
@@ -81,11 +78,19 @@ namespace DryIoc.Mvc
             return container;
         }
 
-        public static void RegisterMvcControllers(this IContainer container, IEnumerable<Type> controllerTypes)
+        /// <summary>Registers controllers types in container with <see cref="WebReuse.InRequest"/> reuse.</summary>
+        /// <param name="container">Container to register controllers to.</param>
+        /// <param name="controllerAssemblies">(optional) Uses <see cref="GetReferencedAssemblies"/> by default.</param>
+        public static void RegisterMvcControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
-            container.RegisterMany(typeof(IController), controllerTypes.ThrowIfNull(), WebReuse.InRequest);
+            controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
+            container.RegisterMany(controllerAssemblies, typeof(IController), WebReuse.InRequest);
         }
 
+        /// <summary>Replaces default Filter Providers with instance of <see cref="DryIocAggregatedFilterAttributeFilterProvider"/>,
+        /// add in addition registers aggregated filter to container..</summary>
+        /// <param name="container">Container to register to.</param>
+        /// <param name="filterProviders">Original filter providers.</param>
         public static void SetFilterAttributeFilterProvider(this IContainer container, Collection<IFilterProvider> filterProviders = null)
         {
             filterProviders = filterProviders ?? FilterProviders.Providers;
@@ -121,7 +126,8 @@ namespace DryIoc.Mvc
         private readonly IResolver _resolver;
     }
 
-    internal class DryIocAggregatedFilterAttributeFilterProvider : FilterAttributeFilterProvider
+    [ComVisible(false)]
+    public class DryIocAggregatedFilterAttributeFilterProvider : FilterAttributeFilterProvider
     {
         public DryIocAggregatedFilterAttributeFilterProvider(IResolver resolver)
         {
@@ -137,42 +143,5 @@ namespace DryIoc.Mvc
         }
 
         private readonly IResolver _resolver;
-    }
-
-    public static class WebReuse
-    {
-        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
-    }
-
-    public sealed class HttpContextScopeContext : IScopeContext
-    {
-        public static readonly object ROOT_SCOPE_NAME = typeof(HttpContextScopeContext);
-
-        public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
-
-        public IScope GetCurrentOrDefault()
-        {
-            var httpContext = HttpContext.Current;
-            return httpContext == null ? _fallbackScope : (IScope)httpContext.Items[ROOT_SCOPE_NAME];
-        }
-
-        public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
-        {
-            var currentOrDefault = GetCurrentOrDefault();
-            var newScope = getNewCurrentScope.ThrowIfNull().Invoke(currentOrDefault);
-            var httpContext = HttpContext.Current;
-            if (httpContext == null)
-            {
-                _fallbackScope = newScope;
-            }
-            else
-            {
-                httpContext.Items[ROOT_SCOPE_NAME] = newScope;
-                _fallbackScope = null;
-            }
-            return newScope;
-        }
-
-        private IScope _fallbackScope;
     }
 }

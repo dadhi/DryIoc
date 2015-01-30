@@ -32,6 +32,7 @@ namespace DryIoc
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using System.Runtime.CompilerServices;
     using System.Text;
     using System.Threading;
 
@@ -882,6 +883,10 @@ namespace DryIoc
                                     return oldFactory;
 
                                 case IfAlreadyRegistered.Replace:
+                                    newFactory.FactoryID = oldFactory.FactoryID; // Register factory with the same ID as the old one.
+                                    _resolutionStateCache.CacheFactoryExpression(oldFactory.FactoryID, null);
+                                    //_keyedFactoryDelegatesCache.Swap(cache => cache.Update(serviceType, HashTree<object, FactoryDelegate>.Empty,
+                                    //    ))
                                     return newFactory;
 
                                 //case IfAlreadyRegistered.Throw:
@@ -2181,9 +2186,9 @@ namespace DryIoc
             registrator.RegisterMany(typeof(TImplementation), reuse, with, setup, types, named, ifAlreadyRegistered);
         }
 
-        public delegate void RegisterManyAction(IRegistrator r, Type[] validServiceTypes, Type implType, Action<Type[], Type> proceed);
+        public delegate void RegisterManyAction(IRegistrator r, Type[] serviceTypes, Type implType, Action<Type[], Type> proceed);
 
-        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes, 
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes,
             RegisterManyAction customAction = null)
         {
             Action<Type[], Type> proceed = (st, it) =>
@@ -2195,7 +2200,8 @@ namespace DryIoc
 
             foreach (var implType in implTypes)
             {
-                if (implType.IsAbstract())
+                if (implType.IsAbstract() ||
+                    implType.GetAttributes().IndexOf(a => a is CompilerGeneratedAttribute) != -1)
                     continue;
 
                 var serviceTypes = implType.GetImplementedTypes();
@@ -2231,12 +2237,14 @@ namespace DryIoc
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies, 
             RegisterManyAction customAction = null)
         {
-            registrator.RegisterMany(implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly), customAction);
+            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
+            registrator.RegisterMany(implTypes, customAction);
         }
 
-        public static void RegisterMany(this IRegistrator registrator, Type serviceType, IEnumerable<Type> implTypes,
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes, Type serviceType, 
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
+            serviceType.ThrowIfNull();
             registrator.RegisterMany(implTypes, (r, serviceTypes, implType, proceed) =>
             {
                 if (serviceTypes.IndexOf(serviceType) != -1)
@@ -2244,11 +2252,11 @@ namespace DryIoc
             });
         }
 
-        public static void RegisterMany(this IRegistrator registrator, Type serviceType, IEnumerable<Assembly> assemblies,
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies, Type serviceType, 
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
-            var implTypes = assemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
-            registrator.RegisterMany(serviceType, implTypes, reuse, ifAlreadyRegistered);
+            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
+            registrator.RegisterMany(implTypes, serviceType, reuse, ifAlreadyRegistered);
         }
 
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
@@ -3574,7 +3582,7 @@ namespace DryIoc
                 // then reused instance could be directly inserted into delegate instead of lazy requested from Scope.
                 var canBeInstantiated = reuse is SingletonReuse && request.Container.Rules.SingletonOptimization
                     && (request.Parent.IsEmpty || !request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc()))
-                    && Setup.ReuseWrappers.IndexOf(w => w.IsAssignableTo(typeof(IRecyclable))) == -1;
+                    && Setup.ReuseWrappers.IndexOf(t => t.IsAssignableTo(typeof(IRecyclable))) == -1;
 
                 serviceExpr = canBeInstantiated
                     ? GetInstantiatedScopedServiceExpressionOrDefault(serviceExpr, reuse, request, reuseWrapperType)
@@ -4725,6 +4733,15 @@ namespace DryIoc
         /// Make it predictable by removing any side effects.</remarks>
         /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
         IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope);
+    }
+
+    public static class ScopeContext
+    {
+        public static IScope OpenScope(this IScopeContext context, Func<IScope, IScope> getScope = null)
+        {
+            getScope = getScope ?? (parent => new Scope(parent, context.RootScopeName));
+            return context.SetCurrent(getScope);
+        }
     }
 
     /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
@@ -6098,11 +6115,14 @@ namespace DryIoc
         /// <summary>Enumerates all constructors from input type.</summary>
         /// <param name="type">Input type.</param>
         /// <param name="includeNonPublic">(optional) If set include non-public constructors into result.</param>
+        /// <param name="includeStatic">(optional) Turned off by default.</param>
         /// <returns>Enumerated constructors.</returns>
-        public static IEnumerable<ConstructorInfo> GetAllConstructors(this Type type, bool includeNonPublic = false)
+        public static IEnumerable<ConstructorInfo> GetAllConstructors(this Type type, bool includeNonPublic = false, bool includeStatic = false)
         {
-            var all = type.GetTypeInfo().DeclaredConstructors;
-            return includeNonPublic ? all : all.Where(c => c.IsPublic);
+            var ctors = type.GetTypeInfo().DeclaredConstructors;
+            if (!includeNonPublic) ctors = ctors.Where(c => c.IsPublic);
+            if (!includeStatic) ctors = ctors.Where(c => !c.IsStatic);
+            return ctors;
         }
 
         /// <summary>Searches and returns constructor by its signature.</summary>

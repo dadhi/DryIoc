@@ -161,7 +161,32 @@ namespace DryIoc.UnitTests
             Assert.That(ex.Message, Is.StringContaining("SomeService is not assignable from factory method"));
         }
 
+        [Test]
+        public void Test()
+        {
+            var container = new Container();
+            container.Register<WithStaticCtor>();
+
+            var service = container.Resolve<WithStaticCtor>();
+
+            Assert.NotNull(service);
+        }
+
         #region CUT
+
+        internal class WithStaticCtor
+        {
+            public static int Hey;
+            static WithStaticCtor()
+            {
+                ++Hey;
+            }
+
+            public WithStaticCtor()
+            {
+                --Hey;
+            }
+        }
 
         internal interface IService 
         {

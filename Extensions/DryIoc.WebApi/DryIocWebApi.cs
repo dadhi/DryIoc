@@ -36,27 +36,24 @@ namespace DryIoc.WebApi
 
     internal static class DryIocWebApi
     {
-        public static IContainer WithWebApi(this IContainer container, HttpConfiguration httpConfiguration, IEnumerable<Assembly> controllerAssembliesProvider)
-        {
-            return container.WithWebApi(httpConfiguration, controllerAssembliesProvider.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly));
-        }
-
-        public static IContainer WithWebApi(this IContainer container, HttpConfiguration httpConfiguration, IEnumerable<Type> controllerTypesProvider)
+        public static IContainer WithWebApi(this IContainer container, HttpConfiguration config,
+            IEnumerable<Assembly> controllerAssemblies = null)
         {
             container = container.ThrowIfNull().With(scopeContext: new ExecutionFlowScopeContext());
 
-            container.RegisterHttpControllers(controllerTypesProvider);
+            container.RegisterHttpControllers(controllerAssemblies);
 
-            container.SetFilterProvider(httpConfiguration.Services);
+            container.SetFilterProvider(config.Services);
 
-            httpConfiguration.DependencyResolver = new DryIocDependencyResolver(container);
+            config.DependencyResolver = new DryIocDependencyResolver(container);
 
             return container;
         }
 
-        public static void RegisterHttpControllers(this IContainer container, IEnumerable<Type> controllerTypeProviders)
+        public static void RegisterHttpControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
-            container.RegisterMany(typeof(IHttpController), controllerTypeProviders.ThrowIfNull(), WebReuse.InRequest);
+            controllerAssemblies = controllerAssemblies ?? new[] { Assembly.GetExecutingAssembly() };
+            container.RegisterMany(controllerAssemblies, typeof(IHttpController), WebReuse.InRequest);
         }
 
         public static void SetFilterProvider(this IContainer container, ServicesContainer services)
@@ -65,7 +62,7 @@ namespace DryIoc.WebApi
             services.RemoveAll(typeof(IFilterProvider), _ => true);
             var filterProvider = new DryIocAggregatedFilterProvider(container, providers);
             services.Add(typeof(IFilterProvider), filterProvider);
-            
+
             container.RegisterInstance<IFilterProvider>(filterProvider);
         }
     }
@@ -83,12 +80,12 @@ namespace DryIoc.WebApi
             _container.Dispose();
             _container = null;
         }
-        
+
         public object GetService(Type serviceType)
         {
             return _container.Resolve(serviceType, IfUnresolved.ReturnDefault);
         }
-          
+
         public IEnumerable<object> GetServices(Type serviceType)
         {
             return _container.ResolveMany<object>(serviceType);
@@ -116,12 +113,12 @@ namespace DryIoc.WebApi
             _scopedContainer = null;
         }
 
-           
+
         public object GetService(Type serviceType)
         {
             return _scopedContainer.Resolve(serviceType, IfUnresolved.ReturnDefault);
         }
-          
+
         public IEnumerable<object> GetServices(Type serviceType)
         {
             return _scopedContainer.ResolveMany<object>(serviceType);

@@ -92,7 +92,7 @@ namespace DryIoc.MefAttributedModel
             registrator.RegisterExports(Scan(assemblyProvider));
         }
 
-        /// <summary>Registers new factories into registrator/container based on provided registration infos, which
+        /// <summary>Registers new factories into registrator/container based on provided registration info's, which
         /// is serializable DTO for registration.</summary>
         /// <param name="registrator">Container to register into.</param>
         /// <param name="infos">Registrations to register.</param>
