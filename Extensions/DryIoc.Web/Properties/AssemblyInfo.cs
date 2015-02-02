@@ -2,11 +2,11 @@
 using System.Runtime.CompilerServices;
 
 [assembly: AssemblyTitle("DryIoc.Web")]
-[assembly: AssemblyDescription("ASP.NET Extension for DryIoc providing InRequest scope and infrastructure")]
+[assembly: AssemblyDescription("DryIoc extension for ASP.NET providing Web Request Reuse")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc")]
-[assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
+[assembly: AssemblyCopyright("Copyright © 2014 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

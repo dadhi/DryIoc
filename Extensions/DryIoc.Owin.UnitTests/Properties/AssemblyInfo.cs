@@ -3,11 +3,11 @@
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("DryIoc.WebApi.UnitTests")]
+[assembly: AssemblyTitle("DryIoc.Owin.UnitTests")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("DryIoc.WebApi.UnitTests")]
+[assembly: AssemblyProduct("DryIoc.Owin.UnitTests")]
 [assembly: AssemblyCopyright("Copyright © 2014 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

@@ -288,6 +288,24 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(container.SingletonScope.DisposingExceptions.OfType<DivideByZeroException>().Any());
         }
 
+        [Test]
+        public void Disposing_container_should_dispose_the_resolved_singleton()
+        {
+            var container = new Container();
+            container.Register<SomethingDisposable>(Reuse.Singleton);
+
+            var service = container.Resolve<SomethingDisposable>();
+
+            container.Dispose();
+            Assert.IsTrue(service.IsDisposed);
+        }
+
+        internal class SomethingDisposable : IDisposable
+        {
+            public bool IsDisposed;
+            public void Dispose() { IsDisposed = true; }
+        }
+
         internal class A : IDisposable {
             public void Dispose()
             {

@@ -65,7 +65,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var rules = configure == null ? Rules : configure(Rules);
             scopeContext = scopeContext ?? _scopeContext;
-            return new Container(rules, _factories, _decorators, _wrappers, _singletonScope, scopeContext, _openedScope, _disposed);
+            return new Container(rules, _serviceFactories, _decoratorFactories, _wrapperFactories, _singletonScope, scopeContext, _openedScope, _disposed);
         }
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
@@ -75,7 +75,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return new Container(Rules,
-                _factories, _decorators, _wrappers, _singletonScope, _scopeContext, _openedScope, _disposed /*drop cache*/);
+                _serviceFactories, _decoratorFactories, _wrapperFactories, _singletonScope, _scopeContext, _openedScope, _disposed /*drop cache*/);
         }
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
@@ -85,7 +85,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return new Container(Rules,
-                _factories, _decorators, _wrappers, null/*singletonScope*/, _scopeContext, _openedScope, _disposed /*drop cache*/);
+                _serviceFactories, _decoratorFactories, _wrapperFactories, null/*singletonScope*/, _scopeContext, _openedScope, _disposed /*drop cache*/);
         }
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
@@ -96,14 +96,14 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return preserveCache
-                ? new Container(Rules, Ref.Of(_factories.Value), Ref.Of(_decorators.Value), Ref.Of(_wrappers.Value),
+                ? new Container(Rules, Ref.Of(_serviceFactories.Value), Ref.Of(_decoratorFactories.Value), Ref.Of(_wrapperFactories.Value),
                     _singletonScope, _scopeContext, _openedScope, _disposed)
-                : new Container(Rules, Ref.Of(_factories.Value), Ref.Of(_decorators.Value), Ref.Of(_wrappers.Value),
+                : new Container(Rules, Ref.Of(_serviceFactories.Value), Ref.Of(_decoratorFactories.Value), Ref.Of(_wrapperFactories.Value),
                     _singletonScope, _scopeContext, _openedScope, _disposed,
                     _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionStateCache);
         }
 
-        /// <summary>Creates new container with new opened scope and set this scope as current in provided/inherited context.</summary>
+        /// <summary>Creates new container with new opened scope and set this scope as current in ambient scope context.</summary>
         /// <param name="scopeName">(optional) Name for opened scope to allow reuse to identify the scope.</param>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
         /// <returns>New container with different current scope.</returns>
@@ -127,7 +127,7 @@ namespace DryIoc
 
             var rules = configure == null ? Rules : configure(Rules);
             return new Container(rules,
-                _factories, _decorators, _wrappers, _singletonScope, _scopeContext, nestedOpenedScope,
+                _serviceFactories, _decoratorFactories, _wrapperFactories, _singletonScope, _scopeContext, nestedOpenedScope,
                 _disposed, _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionStateCache);
         }
 
@@ -198,9 +198,9 @@ namespace DryIoc
 
             _singletonScope.Dispose();
 
-            _factories.Swap(_ => HashTree<Type, object>.Empty);
-            _decorators.Swap(_ => HashTree<Type, Factory[]>.Empty);
-            _wrappers.Swap(_ => HashTree<Type, Factory>.Empty);
+            _serviceFactories.Swap(_ => HashTree<Type, object>.Empty);
+            _decoratorFactories.Swap(_ => HashTree<Type, Factory[]>.Empty);
+            _wrapperFactories.Swap(_ => HashTree<Type, Factory>.Empty);
 
             _defaultFactoryDelegatesCache = Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
             _keyedFactoryDelegatesCache = Ref.Of(HashTree<Type, HashTree<object, FactoryDelegate>>.Empty);
@@ -226,6 +226,26 @@ namespace DryIoc
 
         #region IRegistrator
 
+        /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
+        /// <returns>Existing registrations.</returns>
+        /// <remarks>Decorator and Wrapper types are not included.</remarks>
+        public IEnumerable<ServiceTypeKeyFactory> GetServiceRegistrations()
+        {
+            foreach (var factoryEntry in _serviceFactories.Value.Enumerate())
+            {
+                var serviceType = factoryEntry.Key;
+                var factory = factoryEntry.Value as Factory;
+                if (factory != null)
+                    yield return new ServiceTypeKeyFactory { Type = serviceType, Factory = factory };
+                else
+                {
+                    var factories = ((FactoriesEntry)factoryEntry.Value).Factories;
+                    foreach (var f in factories.Enumerate())
+                        yield return new ServiceTypeKeyFactory { Type = serviceType, OptionalKey = f.Key, Factory = f.Value };
+                }
+            }
+        }
+
         /// <summary>Stores factory into container using <paramref name="serviceType"/> and <paramref name="serviceKey"/> as key
         /// for later lookup.</summary>
         /// <param name="factory">Any subtypes of <see cref="Factory"/>.</param>
@@ -246,9 +266,9 @@ namespace DryIoc
             switch (factory.FactoryType)
             {
                 case FactoryType.Decorator:
-                    _decorators.Swap(x => x.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append)); break;
+                    _decoratorFactories.Swap(x => x.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append)); break;
                 case FactoryType.Wrapper:
-                    _wrappers.Swap(x => x.AddOrUpdate(serviceType, factory)); break;
+                    _wrapperFactories.Swap(x => x.AddOrUpdate(serviceType, factory)); break;
                 default:
                     AddOrUpdateServiceFactory(factory, serviceType, serviceKey, ifAlreadyRegistered); break;
             }
@@ -272,7 +292,7 @@ namespace DryIoc
                     return wrapper != null && (condition == null || condition(wrapper));
 
                 case FactoryType.Decorator:
-                    var decorators = _decorators.Value.GetValueOrDefault(serviceType);
+                    var decorators = _decoratorFactories.Value.GetValueOrDefault(serviceType);
                     return decorators != null && decorators.Length != 0
                         && (condition == null || decorators.Any(condition));
 
@@ -300,7 +320,7 @@ namespace DryIoc
             switch (factoryType)
             {
                 case FactoryType.Wrapper:
-                    _wrappers.Swap(_ => _.Update(serviceType, null, (factory, _null) =>
+                    _wrapperFactories.Swap(_ => _.Update(serviceType, null, (factory, _null) =>
                     {
                         if (factory != null && condition != null && !condition(factory))
                             return factory;
@@ -309,7 +329,7 @@ namespace DryIoc
                     }));
                     break;
                 case FactoryType.Decorator:
-                    _decorators.Swap(_ => _.Update(serviceType, null, (factories, _null) =>
+                    _decoratorFactories.Swap(_ => _.Update(serviceType, null, (factories, _null) =>
                     {
                         var remaining = condition == null ? null : factories.Where(f => !condition(f)).ToArray();
                         removed = remaining == null || remaining.Length == 0 ? factories : factories.Except(remaining).ToArray();
@@ -329,13 +349,13 @@ namespace DryIoc
         {
             object removed = null;
             if (serviceKey == null && condition == null) // simplest case with simplest handling
-                _factories.Swap(_ => _.Update(serviceType, null, (entry, _null) =>
+                _serviceFactories.Swap(_ => _.Update(serviceType, null, (entry, _null) =>
                 {
                     removed = entry;
                     return null;
                 }));
             else
-                _factories.Swap(_ => _.Update(serviceType, null, (entry, _null) =>
+                _serviceFactories.Swap(_ => _.Update(serviceType, null, (entry, _null) =>
                 {
                     if (entry == null)
                         return null;
@@ -596,9 +616,9 @@ namespace DryIoc
 
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType)
         {
-            var entry = _factories.Value.GetValueOrDefault(serviceType);
+            var entry = _serviceFactories.Value.GetValueOrDefault(serviceType);
             if (entry == null && serviceType.IsClosedGeneric())
-                entry = _factories.Value.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
+                entry = _serviceFactories.Value.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
 
             return entry == null ? Enumerable.Empty<KV<object, Factory>>()
                 : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Value, (Factory)entry) }
@@ -608,7 +628,7 @@ namespace DryIoc
         Expression IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
             // Stop if no decorators registered.
-            var decorators = _decorators.Value;
+            var decorators = _decoratorFactories.Value;
             if (decorators.IsEmpty)
                 return null;
 
@@ -689,9 +709,9 @@ namespace DryIoc
         {
             Factory factory = null;
             if (serviceType.IsGeneric())
-                factory = _wrappers.Value.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
+                factory = _wrapperFactories.Value.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
             if (factory == null && !serviceType.IsGenericDefinition())
-                factory = _wrappers.Value.GetValueOrDefault(serviceType);
+                factory = _wrapperFactories.Value.GetValueOrDefault(serviceType);
             return factory;
         }
 
@@ -812,7 +832,7 @@ namespace DryIoc
         private void AddOrUpdateServiceFactory(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
             if (serviceKey == null)
-                _factories.Swap(f => f.AddOrUpdate(serviceType, factory, (oldEntry, newEntry) =>
+                _serviceFactories.Swap(f => f.AddOrUpdate(serviceType, factory, (oldEntry, newEntry) =>
                 {
                     if (oldEntry == null)
                         return newEntry;
@@ -861,7 +881,7 @@ namespace DryIoc
             {
                 var factories = new FactoriesEntry(null, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
 
-                _factories.Swap(f => f.AddOrUpdate(serviceType, factories, (oldEntry, newEntry) =>
+                _serviceFactories.Swap(f => f.AddOrUpdate(serviceType, factories, (oldEntry, newEntry) =>
                 {
                     if (oldEntry == null)
                         return newEntry;
@@ -901,17 +921,17 @@ namespace DryIoc
 
         private Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey, Rules.FactorySelectorRule factorySelector)
         {
-            var entry = _factories.Value.GetValueOrDefault(serviceType);
+            var entry = _serviceFactories.Value.GetValueOrDefault(serviceType);
             if (serviceType.IsGeneric()) // keep entry or find one for open-generic
             {
                 var serviceOpenGenericType = serviceType.GetGenericDefinitionOrNull();
                 if (entry == null) // just find new one for open-generic
-                    entry = _factories.Value.GetValueOrDefault(serviceOpenGenericType);
+                    entry = _serviceFactories.Value.GetValueOrDefault(serviceOpenGenericType);
                 else if (serviceKey != null && (
                     entry is Factory && !DefaultKey.Value.Equals(serviceKey) ||
                     entry is FactoriesEntry && ((FactoriesEntry)entry).Factories.GetValueOrDefault(serviceKey) == null))
                 {
-                    var genericEntry = _factories.Value.GetValueOrDefault(serviceOpenGenericType);
+                    var genericEntry = _serviceFactories.Value.GetValueOrDefault(serviceOpenGenericType);
                     if (genericEntry != null)
                         entry = genericEntry;
                 }
@@ -957,22 +977,22 @@ namespace DryIoc
         private readonly Request _emptyRequest;
         private int _disposed;
 
-        private Scope _singletonScope;
+        private readonly Scope _singletonScope;
         private Scope _openedScope;
         private IScopeContext _scopeContext;
 
-        private readonly Ref<HashTree<Type, object>> _factories;        // where object is Factory or KeyedFactoriesEntry
-        private readonly Ref<HashTree<Type, Factory[]>> _decorators;    // it may be multiple decorators per service type 
-        private readonly Ref<HashTree<Type, Factory>> _wrappers;        // only single wrapper factory per type is supported
+        private readonly Ref<HashTree<Type, object>> _serviceFactories;        // where object is Factory or KeyedFactoriesEntry
+        private readonly Ref<HashTree<Type, Factory[]>> _decoratorFactories;    // it may be multiple decorators per service type 
+        private readonly Ref<HashTree<Type, Factory>> _wrapperFactories;        // only single wrapper factory per type is supported
 
         private Ref<HashTree<Type, FactoryDelegate>> _defaultFactoryDelegatesCache;
         private Ref<HashTree<Type, HashTree<object, FactoryDelegate>>> _keyedFactoryDelegatesCache;
         private ResolutionStateCache _resolutionStateCache;
 
         private Container(Rules rules,
-            Ref<HashTree<Type, object>> factories,
-            Ref<HashTree<Type, Factory[]>> decorators,
-            Ref<HashTree<Type, Factory>> wrappers,
+            Ref<HashTree<Type, object>> serviceFactories,
+            Ref<HashTree<Type, Factory[]>> decoratorFactories,
+            Ref<HashTree<Type, Factory>> wrapperFactories,
             Scope singletonScope,
             IScopeContext scopeContext = null,
             Scope openedScope = null,
@@ -989,9 +1009,9 @@ namespace DryIoc
             _openedScope = openedScope;
             _scopeContext = scopeContext ?? new ThreadScopeContext();
 
-            _factories = factories;
-            _decorators = decorators;
-            _wrappers = wrappers;
+            _serviceFactories = serviceFactories;
+            _decoratorFactories = decoratorFactories;
+            _wrapperFactories = wrapperFactories;
 
             _defaultFactoryDelegatesCache = resolvedDefaultDelegates ?? Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
             _keyedFactoryDelegatesCache = resolvedKeyedDelegates ?? Ref.Of(HashTree<Type, HashTree<object, FactoryDelegate>>.Empty);
@@ -2186,8 +2206,18 @@ namespace DryIoc
             registrator.RegisterMany(typeof(TImplementation), reuse, with, setup, types, named, ifAlreadyRegistered);
         }
 
-        public delegate void RegisterManyAction(IRegistrator r, Type[] serviceTypes, Type implType, Action<Type[], Type> proceed);
+        /// <summary>Action that could be used by User to customize register many default behavior.</summary>
+        /// <param name="r">Registrator provided to do any arbitrary registration User wants.</param>
+        /// <param name="serviceTypes">Valid service type that could be used with <paramref name="implType"/>.</param>
+        /// <param name="implType">Concrete or open-generic implementation type.</param>
+        /// <param name="register">Default registration action to be done on service/implementation types.</param>
+        public delegate void RegisterManyAction(IRegistrator r, Type[] serviceTypes, Type implType, Action<Type[], Type> register);
 
+        /// <summary>Registers many implementations with their auto-figured service types.</summary>
+        /// <param name="registrator">Registrator/Container to register with.</param>
+        /// <param name="implTypes">Implementation type provider.</param>
+        /// <param name="customAction">(optional) User specified registration action: 
+        /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes,
             RegisterManyAction customAction = null)
         {
@@ -2234,6 +2264,11 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Registers many implementations with their auto-figured service types.</summary>
+        /// <param name="registrator">Registrator/Container to register with.</param>
+        /// <param name="implTypeAssemblies">Assemblies with implementation/service types to register.</param>
+        /// <param name="customAction">(optional) User specified registration action: 
+        /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies, 
             RegisterManyAction customAction = null)
         {
@@ -2241,22 +2276,22 @@ namespace DryIoc
             registrator.RegisterMany(implTypes, customAction);
         }
 
-        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes, Type serviceType, 
+        /// <summary>Registers single specified <paramref name="serviceType"/> with possibly many implementations provided
+        /// by <paramref name="implTypeAssemblies"/>. May do nothing if no implementations found.</summary>
+        /// <param name="registrator">Registrator/Container to register with.</param>
+        /// <param name="implTypeAssemblies">Assemblies with implementation/service types to register.</param>
+        /// <param name="serviceType">Service type to register.</param>
+        /// <param name="reuse">(optional) Reuse to apply to all service registrations.</param>
+        /// <param name="ifAlreadyRegistered">(optional) Policy to deal with existing service registrations.</param>
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies, Type serviceType, 
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
-            serviceType.ThrowIfNull();
+            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
             registrator.RegisterMany(implTypes, (r, serviceTypes, implType, proceed) =>
             {
                 if (serviceTypes.IndexOf(serviceType) != -1)
                     r.Register(serviceType, implType, reuse, ifAlreadyRegistered: ifAlreadyRegistered);
             });
-        }
-
-        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies, Type serviceType, 
-            IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
-        {
-            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
-            registrator.RegisterMany(implTypes, serviceType, reuse, ifAlreadyRegistered);
         }
 
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
@@ -5296,9 +5331,27 @@ namespace DryIoc
         Replace
     }
 
+    /// <summary>Define registered service structure.</summary>
+    public struct ServiceTypeKeyFactory
+    {
+        /// <summary>Required service type.</summary>
+        public Type Type;
+
+        /// <summary>Optional service key, may be an instance of <see cref="DefaultKey"/> for multiple default registrations.</summary>
+        public object OptionalKey;
+
+        /// <summary>Registered factory.</summary>
+        public Factory Factory;
+    }
+
     /// <summary>Defines operations that for changing registry, and checking if something exist in registry.</summary>
     public interface IRegistrator
     {
+        /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
+        /// <returns>Existing registrations.</returns>
+        /// <remarks>Decorator and Wrapper types are not included.</remarks>
+        IEnumerable<ServiceTypeKeyFactory> GetServiceRegistrations();
+
         /// <summary>Registers factory in registry with specified service type and key for lookup.</summary>
         /// <param name="factory">To register.</param>
         /// <param name="serviceType">Service type as unique key in registry for lookup.</param>
@@ -5374,7 +5427,7 @@ namespace DryIoc
         /// <returns>New container with copy of all registrations.</returns>
         IContainer WithRegistrationsCopy(bool preserveCache = false);
 
-        /// <summary>Creates new container with new opened scope and set this scope as current in provided/inherited context.</summary>
+        /// <summary>Creates new container with new opened scope and set this scope as current in ambient scope context.</summary>
         /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
         /// <returns>New container with different current scope.</returns>

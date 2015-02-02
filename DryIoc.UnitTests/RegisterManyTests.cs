@@ -160,5 +160,19 @@ namespace DryIoc.UnitTests
                 Handler = () => handler.Handle("Nope!");
             }
         }
+
+	    [Test]
+	    public void Can_get_all_service_registrations()
+	    {
+	        var container = new Container();
+	        container.RegisterMany(new[] { GetType().GetAssembly()}, (registrator, types, type, proceed) =>
+	        {
+	            if (type.GetAllConstructors().Count() == 1)
+                    proceed(types, type);
+	        });
+
+	        var registrations = container.GetServiceRegistrations().Select(r => r.Type).ToArray();
+            CollectionAssert.Contains(registrations, typeof(RegisterManyTests));
+	    }
 	}
 }
