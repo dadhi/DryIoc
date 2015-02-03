@@ -4,31 +4,31 @@ using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
-	[TestFixture]
-	public class RegisterManyTests
-	{
-		[Test]
-		public void Can_register_single_registrations_for_all_public_types_implemented()
-		{
-			var container = new Container();
-			container.RegisterMany<Someberry>();
+    [TestFixture]
+    public class RegisterManyTests
+    {
+        [Test]
+        public void Can_register_single_registrations_for_all_public_types_implemented()
+        {
+            var container = new Container();
+            container.RegisterMany<Someberry>();
 
-			Assert.That(container.IsRegistered<IBerry>(), Is.False);
-			Assert.That(container.IsRegistered<IProduct>(), Is.True);
-			Assert.That(container.IsRegistered<Someberry>(), Is.True);
-		}
+            Assert.That(container.IsRegistered<IBerry>(), Is.False);
+            Assert.That(container.IsRegistered<IProduct>(), Is.True);
+            Assert.That(container.IsRegistered<Someberry>(), Is.True);
+        }
 
-		[Test]
-		public void Singleton_registered_with_multiple_interfaces_should_be_the_same()
-		{
-			var container = new Container();
+        [Test]
+        public void Singleton_registered_with_multiple_interfaces_should_be_the_same()
+        {
+            var container = new Container();
             container.RegisterMany<Someberry>(Reuse.Singleton);
 
-			var product = container.Resolve<IProduct>();
+            var product = container.Resolve<IProduct>();
             var berry = container.Resolve<Someberry>();
 
-			Assert.That(product, Is.SameAs(berry));
-		}
+            Assert.That(product, Is.SameAs(berry));
+        }
 
         [Test]
         public void Non_optimized_singleton_registered_with_multiple_interfaces_should_be_the_same()
@@ -114,32 +114,32 @@ namespace DryIoc.UnitTests
         public class Blah<T0, T1> : IBlah<T0, T1> { }
         public class AnotherBlah<T> : IBlah<string, T> { }
 
-	    [Test]
-	    public void Can_register_something_from_assembly_as_singleton()
-	    {
-	        var container = new Container();
+        [Test]
+        public void Can_register_something_from_assembly_as_singleton()
+        {
+            var container = new Container();
 
-	        container.RegisterMany(
-	            new[] { GetType().GetAssembly() },
-	            (r, serviceTypes, implType, proceed) => // for only A and its implementations
-	            {
-	                if (serviceTypes.IndexOf(typeof(A)) != -1)
-	                    r.Register(typeof(A), implType, Reuse.Singleton);
-	            });
-	    }
+            container.RegisterMany(
+                new[] { GetType().GetAssembly() },
+                (r, serviceTypes, implType, proceed) => // for only A and its implementations
+                {
+                    if (serviceTypes.IndexOf(typeof(A)) != -1)
+                        r.Register(typeof(A), implType, Reuse.Singleton);
+                });
+        }
 
-	    internal class A {}
+        internal class A { }
 
-	    [Test]
-	    public void Register_many_should_skip_Compiler_generated_classes()
-	    {
-	        var container = new Container();
+        [Test]
+        public void Register_many_should_skip_Compiler_generated_classes()
+        {
+            var container = new Container();
 
-	        container.RegisterMany(new[] { GetType().GetAssembly()}, (registrator, types, type, proceed) =>
-	        {
-                Assert.False(type.FullName.Contains("DisplayClass"));
-	        });
-	    }
+            container.RegisterMany(new[] { GetType().GetAssembly() }, (registrator, types, type, proceed) =>
+            {
+                Assert.False(type.FullName.Contains("_DisplayClass"));
+            });
+        }
 
         internal class MyClass
         {
@@ -161,18 +161,32 @@ namespace DryIoc.UnitTests
             }
         }
 
-	    [Test]
-	    public void Can_get_all_service_registrations()
-	    {
-	        var container = new Container();
-	        container.RegisterMany(new[] { GetType().GetAssembly()}, (registrator, types, type, proceed) =>
-	        {
-	            if (type.GetAllConstructors().Count() == 1)
+        [Test]
+        public void Can_get_all_service_registrations()
+        {
+            var container = new Container();
+            container.RegisterMany(new[] { GetType().GetAssembly() }, (registrator, types, type, proceed) =>
+            {
+                if (type.GetAllConstructors().Count() == 1)
                     proceed(types, type);
-	        });
+            });
 
-	        var registrations = container.GetServiceRegistrations().Select(r => r.Type).ToArray();
+            var registrations = container.GetServiceRegistrations().Select(r => r.Type).ToArray();
             CollectionAssert.Contains(registrations, typeof(RegisterManyTests));
-	    }
-	}
+        }
+
+        [Test]
+        public void Can_register_internal_implementation()
+        {
+            var container = new Container(r => r.With(Constructor.WithAllResolvableArguments));
+            container.RegisterMany(new[] { typeof(InternalMe).GetAssembly() });
+            
+            var service = container.Resolve<IPublicMe>();
+
+            Assert.IsInstanceOf<InternalMe>(service);
+        }
+
+        interface IPublicMe { }
+        internal class InternalMe : IPublicMe { }
+    }
 }

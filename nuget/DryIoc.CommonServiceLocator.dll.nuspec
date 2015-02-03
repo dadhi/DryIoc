@@ -13,7 +13,7 @@
         <releaseNotes>First release.</releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" />
+            <dependency id="DryIoc.dll" version="1.5" />
             <dependency id="CommonServiceLocator" />
           </group>
         </dependencies>

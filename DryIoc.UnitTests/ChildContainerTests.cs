@@ -65,24 +65,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Context_scope_is_not_copied_to_child_container_created_from_opened_scope()
-        {
-            var container = new Container();
-            container.Register<IFruit, Mango>(Reuse.InCurrentScope);
-
-            using (var scoped = container.OpenScope())
-            {
-                var child = container.CreateChildContainer();
-                child.Register<IJuice, FruitJuice>();
-
-                scoped.Resolve<IFruit>();
-                
-                var ex = Assert.Throws<ContainerException>(() => child.Resolve<IJuice>());
-                Assert.AreEqual(ex.Error, Error.NO_CURRENT_SCOPE);
-            }
-        }
-
-        [Test]
         public void Can_inject_current_scope_service_from_parent_container_After_it_was_resolved_from_parent2()
         {
             var container = new Container();

@@ -120,7 +120,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same()
         {
-            using (var container = new Container().OpenScope())
+            using (var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope())
             {
                 container.Register<Service>(Reuse.InThreadScope);
 
@@ -134,7 +134,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same_In_nested_scope_too()
         {
-            using (var container = new Container().OpenScope())
+            using (var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope())
             {
                 container.Register<Service>(Reuse.InThreadScope);
 
@@ -154,7 +154,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_Thread_reuse_Dependencies_injected_in_same_thread_should_be_the_same()
         {
-            var container = new Container().OpenScope();
+            var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope();
             container.Register<ServiceWithDependency>();
             container.Register<IDependency, Dependency>(Reuse.InThreadScope);
 
@@ -166,7 +166,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_Thread_reuse_Services_resolved_in_different_thread_should_be_the_different()
         {
-            var container = new Container();
+            var container = new Container(scopeContext: new ThreadScopeContext());
             var mainThread = container.OpenScope();
             mainThread.Register<Service>(Reuse.InThreadScope);
 
@@ -188,7 +188,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_Thread_reuse_Dependencies_injected_in_different_thread_should_be_different()
         {
-            var parent = new Container();
+            var parent = new Container(scopeContext: new ThreadScopeContext());
             var container = parent.OpenScope();
             container.Register<ServiceWithDependency>();
             container.Register<IDependency, Dependency>(Reuse.InThreadScope);
@@ -289,12 +289,11 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Disposing_container_should_dispose_the_resolved_singleton()
+        public void Disposing_container_should_dispose_the_registered_instance_even_not_resolved()
         {
             var container = new Container();
-            container.Register<SomethingDisposable>(Reuse.Singleton);
-
-            var service = container.Resolve<SomethingDisposable>();
+            var service = new SomethingDisposable();
+            container.RegisterInstance(service, Reuse.Singleton);
 
             container.Dispose();
             Assert.IsTrue(service.IsDisposed);

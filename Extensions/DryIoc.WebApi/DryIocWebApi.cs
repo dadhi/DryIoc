@@ -28,7 +28,6 @@ namespace DryIoc.WebApi
     using System.Linq;
     using System.Reflection;
     using System.Collections.Generic;
-    using System.Runtime.Remoting.Messaging;
     using System.Web.Http;
     using System.Web.Http.Dependencies;
     using System.Web.Http.Controllers;
@@ -150,43 +149,5 @@ namespace DryIoc.WebApi
     public static class WebReuse
     {
         public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(ExecutionFlowScopeContext.ROOT_SCOPE_NAME);
-    }
-
-    public sealed class ExecutionFlowScopeContext : IScopeContext
-    {
-        public static readonly object ROOT_SCOPE_NAME = typeof(ExecutionFlowScopeContext);
-
-        public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
-
-        public IScope GetCurrentOrDefault()
-        {
-            var scope = (Copyable<IScope>)CallContext.LogicalGetData(_key);
-            return scope == null ? null : scope.Value;
-        }
-
-        public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
-        {
-            var oldScope = GetCurrentOrDefault();
-            var newScope = getNewCurrentScope.ThrowIfNull()(oldScope);
-            CallContext.LogicalSetData(_key, new Copyable<IScope>(newScope));
-            return newScope;
-        }
-
-        #region Implementation
-
-        private static readonly string _key = typeof(ExecutionFlowScopeContext).Name;
-
-        [Serializable]
-        private sealed class Copyable<T> : MarshalByRefObject
-        {
-            public readonly T Value;
-
-            public Copyable(T value)
-            {
-                Value = value;
-            }
-        }
-
-        #endregion
     }
 }

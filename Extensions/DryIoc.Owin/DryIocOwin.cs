@@ -22,9 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-using System;
-using System.Runtime.Remoting.Messaging;
-
 namespace DryIoc.Owin
 {
     using System.Threading.Tasks;
@@ -68,43 +65,5 @@ namespace DryIoc.Owin
     public static class WebReuse
     {
         public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(ExecutionFlowScopeContext.ROOT_SCOPE_NAME);
-    }
-
-    public sealed class ExecutionFlowScopeContext : IScopeContext
-    {
-        public static readonly object ROOT_SCOPE_NAME = typeof(ExecutionFlowScopeContext);
-
-        public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
-
-        public IScope GetCurrentOrDefault()
-        {
-            var scope = (Copyable<IScope>)CallContext.LogicalGetData(_key);
-            return scope == null ? null : scope.Value;
-        }
-
-        public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
-        {
-            var oldScope = GetCurrentOrDefault();
-            var newScope = getNewCurrentScope.ThrowIfNull()(oldScope);
-            CallContext.LogicalSetData(_key, new Copyable<IScope>(newScope));
-            return newScope;
-        }
-
-        #region Implementation
-
-        private static readonly string _key = typeof(ExecutionFlowScopeContext).Name;
-
-        [Serializable]
-        private sealed class Copyable<T> : MarshalByRefObject
-        {
-            public readonly T Value;
-
-            public Copyable(T value)
-            {
-                Value = value;
-            }
-        }
-
-        #endregion
     }
 }
