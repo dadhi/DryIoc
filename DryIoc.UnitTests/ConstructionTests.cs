@@ -162,7 +162,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Test()
+        public void It_is_fine_to_have_static_ctor()
         {
             var container = new Container();
             container.Register<WithStaticCtor>();

@@ -31,6 +31,7 @@
         <!--net45-->
         <file src="..\DryIoc\Container.cs" target="content\net45\DryIoc" />
         <file src="..\Net40\DryIoc\FactoryCompiler.cs" target="content\net45\DryIoc" />
+        <file src="..\Net40\DryIoc\ExecutionFlowScopeContext.cs" target="content\net45\DryIoc" />
         <file src="..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs" target="content\net45\DryIoc" />
 
         <!-- PCL: Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->

@@ -362,12 +362,11 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Ignore]
         [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_dependency_of_transient()
         {
             var c = new Container();
-            c.Register<ILogger, Logger1>();
+            c.Register<ILogger, Logger1>(setup: Setup.With(isDynamicDependency: true));
             c.Register<UseLogger1>();
             var u11 = c.Resolve<UseLogger1>();
             Assert.IsInstanceOf<Logger1>(u11.Logger);
