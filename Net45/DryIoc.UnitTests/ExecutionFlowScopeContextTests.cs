@@ -10,7 +10,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Reuse_can_select_scope_with_specific_name()
         {
-            var container = new Container(scopeContext: new ExecutionFlowScopeContext());
+            var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
             container.Register<Blah>(Reuse.InCurrentNamedScope(1));
 
             using (var s1 = container.OpenScope(1))
@@ -30,7 +30,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void If_not_matched_name_found_then_current_scope_reuse_should_Throw()
         {
-            var container = new Container(scopeContext: new ExecutionFlowScopeContext());
+            var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
             container.Register<Blah>(Reuse.InCurrentNamedScope(1));
 
             using (var s1 = container.OpenScope())
@@ -43,7 +43,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void If_no_scope_opened_And_not_matched_name_found_then_resolving_should_Throw()
         {
-            var container = new Container(scopeContext: new ExecutionFlowScopeContext());
+            var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
             container.Register<Blah>(Reuse.InCurrentNamedScope(1));
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Blah>());
@@ -53,7 +53,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_can_use_execution_flow_context()
         {
-            var container = new Container(scopeContext: new ExecutionFlowScopeContext());
+            var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
 
             container.Register<SomeRoot>(Reuse.InCurrentScope);
             container.Register<SomeDep>(Reuse.InCurrentScope);
@@ -78,7 +78,7 @@ namespace DryIoc.UnitTests
         [Test]
         public async Task Scoped_service_should_Not_propagate_over_async_boundary_with_exec_flow_context()
         {
-            var c = new Container(scopeContext: new ExecutionFlowScopeContext());
+            var c = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
             c.Register<Blah>(Reuse.InCurrentScope);
 
             using (var b = c.OpenScope())

@@ -31,13 +31,13 @@ namespace DryIoc
     {
         partial void GetDefaultScopeContext(ref IScopeContext resultContext)
         {
-            resultContext = new ExecutionFlowScopeContext();
+            resultContext = new AsyncExecutionFlowScopeContext();
         }
     }
 
-    public sealed class ExecutionFlowScopeContext : IScopeContext
+    public sealed class AsyncExecutionFlowScopeContext : IScopeContext
     {
-        public static readonly object ROOT_SCOPE_NAME = typeof(ExecutionFlowScopeContext);
+        public static readonly object ROOT_SCOPE_NAME = typeof(AsyncExecutionFlowScopeContext);
 
         public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
 
@@ -57,7 +57,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private static readonly string _key = typeof(ExecutionFlowScopeContext).Name;
+        private static readonly string _key = typeof(AsyncExecutionFlowScopeContext).Name;
 
         [Serializable]
         private sealed class Copyable<T> : MarshalByRefObject

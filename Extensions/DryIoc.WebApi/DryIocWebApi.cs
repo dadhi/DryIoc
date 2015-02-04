@@ -38,7 +38,7 @@ namespace DryIoc.WebApi
         public static IContainer WithWebApi(this IContainer container, HttpConfiguration config,
             IEnumerable<Assembly> controllerAssemblies = null)
         {
-            container = container.ThrowIfNull().With(scopeContext: new ExecutionFlowScopeContext());
+            container = container.ThrowIfNull().With(scopeContext: new AsyncExecutionFlowScopeContext());
 
             container.RegisterHttpControllers(controllerAssemblies);
 
@@ -148,6 +148,6 @@ namespace DryIoc.WebApi
 
     public static class WebReuse
     {
-        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(ExecutionFlowScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
     }
 }

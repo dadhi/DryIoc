@@ -361,7 +361,7 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<Logger2>(c.Resolve<ILogger>("a"));
         }
 
-        [Test]
+        [Test, Ignore]
         [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_dependency_of_transient()
         {

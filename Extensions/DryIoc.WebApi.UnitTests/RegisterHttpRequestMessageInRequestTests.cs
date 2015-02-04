@@ -21,11 +21,11 @@ namespace DryIoc.WebApi.UnitTests
         [Test]
         public void ScopeTest()
         {
-            // Create container with ExecutionFlowScopeContext which works across Async/Await boundaries.
+            // Create container with AsyncExecutionFlowScopeContext which works across Async/Await boundaries.
             // In case of MVC it may be changed to HttpContextScopeContext.
             // If not specified container will use ThreadScopeContext.
             var container = new Container( 
-                scopeContext: new ExecutionFlowScopeContext());
+                scopeContext: new AsyncExecutionFlowScopeContext());
 
             container.Register<A>();
 

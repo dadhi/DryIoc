@@ -1,0 +1,52 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ output extension=".cs" #>
+<#@ assembly Name="System" #>
+<#@ assembly Name="System.Core" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.dll" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.UnitTests.dll" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Release\ExpressionToCodeLib.dll" #>
+<#@ import Namespace="System.Reflection" #>
+<#@ import Namespace="System.Text" #>
+<#@ import Namespace="System.Linq" #>
+<#@ import Namespace="ExpressionToCodeLib" #>
+<#@ import Namespace="DryIoc" #>
+<#@ import Namespace="DryIoc.UnitTests" #>
+
+namespace DryIoc.CompileTimeGeneration.Tests
+{
+    using System;
+    public static class GeneratedResolutions
+    {
+        public static HashTree<KV<Type, object>, FactoryDelegate> 
+            Resolutions = HashTree<KV<Type, object>, FactoryDelegate>.Empty;
+
+        static GeneratedResolutions()
+        {
+            Type serviceType;
+            object serviceKey;
+<#
+    IContainer container = new Container(rules => rules
+        .With(Constructor.WithAllResolvableArguments)
+        .WithFactorySelector((t, k, factories) => factories.LastOrDefault(f => f.Key.Equals(k)).Value)
+        .WithoutSingletonOptimization());
+
+    container.RegisterMany(new[] { typeof(DryIoc.UnitTests.NewTests).GetAssembly() });
+
+    foreach (var r in container.GetServiceRegistrations())
+    {
+        var factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalKey, IfUnresolved.ReturnDefault, r.Type);
+        if (factoryExpr != null)
+        {
+#>
+
+            serviceType = typeof(<#=new StringBuilder().Print(r.Type)#>);
+            serviceKey = <#=new StringBuilder().Print(r.OptionalKey, quote: "\"")#>;
+            Resolutions = Resolutions.AddOrUpdate(new KV<Type, object>(serviceType, serviceKey),
+                <#=ExpressionToCode.ToCode(factoryExpr.Value)#>);
+<#
+        }
+    }
+#>
+        } // end of static constructor
+    }
+}

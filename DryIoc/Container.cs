@@ -1054,6 +1054,19 @@ namespace DryIoc
         /// <summary>Default value.</summary>
         public static readonly DefaultKey Value = new DefaultKey(0);
 
+        /// <summary>Create new default key with specified registration order.</summary>
+        /// <param name="registrationOrder"></param> <returns>New default key.</returns>
+        public static DefaultKey Of(int registrationOrder)
+        {
+            if (registrationOrder < _keyPool.Length)
+                return _keyPool[registrationOrder];
+
+            var nextKey = new DefaultKey(registrationOrder);
+            if (registrationOrder == _keyPool.Length)
+                _keyPool = _keyPool.AppendOrUpdate(nextKey);
+            return nextKey;
+        }
+
         /// <summary>Returns next default key with increased <see cref="RegistrationOrder"/>.</summary>
         /// <returns>New key.</returns>
         public DefaultKey Next()
@@ -1082,7 +1095,7 @@ namespace DryIoc
         /// <summary>Prints registration order to string.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
-            return "DefaultKey#" + RegistrationOrder;
+            return "DefaultKey.Of(" + RegistrationOrder + ")";
         }
 
         #region Implementation
@@ -1092,17 +1105,6 @@ namespace DryIoc
         private DefaultKey(int registrationOrder)
         {
             RegistrationOrder = registrationOrder;
-        }
-
-        private static DefaultKey Of(int registrationOrder)
-        {
-            if (registrationOrder < _keyPool.Length)
-                return _keyPool[registrationOrder];
-
-            var nextKey = new DefaultKey(registrationOrder);
-            if (registrationOrder == _keyPool.Length)
-                _keyPool = _keyPool.AppendOrUpdate(nextKey);
-            return nextKey;
         }
 
         #endregion
@@ -1196,6 +1198,10 @@ namespace DryIoc
     /// Array supports only append, no remove.</summary>
     public class AppendableArray
     {
+        /// <summary>Node array size. When the item added to same node, array will be copied. 
+        /// So if array is too big performance will degrade. Should be power of two: e.g. 2, 4, 8, 16, 32...</summary>
+        public const int NODE_ARRAY_SIZE = 32;
+
         /// <summary>Empty/default value to start from.</summary>
         public static readonly AppendableArray Empty = new AppendableArray(0);
 
@@ -1236,10 +1242,6 @@ namespace DryIoc
         }
 
         #region Implementation
-
-        /// <summary>Node array size. When the item added to same node, array will be copied. 
-        /// So if array is too big performance will degrade. Should be power of two: e.g. 2, 4, 8, 16, 32...</summary>
-        internal const int NODE_ARRAY_SIZE = 32;
 
         private readonly object[] _items;
 
@@ -1347,7 +1349,7 @@ namespace DryIoc
     {
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
-        public static Expression<FactoryDelegate> WrapIntoFactoryExpression(this Expression expression)
+        public static Expression<FactoryDelegate> WrapInFactoryExpression(this Expression expression)
         {
             // Removing not required Convert from expression root, because CompiledFactory result still be converted at the end.
             if (expression.NodeType == ExpressionType.Convert)
@@ -1367,7 +1369,7 @@ namespace DryIoc
         /// <returns>Compiled factory delegate to use for service resolution.</returns>
         public static FactoryDelegate CompileToDelegate(this Expression expression, Rules rules)
         {
-            var factoryExpression = expression.WrapIntoFactoryExpression();
+            var factoryExpression = expression.WrapInFactoryExpression();
             FactoryDelegate factoryDelegate = null;
             CompileToMethod(factoryExpression, rules, ref factoryDelegate);
             // ReSharper disable ConstantNullCoalescingCondition
@@ -1473,6 +1475,13 @@ namespace DryIoc
             return factory;
         };
 
+        public static bool IsNestedInFuncWithArgs(this Request request)
+        {
+            return !request.Parent.IsEmpty && request.Parent.Enumerate()
+                .TakeWhile(r => r.ResolvedFactory.FactoryType == FactoryType.Wrapper)
+                .Any(r => r.ServiceType.IsFuncWithArgs());
+        }
+
         private static Expression GetArrayExpression(Request request)
         {
             var collectionType = request.ServiceType;
@@ -1573,13 +1582,6 @@ namespace DryIoc
             return Expression.New(wrapperCtor, factoryExpr);
         }
 
-        private static bool IsNestedInFuncWithArgs(Request request)
-        {
-            return !request.Parent.IsEmpty && request.Parent.Enumerate()
-                .TakeWhile(r => r.ResolvedFactory.FactoryType == FactoryType.Wrapper)
-                .Any(r => r.ServiceType.IsFuncWithArgs());
-        }
-
         private static Expression GetFuncExpression(Request request)
         {
             var funcType = request.ServiceType;
@@ -1606,7 +1608,7 @@ namespace DryIoc
             var serviceRequest = request.Push(serviceType);
             var factory = request.Container.ResolveFactory(serviceRequest);
             var expr = factory == null ? null : factory.GetExpressionOrDefault(serviceRequest);
-            return expr == null ? null : Expression.New(ctor, request.ResolutionCache.GetOrAddStateItemExpression(expr.WrapIntoFactoryExpression()));
+            return expr == null ? null : Expression.New(ctor, request.ResolutionCache.GetOrAddStateItemExpression(expr.WrapInFactoryExpression()));
         }
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request)
@@ -3875,10 +3877,11 @@ namespace DryIoc
                 .Select(c => new { Ctor = c, Params = c.GetParameters() })
                 .OrderByDescending(x => x.Params.Length);
 
-            if (request.Parent.ServiceType.IsFuncWithArgs())
+            var parent = request.Parent;
+            if (request.IsNestedInFuncWithArgs())
             {
                 // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
-                var funcType = request.Parent.ServiceType;
+                var funcType = parent.ServiceType;
                 var funcArgs = funcType.GetGenericParamsAndArgs();
                 var inputArgCount = funcArgs.Length - 1;
 
@@ -5585,7 +5588,7 @@ namespace DryIoc
 
     /// <summary>Wraps factory expression created by container internally. May be used for debugging.</summary>
     /// <typeparam name="TService">Service type to resolve.</typeparam>
-    [DebuggerDisplay("{Expression}")]
+    [DebuggerDisplay("{Value}")]
     public sealed class FactoryExpression<TService>
     {
         /// <summary>Factory expression that Container compiles to delegate.</summary>

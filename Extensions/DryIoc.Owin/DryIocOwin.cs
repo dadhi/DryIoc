@@ -32,7 +32,7 @@ namespace DryIoc.Owin
     {
         public static void UseDryIocMiddleware(this IAppBuilder app, IContainer container)
         {
-            container = container.With(scopeContext: new ExecutionFlowScopeContext());
+            container = container.With(scopeContext: new AsyncExecutionFlowScopeContext());
             app.Use<DryIocMiddleware>(container);
             //var registeredMiddleware = container.Resolve<Func<OwinMiddleware, OwinMiddleware>[]>();
             //foreach (var getMiddleware in registeredMiddleware)
@@ -64,6 +64,6 @@ namespace DryIoc.Owin
 
     public static class WebReuse
     {
-        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(ExecutionFlowScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
     }
 }
