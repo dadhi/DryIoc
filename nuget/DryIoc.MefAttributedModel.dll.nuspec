@@ -28,26 +28,33 @@
         <!-- net35 -->
         <file src="..\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net35" />
         <file src="..\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net35" />
+        <file src="..\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net35" />
 
         <!-- net40 -->
         <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net40" />
         <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net40" />
+        <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net40" />
 
         <!-- net45 -->
         <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net45" />
         <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net45" />
+        <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net45" />
 
         <!-- PCL: Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\PCL\bin\Release\DryIoc.MefAttributedModel.dll" 
-              target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+            target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL\bin\Release\DryIoc.MefAttributedModel.pdb" 
-              target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+            target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <file src="..\PCL\bin\Release\DryIoc.MefAttributedModel.xml"
+            target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
         <!-- PCL: Profile259	.NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.dll" 
-              target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+            target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.pdb" 
-              target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+            target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.xml"
+            target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
         <!-- tools -->
         <file src="..\NuGet\DryIoc.snk" target="tools" />

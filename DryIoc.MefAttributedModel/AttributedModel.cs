@@ -247,8 +247,8 @@ namespace DryIoc.MefAttributedModel
                 var reuseName = reuseAttr == null ? null : reuseAttr.ReuseName;
                 var reuse = GetReuse(reuseType, reuseName);
 
-                var withConstructor = import.WithConstructor == null ? null
-                    : (Func<Type, ConstructorInfo>)(t => t.GetConstructorOrNull(args: import.WithConstructor));
+                var withConstructor = import.ConstructorSignature == null ? null
+                    : (Func<Type, ConstructorInfo>)(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
                 registry.Register(serviceType, implementationType,
                     reuse, withConstructor, null, Setup.With(metadata: import.Metadata),
@@ -661,6 +661,8 @@ namespace DryIoc.MefAttributedModel
             return Setup.With(lazyMetadata: lazyMetadata, reuseWrappers: ReusedWrappers);
         }
 
+        /// <summary>Compares with another info for equality.</summary>
+        /// <param name="obj">Other info to compare.</param> <returns>True if equal.</returns>
         public override bool Equals(object obj)
         {
             var other = obj as RegistrationInfo;
@@ -741,6 +743,8 @@ namespace DryIoc.MefAttributedModel
             ServiceKeyInfo = ServiceKeyInfo.Of(serviceKey);
         }
 
+        /// <summary>Compares with another info for equality.</summary>
+        /// <param name="obj">Other info to compare.</param> <returns>True if equal.</returns>
         public override bool Equals(object obj)
         {
             var other = obj as ExportInfo;
@@ -858,19 +862,21 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
-    /// <summary>
-    ///  TODO: Do we really need it? Or could just throw on no primitive type.
-    /// </summary>
+    /// <summary>Wrapper on un-typed key object for serialization purposes.</summary>
+    /// <remarks>May be unnecessary and only required by ProtocolBufferers. NOTE: Require further checks.</remarks>
     public sealed class ServiceKeyInfo
     {
+        /// <summary>Default key to represent null key object.</summary>
         public static readonly ServiceKeyInfo Default = new ServiceKeyInfo();
 
+        /// <summary>Original key.</summary>
+        public object Key;
+
+        /// <summary>Wraps key.</summary> <param name="key">Input key.</param> <returns>Wrapper.</returns>
         public static ServiceKeyInfo Of(object key)
         {
             return key == null ? Default : new ServiceKeyInfo { Key = key };
         }
-
-        public object Key;
     }
 
 #pragma warning restore 659
@@ -928,28 +934,37 @@ namespace DryIoc.MefAttributedModel
         public ResolutionScopeReuseAttribute() : base(typeof(ResolutionScopeReuse)) { }
     }
 
+    /// <summary>Represents number of <see cref="IReuseWrapper"/> defined for exported type.</summary>
     public class ReuseWrappersAttribute : Attribute
     {
+        /// <summary>Types derived from <see cref="IReuseWrapper"/>.</summary>
         public Type[] WrapperTypes { get; set; }
 
+        /// <summary>Creates attribute.</summary> <param name="wrapperTypes"><see cref="IReuseWrapper"/> types.</param>
         public ReuseWrappersAttribute(params Type[] wrapperTypes)
         {
             WrapperTypes = wrapperTypes;
         }
     }
 
+    /// <summary>Defines export with arbitrary object key.</summary>
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible"), AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
     public class ExportWithKeyAttribute : ExportAttribute
     {
         /// <remarks>Specifies service key if <see cref="ExportAttribute.ContractName"/> is not specified.</remarks>
         public object ContractKey { get; set; }
 
+        /// <summary>Creates attribute.</summary>
+        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
+        /// <param name="contractType">Service type.</param>
         public ExportWithKeyAttribute(object contractKey, Type contractType)
             : base(contractType)
         {
             ContractKey = contractKey;
         }
 
+        /// <summary>Creates attribute using implementation type as <see cref="ExportAttribute.ContractType"/></summary>
+        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
         public ExportWithKeyAttribute(object contractKey) : this(contractKey, null) { }
     }
 
@@ -983,17 +998,25 @@ namespace DryIoc.MefAttributedModel
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class AsFactoryAttribute : Attribute { }
 
+    /// <summary>Exports service as custom wrapper.</summary>
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class AsWrapperAttribute : Attribute
     {
+        /// <summary>For open-generic wrapper indicates wrapped argument type index.</summary>
         public int ContractTypeGenericArgIndex { get; set; }
+
+        /// <summary>Explicitly defines wrapped type. If defined overrides <see cref="ContractTypeGenericArgIndex"/>.</summary>
         public Type WrappedContractType { get; set; }
 
+        /// <summary>Creates attribute with <see cref="ContractTypeGenericArgIndex"/>.</summary>
+        /// <param name="contractTypeGenericArgInsdex"></param>
         public AsWrapperAttribute(int contractTypeGenericArgInsdex = 0)
         {
             ContractTypeGenericArgIndex = contractTypeGenericArgInsdex.ThrowIf(contractTypeGenericArgInsdex < 0);
         }
 
+        /// <summary>Creates attribute with <see cref="WrappedContractType"/>.</summary>
+        /// <param name="wrappedContractType"></param>
         public AsWrapperAttribute(Type wrappedContractType)
         {
             WrappedContractType = wrappedContractType.ThrowIfNull();
@@ -1022,55 +1045,78 @@ namespace DryIoc.MefAttributedModel
         bool Match(Request request);
     }
 
+
+    /// <summary>Imports service Only with equal <see cref="ContractKey"/>.</summary>
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible"), AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property)]
     public class ImportWithKeyAttribute : ImportAttribute
     {
+        /// <summary>Arbitrary object to match with service key.</summary>
         public object ContractKey { get; set; }
 
+        /// <summary>Creates attribute object service key.</summary> <param name="contractKey"></param>
+        /// <param name="contractType">(optional) If missing then imported member type will be used as service type.</param>
         public ImportWithKeyAttribute(object contractKey, Type contractType = null)
             : base(contractType)
         {
             ContractKey = contractKey;
         }
 
+        /// <summary>Creates attribute with string service name.</summary> <param name="contractKey"></param>
+        /// <param name="contractType">(optional) If missing then imported member type will be used as service type.</param>
         public ImportWithKeyAttribute(string contractKey, Type contractType = null)
             : base(contractKey, contractType)
         {
             ContractKey = contractKey;
         }
-
-        public ImportWithKeyAttribute(Type contractType)
-            : this(null, contractType) { }
     }
 
+    /// <summary>Exports service with associated metadata object.</summary>
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class | // for Export 
         AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, Inherited = false)]
     public class WithMetadataAttribute : Attribute
     {
+        /// <summary>Metadata object</summary>
+        public readonly object Metadata;
+
+        /// <summary>Creates attribute</summary> <param name="metadata"></param>
         public WithMetadataAttribute(object metadata)
         {
             Metadata = metadata.ThrowIfNull();
         }
-
-        public readonly object Metadata;
     }
 
-
+    /// <summary>Indicate to import service and in case it is not registered, register it using provided
+    /// implementation info. Useful for ad-hoc/quick-prototyping registration of types from not controlled libraries.</summary>
     [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property)]
     public class ImportExternalAttribute : Attribute
     {
+        /// <summary>Implementation type of registered service.</summary>
         public Type ImplementationType { get; set; }
-        public Type[] WithConstructor { get; set; }
+
+        /// <summary>Use specific constructor for registration.</summary>
+        public Type[] ConstructorSignature { get; set; }
+
+        /// <summary>Metadata associated with registration.</summary>
         public object Metadata { get; set; }
+
+        /// <summary>Registering (and importing) with specified service key.</summary>
         public object ContractKey { get; set; }
+        
+        /// <summary>Registering (and importing) with specified service type.</summary>
         public Type ContractType { get; set; }
 
-        public ImportExternalAttribute(Type implementationType = null, Type[] withConstructor = null, object metadata = null,
-            object contractKey = null, Type contractType = null)
+        /// <summary>Creates attributes.</summary>
+        /// <param name="implementationType">(optional) Implementation type of registered service.</param>
+        /// <param name="constructorSignature">(optional) Use specific constructor for registration.</param>
+        /// <param name="metadata">(optional) Metadata associated with registration.</param>
+        /// <param name="contractKey">(optional) Registering (and importing) with specified service key.</param>
+        /// <param name="contractType">(optional) Registering (and importing) with specified service type.</param>
+        public ImportExternalAttribute(Type implementationType = null, Type[] constructorSignature = null, 
+            object metadata = null, object contractKey = null, Type contractType = null)
         {
             ImplementationType = implementationType;
-            WithConstructor = withConstructor;
+            ConstructorSignature = constructorSignature;
             Metadata = metadata;
             ContractType = contractType;
             ContractKey = contractKey;

@@ -211,14 +211,13 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_open_generic_is_registered_IsRegistered_for_closed_generic_should_return_true()
+        public void IsRegistered_Should_return_false_for_concrete_generic_In_case_of_only_open_generic_registered_()
         {
             var container = new Container();
             container.Register(typeof(ServiceWithTwoGenericParameters<,>));
 
-            var registered = container.IsRegistered<ServiceWithTwoGenericParameters<int, string>>();
-
-            Assert.That(registered, Is.True);
+            Assert.IsFalse(container.IsRegistered<ServiceWithTwoGenericParameters<int, string>>());
+            Assert.IsTrue(container.IsRegistered(typeof(ServiceWithTwoGenericParameters<,>)));
         }
 
         [Test]

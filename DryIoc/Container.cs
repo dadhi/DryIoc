@@ -281,13 +281,15 @@ namespace DryIoc
             }
         }
 
-        /// <summary>Returns true if there is registered factory for requested service type and key, 
-        /// and factory is of specified factory type and condition.</summary>
+        /// <summary>Returns true if there is registered factory with the service type and key.
+        /// To check if only default factory is registered specify <see cref="DefaultKey.Value"/> as <paramref name="serviceKey"/>.
+        /// Otherwise, if no <paramref name="serviceKey"/> specified then True will returned for any registered factories, even keyed.
+        /// Additionally you can specify <paramref name="condition"/> to be applied to registered factories.</summary>
         /// <param name="serviceType">Service type to look for.</param>
         /// <param name="serviceKey">Service key to look for.</param>
         /// <param name="factoryType">Expected registered factory type.</param>
         /// <param name="condition">Expected factory condition.</param>
-        /// <returns>Returns true if factory requested is registered.</returns>
+        /// <returns>Returns true if factory is registered.</returns>
         public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
             ThrowIfContainerDisposed();
@@ -304,12 +306,21 @@ namespace DryIoc
                         && (condition == null || decorators.Any(condition));
 
                 default:
-                    Rules.FactorySelectorRule selector = (t, k, factories) =>
-                        factories.FirstOrDefault(f => f.Key.Equals(k)
-                        && (condition == null || condition(f.Value))).Value;
+                    var entry = _serviceFactories.Value.GetValueOrDefault(serviceType);
+                    if (entry == null)
+                        return false;
+                    
+                    var factory = entry as Factory;
+                    if (factory != null)
+                        return (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
+                            && (condition == null || condition(factory));
 
-                    var factory = GetServiceFactoryOrDefault(serviceType, serviceKey, selector);
-                    return factory != null;
+                    var factories = ((FactoriesEntry)entry).Factories;
+                    if (serviceKey == null)
+                        return condition == null || factories.Enumerate().Any(f => condition(f.Value));
+
+                    factory = factories.GetValueOrDefault(serviceKey);
+                    return factory != null && (condition == null || condition(factory));
             }
         }
 
@@ -609,20 +620,15 @@ namespace DryIoc
                 (factory = factory.Provider.ProvideConcreteFactory(request)) != null)
                 Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.Replace);
 
-            if (factory != null)
-                return factory;
+            var unknownServiceResolvers = Rules.UnknownServiceResolvers;
+            if (factory == null && !unknownServiceResolvers.IsNullOrEmpty())
+                for (var i = 0; factory == null && i < unknownServiceResolvers.Length; i++)
+                    factory = unknownServiceResolvers[i](request);
 
-            var resolvers = Rules.UnknownServiceResolvers;
-            if (!resolvers.IsNullOrEmpty())
-                for (var i = 0; i < resolvers.Length; i++)
-                {
-                    var ruleFactory = resolvers[i](request);
-                    if (ruleFactory != null)
-                        return ruleFactory;
-                }
-
-            Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
-            return null;
+            if (factory == null)
+                Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
+            
+            return factory;
         }
 
         Factory IContainer.GetServiceFactoryOrDefault(Type serviceType, object serviceKey)

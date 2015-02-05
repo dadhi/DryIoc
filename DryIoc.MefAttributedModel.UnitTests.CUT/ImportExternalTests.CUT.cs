@@ -27,7 +27,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public ExternalTool Tool { get; set; }
 
-        public HomeUser([ImportExternal(withConstructor: new[] { typeof(string) })] Func<string, ExternalTool> getTool)
+        public HomeUser([ImportExternal(constructorSignature: new[] { typeof(string) })] Func<string, ExternalTool> getTool)
         {
             Tool = getTool("blah");
         }
@@ -60,7 +60,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public MineMeta ToolMeta { get; set; }
 
         public MyCode(
-            [ImportExternal(Metadata = MineMeta.Green, WithConstructor = new Type[0])] 
+            [ImportExternal(Metadata = MineMeta.Green, ConstructorSignature = new Type[0])] 
             Meta<Lazy<ExternalTool>, MineMeta> tool)
         {
             Tool = tool.Value.Value;
@@ -83,7 +83,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public readonly ExternalTool Tool;
 
-        public OneDependsOnExternalTool([ImportExternal(withConstructor: new Type[0], contractKey: 13)]ExternalTool tool)
+        public OneDependsOnExternalTool([ImportExternal(constructorSignature: new Type[0], contractKey: 13)]ExternalTool tool)
         {
             Tool = tool;
         }
