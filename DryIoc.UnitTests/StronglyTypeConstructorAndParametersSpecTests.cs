@@ -12,7 +12,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<Burger>(with: Construct.Of(_ => new Burger()));
+            container.Register<Burger>(
+                with: Construct.Of(_ => new Burger()));
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Null);
@@ -31,11 +32,25 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Specify_parameter_ifUnresolved_bahavior_without_reflection()
+        public void Specify_parameter_ifUnresolved_behavior_without_reflection()
         {
             var container = new Container();
 
-            container.Register<Burger>(with: Construct.Of(p => new Burger(p.Of<ICheese>(IfUnresolved.ReturnDefault))));
+            container.Register<Burger>(
+                with: Construct.Of(p => new Burger(p.Of<ICheese>(IfUnresolved.ReturnDefault))));
+
+            var burger = container.Resolve<Burger>();
+            Assert.That(burger.Cheese, Is.Null);
+        }
+
+        [Test, Ignore]
+        public void Specify_parameter_default_value_without_reflection()
+        {
+            var container = new Container();
+
+            var cheese = new BlueCheese();
+            container.Register<Burger>(
+                with: Construct.Of(p => new Burger(p.UseDefault(cheese))));
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Null);
@@ -54,11 +69,13 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Specify_allow_default_for_unresovled_service()
+        public void Specify_service_key_and_required_service_type_for_parameter()
         {
             var container = new Container();
 
-            container.Register<Burger>(with: Construct.Of(p => new Burger("King", p.AllowDefault<ICheese>())));
+            container.Register<BlueCheese>(named: "a");
+            container.Register<Burger>(
+                with: Construct.Of(p => new Burger("King", p.Of<BlueCheese>("a"))));
 
             var burger = container.Resolve<Burger>();
             Assert.AreEqual("King", burger.Name);
@@ -106,21 +123,27 @@ namespace DryIoc.UnitTests
                     var arg = args[i] as MethodCallExpression;
                     if (arg != null && arg.Method.DeclaringType == typeof(Params))
                     {
-                        var ifUnresolved = arg.Method.Name == Params.ALLOW_DEFAULT 
-                            ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
+                        var requiredServiceType = arg.Method.GetGenericArguments()[0];
+                        if (requiredServiceType == par.ParameterType)
+                            requiredServiceType = null;
+                        
+                        var serviceKey = default(object);
+                        var ifUnresolved = IfUnresolved.Throw;
 
                         var settings = arg.Arguments;
                         for (var j = 0; j < settings.Count; j++)
                         {
-                            var setting = settings[i] as ConstantExpression;
+                            var setting = settings[j] as ConstantExpression;
                             if (setting != null)
                             {
                                 if (setting.Type == typeof(IfUnresolved))
                                     ifUnresolved = (IfUnresolved)setting.Value;
+                                else // service key
+                                    serviceKey = setting.Value;
                             }
                         }
 
-                        parameters = parameters.Condition(par.Equals, ifUnresolved: ifUnresolved);
+                        parameters = parameters.Condition(par.Equals, requiredServiceType, serviceKey, ifUnresolved);
                     }
                     else
                     {
@@ -144,9 +167,14 @@ namespace DryIoc.UnitTests
         public T Of<T>() { return default(T); }
 
         public T Of<T>(IfUnresolved ifUnresolved) { return default(T); }
+        
+        public T Of<T>(object serviceKey) { return default(T); }
+        
+        public T Of<T>(object serviceKey, IfUnresolved ifUnresolved) { return default(T); }
 
-        public static readonly string ALLOW_DEFAULT = "AllowDefault";
-        public T AllowDefault<T>() { return default(T); }
+        public T UseDefault<T>(T defaultValue) { return default(T); }
+        
+        public T UseDefault<T>(object serviceKey, T defaultValue) { return default(T); }
 
         private Params() { }
     }

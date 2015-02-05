@@ -3367,10 +3367,11 @@ namespace DryIoc
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
 
-        // TODO: Use it for Service factory. Currently used by Decorator only.
         /// <summary>Predicate to check if factory could be used for resolved request.</summary>
         public virtual Func<Request, bool> Condition { get { return null; } }
 
+        /// <summary>Indicate that dependency expression should be "r.Resolver.Resolve<DependencyServiceType>(...)" 
+        /// instead of actual creation expression.</summary>
         public virtual bool IsDynamicDependency { get { return false; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
@@ -3624,7 +3625,7 @@ namespace DryIoc
         /// <returns>Service expression.</returns>
         public Expression GetExpressionOrDefault(Request request, Type reuseWrapperType = null)
         {
-            // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual creation expression.s
+            // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual creation expression.
             if (Setup.IsDynamicDependency && !request.Parent.IsEmpty)
             {
                 var serviceKeyExp = request.ResolutionCache.GetOrAddStateItemExpression(request.ServiceKey);
@@ -3670,18 +3671,18 @@ namespace DryIoc
                     : GetScopedServiceExpressionOrDefault(serviceExpr, reuse, request, reuseWrapperType);
             }
 
-            if (serviceExpr == null)
+            if (serviceExpr != null)
             {
-                Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
-                return null;
+                if (isCacheable)
+                    request.ResolutionCache.CacheFactoryExpression(FactoryID, serviceExpr);
+
+                if (noOrFuncDecorator && decorator != null)
+                    serviceExpr = Expression.Invoke(decorator, serviceExpr);
             }
 
-            if (isCacheable)
-                request.ResolutionCache.CacheFactoryExpression(FactoryID, serviceExpr);
-
-            if (noOrFuncDecorator && decorator != null)
-                serviceExpr = Expression.Invoke(decorator, serviceExpr);
-
+            if (serviceExpr == null)
+                Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
+            
             return serviceExpr;
         }
 
