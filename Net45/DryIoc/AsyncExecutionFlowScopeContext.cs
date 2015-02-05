@@ -26,9 +26,11 @@ namespace DryIoc
 {
     using System;
     using System.Runtime.Remoting.Messaging;
+    using System.Diagnostics.CodeAnalysis;
 
     partial class Container
     {
+        [SuppressMessage("ReSharper", "RedundantAssignment")]
         partial void GetDefaultScopeContext(ref IScopeContext resultContext)
         {
             resultContext = new AsyncExecutionFlowScopeContext();

@@ -31,10 +31,8 @@ namespace DryIoc.WebApi.UnitTests
 
             // Register Null request in parent container in order to swap to actual request in current scope.
             // When resolving A container will find registered request dependency and cache access to it for fast performance.
-            container.RegisterInstance(default(MessageRequest),
-                WebReuse.InRequest, Setup.With(reuseWrappers: typeof(ReuseSwapable)));
 
-            var request1 = Task.Run(async () =>
+            var task1 = Task.Run(async () =>
             {
                 var request = new MessageRequest();
                 using (var scope = container.OpenScope())
@@ -42,26 +40,29 @@ namespace DryIoc.WebApi.UnitTests
                     // Resolve request as early registered ReuseSwapable.
                     // and swap its current value (null) with your request.
                     // It will replace request instance inside current scope, keep all resolution cache, etc intact. It is fast.
-                    scope.Resolve<ReuseSwapable>(typeof(MessageRequest)).Swap(request);
+                    scope.RegisterInstance(request, Reuse.InCurrentScope);
+                    //scope.Resolve<ReuseSwapable>(typeof(MessageRequest)).Swap(request);
 
+                    var a = scope.Resolve<A>();
                     await Task.Delay(5);//processing request
-                    Assert.AreSame(request, scope.Resolve<A>().Request);
+                    Assert.AreSame(a.Request, scope.Resolve<A>().Request);
                 }
             });
 
-            var request2 = Task.Run(async () =>
+            var task2 = Task.Run(async () =>
             {
                 var request = new MessageRequest();
                 using (var scope = container.OpenScope())
                 {
-                    scope.Resolve<ReuseSwapable>(typeof(MessageRequest)).Swap(request);
+                    scope.RegisterInstance(request, Reuse.InCurrentScope);
 
+                    var a = scope.Resolve<A>();
                     await Task.Delay(2);//processing request
-                    Assert.AreSame(request, scope.Resolve<A>().Request);
+                    Assert.AreSame(a.Request, scope.Resolve<A>().Request);
                 }
             });
 
-            Task.WaitAll(request1, request2);
+            Task.WaitAll(task1, task2);
         }
     }
 }

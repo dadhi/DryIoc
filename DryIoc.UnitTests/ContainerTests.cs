@@ -361,42 +361,46 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<Logger2>(c.Resolve<ILogger>("a"));
         }
 
-        [Test, Ignore]
+        [Test]
         [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_dependency_of_transient()
         {
             var c = new Container();
             c.Register<ILogger, Logger1>(setup: Setup.With(isDynamicDependency: true));
+            
             c.Register<UseLogger1>();
-            var u11 = c.Resolve<UseLogger1>();
-            Assert.IsInstanceOf<Logger1>(u11.Logger);
+            var user = c.Resolve<UseLogger1>();
+            Assert.IsInstanceOf<Logger1>(user.Logger);
 
             c.Register<ILogger, Logger2>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-            Assert.IsInstanceOf<Logger2>(u11.Logger);
+            user = c.Resolve<UseLogger1>();
+            Assert.IsInstanceOf<Logger2>(user.Logger);
         }
 
         [Test]
-        [Ignore("To be passed it should be way remove UseLogger1 expression and delegate cache, better in sync with Recycling")]
         [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_dependency_of_singleton()
         {
             var c = new Container();
-            c.Register<ILogger, Logger1>();
+            
+            // If we know that Logger could be changed/re-registered, then register it as dynamic dependency
+            c.Register<ILogger, Logger1>(setup: Setup.With(isDynamicDependency: true));
+
             c.Register<UseLogger1>(Reuse.Singleton, setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable));
-            var u11 = c.Resolve<UseLogger1>();
+            var user1 = c.Resolve<UseLogger1>();
 
             c.Register<ILogger, Logger2>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             // It is a already resolved singleton,
             // so it should not be affected by new ILogger registration.
             // To change that, you may recycle singleton to re-create it with new ILogger.
-            var u12 = c.Resolve<UseLogger1>();      
-            Assert.AreSame(u11, u12);
-            Assert.IsInstanceOf<Logger1>(u12.Logger);
+            var user12 = c.Resolve<UseLogger1>();      
+            Assert.AreSame(user1, user12);
+            Assert.IsInstanceOf<Logger1>(user12.Logger);
 
             c.Resolve<ReuseRecyclable>(typeof(UseLogger1)).Recycle();
             var u13 = c.Resolve<UseLogger1>();
-            Assert.AreNotSame(u12, u13);
+            Assert.AreNotSame(user12, u13);
             Assert.IsInstanceOf<Logger2>(u13.Logger);
 
             c.Register<UseLogger2>(Reuse.Singleton); // uses ILogger

@@ -958,7 +958,7 @@ namespace DryIoc.MefAttributedModel
     public class ExportManyAttribute : Attribute
     {
         /// <summary>Default rule to check that type could be exported.</summary>
-        public static Func<Type, bool> ExportedContractTypes = Registrator.DefaultServiceTypesForRegisterMany;
+        public static Func<Type, bool> ExportedContractTypes = Registrator.RegisterManyPublicServiceTypes;
 
         /// <summary>Specifies service key if <see cref="ContractName"/> is not specified.</summary>
         public object ContractKey { get; set; }

@@ -179,14 +179,14 @@ namespace DryIoc.UnitTests
         public void Can_register_internal_implementation()
         {
             var container = new Container(r => r.With(Constructor.WithAllResolvableArguments));
-            container.RegisterMany(new[] { typeof(InternalMe).GetAssembly() });
+            container.RegisterMany(new[] { typeof(InternalMe).GetAssembly() }, nonPublicServiceTypes: true);
             
             var service = container.Resolve<IPublicMe>();
 
             Assert.IsInstanceOf<InternalMe>(service);
         }
 
-        interface IPublicMe { }
+        internal interface IPublicMe { }
         internal class InternalMe : IPublicMe { }
     }
 }

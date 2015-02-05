@@ -126,8 +126,31 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            Assert.Throws<ContainerException>(() =>
-                container.RegisterInstance(typeof (IService), "ring", named: "MyPrecious"));
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.RegisterInstance(typeof(IService), "ring", named: "MyPrecious"));
+
+            Assert.AreEqual(ex.Error, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
+        }
+
+        [Test]
+        public void Wiping_cache_should_not_delete_current_instance_value()
+        {
+            var container = new Container();
+            container.RegisterInstance("mine", Reuse.Singleton);
+
+            var mine = container.WithoutCache().Resolve<string>();
+            Assert.AreEqual("mine", mine);
+        }
+
+        [Test]
+        public void Register_instance_with_different_if_already_resgitered_policies()
+        {
+            var container = new Container();
+            container.RegisterInstance("mine", Reuse.Singleton);
+            Assert.AreEqual("mine", container.Resolve<string>());
+
+            container.RegisterInstance("yours", Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            CollectionAssert.AreEquivalent(new[] { "mine", "yours" }, container.Resolve<string[]>());
         }
 
         [Test]
