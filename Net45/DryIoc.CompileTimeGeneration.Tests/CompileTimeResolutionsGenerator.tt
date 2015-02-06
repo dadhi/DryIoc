@@ -22,27 +22,40 @@ namespace DryIoc.CompileTimeGeneration.Tests
 
         static GeneratedResolutions()
         {
-            Type serviceType;
-            object serviceKey;
 <#
     IContainer container = new Container(rules => rules
         .With(Constructor.WithAllResolvableArguments)
-        .WithFactorySelector((t, k, factories) => factories.LastOrDefault(f => f.Key.Equals(k)).Value)
         .WithoutSingletonOptimization());
 
     container.RegisterMany(new[] { typeof(DryIoc.UnitTests.NewTests).GetAssembly() });
 
+    var exprToCode = ExpressionToCode.With(r => r.WithFullTypeNames().WithExplicitMethodTypeArgs());
+
     foreach (var r in container.GetServiceRegistrations())
     {
-        var factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalKey, IfUnresolved.ReturnDefault, r.Type);
-        if (factoryExpr != null)
+        FactoryExpression<object> factoryExpr = null;
+        try
+        {
+            factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalKey, IfUnresolved.Throw, r.Type);
+            var serviceTypeName = CSharpFriendlyTypeName.Get(r.Type, true);
+            var serviceKeyString = new StringBuilder().Print(r.OptionalKey, quote: "\"");
+
+            var code = exprToCode.ToCode(factoryExpr.Value);
+#>
+
+            Resolutions = Resolutions.AddOrUpdate(new KV<Type, object>(
+                typeof(<#=serviceTypeName#>), <#=serviceKeyString#>),
+                <#=code#>);
+<#
+        }
+        catch (Exception ex)
         {
 #>
 
-            serviceType = typeof(<#=new StringBuilder().Print(r.Type)#>);
-            serviceKey = <#=new StringBuilder().Print(r.OptionalKey, quote: "\"")#>;
-            Resolutions = Resolutions.AddOrUpdate(new KV<Type, object>(serviceType, serviceKey),
-                <#=ExpressionToCode.ToCode(factoryExpr.Value)#>);
+/* Exception: <#=CSharpFriendlyTypeName.Get(ex.GetType())#>
+----------------------
+<#=ex.Message#>
+*/
 <#
         }
     }

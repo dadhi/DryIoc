@@ -131,6 +131,10 @@ namespace DryIoc
         }
 
         // TODO
+        /// <summary>Creates scoped container with new current scope independent of any scope context.
+        /// Current container scope will become parent for new scope.</summary>
+        /// <param name="scopeName">(optional) Scope name.</param>
+        /// <returns>New container with all state shared except new created scope and context.</returns>
         public IContainer OpenScopeWithoutContext(object scopeName = null)
         {
             ThrowIfContainerDisposed();
@@ -1501,6 +1505,10 @@ namespace DryIoc
             return factory;
         };
 
+        /// <summary>Checks if request has parent with service type of Func with arguments. 
+        /// Often required to check in lazy scenarios.</summary>
+        /// <param name="request">Request too check.</param>
+        /// <returns>True if has Func parent.</returns>
         public static bool IsNestedInFuncWithArgs(this Request request)
         {
             return !request.Parent.IsEmpty && request.Parent.Enumerate()
@@ -4788,12 +4796,17 @@ namespace DryIoc
         IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope);
     }
 
+    /// <summary>Scope context extensions.</summary>
     public static class ScopeContext
     {
+        /// <summary>Opens new ambient current scope from context not bound to any container.</summary>
+        /// <param name="context">Context to create new scope in.</param>
+        /// <param name="getScope">Custom scope creation delegate.</param>
+        /// <returns>New ambient current scope.</returns>
         public static IScope OpenScope(this IScopeContext context, Func<IScope, IScope> getScope = null)
         {
-            getScope = getScope ?? (parent => new Scope(parent, context.RootScopeName));
-            return context.SetCurrent(getScope);
+            return context.SetCurrent(getScope
+                ?? (parent => new Scope(parent, parent == null ? context.RootScopeName : null)));
         }
     }
 
@@ -5801,6 +5814,8 @@ namespace DryIoc
                 Of("Recyclable wrapper is recycled.");
 #pragma warning restore 1591
 
+        /// <summary>Stores new error message and returns error code for it.</summary>
+        /// <param name="message">Error message to store.</param> <returns>Error code for message.</returns>
         public static int Of(string message)
         {
             Messages.Add(message);
@@ -5872,6 +5887,12 @@ namespace DryIoc
             throw GetMatchedException(ErrorCheck.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
         }
 
+        /// <summary>Throws exception if <paramref name="arg"/> is null, otherwise returns <paramref name="arg"/>.</summary>
+        /// <param name="arg">Argument to check for null.</param>
+        /// <param name="error">Error code.</param>
+        /// <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
+        /// <typeparam name="T">Type of argument to check and return.</typeparam>
+        /// <returns><paramref name="arg"/> if it is not null.</returns>
         public static T ThrowIfNull<T>(this T arg, int error = -1, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
             where T : class
         {
@@ -5879,6 +5900,14 @@ namespace DryIoc
             throw GetMatchedException(ErrorCheck.IsNull, error, arg0 ?? typeof(T), arg1, arg2, arg3, null);
         }
 
+        /// <summary>Throws exception if <paramref name="arg0"/> is not assignable to type specified by <paramref name="arg1"/>,
+        /// otherwise just returns <paramref name="arg0"/>.</summary>
+        /// <typeparam name="T">Type of argument to check and return if no error.</typeparam>
+        /// <param name="arg0">Instance to check if it is assignable to type <paramref name="arg1"/>.</param>
+        /// <param name="arg1">Type to check <paramref name="arg0"/> against.</param>
+        /// <param name="error">Error code</param>
+        /// <param name="arg2"></param> <param name="arg3"></param>
+        /// <returns><paramref name="arg0"/> if it assignable to <paramref name="arg1"/>.</returns>
         public static T ThrowIfNotOf<T>(this T arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
             where T : class
         {
@@ -5886,12 +5915,23 @@ namespace DryIoc
             throw GetMatchedException(ErrorCheck.IsNotOfType, error, arg0, arg1, arg2, arg3, null);
         }
 
+        /// <summary>Throws if <paramref name="arg0"/> is not assignable from <paramref name="arg1"/>.</summary>
+        /// <param name="arg0"></param> <param name="arg1"></param> 
+        /// <param name="error">Error code</param>
+        ///  <param name="arg2"></param> <param name="arg3"></param>
+        /// <returns><paramref name="arg0"/> if no exception.</returns>
         public static Type ThrowIfNotOf(this Type arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
         {
             if (arg1.IsAssignableTo(arg0)) return arg0;
             throw GetMatchedException(ErrorCheck.TypeIsNotOfType, error, arg0, arg1, arg2, arg3, null);
         }
 
+        /// <summary>Invokes <paramref name="operation"/> and in case of <typeparamref name="TEx"/> re-throws it as inner-exception.</summary>
+        /// <typeparam name="TEx">Exception to check and handle, and then wrap as inner-exception.</typeparam>
+        /// <typeparam name="T">Result of <paramref name="operation"/>.</typeparam>
+        /// <param name="operation">To invoke</param> <param name="error">Error code</param>
+        /// <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
+        /// <returns>Result of <paramref name="operation"/> if no exception.</returns>
         public static T IfThrows<TEx, T>(Func<T> operation, int error, object arg0 = null, object arg1 = null,
             object arg2 = null, object arg3 = null) where TEx : Exception
         {
@@ -5899,6 +5939,9 @@ namespace DryIoc
             catch (TEx ex) { throw GetMatchedException(ErrorCheck.OperationThrows, error, arg0, arg1, arg2, arg3, ex); }
         }
 
+        /// <summary>Just throws the exception with the <paramref name="error"/> code.</summary>
+        /// <param name="error">Error code.</param>
+        /// <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
         public static void Error(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
@@ -6654,16 +6697,24 @@ namespace DryIoc
         /// <summary>Returns true is tree is empty.</summary>
         public bool IsEmpty { get { return Height == 0; } }
 
+        /// <summary>Returns new tree with added or updated value for specified key.</summary>
+        /// <param name="key"></param> <param name="value"></param>
+        /// <returns>New tree.</returns>
         public IntKeyTree AddOrUpdate(int key, object value)
         {
             return AddOrUpdate(key, value, false);
         }
 
+        /// <summary>Returns new tree with updated value for the key, Or the same tree if key was not found.</summary>
+        /// <param name="key"></param> <param name="value"></param>
+        /// <returns>New tree if key is found, or the same tree otherwise.</returns>
         public IntKeyTree Update(int key, object value)
         {
             return AddOrUpdate(key, value, true);
         }
 
+        /// <summary>Get value for found key or null otherwise.</summary>
+        /// <param name="key"></param> <returns>Found value or null.</returns>
         public object GetValueOrDefault(int key)
         {
             var t = this;
@@ -6672,6 +6723,8 @@ namespace DryIoc
             return t.Height != 0 ? t.Value : null;
         }
 
+        /// <summary>Returns all sub-trees enumerated from left to right.</summary> 
+        /// <returns>Enumerated sub-trees or empty if tree is empty.</returns>
         public IEnumerable<IntKeyTree> Enumerate()
         {
             if (Height == 0)
