@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ExecutionFlowScopeContextTests
+    public class AsyncExecutionFlowScopeContextTests
     {
         [Test]
         public void Reuse_can_select_scope_with_specific_name()

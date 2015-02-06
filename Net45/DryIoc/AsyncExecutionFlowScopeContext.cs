@@ -31,7 +31,7 @@ namespace DryIoc
     partial class Container
     {
         [SuppressMessage("ReSharper", "RedundantAssignment")]
-        partial void GetDefaultScopeContext(ref IScopeContext resultContext)
+        static partial void GetDefaultScopeContext(ref IScopeContext resultContext)
         {
             resultContext = new AsyncExecutionFlowScopeContext();
         }

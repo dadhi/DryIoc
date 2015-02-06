@@ -183,7 +183,7 @@
     <Compile Include="..\..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs">
       <Link>Properties\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs</Link>
     </Compile>
-    <Compile Include="ExecutionFlowScopeContextTests.cs" />
+    <Compile Include="AsyncExecutionFlowScopeContextTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">

@@ -145,15 +145,16 @@ namespace DryIoc.UnitTests
         public void Can_hook_and_verify_registered_factories_ID()
         {
             var factoryIDs = new Dictionary<Type, string>();
-            var container = new Container(rules => rules
-                .WithoutSingletonOptimization()
-                .WithBeforeFactoryRegistrationHook((f, t, k) => factoryIDs[t] = f.FactoryID.ToString()));
+            var container = new Container(rules => rules.WithoutSingletonOptimization());
 
-            container.Register<XX>(Reuse.Singleton);
-            container.Register<YY>(Reuse.Singleton);
-            container.Register<ZZ>(Reuse.Singleton);
+            var factory = new ReflectionFactory(typeof(XX), Reuse.Singleton);
+            factoryIDs[typeof(XX)] = factory.FactoryID.ToString();
+            container.Register(typeof(XX), factory);
 
-            StringAssert.Contains(factoryIDs[typeof(ZZ)], container.Resolve<FactoryExpression<ZZ>>().Value.ToString());
+            factory = new ReflectionFactory(typeof(YY), Reuse.Singleton);
+            container.Register(typeof(YY), factory);
+            factoryIDs[typeof(YY)] = factory.FactoryID.ToString();
+
             StringAssert.Contains(factoryIDs[typeof(YY)], container.Resolve<FactoryExpression<YY>>().Value.ToString());
             StringAssert.Contains(factoryIDs[typeof(XX)], container.Resolve<FactoryExpression<XX>>().Value.ToString());
         }

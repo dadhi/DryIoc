@@ -222,6 +222,38 @@ namespace DryIoc.UnitTests
             Assert.That(second, Is.Not.SameAs(first));
         }
 
+        [Test]
+        public void Open_independent_scope()
+        {
+            var container = new Container();
+            container.Register<Blah>(Reuse.InCurrentScope);
+
+            using (var scope = container.OpenScopeWithoutContext())
+            {
+                var blah = scope.Resolve<Blah>();
+                Assert.AreSame(blah, scope.Resolve<Blah>());
+
+                using (var scope2 = ((Container)scope).OpenScopeWithoutContext())
+                    Assert.AreNotSame(blah, scope2.Resolve<Blah>());
+            }
+        }
+
+        [Test]
+        public void Open_independent_named_scope()
+        {
+            var container = new Container();
+            container.Register<Blah>(Reuse.InCurrentNamedScope("hey"));
+
+            using (var scope = container.OpenScopeWithoutContext("hey"))
+            {
+                var blah = scope.Resolve<Blah>();
+                Assert.AreSame(blah, scope.Resolve<Blah>());
+
+                using (var scope2 = ((Container)scope).OpenScopeWithoutContext())
+                    Assert.AreSame(blah, scope2.Resolve<Blah>());
+            }
+        }
+
         internal class IndependentService : IService { }
 
         internal class ServiceWithFuncConstructorDependency
