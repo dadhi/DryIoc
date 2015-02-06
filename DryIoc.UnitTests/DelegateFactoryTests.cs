@@ -143,6 +143,16 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Wiping_singletons_should_not_delete_current_instance_value()
+        {
+            var container = new Container();
+            container.RegisterInstance("mine", Reuse.Singleton);
+
+            var mine = container.WithoutSingletonsAndCache().Resolve<string>();
+            Assert.AreEqual("mine", mine);
+        }
+
+        [Test]
         public void Register_instance_with_different_if_already_resgitered_policies()
         {
             var container = new Container();

@@ -281,7 +281,7 @@ namespace DryIoc
         /// implemented.</param>
         /// <param name="ifAlreadyRegistered">(optional) Says how to handle existing registration with the same 
         /// <paramref name="serviceType"/> and <paramref name="serviceKey"/>.</param>
-        public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
+        public DefaultKey Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
             ThrowIfContainerDisposed();
             factory.ThrowIfNull().CheckBeforeRegistration(this, serviceType.ThrowIfNull(), serviceKey);
@@ -292,8 +292,10 @@ namespace DryIoc
                 case FactoryType.Wrapper:
                     _wrapperFactories.Swap(x => x.AddOrUpdate(serviceType, factory)); break;
                 default:
-                    AddOrUpdateServiceFactory(factory, serviceType, serviceKey, ifAlreadyRegistered); break;
+                    return AddOrUpdateServiceFactory(factory, serviceType, serviceKey, ifAlreadyRegistered);
             }
+            
+            return null;
         }
 
         /// <summary>Returns true if there is registered factory with the service type and key.
@@ -866,8 +868,9 @@ namespace DryIoc
             }
         }
 
-        private void AddOrUpdateServiceFactory(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
+        private DefaultKey AddOrUpdateServiceFactory(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
         {
+            DefaultKey defaultKey = null;
             if (serviceKey == null)
             {
                 _serviceFactories.Swap(f => f.AddOrUpdate(serviceType, factory, (oldEntry, newEntry) =>
@@ -877,8 +880,8 @@ namespace DryIoc
 
                     var oldFactories = oldEntry as FactoriesEntry;
                     if (oldFactories != null && oldFactories.LastDefaultKey == null) // no default registered yet
-                        return new FactoriesEntry(DefaultKey.Value,
-                            oldFactories.Factories.AddOrUpdate(DefaultKey.Value, (Factory)newEntry));
+                        return new FactoriesEntry(defaultKey = DefaultKey.Value,
+                            oldFactories.Factories.AddOrUpdate(defaultKey, (Factory)newEntry));
 
                     var oldFactory = oldFactories == null ? (Factory)oldEntry : null;
 
@@ -901,19 +904,18 @@ namespace DryIoc
                             }
 
                             return oldFactories == null ? newEntry :
-                                new FactoriesEntry(oldFactories.LastDefaultKey,
-                                    oldFactories.Factories.AddOrUpdate(oldFactories.LastDefaultKey, (Factory)newEntry));
+                                new FactoriesEntry(defaultKey = oldFactories.LastDefaultKey,
+                                    oldFactories.Factories.AddOrUpdate(defaultKey, (Factory)newEntry));
 
                         default:
                             if (oldFactories == null)
                                 return new FactoriesEntry(DefaultKey.Value.Next(),
                                     HashTree<object, Factory>.Empty
                                         .AddOrUpdate(DefaultKey.Value, (Factory)oldEntry)
-                                        .AddOrUpdate(DefaultKey.Value.Next(), (Factory)newEntry));
+                                        .AddOrUpdate(defaultKey = DefaultKey.Value.Next(), (Factory)newEntry));
 
-                            var newDefaultKey = oldFactories.LastDefaultKey.Next();
-                            return new FactoriesEntry(newDefaultKey,
-                                oldFactories.Factories.AddOrUpdate(newDefaultKey, (Factory)newEntry));
+                            return new FactoriesEntry(defaultKey = oldFactories.LastDefaultKey.Next(),
+                                oldFactories.Factories.AddOrUpdate(defaultKey, (Factory)newEntry));
                     }
                 }));
             }
@@ -957,6 +959,8 @@ namespace DryIoc
                         }));
                 }));
             }
+
+            return defaultKey;
         }
 
         private Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey, Rules.FactorySelectorRule factorySelector)
@@ -5371,7 +5375,7 @@ namespace DryIoc
         /// <param name="serviceType">Service type as unique key in registry for lookup.</param>
         /// <param name="serviceKey">Service key as complementary lookup for the same service type.</param>
         /// <param name="ifAlreadyRegistered">Policy how to deal with already registered factory with same service type and key.</param>
-        void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered);
+        DefaultKey Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered);
 
         /// <summary>Returns true if expected factory is registered with specified service key and type.</summary>
         /// <param name="serviceType">Type to lookup.</param>
@@ -5983,17 +5987,14 @@ namespace DryIoc
             if (!type.IsOpenGeneric())
                 return false;
 
-            SetToNullGenericParametersReferencedInConstraints(genericParams);
+            var matchedParams = new Type[genericParams.Length];
+            Array.Copy(genericParams, matchedParams, genericParams.Length);
 
-            var paramNames = new string[genericParams.Length];
-            for (var i = 0; i < genericParams.Length; i++)
-                if (genericParams[i] != null)
-                    paramNames[i] = genericParams[i].Name;
+            SetToNullGenericParametersReferencedInConstraints(matchedParams);
+            SetToNullMatchesFoundInGenericParameters(matchedParams, type.GetGenericParamsAndArgs());
 
-            SetToNullNamesFoundInGenericParameters(paramNames, type.GetGenericParamsAndArgs());
-
-            for (var i = 0; i < paramNames.Length; i++)
-                if (paramNames[i] != null)
+            for (var i = 0; i < matchedParams.Length; i++)
+                if (matchedParams[i] != null)
                     return false;
             return true;
         }
@@ -6013,7 +6014,7 @@ namespace DryIoc
                     if (genericConstraint.IsOpenGeneric())
                     {
                         var constraintGenericParams = genericConstraint.GetGenericParamsAndArgs();
-                        for (int k = 0; k < constraintGenericParams.Length; k++)
+                        for (var k = 0; k < constraintGenericParams.Length; k++)
                         {
                             var constraintGenericParam = constraintGenericParams[k];
                             if (constraintGenericParam != genericParam)
@@ -6258,19 +6259,19 @@ namespace DryIoc
 
         #region Implementation
 
-        private static void SetToNullNamesFoundInGenericParameters(string[] names, Type[] genericParameters)
+        private static void SetToNullMatchesFoundInGenericParameters(Type[] matchedParams, Type[] genericParams)
         {
-            for (var i = 0; i < genericParameters.Length; i++)
+            for (var i = 0; i < genericParams.Length; i++)
             {
-                var sourceTypeArg = genericParameters[i];
-                if (sourceTypeArg.IsGenericParameter)
+                var genericParam = genericParams[i];
+                if (genericParam.IsGenericParameter)
                 {
-                    var matchingTargetArgIndex = Array.IndexOf(names, sourceTypeArg.Name);
-                    if (matchingTargetArgIndex != -1)
-                        names[matchingTargetArgIndex] = null;
+                    var matchedIndex = matchedParams.IndexOf(genericParam);
+                    if (matchedIndex != -1)
+                        matchedParams[matchedIndex] = null;
                 }
-                else if (sourceTypeArg.IsOpenGeneric())
-                    SetToNullNamesFoundInGenericParameters(names, sourceTypeArg.GetGenericParamsAndArgs());
+                else if (genericParam.IsOpenGeneric())
+                    SetToNullMatchesFoundInGenericParameters(matchedParams, genericParam.GetGenericParamsAndArgs());
             }
         }
 
