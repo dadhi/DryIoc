@@ -34,30 +34,31 @@ namespace DryIoc.WebApi.UnitTests
 
             var task1 = Task.Run(async () =>
             {
-                var request = new MessageRequest();
+                var messageRequest = new MessageRequest();
                 using (var scope = container.OpenScope())
                 {
                     // Resolve request as early registered ReuseSwapable.
                     // and swap its current value (null) with your request.
                     // It will replace request instance inside current scope, keep all resolution cache, etc intact. It is fast.
-                    scope.RegisterInstance(request, Reuse.InCurrentScope);
-                    //scope.Resolve<ReuseSwapable>(typeof(MessageRequest)).Swap(request);
+                    scope.RegisterInstance(messageRequest, Reuse.InCurrentScope, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
                     var a = scope.Resolve<A>();
                     await Task.Delay(5);//processing request
+                    Assert.NotNull(a.Request);
                     Assert.AreSame(a.Request, scope.Resolve<A>().Request);
                 }
             });
 
             var task2 = Task.Run(async () =>
             {
-                var request = new MessageRequest();
+                var messageRequest = new MessageRequest();
                 using (var scope = container.OpenScope())
                 {
-                    scope.RegisterInstance(request, Reuse.InCurrentScope);
+                    scope.RegisterInstance(messageRequest, Reuse.InCurrentScope, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
                     var a = scope.Resolve<A>();
                     await Task.Delay(2);//processing request
+                    Assert.NotNull(a.Request);
                     Assert.AreSame(a.Request, scope.Resolve<A>().Request);
                 }
             });

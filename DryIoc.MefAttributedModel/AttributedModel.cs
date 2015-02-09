@@ -252,7 +252,7 @@ namespace DryIoc.MefAttributedModel
 
                 registry.Register(serviceType, implementationType,
                     reuse, withConstructor, null, Setup.With(metadata: import.Metadata),
-                    serviceKey, IfAlreadyRegistered.KeepIt);
+                    serviceKey, IfAlreadyRegistered.Keep);
             }
 
             return ServiceInfoDetails.Of(serviceType, serviceKey);

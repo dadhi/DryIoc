@@ -148,8 +148,10 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.RegisterInstance("mine", Reuse.Singleton);
 
-            var mine = container.WithoutSingletonsAndCache().Resolve<string>();
-            Assert.AreEqual("mine", mine);
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.WithoutSingletonsAndCache().Resolve<string>());
+
+            Assert.AreEqual(ex.Error, Error.REUSED_INSTANCE_NO_LONGER_AVAILABLE);
         }
 
         [Test]
@@ -159,7 +161,7 @@ namespace DryIoc.UnitTests
             container.RegisterInstance("mine", Reuse.Singleton);
             Assert.AreEqual("mine", container.Resolve<string>());
 
-            container.RegisterInstance("yours", Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.RegisterInstance("yours", Reuse.Singleton);
             CollectionAssert.AreEquivalent(new[] { "mine", "yours" }, container.Resolve<string[]>());
         }
 

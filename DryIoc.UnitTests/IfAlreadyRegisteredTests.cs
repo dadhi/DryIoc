@@ -72,7 +72,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_update_second_registered_default()
+        public void Can_update_latest_registered_default()
         {
             var container = new Container();
             container.Register<IService, Service>();
