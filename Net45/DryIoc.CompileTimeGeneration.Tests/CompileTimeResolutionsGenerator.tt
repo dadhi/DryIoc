@@ -4,6 +4,9 @@
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.dll" #>
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.UnitTests.dll" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.MefAttributedModel.dll" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.MefAttributedModel.UnitTests.dll" #>
+<#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ assembly Name="$(ProjectDir)..\bin\Release\ExpressionToCodeLib.dll" #>
 <#@ import Namespace="System.Reflection" #>
 <#@ import Namespace="System.Text" #>
@@ -11,6 +14,18 @@
 <#@ import Namespace="ExpressionToCodeLib" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.UnitTests" #>
+<#@ import Namespace="DryIoc.MefAttributedModel" #>
+
+<#
+IContainer container = new Container(rules => rules
+    //.With(Constructor.WithAllResolvableArguments)
+    .WithoutSingletonOptimization()
+    .WithMefAttributedModel());
+
+container.RegisterExports(new[] { typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport).GetAssembly() });
+
+// container.RegisterMany(new[] { typeof(DryIoc.UnitTests.NewTests).GetAssembly() });
+#>
 
 namespace DryIoc.CompileTimeGeneration.Tests
 {
@@ -23,12 +38,6 @@ namespace DryIoc.CompileTimeGeneration.Tests
         static GeneratedResolutions()
         {
 <#
-    IContainer container = new Container(rules => rules
-        .With(Constructor.WithAllResolvableArguments)
-        .WithoutSingletonOptimization());
-
-    container.RegisterMany(new[] { typeof(DryIoc.UnitTests.NewTests).GetAssembly() });
-
     var exprToCode = ExpressionToCode.With(r => r.WithFullTypeNames().WithExplicitMethodTypeArgs());
 
     foreach (var r in container.GetServiceRegistrations())
@@ -38,7 +47,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
         {
             factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalKey, IfUnresolved.Throw, r.Type);
             var serviceTypeName = CSharpFriendlyTypeName.Get(r.Type, true);
-            var serviceKeyString = new StringBuilder().Print(r.OptionalKey, quote: "\"");
+            var serviceKeyString = new StringBuilder().AppendCode(r.OptionalKey);
 
             var code = exprToCode.ToCode(factoryExpr.Value);
 #>

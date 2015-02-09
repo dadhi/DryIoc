@@ -717,7 +717,9 @@ namespace DryIoc
                         var decoratorExpr = request.ResolutionCache.GetCachedFactoryExpressionOrDefault(decorator.FactoryID);
                         if (decoratorExpr == null)
                         {
-                            decoratorRequest = decoratorRequest.WithFuncArgs(decoratorFuncType);
+                            decoratorRequest = decoratorRequest.WithFuncArgs(decoratorFuncType, 
+                                funcArgPrefix: i.ToString()); // use prefix to generate non-conflicting Func argument names
+
                             decoratorExpr = decorator.GetExpressionOrDefault(decoratorRequest)
                                 .ThrowIfNull(Error.CANT_CREATE_DECORATOR_EXPR, decoratorRequest);
 
@@ -840,7 +842,7 @@ namespace DryIoc
         {
             if (result == null)
             {
-                var decorated = Expression.Parameter(serviceType, "decorated");
+                var decorated = Expression.Parameter(serviceType, "decorated" + serviceType.Name);
                 result = Expression.Lambda(Expression.Invoke(decoratorFuncExpr, decorated), decorated);
             }
             else
@@ -1598,13 +1600,10 @@ namespace DryIoc
             var wrapperType = request.ServiceType;
             var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
 
-            var serviceKeyExp = request.ResolutionCache.GetOrAddStateItemExpression(request.ServiceKey);
-            var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved);
-            var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
+            var serviceExpr = Resolver.CreateResolutionExpression(request.ResolutionCache,
+                serviceType, request.ServiceKey, request.IfUnresolved, request.RequiredServiceType);
 
-            var resolveMethod = Resolver.ResolveMethodDefinition.MakeGenericMethod(serviceType);
-            var factoryExpr = Expression.Lambda(Expression.Call(resolveMethod,
-                Container.ResolverExpr, serviceKeyExp, ifUnresolvedExpr, requiredServiceTypeExpr));
+            var factoryExpr = Expression.Lambda(serviceExpr, null);
 
             var wrapperCtor = wrapperType.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(serviceType));
             return Expression.New(wrapperCtor, factoryExpr);
@@ -2622,8 +2621,21 @@ namespace DryIoc
             return (T)container.New(typeof(T), with);
         }
 
-        /// <summary>Provides Resolve generic method definition for dynamic scenarios, e.g.: Lazy, IsDynamicDependency.</summary>
-        internal static readonly MethodInfo ResolveMethodDefinition = typeof(Resolver)
+        internal static Expression CreateResolutionExpression(ResolutionCache cache,
+            Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
+        {
+            var serviceKeyExp = cache.GetOrAddStateItemExpression(serviceKey);
+            var ifUnresolvedExpr = Expression.Constant(ifUnresolved);
+            var requiredServiceTypeExpr = Expression.Constant(requiredServiceType, typeof(Type));
+
+            var resolveMethod = _resolveMethodDefinition.MakeGenericMethod(serviceType);
+
+            var serviceResolveExpr = Expression.Call(resolveMethod,
+                Container.ResolverExpr, serviceKeyExp, ifUnresolvedExpr, requiredServiceTypeExpr);
+            return serviceResolveExpr;
+        }
+
+        private static readonly MethodInfo _resolveMethodDefinition = typeof(Resolver)
             .GetDeclaredMethodOrNull("Resolve", typeof(IResolver), typeof(object), typeof(IfUnresolved), typeof(Type)).ThrowIfNull();
     }
 
@@ -3233,15 +3245,18 @@ namespace DryIoc
         /// The expression is set to <see cref="FuncArgs"/> request field to use for <see cref="WrappersSupport.FuncTypes"/>
         /// resolution.</summary>
         /// <param name="funcType">Func type to get input arguments from.</param>
+        /// <param name="funcArgPrefix">(optional) Unique prefix to help generate non-conflicting argument names.</param>
         /// <returns>New request with <see cref="FuncArgs"/> field set.</returns>
-        public Request WithFuncArgs(Type funcType)
+        public Request WithFuncArgs(Type funcType, string funcArgPrefix = null)
         {
             var funcArgs = funcType.ThrowIf(!funcType.IsFuncWithArgs()).GetGenericParamsAndArgs();
             var funcArgExprs = new ParameterExpression[funcArgs.Length - 1];
-            for (var i = 0; i < funcArgExprs.Length; i++)
+
+            for (var i = 0; i < funcArgExprs.Length; ++i)
             {
                 var funcArg = funcArgs[i];
-                var funcArgName = "arg" + funcArg.Name + i; // Valid non conflicting argument names for code generation
+                var prefix = funcArgPrefix == null ? "_" : "_" + funcArgPrefix + "_";
+                var funcArgName = prefix + funcArg.Name + i; // Valid non conflicting argument names for code generation
                 funcArgExprs[i] = Expression.Parameter(funcArg, funcArgName);
             }
 
@@ -3632,17 +3647,8 @@ namespace DryIoc
         {
             // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual creation expression.
             if (Setup.IsDynamicDependency && !request.Parent.IsEmpty)
-            {
-                var serviceKeyExp = request.ResolutionCache.GetOrAddStateItemExpression(request.ServiceKey);
-                var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved);
-                var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
-
-                var resolveMethod = Resolver.ResolveMethodDefinition.MakeGenericMethod(request.ServiceType);
-
-                var serviceResolveExpr = Expression.Call(resolveMethod,
-                    Container.ResolverExpr, serviceKeyExp, ifUnresolvedExpr, requiredServiceTypeExpr);
-                return serviceResolveExpr;
-            }
+                return Resolver.CreateResolutionExpression(request.ResolutionCache,
+                    request.ServiceType, request.ServiceKey, request.IfUnresolved, request.RequiredServiceType);
 
             request = request.ResolveWithFactory(this);
 

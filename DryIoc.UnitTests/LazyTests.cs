@@ -1,6 +1,7 @@
 ﻿using System;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
+// ReSharper disable RedundantAssignment
 
 namespace DryIoc.UnitTests
 {
@@ -173,6 +174,35 @@ namespace DryIoc.UnitTests
                 Self = self;
             }
         }
-    }
 
+        [Test]
+        public void Can_resolve_dynamic_dependency_as_Lazy()
+        {
+            var container = new Container();
+            container.Register<Dog>();
+            container.Register<Food>(setup: Setup.With(isDynamicDependency: true));
+
+            var dog = container.Resolve<Dog>();
+            var food = dog.Feed();
+
+            Assert.IsInstanceOf<Food>(food);
+        }
+
+        internal class Dog
+        {
+            private readonly Lazy<Food> _food;
+
+            public Dog(Lazy<Food> food)
+            {
+                _food = food;
+            }
+
+            public Food Feed()
+            {
+                return _food.Value;
+            }
+        }
+
+        internal class Food { }
+    }
 }

@@ -46,6 +46,21 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">
+      <Project>{e210b3d9-29c8-46f5-8968-09a0e5857158}</Project>
+      <Name>DryIoc.MefAttributedModel.UnitTests.CUT</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.csproj">
+      <Project>{bd3efe68-767a-4f0d-be4a-ab6334212248}</Project>
+      <Name>DryIoc.MefAttributedModel.UnitTests</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
+      <Project>{bfb1206a-3545-4369-8f23-49fd1bffc362}</Project>
+      <Name>DryIoc.MefAttributedModel</Name>
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj">
       <Project>{13085219-07c8-4907-ba4b-e215b3dba588}</Project>
       <Name>DryIoc.UnitTests</Name>
@@ -62,9 +77,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CompileTimeResolutionsGenerator.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
       <DependentUpon>CompileTimeResolutionsGenerator.tt</DependentUpon>
+      <SubType>Code</SubType>
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

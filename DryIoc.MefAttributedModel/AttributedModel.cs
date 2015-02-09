@@ -67,10 +67,10 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
         /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.</summary>
         /// <param name="registrator">Container to register types into.</param>
-        /// <param name="typeProvider">Provides types to peek exported implementation types from.</param>
-        public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> typeProvider)
+        /// <param name="types">Provides types to peek exported implementation types from.</param>
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> types)
         {
-            registrator.RegisterExports(typeProvider.ThrowIfNull().Select(GetRegistrationInfoOrDefault).Where(regInfo => regInfo != null));
+            registrator.RegisterExports(types.ThrowIfNull().Select(GetRegistrationInfoOrDefault).Where(regInfo => regInfo != null));
         }
 
         /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
@@ -86,10 +86,10 @@ namespace DryIoc.MefAttributedModel
         /// <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.
         /// Then registers found types into registrator/container.</summary>
         /// <param name="registrator">Container to register into</param>
-        /// <param name="assemblyProvider">Provides assemblies to scan for exported implementation types.</param>
-        public static void RegisterExports(this IRegistrator registrator, IEnumerable<Assembly> assemblyProvider)
+        /// <param name="assemblies">Provides assemblies to scan for exported implementation types.</param>
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<Assembly> assemblies)
         {
-            registrator.RegisterExports(Scan(assemblyProvider));
+            registrator.RegisterExports(Scan(assemblies));
         }
 
         /// <summary>Registers new factories into registrator/container based on provided registration info's, which
@@ -553,7 +553,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendType(this StringBuilder code, Type x)
         {
-            return x == null ? code.Append("null") : code.Append("typeof(").Print(x).Append(')');
+            return x == null ? code.Append("null") : code.Append("typeof(").Print(x, t => t.FullName ?? t.Name).Append(')');
         }
 
         /// <summary>Prints valid c# Enum literal: Enum.Value.</summary>
@@ -562,14 +562,14 @@ namespace DryIoc.MefAttributedModel
         /// <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object x)
         {
-            return code.Print(enumType).Append('.').Append(Enum.GetName(enumType, x));
+            return code.Print(enumType, t => t.FullName ?? t.Name).Append('.').Append(Enum.GetName(enumType, x));
         }
 
         /// <summary>Prints valid c# literal depending of <paramref name="x"/> type.</summary>
         /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param>
         /// <param name="ifNotRecognized">(optional) Delegate to print unrecognized value.</param>
         /// <returns>Code with appended literal.</returns>
-        public static StringBuilder AppendObject(this StringBuilder code, object x, Action<StringBuilder, object> ifNotRecognized = null)
+        public static StringBuilder AppendCode(this StringBuilder code, object x, Action<StringBuilder, object> ifNotRecognized = null)
         {
             if (x == null)
                 return code.Append("null");
@@ -678,7 +678,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Generate valid c# code for instantiating of info from its state. Supposed be used in compile-time scenarios.</summary>
         /// <param name="code">Code to append "new RegistrationInfo(...)" to.</param>
         /// <returns>Code with "new info".</returns>
-        public StringBuilder AppendAsCode(StringBuilder code = null)
+        public StringBuilder ToCode(StringBuilder code = null)
         {
             code = code ?? new StringBuilder();
             code.Append(
@@ -686,7 +686,7 @@ namespace DryIoc.MefAttributedModel
     ImplementationType = ").AppendType(ImplementationType).Append(@",
     Exports = new[] {
         "); for (var i = 0; i < Exports.Length; i++)
-                code = Exports[i].AppendCode(code).Append(@",
+                code = Exports[i].ToCode(code).Append(@",
         "); code.Append(@"},
     ReuseType = ").AppendType(ReuseType).Append(@",
     HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
@@ -699,7 +699,7 @@ namespace DryIoc.MefAttributedModel
             if (Decorator != null)
             {
                 code.Append(@",
-"); Decorator.AppendAsCode(code);
+"); Decorator.ToCode(code);
             }
             code.Append(@"
 }");
@@ -756,11 +756,11 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Generates valid c# code to "new <see cref="ExportInfo"/>() { ... };" from its state.</summary>
         /// <param name="code">Code to append generated code to.</param>
         /// <returns>Code with appended generated info.</returns>
-        public StringBuilder AppendCode(StringBuilder code = null)
+        public StringBuilder ToCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
                 .Append(@"new ExportInfo(").AppendType(ServiceType).Append(@", ")
-                .AppendObject(ServiceKeyInfo.Key).Append(@")");
+                .AppendCode(ServiceKeyInfo.Key).Append(@")");
         }
     }
 
@@ -791,12 +791,12 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
         /// <param name="code">Code to append to.</param> <returns>Code with appended info code.</returns>
-        public StringBuilder AppendAsCode(StringBuilder code = null)
+        public StringBuilder ToCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
                 .Append(@"Wrapper = new WrapperInfo(")
                 .AppendType(WrappedServiceType).Append(", ")
-                .AppendObject(WrappedServiceTypeGenericArgIndex).Append(")");
+                .AppendCode(WrappedServiceTypeGenericArgIndex).Append(")");
         }
 
         /// <summary>Function to be used as delegate for unwrapping service type from wrapper using this info.</summary>
@@ -853,12 +853,12 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
         /// <param name="code">Code to append to.</param> <returns>Code with appended info code.</returns>
-        public StringBuilder AppendAsCode(StringBuilder code = null)
+        public StringBuilder ToCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
                 .Append(@"Decorator = new DecoratorInfo(")
                 .AppendType(DecoratedServiceConditionType).Append(", ")
-                .AppendObject(DecoratedServiceKeyInfo.Key).Append(")");
+                .AppendCode(DecoratedServiceKeyInfo.Key).Append(")");
         }
     }
 

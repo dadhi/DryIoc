@@ -349,7 +349,7 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(null, r2.Data);
         }
 
-        [Test][Ignore]
+        [Test]
         public void ReRegister_transient_with_key()
         {
             var c = new Container();

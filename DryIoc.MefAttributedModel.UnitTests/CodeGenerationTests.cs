@@ -11,7 +11,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             var info = AttributedModel.GetRegistrationInfoOrDefault(typeof(PrintToCodeExample));
 
-            var code = info.AppendAsCode();
+            var code = info.ToCode();
             var codeValue = code.ToString();
             Assert.That(codeValue, Is.EqualTo(
 @"new RegistrationInfo {
