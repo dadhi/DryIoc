@@ -2303,7 +2303,7 @@ namespace DryIoc
 
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
         /// Delegate can use <see cref="IResolver"/> parameter to resolve any required dependencies, e.g.:
-        /// <code>RegisterDelegate&lt;ICar&gt;(r => new Car(r.Resolve&lt;IEngine&gt;()))</code></summary>
+        /// <code lang="cs"><![CDATA[container.RegisterDelegate<ICar>(r => new Car(r.Resolve<IEngine>()))]]></code></summary>
         /// <typeparam name="TService">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="factoryDelegate">The delegate used to create a instance of <typeparamref name="TService"/>.</param>
@@ -2321,7 +2321,7 @@ namespace DryIoc
 
         /// <summary>Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
         /// Delegate can use <see cref="IResolver"/> parameter to resolve any required dependencies, e.g.:
-        /// <code>RegisterDelegate&lt;ICar&gt;(r => new Car(r.Resolve&lt;IEngine&gt;()))</code></summary>
+        /// <code lang="cs"><![CDATA[container.RegisterDelegate<ICar>(r => new Car(r.Resolve<IEngine>()))]]></code></summary>
         /// <param name="serviceType">Service type to register.</param>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="factoryDelegate">The delegate used to create a instance of <paramref name="serviceType"/>.</param>
@@ -2337,6 +2337,17 @@ namespace DryIoc
                 .ThrowIfNotOf(serviceType, Error.REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, r);
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
             registrator.Register(factory, serviceType, named, ifAlreadyRegistered);
+        }
+
+        /// <summary>Registers decorator function that gets decorated value as input and return decorator.</summary>
+        /// <typeparam name="TService">Registered service type to decorate.</typeparam>
+        /// <param name="registrator">Registrator/Container.</param>
+        /// <param name="getDecorator">Delegate returning decorating function.</param>
+        /// <param name="condition">(optional) Condition for decorator application.</param>
+        public static void RegisterDelegateDecorator<TService>(this IRegistrator registrator,
+            Func<IResolver, Func<TService, TService>> getDecorator, Func<Request, bool> condition = null)
+        {
+            registrator.RegisterDelegate(getDecorator, setup: SetupDecorator.With(condition));
         }
 
         /// <summary>Registers a pre-created object assignable to <paramref name="serviceType"/>. </summary>
