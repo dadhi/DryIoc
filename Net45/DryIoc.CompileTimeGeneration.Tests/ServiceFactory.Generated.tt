@@ -15,27 +15,30 @@
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.UnitTests" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
-
 <#
 IContainer container = new Container(rules => rules
-    //.With(Constructor.WithAllResolvableArguments)
     .WithoutSingletonOptimization()
     .WithMefAttributedModel());
 
-container.RegisterExports(new[] { typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport).GetAssembly() });
+container.RegisterExports(new[]
+{
+    //typeof(DryIoc.MefAttributedModel.UnitTests.ExportFactoryTests).GetAssembly(),   // MefAttrModel.UnitTests
+    typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport).GetAssembly()        // MefAttrModel.UnitTests.CUT
+});
 
-// container.RegisterMany(new[] { typeof(DryIoc.UnitTests.NewTests).GetAssembly() });
 #>
-
 namespace DryIoc.CompileTimeGeneration.Tests
 {
     using System;
-    public static class GeneratedResolutions
+    public partial class ServiceFactory
     {
-        public static HashTree<KV<Type, object>, FactoryDelegate> 
-            Resolutions = HashTree<KV<Type, object>, FactoryDelegate>.Empty;
+        public static HashTree<Type, FactoryDelegate> 
+            DefaultResolutions = HashTree<Type, FactoryDelegate>.Empty;
 
-        static GeneratedResolutions()
+        public static HashTree<KV<Type, object>, FactoryDelegate> 
+            KeyedResolutions = HashTree<KV<Type, object>, FactoryDelegate>.Empty;
+
+        static ServiceFactory()
         {
 <#
     var exprToCode = ExpressionToCode.With(r => r.WithFullTypeNames().WithExplicitMethodTypeArgs());
@@ -46,16 +49,30 @@ namespace DryIoc.CompileTimeGeneration.Tests
         try
         {
             factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalKey, IfUnresolved.Throw, r.Type);
-            var serviceTypeName = CSharpFriendlyTypeName.Get(r.Type, true);
-            var serviceKeyString = new StringBuilder().AppendCode(r.OptionalKey);
 
             var code = exprToCode.ToCode(factoryExpr.Value);
+
+            var serviceTypeName = CSharpFriendlyTypeName.Get(r.Type, true);
+
+            if (r.OptionalKey == null)
+            {
 #>
 
-            Resolutions = Resolutions.AddOrUpdate(new KV<Type, object>(
-                typeof(<#=serviceTypeName#>), <#=serviceKeyString#>),
-                <#=code#>);
+                DefaultResolutions = DefaultResolutions.AddOrUpdate(
+                    typeof(<#=serviceTypeName #>),
+                    <#=code #>);
 <#
+            }
+            else
+            {
+                var serviceKeyString = new StringBuilder().AppendCode(r.OptionalKey);
+#>
+
+                KeyedResolutions = KeyedResolutions.AddOrUpdate(new KV<Type, object>(
+                    typeof(<#=serviceTypeName#>), <#=serviceKeyString#>),
+                    <#=code#>);
+<#                
+            }
         }
         catch (Exception ex)
         {
