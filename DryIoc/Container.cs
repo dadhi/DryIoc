@@ -2353,7 +2353,7 @@ namespace DryIoc
             if (instance != null)
                 instance.ThrowIfNotOf(serviceType, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
 
-            if (reuse == null)
+            if (reuse == null || reuse is ResolutionScopeReuse)
             {
                 var factory = new DelegateFactory(_ => instance, setup: setup);
                 container.Register(factory, serviceType, named, ifAlreadyRegistered);

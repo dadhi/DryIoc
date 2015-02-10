@@ -166,6 +166,15 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Regster_instance_in_resolution_scope_is_the_same_as_delegate()
+        {
+            var container = new Container();
+            container.RegisterInstance(new MyClass(), Reuse.InResolutionScope);
+
+            Assert.NotNull(container.Resolve<MyClass>());
+        }
+
+        [Test]
         public void Can_use_props_and_fields_resolution_in_delegate_factory()
         {
             var container = new Container();
