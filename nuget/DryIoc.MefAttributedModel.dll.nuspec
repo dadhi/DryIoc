@@ -15,7 +15,7 @@
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc.dll" version="[2.0.0, 3.0.0)" />
+                <dependency id="DryIoc.dll" version="1.5" />
             </group>
         </dependencies>
         <frameworkAssemblies>

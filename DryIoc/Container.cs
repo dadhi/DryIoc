@@ -3850,6 +3850,7 @@ namespace DryIoc
     public sealed class InstanceFactory : Factory
     {
         /// <summary>Creates factory.</summary>
+        /// <param name="instance">Instance to register.</param>
         /// <param name="reuse">Target reuse</param>
         /// <param name="setup">?</param>
         public InstanceFactory(object instance, IReuse reuse, FactorySetup setup) : base(reuse.ThrowIfNull(), setup)
