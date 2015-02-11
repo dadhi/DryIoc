@@ -64,6 +64,7 @@
     <ProjectReference Include="..\DryIoc.Owin\DryIoc.Owin.csproj">
       <Project>{6e6097be-1ea6-46a7-9eef-179d6651804b}</Project>
       <Name>DryIoc.Owin</Name>
+      <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

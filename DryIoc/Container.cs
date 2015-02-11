@@ -486,16 +486,15 @@ namespace DryIoc
 
         #region IResolver
 
-        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request parentOrEmpty)
+        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
             var factoryDelegate = _defaultFactoryDelegatesCache.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
                 ? factoryDelegate(_resolutionCache.State, _containerWeakRef, null)
-                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, parentOrEmpty);
+                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved);
         }
 
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType,
-            Request parentOrEmpty)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
         {
             var cacheServiceKey = serviceKey;
             if (requiredServiceType != null)
@@ -512,7 +511,7 @@ namespace DryIoc
 
             // If service key is null, then use resolve default instead of keyed.
             if (cacheServiceKey == null)
-                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, parentOrEmpty);
+                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved);
 
             ThrowIfContainerDisposed();
 
@@ -521,7 +520,7 @@ namespace DryIoc
             if (factoryDelegate != null)
                 return factoryDelegate(_resolutionCache.State, _containerWeakRef, null);
 
-            var request = (parentOrEmpty ?? _emptyRequest).Push(serviceType, serviceKey, ifUnresolved, requiredServiceType);
+            var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType);
 
             var factory = ((IContainer)this).ResolveFactory(request);
             factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
@@ -535,12 +534,12 @@ namespace DryIoc
             return resultService;
         }
 
-        void IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selector, Request parentOrEmpty)
+        object IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selector)
         {
             selector = selector ?? Rules.PropertiesAndFields ?? PropertiesAndFields.PublicNonPrimitive;
 
             var instanceType = instance.ThrowIfNull().GetType();
-            var request = (parentOrEmpty ?? _emptyRequest).Push(instanceType)
+            var request = _emptyRequest.Push(instanceType)
                 .ResolveWithFactory(new ReflectionFactory(instanceType));
 
             foreach (var serviceInfo in selector(request))
@@ -550,6 +549,8 @@ namespace DryIoc
                     if (value != null)
                         serviceInfo.SetValue(instance, value);
                 }
+            
+            return instance;
         }
 
         IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey)
@@ -565,17 +566,17 @@ namespace DryIoc
 
             foreach (var item in serviceFactories)
             {
-                var service = ((IResolver)this).ResolveKeyed(serviceType, item.Key, IfUnresolved.ReturnDefault, requiredServiceType, null);
+                var service = ((IResolver)this).ResolveKeyed(serviceType, item.Key, IfUnresolved.ReturnDefault, requiredServiceType);
                 if (service != null)            // skip unresolved items
                     yield return service;
             }
         }
 
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, Request parentOrEmpty)
+        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved)
         {
             ThrowIfContainerDisposed();
 
-            var request = (parentOrEmpty ?? _emptyRequest).Push(serviceType, ifUnresolved: ifUnresolved);
+            var request = _emptyRequest.Push(serviceType, ifUnresolved: ifUnresolved);
 
             var factory = ((IContainer)this).ResolveFactory(request);
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
@@ -2355,26 +2356,27 @@ namespace DryIoc
         /// <param name="serviceType">Service type to register.</param>
         /// <param name="instance">The pre-created instance of <paramref name="serviceType"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterInstance(this IContainer container, Type serviceType, object instance, IReuse reuse = null,
-            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             if (instance != null)
                 instance.ThrowIfNotOf(serviceType, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
 
             if (reuse == null || reuse is ResolutionScopeReuse)
             {
-                var factory = new DelegateFactory(_ => instance, setup: setup);
+                var factory = new DelegateFactory(_ => instance, setup: Setup.Default);
                 container.Register(factory, serviceType, named, ifAlreadyRegistered);
             }
             else
             {
-                setup = setup ?? Setup.Default;
-                if (setup.FactoryType == FactoryType.Service)
-                    setup = ((Setup)setup).WithDynamicDependency();
-                var factory = new InstanceFactory(instance, reuse, setup);
+                if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
+                {
+                    
+                }
+
+                var factory = new InstanceFactory(instance, reuse, Setup.Default);
                 if (container.Register(factory, serviceType, named, ifAlreadyRegistered))
                     factory.CreateExpressionOrDefault(container.EmptyRequest);
             }
@@ -2386,13 +2388,12 @@ namespace DryIoc
         /// <param name="container">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="instance">The pre-created instance of <typeparamref name="TService"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup"/>)</param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         public static void RegisterInstance<TService>(this IContainer container, TService instance, IReuse reuse = null,
-            FactorySetup setup = null, object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
+            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
-            container.RegisterInstance(typeof(TService), instance, reuse, setup, named, ifAlreadyRegistered);
+            container.RegisterInstance(typeof(TService), instance, reuse, named, ifAlreadyRegistered);
         }
 
         /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
@@ -2416,7 +2417,8 @@ namespace DryIoc
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
             Action<TTarget, IResolver> initialize, Func<Request, bool> condition = null)
         {
-            registrator.RegisterDelegate<Action<TTarget>>(r => target => initialize(target, r), setup: SetupDecorator.With(condition));
+            registrator.RegisterDelegate<Action<TTarget>>(r => target => initialize(target, r), 
+                setup: SetupDecorator.With(condition));
         }
 
         /// <summary>Returns true if <paramref name="serviceType"/> is registered in container or its open generic definition is registered in container.</summary>
@@ -2480,7 +2482,7 @@ namespace DryIoc
         /// <returns>The requested service instance.</returns>
         public static object Resolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return resolver.ResolveDefault(serviceType, ifUnresolved, null);
+            return resolver.ResolveDefault(serviceType, ifUnresolved);
         }
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
@@ -2490,7 +2492,7 @@ namespace DryIoc
         /// <returns>The requested service instance.</returns>
         public static TService Resolve<TService>(this IResolver resolver, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveDefault(typeof(TService), ifUnresolved, null);
+            return (TService)resolver.ResolveDefault(typeof(TService), ifUnresolved);
         }
 
         /// <summary>Returns instance of <typeparamref name="TService"/> searching for <paramref name="requiredServiceType"/>.
@@ -2508,7 +2510,7 @@ namespace DryIoc
         /// ]]></code></example>
         public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved, requiredServiceType, null);
+            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved, requiredServiceType);
         }
 
         /// <summary>Returns instance of <paramref name="serviceType"/> searching for <paramref name="requiredServiceType"/>.
@@ -2529,8 +2531,8 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
             return serviceKey == null && requiredServiceType == null
-                ? resolver.ResolveDefault(serviceType, ifUnresolved, null)
-                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, null);
+                ? resolver.ResolveDefault(serviceType, ifUnresolved)
+                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType);
         }
 
         /// <summary>Resolve service using provided specification with <paramref name="info"/>. Useful for DryIoc extensions and hooks.</summary>
@@ -2593,8 +2595,7 @@ namespace DryIoc
         public static TService ResolvePropertiesAndFields<TService>(this IResolver resolver,
             TService instance, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            resolver.ResolvePropertiesAndFields(instance, propertiesAndFields, null);
-            return instance;
+            return (TService)resolver.ResolvePropertiesAndFields(instance, propertiesAndFields);
         }
 
         /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
@@ -3141,23 +3142,29 @@ namespace DryIoc
 
         #region Resolver
 
-        public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request _)
+        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            return Container.ResolveDefault(serviceType, ifUnresolved, this);
+            // TODO Inherit info
+            // override requested unresolved
+            ifUnresolved = ifUnresolved == IfUnresolved.ReturnDefault ? ifUnresolved : IfUnresolved;
+            return Container.ResolveDefault(serviceType, ifUnresolved);
         }
 
-        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request _)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
         {
-            return Container.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, this);
+            // TODO Inherit info
+            ifUnresolved = ifUnresolved == IfUnresolved.ReturnDefault ? ifUnresolved : IfUnresolved;
+            return Container.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType);
         }
 
-        public void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request _)
+        object IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
         {
-            Container.ResolvePropertiesAndFields(instance, selectPropertiesAndFields, this);
+            return Container.ResolvePropertiesAndFields(instance, selectPropertiesAndFields);
         }
 
-        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey)
+        IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey)
         {
+            // TODO Inherit info
             return Container.ResolveMany(serviceType, serviceKey, requiredServiceType, compositeParentKey);
         }
 
@@ -3859,8 +3866,8 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request)
         {
             // May throw for not available scope - CurrentScope for instance.
-            IScope _ = null;
-            var scope = Reuse.GetScope(request.Container, ref _);
+            IScope resolutionScopeIgnored = null;
+            var scope = Reuse.GetScope(request.Container, ref resolutionScopeIgnored);
 
             // Put instance into available scope.
             scope.GetOrAdd(FactoryID, () => _instance.ThrowIfNull(Error.REUSED_INSTANCE_NO_LONGER_AVAILABLE));
@@ -5349,23 +5356,21 @@ namespace DryIoc
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
-        /// <param name="parentOrEmpty">Parent request for dependency, or null for resolution root.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
-        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, Request parentOrEmpty);
+        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved);
 
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="serviceKey">Optional service key used for registering service.</param>
         /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
         /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
-        /// or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
-        /// <param name="parentOrEmpty">Parent request for dependency, or null for resolution root.</param>
+        ///     or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
         /// <remarks>
         /// This method covers all possible resolution input parameters comparing to <see cref="ResolveDefault"/>, and
         /// by specifying the same parameters as for <see cref="ResolveDefault"/> should return the same result.
         /// </remarks>
-        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request parentOrEmpty);
+        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType);
 
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
@@ -5373,9 +5378,8 @@ namespace DryIoc
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.</summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
-        /// <param name="parentOrEmpty">Parent request for dependency, or null for resolution root.</param>
         /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
-        void ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields, Request parentOrEmpty);
+        object ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields);
 
         /// <summary>Resolve all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with

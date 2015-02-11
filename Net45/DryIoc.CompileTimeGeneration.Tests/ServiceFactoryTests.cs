@@ -25,5 +25,27 @@ namespace DryIoc.CompileTimeGeneration.Tests
             Assert.NotNull(service);
             Assert.AreSame(service, factory.Resolve<IMultiExported>("c"));
         }
+
+        [Test]
+        public void Will_throw_for_not_registered_service_type()
+        {
+            var factory = new ServiceFactory();
+
+            var ex = Assert.Throws<ContainerException>(() => factory.Resolve<NotRegistered>());
+
+            Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
+        }
+
+        [Test]
+        public void Will_return_null_for_not_registered_service_type_with_IfUnresolved_option()
+        {
+            var factory = new ServiceFactory();
+
+            var nullService = factory.Resolve<NotRegistered>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNull(nullService);
+        }
+
+        internal class NotRegistered {}
     }
 }
