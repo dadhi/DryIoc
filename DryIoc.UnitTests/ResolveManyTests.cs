@@ -61,16 +61,27 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Newly_registered_services_could_be_turned_off_for_speed()
+        public void Result_enumrable_Behavior_Not_aware_of_newly_registered_services()
         {
             var container = new Container();
 
-            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AllItemsResolvedIntoFixedArray).ToArray();
-            Assert.That(items.Count(), Is.EqualTo(0));
+            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AllItemsResolvedIntoFixedArray);
+            Assert.AreEqual(0, items.Count());
 
             container.Register<IService, Service>();
-            items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AllItemsResolvedIntoFixedArray).ToArray();
-            Assert.That(items.Count(), Is.EqualTo(0));
+            Assert.AreEqual(0, items.Count());
+        }
+
+        [Test]
+        public void Result_enumrable_Behavior_aware_of_newly_registered_services()
+        {
+            var container = new Container();
+
+            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.EachItemLazyResolved);
+            Assert.AreEqual(0, items.Count());
+
+            container.Register<IService, Service>();
+            Assert.AreEqual(1, items.Count());
         }
 
         [Test]

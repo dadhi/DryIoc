@@ -34,7 +34,10 @@ namespace DryIoc.CompileTimeGeneration.Tests
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
         {
             var factoryDelegate = KeyedResolutions.GetValueOrDefault(new KV<Type, object>(serviceType, serviceKey));
-            return factoryDelegate(AppendableArray.Empty, this, null);
+            return factoryDelegate == null
+                ? ifUnresolved == IfUnresolved.ReturnDefault ? null
+                    : Throw.Instead<object>(Error.UNABLE_TO_RESOLVE_SERVICE, serviceType)
+                : factoryDelegate(AppendableArray.Empty, this, null);
         }
 
         public object ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)

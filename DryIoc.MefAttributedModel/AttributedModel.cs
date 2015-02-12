@@ -105,29 +105,29 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Registers factories into registrator/container based on single provided info, which could
         /// contain multiple exported services with single implementation.</summary>
         /// <param name="registrator">Container to register into.</param>
-        /// <param name="registrationInfo">Registration information provided.</param>
-        public static void RegisterInfo(this IRegistrator registrator, RegistrationInfo registrationInfo)
+        /// <param name="info">Registration information provided.</param>
+        public static void RegisterInfo(this IRegistrator registrator, RegistrationInfo info)
         {
-            var factory = registrationInfo.CreateFactory();
+            var factory = info.CreateFactory();
 
-            for (var i = 0; i < registrationInfo.Exports.Length; i++)
+            for (var i = 0; i < info.Exports.Length; i++)
             {
-                var export = registrationInfo.Exports[i];
+                var export = info.Exports[i];
                 registrator.Register(factory, export.ServiceType,
                     export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
             }
 
-            if (registrationInfo.IsFactory)
-                RegisterFactoryMethods(registrator, registrationInfo);
+            if (info.IsFactory)
+                RegisterFactoryMethods(registrator, info);
         }
 
         /// <summary>Scans assemblies to find concrete type annotated with <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>
         /// attributes, and create serializable DTO with all information required for registering of exported types.</summary>
-        /// <param name="assemblyProvider">Assemblies to scan.</param>
+        /// <param name="assemblies">Assemblies to scan.</param>
         /// <returns>Lazy collection of registration info DTOs.</returns>
-        public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblyProvider)
+        public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
-            return assemblyProvider.SelectMany(Portable.GetTypesFromAssembly).Select(GetRegistrationInfoOrDefault).Where(x => x != null);
+            return assemblies.SelectMany(Portable.GetTypesFromAssembly).Select(GetRegistrationInfoOrDefault).Where(x => x != null);
         }
 
         /// <summary>Creates registration info DTO for provided type. To find this info checks type attributes:
@@ -272,6 +272,9 @@ namespace DryIoc.MefAttributedModel
 
         private static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType, Attribute[] attributes)
         {
+            if (implementationType.IsOpenGeneric())
+                implementationType = implementationType.GetGenericTypeDefinition();
+
             var info = new RegistrationInfo { ImplementationType = implementationType, ReuseType = DefaultReuseType };
 
             for (var attrIndex = 0; attrIndex < attributes.Length; attrIndex++)

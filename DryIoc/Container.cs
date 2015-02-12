@@ -530,7 +530,9 @@ namespace DryIoc
             var resultService = factoryDelegate(request.ResolutionCache.State, _containerWeakRef, null);
 
             // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
-            _keyedFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(cacheKey, factoryDelegate));
+            if (factory.Setup.CacheFactoryExpression)
+                _keyedFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(cacheKey, factoryDelegate));
+            
             return resultService;
         }
 
@@ -539,6 +541,7 @@ namespace DryIoc
             selector = selector ?? Rules.PropertiesAndFields ?? PropertiesAndFields.PublicNonPrimitive;
 
             var instanceType = instance.ThrowIfNull().GetType();
+            
             var request = _emptyRequest.Push(instanceType)
                 .ResolveWithFactory(new ReflectionFactory(instanceType));
 
@@ -584,7 +587,10 @@ namespace DryIoc
                 return null;
 
             var resultService = factoryDelegate(request.ResolutionCache.State, _containerWeakRef, null);
-            _defaultFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+            
+            if (factory.Setup.CacheFactoryExpression)
+                _defaultFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+            
             return resultService;
         }
 
@@ -651,11 +657,6 @@ namespace DryIoc
                 Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
 
             return factory;
-        }
-
-        Factory IContainer.GetServiceFactoryOrDefault(Type serviceType, object serviceKey)
-        {
-            return GetServiceFactoryOrDefault(serviceType.ThrowIfNull(), serviceKey, Rules.FactorySelector);
         }
 
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType)
@@ -1664,6 +1665,8 @@ namespace DryIoc
             return pairExpr;
         }
 
+        /// <remarks>If service key is not specified in request then it will search for all
+        /// registered factory with the same metadata type, despite keys.</remarks>
         private static Expression GetMetaExpressionOrDefault(Request request)
         {
             var typeArgs = request.ServiceType.GetGenericParamsAndArgs();
@@ -1672,39 +1675,25 @@ namespace DryIoc
 
             var container = request.Container;
             var requiredServiceType = container.UnwrapServiceType(request.RequiredServiceType ?? serviceType);
-
-            object resultMetadata = null;
             var serviceKey = request.ServiceKey;
-            if (serviceKey == null)
-            {
-                var result = container.GetAllServiceFactories(requiredServiceType).FirstOrDefault(kv =>
-                    kv.Value.Setup.Metadata != null && metadataType.IsTypeOf(kv.Value.Setup.Metadata));
-                if (result != null)
-                {
-                    serviceKey = result.Key;
-                    resultMetadata = result.Value.Setup.Metadata;
-                }
-            }
-            else
-            {
-                var factory = container.GetServiceFactoryOrDefault(requiredServiceType, serviceKey);
-                if (factory != null)
-                {
-                    var metadata = factory.Setup.Metadata;
-                    resultMetadata = metadata != null && metadataType.IsTypeOf(metadata) ? metadata : null;
-                }
-            }
 
-            if (resultMetadata == null)
+            var result = container.GetAllServiceFactories(requiredServiceType)
+                .FirstOrDefault(f => (serviceKey == null || f.Key.Equals(serviceKey))
+                    && f.Value.Setup.Metadata != null && metadataType.IsTypeOf(f.Value.Setup.Metadata));
+
+            if (result == null)
                 return null;
+            
+            serviceKey = result.Key;
 
             var serviceRequest = request.Push(serviceType, serviceKey);
             var serviceFactory = container.ResolveFactory(serviceRequest);
             var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
                 return null;
+
             var metaCtor = request.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
-            var metadataExpr = request.ResolutionCache.GetOrAddStateItemExpression(resultMetadata, metadataType);
+            var metadataExpr = request.ResolutionCache.GetOrAddStateItemExpression(result.Value.Setup.Metadata, metadataType);
             var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
             return metaExpr;
         }
@@ -1919,16 +1908,16 @@ namespace DryIoc
     public sealed class FactoryMethod
     {
         /// <summary><see cref="ConstructorInfo"/> or <see cref="MethodInfo"/> for factory method.</summary>
-        public readonly MethodBase Method;
+        public readonly MethodBase MethodOrCtor;
 
-        /// <summary>Factory instance if <see cref="Method"/> is instance factory method.</summary>
+        /// <summary>Factory instance if <see cref="MethodOrCtor"/> is instance factory method.</summary>
         public readonly object Factory;
 
         /// <summary>For convenience conversation from method to its wrapper.</summary>
-        /// <param name="method">Method to wrap.</param> <returns>Factory method wrapper.</returns>
-        public static implicit operator FactoryMethod(MethodBase method)
+        /// <param name="methodOrCtor">Method to wrap.</param> <returns>Factory method wrapper.</returns>
+        public static implicit operator FactoryMethod(MethodBase methodOrCtor)
         {
-            return Of(method);
+            return Of(methodOrCtor);
         }
 
         /// <summary>Converts method to <see cref="FactoryMethodSelector"/> ignoring request.</summary>
@@ -1939,11 +1928,11 @@ namespace DryIoc
         }
 
         /// <summary>Wraps method and factory instance.</summary>
-        /// <param name="method">Static or instance method.</param> <param name="factory">Factory instance in case of instance <paramref name="method"/>.</param>
+        /// <param name="methodOrCtor">Static or instance method.</param> <param name="factory">Factory instance in case of instance <paramref name="methodOrCtor"/>.</param>
         /// <returns>New factory method wrapper.</returns>
-        public static FactoryMethod Of(MethodBase method, object factory = null)
+        public static FactoryMethod Of(MethodBase methodOrCtor, object factory = null)
         {
-            return new FactoryMethod(method.ThrowIfNull(), factory);
+            return new FactoryMethod(methodOrCtor.ThrowIfNull(), factory);
         }
 
         /// <summary>Creates factory method using refactoring friendly static method call expression (without string method name).
@@ -1972,12 +1961,12 @@ namespace DryIoc
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
-            return new StringBuilder().Print(Method.DeclaringType).Append("::[").Append(Method).Append("]").ToString();
+            return new StringBuilder().Print(MethodOrCtor.DeclaringType).Append("::[").Append(MethodOrCtor).Append("]").ToString();
         }
 
-        private FactoryMethod(MethodBase method, object factory = null)
+        private FactoryMethod(MethodBase methodOrCtor, object factory = null)
         {
-            Method = method;
+            MethodOrCtor = methodOrCtor;
             Factory = factory;
         }
     }
@@ -3144,15 +3133,12 @@ namespace DryIoc
 
         object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            // TODO Inherit info
-            // override requested unresolved
             ifUnresolved = ifUnresolved == IfUnresolved.ReturnDefault ? ifUnresolved : IfUnresolved;
             return Container.ResolveDefault(serviceType, ifUnresolved);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
         {
-            // TODO Inherit info
             ifUnresolved = ifUnresolved == IfUnresolved.ReturnDefault ? ifUnresolved : IfUnresolved;
             return Container.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType);
         }
@@ -3164,7 +3150,6 @@ namespace DryIoc
 
         IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey)
         {
-            // TODO Inherit info
             return Container.ResolveMany(serviceType, serviceKey, requiredServiceType, compositeParentKey);
         }
 
@@ -4339,7 +4324,7 @@ namespace DryIoc
             if (method == null)
                 return null;
 
-            var parameters = method.Method.GetParameters();
+            var parameters = method.MethodOrCtor.GetParameters();
 
             Expression[] paramExprs = null;
             if (parameters.Length != 0)
@@ -4465,15 +4450,15 @@ namespace DryIoc
             if (getMethodOrNull != null)
             {
                 var method = getMethodOrNull(request);
-                if (method != null && method.Method is MethodInfo)
+                if (method != null && method.MethodOrCtor is MethodInfo)
                 {
-                    Throw.If(method.Method.IsStatic && method.Factory != null,
+                    Throw.If(method.MethodOrCtor.IsStatic && method.Factory != null,
                         Error.FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC, method.Factory, method, request);
 
-                    request.ServiceType.ThrowIfNotOf(((MethodInfo)method.Method).ReturnType,
+                    request.ServiceType.ThrowIfNotOf(((MethodInfo)method.MethodOrCtor).ReturnType,
                         Error.SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD, method, request);
 
-                    if (!method.Method.IsStatic && method.Factory == null)
+                    if (!method.MethodOrCtor.IsStatic && method.Factory == null)
                         return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
                             : Throw.Instead<FactoryMethod>(Error.FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD, method, request);
                 }
@@ -4516,11 +4501,11 @@ namespace DryIoc
 
         private Expression MakeServiceExpression(FactoryMethod method, Request request, Expression[] paramExprs)
         {
-            return method.Method.IsConstructor
-                ? SetPropertiesAndFields(Expression.New((ConstructorInfo)method.Method, paramExprs), request)
-                : method.Method.IsStatic
-                    ? Expression.Call((MethodInfo)method.Method, paramExprs)
-                    : Expression.Call(request.ResolutionCache.GetOrAddStateItemExpression(method.Factory), (MethodInfo)method.Method, paramExprs);
+            return method.MethodOrCtor.IsConstructor
+                ? SetPropertiesAndFields(Expression.New((ConstructorInfo)method.MethodOrCtor, paramExprs), request)
+                : method.MethodOrCtor.IsStatic
+                    ? Expression.Call((MethodInfo)method.MethodOrCtor, paramExprs)
+                    : Expression.Call(request.ResolutionCache.GetOrAddStateItemExpression(method.Factory), (MethodInfo)method.MethodOrCtor, paramExprs);
         }
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(Type implType, Request request)
@@ -5526,11 +5511,12 @@ namespace DryIoc
         /// <returns>Found factory, otherwise null if <see cref="Request.IfUnresolved"/> is set to <see cref="IfUnresolved.ReturnDefault"/>.</returns>
         Factory ResolveFactory(Request request);
 
-        /// <summary>Searches for registered service factory and returns it, or null if not found.</summary>
-        /// <param name="serviceType">Service type to look for.</param>
-        /// <param name="serviceKey">(optional) Service key to lookup in addition to type.</param>
-        /// <returns>Found registered factory or null.</returns>
-        Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey);
+        /// <summary>Finds all registered default and keyed service factories and returns them.
+        /// It skips decorators and wrappers.</summary>
+        /// <param name="serviceType"></param>
+        /// <returns>Enumerable of found pairs.</returns>
+        /// <remarks>Returned Key item should not be null - it should be <see cref="DefaultKey.Value"/>.</remarks>
+        IEnumerable<KV<object, Factory>> GetAllServiceFactories(Type serviceType);
 
         /// <summary>Searches for registered wrapper factory and returns it, or null if not found.</summary>
         /// <param name="serviceType">Service type to look for.</param> <returns>Found wrapper factory or null.</returns>
@@ -5541,12 +5527,6 @@ namespace DryIoc
         /// <param name="request">Decorated service request.</param>
         /// <returns>Decorator expression.</returns>
         Expression GetDecoratorExpressionOrDefault(Request request);
-
-        /// <summary>Finds all registered default and keyed service factories and returns them.
-        /// It skips decorators and wrappers.</summary>
-        /// <param name="serviceType"></param>
-        /// <returns></returns>
-        IEnumerable<KV<object, Factory>> GetAllServiceFactories(Type serviceType);
 
         /// <summary>If <paramref name="type"/> is generic type then this method checks if the type registered as generic wrapper,
         /// and recursively unwraps and returns its type argument. This type argument is the actual service type we want to find.
@@ -5668,7 +5648,7 @@ namespace DryIoc
         /// <param name="inner">(optional) Inner exception.</param>
         /// <returns>Created exception.</returns>
         public static ContainerException Of(ErrorCheck errorCheck, int errorCode,
-            object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null,
+            object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
             Exception inner = null)
         {
             string message = null;
@@ -5760,16 +5740,13 @@ namespace DryIoc
             REG_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE =
                 Of("Unable to register open-generic implementation {0} with non-generic service {1}."),
             REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS =
-                Of(
-                    "Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}."),
+                Of("Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}."),
             REG_NOT_A_GENERIC_TYPEDEF_IMPL_TYPE =
-                Of(
-                    "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." +
+                Of("Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." +
                     Environment.NewLine
                     + "Consider to register generic type definition {1} instead."),
             REG_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE =
-                Of(
-                    "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." +
+                Of("Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." +
                     Environment.NewLine
                     + "Consider to register generic type definition {1} instead."),
             EXPECTED_NON_ABSTRACT_IMPL_TYPE =

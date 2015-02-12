@@ -43,7 +43,8 @@ namespace DryIoc.CompileTimeGeneration.Tests
 <#
     var exprToCode = ExpressionToCode.With(r => r.WithFullTypeNames().WithExplicitMethodTypeArgs());
 
-    foreach (var r in container.GetServiceRegistrations())
+    var registrations = container.GetServiceRegistrations().Where(r => !r.Type.IsGenericDefinition());
+    foreach (var r in registrations)
     {
         FactoryExpression<object> factoryExpr = null;
         try

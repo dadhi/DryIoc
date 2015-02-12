@@ -130,17 +130,28 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_enumerable_is_reresolved_after_registering_another_service_Then_enumerable_should_NOT_contain_that_service()
+        public void When_enumerable_is_injected_it_will_Not_change_after_registering_of_new_service()
         {
             var container = new Container();
+            container.Register<ServiceAggregator>();
+
             container.Register(typeof(IService), typeof(Service));
-            var servicesBefore = container.Resolve<IService[]>();
-            Assert.That(servicesBefore.Length, Is.EqualTo(1));
+            var servicesBefore = container.Resolve<ServiceAggregator>().Services;
+            Assert.AreEqual(1, servicesBefore.Count());
 
             container.Register(typeof(IService), typeof(AnotherService), named: "another");
 
-            var servicesAfter = container.Resolve<IService[]>();
-            Assert.That(servicesAfter.Length, Is.EqualTo(1));
+            var servicesAfter = container.Resolve<ServiceAggregator>().Services;
+            Assert.AreEqual(1, servicesAfter.Count());
+        }
+
+        internal class ServiceAggregator
+        {
+            public IEnumerable<IService> Services { get; private set; }
+            public ServiceAggregator(IEnumerable<IService> services)
+            {
+                Services = services;
+            }
         }
 
         [Test]
