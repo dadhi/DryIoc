@@ -197,7 +197,7 @@ namespace DryIoc.UnitTests
         public void Should_resolve_any_named_service_with_corresponding_metadata_If_name_is_not_specified_in_resolve()
         {
             var container = new Container();
-            container.RegisterMany(typeof(Service<>), setup: Setup.With(metadata: 3), named: "some");
+            container.RegisterMany(typeof(Service<>), named: "some", setup: Setup.With(metadata: 3));
 
             var meta = container.Resolve<Meta<IService<string>, int>>();
 

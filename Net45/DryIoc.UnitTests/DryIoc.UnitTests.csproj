@@ -184,6 +184,7 @@
       <Link>Properties\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs</Link>
     </Compile>
     <Compile Include="AsyncExecutionFlowScopeContextTests.cs" />
+    <Compile Include="RegisterInstanceTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">

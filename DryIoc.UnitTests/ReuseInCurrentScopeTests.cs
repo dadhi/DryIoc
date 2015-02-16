@@ -129,7 +129,6 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(() => getLog());
             Assert.That(ex.Error, Is.EqualTo(Error.NO_CURRENT_SCOPE));
-            Assert.That(ex.Message, Is.StringContaining("No current scope available: probably you are resolving scoped service outside of scope."));
         }
 
         [Test]
