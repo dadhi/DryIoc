@@ -37,9 +37,12 @@
   <ItemGroup>
     <Compile Include="AttributedModelTests.CUT.cs" />
     <Compile Include="CodeGenerationTests.CUT.cs" />
+    <Compile Include="CustomInjectionRulesTests.CUT.cs" />
     <Compile Include="ExportAsDecoratorTests.CUT.cs" />
     <Compile Include="ExportAsGenericWrapperTests.CUT.cs" />
+    <Compile Include="ExportFactoryTests.CUT.cs" />
     <Compile Include="ExportImportWithKeyTests.CUT.cs" />
+    <Compile Include="ExportManyTests.CUT.cs" />
     <Compile Include="ImportExternalTests.CUT.cs" />
     <Compile Include="ImportWithMetadataTests.CUT.cs" />
     <Compile Include="InheritedExportTests.CUT.cs" />

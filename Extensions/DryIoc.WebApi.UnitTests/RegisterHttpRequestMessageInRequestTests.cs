@@ -6,22 +6,22 @@ namespace DryIoc.WebApi.UnitTests
     [TestFixture]
     public class RegisterHttpRequestMessageInRequestTests
     {
-        public class MessageRequest {}
+        public class TestRequestMessage {}
 
         public class A
         {
-            public MessageRequest Request { get; set; }
+            public TestRequestMessage Request { get; set; }
 
-            public A(MessageRequest r)
+            public A(TestRequestMessage r)
             {
                 Request = r;
             }
         }
 
         [Test]
-        public void ScopeTest()
+        public void Register_request_message_in_current_scope()
         {
-            // Create container with AsyncExecutionFlowScopeContext which works across Async/Await boundaries.
+            // Create container with AsyncExecutionFlowScopeContext which works across async/await boundaries.
             // In case of MVC it may be changed to HttpContextScopeContext.
             // If not specified container will use ThreadScopeContext.
             var container = new Container( 
@@ -32,38 +32,29 @@ namespace DryIoc.WebApi.UnitTests
             // Register Null request in parent container in order to swap to actual request in current scope.
             // When resolving A container will find registered request dependency and cache access to it for fast performance.
 
-            var task1 = Task.Run(async () =>
+            const int parallelRequestCount = 10;
+            var tasks = new Task[parallelRequestCount];
+            for (var i = 0; i < parallelRequestCount; i++)
             {
-                var messageRequest = new MessageRequest();
-                using (var scope = container.OpenScope())
+                tasks[i] = Task.Run(async () =>
                 {
-                    // Resolve request as early registered ReuseSwapable.
-                    // and swap its current value (null) with your request.
-                    // It will replace request instance inside current scope, keep all resolution cache, etc intact. It is fast.
-                    scope.RegisterInstance(messageRequest, Reuse.InCurrentScope, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+                    var message = new TestRequestMessage();
+                    using (var scope = container.OpenScope())
+                    {
+                        // Resolve request as early registered ReuseSwapable.
+                        // and swap its current value (null) with your request.
+                        // It will replace request instance inside current scope, keep all resolution cache, etc intact. It is fast.
+                        scope.RegisterInstance(message, Reuse.InCurrentScope, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
-                    var a = scope.Resolve<A>();
-                    await Task.Delay(5);//processing request
-                    Assert.NotNull(a.Request);
-                    Assert.AreSame(a.Request, scope.Resolve<A>().Request);
-                }
-            });
+                        var a = scope.Resolve<A>();
+                        await Task.Delay(5);//processing request
+                        Assert.NotNull(a.Request);
+                        Assert.AreSame(a.Request, scope.Resolve<A>().Request);
+                    }
+                });
+            }
 
-            var task2 = Task.Run(async () =>
-            {
-                var messageRequest = new MessageRequest();
-                using (var scope = container.OpenScope())
-                {
-                    scope.RegisterInstance(messageRequest, Reuse.InCurrentScope, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-
-                    var a = scope.Resolve<A>();
-                    await Task.Delay(2);//processing request
-                    Assert.NotNull(a.Request);
-                    Assert.AreSame(a.Request, scope.Resolve<A>().Request);
-                }
-            });
-
-            Task.WaitAll(task1, task2);
+            Task.WaitAll(tasks);
         }
     }
 }

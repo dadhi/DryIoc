@@ -32,6 +32,7 @@
     <RunCodeAnalysis>true</RunCodeAnalysis>
     <DocumentationFile>
     </DocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />

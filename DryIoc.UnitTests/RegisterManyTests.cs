@@ -121,7 +121,7 @@ namespace DryIoc.UnitTests
 
             container.RegisterMany(
                 new[] { GetType().GetAssembly() },
-                (r, serviceTypes, implType, proceed) => // for only A and its implementations
+                with: (r, serviceTypes, implType, register) => // for only A and its implementations
                 {
                     if (serviceTypes.IndexOf(typeof(A)) != -1)
                         r.Register(typeof(A), implType, Reuse.Singleton);
@@ -135,9 +135,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterMany(new[] { GetType().GetAssembly() }, (registrator, types, type, proceed) =>
+            container.RegisterMany(new[] { GetType().GetAssembly() }, with: (r, serviceTypes, implType, register) =>
             {
-                Assert.False(type.FullName.Contains("_DisplayClass"));
+                Assert.False(implType.FullName.Contains("_DisplayClass"));
             });
         }
 
@@ -165,10 +165,10 @@ namespace DryIoc.UnitTests
         public void Can_get_all_service_registrations()
         {
             var container = new Container();
-            container.RegisterMany(new[] { GetType().GetAssembly() }, (registrator, types, type, proceed) =>
+            container.RegisterMany(new[] { GetType().GetAssembly() }, with: (r, types, type, register) =>
             {
                 if (type.GetAllConstructors().Count() == 1)
-                    proceed(types, type);
+                    register(types, type);
             });
 
             var registrations = container.GetServiceRegistrations().Select(r => r.Type).ToArray();
@@ -176,7 +176,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_register_internal_implementation()
+        public void Can_register_internal_implementations()
         {
             var container = new Container(r => r.With(Constructor.WithAllResolvableArguments));
             container.RegisterMany(new[] { typeof(InternalMe).GetAssembly() }, nonPublicServiceTypes: true);

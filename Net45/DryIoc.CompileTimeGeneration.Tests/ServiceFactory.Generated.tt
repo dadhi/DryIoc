@@ -22,8 +22,7 @@ IContainer container = new Container(rules => rules
 
 container.RegisterExports(new[]
 {
-    //typeof(DryIoc.MefAttributedModel.UnitTests.ExportFactoryTests).GetAssembly(),   // MefAttrModel.UnitTests
-    typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport).GetAssembly()        // MefAttrModel.UnitTests.CUT
+    typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport).GetAssembly() // MefAttrModel.UnitTests.CUT
 });
 
 #>
@@ -46,21 +45,19 @@ namespace DryIoc.CompileTimeGeneration.Tests
     var registrations = container.GetServiceRegistrations().Where(r => !r.Type.IsGenericDefinition());
     foreach (var r in registrations)
     {
-        FactoryExpression<object> factoryExpr = null;
         try
         {
-            factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalKey, IfUnresolved.Throw, r.Type);
-
+            var factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalKey, IfUnresolved.Throw, r.Type);
+            
+            var serviceTypeName = ObjectToCode.PlainObjectToCode(r.Type, typeof(Type), true);
             var code = exprToCode.ToCode(factoryExpr.Value);
-
-            var serviceTypeName = CSharpFriendlyTypeName.Get(r.Type, true);
 
             if (r.OptionalKey == null)
             {
 #>
 
                 DefaultResolutions = DefaultResolutions.AddOrUpdate(
-                    typeof(<#=serviceTypeName #>),
+                    <#=serviceTypeName #>,
                     <#=code #>);
 <#
             }
@@ -70,7 +67,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
 #>
 
                 KeyedResolutions = KeyedResolutions.AddOrUpdate(new KV<Type, object>(
-                    typeof(<#=serviceTypeName#>), <#=serviceKeyString#>),
+                    <#=serviceTypeName#>, <#=serviceKeyString#>),
                     <#=code#>);
 <#                
             }

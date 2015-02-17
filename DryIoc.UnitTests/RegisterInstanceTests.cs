@@ -36,10 +36,11 @@ namespace DryIoc.UnitTests
             using (container.OpenScope())
             {
                 container.RegisterInstance("b", Reuse.InCurrentScope, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-                Assert.AreEqual("a", container.Resolve<string>());
+                Assert.AreEqual("b", container.Resolve<string>());
             }
 
-            Assert.AreEqual("a", container.Resolve<string>());
+            var ex = Assert.Throws<ContainerException>(() => container.Resolve<string>());
+            Assert.AreEqual(ex.Error, Error.NO_CURRENT_SCOPE);
         }
 
         [Test]
@@ -83,7 +84,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.WithoutSingletonsAndCache().Resolve<string>());
 
-            Assert.AreEqual(ex.Error, Error.REUSED_INSTANCE_NO_LONGER_AVAILABLE);
+            Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
         }
 
         [Test]

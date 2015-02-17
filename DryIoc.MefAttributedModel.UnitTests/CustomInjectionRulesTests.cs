@@ -1,5 +1,4 @@
-﻿using System.ComponentModel.Composition;
-using DryIoc.MefAttributedModel.UnitTests.CUT;
+﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
@@ -32,27 +31,5 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.That(client.Message, Is.EqualTo("hell"));
         }
-
-        [Export]
-        public class ClientWithPrimitiveParameter
-        {
-            public IService Service { get; private set; }
-            public string Message { get; private set; }
-
-            public ClientWithPrimitiveParameter([ImportWithKey(ServiceKey.One)]IService service, string message)
-            {
-                Service = service;
-                Message = message;
-            }
-        }
-
-        [Export]
-        public class ClientWithServiceAndPrimitiveProperty
-        {
-            [ImportWithKey(ServiceKey.One)]
-            public IService Service { get; set; }
-
-            public string Message { get; set; }
-        } 
     }
 }

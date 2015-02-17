@@ -1,5 +1,4 @@
-﻿using System.ComponentModel.Composition;
-using DryIoc.MefAttributedModel.UnitTests.CUT;
+﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
@@ -54,20 +53,5 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.DoesNotThrow(() =>
                 container.Resolve<WithBothTheSameExports>());
         }
-    }
-
-    [ExportMany, Export]
-    public class WithBothTheSameExports {}
-
-    public interface IOne {}
-
-    public interface INamed {}
-
-    [ExportMany(ContractName = "blah")]
-    public class NamedOne : INamed, IOne {}
-
-    [Export("named", typeof(INamed)), ExportMany]
-    public class BothExportManyAndExport : INamed, IOne
-    {
     }
 }

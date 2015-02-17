@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DryIoc.CompileTimeGeneration.Tests
 {
-    public partial class ServiceFactory : IResolverWithScopes, IResolverProvider
+    public partial class ServiceFactory : IResolverWithScopes, IResolverProvider, IDisposable
     {
         public IScope SingletonScope { get; private set; }
 
@@ -17,6 +17,11 @@ namespace DryIoc.CompileTimeGeneration.Tests
             SingletonScope = new Scope();
         }
 
+        public void Dispose()
+        {
+            SingletonScope.Dispose();
+        }
+
         public IResolverWithScopes Resolver
         {
             get { return this; }
@@ -26,8 +31,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
         {
             var factoryDelegate = DefaultResolutions.GetValueOrDefault(serviceType);
             return factoryDelegate == null 
-                ? ifUnresolved == IfUnresolved.ReturnDefault ? null
-                    : Throw.Instead<object>(Error.UNABLE_TO_RESOLVE_SERVICE, serviceType)
+                ? GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved)
                 : factoryDelegate(AppendableArray.Empty, this, null);
         }
 
@@ -35,8 +39,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
         {
             var factoryDelegate = KeyedResolutions.GetValueOrDefault(new KV<Type, object>(serviceType, serviceKey));
             return factoryDelegate == null
-                ? ifUnresolved == IfUnresolved.ReturnDefault ? null
-                    : Throw.Instead<object>(Error.UNABLE_TO_RESOLVE_SERVICE, serviceType)
+                ? GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved)
                 : factoryDelegate(AppendableArray.Empty, this, null);
         }
 
@@ -48,6 +51,12 @@ namespace DryIoc.CompileTimeGeneration.Tests
         public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey)
         {
             throw new NotImplementedException();
+        }
+
+        private static object GetDefaultOrThrowIfUnresolved(Type serviceType, IfUnresolved ifUnresolved)
+        {
+            return ifUnresolved == IfUnresolved.ReturnDefault ? null
+                : Throw.Instead<object>(Error.UNABLE_TO_RESOLVE_SERVICE, serviceType);
         }
     }
 }

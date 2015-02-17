@@ -48,6 +48,7 @@
     <Compile Include="IfUnresolvedTests.cs" />
     <Compile Include="InitializerTests.cs" />
     <Compile Include="NewTests.cs" />
+    <Compile Include="RegisterInstanceTests.cs" />
     <Compile Include="RegisterManyTests.cs" />
     <Compile Include="RequiredServiceTypeTests.cs" />
     <Compile Include="ResolveManyTests.cs" />

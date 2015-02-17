@@ -132,6 +132,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\RefTests.cs">
       <Link>RefTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\RegisterInstanceTests.cs">
+      <Link>RegisterInstanceTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\RegisterManyTests.cs">
       <Link>RegisterManyTests.cs</Link>
     </Compile>
@@ -184,7 +187,6 @@
       <Link>Properties\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs</Link>
     </Compile>
     <Compile Include="AsyncExecutionFlowScopeContextTests.cs" />
-    <Compile Include="RegisterInstanceTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">

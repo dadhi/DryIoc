@@ -28,6 +28,7 @@ namespace DryIoc
 
     public static partial class Portable
     {
+        // ReSharper disable once RedundantAssignment
         static partial void GetCurrentManagedThreadID(ref int threadID)
         {
             threadID = Thread.CurrentThread.ManagedThreadId;

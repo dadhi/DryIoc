@@ -31,23 +31,24 @@ namespace DryIoc.Samples
         public void Convention_setup_example()
         {
             var container = new Container();
-            container.RegisterMany(new[] { Assembly.GetExecutingAssembly() }, (r, types, type, proceed) =>
-            {
-                if (type == typeof(AnotherPlugin)) // custom registration of specific type
-                    r.Register<AnotherPlugin>(Reuse.Singleton);
-                else
-                    proceed(types, type);
-            });
+            container.RegisterMany(new[] { Assembly.GetExecutingAssembly() },
+                typeof(IPlugin).Equals,
+                (r, types, type, proceed) =>
+                {
+                    if (type == typeof(AnotherPlugin)) // custom registration of specific type
+                        r.Register<IPlugin, AnotherPlugin>(Reuse.Singleton, named: "another");
+                    else
+                        proceed(types, type);
+                });
 
-            var plugin = container.Resolve<IPlugin>(typeof(AnotherPlugin));
+            var plugin = container.Resolve<IPlugin>("another");
             Assert.NotNull(plugin);
-            Assert.AreSame(plugin, container.Resolve<AnotherPlugin>());
+            Assert.AreSame(plugin, container.Resolve<IPlugin>("another"));
             Assert.AreEqual(2, container.Resolve<IPlugin[]>().Length);
         }
     }
 
     public interface IPlugin { }
-
     public class SomePlugin : IPlugin { }
     public class AnotherPlugin : IPlugin { }
 }

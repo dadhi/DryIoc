@@ -46,7 +46,7 @@
     <Compile Include="CodeGenerationTests.cs" />
     <Compile Include="CustomInjectionRulesTests.cs" />
     <Compile Include="ExportFactoryTests.cs" />
-    <Compile Include="ExportAllTests.cs" />
+    <Compile Include="ExportManyTests.cs" />
     <Compile Include="ExportAsDecoratorTests.cs" />
     <Compile Include="ExportAsWrapperTests.cs" />
     <Compile Include="ExportImportWithKeyTests.cs" />

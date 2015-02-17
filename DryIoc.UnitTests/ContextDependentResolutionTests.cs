@@ -29,7 +29,7 @@ namespace DryIoc.UnitTests
             Assert.That(c.Resolve<User1>().Logger, Is.InstanceOf<Logger<User1>>());
         }
 
-        [Test, Ignore("Not implemented yet: Need to provide request into condition somehow")]
+        [Test, Explicit("Not implemented yet: #22: Add Resolution condition to Factory setup")]
         public void Can_select_what_factory_to_use_as_dependency_and_what_as_resolution_root()
         {
             var container = new Container();

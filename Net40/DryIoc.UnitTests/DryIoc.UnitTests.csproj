@@ -126,6 +126,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\RefTests.cs">
       <Link>RefTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\RegisterInstanceTests.cs">
+      <Link>RegisterInstanceTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\RegisterManyTests.cs">
       <Link>RegisterManyTests.cs</Link>
     </Compile>

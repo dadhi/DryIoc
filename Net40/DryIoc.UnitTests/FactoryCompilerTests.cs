@@ -6,9 +6,9 @@ namespace DryIoc.UnitTests
     public class FactoryCompilerTests
     {
         [Test]
-        public void Container_with_disabled_compilation_to_DynamicAssembly()
+        public void Container_with_enabled_compilation_to_DynamicAssembly()
         {
-            var container = new Container(rules => rules.EnableCompilationToDynamicAssembly(false));
+            var container = new Container(rules => rules.WithFactoryDelegateCompilationToDynamicAssembly());
             container.Register<InternalService>();
 
             var service = container.Resolve<InternalService>();
