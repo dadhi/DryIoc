@@ -50,7 +50,7 @@ namespace DryIoc.UnitTests
 
             var cheese = new BlueCheese();
             container.Register<Burger>(
-                with: Construct.Of(p => new Burger(p.UseDefault(cheese))));
+                with: Construct.Of(p => new Burger(p.AllowDefault(cheese))));
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Null);
@@ -172,9 +172,9 @@ namespace DryIoc.UnitTests
         
         public T Of<T>(object serviceKey, IfUnresolved ifUnresolved) { return default(T); }
 
-        public T UseDefault<T>(T defaultValue) { return default(T); }
+        public T AllowDefault<T>(T defaultValue) { return default(T); }
         
-        public T UseDefault<T>(object serviceKey, T defaultValue) { return default(T); }
+        public T AllowDefault<T>(object serviceKey, T defaultValue) { return default(T); }
 
         private Params() { }
     }

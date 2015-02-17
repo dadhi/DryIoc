@@ -62,8 +62,8 @@ namespace DryIoc.Owin
         {
             var services = registry.GetServiceRegistrations()
                 .Where(r => r.ServiceType.IsAssignableTo(typeof(OwinMiddleware)))
-                .Select(r => typeof(DryIocWrapperMiddleware<>).MakeGenericType(r.Factory.ImplementationType))
-                .Where(serviceType => !registry.IsRegistered(serviceType))
+                .Select(r => typeof(DryIocWrapperMiddleware<>)
+                    .MakeGenericType(r.Factory.ImplementationType ?? r.ServiceType))
                 .ToArray();
 
             if (!services.IsNullOrEmpty())

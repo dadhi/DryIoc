@@ -222,7 +222,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Open_independent_scope()
+        public void Open_context_independent_scope()
         {
             var container = new Container();
             container.Register<Blah>(Reuse.InCurrentScope);
@@ -238,7 +238,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Open_independent_named_scope()
+        public void Open_context_independent_named_scope()
         {
             var container = new Container();
             container.Register<Blah>(Reuse.InCurrentNamedScope("hey"));
@@ -251,6 +251,8 @@ namespace DryIoc.UnitTests
                 using (var scope2 = ((Container)scope).OpenScopeWithoutContext())
                     Assert.AreSame(blah, scope2.Resolve<Blah>());
             }
+
+            container.Dispose();
         }
 
         internal class IndependentService : IService { }

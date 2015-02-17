@@ -135,7 +135,6 @@ namespace DryIoc
                 _disposed, _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionCache);
         }
 
-        // TODO
         /// <summary>Creates scoped container with new current scope independent of any scope context.
         /// Current container scope will become parent for new scope.</summary>
         /// <param name="scopeName">(optional) Scope name.</param>
@@ -144,28 +143,16 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
 
-            scopeName = scopeName ?? (_openedScope == null ? SingleScopeContext.ROOT_SCOPE_NAME : null);
+            scopeName = scopeName ?? (_openedScope == null ? NO_CONTEXT_ROOT_SCOPE_NAME : null);
             var nestedOpenedScope = new Scope(_openedScope, scopeName);
 
             return new Container(Rules, _serviceFactories, _decoratorFactories, _wrapperFactories, _singletonScope,
-                new SingleScopeContext(nestedOpenedScope), nestedOpenedScope,
+                /*scopeContext:*/null, nestedOpenedScope,
                 _disposed, _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionCache);
         }
 
-        private sealed class SingleScopeContext : IScopeContext
-        {
-            public static object ROOT_SCOPE_NAME = typeof(SingleScopeContext);
-
-            public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
-
-            public SingleScopeContext(IScope scope) { _scope = scope; }
-
-            public IScope GetCurrentOrDefault() { return _scope; }
-
-            public IScope SetCurrent(Func<IScope, IScope> handle) { return handle(_scope); }
-
-            private readonly IScope _scope;
-        }
+        /// <summary>Provide root scope name for <see cref="OpenScopeWithoutContext"/></summary>
+        public static readonly object NO_CONTEXT_ROOT_SCOPE_NAME = typeof(IContainer);
 
         /// <summary>Creates child container using the same rules as its created from.
         /// Additionally child container will fallback for not registered service to it parent.</summary>
@@ -219,9 +206,12 @@ namespace DryIoc
 
             if (_openedScope != null)
             {
-                var openedScope = _openedScope;
-                _scopeContext.SetCurrent(scope =>
-                    scope.ThrowIf(scope != openedScope, Error.UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE).Parent);
+                if (_scopeContext != null)
+                {
+                    var openedScope = _openedScope;
+                    _scopeContext.SetCurrent(scope =>
+                        scope.ThrowIf(scope != openedScope, Error.UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE).Parent);
+                }
 
                 _openedScope.Dispose();
                 _openedScope = null;
@@ -628,7 +618,7 @@ namespace DryIoc
         /// <summary>Scope associated with containers created by <see cref="Container.OpenScope"/>.</summary>
         IScope IResolverWithScopes.CurrentScope
         {
-            get { return _scopeContext.GetCurrentOrDefault().ThrowIfNull(Error.NO_CURRENT_SCOPE); }
+            get { return (_scopeContext == null ? _openedScope : _scopeContext.GetCurrentOrDefault()).ThrowIfNull(Error.NO_CURRENT_SCOPE); }
         }
 
         /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
