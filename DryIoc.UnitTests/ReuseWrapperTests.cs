@@ -190,7 +190,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             var service = new DisposableService();
-            container.RegisterInstance<IService>(service, Reuse.Singleton,
+            container.RegisterDelegate<IService>(r => service, Reuse.Singleton,
                 Setup.With(reuseWrappers: new[] {typeof(ReuseWeakReference), typeof(ReuseHiddenDisposable)}));
 
             Assert.Throws<ContainerException>(() =>

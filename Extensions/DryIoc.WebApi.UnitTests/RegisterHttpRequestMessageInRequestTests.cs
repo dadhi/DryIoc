@@ -44,7 +44,7 @@ namespace DryIoc.WebApi.UnitTests
                         // Resolve request as early registered ReuseSwapable.
                         // and swap its current value (null) with your request.
                         // It will replace request instance inside current scope, keep all resolution cache, etc intact. It is fast.
-                        scope.RegisterInstance(message, Reuse.InCurrentScope, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+                        scope.RegisterInstance(message, Reuse.InCurrentScope, IfAlreadyRegistered.Replace);
 
                         var a = scope.Resolve<A>();
                         await Task.Delay(5);//processing request

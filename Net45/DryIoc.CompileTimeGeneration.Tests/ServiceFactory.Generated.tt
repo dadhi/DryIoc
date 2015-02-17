@@ -42,17 +42,17 @@ namespace DryIoc.CompileTimeGeneration.Tests
 <#
     var exprToCode = ExpressionToCode.With(r => r.WithFullTypeNames().WithExplicitMethodTypeArgs());
 
-    var registrations = container.GetServiceRegistrations().Where(r => !r.Type.IsGenericDefinition());
+    var registrations = container.GetServiceRegistrations().Where(r => !r.ServiceType.IsGenericDefinition());
     foreach (var r in registrations)
     {
         try
         {
-            var factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalKey, IfUnresolved.Throw, r.Type);
+            var factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalServiceKey, IfUnresolved.Throw, r.ServiceType);
             
-            var serviceTypeName = ObjectToCode.PlainObjectToCode(r.Type, typeof(Type), true);
+            var serviceTypeName = ObjectToCode.PlainObjectToCode(r.ServiceType, typeof(Type), true);
             var code = exprToCode.ToCode(factoryExpr.Value);
 
-            if (r.OptionalKey == null)
+            if (r.OptionalServiceKey == null)
             {
 #>
 
@@ -63,7 +63,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
             }
             else
             {
-                var serviceKeyString = new StringBuilder().AppendCode(r.OptionalKey);
+                var serviceKeyString = new StringBuilder().AppendCode(r.OptionalServiceKey);
 #>
 
                 KeyedResolutions = KeyedResolutions.AddOrUpdate(new KV<Type, object>(

@@ -171,7 +171,7 @@ namespace DryIoc.UnitTests
                     register(types, type);
             });
 
-            var registrations = container.GetServiceRegistrations().Select(r => r.Type).ToArray();
+            var registrations = container.GetServiceRegistrations().Select(r => r.ServiceType).ToArray();
             CollectionAssert.Contains(registrations, typeof(RegisterManyTests));
         }
 

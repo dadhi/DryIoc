@@ -24,42 +24,69 @@ THE SOFTWARE.
 
 namespace DryIoc.Owin
 {
+    using System;
+    using System.Linq;
     using System.Threading.Tasks;
     using global::Owin;
     using Microsoft.Owin;
 
     public static class DryIocOwin
     {
-        public static void UseDryIocMiddleware(this IAppBuilder app, IContainer container)
+        public static readonly string ScopedContainerKey = typeof(DryIocOwin).FullName;
+
+        public static void UseDryIocMiddleware(this IAppBuilder app, IContainer container,
+            Action<IContainer> registerInScope = null)
         {
             container = container.With(scopeContext: new AsyncExecutionFlowScopeContext());
-            app.Use<DryIocMiddleware>(container);
-            //var registeredMiddleware = container.Resolve<Func<OwinMiddleware, OwinMiddleware>[]>();
-            //foreach (var getMiddleware in registeredMiddleware)
-            //{
-            //    app.Use((context, next) =>
-            //    {
-            //        getMiddleware(context.)
-            //    })
-            //}
+            app.Use(async (context, next) =>
+            {
+                using (var scopedContainer = container.OpenScope())
+                {
+                    scopedContainer.RegisterInstance(context);
+                    if (registerInScope != null)
+                        registerInScope(scopedContainer);
+                    context.Set(ScopedContainerKey, scopedContainer);
+                    await next();
+                }
+            });
+
+            app.UseRegisteredMiddleware(container);
+        }
+
+        public static IContainer GetDryIocScopedContainer(this IOwinContext context)
+        {
+            return context.Get<IContainer>(ScopedContainerKey);
+        }
+
+        static void UseRegisteredMiddleware(this IAppBuilder app, IRegistrator registry)
+        {
+            var services = registry.GetServiceRegistrations()
+                .Where(r => r.ServiceType.IsAssignableTo(typeof(OwinMiddleware)))
+                .Select(r => typeof(DryIocWrapperMiddleware<>).MakeGenericType(r.Factory.ImplementationType))
+                .Where(serviceType => !registry.IsRegistered(serviceType))
+                .ToArray();
+
+            if (!services.IsNullOrEmpty())
+                foreach (var service in services)
+                    app.Use(service);
         }
     }
 
-    public class DryIocMiddleware : OwinMiddleware
+    internal sealed class DryIocWrapperMiddleware<TServiceMiddleware> : OwinMiddleware 
+        where TServiceMiddleware : OwinMiddleware
     {
-        public DryIocMiddleware(OwinMiddleware next, IContainer container)
-            : base(next)
-        {
-            _container = container;
-        }
+        public DryIocWrapperMiddleware(OwinMiddleware next) : base(next) {}
 
-        public async override Task Invoke(IOwinContext context)
+        public override Task Invoke(IOwinContext context)
         {
-            using (_container.OpenScope())
-                await Next.Invoke(context);
-        }
+            var container = context.GetDryIocScopedContainer().ThrowIfNull();
 
-        private readonly IContainer _container;
+            var middleware = container.Resolve<Func<OwinMiddleware, TServiceMiddleware>>(IfUnresolved.ReturnDefault);
+            if (middleware == null)
+                return Next.Invoke(context);
+            
+            return middleware(Next).Invoke(context);
+        }
     }
 
     public static class WebReuse

@@ -64,7 +64,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var rules = configure == null ? Rules : configure(Rules);
             scopeContext = scopeContext ?? _scopeContext;
-            return new Container(rules, _serviceFactories, _decoratorFactories, _wrapperFactories, _singletonScope, 
+            return new Container(rules, _serviceFactories, _decoratorFactories, _wrapperFactories, _singletonScope,
                 scopeContext ?? GetDefaultScopeContext(), _openedScope, _disposed);
         }
 
@@ -85,8 +85,8 @@ namespace DryIoc
         public IContainer WithoutSingletonsAndCache()
         {
             ThrowIfContainerDisposed();
-            return new Container(Rules, _serviceFactories, _decoratorFactories, _wrapperFactories, 
-                /*singletonScope:*/new Scope(), _scopeContext, _openedScope, _disposed 
+            return new Container(Rules, _serviceFactories, _decoratorFactories, _wrapperFactories,
+                /*singletonScope:*/new Scope(), _scopeContext, _openedScope, _disposed
                 /*drop cache*/);
         }
 
@@ -98,10 +98,10 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return preserveCache
-                ? new Container(Rules, 
+                ? new Container(Rules,
                     Ref.Of(_serviceFactories.Value), Ref.Of(_decoratorFactories.Value), Ref.Of(_wrapperFactories.Value),
                     _singletonScope, _scopeContext, _openedScope, _disposed)
-                : new Container(Rules, 
+                : new Container(Rules,
                     Ref.Of(_serviceFactories.Value), Ref.Of(_decoratorFactories.Value), Ref.Of(_wrapperFactories.Value),
                     _singletonScope, _scopeContext, _openedScope, _disposed,
                     _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionCache);
@@ -130,7 +130,7 @@ namespace DryIoc
                 nestedOpenedScope.ThrowIf(scope != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT));
 
             var rules = configure == null ? Rules : configure(Rules);
-            return new Container(rules, _serviceFactories, _decoratorFactories, _wrapperFactories, 
+            return new Container(rules, _serviceFactories, _decoratorFactories, _wrapperFactories,
                 _singletonScope, _scopeContext, nestedOpenedScope,
                 _disposed, _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionCache);
         }
@@ -272,12 +272,12 @@ namespace DryIoc
                 var serviceType = factoryEntry.Key;
                 var factory = factoryEntry.Value as Factory;
                 if (factory != null)
-                    yield return new ServiceTypeKeyFactory { Type = serviceType, Factory = factory };
+                    yield return new ServiceTypeKeyFactory { ServiceType = serviceType, Factory = factory };
                 else
                 {
                     var factories = ((FactoriesEntry)factoryEntry.Value).Factories;
                     foreach (var f in factories.Enumerate())
-                        yield return new ServiceTypeKeyFactory { Type = serviceType, OptionalKey = f.Key, Factory = f.Value };
+                        yield return new ServiceTypeKeyFactory { ServiceType = serviceType, OptionalServiceKey = f.Key, Factory = f.Value };
                 }
             }
         }
@@ -539,7 +539,7 @@ namespace DryIoc
             // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
             if (factory.Setup.CacheFactoryExpression)
                 _keyedFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(cacheKey, factoryDelegate));
-            
+
             return resultService;
         }
 
@@ -548,7 +548,7 @@ namespace DryIoc
             selector = selector ?? Rules.PropertiesAndFields ?? PropertiesAndFields.PublicNonPrimitive;
 
             var instanceType = instance.ThrowIfNull().GetType();
-            
+
             var request = _emptyRequest.Push(instanceType)
                 .ResolveWithFactory(new ReflectionFactory(instanceType));
 
@@ -559,7 +559,7 @@ namespace DryIoc
                     if (value != null)
                         serviceInfo.SetValue(instance, value);
                 }
-            
+
             return instance;
         }
 
@@ -594,10 +594,10 @@ namespace DryIoc
                 return null;
 
             var resultService = factoryDelegate(request.ResolutionCache.State, _containerWeakRef, null);
-            
+
             if (factory.Setup.CacheFactoryExpression)
                 _defaultFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
-            
+
             return resultService;
         }
 
@@ -1695,7 +1695,7 @@ namespace DryIoc
 
             if (result == null)
                 return null;
-            
+
             serviceKey = result.Key;
 
             var serviceRequest = request.Push(serviceType, serviceKey);
@@ -2202,7 +2202,7 @@ namespace DryIoc
                 var factory = new ReflectionFactory(implType, reuse, rules, setup);
                 foreach (var serviceType in serviceTypes.Where(serviceTypeCondition ?? RegisterManyPublicServiceTypes))
                     r.Register(factory, serviceType, named, ifAlreadyRegistered);
-            }, 
+            },
             nonPublicServiceTypes: true);
         }
 
@@ -2285,7 +2285,7 @@ namespace DryIoc
             Func<Type, bool> serviceTypeCondition = null, RegisterManyAction with = null, bool nonPublicServiceTypes = false)
         {
             var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
-            registrator.RegisterMany(implTypes, serviceTypeCondition == null ? with 
+            registrator.RegisterMany(implTypes, serviceTypeCondition == null ? with
                 : (r, serviceTypes, implType, register) =>
                 {
                     serviceTypes = serviceTypes.Where(serviceTypeCondition).ToArrayOrSelf();
@@ -2294,7 +2294,7 @@ namespace DryIoc
                             with(r, serviceTypes, implType, register);
                         else
                             register(serviceTypes, implType);
-                }, 
+                },
                 nonPublicServiceTypes);
         }
 
@@ -2371,10 +2371,11 @@ namespace DryIoc
         /// <param name="serviceType">Service type to register.</param>
         /// <param name="instance">The pre-created instance of <paramref name="serviceType"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        public static void RegisterInstance(this IContainer container, Type serviceType, object instance, IReuse reuse = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
+        /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        public static void RegisterInstance(this IContainer container, Type serviceType, object instance, 
+            IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, 
+            object named = null)
         {
             if (instance != null)
                 instance.ThrowIfNotOf(serviceType, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
@@ -2390,7 +2391,7 @@ namespace DryIoc
             if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
             {
                 var registeredFactory = container.GetServiceFactoryOrDefault(serviceType, named, container.Rules.FactorySelector);
-                
+
                 // If existing factory is the same kind: reuse and setup-wise, then we can just replace value in scope.
                 if (registeredFactory != null &&
                     registeredFactory.Reuse == reuse &&
@@ -2424,12 +2425,13 @@ namespace DryIoc
         /// <param name="container">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="instance">The pre-created instance of <typeparamref name="TService"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        public static void RegisterInstance<TService>(this IContainer container, TService instance, IReuse reuse = null,
-            object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
+        /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        public static void RegisterInstance<TService>(this IContainer container, TService instance,
+            IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            object named = null)
         {
-            container.RegisterInstance(typeof(TService), instance, reuse, named, ifAlreadyRegistered);
+            container.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered, named);
         }
 
         /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
@@ -2453,7 +2455,7 @@ namespace DryIoc
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
             Action<TTarget, IResolver> initialize, Func<Request, bool> condition = null)
         {
-            registrator.RegisterDelegate<Action<TTarget>>(r => target => initialize(target, r), 
+            registrator.RegisterDelegate<Action<TTarget>>(r => target => initialize(target, r),
                 setup: SetupDecorator.With(condition));
         }
 
@@ -5416,10 +5418,10 @@ namespace DryIoc
     public struct ServiceTypeKeyFactory
     {
         /// <summary>Required service type.</summary>
-        public Type Type;
+        public Type ServiceType;
 
         /// <summary>Optional service key, may be an instance of <see cref="DefaultKey"/> for multiple default registrations.</summary>
-        public object OptionalKey;
+        public object OptionalServiceKey;
 
         /// <summary>Registered factory.</summary>
         public Factory Factory;
