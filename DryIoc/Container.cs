@@ -1909,12 +1909,12 @@ namespace DryIoc
     }
 
     /// <summary>Wraps constructor or factory method optionally with factory instance to create service.</summary>
-    public sealed class FactoryMethod
+    public class FactoryMethod
     {
-        /// <summary><see cref="ConstructorInfo"/> or <see cref="MethodInfo"/> for factory method.</summary>
+        /// <summary>Specified <see cref="ConstructorInfo"/> or <see cref="MethodInfo"/> to use for service creation.</summary>
         public readonly MethodBase MethodOrCtor;
 
-        /// <summary>Factory instance if <see cref="MethodOrCtor"/> is instance factory method.</summary>
+        /// <summary>Factory instance if <see cref="MethodOrCtor"/> is instance method.</summary>
         public readonly object Factory;
 
         /// <summary>For convenience conversation from method to its wrapper.</summary>
@@ -1994,8 +1994,8 @@ namespace DryIoc
             ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            return factoryMethod == null && parameters == null && propertiesAndFields == null
-                ? Default : new InjectionRules(factoryMethod, parameters, propertiesAndFields);
+            return factoryMethod == null && parameters == null && propertiesAndFields == null ? Default 
+                : new InjectionRules(factoryMethod, parameters, propertiesAndFields);
         }
 
         /// <summary>Sets rule how to select constructor with simplified signature without <see cref="Request"/> 
@@ -2057,9 +2057,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private InjectionRules() { }
-
-        private InjectionRules(
+        protected InjectionRules(
             FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
@@ -2070,6 +2068,20 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    public class InjectionRules<T> : InjectionRules
+    {
+        protected InjectionRules(
+            FactoryMethodSelector factoryMethod = null, 
+            ParameterSelector parameters = null, 
+            PropertiesAndFieldsSelector propertiesAndFields = null) 
+            : base(factoryMethod, parameters, propertiesAndFields) {}
+
+        public static InjectionRules<T> Of(FactoryMethodSelector factoryMethod, ParameterSelector parameters)
+        {
+            return new InjectionRules<T>(factoryMethod, parameters);
+        }
     }
 
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
@@ -2163,6 +2175,15 @@ namespace DryIoc
             object named = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             with = (with ?? InjectionRules.Default).With(withConstructor);
+            var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, with, setup);
+            registrator.Register(factory, typeof(TServiceAndImplementation), named, ifAlreadyRegistered);
+        }
+
+        public static void Register2<TServiceAndImplementation>(this IRegistrator registrator,
+            IReuse reuse = null, InjectionRules<TServiceAndImplementation> with = null,
+            FactorySetup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            object named = null)
+        {
             var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, with, setup);
             registrator.Register(factory, typeof(TServiceAndImplementation), named, ifAlreadyRegistered);
         }

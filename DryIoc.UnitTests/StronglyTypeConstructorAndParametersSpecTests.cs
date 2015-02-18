@@ -14,8 +14,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<Burger>(
-                with: Construct.Of(_ => new Burger()));
+            container.Register2(with: Construct.Of(_ => new Burger()));
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Null);
@@ -80,6 +79,19 @@ namespace DryIoc.UnitTests
             Assert.NotNull(container.Resolve<Burger>());
         }
 
+        [Test]
+        public void Specify_for_factory_method_service_key_and_required_service_type_for_parameter()
+        {
+            var container = new Container();
+
+            container.Register<BlueCheese>(named: "a");
+            container.Register2(
+                with: Construct.Of(p => Burger.Create("King", p.Of<BlueCheese>("a"))));
+
+            var burger = container.Resolve<Burger>();
+            Assert.AreEqual("King", burger.Name);
+        }
+
         internal interface ICheese { }
 
         internal class BlueCheese : ICheese { }
@@ -107,32 +119,37 @@ namespace DryIoc.UnitTests
             {
                 return new Burger();
             }
+
+            public static Burger Create(string name, ICheese cheese)
+            {
+                return new Burger(name, cheese);
+            }
         }
     }
 
     public static class Construct
     {
-        public static InjectionRules Of<TImpl>(Expression<Func<Params, TImpl>> methodOrCtorCallExpression)
+        public static InjectionRules<T> Of<T>(Expression<Func<Params, T>> methodOrCtorCallExpr)
         {
             MethodBase methodOrCtor;
             ReadOnlyCollection<Expression> argExprs;
 
-            var callExpr = methodOrCtorCallExpression.Body;
-            var newExpr = callExpr as NewExpression;
-            if (newExpr != null)
+            var callExpr = methodOrCtorCallExpr.Body;
+            if (!(callExpr is NewExpression) && !(callExpr is MethodCallExpression))
+                return Throw.Instead<InjectionRules<T>>(
+                    Error.Of("Only method calls and new expression are supported, but found: " + callExpr));
+
+            if (callExpr is NewExpression)
             {
+                var newExpr = (NewExpression)callExpr;
                 argExprs = newExpr.Arguments;
                 methodOrCtor = newExpr.Constructor;
             }
             else
             {
-                var methodCallExpr = callExpr as MethodCallExpression;
-                if (methodCallExpr != null)
-                {
-                    argExprs = methodCallExpr.Arguments;
-                    methodOrCtor = methodCallExpr.Method;
-                }
-                else return Throw.Instead<InjectionRules>(Error.Of("Not supported expression"));
+                var methodCallExpr = (MethodCallExpression)callExpr;
+                argExprs = methodCallExpr.Arguments;
+                methodOrCtor = methodCallExpr.Method;
             }
 
             var pars = methodOrCtor.GetParameters();
@@ -178,7 +195,7 @@ namespace DryIoc.UnitTests
                 }
             }
 
-            return InjectionRules.With(request => FactoryMethod.Of(methodOrCtor), parameters);
+            return InjectionRules<T>.Of(_ => FactoryMethod.Of(methodOrCtor), parameters);
         }
     }
 
