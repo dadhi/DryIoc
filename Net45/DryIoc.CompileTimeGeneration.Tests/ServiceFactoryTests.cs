@@ -1,4 +1,5 @@
-﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
+﻿using System.Linq;
+using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.CompileTimeGeneration.Tests
@@ -44,6 +45,16 @@ namespace DryIoc.CompileTimeGeneration.Tests
             var nullService = factory.Resolve<NotRegistered>(IfUnresolved.ReturnDefault);
 
             Assert.IsNull(nullService);
+        }
+
+        [Test, Ignore]
+        public void Can_resolve_many()
+        {
+            var factory = new ServiceFactory();
+
+            var handlers = factory.ResolveMany<IHandler>().ToArray();
+
+            Assert.AreEqual(5, handlers.Length);
         }
 
         internal class NotRegistered {}

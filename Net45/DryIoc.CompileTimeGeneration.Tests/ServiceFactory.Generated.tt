@@ -34,8 +34,8 @@ namespace DryIoc.CompileTimeGeneration.Tests
         public static HashTree<Type, FactoryDelegate> 
             DefaultResolutions = HashTree<Type, FactoryDelegate>.Empty;
 
-        public static HashTree<KV<Type, object>, FactoryDelegate> 
-            KeyedResolutions = HashTree<KV<Type, object>, FactoryDelegate>.Empty;
+        public static HashTree<Type, HashTree<object, FactoryDelegate>> 
+            KeyedResolutions =  HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
 
         static ServiceFactory()
         {
@@ -56,9 +56,9 @@ namespace DryIoc.CompileTimeGeneration.Tests
             {
 #>
 
-                DefaultResolutions = DefaultResolutions.AddOrUpdate(
-                    <#=serviceTypeName #>,
-                    <#=code #>);
+            DefaultResolutions = DefaultResolutions.AddOrUpdate(
+                <#=serviceTypeName #>,
+                <#=code #>);
 <#
             }
             else
@@ -66,17 +66,19 @@ namespace DryIoc.CompileTimeGeneration.Tests
                 var serviceKeyString = new StringBuilder().AppendCode(r.OptionalServiceKey);
 #>
 
-                KeyedResolutions = KeyedResolutions.AddOrUpdate(new KV<Type, object>(
-                    <#=serviceTypeName#>, <#=serviceKeyString#>),
-                    <#=code#>);
-<#                
+            KeyedResolutions = KeyedResolutions.AddOrUpdate(
+                <#=serviceTypeName#>,     HashTree<object, FactoryDelegate>.Empty.AddOrUpdate(
+                <#=serviceKeyString#>,
+                <#=code#>),
+                (oldEntry, newEntry) => oldEntry.AddOrUpdate(newEntry.Key, newEntry.Value));
+<#
             }
         }
         catch (Exception ex)
         {
 #>
 
-/* Exception: <#=CSharpFriendlyTypeName.Get(ex.GetType())#>
+/* Exception: <#=ObjectToCode.PlainObjectToCode(ex.GetType())#>
 ----------------------
 <#=ex.Message#>
 */

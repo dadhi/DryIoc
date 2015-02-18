@@ -31,7 +31,7 @@ namespace DryIoc.IssuesTests
         public void ExternallyOwnedInstanceShouldNotBeAliveAfterDisposalAndGc()
         {
             WeakReference @ref;
-            var c = new Container();
+            var c = new Container(scopeContext: new ThreadScopeContext());
             c.Register<ITest, Test>(Reuse.InCurrentScope);
             var cx = c.OpenScope();
             var scopeRef = new WeakReference(cx);

@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.ObjectModel;
 using System.Linq.Expressions;
+using System.Reflection;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -43,19 +45,6 @@ namespace DryIoc.UnitTests
             Assert.That(burger.Cheese, Is.Null);
         }
 
-        [Test, Ignore]
-        public void Specify_parameter_default_value_without_reflection()
-        {
-            var container = new Container();
-
-            var cheese = new BlueCheese();
-            container.Register<Burger>(
-                with: Construct.Of(p => new Burger(p.AllowDefault(cheese))));
-
-            var burger = container.Resolve<Burger>();
-            Assert.That(burger.Cheese, Is.Null);
-        }
-
         [Test]
         public void Specify_primitive_parameter_value_directly()
         {
@@ -81,6 +70,16 @@ namespace DryIoc.UnitTests
             Assert.AreEqual("King", burger.Name);
         }
 
+        [Test]
+        public void Specify_static_factory_method()
+        {
+            var container = new Container();
+
+            container.Register<Burger>(with: Construct.Of(p => Burger.Create()));
+
+            Assert.NotNull(container.Resolve<Burger>());
+        }
+
         internal interface ICheese { }
 
         internal class BlueCheese : ICheese { }
@@ -103,24 +102,47 @@ namespace DryIoc.UnitTests
                 Name = name;
                 Cheese = cheese;
             }
+
+            public static Burger Create()
+            {
+                return new Burger();
+            }
         }
     }
 
     public static class Construct
     {
-        public static InjectionRules Of<TImpl>(Expression<Func<Params, TImpl>> newImpl)
+        public static InjectionRules Of<TImpl>(Expression<Func<Params, TImpl>> methodOrCtorCallExpression)
         {
-            var newExpr = (newImpl.Body as NewExpression).ThrowIfNull();
-            var ctor = newExpr.Constructor;
-            var pars = ctor.GetParameters();
-            var args = newExpr.Arguments;
-            var parameters = Parameters.Of;
-            if (args.Count != 0)
+            MethodBase methodOrCtor;
+            ReadOnlyCollection<Expression> argExprs;
+
+            var callExpr = methodOrCtorCallExpression.Body;
+            var newExpr = callExpr as NewExpression;
+            if (newExpr != null)
             {
-                for (var i = 0; i < args.Count; i++)
+                argExprs = newExpr.Arguments;
+                methodOrCtor = newExpr.Constructor;
+            }
+            else
+            {
+                var methodCallExpr = callExpr as MethodCallExpression;
+                if (methodCallExpr != null)
+                {
+                    argExprs = methodCallExpr.Arguments;
+                    methodOrCtor = methodCallExpr.Method;
+                }
+                else return Throw.Instead<InjectionRules>(Error.Of("Not supported expression"));
+            }
+
+            var pars = methodOrCtor.GetParameters();
+            var parameters = Parameters.Of;
+            if (argExprs.Count != 0)
+            {
+                for (var i = 0; i < argExprs.Count; i++)
                 {
                     var par = pars[i];
-                    var arg = args[i] as MethodCallExpression;
+                    var arg = argExprs[i] as MethodCallExpression;
                     if (arg != null && arg.Method.DeclaringType == typeof(Params))
                     {
                         var requiredServiceType = arg.Method.GetGenericArguments()[0];
@@ -147,7 +169,7 @@ namespace DryIoc.UnitTests
                     }
                     else
                     {
-                        var argValue = args[i] as ConstantExpression;
+                        var argValue = argExprs[i] as ConstantExpression;
                         if (argValue != null && argValue.Type.IsPrimitive())
                         {
                             parameters = parameters.Name(par.Name, argValue.Value);
@@ -156,7 +178,7 @@ namespace DryIoc.UnitTests
                 }
             }
 
-            return InjectionRules.With(request => FactoryMethod.Of(ctor), parameters);
+            return InjectionRules.With(request => FactoryMethod.Of(methodOrCtor), parameters);
         }
     }
 
@@ -171,10 +193,6 @@ namespace DryIoc.UnitTests
         public T Of<T>(object serviceKey) { return default(T); }
         
         public T Of<T>(object serviceKey, IfUnresolved ifUnresolved) { return default(T); }
-
-        public T AllowDefault<T>(T defaultValue) { return default(T); }
-        
-        public T AllowDefault<T>(object serviceKey, T defaultValue) { return default(T); }
 
         private Params() { }
     }
