@@ -656,6 +656,11 @@ namespace DryIoc
             return factory;
         }
 
+        Factory IContainer.GetServiceFactoryOrDefault(Type serviceType, object serviceKey)
+        {
+            return GetServiceFactoryOrDefault(serviceType.ThrowIfNull(), serviceKey, Rules.FactorySelector);
+        }
+
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType)
         {
             var entry = _serviceFactories.Value.GetValueOrDefault(serviceType);
@@ -2401,7 +2406,7 @@ namespace DryIoc
             // Try get existing factory.
             if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
             {
-                var registeredFactory = container.GetServiceFactoryOrDefault(serviceType, named, container.Rules.FactorySelector);
+                var registeredFactory = container.GetServiceFactoryOrDefault(serviceType, named);
 
                 // If existing factory is the same kind: reuse and setup-wise, then we can just replace value in scope.
                 if (registeredFactory != null &&
@@ -5554,6 +5559,12 @@ namespace DryIoc
         /// <remarks>Returned Key item should not be null - it should be <see cref="DefaultKey.Value"/>.</remarks>
         IEnumerable<KV<object, Factory>> GetAllServiceFactories(Type serviceType);
 
+        /// <summary>Searches for registered service factory and returns it, or null if not found.</summary>
+        /// <param name="serviceType">Service type to look for.</param>
+        /// <param name="serviceKey">(optional) Service key to lookup in addition to type.</param>
+        /// <returns>Found registered factory or null.</returns>
+        Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey);
+
         /// <summary>Searches for registered wrapper factory and returns it, or null if not found.</summary>
         /// <param name="serviceType">Service type to look for.</param> <returns>Found wrapper factory or null.</returns>
         Factory GetWrapperFactoryOrDefault(Type serviceType);
@@ -5570,8 +5581,6 @@ namespace DryIoc
         /// <param name="type">Type to unwrap. Method will return early if type is not generic.</param>
         /// <returns>Unwrapped service type in case it corresponds to registered generic wrapper, or input type in all other cases.</returns>
         Type UnwrapServiceType(Type type);
-
-        Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey, Rules.FactorySelectorRule factorySelector);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand, 
