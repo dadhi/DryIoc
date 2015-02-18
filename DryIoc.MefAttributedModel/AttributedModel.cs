@@ -443,7 +443,7 @@ namespace DryIoc.MefAttributedModel
                 var factoryMethod = method;
                 var factoryExport = factoryInfo.Exports[0];
                 var rules = InjectionRules.With(r => FactoryMethod.Of(factoryMethod, 
-                    r.Resolve(factoryExport.ServiceType, factoryExport.ServiceKeyInfo.Key, IfUnresolved.ReturnDefault)));
+                    ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key)));
                 
                 var serviceFactory = serviceInfo.CreateFactory(rules);
 

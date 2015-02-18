@@ -44,8 +44,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ServiceFactory>();
-            container.Register<IService>(with: InjectionRules.With(r => FactoryMethod.Of(
-                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), r.Resolve<ServiceFactory>())));
+            container.Register<IService>(with: FactoryMethod.Of(
+                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), 
+                ServiceInfo.Of<ServiceFactory>()));
 
             var service = container.Resolve<IService>();
 
@@ -58,8 +59,9 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ServiceFactory>();
             container.RegisterInstance("parameter");
-            container.Register<IService>(with: InjectionRules.With(r => FactoryMethod.Of(
-                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create", typeof(string)), r.Resolve<ServiceFactory>())));
+            container.Register<IService>(with: FactoryMethod.Of(
+                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create", typeof(string)), 
+                ServiceInfo.Of<ServiceFactory>()));
 
             var service = container.Resolve<IService>();
 
@@ -72,7 +74,9 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ServiceFactory>();
             container.RegisterInstance("parameter");
-            container.Register<IService>(with: FactoryMethod.Of(r => r.Resolve<ServiceFactory>(), f => f.Create(default(string))));
+            container.Register<IService>(with: FactoryMethod.Of(
+                r => ServiceInfo.Of<ServiceFactory>(), 
+                f => f.Create(default(string))));
 
             var service = container.Resolve<IService>();
 
@@ -83,10 +87,12 @@ namespace DryIoc.UnitTests
         public void Can_get_factory_registered_with_key()
         {
             var container = new Container();
+            
             container.Register<ServiceFactory>(named: "factory");
             container.RegisterInstance("parameter");
+
             container.Register<IService>(with: FactoryMethod.Of(
-                r => r.Resolve<ServiceFactory>("factory"), 
+                r => ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"), 
                 f => f.Create(default(string))));
 
             var service = container.Resolve<IService>();
@@ -95,29 +101,16 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_inject_external_factory_fields()
-        {
-            var container = new Container();
-            container.Register<IService>(with: FactoryMethod.Of(
-                r => r.ResolvePropertiesAndFields(
-                    new PropertyBasedFactory(), 
-                    PropertiesAndFields.Of.The<PropertyBasedFactory>(f => f.Message, "Hey")),
-                f => f.Create()));
-
-            var service = container.Resolve<IService>();
-
-            Assert.That(service.Message, Is.EqualTo("Hey"));
-        }
-
-        [Test]
         public void Should_throw_if_instance_factory_unresolved()
         {
             var container = new Container();
-            container.Register<SomeService>(with: InjectionRules.With(r => FactoryMethod.Of(
-                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), r.Resolve<ServiceFactory>())));
+
+            container.Register<IService, SomeService>(with: FactoryMethod.Of(
+                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), 
+                ServiceInfo.Of<ServiceFactory>()));
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<SomeService>());
+                container.Resolve<IService>());
 
             Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
             Assert.That(ex.Message, Is.StringContaining("Unable to resolve"));
@@ -140,8 +133,9 @@ namespace DryIoc.UnitTests
         public void Should_return_null_if_instance_factory_is_not_resolved_on_TryResolve()
         {
             var container = new Container();
-            container.Register<IService>(with: InjectionRules.With(r => FactoryMethod.Of(
-                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), r.Resolve<ServiceFactory>())));
+            container.Register<IService>(with: FactoryMethod.Of(
+                typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), 
+                ServiceInfo.Of<ServiceFactory>()));
 
             var service = container.Resolve<IService>(IfUnresolved.ReturnDefault);
 

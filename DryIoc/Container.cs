@@ -1919,8 +1919,8 @@ namespace DryIoc
         /// <summary>Specified <see cref="ConstructorInfo"/> or <see cref="MethodInfo"/> to use for service creation.</summary>
         public readonly MethodBase MethodOrCtor;
 
-        /// <summary>Factory instance if <see cref="MethodOrCtor"/> is instance method.</summary>
-        public readonly object Factory;
+        /// <summary>Factory info to resolve if <see cref="MethodOrCtor"/> is instance method.</summary>
+        public readonly ServiceInfo FactoryServiceInfo;
 
         /// <summary>For convenience conversation from method to its wrapper.</summary>
         /// <param name="methodOrCtor">Method to wrap.</param> <returns>Factory method wrapper.</returns>
@@ -1937,11 +1937,12 @@ namespace DryIoc
         }
 
         /// <summary>Wraps method and factory instance.</summary>
-        /// <param name="methodOrCtor">Static or instance method.</param> <param name="factory">Factory instance in case of instance <paramref name="methodOrCtor"/>.</param>
+        /// <param name="methodOrCtor">Static or instance method.</param> 
+        /// <param name="factoryServiceInfo">Factory info to resolve in case of instance <paramref name="methodOrCtor"/>.</param>
         /// <returns>New factory method wrapper.</returns>
-        public static FactoryMethod Of(MethodBase methodOrCtor, object factory = null)
+        public static FactoryMethod Of(MethodBase methodOrCtor, ServiceInfo factoryServiceInfo = null)
         {
-            return new FactoryMethod(methodOrCtor.ThrowIfNull(), factory);
+            return new FactoryMethod(methodOrCtor.ThrowIfNull(), factoryServiceInfo);
         }
 
         /// <summary>Creates factory method using refactoring friendly static method call expression (without string method name).
@@ -1957,14 +1958,14 @@ namespace DryIoc
         /// <summary>Creates factory method using refactoring friendly instance method call expression (without string method name).
         /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
         /// <typeparam name="TFactory">Factory type.</typeparam> <typeparam name="TService">Factory product type.</typeparam>
-        /// <param name="getFactory">Returns or resolves factory instance.</param> <param name="method">Method call expression.</param>
+        /// <param name="getFactoryServiceInfo">Returns or resolves factory instance.</param> <param name="callFactoryMethodExpr">Method call expression.</param>
         /// <returns>New factory method wrapper.</returns>
-        public static FactoryMethodSelector
-            Of<TFactory, TService>(Func<Request, TFactory> getFactory, Expression<Func<TFactory, TService>> method)
+        public static FactoryMethodSelector Of<TFactory, TService>(
+            Func<Request, ServiceInfo<TFactory>> getFactoryServiceInfo, Expression<Func<TFactory, TService>> callFactoryMethodExpr)
             where TFactory : class
         {
-            var methodInfo = ExpressionTools.GetCalledMethodOrNull(method);
-            return r => new FactoryMethod(methodInfo.ThrowIfNull(), getFactory(r).ThrowIfNull());
+            var methodInfo = ExpressionTools.GetCalledMethodOrNull(callFactoryMethodExpr);
+            return r => new FactoryMethod(methodInfo.ThrowIfNull(), getFactoryServiceInfo(r).ThrowIfNull());
         }
 
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
@@ -1973,10 +1974,10 @@ namespace DryIoc
             return new StringBuilder().Print(MethodOrCtor.DeclaringType).Append("::[").Append(MethodOrCtor).Append("]").ToString();
         }
 
-        private FactoryMethod(MethodBase methodOrCtor, object factory = null)
+        private FactoryMethod(MethodBase methodOrCtor, ServiceInfo factoryServiceInfo = null)
         {
             MethodOrCtor = methodOrCtor;
-            Factory = factory;
+            FactoryServiceInfo = factoryServiceInfo;
         }
     }
 
@@ -2925,15 +2926,20 @@ namespace DryIoc
     {
         /// <summary>Creates info out of provided settings</summary>
         /// <param name="serviceType">Service type</param>
-        /// <param name="serviceKey">(optional) Service key.</param> 
         /// <param name="ifUnresolved">(optional) If unresolved policy. Set to Throw if not specified.</param>
+        /// <param name="serviceKey">(optional) Service key.</param>
         /// <returns>Created info.</returns>
-        public static ServiceInfo Of(Type serviceType, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null)
         {
             serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE);
             return serviceKey == null && ifUnresolved == IfUnresolved.Throw
                 ? new ServiceInfo(serviceType)
                 : new WithDetails(serviceType, ServiceInfoDetails.Of(null, serviceKey, ifUnresolved));
+        }
+
+        public static ServiceInfo<TService> Of<TService>(IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null)
+        {
+            return ServiceInfo<TService>.Of(ifUnresolved, serviceKey);
         }
 
         /// <summary>Type of service to create. Indicates registered service in registry.</summary>
@@ -2959,12 +2965,12 @@ namespace DryIoc
 
         #region Implementation
 
-        private ServiceInfo(Type serviceType)
+        protected ServiceInfo(Type serviceType)
         {
             ServiceType = serviceType;
         }
 
-        private sealed class WithDetails : ServiceInfo
+        protected class WithDetails : ServiceInfo
         {
             public override ServiceInfoDetails Details
             {
@@ -2981,6 +2987,33 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    public class ServiceInfo<TService> : ServiceInfo
+    {
+        public static ServiceInfo<TService> Of(IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null)
+        {
+            return ifUnresolved == IfUnresolved.Throw && serviceKey == null 
+                ? new ServiceInfo<TService>()
+                : new WithDetails(ServiceInfoDetails.Of(null, serviceKey, ifUnresolved));
+        }
+
+        protected ServiceInfo() : base(typeof(TService)) { }
+
+        protected new class WithDetails : ServiceInfo<TService>
+        {
+            public override ServiceInfoDetails Details
+            {
+                get { return _details; }
+            }
+
+            public WithDetails(ServiceInfoDetails details)
+            {
+                _details = details;
+            }
+
+            private readonly ServiceInfoDetails _details;
+        }
     }
 
     /// <summary>Provides <see cref="IServiceInfo"/> for parameter, 
@@ -4346,11 +4379,20 @@ namespace DryIoc
         /// <param name="request">Request for service to resolve.</param> <returns>Created expression.</returns>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            var method = GetFactoryMethodOrDefault(request);
-            if (method == null)
-                return null;
+            var factoryMethod = GetFactoryMethod(request);
 
-            var parameters = method.MethodOrCtor.GetParameters();
+            // If factory method is instance method, then resolve factory instance first.
+            Expression factoryExpr = null;
+            if (factoryMethod.FactoryServiceInfo != null)
+            {
+                var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
+                var factoryFactory = factoryRequest.Container.ResolveFactory(factoryRequest);
+                factoryExpr = factoryFactory == null ? null : factoryFactory.GetExpressionOrDefault(factoryRequest);
+                if (factoryExpr == null)
+                    return null;
+            }
+
+            var parameters = factoryMethod.MethodOrCtor.GetParameters();
 
             Expression[] paramExprs = null;
             if (parameters.Length != 0)
@@ -4410,7 +4452,11 @@ namespace DryIoc
                 }
             }
 
-            return MakeServiceExpression(method, request, paramExprs);
+            return factoryExpr != null
+                ? Expression.Call(factoryExpr, (MethodInfo)factoryMethod.MethodOrCtor, paramExprs)
+                : (factoryMethod.MethodOrCtor.IsConstructor
+                    ? SetPropertiesAndFields(Expression.New((ConstructorInfo)factoryMethod.MethodOrCtor, paramExprs), request)
+                    : Expression.Call((MethodInfo)factoryMethod.MethodOrCtor, paramExprs));
         }
 
         #region Implementation
@@ -4456,11 +4502,9 @@ namespace DryIoc
                 }
 
                 var factory = new ReflectionFactory(closedImplType, _factory.Reuse, _factory.Rules, _factory.Setup);
-                _providedFactories.Swap(_ => _.AddOrUpdate(
-                    key: factory.FactoryID,
-                    value: new KV<Type, object>(serviceType, request.ServiceKey)));
+                _providedFactories.Swap(_ => _.AddOrUpdate(factory.FactoryID,
+                    new KV<Type, object>(serviceType, request.ServiceKey)));
                 return factory;
-
             }
 
             private readonly ReflectionFactory _factory;
@@ -4469,7 +4513,7 @@ namespace DryIoc
                 _providedFactories = Ref.Of(HashTree<int, KV<Type, object>>.Empty);
         }
 
-        private FactoryMethod GetFactoryMethodOrDefault(Request request)
+        private FactoryMethod GetFactoryMethod(Request request)
         {
             var implType = _implementationType;
             var getMethodOrNull = Rules.FactoryMethod ?? request.Container.Rules.FactoryMethod;
@@ -4478,15 +4522,14 @@ namespace DryIoc
                 var method = getMethodOrNull(request);
                 if (method != null && method.MethodOrCtor is MethodInfo)
                 {
-                    Throw.If(method.MethodOrCtor.IsStatic && method.Factory != null,
-                        Error.FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC, method.Factory, method, request);
+                    Throw.If(method.MethodOrCtor.IsStatic && method.FactoryServiceInfo != null,
+                        Error.FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC, method.FactoryServiceInfo, method, request);
 
                     request.ServiceType.ThrowIfNotOf(((MethodInfo)method.MethodOrCtor).ReturnType,
                         Error.SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD, method, request);
 
-                    if (!method.MethodOrCtor.IsStatic && method.Factory == null)
-                        return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
-                            : Throw.Instead<FactoryMethod>(Error.FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD, method, request);
+                    if (!method.MethodOrCtor.IsStatic && method.FactoryServiceInfo == null)
+                        return Throw.Instead<FactoryMethod>(Error.FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD, method, request);
                 }
 
                 return method.ThrowIfNull(Error.UNABLE_TO_SELECT_CTOR_USING_SELECTOR, implType);
@@ -4523,15 +4566,6 @@ namespace DryIoc
                 }
 
             return bindings.Count == 0 ? (Expression)newServiceExpr : Expression.MemberInit(newServiceExpr, bindings);
-        }
-
-        private Expression MakeServiceExpression(FactoryMethod method, Request request, Expression[] paramExprs)
-        {
-            return method.MethodOrCtor.IsConstructor
-                ? SetPropertiesAndFields(Expression.New((ConstructorInfo)method.MethodOrCtor, paramExprs), request)
-                : method.MethodOrCtor.IsStatic
-                    ? Expression.Call((MethodInfo)method.MethodOrCtor, paramExprs)
-                    : Expression.Call(request.ResolutionCache.GetOrAddStateItemExpression(method.Factory), (MethodInfo)method.MethodOrCtor, paramExprs);
         }
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(Type implType, Request request)
@@ -5846,9 +5880,8 @@ namespace DryIoc
             NO_WRAPPED_TYPE_FOR_NON_GENERIC_WRAPPER = Of(
                 "Non-generic wrapper {0} should specify wrapped service selector when registered."),
             DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN = Of(
-                "Dependency {0} has shorter Reuse lifespan than its parent: {1}." + Environment.NewLine
-                + "{2} lifetime is shorter than {3}." + Environment.NewLine
-                +
+                "Dependency {0} has shorter Reuse lifespan than its parent: {1}." + Environment.NewLine + 
+                "{2} lifetime is shorter than {3}." + Environment.NewLine +
                 "You may turn Off this error with new Container(rules=>rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false))."),
             WEAKREF_REUSE_WRAPPER_GCED = Of(
                 "Service with WeakReference reuse wrapper is garbage collected now, and no longer available."),
