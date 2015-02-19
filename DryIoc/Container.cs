@@ -1707,9 +1707,6 @@ namespace DryIoc
 
         private static Expression GetResolutionScopedExpressionOrDefault(Request request)
         {
-            if (!request.Parent.IsEmpty)
-                return null; // wrapper is only valid for resolution root.
-
             var wrapperType = request.ServiceType;
             var wrapperCtor = wrapperType.GetSingleConstructorOrNull();
 
@@ -5683,10 +5680,10 @@ namespace DryIoc
         /// <summary>Disposes both resolved service (if disposable) and then disposes resolution scope.</summary>
         public void Dispose()
         {
-            var disposableValue = Value as IDisposable;
-            if (disposableValue != null)
+            var disposable = Value as IDisposable;
+            if (disposable != null)
             {
-                disposableValue.Dispose();
+                disposable.Dispose();
                 Value = default(T);
             }
 
