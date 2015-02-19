@@ -291,7 +291,7 @@ namespace DryIoc.MefAttributedModel
                 else if (attribute is PartCreationPolicyAttribute)
                 {
                     var creationPolicy = ((PartCreationPolicyAttribute)attribute).CreationPolicy;
-                    info.ReuseType = creationPolicy == CreationPolicy.Shared ? typeof(SingletonReuse) : null;
+                    info.ReuseType = creationPolicy == CreationPolicy.NonShared ? null : typeof(SingletonReuse);
                 }
                 else if (attribute is ReuseAttribute)
                 {

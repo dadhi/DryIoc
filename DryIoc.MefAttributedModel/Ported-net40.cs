@@ -93,6 +93,8 @@ namespace System.ComponentModel.Composition
     /// or Shared (created once and then reused in each Import - aka Singleton).</summary>
     public enum CreationPolicy
     {
+        /// <summary>Default for compatibility with MEF .NET 4.5, in DryIoc means the same as <see cref="Shared"/>.</summary>
+        Any,
         /// <summary>(default) Exported type instance will be created once and then reused in each Import - aka Singleton</summary>
         Shared,
         /// <summary>Exported type instance will be created in each Import - aka Transient.</summary>

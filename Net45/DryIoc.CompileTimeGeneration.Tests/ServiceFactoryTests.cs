@@ -47,7 +47,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
             Assert.IsNull(nullService);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_resolve_many()
         {
             var factory = new ServiceFactory();

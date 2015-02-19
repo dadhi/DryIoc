@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -97,19 +99,20 @@ namespace DryIoc.IssuesTests
 
         internal class CarefulAreaManager : IDisposable
         {
-            public AreaWithOneCar OneCarArea { get { return _disposableArea.Area; } }
+            public IEnumerable<AreaWithOneCar> OneCarAreas { get { return _disposableAreas.Select(x => x.Area); } }
             public ICar ReferenceCar { get; private set; }
 
-            private readonly DisposableArea<AreaWithOneCar> _disposableArea;
-            public CarefulAreaManager(DisposableArea<AreaWithOneCar> disposableArea, ICar referenceCar)
+            private readonly DisposableArea<AreaWithOneCar>[] _disposableAreas;
+            public CarefulAreaManager(DisposableArea<AreaWithOneCar>[] disposableAreas, ICar referenceCar)
             {
-                _disposableArea = disposableArea;
+                _disposableAreas = disposableAreas;
                 ReferenceCar = referenceCar;
             }
 
             public void Dispose()
             {
-                _disposableArea.Dispose();
+                foreach (var disposableArea in _disposableAreas)
+                    disposableArea.Dispose();
             }
         }
 
@@ -127,7 +130,7 @@ namespace DryIoc.IssuesTests
             container.Register<CarefulAreaManager>();
 
             var manager = container.Resolve<CarefulAreaManager>();
-            var area = manager.OneCarArea;
+            var area = manager.OneCarAreas.First();
 
             Assert.AreSame(area.Car, area.Tool.Car);
             Assert.AreNotSame(manager.ReferenceCar, area.Car);

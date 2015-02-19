@@ -171,6 +171,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(ex.Error, Error.NO_SINGLE_CTOR_WITH_IMPORTING_ATTR);
         }
 
+        [Test]
+        public void Importing_LazyEnumerable()
+        {
+            var container = new Container(r => r.WithMefAttributedModel());
+            container.RegisterExports(typeof(UseLazyEnumerable), typeof(Me));
+
+            Assert.IsInstanceOf<Me>(
+                container.Resolve<UseLazyEnumerable>().Mes.FirstOrDefault());
+        }
+
         #region Implementation
 
         private void WhenIRegisterAllExportedTypes()

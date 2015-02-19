@@ -37,6 +37,10 @@ namespace DryIoc.CompileTimeGeneration.Tests
 
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
         {
+            if (serviceKey == null && requiredServiceType == null)
+                return ResolveDefault(serviceType, ifUnresolved);
+
+            serviceType = requiredServiceType ?? serviceType;
             var resolutions = KeyedResolutions.GetValueOrDefault(serviceType);
             if (resolutions != null)
             {
@@ -48,12 +52,37 @@ namespace DryIoc.CompileTimeGeneration.Tests
             return GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
         }
 
-        public object ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
+        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey)
         {
-            throw new NotImplementedException();
+            serviceType = requiredServiceType ?? serviceType;
+
+            var resolutions = KeyedResolutions.GetValueOrDefault(serviceType);
+            if (resolutions != null)
+            {
+                if (serviceKey != null)
+                {
+                    var factoryDelegate = resolutions.GetValueOrDefault(serviceKey);
+                    if (factoryDelegate != null)
+                        yield return factoryDelegate(AppendableArray.Empty, this, null);
+                }
+                else
+                {
+                    foreach (var resolution in resolutions.Enumerate())
+                    {
+                        var factoryDelegate = resolution.Value;
+                        yield return factoryDelegate(AppendableArray.Empty, this, null);
+                    }
+                }
+            }
+            else
+            {
+                var factoryDelegate = DefaultResolutions.GetValueOrDefault(serviceType);
+                if (factoryDelegate != null)
+                    yield return factoryDelegate(AppendableArray.Empty, this, null);
+            }
         }
 
-        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey)
+        public object ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
         {
             throw new NotImplementedException();
         }

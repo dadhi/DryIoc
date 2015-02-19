@@ -29,6 +29,8 @@ container.RegisterExports(new[]
 namespace DryIoc.CompileTimeGeneration.Tests
 {
     using System;
+    using System.Linq; // For Cast method required for LazyEnumerable<T>
+
     public partial class ServiceFactory
     {
         public static HashTree<Type, FactoryDelegate> 

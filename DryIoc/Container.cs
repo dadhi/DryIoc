@@ -558,16 +558,16 @@ namespace DryIoc
             var registeredServiceType = requiredServiceType ?? serviceType;
             var serviceFactories = ((IContainer)this).GetAllServiceFactories(registeredServiceType);
 
-            if (serviceKey != null)             // include only single item matching key.
+            if (serviceKey != null) // include only single item matching key.
                 serviceFactories = serviceFactories.Where(kv => serviceKey.Equals(kv.Key));
 
-            if (compositeParentKey != null)     // exclude composite parent from items
+            if (compositeParentKey != null) // exclude composite parent from items
                 serviceFactories = serviceFactories.Where(kv => !compositeParentKey.Equals(kv.Key));
 
             foreach (var item in serviceFactories)
             {
                 var service = ((IResolver)this).ResolveKeyed(serviceType, item.Key, IfUnresolved.ReturnDefault, requiredServiceType);
-                if (service != null)            // skip unresolved items
+                if (service != null) // skip unresolved items
                     yield return service;
             }
         }
@@ -1598,9 +1598,10 @@ namespace DryIoc
                 Expression.Constant(itemRequiredServiceType),
                 request.ResolutionCache.GetOrAddStateItemExpression(compositeParentKey));
 
-            var getServicesExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemServiceType }, callResolveManyExpr);
+            if (itemServiceType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
+                callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] {itemServiceType}, callResolveManyExpr);
 
-            return Expression.New(wrapperType.GetSingleConstructorOrNull().ThrowIfNull(), getServicesExpr);
+            return Expression.New(wrapperType.GetSingleConstructorOrNull().ThrowIfNull(), callResolveManyExpr);
         }
 
         // Result: r => new Lazy<TService>(() => r.Resolver.Resolve<TService>(key, ifUnresolved, requiredType));
@@ -2627,10 +2628,10 @@ namespace DryIoc
         /// ]]></code>
         /// </remarks>
         public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver,
-            Type requiredServiceType = null, ResolveManyBehavior behavior = ResolveManyBehavior.EachItemLazyResolved)
+            Type requiredServiceType = null, ResolveManyBehavior behavior = ResolveManyBehavior.AsLazyEnumerable)
         {
-            return behavior == ResolveManyBehavior.EachItemLazyResolved
-                ? resolver.Resolve<LazyEnumerable<TService>>(requiredServiceType)
+            return behavior == ResolveManyBehavior.AsLazyEnumerable
+                ? resolver.ResolveMany(typeof(TService), null, requiredServiceType, null).Cast<TService>()
                 : resolver.Resolve<IEnumerable<TService>>(requiredServiceType);
         }
 
@@ -2638,7 +2639,7 @@ namespace DryIoc
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
         /// or if rules are not set it uses <see cref="PropertiesAndFields.PublicNonPrimitive"/>, 
         /// or you can specify your own rules with <paramref name="propertiesAndFields"/> parameter.</summary>
-        /// <typeparam name="TService">Input and returned instance type.</typeparam>
+        /// <typeparam name="TService">Input and returned instance type.</typeparam>Service (wrapped)
         /// <param name="resolver">Usually a container instance, cause <see cref="Container"/> implements <see cref="IResolver"/></param>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
@@ -2698,9 +2699,9 @@ namespace DryIoc
     public enum ResolveManyBehavior
     {
         /// <summary>Lazy/dynamic item resolve.</summary>
-        EachItemLazyResolved,
+        AsLazyEnumerable,
         /// <summary>Fixed array of item at time of resolve, newly registered/removed services won't be listed.</summary>
-        AllItemsResolvedIntoFixedArray
+        AsFixedArray
     }
 
     /// <summary>Provides information required for service resolution: service type, 
@@ -5804,13 +5805,10 @@ namespace DryIoc
             TYPE_IS_NOT_OF_TYPE = Of("Type argument {0} is not assignable from type {1}."),
 
             UNABLE_TO_RESOLVE_SERVICE = Of(
-                "Unable to resolve {0}." + Environment.NewLine
-                +
+                "Unable to resolve {0}." + Environment.NewLine +
                 "Please register service, or specify @requiredServiceType while resolving, or add Rules.WithUnknownServiceResolver(MyRule)."),
             EXPECTED_SINGLE_DEFAULT_FACTORY = Of(
-                "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." +
-                Environment.NewLine
-                +
+                "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
             IMPL_NOT_ASSIGNABLE_TO_SERVICE_TYPE = Of(
                 "Implementation type {0} should be assignable to service type {1} but it is not."),
@@ -5821,9 +5819,8 @@ namespace DryIoc
             REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS = Of(
                 "Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}."),
             REG_NOT_A_GENERIC_TYPEDEF_IMPL_TYPE = Of(
-                "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." +
-                Environment.NewLine
-                + "Consider to register generic type definition {1} instead."),
+                "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine + 
+                "Consider to register generic type definition {1} instead."),
             REG_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE = Of(
                 "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." +
                 Environment.NewLine

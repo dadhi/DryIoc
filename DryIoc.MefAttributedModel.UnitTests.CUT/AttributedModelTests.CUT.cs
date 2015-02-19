@@ -253,4 +253,18 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     public interface ISomeDb<T>
     {
     }
+
+    [Export, PartCreationPolicy(CreationPolicy.Any)]
+    public class UseLazyEnumerable
+    {
+        public LazyEnumerable<Me> Mes { get; private set; }
+
+        public UseLazyEnumerable(LazyEnumerable<Me> mes)
+        {
+            Mes = mes;
+        }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.NonShared)]
+    public class Me {}
 }

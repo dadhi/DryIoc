@@ -65,7 +65,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AllItemsResolvedIntoFixedArray);
+            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AsFixedArray);
             Assert.AreEqual(0, items.Count());
 
             container.Register<IService, Service>();
@@ -77,7 +77,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.EachItemLazyResolved);
+            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AsLazyEnumerable);
             Assert.AreEqual(0, items.Count());
 
             container.Register<IService, Service>();
@@ -89,7 +89,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AllItemsResolvedIntoFixedArray).ToArray();
+            var items = container.ResolveMany<IService>(behavior: ResolveManyBehavior.AsFixedArray).ToArray();
             Assert.That(items.Count(), Is.EqualTo(0));
 
             container.Register<IService, Service>();
@@ -119,7 +119,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(named: 1);
             container.Register<IService, AnotherService>(named: '1');
 
-            IEnumerable<object> result = container.ResolveMany<object>(typeof(IService), ResolveManyBehavior.AllItemsResolvedIntoFixedArray);
+            IEnumerable<object> result = container.ResolveMany<object>(typeof(IService), ResolveManyBehavior.AsFixedArray);
             var items = result.ToArray();
 
             Assert.That(items.Length, Is.EqualTo(2));
@@ -134,10 +134,10 @@ namespace DryIoc.UnitTests
             container.Register<Service>();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.ResolveMany<AnotherService>(typeof(Service)));
+                // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
+                container.ResolveMany<AnotherService>(typeof(Service)).ToArray());
 
-            Assert.That(ex.Message, Is.StringContaining(
-                "Service (wrapped)"));
+            Assert.AreEqual(ex.Error, Error.WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE);
         }
 
         [Test]
