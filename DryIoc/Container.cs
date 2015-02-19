@@ -2593,9 +2593,8 @@ namespace DryIoc
         /// <returns>Resolved service object.</returns>
         public static object Resolve(this IResolver resolver, IServiceInfo info)
         {
-            var details = info.Details;
-            return details.GetValue != null ? details.GetValue(resolver)
-                : resolver.Resolve(info.ServiceType, details.ServiceKey, details.IfUnresolved, details.RequiredServiceType);
+            var d = info.Details;
+            return resolver.Resolve(info.ServiceType, d.ServiceKey, d.IfUnresolved, d.RequiredServiceType);
         }
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
@@ -2749,14 +2748,6 @@ namespace DryIoc
                     : new WithTypeReturnDefault(requiredServiceType, serviceKey, defaultValue));
         }
 
-        /// <summary>Sets custom value for service. This setting is orthogonal to the rest.</summary>
-        /// <param name="getValue">Delegate to return custom service value.</param>
-        /// <returns>Details with custom value provider set.</returns>
-        public static ServiceInfoDetails Of(Func<IResolver, object> getValue)
-        {
-            return new WithValue(getValue.ThrowIfNull());
-        }
-
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
         public virtual Type RequiredServiceType { get { return null; } }
 
@@ -2769,15 +2760,9 @@ namespace DryIoc
         /// <summary>Value to use in case <see cref="IfUnresolved"/> is set to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</summary>
         public virtual object DefaultValue { get { return null; } }
 
-        /// <summary>Allows to get, or resolve value using passed <see cref="Request"/>.</summary>
-        public virtual Func<IResolver, object> GetValue { get { return null; } }
-
         /// <summary>Pretty prints service details to string for debugging and errors.</summary> <returns>Details string.</returns>
         public override string ToString()
         {
-            if (GetValue != null)
-                return "{with custom value}";
-
             var s = new StringBuilder();
             if (RequiredServiceType != null)
                 s.Append("{required: ").Print(RequiredServiceType);
@@ -2793,13 +2778,6 @@ namespace DryIoc
         private sealed class WithIfUnresolvedReturnDefault : ServiceInfoDetails
         {
             public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnDefault; } }
-        }
-
-        private class WithValue : ServiceInfoDetails
-        {
-            public override Func<IResolver, object> GetValue { get { return _getValue; } }
-            public WithValue(Func<IResolver, object> getValue) { _getValue = getValue; }
-            private readonly Func<IResolver, object> _getValue;
         }
 
         private class WithKey : ServiceInfoDetails
@@ -4046,32 +4024,11 @@ namespace DryIoc
             return source.Condition(p => p.Name.Equals(name), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
-        public static ParameterSelector Name(this ParameterSelector source, string name, Func<IResolver, object> getValue)
-        {
-            return source.CombineWith(p => p.Name.Equals(name), ServiceInfoDetails.Of(getValue));
-        }
-
-        public static ParameterSelector Name(this ParameterSelector source, string name, object value)
-        {
-            return source.Name(name, _ => value);
-        }
-
         public static ParameterSelector Type(this ParameterSelector source, Type type,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
             type.ThrowIfNull();
             return source.Condition(p => type.IsAssignableTo(p.ParameterType), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
-        }
-
-        public static ParameterSelector Type(this ParameterSelector source, Type type, Func<IResolver, object> getValue)
-        {
-            type.ThrowIfNull();
-            return source.CombineWith(p => type.IsAssignableTo(p.ParameterType), ServiceInfoDetails.Of(getValue));
-        }
-
-        public static ParameterSelector Type(this ParameterSelector source, Type type, object value)
-        {
-            return source.Type(type, _ => value);
         }
 
         public static IEnumerable<Attribute> GetAttributes(this ParameterInfo parameter, Type attributeType = null, bool inherit = false)
@@ -4157,37 +4114,10 @@ namespace DryIoc
                 .WithDetails(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue), r) });
         }
 
-        public static PropertiesAndFieldsSelector The<T>(this PropertiesAndFieldsSelector s, Expression<Func<T, object>> getterExpression, Func<IResolver, object> getValue)
-        {
-            var member = ExpressionTools.GetAccessedMemberOrNull(getterExpression.ThrowIfNull()).ThrowIfNull();
-            return s.OverrideWith(r => new[] { PropertyOrFieldServiceInfo.Of(member).WithDetails(ServiceInfoDetails.Of(getValue), r) });
-        }
-
-        public static PropertiesAndFieldsSelector The<T>(this PropertiesAndFieldsSelector s, Expression<Func<T, object>> getterExpression, object value)
-        {
-            return s.The(getterExpression, new Func<IResolver, object>(_ => value));
-        }
-
-        public static PropertiesAndFieldsSelector The<T>(this PropertiesAndFieldsSelector s, params Expression<Func<T, object>>[] getterExpressions)
-        {
-            var infos = getterExpressions.Select(ExpressionTools.GetAccessedMemberOrNull).Select(PropertyOrFieldServiceInfo.Of).ToArray();
-            return s.OverrideWith(r => infos);
-        }
-
         public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector s, string name,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, object defaultValue = null)
         {
             return s.WithDetails(name, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
-        }
-
-        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector s, string name, object value)
-        {
-            return s.WithDetails(name, ServiceInfoDetails.Of(_ => value));
-        }
-
-        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector s, string name, Func<IResolver, object> getValue)
-        {
-            return s.WithDetails(name, ServiceInfoDetails.Of(getValue));
         }
 
         #region Tools
@@ -4428,12 +4358,8 @@ namespace DryIoc
                         var paramInfo = getParamInfo(ctorParam, request) ?? ParameterServiceInfo.Of(ctorParam);
                         var paramRequest = request.Push(paramInfo);
 
-                        var factory = paramInfo.Details.GetValue == null
-                            ? paramRequest.Container.ResolveFactory(paramRequest)
-                            : new DelegateFactory(r => paramRequest.ServiceInfo.Details.GetValue(r)
-                                .ThrowIfNotOf(paramRequest.ServiceType, Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, paramRequest));
-
-                        paramExpr = factory == null ? null : factory.GetExpressionOrDefault(paramRequest);
+                        var paramFactory = paramRequest.Container.ResolveFactory(paramRequest);
+                        paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
                         if (paramExpr == null)
                         {
                             if (request.IfUnresolved == IfUnresolved.ReturnDefault)
@@ -4551,12 +4477,8 @@ namespace DryIoc
                 if (memberInfo != null)
                 {
                     var memberRequest = request.Push(memberInfo);
-                    var factory = memberInfo.Details.GetValue == null
-                        ? memberRequest.Container.ResolveFactory(memberRequest)
-                        : new DelegateFactory(r => memberRequest.ServiceInfo.Details.GetValue(r)
-                            .ThrowIfNotOf(memberRequest.ServiceType, Error.INJECTED_VALUE_IS_OF_DIFFERENT_TYPE, memberRequest));
-
-                    var memberExpr = factory == null ? null : factory.GetExpressionOrDefault(memberRequest);
+                    var memberFactory = memberRequest.Container.ResolveFactory(memberRequest);
+                    var memberExpr = memberFactory == null ? null : memberFactory.GetExpressionOrDefault(memberRequest);
                     if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault)
                         return null;
                     if (memberExpr != null)
@@ -5859,8 +5781,6 @@ namespace DryIoc
                 + "and the rest of parameters resolvable from Container when resolving: {1}."),
             REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE = Of(
                 "Registered factory delegate returns service {0} is not assignable to {2}."),
-            INJECTED_VALUE_IS_OF_DIFFERENT_TYPE = Of(
-                "Injected value {0} is not assignable to {2}."),
             REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE = Of(
                 "Registered instance {0} is not assignable to serviceType {1}."),
             NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD = Of(

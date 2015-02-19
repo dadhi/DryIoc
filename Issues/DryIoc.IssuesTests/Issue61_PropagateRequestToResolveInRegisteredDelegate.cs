@@ -46,21 +46,6 @@ namespace DryIoc.IssuesTests
             Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
         }
 
-        [Test]
-        public void Detect_recusive_dependency_for_custom_specified_parameter_with_factory_delegate()
-        {
-            var container = new Container();
-            container.RegisterDelegate(r => new SomeClient(r.Resolve<ServiceWithClient>()));
-            container.Register<ServiceWithClient>(with: Parameters.Of.Name("client", r => r.Resolve<SomeClient>()));
-
-            var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<SomeClient>());
-
-            Assert.That(ex.Message, Is
-                .StringContaining("Recursive dependency is detected when resolving").And
-                .StringContaining("SomeClient <--recursive"));
-        }
-
         internal class SomeClient
         {
             public ServiceWithClient Service { get; set; }

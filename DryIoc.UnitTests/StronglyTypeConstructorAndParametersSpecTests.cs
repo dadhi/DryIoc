@@ -45,23 +45,13 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Specify_primitive_parameter_value_directly()
-        {
-            var container = new Container();
-
-            container.Register<Burger>(with: Construct.Of(p => new Burger("King", p.Of<ICheese>())));
-            container.Register<ICheese, BlueCheese>();
-
-            var burger = container.Resolve<Burger>();
-            Assert.AreEqual("King", burger.Name);
-        }
-
-        [Test]
         public void Specify_service_key_and_required_service_type_for_parameter()
         {
             var container = new Container();
 
             container.Register<BlueCheese>(named: "a");
+            container.RegisterInstance("King");
+
             container.Register<Burger>(
                 with: Construct.Of(p => new Burger("King", p.Of<BlueCheese>("a"))));
 
@@ -85,6 +75,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<BlueCheese>(named: "a");
+            container.RegisterInstance("King");
+
             container.Register2(
                 with: Construct.Of(p => Burger.Create("King", p.Of<BlueCheese>("a"))));
 
@@ -183,14 +175,6 @@ namespace DryIoc.UnitTests
                         }
 
                         parameters = parameters.Condition(par.Equals, requiredServiceType, serviceKey, ifUnresolved);
-                    }
-                    else
-                    {
-                        var argValue = argExprs[i] as ConstantExpression;
-                        if (argValue != null && argValue.Type.IsPrimitive())
-                        {
-                            parameters = parameters.Name(par.Name, argValue.Value);
-                        }
                     }
                 }
             }
