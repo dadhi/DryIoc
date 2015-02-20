@@ -123,6 +123,8 @@ namespace DryIoc.UnitTests
 
             var serviceWeakRef = container.Resolve<ReuseWeakReference>(typeof(IService));
             Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
+
+            GC.KeepAlive(serviceWeakRef.Target);
         }
 
         [Test]
