@@ -104,7 +104,7 @@ namespace DryIoc
                 : new Container(Rules,
                     Ref.Of(_serviceFactories.Value), Ref.Of(_decoratorFactories.Value), Ref.Of(_wrapperFactories.Value),
                     _singletonScope, _scopeContext, _openedScope, _disposed,
-                    _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionCache);
+                    _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _factoryExpressionCache, _resolutionCache);
         }
 
         /// <summary>Creates new container with new opened scope and set this scope as current in ambient scope context.</summary>
@@ -132,7 +132,7 @@ namespace DryIoc
             var rules = configure == null ? Rules : configure(Rules);
             return new Container(rules, _serviceFactories, _decoratorFactories, _wrapperFactories,
                 _singletonScope, _scopeContext, nestedOpenedScope,
-                _disposed, _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionCache);
+                _disposed, _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _factoryExpressionCache, _resolutionCache);
         }
 
         /// <summary>Creates scoped container with new current scope independent of any scope context.
@@ -148,7 +148,7 @@ namespace DryIoc
 
             return new Container(Rules, _serviceFactories, _decoratorFactories, _wrapperFactories, _singletonScope,
                 /*scopeContext:*/null, nestedOpenedScope,
-                _disposed, _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _resolutionCache);
+                _disposed, _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _factoryExpressionCache, _resolutionCache);
         }
 
         /// <summary>Provide root scope name for <see cref="OpenScopeWithoutContext"/></summary>
@@ -230,6 +230,8 @@ namespace DryIoc
 
             _defaultFactoryDelegatesCache = Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
             _keyedFactoryDelegatesCache = Ref.Of(HashTree<KV<Type, object>, FactoryDelegate>.Empty);
+
+            _factoryExpressionCache = Ref.Of(IntKeyTree.Empty);
 
             _resolutionCache.Dispose();
             _resolutionCache = null;
@@ -468,7 +470,7 @@ namespace DryIoc
         {
             if (factory == null) return;
 
-            _resolutionCache.CacheFactoryExpression(factory.FactoryID, null);
+            CacheFactoryExpression(factory.FactoryID, null);
             if (serviceKey == null)
                 _defaultFactoryDelegatesCache.Swap(_ => _.Update(serviceType, null));
             else
@@ -718,7 +720,7 @@ namespace DryIoc
                             Register(decorator, serviceType, null, IfAlreadyRegistered.AppendNotKeyed);
                         }
 
-                        var decoratorExpr = request.ResolutionCache.GetCachedFactoryExpressionOrDefault(decorator.FactoryID);
+                        var decoratorExpr = GetCachedFactoryExpressionOrDefault(decorator.FactoryID);
                         if (decoratorExpr == null)
                         {
                             decoratorRequest = decoratorRequest.WithFuncArgs(decoratorFuncType,
@@ -731,7 +733,7 @@ namespace DryIoc
                             decoratorExpr = !decoratedArgWasUsed ? decoratorExpr // case of replacing decorator.
                                 : Expression.Lambda(decoratorFuncType, decoratorExpr, decoratorRequest.FuncArgs.Value);
 
-                            request.ResolutionCache.CacheFactoryExpression(decorator.FactoryID, decoratorExpr);
+                            CacheFactoryExpression(decorator.FactoryID, decoratorExpr);
                         }
 
                         if (resultDecorator == null || !(decoratorExpr is LambdaExpression))
@@ -779,6 +781,21 @@ namespace DryIoc
 
             // Unwrap further recursively.
             return ((IContainer)this).UnwrapServiceType(wrappedServiceType);
+        }
+
+        /// <summary>Adds factory expression to cache identified by factory ID (<see cref="Factory.FactoryID"/>).</summary>
+        /// <param name="factoryID">Key in cache.</param>
+        /// <param name="factoryExpression">Value to cache.</param>
+        public void CacheFactoryExpression(int factoryID, Expression factoryExpression)
+        {
+            _factoryExpressionCache.Swap(_ => _.AddOrUpdate(factoryID, factoryExpression));
+        }
+
+        /// <summary>Searches and returns cached factory expression, or null if not found.</summary>
+        /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
+        public Expression GetCachedFactoryExpressionOrDefault(int factoryID)
+        {
+            return _factoryExpressionCache.Value.GetValueOrDefault(factoryID) as Expression;
         }
 
         #endregion
@@ -910,7 +927,7 @@ namespace DryIoc
                             if (oldFactory != null) // clear cache of old factory
                             {
                                 ((Factory)newFactory).FactoryID = oldFactory.FactoryID;
-                                _resolutionCache.CacheFactoryExpression(oldFactory.FactoryID, null);
+                                CacheFactoryExpression(oldFactory.FactoryID, null);
                                 _defaultFactoryDelegatesCache.Swap(_ => _.Update(serviceType, null));
                             }
 
@@ -959,7 +976,7 @@ namespace DryIoc
 
                                 case IfAlreadyRegistered.Replace:
                                     newFactory.FactoryID = oldFactory.FactoryID; // Register factory with the same ID as the old one.
-                                    _resolutionCache.CacheFactoryExpression(oldFactory.FactoryID, null);
+                                    CacheFactoryExpression(oldFactory.FactoryID, null);
                                     var cacheKey = new KV<Type, object>(serviceType, serviceKey);
                                     _keyedFactoryDelegatesCache.Swap(_ => _.Update(cacheKey, null));
                                     return newFactory;
@@ -976,7 +993,7 @@ namespace DryIoc
             return !isNotAddedOrUpdated;
         }
 
-        public Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey, Rules.FactorySelectorRule factorySelector)
+        private Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey, Rules.FactorySelectorRule factorySelector)
         {
             var entry = _serviceFactories.Value.GetValueOrDefault(serviceType);
             if (serviceType.IsGeneric()) // keep entry or find one for open-generic
@@ -1042,6 +1059,7 @@ namespace DryIoc
         private readonly Ref<HashTree<Type, Factory[]>> _decoratorFactories;    // it may be multiple decorators per service type 
         private readonly Ref<HashTree<Type, Factory>> _wrapperFactories;        // only single wrapper factory per type is supported
 
+        private Ref<IntKeyTree> _factoryExpressionCache;
         private Ref<HashTree<Type, FactoryDelegate>> _defaultFactoryDelegatesCache;
         private Ref<HashTree<KV<Type, object>, FactoryDelegate>> _keyedFactoryDelegatesCache;
         private ResolutionCache _resolutionCache;
@@ -1056,6 +1074,7 @@ namespace DryIoc
             int disposed = 0,
             Ref<HashTree<Type, FactoryDelegate>> resolvedDefaultDelegates = null,
             Ref<HashTree<KV<Type, object>, FactoryDelegate>> resolvedKeyedDelegates = null,
+            Ref<IntKeyTree> factoryExpressionCache = null,
             ResolutionCache resolutionCache = null)
         {
             Rules = rules;
@@ -1072,6 +1091,8 @@ namespace DryIoc
 
             _defaultFactoryDelegatesCache = resolvedDefaultDelegates ?? Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
             _keyedFactoryDelegatesCache = resolvedKeyedDelegates ?? Ref.Of(HashTree<KV<Type, object>, FactoryDelegate>.Empty);
+
+            _factoryExpressionCache = factoryExpressionCache ?? Ref.Of(IntKeyTree.Empty);
             _resolutionCache = resolutionCache ?? new ResolutionCache();
 
             _containerWeakRef = new ContainerWeakRef(this);
@@ -1158,7 +1179,7 @@ namespace DryIoc
     public sealed class ResolutionCache : IDisposable
     {
         /// <summary>Creates resolution state.</summary>
-        public ResolutionCache() : this(AppendableArray.Empty, Ref.Of(IntKeyTree.Empty)) { }
+        public ResolutionCache() : this(AppendableArray.Empty) { }
 
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
         public AppendableArray State
@@ -1198,28 +1219,10 @@ namespace DryIoc
             return Expression.Convert(getItemByIndexExpr, itemType);
         }
 
-        /// <summary>Adds factory expression to cache identified by factory ID (<see cref="Factory.FactoryID"/>).</summary>
-        /// <param name="factoryID">Key in cache.</param>
-        /// <param name="factoryExpression">Value to cache.</param>
-        public void CacheFactoryExpression(int factoryID, Expression factoryExpression)
-        {
-            // Not  using Ref here, because if some cache entries will be missed or replaced from another thread, 
-            // it still the cache and does not affect application logic, just performance.
-            _factoryExpressions.Swap(_ => _.AddOrUpdate(factoryID, factoryExpression));
-        }
-
-        /// <summary>Searches and returns cached factory expression, or null if not found.</summary>
-        /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
-        public Expression GetCachedFactoryExpressionOrDefault(int factoryID)
-        {
-            return _factoryExpressions.Value.GetValueOrDefault(factoryID) as Expression;
-        }
-
         /// <summary>Removes state items and expression cache.</summary>
         public void Dispose()
         {
             _state = AppendableArray.Empty;
-            _factoryExpressions = Ref.Of(IntKeyTree.Empty);
         }
 
         #region Implementation
@@ -1227,12 +1230,10 @@ namespace DryIoc
         private static readonly MethodInfo _getItemMethod = typeof(AppendableArray).GetSingleDeclaredMethodOrNull("Get");
 
         private AppendableArray _state;
-        private Ref<IntKeyTree> _factoryExpressions;
 
-        private ResolutionCache(AppendableArray state, Ref<IntKeyTree> factoryExpressions)
+        private ResolutionCache(AppendableArray state)
         {
             _state = state;
-            _factoryExpressions = factoryExpressions;
         }
 
         #endregion
@@ -3736,7 +3737,7 @@ namespace DryIoc
                 && request.FuncArgs == null && reuseWrapperType == null;
             if (isCacheable)
             {
-                var cachedServiceExpr = request.ResolutionCache.GetCachedFactoryExpressionOrDefault(FactoryID);
+                var cachedServiceExpr = request.Container.GetCachedFactoryExpressionOrDefault(FactoryID);
                 if (cachedServiceExpr != null)
                     return decorator == null ? cachedServiceExpr : Expression.Invoke(decorator, cachedServiceExpr);
             }
@@ -3758,7 +3759,7 @@ namespace DryIoc
             if (serviceExpr != null)
             {
                 if (isCacheable)
-                    request.ResolutionCache.CacheFactoryExpression(FactoryID, serviceExpr);
+                    request.Container.CacheFactoryExpression(FactoryID, serviceExpr);
 
                 if (noOrFuncDecorator && decorator != null)
                     serviceExpr = Expression.Invoke(decorator, serviceExpr);
@@ -5535,6 +5536,15 @@ namespace DryIoc
         /// <param name="type">Type to unwrap. Method will return early if type is not generic.</param>
         /// <returns>Unwrapped service type in case it corresponds to registered generic wrapper, or input type in all other cases.</returns>
         Type UnwrapServiceType(Type type);
+
+        /// <summary>Adds factory expression to cache identified by factory ID (<see cref="Factory.FactoryID"/>).</summary>
+        /// <param name="factoryID">Key in cache.</param>
+        /// <param name="factoryExpression">Value to cache.</param>
+        void CacheFactoryExpression(int factoryID, Expression factoryExpression);
+
+        /// <summary>Searches and returns cached factory expression, or null if not found.</summary>
+        /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
+        Expression GetCachedFactoryExpressionOrDefault(int factoryID);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand, 

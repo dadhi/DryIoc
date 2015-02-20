@@ -176,6 +176,14 @@ namespace DryIoc.UnitTests
 
                         parameters = parameters.Condition(par.Equals, requiredServiceType, serviceKey, ifUnresolved);
                     }
+                    else
+                    {
+                        var argValue = argExprs[i] as ConstantExpression;
+                        if (argValue != null && argValue.Type.IsPrimitive())
+                        {
+                            parameters = parameters.Condition(par.Equals, defaultValue: argValue.Value);
+                        }
+                    }
                 }
             }
 
