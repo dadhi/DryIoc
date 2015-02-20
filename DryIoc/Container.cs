@@ -243,8 +243,8 @@ namespace DryIoc
 
         internal static readonly ParameterExpression StateParamExpr = Expression.Parameter(typeof(AppendableArray), "state");
 
-        internal static readonly ParameterExpression ResolverProviderParamExpr = Expression.Parameter(typeof(IResolverProvider), "r");
-        internal static readonly Expression ResolverExpr = Expression.Property(ResolverProviderParamExpr, "Resolver");
+        internal static readonly ParameterExpression ResolverContextProviderParamExpr = Expression.Parameter(typeof(IResolverContextProvider), "r");
+        internal static readonly Expression ResolverExpr = Expression.Property(ResolverContextProviderParamExpr, "Resolver");
 
         internal static readonly ParameterExpression ResolutionScopeParamExpr = Expression.Parameter(typeof(IScope), "scope");
 
@@ -545,7 +545,9 @@ namespace DryIoc
             foreach (var serviceInfo in selector(request))
                 if (serviceInfo != null)
                 {
-                    var value = request.Resolve(serviceInfo);
+                    var details = serviceInfo.Details;
+                    var value = request.Container.Resolve(serviceInfo.ServiceType,
+                        details.ServiceKey, details.IfUnresolved, details.RequiredServiceType);
                     if (value != null)
                         serviceInfo.SetValue(instance, value);
                 }
@@ -610,13 +612,13 @@ namespace DryIoc
         }
 
         /// <summary>Scope associated with container.</summary>
-        IScope IResolverWithScopes.SingletonScope
+        IScope IResolverContext.SingletonScope
         {
             get { return _singletonScope; }
         }
 
         /// <summary>Scope associated with containers created by <see cref="Container.OpenScope"/>.</summary>
-        IScope IResolverWithScopes.CurrentScope
+        IScope IResolverContext.CurrentScope
         {
             get { return (_scopeContext == null ? _openedScope : _scopeContext.GetCurrentOrDefault()).ThrowIfNull(Error.NO_CURRENT_SCOPE); }
         }
@@ -1319,16 +1321,17 @@ namespace DryIoc
 
     /// <summary>Returns reference to actual resolver implementation. 
     /// Minimizes <see cref="FactoryDelegate"/> dependency on container.</summary>
-    public interface IResolverProvider
+    public interface IResolverContextProvider
     {
         /// <summary>Provides access to resolver implementation.</summary>
-        IResolverWithScopes Resolver { get; }
+        IResolverContext Resolver { get; }
     }
 
     /// <summary>Wraps <see cref="IContainer"/> WeakReference with more specialized exceptions on access to GCed or disposed container.</summary>
-    public sealed class ContainerWeakRef : IResolverProvider
+    public sealed class ContainerWeakRef : IResolverContextProvider
     {
-        public IResolverWithScopes Resolver
+        /// <summary>Provides access to resolver implementation.</summary>
+        public IResolverContext Resolver
         {
             get { return GetTarget(); }
         }
@@ -1339,7 +1342,8 @@ namespace DryIoc
             var container = _weakref.Target as IContainer;
             return container
                 .ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED)
-                .ThrowIf(container != null && container.IsDisposed, Error.CONTAINER_IS_DISPOSED);
+                // ReSharper disable once PossibleNullReferenceException
+                .ThrowIf(container.IsDisposed, Error.CONTAINER_IS_DISPOSED);
         }
 
         /// <summary>Creates weak reference wrapper over passed container object.</summary> <param name="container">Object to wrap.</param>
@@ -1356,7 +1360,7 @@ namespace DryIoc
     /// registered delegate factory, <see cref="Lazy{T}"/>, and <see cref="LazyEnumerable{TService}"/>.</param>
     /// <param name="scope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
     /// <returns>Created service object.</returns>
-    public delegate object FactoryDelegate(AppendableArray state, IResolverProvider r, IScope scope);
+    public delegate object FactoryDelegate(AppendableArray state, IResolverContextProvider r, IScope scope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
     public static partial class FactoryCompiler
@@ -1371,7 +1375,7 @@ namespace DryIoc
             if (expression.Type.IsValueType())
                 expression = Expression.Convert(expression, typeof(object));
             return Expression.Lambda<FactoryDelegate>(expression,
-                Container.StateParamExpr, Container.ResolverProviderParamExpr, Container.ResolutionScopeParamExpr);
+                Container.StateParamExpr, Container.ResolverContextProviderParamExpr, Container.ResolutionScopeParamExpr);
         }
 
         /// <summary>First wraps the input service creation expression into lambda expression and
@@ -1569,7 +1573,7 @@ namespace DryIoc
                 request.Container.GetOrAddStateItemExpression(compositeParentKey));
 
             if (itemServiceType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
-                callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] {itemServiceType}, callResolveManyExpr);
+                callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemServiceType }, callResolveManyExpr);
 
             return Expression.New(wrapperType.GetSingleConstructorOrNull().ThrowIfNull(), callResolveManyExpr);
         }
@@ -1584,7 +1588,7 @@ namespace DryIoc
             var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
 
             var serviceExpr = Resolver.CreateResolutionExpression(
-                serviceType, request.IfUnresolved, request.RequiredServiceType, 
+                serviceType, request.IfUnresolved, request.RequiredServiceType,
                 request.Container.GetOrAddStateItemExpression(request.ServiceKey));
 
             var factoryExpr = Expression.Lambda(serviceExpr, null);
@@ -1969,7 +1973,7 @@ namespace DryIoc
             ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            return factoryMethod == null && parameters == null && propertiesAndFields == null ? Default 
+            return factoryMethod == null && parameters == null && propertiesAndFields == null ? Default
                 : new InjectionRules(factoryMethod, parameters, propertiesAndFields);
         }
 
@@ -2048,10 +2052,10 @@ namespace DryIoc
     public class InjectionRules<T> : InjectionRules
     {
         protected InjectionRules(
-            FactoryMethodSelector factoryMethod = null, 
-            ParameterSelector parameters = null, 
-            PropertiesAndFieldsSelector propertiesAndFields = null) 
-            : base(factoryMethod, parameters, propertiesAndFields) {}
+            FactoryMethodSelector factoryMethod = null,
+            ParameterSelector parameters = null,
+            PropertiesAndFieldsSelector propertiesAndFields = null)
+            : base(factoryMethod, parameters, propertiesAndFields) { }
 
         public static InjectionRules<T> Of(FactoryMethodSelector factoryMethod, ParameterSelector parameters)
         {
@@ -2359,8 +2363,8 @@ namespace DryIoc
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="named">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void RegisterInstance(this IContainer container, Type serviceType, object instance, 
-            IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, 
+        public static void RegisterInstance(this IContainer container, Type serviceType, object instance,
+            IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object named = null)
         {
             if (instance != null)
@@ -2557,15 +2561,6 @@ namespace DryIoc
             return serviceKey == null && requiredServiceType == null
                 ? resolver.ResolveDefault(serviceType, ifUnresolved)
                 : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType);
-        }
-
-        /// <summary>Resolve service using provided specification with <paramref name="info"/>. Useful for DryIoc extensions and hooks.</summary>
-        /// <param name="resolver">Container to resolve from</param> <param name="info">Service specification.</param>
-        /// <returns>Resolved service object.</returns>
-        public static object Resolve(this IResolver resolver, IServiceInfo info)
-        {
-            var d = info.Details;
-            return resolver.Resolve(info.ServiceType, d.ServiceKey, d.IfUnresolved, d.RequiredServiceType);
         }
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
@@ -2938,7 +2933,7 @@ namespace DryIoc
     {
         public static ServiceInfo<TService> Of(IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null)
         {
-            return ifUnresolved == IfUnresolved.Throw && serviceKey == null 
+            return ifUnresolved == IfUnresolved.Throw && serviceKey == null
                 ? new ServiceInfo<TService>()
                 : new WithDetails(ServiceInfoDetails.Of(null, serviceKey, ifUnresolved));
         }
@@ -3154,48 +3149,19 @@ namespace DryIoc
     /// <summary>Contains resolution stack with information about resolved service and factory for it,
     /// Additionally request contain weak reference to <see cref="IContainer"/>. That the all required information for resolving services.
     /// Request implements <see cref="IResolver"/> interface on top of provided container, which could be use by delegate factories.</summary>
-    public sealed class Request : IResolver
+    public sealed class Request
     {
         /// <summary>Creates empty request associated with provided <paramref name="container"/>.
         /// Every resolution will start from this request by pushing service information into, and then resolving it.</summary>
         /// <param name="container">Reference to container issued the request. Could be changed later with <see cref="SwitchContainer"/> method.</param>
         /// <returns>New empty request.</returns>
-        internal static Request CreateEmpty(ContainerWeakRef container)
+        public static Request CreateEmpty(ContainerWeakRef container)
         {
             return new Request(null, container, null, null);
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="ServiceInfo"/> in such a request.</summary>
-        public bool IsEmpty
-        {
-            get { return ServiceInfo == null; }
-        }
-
-        #region Resolver
-
-        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
-        {
-            ifUnresolved = ifUnresolved == IfUnresolved.ReturnDefault ? ifUnresolved : IfUnresolved;
-            return Container.ResolveDefault(serviceType, ifUnresolved);
-        }
-
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
-        {
-            ifUnresolved = ifUnresolved == IfUnresolved.ReturnDefault ? ifUnresolved : IfUnresolved;
-            return Container.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType);
-        }
-
-        object IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
-        {
-            return Container.ResolvePropertiesAndFields(instance, selectPropertiesAndFields);
-        }
-
-        IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey)
-        {
-            return Container.ResolveMany(serviceType, serviceKey, requiredServiceType, compositeParentKey);
-        }
-
-        #endregion
+        public bool IsEmpty { get { return ServiceInfo == null; } }
 
         /// <summary>Previous request in dependency chain. It <see cref="IsEmpty"/> for resolution root.</summary>
         public readonly Request Parent;
@@ -3682,7 +3648,7 @@ namespace DryIoc
             // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual creation expression.
             if (Setup.IsDynamicDependency && !request.Parent.IsEmpty)
                 return Resolver.CreateResolutionExpression(
-                    request.ServiceType, request.IfUnresolved, request.RequiredServiceType, 
+                    request.ServiceType, request.IfUnresolved, request.RequiredServiceType,
                     request.Container.GetOrAddStateItemExpression(request.ServiceKey));
 
             request = request.ResolveWithFactory(this);
@@ -4852,10 +4818,10 @@ namespace DryIoc
 
         /// <summary>Locates or creates scope to store reused service objects.</summary>
         /// <returns>Located scope.</returns>
-        IScope GetScope(IResolverWithScopes resolverWithScopes, ref IScope resolutionScope);
+        IScope GetScope(IResolverContext resolverContext, ref IScope resolutionScope);
 
         /// <summary>Supposed to create in-line expression with the same code as body of <see cref="GetScope"/> method.</summary>
-        /// <param name="resolverWithScopesExpr"><see cref="IResolverWithScopes"/> to provide access to resolver and scopes.</param>
+        /// <param name="resolverWithScopesExpr"><see cref="IResolverContext"/> to provide access to resolver and scopes.</param>
         /// <param name="resolutionScopeExpr">Expression represent current value of resolution scope, initially it is null.</param>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Expression of type <see cref="IScope"/>.</returns>
@@ -4874,16 +4840,16 @@ namespace DryIoc
         public int Lifespan { get { return LIFESPAN; } }
 
         /// <summary>Returns container bound Singleton scope.</summary>
-        /// <param name="resolverWithScopes">Provides access to Resolver and Scopes.</param>
+        /// <param name="resolverContext">Provides access to Resolver and Scopes.</param>
         /// <param name="resolutionScope">Scope associated with resolution root.</param>
         /// <returns>Container singleton scope.</returns>
-        public IScope GetScope(IResolverWithScopes resolverWithScopes, ref IScope resolutionScope)
+        public IScope GetScope(IResolverContext resolverContext, ref IScope resolutionScope)
         {
-            return resolverWithScopes.SingletonScope;
+            return resolverContext.SingletonScope;
         }
 
-        /// <summary>Returns expression directly accessing <see cref="IResolverWithScopes.SingletonScope"/>.</summary>
-        /// <param name="resolverWithScopesExpr"><see cref="IResolverWithScopes"/> expression.</param>
+        /// <summary>Returns expression directly accessing <see cref="IResolverContext.SingletonScope"/>.</summary>
+        /// <param name="resolverWithScopesExpr"><see cref="IResolverContext"/> expression.</param>
         /// <param name="_">(ignored)</param> <param name="__">(ignored)</param>
         /// <returns>Singleton scope property expression.</returns>
         public Expression GetScopeExpression(Expression resolverWithScopesExpr, Expression _, Request __)
@@ -4916,19 +4882,19 @@ namespace DryIoc
         }
 
         /// <summary>Returns container current scope or if <see cref="Name"/> specified: current scope or its parent with corresponding name.</summary>
-        /// <param name="resolverWithScopes">Provides access to Resolver and Scopes, e.g. CurrentScope.</param>
+        /// <param name="resolverContext">Provides access to Resolver and Scopes, e.g. CurrentScope.</param>
         /// <param name="resolutionScope">Scope associated with resolution root.</param>
         /// <returns>Found current scope or its parent.</returns>
         /// <exception cref="ContainerException">with the code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/> if <see cref="Name"/> specified but
         /// no matching scope or its parent found.</exception>
-        public IScope GetScope(IResolverWithScopes resolverWithScopes, ref IScope resolutionScope)
+        public IScope GetScope(IResolverContext resolverContext, ref IScope resolutionScope)
         {
-            return GetMatchingScope(resolverWithScopes.CurrentScope, Name);
+            return GetMatchingScope(resolverContext.CurrentScope, Name);
         }
 
         /// <summary>Returns <see cref="GetMatchingScope"/> method call expression, which returns current scope,
         /// or current scope parent matched by name, or throws exception if no current scope is available.</summary>
-        /// <param name="resolverWithScopesExpr">Access to <see cref="IResolverWithScopes"/>.</param>
+        /// <param name="resolverWithScopesExpr">Access to <see cref="IResolverContext"/>.</param>
         /// <param name="_">(ignored)</param>
         /// <param name="request">Used to access resolution state to store <see cref="Name"/> in (if its non-primitive).</param>
         /// <returns>Method call expression returning matched current scope.</returns>
@@ -4978,7 +4944,7 @@ namespace DryIoc
         /// <param name="_">(ignored)</param>
         /// <param name="resolutionScope">Scope associated with resolution root.</param>
         /// <returns>Created or existing scope.</returns>
-        public IScope GetScope(IResolverWithScopes _, ref IScope resolutionScope)
+        public IScope GetScope(IResolverContext _, ref IScope resolutionScope)
         {
             return GetOrCreateScope(ref resolutionScope);
         }
@@ -5393,7 +5359,7 @@ namespace DryIoc
     }
 
     /// <summary>Provides access to both resolver and scopes to <see cref="FactoryDelegate"/>.</summary>
-    public interface IResolverWithScopes : IResolver
+    public interface IResolverContext : IResolver
     {
         /// <summary>Scope associated with container.</summary>
         IScope SingletonScope { get; }
@@ -5405,7 +5371,7 @@ namespace DryIoc
 
     /// <summary>Exposes operations required for internal registry access. 
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
-    public interface IContainer : IRegistrator, IResolverWithScopes, IDisposable
+    public interface IContainer : IRegistrator, IResolver, IResolverContext, IDisposable
     {
         /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
         Request EmptyRequest { get; }
@@ -5722,7 +5688,7 @@ namespace DryIoc
             REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS = Of(
                 "Unable to register open-generic implementation {0} because service {1} should specify all of its type arguments, but specifies only {2}."),
             REG_NOT_A_GENERIC_TYPEDEF_IMPL_TYPE = Of(
-                "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine + 
+                "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
                 "Consider to register generic type definition {1} instead."),
             REG_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE = Of(
                 "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." +
@@ -5775,7 +5741,7 @@ namespace DryIoc
             NO_WRAPPED_TYPE_FOR_NON_GENERIC_WRAPPER = Of(
                 "Non-generic wrapper {0} should specify wrapped service selector when registered."),
             DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN = Of(
-                "Dependency {0} has shorter Reuse lifespan than its parent: {1}." + Environment.NewLine + 
+                "Dependency {0} has shorter Reuse lifespan than its parent: {1}." + Environment.NewLine +
                 "{2} lifetime is shorter than {3}." + Environment.NewLine +
                 "You may turn Off this error with new Container(rules=>rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false))."),
             WEAKREF_REUSE_WRAPPER_GCED = Of(

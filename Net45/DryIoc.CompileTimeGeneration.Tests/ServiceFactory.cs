@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DryIoc.CompileTimeGeneration.Tests
 {
-    public partial class ServiceFactory : IResolverWithScopes, IResolverProvider, IDisposable
+    public partial class ServiceFactory : IResolverContext, IResolverContextProvider, IDisposable
     {
         public IScope SingletonScope { get; private set; }
 
@@ -22,7 +22,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
             SingletonScope.Dispose();
         }
 
-        public IResolverWithScopes Resolver
+        public IResolverContext Resolver
         {
             get { return this; }
         }
