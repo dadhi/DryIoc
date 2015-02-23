@@ -185,6 +185,7 @@ namespace DryIoc.UnitTests
             var serviceDisposable = container.Resolve<ReuseHiddenDisposable>(typeof(IService));
 
             Assert.That(serviceWeakRef.Target, Is.SameAs(serviceDisposable));
+            GC.KeepAlive(serviceWeakRef.Target);
         }
 
         [Test]

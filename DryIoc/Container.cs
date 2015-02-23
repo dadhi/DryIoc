@@ -10,7 +10,7 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
+The above copyright notice and this permission notice shall be included AddOrUpdateServiceFactory
 all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -47,7 +47,9 @@ namespace DryIoc
             Ref.Of(HashTree<Type, object>.Empty),
             Ref.Of(HashTree<Type, Factory[]>.Empty),
             Ref.Of(WrappersSupport.Wrappers),
-            new Scope(), scopeContext ?? GetDefaultScopeContext()) { }
+            new Scope(),
+            scopeContext ?? GetDefaultScopeContext(),
+            registry: Ref.Of(new Registry(WrappersSupport.Wrappers))) { }
 
         /// <summary>Creates new container with configured rules.</summary>
         /// <param name="configure">Delegate gets <see cref="DryIoc.Rules.Default"/> as input and may return configured rules.</param>
@@ -65,7 +67,7 @@ namespace DryIoc
             var rules = configure == null ? Rules : configure(Rules);
             scopeContext = scopeContext ?? _scopeContext;
             return new Container(rules, _serviceFactories, _decoratorFactories, _wrapperFactories, _singletonScope,
-                scopeContext ?? GetDefaultScopeContext(), _openedScope, _disposed);
+                scopeContext ?? GetDefaultScopeContext(), _openedScope, _disposed, registry: _registry);
         }
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
@@ -75,7 +77,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return new Container(Rules, _serviceFactories, _decoratorFactories, _wrapperFactories,
-                _singletonScope, _scopeContext, _openedScope, _disposed
+                _singletonScope, _scopeContext, _openedScope, _disposed, registry: _registry
                 /*drop cache*/);
         }
 
@@ -86,7 +88,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return new Container(Rules, _serviceFactories, _decoratorFactories, _wrapperFactories,
-                /*singletonScope:*/new Scope(), _scopeContext, _openedScope, _disposed
+                /*singletonScope:*/new Scope(), _scopeContext, _openedScope, _disposed, registry: _registry
                 /*drop cache*/);
         }
 
@@ -100,11 +102,13 @@ namespace DryIoc
             return preserveCache
                 ? new Container(Rules,
                     Ref.Of(_serviceFactories.Value), Ref.Of(_decoratorFactories.Value), Ref.Of(_wrapperFactories.Value),
-                    _singletonScope, _scopeContext, _openedScope, _disposed)
+                    _singletonScope, _scopeContext, _openedScope, _disposed
+                    , registry: Ref.Of(_registry.Value.WithoutCache()))
                 : new Container(Rules,
                     Ref.Of(_serviceFactories.Value), Ref.Of(_decoratorFactories.Value), Ref.Of(_wrapperFactories.Value),
                     _singletonScope, _scopeContext, _openedScope, _disposed,
-                    _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _factoryExpressionCache, _resolutionStateCache);
+                    _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _factoryExpressionCache, _resolutionStateCache
+                    , _registry);
         }
 
         /// <summary>Creates new container with new opened scope and set this scope as current in ambient scope context.</summary>
@@ -299,6 +303,20 @@ namespace DryIoc
             return true;
         }
 
+        public bool Register2(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
+        {
+            ThrowIfContainerDisposed();
+            factory.ThrowIfNull().CheckBeforeRegistration(this, serviceType.ThrowIfNull(), serviceKey);
+            var isRegistered = true;
+            _registry.Swap(registry =>
+            {
+                var newRegistry = registry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey);
+                isRegistered = newRegistry != registry;
+                return newRegistry;
+            });
+            return isRegistered;
+        }
+
         /// <summary>Returns true if there is registered factory with the service type and key.
         /// To check if only default factory is registered specify <see cref="DefaultKey.Value"/> as <paramref name="serviceKey"/>.
         /// Otherwise, if no <paramref name="serviceKey"/> specified then True will returned for any registered factories, even keyed.
@@ -379,6 +397,12 @@ namespace DryIoc
 
             if (removed != null)
                 CleanRemovedFactoriesCache(removed, factoryType, serviceType, serviceKey);
+        }
+
+        public void Unregister2(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
+        {
+            ThrowIfContainerDisposed();
+            _registry.Swap(r => r.Unregister(factoryType, serviceType, serviceKey, condition));
         }
 
         private object UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
@@ -1103,6 +1127,322 @@ namespace DryIoc
         private Ref<IntKeyTree> _factoryExpressionCache;
         private Ref<AppendableArray> _resolutionStateCache;
 
+        public sealed class Registry
+        {
+            public readonly HashTree<Type, object> ServiceFactories;
+            public readonly HashTree<Type, Factory[]> DecoratorFactories;
+            public readonly HashTree<Type, Factory> WrapperFactories;
+
+            public readonly Ref<HashTree<Type, FactoryDelegate>> DefaultFactoryDelegatesCache;
+            public readonly Ref<HashTree<KV<Type, object>, FactoryDelegate>> KeyedFactoryDelegatesCache;
+            public readonly Ref<IntKeyTree> FactoryExpressionCache;
+            public readonly Ref<AppendableArray> ResolutionStateCache;
+
+            public Registry With(
+                HashTree<Type, object> serviceFactories = null,
+                HashTree<Type, Factory[]> decoratorFactories = null,
+                HashTree<Type, Factory> wrapperFactories = null)
+            {
+                return new Registry(
+                    serviceFactories ?? ServiceFactories,
+                    decoratorFactories ?? DecoratorFactories,
+                    wrapperFactories ?? WrapperFactories,
+                    DefaultFactoryDelegatesCache.Copy(), KeyedFactoryDelegatesCache.Copy(),
+                    FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
+            }
+
+            public Registry WithoutCache()
+            {
+                return new Registry(ServiceFactories, DecoratorFactories, WrapperFactories,
+                    Ref.Of(HashTree<Type, FactoryDelegate>.Empty),
+                    Ref.Of(HashTree<KV<Type, object>, FactoryDelegate>.Empty),
+                    Ref.Of(IntKeyTree.Empty),
+                    Ref.Of(AppendableArray.Empty));
+            }
+
+            public Registry(HashTree<Type, Factory> wrapperFactories = null)
+                : this(
+                    HashTree<Type, object>.Empty, HashTree<Type, Factory[]>.Empty,
+                    wrapperFactories ?? HashTree<Type, Factory>.Empty,
+                    Ref.Of(HashTree<Type, FactoryDelegate>.Empty),
+                    Ref.Of(HashTree<KV<Type, object>, FactoryDelegate>.Empty),
+                    Ref.Of(IntKeyTree.Empty),
+                    Ref.Of(AppendableArray.Empty)) { }
+
+            public Registry(
+                HashTree<Type, object> serviceFactories,
+                HashTree<Type, Factory[]> decoratorFactories,
+                HashTree<Type, Factory> wrapperFactories,
+                Ref<HashTree<Type, FactoryDelegate>> defaultFactoryDelegatesCache,
+                Ref<HashTree<KV<Type, object>, FactoryDelegate>> keyedFactoryDelegatesCache,
+                Ref<IntKeyTree> factoryExpressionCache,
+                Ref<AppendableArray> resolutionStateCache)
+            {
+                ServiceFactories = serviceFactories;
+                DecoratorFactories = decoratorFactories;
+                WrapperFactories = wrapperFactories;
+                DefaultFactoryDelegatesCache = defaultFactoryDelegatesCache;
+                KeyedFactoryDelegatesCache = keyedFactoryDelegatesCache;
+                FactoryExpressionCache = factoryExpressionCache;
+                ResolutionStateCache = resolutionStateCache;
+            }
+
+            public Registry Register(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
+            {
+                switch (factory.FactoryType)
+                {
+                    case FactoryType.Decorator:
+                        var decorators = DecoratorFactories.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append);
+                        return decorators == DecoratorFactories ? this : With(decoratorFactories: DecoratorFactories);
+
+                    case FactoryType.Wrapper:
+                        var wrappers = WrapperFactories.AddOrUpdate(serviceType, factory);
+                        return wrappers == WrapperFactories ? this : With(wrapperFactories: WrapperFactories);
+
+                    default:
+                        return AddOrUpdateServiceFactory(factory, serviceType, serviceKey, ifAlreadyRegistered);
+                }
+            }
+
+            public Registry AddOrUpdateServiceFactory(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
+            {
+                Factory replacedFactory = null;
+                HashTree<Type, object> serviceFactories;
+                if (serviceKey == null)
+                {
+                    serviceFactories = ServiceFactories.AddOrUpdate(serviceType, factory, (oldEntry, newFactory) =>
+                    {
+                        if (oldEntry == null)
+                            return newFactory;
+
+                        var oldFactories = oldEntry as FactoriesEntry;
+                        if (oldFactories != null && oldFactories.LastDefaultKey == null) // no default registered yet
+                            return new FactoriesEntry(DefaultKey.Value,
+                                oldFactories.Factories.AddOrUpdate(DefaultKey.Value, (Factory)newFactory));
+
+                        var oldFactory = oldFactories == null ? (Factory)oldEntry : null;
+                        switch (ifAlreadyRegistered)
+                        {
+                            case IfAlreadyRegistered.Throw:
+                                oldFactory = oldFactory ?? oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
+                                return Throw.Instead<object>(Error.UNABLE_TO_REGISTER_DUPLICATE_DEFAULT, serviceType, oldFactory);
+
+                            case IfAlreadyRegistered.Keep:
+                                return oldEntry;
+
+                            case IfAlreadyRegistered.Replace:
+                                replacedFactory = oldFactory ?? oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
+                                if (replacedFactory != null)
+                                    ((Factory)newFactory).FactoryID = replacedFactory.FactoryID;
+                                return oldFactories == null
+                                    ? newFactory
+                                    : new FactoriesEntry(oldFactories.LastDefaultKey,
+                                        oldFactories.Factories.AddOrUpdate(oldFactories.LastDefaultKey, (Factory)newFactory));
+
+                            default:
+                                if (oldFactories == null)
+                                    return new FactoriesEntry(DefaultKey.Value.Next(),
+                                        HashTree<object, Factory>.Empty
+                                            .AddOrUpdate(DefaultKey.Value, (Factory)oldEntry)
+                                            .AddOrUpdate(DefaultKey.Value.Next(), (Factory)newFactory));
+
+                                var nextKey = oldFactories.LastDefaultKey.Next();
+                                return new FactoriesEntry(nextKey,
+                                    oldFactories.Factories.AddOrUpdate(nextKey, (Factory)newFactory));
+                        }
+                    });
+                }
+                else
+                {
+                    var factories = new FactoriesEntry(null, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
+                    serviceFactories = ServiceFactories.AddOrUpdate(serviceType, factories, (oldEntry, newEntry) =>
+                    {
+                        if (oldEntry == null)
+                            return newEntry;
+
+                        if (oldEntry is Factory) // if registered is default, just add it to new entry
+                            return new FactoriesEntry(DefaultKey.Value,
+                                ((FactoriesEntry)newEntry).Factories.AddOrUpdate(DefaultKey.Value, (Factory)oldEntry));
+
+                        var oldFactories = (FactoriesEntry)oldEntry;
+                        return new FactoriesEntry(oldFactories.LastDefaultKey,
+                            oldFactories.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, newFactory) =>
+                            {
+                                if (oldFactory == null)
+                                    return factory;
+
+                                switch (ifAlreadyRegistered)
+                                {
+                                    case IfAlreadyRegistered.Keep:
+                                        return oldFactory;
+
+                                    case IfAlreadyRegistered.Replace:
+                                        replacedFactory = oldFactory;
+                                        newFactory.FactoryID = replacedFactory.FactoryID;
+                                        return newFactory;
+
+                                    //case IfAlreadyRegistered.Throw:
+                                    //case IfAlreadyRegistered.AppendDefault:
+                                    default:
+                                        return Throw.Instead<Factory>(Error.UNABLE_TO_REGISTER_DUPLICATE_KEY,
+                                            serviceType, serviceKey, oldFactory);
+                                }
+                            }));
+                    });
+                }
+
+                if (serviceFactories == ServiceFactories)
+                    return this; // no update.
+
+                var registry = With(serviceFactories);
+                return replacedFactory == null ? registry : RemoveFactoryCache(registry, replacedFactory, serviceType, serviceKey);
+            }
+
+            public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
+            {
+                switch (factoryType)
+                {
+                    case FactoryType.Wrapper:
+                        Factory removedWrapper = null;
+                        var registry = With(wrapperFactories: WrapperFactories.Update(serviceType, null, (factory, _null) =>
+                        {
+                            if (factory != null && condition != null && !condition(factory))
+                                return factory;
+                            removedWrapper = factory;
+                            return null;
+                        }));
+                        
+                        return removedWrapper == null ? this
+                            : RemoveFactoryCache(registry, removedWrapper, serviceType);
+
+                    case FactoryType.Decorator:
+                        Factory[] removedDecorators = null;
+                        registry = With(decoratorFactories: DecoratorFactories.Update(serviceType, null, (factories, _null) =>
+                        {
+                            var remaining = condition == null ? null : factories.Where(f => !condition(f)).ToArray();
+                            removedDecorators = remaining == null || remaining.Length == 0 ? factories : factories.Except(remaining).ToArray();
+                            return remaining;
+                        }));
+
+                        if (removedDecorators.IsNullOrEmpty()) 
+                            return this;
+                        
+                        foreach (var removedDecorator in removedDecorators)
+                            registry = RemoveFactoryCache(registry, removedDecorator, serviceType);
+                        return registry;
+
+                    default:
+                        return UnregisterServiceFactory(serviceType, serviceKey, condition);
+                }
+            }
+
+            public Registry UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
+            {
+                object removed = null; // Factory or FactoriesEntry or Factory[]
+
+                HashTree<Type, object> serviceFactories;
+
+                if (serviceKey == null && condition == null) // simplest case with simplest handling
+                    serviceFactories = ServiceFactories.Update(serviceType, null, (entry, _null) =>
+                    {
+                        removed = entry;
+                        return null;
+                    });
+                else
+                    serviceFactories = ServiceFactories.Update(serviceType, null, (entry, _null) =>
+                    {
+                        if (entry == null)
+                            return null;
+
+                        if (entry is Factory)
+                        {
+                            if ((serviceKey != null && !DefaultKey.Value.Equals(serviceKey)) ||
+                                (condition != null && !condition((Factory)entry)))
+                                return entry; // keep entry
+                            removed = entry; // otherwise remove it (the only case if serviceKey == DefaultKey.Value)
+                            return null;
+                        }
+
+                        var factoriesEntry = (FactoriesEntry)entry;
+                        var oldFactories = factoriesEntry.Factories;
+                        var remainingFactories = HashTree<object, Factory>.Empty;
+                        if (serviceKey == null) // automatically means condition != null
+                        {
+                            // keep factories for which condition is true
+                            foreach (var factory in oldFactories.Enumerate())
+                                if (condition != null && !condition(factory.Value))
+                                    remainingFactories = remainingFactories.AddOrUpdate(factory.Key, factory.Value);
+                        }
+                        else // serviceKey is not default, which automatically means condition == null
+                        {
+                            // set to null factory with specified key if its found
+                            remainingFactories = oldFactories;
+                            var factory = oldFactories.GetValueOrDefault(serviceKey);
+                            if (factory != null)
+                                remainingFactories = oldFactories.Height > 1
+                                    ? oldFactories.Update(serviceKey, null)
+                                    : HashTree<object, Factory>.Empty;
+                        }
+
+                        if (remainingFactories.IsEmpty)
+                        {
+                            // if no more remaining factories, then delete the whole entry
+                            removed = entry;
+                            return null;
+                        }
+
+                        removed =
+                            oldFactories.Enumerate()
+                                .Except(remainingFactories.Enumerate())
+                                .Select(f => f.Value)
+                                .ToArray();
+
+                        if (remainingFactories.Height == 1 && DefaultKey.Value.Equals(remainingFactories.Key))
+                            return remainingFactories.Value; // replace entry with single remaining default factory
+
+                        // update last default key if current default key was removed
+                        var newDefaultKey = factoriesEntry.LastDefaultKey;
+                        if (newDefaultKey != null && remainingFactories.GetValueOrDefault(newDefaultKey) == null)
+                            newDefaultKey = remainingFactories.Enumerate().Select(x => x.Key)
+                                .OfType<DefaultKey>().OrderByDescending(key => key.RegistrationOrder).FirstOrDefault();
+                        return new FactoriesEntry(newDefaultKey, remainingFactories);
+                    });
+
+                if (removed == null)
+                    return this;
+
+                var registry = With(serviceFactories);
+
+                if (removed is Factory)
+                    return RemoveFactoryCache(registry, (Factory)removed, serviceType, serviceKey);
+
+                var removedFactories = removed as Factory[] 
+                    ?? ((FactoriesEntry)removed).Factories.Enumerate().Select(f => f.Value).ToArray();
+                
+                foreach (var removedFactory in removedFactories)
+                    registry = RemoveFactoryCache(registry, removedFactory, serviceType, serviceKey);
+
+                return registry;
+            }
+
+            private static Registry RemoveFactoryCache(Registry registry, Factory factory, Type serviceType, object serviceKey = null)
+            {
+                registry.FactoryExpressionCache.Swap(_ => _.Update(factory.FactoryID, null));
+                if (serviceKey == null)
+                    registry.DefaultFactoryDelegatesCache.Swap(_ => _.Update(serviceType, null));
+                else
+                    registry.KeyedFactoryDelegatesCache.Swap(_ => _.Update(new KV<Type, object>(serviceType, serviceKey), null));
+
+                if (factory.Provider != null)
+                    foreach (var f in factory.Provider.ProvidedFactoriesServiceTypeKey)
+                        registry = registry.Unregister(factory.FactoryType, f.Key, f.Value, null);
+
+                return registry;
+            }
+        }
+
+        private readonly Ref<Registry> _registry;
+
         private Container(Rules rules,
             Ref<HashTree<Type, object>> serviceFactories,
             Ref<HashTree<Type, Factory[]>> decoratorFactories,
@@ -1114,9 +1454,12 @@ namespace DryIoc
             Ref<HashTree<Type, FactoryDelegate>> resolvedDefaultDelegates = null,
             Ref<HashTree<KV<Type, object>, FactoryDelegate>> resolvedKeyedDelegates = null,
             Ref<IntKeyTree> factoryExpressionCache = null,
-            Ref<AppendableArray> resolutionStateCache = null)
+            Ref<AppendableArray> resolutionStateCache = null,
+            Ref<Registry> registry = null)
         {
             Rules = rules;
+
+            _registry = registry ?? Ref.Of(new Registry());
 
             _disposed = disposed;
 
@@ -6962,9 +7305,16 @@ namespace DryIoc
         /// <typeparam name="T">Type of value to wrap.</typeparam>
         /// <param name="value">Initial value to wrap.</param>
         /// <returns>New ref.</returns>
-        public static Ref<T> Of<T>(T value = default(T)) where T : class
+        public static Ref<T> Of<T>(T value) where T : class
         {
             return new Ref<T>(value);
+        }
+
+        /// <summary>Creates new ref to original ref value.</summary> <typeparam name="T">Type of ref value.</typeparam>
+        /// <param name="original">Original ref.</param> <returns>New ref to original value.</returns>
+        public static Ref<T> Copy<T>(this Ref<T> original) where T : class
+        {
+            return Of(original.Value);
         }
 
         /// <summary>First, it evaluates new value using <paramref name="getNewValue"/> function. 
