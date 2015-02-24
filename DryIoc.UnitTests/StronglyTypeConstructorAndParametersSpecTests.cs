@@ -84,6 +84,20 @@ namespace DryIoc.UnitTests
             Assert.AreEqual("King", burger.Name);
         }
 
+        [Test]
+        public void Can_specify_default_value()
+        {
+            var container = new Container();
+
+            container.Register<ICheese, BlueCheese>();
+
+            container.Register2(
+                with: Construct.Of(p => Burger.CreateMany(p.Of<ICheese>(), default(int))));
+
+            var burger = container.Resolve<Burger>();
+
+        }
+
         internal interface ICheese { }
 
         internal class BlueCheese : ICheese { }
@@ -115,6 +129,12 @@ namespace DryIoc.UnitTests
             public static Burger Create(string name, ICheese cheese)
             {
                 return new Burger(name, cheese);
+            }
+
+            public int Number { get; private set; }
+            public static Burger CreateMany(ICheese cheese, int number = 1)
+            {
+                return new Burger("default", cheese) { Number = number };
             }
         }
     }
@@ -176,14 +196,14 @@ namespace DryIoc.UnitTests
 
                         parameters = parameters.Condition(par.Equals, requiredServiceType, serviceKey, ifUnresolved);
                     }
-                    else
-                    {
-                        var argValue = argExprs[i] as ConstantExpression;
-                        if (argValue != null && argValue.Type.IsPrimitive())
-                        {
-                            parameters = parameters.Condition(par.Equals, defaultValue: argValue.Value);
-                        }
-                    }
+                    //else
+                    //{
+                    //    var argValue = argExprs[i] as ConstantExpression;
+                    //    if (argValue != null && argValue.Type.IsPrimitive())
+                    //    {
+                    //        parameters = parameters.Condition(par.Equals, defaultValue: argValue.Value);
+                    //    }
+                    //}
                 }
             }
 

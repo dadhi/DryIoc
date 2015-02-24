@@ -559,7 +559,7 @@ namespace DryIoc
 
         object IResolver.ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selector)
         {
-            selector = selector ?? Rules.PropertiesAndFields ?? PropertiesAndFields.PublicNonPrimitive;
+            selector = selector ?? Rules.PropertiesAndFields ?? PropertiesAndFields.Auto;
 
             var instanceType = instance.ThrowIfNull().GetType();
 
@@ -661,7 +661,7 @@ namespace DryIoc
 
         Factory IContainer.ResolveFactory(Request request)
         {
-            var factory = GetServiceFactoryOrDefault(request.ServiceType, request.ServiceKey, Rules.FactorySelector);
+            var factory = GetServiceFactoryOrDefault(request, Rules.FactorySelector);
             if (factory != null && factory.Provider != null && // handle provider: open-generic, etc.
                 (factory = factory.Provider.ProvideConcreteFactory(request)) != null)
                 Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.Replace);
@@ -679,7 +679,8 @@ namespace DryIoc
 
         Factory IContainer.GetServiceFactoryOrDefault(Type serviceType, object serviceKey)
         {
-            return GetServiceFactoryOrDefault(serviceType.ThrowIfNull(), serviceKey, Rules.FactorySelector);
+            var request = _emptyRequest.Push(serviceType.ThrowIfNull(), serviceKey);
+            return GetServiceFactoryOrDefault(request, Rules.FactorySelector);
         }
 
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType)
@@ -1056,8 +1057,11 @@ namespace DryIoc
             return !isNotAddedOrUpdated;
         }
 
-        private Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey, Rules.FactorySelectorRule factorySelector)
+        private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
         {
+            var serviceType = request.ServiceType;
+            var serviceKey = request.ServiceKey;
+
             var entry = _serviceFactories.Value.GetValueOrDefault(serviceType);
             if (serviceType.IsGeneric()) // keep entry or find one for open-generic
             {
@@ -1084,7 +1088,7 @@ namespace DryIoc
                     : ((FactoriesEntry)entry).Factories.Enumerate()
                         .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value)).ToArray();
 
-                var factory = factorySelector(serviceType, serviceKey, allFactories);
+                var factory = factorySelector(request, allFactories);
                 return factory;
             }
 
@@ -1311,7 +1315,7 @@ namespace DryIoc
                             removedWrapper = factory;
                             return null;
                         }));
-                        
+
                         return removedWrapper == null ? this
                             : RemoveFactoryCache(registry, removedWrapper, serviceType);
 
@@ -1324,9 +1328,9 @@ namespace DryIoc
                             return remaining;
                         }));
 
-                        if (removedDecorators.IsNullOrEmpty()) 
+                        if (removedDecorators.IsNullOrEmpty())
                             return this;
-                        
+
                         foreach (var removedDecorator in removedDecorators)
                             registry = RemoveFactoryCache(registry, removedDecorator, serviceType);
                         return registry;
@@ -1416,9 +1420,9 @@ namespace DryIoc
                 if (removed is Factory)
                     return RemoveFactoryCache(registry, (Factory)removed, serviceType, serviceKey);
 
-                var removedFactories = removed as Factory[] 
+                var removedFactories = removed as Factory[]
                     ?? ((FactoriesEntry)removed).Factories.Enumerate().Select(f => f.Value).ToArray();
-                
+
                 foreach (var removedFactory in removedFactories)
                     registry = RemoveFactoryCache(registry, removedFactory, serviceType, serviceKey);
 
@@ -2113,8 +2117,7 @@ namespace DryIoc
         /// <summary>Defines single factory selector delegate.</summary>
         /// <param name="factories">Registered factories with corresponding key to select from.</param>
         /// <returns>Single selected factory, or null if unable to select.</returns>
-        public delegate Factory FactorySelectorRule(
-            Type serviceType, object serviceKey, KeyValuePair<object, Factory>[] factories);
+        public delegate Factory FactorySelectorRule(Request request, KeyValuePair<object, Factory>[] factories);
 
         /// <summary>Rules to select single matched factory default and keyed registered factory/factories. 
         /// Selectors applied in specified array order, until first returns not null <see cref="Factory"/>.
@@ -2131,16 +2134,18 @@ namespace DryIoc
         }
 
         //we are watching you...public static
-        /// <summary>Maps default to specified service key, if no factory with such a key found, then rule fall-backs to default again.
+        /// <summary>Say to prefer specified service key (if found) over default key.
         /// Help to override default registrations in Open Scope scenarios: I may register service with key and resolve it as default in current scope.</summary>
-        /// <param name="key">Service key to look for instead default.</param>
+        /// <param name="serviceKey">Service key to look for instead default.</param>
         /// <returns>Found factory or null.</returns>
-        public static FactorySelectorRule MapDefaultToKey(object key)
+        public static FactorySelectorRule PreferKeyOverDefault(object serviceKey)
         {
-            return (t, k, fs) => k == null
-                ? fs.FirstOrDefault(f => f.Key.Equals(key)).Value
-                ?? fs.FirstOrDefault(f => f.Key.Equals(null)).Value
-                : fs.FirstOrDefault(f => f.Key.Equals(k)).Value;
+            return (request, factories) => request.ServiceKey != null
+                // if service key is not default, then look for it
+                ? factories.FirstOrDefault(f => f.Key.Equals(request.ServiceKey)).Value
+                // otherwise look for specified service key, and if no found look for default.
+                : factories.FirstOrDefault(f => f.Key.Equals(serviceKey)).Value
+                  ?? factories.FirstOrDefault(f => f.Key.Equals(null)).Value;
         }
 
         /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
@@ -2650,6 +2655,7 @@ namespace DryIoc
             nonPublicServiceTypes: true);
         }
 
+        // TODO: Add note about using it ONLY for last resort, and add alternative example with FactoryMethod.
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
         /// Delegate can use <see cref="IResolver"/> parameter to resolve any required dependencies, e.g.:
         /// <code lang="cs"><![CDATA[container.RegisterDelegate<ICar>(r => new Car(r.Resolve<IEngine>()))]]></code></summary>
@@ -2945,7 +2951,7 @@ namespace DryIoc
 
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses <see cref="PropertiesAndFields.PublicNonPrimitive"/>, 
+        /// or if rules are not set it uses <see cref="PropertiesAndFields.Auto"/>, 
         /// or you can specify your own rules with <paramref name="propertiesAndFields"/> parameter.</summary>
         /// <typeparam name="TService">Input and returned instance type.</typeparam>Service (wrapped)
         /// <param name="resolver">Usually a container instance, cause <see cref="Container"/> implements <see cref="IResolver"/></param>
@@ -2985,15 +2991,17 @@ namespace DryIoc
             return (T)container.New(typeof(T), with);
         }
 
+        // TODO: Using serviceKeyExpr smells comparing to the rest parameters
         internal static Expression CreateResolutionExpression(Type serviceType, IfUnresolved ifUnresolved, Type requiredServiceType, Expression serviceKeyExpr)
         {
             var ifUnresolvedExpr = Expression.Constant(ifUnresolved);
             var requiredServiceTypeExpr = Expression.Constant(requiredServiceType, typeof(Type));
+            serviceKeyExpr = Expression.Convert(serviceKeyExpr, typeof(object));
 
             var resolveMethod = _resolveMethodDefinition.MakeGenericMethod(serviceType);
-
             var serviceResolveExpr = Expression.Call(resolveMethod,
                 Container.ResolverExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr);
+
             return serviceResolveExpr;
         }
 
@@ -3138,8 +3146,11 @@ namespace DryIoc
             var requiredServiceType = details == null ? null : details.RequiredServiceType;
             if (requiredServiceType != null)
             {
-                wrappedServiceType.ThrowIfNotOf(requiredServiceType, Error.WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE, request);
-                if (wrappedServiceType == serviceType) // if Not a wrapper, 
+                var wrappedRequiredServiceType = request.Container.UnwrapServiceType(requiredServiceType);
+                wrappedServiceType.ThrowIfNotOf(wrappedRequiredServiceType, Error.WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE, request);
+
+                // Replace serviceType with Required if they are assignable
+                if (requiredServiceType.IsAssignableTo(serviceType))
                 {
                     serviceType = requiredServiceType; // override service type with required one
                     details = ServiceInfoDetails.Of(null, details.ServiceKey, details.IfUnresolved);
@@ -3620,6 +3631,7 @@ namespace DryIoc
             if (IsEmpty || (ResolvedFactory != null && ResolvedFactory.FactoryID == factory.FactoryID))
                 return this; // resolving only once, no need to check recursion again.
 
+            // TODO: Check for recursive dependency only for service.
             if (factory.FactoryType == FactoryType.Service)
                 for (var p = Parent; !p.IsEmpty; p = p.Parent)
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID,
@@ -4330,7 +4342,7 @@ namespace DryIoc
         public static PropertiesAndFieldsSelector Of = request => null;
 
         /// <summary>Public assignable instance members of any type except object, string, primitives types, and arrays of those.</summary>
-        public static PropertiesAndFieldsSelector PublicNonPrimitive = All(false, false);
+        public static PropertiesAndFieldsSelector Auto = All(false, false);
 
         public delegate PropertyOrFieldServiceInfo GetInfo(MemberInfo member, Request request);
 
@@ -5624,7 +5636,7 @@ namespace DryIoc
 
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses default rule <see cref="PropertiesAndFields.PublicNonPrimitive"/>, 
+        /// or if rules are not set it uses default rule <see cref="PropertiesAndFields.Auto"/>, 
         /// or you can specify your own rules with <paramref name="selectPropertiesAndFields"/> parameter.</summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="selectPropertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>

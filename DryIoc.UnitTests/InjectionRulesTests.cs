@@ -42,7 +42,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterMany<ClientWithPropsAndFields>(with: PropertiesAndFields.PublicNonPrimitive);
+            container.RegisterMany<ClientWithPropsAndFields>(with: PropertiesAndFields.Auto);
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -127,7 +127,7 @@ namespace DryIoc.UnitTests
 
             container.Register<IService, Service>();
             container.RegisterInstance("Hello string!");
-            container.Register<ClientWithServiceAndStringProperty>(with: PropertiesAndFields.PublicNonPrimitive);
+            container.Register<ClientWithServiceAndStringProperty>(with: PropertiesAndFields.Auto);
 
             var client = container.Resolve<ClientWithServiceAndStringProperty>();
 

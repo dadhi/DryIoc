@@ -154,7 +154,7 @@ namespace DryIoc.UnitTests
 
             var fooExpr = container.Resolve<FactoryExpression<Foo>>();
 
-            Assert.That(fooExpr.Value.ToString(), Is.StringContaining("Resolve(null, Throw, null)"));
+            Assert.That(fooExpr.Value.ToString(), Is.StringContaining("Resolve("));
         }
 
         internal class BarDependency : IDependency {}

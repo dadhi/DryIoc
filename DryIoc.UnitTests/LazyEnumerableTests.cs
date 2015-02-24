@@ -192,6 +192,32 @@ namespace DryIoc.UnitTests
             Assert.That(ex.Message, Is.StringContaining("Unable to resolve wrapper DryIoc.LazyEnumerable"));
         }
 
+	    [Test]
+	    public void Can_inject_Enumerable_as_LazyEnumerable_with_required_service_type()
+	    {
+	        var container = new Container();
+	        container.Register<Child>();
+	        container.Register<Man>(with: Parameters.Of.Name("children", typeof(LazyEnumerable<Child>)));
+
+	        var man = container.Resolve<Man>();
+            Assert.IsInstanceOf<Child>(man.Children.FirstOrDefault());
+
+	        var expr = container.Resolve<FactoryExpression<Man>>();
+	        StringAssert.Contains("r.Resolver.ResolveMany(", expr.Value.ToString());
+	    }
+
+        public class Man
+	    {
+            public IEnumerable<Child> Children { get; private set; }
+
+            public Man(IEnumerable<Child> children)
+            {
+                Children = children;
+            }
+	    }
+
+        public class Child { }
+
 	    [Test, Explicit]
         public void When_container_is_disposed_lazy_enumerable_will_stop_working()
 	    {
@@ -200,11 +226,13 @@ namespace DryIoc.UnitTests
 	        var services = container.Resolve<LazyEnumerable<Service>>();
             var containerRef = new WeakReference(container);
 
+	        // ReSharper disable once RedundantAssignment
 	        container = null;
             GC.Collect();
 
             Assert.That(containerRef.IsAlive, Is.False);
-            Assert.Throws<ContainerException>(() => { var _ = services.FirstOrDefault(); });
+	        // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
+            Assert.Throws<ContainerException>(() => { services.FirstOrDefault(); });
 	    }
 	}
 }

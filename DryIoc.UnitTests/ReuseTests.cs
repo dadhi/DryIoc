@@ -274,6 +274,33 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_reuse_item_multiple_times_down_in_object_subgraph_only_as_lazy_dependency()
+        {
+            var container = new Container();
+            container.Register<X>(Reuse.Singleton);
+            container.Register<Y>();
+
+            container.Resolve<X>();
+        }
+
+        internal class X
+        {
+            public Y Y { get; private set; }
+            public X(Y y)
+            {
+                Y = y;
+            }
+        }
+        internal class Y
+        {
+            public Lazy<X> X { get; private set; }
+            public Y(Lazy<X> x)
+            {
+                X = x;
+            }
+        }
+
+        [Test]
         public void Should_dispose_all_singletons_despite_exception_in_first_dispose()
         {
             IContainer container = new Container();
