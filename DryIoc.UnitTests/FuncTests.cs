@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -344,6 +343,43 @@ namespace DryIoc.UnitTests
             var service = func("Hey");
 
             Assert.That(service.Dep.Message, Is.EqualTo("Hey"));
+        }
+
+        [Test]
+        public void Can_reuse_func_argument_for_dependency_and_subdependency()
+        {
+            var container = new Container();
+            container.Register<X>();
+            container.Register<Y>();
+
+            var getX = container.Resolve<Func<A, X>>();
+            var a = new A();
+            var x = getX(a);
+
+            Assert.AreSame(x.A, x.Y.A);
+        }
+
+        internal class X
+        {
+            public A A { get; private set; }
+            public Y Y { get; private set; }
+
+            public X(A a, Y y)
+            {
+                A = a;
+                Y = y;
+            }
+        }
+
+        internal class A { }
+
+        internal class Y 
+        {
+            public A A { get; private set; }
+            public Y(A a)
+            {
+                A = a;
+            }
         }
 
         internal class ClassWithDepAndSubDep

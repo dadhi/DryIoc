@@ -45,7 +45,8 @@ namespace DryIoc.IssuesTests
                 KeyValuePair<Areas, Func<ITwoVariants, IMainViewModel>>[] mainViewModels)
             {
                 var firstVariant = variants.Single(v => v.Key == Areas.First).Value;
-                Area1 = getArea(firstVariant, mainViewModels.Single(v => v.Key == Areas.First).Value(firstVariant));
+                var firstMainViewModel = mainViewModels.Single(v => v.Key == Areas.First).Value(firstVariant);
+                Area1 = getArea(firstVariant, firstMainViewModel);
 
                 var secondVariant = variants.Single(v => v.Key == Areas.Second).Value;
                 Area2 = getArea(secondVariant, mainViewModels.Single(v => v.Key == Areas.Second).Value(secondVariant));
@@ -215,7 +216,7 @@ namespace DryIoc.IssuesTests
 
         internal enum Areas { First, Second }
 
-        [Test]
+        [Test, Ignore]
         public void Can_register_complex_graph_bound_to_context_area_Using_Func_with_Args()
         {
             var container = new Container();
@@ -228,7 +229,7 @@ namespace DryIoc.IssuesTests
             container.Register<IMainViewModel, MainViewModel1>(named: Areas.First, reuse: Reuse.InResolutionScope);
             container.Register<IMainViewModel, MainViewModel2>(named: Areas.Second, reuse: Reuse.InResolutionScope);
 
-            container.Register<IArea, Area>(setup: Setup.With(isDynamicDependency: true));  // Making Area a resolution root 
+            container.Register<IArea, Area>(); 
 
             container.Register<IComponent, Component2>();
 
@@ -244,7 +245,7 @@ namespace DryIoc.IssuesTests
             Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.Simple.Database, "Inside of area always the same database");
             Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.Database, "Inside of area always the same database");
             Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.Database, "Inside of area always the same database");
-            //Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.Database, "Inside of area always the same database");
             Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.Simple.Database, "Inside of area always the same database");
             Assert.AreNotSame(component.Area1.Database, component.Area2.Database, "Each area with own database");
 
@@ -314,7 +315,7 @@ namespace DryIoc.IssuesTests
             Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.Simple.Database, "Inside of area always the same database");
             Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.Database, "Inside of area always the same database");
             Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.Database, "Inside of area always the same database");
-            //Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.Database, "Inside of area always the same database");
             Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.Simple.Database, "Inside of area always the same database");
             Assert.AreNotSame(component.Area1.Database, component.Area2.Database, "Each area with own database");
 

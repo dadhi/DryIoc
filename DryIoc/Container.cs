@@ -3609,9 +3609,9 @@ namespace DryIoc
                 funcArgExprs[i] = Expression.Parameter(funcArg, funcArgName);
             }
 
-            var isArgUsed = new bool[funcArgExprs.Length];
-            var funcArgExpr = new KV<bool[], ParameterExpression[]>(isArgUsed, funcArgExprs);
-            return new Request(Parent, ContainerWeakRef, ServiceInfo, ResolvedFactory, funcArgExpr);
+            var funcArgsUsage = new bool[funcArgExprs.Length];
+            var funcArgsUsageAndExpr = new KV<bool[], ParameterExpression[]>(funcArgsUsage, funcArgExprs);
+            return new Request(Parent, ContainerWeakRef, ServiceInfo, ResolvedFactory, funcArgsUsageAndExpr);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container, 
