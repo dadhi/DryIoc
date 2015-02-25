@@ -188,7 +188,7 @@ namespace DryIoc.UnitTests.CUT
 	{
 		public object Clone()
 		{
-			throw new NotImplementedException();
+			return MemberwiseClone();
 		}
 	}
 

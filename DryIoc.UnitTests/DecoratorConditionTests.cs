@@ -9,8 +9,8 @@ namespace DryIoc.UnitTests
         public void Can_register_decorator_with_condition_based_on_service_name()
         {
             var container = new Container();
-            container.Register<IHandler, FastHandler>(named: "fast");
-            container.Register<IHandler, SlowHandler>(named: "slow");
+            container.Register<IHandler, FastHandler>(serviceKey: "fast");
+            container.Register<IHandler, SlowHandler>(serviceKey: "slow");
             container.Register<IHandler, LoggingHandlerDecorator>(
                 setup: SetupDecorator.With(request => Equals(request.ServiceKey, "slow")));
 

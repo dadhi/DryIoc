@@ -34,42 +34,23 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        internal class Component2 : IComponent
-        {
-            public IArea Area1 { get; set; }
-            public IArea Area2 { get; set; }
-
-            public Component2(
-                Func<ITwoVariants, IMainViewModel, IArea> getArea,
-                KeyValuePair<Areas, ITwoVariants>[] variants,
-                KeyValuePair<Areas, Func<ITwoVariants, IMainViewModel>>[] mainViewModels)
-            {
-                var firstVariant = variants.Single(v => v.Key == Areas.First).Value;
-                var firstMainViewModel = mainViewModels.Single(v => v.Key == Areas.First).Value(firstVariant);
-                Area1 = getArea(firstVariant, firstMainViewModel);
-
-                var secondVariant = variants.Single(v => v.Key == Areas.Second).Value;
-                Area2 = getArea(secondVariant, mainViewModels.Single(v => v.Key == Areas.Second).Value(secondVariant));
-            }
-        }
-
         public interface IArea
         {
             IDatabase Database { get; set; }
-            IMainViewModel MainViewModel { get; set; } // NOTE: changed from IMainViewModel1 to IMainViewModel, that was probably the original desire.
+            IMainViewModel1 MainViewModel1 { get; set; }
             ITwoVariants OneVariant { get; set; }
         }
 
         public class Area : IArea
         {
             public IDatabase Database { get; set; }
-            public IMainViewModel MainViewModel { get; set; }
+            public IMainViewModel1 MainViewModel1 { get; set; }
             public ITwoVariants OneVariant { get; set; }
 
-            public Area(IDatabase database, IMainViewModel mainViewModel, ITwoVariants oneVariant)
+            public Area(IDatabase database, IMainViewModel1 mainViewModel1, ITwoVariants oneVariant)
             {
                 Database = database;
-                MainViewModel = mainViewModel;
+                MainViewModel1 = mainViewModel1;
                 OneVariant = oneVariant;
             }
         }
@@ -77,7 +58,9 @@ namespace DryIoc.IssuesTests
         public interface IViewModelPresenter { }
         internal class ViewModelPresenter : IViewModelPresenter { }
 
-        public interface IMainViewModel
+        public interface IMainViewModel { }
+
+        public interface IMainViewModel1 : IMainViewModel
         {
             IViewModelPresenter ViewModelPresenter { get; set; }
             IDatabase Database { get; set; }
@@ -87,7 +70,7 @@ namespace DryIoc.IssuesTests
             ITwoVariants OneVariant { get; set; }
         }
 
-        internal class MainViewModel1 : IMainViewModel
+        internal class MainViewModel1 : IMainViewModel1
         {
             public IViewModelPresenter ViewModelPresenter { get; set; }
             public IDatabase Database { get; set; }
@@ -96,12 +79,7 @@ namespace DryIoc.IssuesTests
             public IChildViewModelWithChildren WithChildren { get; set; }
             public Func<IChildViewModelSimple> ChildResolver { get; set; }
 
-            public MainViewModel1(
-                IViewModelPresenter viewModelPresenter, 
-                IDatabase database, 
-                ITwoVariants oneVariant, 
-                IChildViewModelSimple simple, 
-                IChildViewModelWithChildren withChildren,
+            public MainViewModel1(IViewModelPresenter viewModelPresenter, IDatabase database, ITwoVariants oneVariant, IChildViewModelSimple simple, IChildViewModelWithChildren withChildren,
                 Func<IChildViewModelSimple> childResolver)
             {
                 ViewModelPresenter = viewModelPresenter;
@@ -164,180 +142,123 @@ namespace DryIoc.IssuesTests
         {
             IViewModelPresenter ViewModelPresenter { get; set; }
             IDatabase Database { get; set; }
-            IMainViewModel MainViewModel { get; }
+            IMainViewModel2 MainViewModel { get; set; }
         }
 
         internal class ChildViewModelWithMainViewModel : IChildViewModelWithMainViewModel
         {
             public IViewModelPresenter ViewModelPresenter { get; set; }
             public IDatabase Database { get; set; }
-            public IMainViewModel MainViewModel { get { return _mainviewModel.Value; } }
+            public IMainViewModel2 MainViewModel { get; set; }
 
-            public ChildViewModelWithMainViewModel(IViewModelPresenter viewModelPresenter, IDatabase database, Lazy<IMainViewModel> mainviewModel)
+            public ChildViewModelWithMainViewModel(IViewModelPresenter viewModelPresenter, IDatabase database, IMainViewModel2 mainViewModel)
             {
                 ViewModelPresenter = viewModelPresenter;
                 Database = database;
-                _mainviewModel = mainviewModel;
+                MainViewModel = mainViewModel;
             }
-
-            private Lazy<IMainViewModel> _mainviewModel;
         }
 
-        internal class MainViewModel2 : IMainViewModel
+        public interface IMainViewModel2 : IMainViewModel
+        {
+            IViewModelPresenter ViewModelPresenter { get; set; }
+            IDatabase Database { get; set; }
+            IChildViewModelSimple Simple { get; set; }
+        }
+
+        internal class MainViewModel2 : IMainViewModel2
         {
             public IViewModelPresenter ViewModelPresenter { get; set; }
             public IDatabase Database { get; set; }
-            public ITwoVariants OneVariant { get; set; }
             public IChildViewModelSimple Simple { get; set; }
-            public IChildViewModelWithChildren WithChildren { get; set; }
-            public Func<IChildViewModelSimple> ChildResolver { get; set; }
 
-            public IChildViewModelSimple CreateDynamicChild()
-            {
-                return ChildResolver();
-            }
-
-            public MainViewModel2(
-                IViewModelPresenter viewModelPresenter, 
-                IDatabase database,
-                ITwoVariants oneVariant, 
-                IChildViewModelSimple simple,
-                IChildViewModelWithChildren withChildren,
-                Func<IChildViewModelSimple> childResolver)
+            public MainViewModel2(IViewModelPresenter viewModelPresenter, IDatabase database, IChildViewModelSimple simple)
             {
                 ViewModelPresenter = viewModelPresenter;
                 Database = database;
-                OneVariant = oneVariant;
                 Simple = simple;
-                WithChildren = withChildren;
-                ChildResolver = childResolver;
             }
         }
 
         internal enum Areas { First, Second }
 
-        [Test, Ignore]
-        public void Can_register_complex_graph_bound_to_context_area_Using_Func_with_Args()
+        [Test]
+        public void Can_register_complex_graph_bound_to_context_area()
         {
             var container = new Container();
 
-            container.Register<IDatabase, Database>(Reuse.InResolutionScope);
+            container.Register<IComponent, Component>(
+                with: Parameters.Of
+                    .Name("area1", serviceKey: Areas.First)
+                    .Name("area2", serviceKey: Areas.Second));
 
-            container.Register<ITwoVariants, FirstVariant>(named: Areas.First);  // For Area1
-            container.Register<ITwoVariants, SecondVariant>(named: Areas.Second); // For Area2
+            container.Register<IArea, Area>(serviceKey: Areas.First,
+                setup: Setup.With(newResolutionScope: true),
+                with: Parameters.Of
+                    .Name("oneVariant", serviceKey: Areas.First)
+                    .Name("mainViewModel1", serviceKey: Areas.First));
 
-            container.Register<IMainViewModel, MainViewModel1>(named: Areas.First, reuse: Reuse.InResolutionScope);
-            container.Register<IMainViewModel, MainViewModel2>(named: Areas.Second, reuse: Reuse.InResolutionScope);
+            container.Register<IArea, Area>(serviceKey: Areas.Second,
+                setup: Setup.With(newResolutionScope: true),
+                with: Parameters.Of
+                    .Name("oneVariant", serviceKey: Areas.Second)
+                    .Name("mainViewModel1", serviceKey: Areas.Second));
 
-            container.Register<IArea, Area>(); 
+            container.Register<IDatabase, Database>(Reuse.InResolutionScopeOf<IArea>());
 
-            container.Register<IComponent, Component2>();
+            container.Register<IMainViewModel1, MainViewModel1>(serviceKey: Areas.First,
+                setup: Setup.With(newResolutionScope: true),
+                with: Parameters.Of
+                    .Name("oneVariant", serviceKey: Areas.First));
+            container.Register<IMainViewModel1, MainViewModel1>(serviceKey: Areas.Second,
+                setup: Setup.With(newResolutionScope: true),
+                with: Parameters.Of
+                    .Name("oneVariant", serviceKey: Areas.Second));
 
-            container.Register<IViewModelPresenter, ViewModelPresenter>(Reuse.InResolutionScope);
+            container.Register<ITwoVariants, FirstVariant>(serviceKey: Areas.First);
+            container.Register<ITwoVariants, SecondVariant>(serviceKey: Areas.Second);
+
+            container.Register<IViewModelPresenter, ViewModelPresenter>(Reuse.InResolutionScopeOf<IMainViewModel>());
+
             container.Register<IChildViewModelSimple, ChildViewModelSimple>();
+
             container.Register<IChildViewModelWithChildren, ChildViewModelWithChildren>();
+
             container.Register<IChildViewModelWithMainViewModel, ChildViewModelWithMainViewModel>();
+
+            container.Register<IMainViewModel2, MainViewModel2>(
+                setup: Setup.With(newResolutionScope: true));
 
             var component = container.Resolve<IComponent>();
 
-            // Database: Same for Area1 and Area2
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.Database, "Inside of area always the same database");
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.Simple.Database, "Inside of area always the same database");
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.Database, "Inside of area always the same database");
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.Database, "Inside of area always the same database");
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.Database, "Inside of area always the same database");
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.Simple.Database, "Inside of area always the same database");
+            // Database: Same in Area1 and Area2
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.Simple.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.Simple.Database, "Inside of area always the same database");
             Assert.AreNotSame(component.Area1.Database, component.Area2.Database, "Each area with own database");
 
-            // ViewModelPresnter (LifestyleBoundToNearest): Same for Area1 and Area 2
-            Assert.AreSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            Assert.AreSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.WithChildren.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            Assert.AreSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.WithChildren.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            Assert.AreSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            Assert.AreNotSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area2.MainViewModel.ViewModelPresenter, "Each MainViewModel has own ViewModelPresenter");
-            //Assert.AreNotSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.ViewModelPresenter, "Each MainViewModel has own ViewModelPresenter");
-            //Assert.AreSame(component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
+            // ViewModelPrsenter (LifestyleBoundToNearest): Same in Area1 and Area 2
+            Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
+            Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
+            Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
+            Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
+            Assert.AreNotSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area2.MainViewModel1.ViewModelPresenter, "Each MainViewModel has own ViewModelPresenter");
+            Assert.AreNotSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.ViewModelPresenter, "Each MainViewModel has own ViewModelPresenter");
+            Assert.AreSame(component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
 
-            // Dynamic: Same for Area1 and Area2
-            var child = component.Area1.MainViewModel.CreateDynamicChild();
-            Assert.AreSame(component.Area1.MainViewModel.ViewModelPresenter, child.ViewModelPresenter, "Also dynamic created objects should follow the normal rules");
+            // Dynamic: Same in Area1 and Area2
+            var child = component.Area1.MainViewModel1.CreateDynamicChild();
+            Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, child.ViewModelPresenter, "Also dynamic created objects should follow the normal rules");
             Assert.AreSame(component.Area1.Database, child.Database, "Also dynamic created objects should follow the normal rules");
 
             // Area1 should use FirstVariant as ITwoVariants, Area2 SecondVariant
             Assert.IsInstanceOf<FirstVariant>(component.Area1.OneVariant);
-            Assert.IsInstanceOf<FirstVariant>(component.Area1.MainViewModel.OneVariant);
+            Assert.IsInstanceOf<FirstVariant>(component.Area1.MainViewModel1.OneVariant);
             Assert.IsInstanceOf<SecondVariant>(component.Area2.OneVariant);
-            Assert.IsInstanceOf<SecondVariant>(component.Area2.MainViewModel.OneVariant);
-        }
-
-        public static Rules.FactorySelectorRule PreferParentKeyOverDefault = (request, factories) =>
-        {
-            if (request.ServiceKey != null) // if key is specified, do not handle it
-                return factories.FirstOrDefault(f => f.Key.Equals(request.ServiceKey)).Value;
-
-            var parentWithKey = request.Parent.Enumerate().FirstOrDefault(p => p.ServiceKey != null);
-            if (parentWithKey != null) // try find service with the same key as parent.
-                return factories.FirstOrDefault(f => f.Key.Equals(parentWithKey.ServiceKey)).Value
-                    ?? factories.FirstOrDefault(f => f.Key.Equals(null)).Value; // if not found, fallback to default key
-
-            return factories.FirstOrDefault(f => f.Key.Equals(null)).Value; // if no parent with key, fallback to default key
-        };
-
-        [Test]
-        public void Can_register_complex_graph_bound_to_context_area_Using_key_based_type_selection()
-        {
-            var container = new Container(rules => rules.WithFactorySelector(PreferParentKeyOverDefault));
-
-            container.Register<IDatabase, Database>(Reuse.InResolutionScope);
-
-            container.Register<ITwoVariants, FirstVariant>(named: Areas.First);  // For Area1
-            container.Register<ITwoVariants, SecondVariant>(named: Areas.Second); // For Area2
-
-            container.Register<IMainViewModel, MainViewModel1>(named: Areas.First, reuse: Reuse.InResolutionScope);
-            container.Register<IMainViewModel, MainViewModel2>(named: Areas.Second, reuse: Reuse.InResolutionScope);
-
-            container.Register<IArea, Area>(named: Areas.First, setup: Setup.With(isDynamicDependency: true));  // Making area1, area2 resolution roots 
-            container.Register<IArea, Area>(named: Areas.Second, setup: Setup.With(isDynamicDependency: true)); // to start their own object sub-graphs.
-
-            container.Register<IComponent, Component>(with: Parameters.Of
-                .Name("area1", serviceKey: Areas.First)
-                .Name("area2", serviceKey: Areas.Second));
-
-            container.Register<IViewModelPresenter, ViewModelPresenter>(Reuse.InResolutionScope);
-            container.Register<IChildViewModelSimple, ChildViewModelSimple>();
-            container.Register<IChildViewModelWithChildren, ChildViewModelWithChildren>();
-            container.Register<IChildViewModelWithMainViewModel, ChildViewModelWithMainViewModel>();
-
-            var component = container.Resolve<IComponent>();
-
-            // Database: Same for Area1 and Area2
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.Database, "Inside of area always the same database");
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.Simple.Database, "Inside of area always the same database");
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.Database, "Inside of area always the same database");
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.Database, "Inside of area always the same database");
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.Database, "Inside of area always the same database");
-            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel.WithChildren.Simple.Database, "Inside of area always the same database");
-            Assert.AreNotSame(component.Area1.Database, component.Area2.Database, "Each area with own database");
-
-            // ViewModelPresnter (LifestyleBoundToNearest): Same for Area1 and Area 2
-            Assert.AreSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            Assert.AreSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.WithChildren.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            Assert.AreSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.WithChildren.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            Assert.AreSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            Assert.AreNotSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area2.MainViewModel.ViewModelPresenter, "Each MainViewModel has own ViewModelPresenter");
-            //Assert.AreNotSame(component.Area1.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.ViewModelPresenter, "Each MainViewModel has own ViewModelPresenter");
-            //Assert.AreSame(component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel.WithChildren.ChildWithMainViewModel.MainViewModel.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-
-            // Dynamic: Same for Area1 and Area2
-            var child = component.Area1.MainViewModel.CreateDynamicChild();
-            Assert.AreSame(component.Area1.MainViewModel.ViewModelPresenter, child.ViewModelPresenter, "Also dynamic created objects should follow the normal rules");
-            Assert.AreSame(component.Area1.Database, child.Database, "Also dynamic created objects should follow the normal rules");
-
-            // Area1 should use FirstVariant as ITwoVariants, Area2 SecondVariant
-            Assert.IsInstanceOf<FirstVariant>(component.Area1.OneVariant);
-            Assert.IsInstanceOf<FirstVariant>(component.Area1.MainViewModel.OneVariant);
-            Assert.IsInstanceOf<SecondVariant>(component.Area2.OneVariant);
-            Assert.IsInstanceOf<SecondVariant>(component.Area2.MainViewModel.OneVariant);
+            Assert.IsInstanceOf<SecondVariant>(component.Area2.MainViewModel1.OneVariant);
         }
 
         internal interface ICar { }
@@ -383,13 +304,13 @@ namespace DryIoc.IssuesTests
 
             container.Register<ICar, FastCar>(Reuse.InResolutionScope);
 
-            // isDynamicDependency: true means that service will be injected as: `r => new Client(r.Resolve<Service>())`
+            // isResolutionRoot: true means that service will be injected as: `r => new Client(r.Resolve<Service>())`
             // rather then inline creation expression (which is default): `r => new Client(new Service(...))`
             // Direct use of `Resolve` method means that dependency treated by container as new resolution root,
             // and therefore has its own ResolutionScope! So every dependency (e.g. ICar) down the resolve method 
             // registered with `Reuse.InResolutionScope` will reside in the new resolution scope. 
             container.Register<AreaWithOneCar>(
-                setup: Setup.With(isDynamicDependency: true)); // NOTE: remove setup parameter to see what happens
+                setup: Setup.With(newResolutionScope: true)); // NOTE: remove setup parameter to see what happens
 
             container.Register<SomeTool>();
 
@@ -455,7 +376,7 @@ namespace DryIoc.IssuesTests
 
             container.Register<ICar, SmallCar>(Reuse.InResolutionScope);
 
-            container.Register(typeof(DisposableArea<>), setup: Setup.With(isDynamicDependency: true));
+            container.Register(typeof(DisposableArea<>), setup: Setup.With(newResolutionScope: true));
             container.Register<AreaWithOneCar>();
             container.Register<SomeTool>();
 

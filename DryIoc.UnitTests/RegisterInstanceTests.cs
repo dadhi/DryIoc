@@ -48,7 +48,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance(typeof(string), "ring", named: "MyPrecious");
+            container.RegisterInstance(typeof(string), "ring", serviceKey: "MyPrecious");
 
             var ring = container.Resolve<string>("MyPrecious");
             Assert.That(ring, Is.EqualTo("ring"));
@@ -60,7 +60,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.RegisterInstance(typeof(int), "ring", named: "MyPrecious"));
+                container.RegisterInstance(typeof(int), "ring", serviceKey: "MyPrecious"));
 
             Assert.AreEqual(ex.Error, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
         }

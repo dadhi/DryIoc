@@ -112,9 +112,9 @@ namespace DryIoc.Web
     }
 
     /// <summary>Defines web reuse as reuse items in <see cref="HttpContextScopeContext"/>.</summary>
-    public static class WebReuse
+    public static class ReuseInWeb
     {
         /// <summary>Request reuse corresponds to reusing items in root open scope (physically stored in current <see cref="HttpContext"/>).</summary>
-        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse Request = Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
     }
 }

@@ -154,7 +154,7 @@ namespace DryIoc.UnitTests
 
             var fooExpr = container.Resolve<FactoryExpression<Foo>>();
 
-            Assert.That(fooExpr.Value.ToString(), Is.StringContaining("Resolve("));
+            Assert.That(fooExpr.Value.ToString(), Is.StringContaining(".Resolve"));
         }
 
         internal class BarDependency : IDependency {}
@@ -180,12 +180,14 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Dog>();
-            container.Register<Food>(setup: Setup.With(isDynamicDependency: true));
+            container.Register<Food>(setup: Setup.With(newResolutionScope: true));
 
             var dog = container.Resolve<Dog>();
             var food = dog.Feed();
-
             Assert.IsInstanceOf<Food>(food);
+
+            var dogExpr = container.Resolve<FactoryExpression<Dog>>();
+            StringAssert.Contains(".Resolve", dogExpr.Value.ToString());
         }
 
         internal class Dog

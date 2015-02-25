@@ -81,7 +81,7 @@ namespace DryIoc.IssuesTests
             await ThrowsAsync<ContainerException>(async () =>
             {
                 var c = new Container();
-                c.Register<XProvider>(Reuse.Singleton, named: 1);
+                c.Register<XProvider>(Reuse.Singleton, serviceKey: 1);
 
                 Task t;
                 object result = null;

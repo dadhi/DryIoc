@@ -17,7 +17,7 @@ namespace DryIoc.Web.UnitTests
             var fakeItems = new Dictionary<object, object>();
             var container = original.WithWebReuseInRequest(() => fakeItems);
             
-            container.Register<Me>(WebReuse.InRequest);
+            container.Register<Me>(ReuseInWeb.Request);
             using (var c = container.OpenScope())
             {
                 var me = container.Resolve<Me>();

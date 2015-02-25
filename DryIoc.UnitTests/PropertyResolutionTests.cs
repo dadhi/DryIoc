@@ -146,7 +146,7 @@ namespace DryIoc.UnitTests
             var container = new Container(r => r.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
             container.Register<LazyChicken>();
-            container.Register<Guts>(named: "lazy-me");
+            container.Register<Guts>(serviceKey: "lazy-me");
 
             var chicken = container.Resolve<LazyChicken>();
 

@@ -66,7 +66,6 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.InResolutionScope);
 
             var consumer = container.Resolve<Consumer>();
-            //var consumerExpr = container.Resolve<Container.DebugExpression<Consumer>>();
 
             Assert.That(consumer.Log, Is.Not.Null.And.SameAs(consumer.Account.Log));
         }
@@ -85,24 +84,97 @@ namespace DryIoc.UnitTests
             Assert.That(consumer.Log, Is.Not.Null.And.Not.SameAs(account.Log));
         }
 
-        [Test, Explicit]
-        public void For_signleton_injected_as_Func_and_as_instance_only_one_instance_should_be_created()
+        [Test]
+        public void If_not_fully_matched_resolution_scope_found_Then_the_top_scope_will_be_used()
         {
-            ServiceWithInstanceCountWithStringParam.InstanceCount = 0;
-            try
+            var container = new Container();
+
+            container.Register<AccountUser>();
+            container.Register<Account>(setup: Setup.With(newResolutionScope: true));
+            container.Register<Log>(Reuse.InResolutionScopeOf<Account>("account"));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<AccountUser>());
+
+            Assert.AreEqual(ex.Error, Error.NO_MATCHED_SCOPE_FOUND);
+        }
+
+        [Test]
+        public void Resolve_succeed_only_if_fully_matched_resolution_scope_found()
+        {
+            var container = new Container();
+
+            container.Register<AccountUser>(with: Parameters.Of.Type<Account>(serviceKey: "account"));
+            container.Register<Account>(serviceKey: "account", setup: Setup.With(newResolutionScope: true));
+            container.Register<Log>(Reuse.InResolutionScopeOf<Account>("account"));
+
+            var user = container.Resolve<AccountUser>();
+
+            Assert.NotNull(user.Account.Log);
+        }
+
+        [Test]
+        public void Resolve_service_reused_in_resolution_scope_succeed_if_key_matched()
+        {
+            var container = new Container();
+
+            container.Register<AccountUser>(with: Parameters.Of.Type<Account>(serviceKey: "account"));
+            container.Register<Account>(serviceKey: "account", setup: Setup.With(newResolutionScope: true));
+            container.Register<Log>(Reuse.InResolutionScopeOf(serviceKey: "account"));
+
+            var user = container.Resolve<AccountUser>();
+
+            Assert.NotNull(user.Account.Log);
+        }
+
+        [Test]
+        public void Can_control_disposing_of_matching_resolution_scope_with_wrapper()
+        {
+            var container = new Container();
+
+            container.Register<AccountUser>();
+            container.Register<Account, CarefulAccount>(setup: Setup.With(newResolutionScope: true));
+            container.Register<Log, DisposableLog>(Reuse.InResolutionScopeOf<Account>());
+
+            var user = container.Resolve<AccountUser>();
+
+            Assert.NotNull(user.Account.Log);
+            ((IDisposable)user.Account).Dispose();
+
+            Assert.IsTrue(((DisposableLog)user.Account.Log).IsDisposed);
+        }
+
+        internal class AccountUser
+        {
+            public Account Account { get; private set; }
+            public AccountUser(Account account)
             {
-                var container = new Container();
-                container.Register<ClientWithFuncAndInstanceDependency>();
-                container.Register<IService, ServiceWithInstanceCountWithStringParam>(Reuse.Singleton);
-                container.RegisterInstance("I am a string");
-
-                container.Resolve<ClientWithFuncAndInstanceDependency>();
-
-                Assert.That(ServiceWithInstanceCountWithStringParam.InstanceCount, Is.EqualTo(1));
+                Account = account;
             }
-            finally
+        }
+
+        internal class DisposableLog : Log, IDisposable 
+        {
+            public void Dispose()
             {
-                ServiceWithInstanceCountWithStringParam.InstanceCount = 0;
+                IsDisposed = true;
+            }
+
+            public bool IsDisposed { get; private set; }
+        }
+
+        internal class CarefulAccount : Account, IDisposable
+        {
+            private readonly ResolutionScoped<Log> _disposableLogAndEverything;
+
+            public CarefulAccount(ResolutionScoped<Log> log) : base(log.Value)
+            {
+                _disposableLogAndEverything = log;
+            }
+
+            public void Dispose()
+            {
+                _disposableLogAndEverything.Dispose();
             }
         }
 
@@ -274,13 +346,13 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_reuse_item_multiple_times_down_in_object_subgraph_only_as_lazy_dependency()
+        public void Possible_to_reuse_item_multiple_times_down_in_object_subgraph_Only_as_lazy_dependency()
         {
             var container = new Container();
             container.Register<X>(Reuse.Singleton);
             container.Register<Y>();
 
-            container.Resolve<X>();
+            Assert.DoesNotThrow(() => container.Resolve<X>());
         }
 
         internal class X
@@ -293,6 +365,7 @@ namespace DryIoc.UnitTests
         }
         internal class Y
         {
+            // ReSharper disable once MemberHidesStaticFromOuterClass
             public Lazy<X> X { get; private set; }
             public Y(Lazy<X> x)
             {

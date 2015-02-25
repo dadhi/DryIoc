@@ -22,7 +22,7 @@ namespace DryIoc.CommonServiceLocator.UnitTests
         public void Can_get_keyyed_instance_with_locator()
         {
             var locator = new DryIocServiceLocator(new Container());
-            locator.Container.Register<IService, Service>(named: "1");
+            locator.Container.Register<IService, Service>(serviceKey: "1");
 
             var service = locator.GetInstance<IService>("1");
 
@@ -34,7 +34,7 @@ namespace DryIoc.CommonServiceLocator.UnitTests
         {
             var locator = new DryIocServiceLocator(new Container());
             locator.Container.Register<IService, Service>();
-            locator.Container.Register<IService, AnotherService>(named: "another");
+            locator.Container.Register<IService, AnotherService>(serviceKey: "another");
 
             var services = locator.GetAllInstances<IService>().ToArray();
 

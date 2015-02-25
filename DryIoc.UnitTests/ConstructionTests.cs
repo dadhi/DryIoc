@@ -88,7 +88,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             
-            container.Register<ServiceFactory>(named: "factory");
+            container.Register<ServiceFactory>(serviceKey: "factory");
             container.RegisterInstance("parameter");
 
             container.Register<IService>(with: FactoryMethod.Of(

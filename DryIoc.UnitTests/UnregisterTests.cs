@@ -84,11 +84,11 @@ namespace DryIoc.UnitTests
         public void Unregister_then_register_named_impl_Should_return_new_impl()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: "a");
+            container.Register<IService, Service>(serviceKey: "a");
 
             container.Unregister(typeof(IService), "a");
 
-            container.Register<IService, AnotherService>(named: "a");
+            container.Register<IService, AnotherService>(serviceKey: "a");
 
             var b = container.Resolve<IService>("a");
 
@@ -99,12 +99,12 @@ namespace DryIoc.UnitTests
         public void Unregister_then_register_one_of_named_impl_Should_return_new_impl()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: "a");
-            container.Register<IService, AnotherService>(named: "b");
+            container.Register<IService, Service>(serviceKey: "a");
+            container.Register<IService, AnotherService>(serviceKey: "b");
 
             container.Unregister(typeof(IService), "b");
 
-            container.Register<IService, Service>(named: "b");
+            container.Register<IService, Service>(serviceKey: "b");
 
             var b = container.Resolve<IService>("b");
 
@@ -194,7 +194,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>();
-            container.Register<IService, DisposableService>(named: 2);
+            container.Register<IService, DisposableService>(serviceKey: 2);
 
             var lastDefaultKey = DefaultKey.Value.Next();
             container.Unregister(typeof(IService), lastDefaultKey);
@@ -210,7 +210,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>();
-            container.Register<IService, DisposableService>(named: 2);
+            container.Register<IService, DisposableService>(serviceKey: 2);
 
             var lastDefaultKey = DefaultKey.Value.Next();
             container.Unregister(typeof(IService), lastDefaultKey);
@@ -225,34 +225,34 @@ namespace DryIoc.UnitTests
         public void Unregister_named_registration_should_Succeed()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: 1);
+            container.Register<IService, Service>(serviceKey: 1);
 
-            container.Unregister(typeof(IService), named: 1);
+            container.Unregister(typeof(IService), serviceKey: 1);
 
-            Assert.IsFalse(container.IsRegistered<IService>(named: 1));
+            Assert.IsFalse(container.IsRegistered<IService>(serviceKey: 1));
         }
 
         [Test]
         public void Unregister_unregistered_named_registration_should_Succeed()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: 1);
+            container.Register<IService, Service>(serviceKey: 1);
 
-            container.Unregister(typeof(IService), named: 1);
-            container.Unregister(typeof(IService), named: 1);
+            container.Unregister(typeof(IService), serviceKey: 1);
+            container.Unregister(typeof(IService), serviceKey: 1);
 
-            Assert.IsFalse(container.IsRegistered<IService>(named: 1));
+            Assert.IsFalse(container.IsRegistered<IService>(serviceKey: 1));
         }
 
         [Test]
         public void Unregister_without_key_from_named_registration_should_remove_all_registrations()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: 'a');
+            container.Register<IService, Service>(serviceKey: 'a');
 
             container.Unregister<IService>();
 
-            Assert.That(container.IsRegistered<IService>(named: 'a'), Is.False);
+            Assert.That(container.IsRegistered<IService>(serviceKey: 'a'), Is.False);
             Assert.That(container.IsRegistered<IService>(), Is.False);
         }
 
@@ -260,12 +260,12 @@ namespace DryIoc.UnitTests
         public void Unregister_named_from_default_and_named_default_should_keep_default()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: 'a');
+            container.Register<IService, Service>(serviceKey: 'a');
             container.Register<IService, AnotherService>();
 
-            container.Unregister<IService>(named: 'a');
+            container.Unregister<IService>(serviceKey: 'a');
 
-            Assert.That(container.IsRegistered<IService>(named: 'a'), Is.False);
+            Assert.That(container.IsRegistered<IService>(serviceKey: 'a'), Is.False);
             Assert.That(container.IsRegistered<IService>(DefaultKey.Value), Is.True);
         }
 

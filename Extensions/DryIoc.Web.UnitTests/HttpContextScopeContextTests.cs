@@ -12,7 +12,7 @@ namespace DryIoc.Web.UnitTests
             var fakeContextItems = new Dictionary<object, object>();
 
             var c = new Container(scopeContext: new HttpContextScopeContext(() => fakeContextItems));
-            c.Register<Blah>(WebReuse.InRequest);
+            c.Register<Blah>(ReuseInWeb.Request);
 
             var contextProxy = new HttpContextScopeContext(() => fakeContextItems);
             using (contextProxy.SetCurrent(current => new Scope(current, contextProxy.RootScopeName)))

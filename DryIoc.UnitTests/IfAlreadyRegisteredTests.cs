@@ -37,9 +37,9 @@ namespace DryIoc.UnitTests
         public void I_can_say_to_Throw_on_new_default_registration_when_multi_keyed_registrations_present()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: 1, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+            container.Register<IService, Service>(serviceKey: 1, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
             container.Register<IService, Service>(ifAlreadyRegistered: IfAlreadyRegistered.Throw);
-            container.Register<IService, AnotherService>(named: 2, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+            container.Register<IService, AnotherService>(serviceKey: 2, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
 
             var ex = Assert.Throws<ContainerException>(() =>
             container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Throw));
@@ -63,8 +63,8 @@ namespace DryIoc.UnitTests
         public void Can_update_registered_named_with_new_named()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: EnumKey.Some);
-            container.Register<IService, AnotherService>(named: EnumKey.Some, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.Register<IService, Service>(serviceKey: EnumKey.Some);
+            container.Register<IService, AnotherService>(serviceKey: EnumKey.Some, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             var service = container.Resolve<IService>(EnumKey.Some);
 

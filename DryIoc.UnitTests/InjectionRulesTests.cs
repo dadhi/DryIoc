@@ -93,7 +93,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: "another");
+            container.Register<IService, AnotherService>(serviceKey: "another");
 
             container.RegisterMany<ClientWithPropsAndFields>(with: 
                 PropertiesAndFields.All(withFields: false).The<ClientWithPropsAndFields>(_ => _.PInternal, serviceKey: "another"));

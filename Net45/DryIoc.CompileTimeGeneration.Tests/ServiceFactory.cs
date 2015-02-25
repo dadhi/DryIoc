@@ -27,7 +27,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
             get { return this; }
         }
 
-        public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
+        public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
         {
             var factoryDelegate = DefaultResolutions.GetValueOrDefault(serviceType);
             return factoryDelegate == null 
@@ -35,10 +35,10 @@ namespace DryIoc.CompileTimeGeneration.Tests
                 : factoryDelegate(AppendableArray.Empty, this, null);
         }
 
-        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType)
+        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
         {
             if (serviceKey == null && requiredServiceType == null)
-                return ResolveDefault(serviceType, ifUnresolved);
+                return ResolveDefault(serviceType, ifUnresolved, scope);
 
             serviceType = requiredServiceType ?? serviceType;
             var resolutions = KeyedResolutions.GetValueOrDefault(serviceType);
@@ -52,7 +52,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
             return GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
         }
 
-        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey)
+        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, IScope scope)
         {
             serviceType = requiredServiceType ?? serviceType;
 
@@ -63,14 +63,14 @@ namespace DryIoc.CompileTimeGeneration.Tests
                 {
                     var factoryDelegate = resolutions.GetValueOrDefault(serviceKey);
                     if (factoryDelegate != null)
-                        yield return factoryDelegate(AppendableArray.Empty, this, null);
+                        yield return factoryDelegate(AppendableArray.Empty, this, scope);
                 }
                 else
                 {
                     foreach (var resolution in resolutions.Enumerate())
                     {
                         var factoryDelegate = resolution.Value;
-                        yield return factoryDelegate(AppendableArray.Empty, this, null);
+                        yield return factoryDelegate(AppendableArray.Empty, this, scope);
                     }
                 }
             }
@@ -78,7 +78,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
             {
                 var factoryDelegate = DefaultResolutions.GetValueOrDefault(serviceType);
                 if (factoryDelegate != null)
-                    yield return factoryDelegate(AppendableArray.Empty, this, null);
+                    yield return factoryDelegate(AppendableArray.Empty, this, scope);
             }
         }
 

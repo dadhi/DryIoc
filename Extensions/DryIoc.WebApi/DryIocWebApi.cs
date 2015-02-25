@@ -52,7 +52,7 @@ namespace DryIoc.WebApi
         public static void RegisterHttpControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             controllerAssemblies = controllerAssemblies ?? new[] { Assembly.GetExecutingAssembly() };
-            container.RegisterMany(controllerAssemblies, typeof(IHttpController), WebReuse.InRequest);
+            container.RegisterMany(controllerAssemblies, typeof(IHttpController), ReuseInWeb.Request);
         }
 
         public static void SetFilterProvider(this IContainer container, ServicesContainer services)
@@ -146,8 +146,8 @@ namespace DryIoc.WebApi
         private readonly IEnumerable<IFilterProvider> _providers;
     }
 
-    public static class WebReuse
+    public static class ReuseInWeb
     {
-        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse Request = Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
     }
 }

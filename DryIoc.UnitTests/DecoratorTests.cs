@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, AnotherOperation>(named: "Another");
+            container.Register<IOperation, AnotherOperation>(serviceKey: "Another");
             container.Register<IOperation, RetryOperationDecorator>(setup: SetupDecorator.Default);
 
             var decorator = (RetryOperationDecorator)container.Resolve<IOperation>("Another");
@@ -48,8 +48,8 @@ namespace DryIoc.UnitTests
         public void Should_NOT_cache_decorator_so_it_could_decorated_another_service()
         {
             var container = new Container();
-            container.Register<IOperation, SomeOperation>(named: "Some");
-            container.Register<IOperation, AnotherOperation>(named: "Another");
+            container.Register<IOperation, SomeOperation>(serviceKey: "Some");
+            container.Register<IOperation, AnotherOperation>(serviceKey: "Another");
             container.Register<IOperation, RetryOperationDecorator>(setup: SetupDecorator.Default);
 
             var some = (RetryOperationDecorator)container.Resolve<IOperation>("Some");
@@ -212,7 +212,7 @@ namespace DryIoc.UnitTests
         public void Should_support_decorating_of_Lazy_named_service()
         {
             var container = new Container();
-            container.Register<IOperation, SomeOperation>(named: "some");
+            container.Register<IOperation, SomeOperation>(serviceKey: "some");
             container.Register<IOperation, LazyDecorator>(setup: SetupDecorator.Default);
 
             var operation = container.Resolve<IOperation>("some");

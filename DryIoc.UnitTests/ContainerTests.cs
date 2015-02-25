@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: "another");
+            container.Register<IService, AnotherService>(serviceKey: "another");
 
             var service = container.Resolve<IService>();
 
@@ -34,7 +34,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: "another");
+            container.Register<IService, AnotherService>(serviceKey: "another");
 
             var service = container.Resolve<IService>("another");
 
@@ -45,8 +45,8 @@ namespace DryIoc.UnitTests
         public void Given_two_named_registerations_Resolving_without_name_should_throw()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: "some");
-            container.Register<IService, Service>(named: "another");
+            container.Register<IService, Service>(serviceKey: "some");
+            container.Register<IService, Service>(serviceKey: "another");
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
@@ -234,10 +234,10 @@ namespace DryIoc.UnitTests
         public void Registering_service_with_duplicate_name_should_throw()
         {
             var container = new Container();
-            container.Register(typeof(IService), typeof(Service), named: "blah");
+            container.Register(typeof(IService), typeof(Service), serviceKey: "blah");
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.Register(typeof(IService), typeof(AnotherService), named: "blah"));
+                container.Register(typeof(IService), typeof(AnotherService), serviceKey: "blah"));
 
             Assert.That(ex.Message, Is.StringContaining("IService with the same key \"blah\""));
         }
@@ -293,7 +293,7 @@ namespace DryIoc.UnitTests
         public void Register_once_for_default_service_Should_not_be_affected_by_already_registered_named_services()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: "a");
+            container.Register<IService, Service>(serviceKey: "a");
             container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
             var service = container.Resolve<IService>();
@@ -319,8 +319,8 @@ namespace DryIoc.UnitTests
         public void Register_once_for_named_service()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: "a");
-            container.Register<IService, AnotherService>(named: "a", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+            container.Register<IService, Service>(serviceKey: "a");
+            container.Register<IService, AnotherService>(serviceKey: "a", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
             var service = container.Resolve<IService>("a");
 
@@ -353,10 +353,10 @@ namespace DryIoc.UnitTests
         public void ReRegister_transient_with_key()
         {
             var c = new Container();
-            c.Register<ILogger, Logger1>(named: "a");
+            c.Register<ILogger, Logger1>(serviceKey: "a");
             Assert.IsInstanceOf<Logger1>(c.Resolve<ILogger>("a"));
 
-            c.Register<ILogger, Logger2>(named: "a", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            c.Register<ILogger, Logger2>(serviceKey: "a", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             Assert.IsInstanceOf<Logger2>(c.Resolve<ILogger>("a"));
         }
 
@@ -365,7 +365,7 @@ namespace DryIoc.UnitTests
         public void ReRegister_dependency_of_transient()
         {
             var c = new Container();
-            c.Register<ILogger, Logger1>(setup: Setup.With(isDynamicDependency: true));
+            c.Register<ILogger, Logger1>(setup: Setup.With(newResolutionScope: true));
             
             c.Register<UseLogger1>();
             var user = c.Resolve<UseLogger1>();
@@ -383,7 +383,7 @@ namespace DryIoc.UnitTests
             var c = new Container();
             
             // If we know that Logger could be changed/re-registered, then register it as dynamic dependency
-            c.Register<ILogger, Logger1>(setup: Setup.With(isDynamicDependency: true));
+            c.Register<ILogger, Logger1>(setup: Setup.With(newResolutionScope: true));
 
             c.Register<UseLogger1>(Reuse.Singleton, setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable));
             var user1 = c.Resolve<UseLogger1>();

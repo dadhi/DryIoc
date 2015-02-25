@@ -49,7 +49,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<BlueCheese>(named: "a");
+            container.Register<BlueCheese>(serviceKey: "a");
             container.RegisterInstance("King");
 
             container.Register<Burger>(
@@ -74,7 +74,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<BlueCheese>(named: "a");
+            container.Register<BlueCheese>(serviceKey: "a");
             container.RegisterInstance("King");
 
             container.Register2(
@@ -84,7 +84,7 @@ namespace DryIoc.UnitTests
             Assert.AreEqual("King", burger.Name);
         }
 
-        [Test]
+        [Test, Ignore]
         public void Can_specify_default_value()
         {
             var container = new Container();
@@ -95,7 +95,6 @@ namespace DryIoc.UnitTests
                 with: Construct.Of(p => Burger.CreateMany(p.Of<ICheese>(), default(int))));
 
             var burger = container.Resolve<Burger>();
-
         }
 
         internal interface ICheese { }

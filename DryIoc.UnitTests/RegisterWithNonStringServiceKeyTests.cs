@@ -10,7 +10,7 @@ namespace DryIoc.UnitTests
         public void Register_and_resolve_service_with_enumeration_key_should_work()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: ServiceColors.Red);
+            container.Register<IService, Service>(serviceKey: ServiceColors.Red);
 
             var service = container.Resolve<IService>(ServiceColors.Red);
 
@@ -21,7 +21,7 @@ namespace DryIoc.UnitTests
         public void Register_with_one_and_resolve_with_another_key_should_Throw()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: ServiceColors.Red);
+            container.Register<IService, Service>(serviceKey: ServiceColors.Red);
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>(ServiceColors.Green));
@@ -31,7 +31,7 @@ namespace DryIoc.UnitTests
         public void When_registered_with_int_key_Then_could_be_resolved_with_that_key()
         {
             var container = new Container();
-            container.Register<Service>(named: 1);
+            container.Register<Service>(serviceKey: 1);
 
             var service = container.Resolve<Service>(1);
 
@@ -43,7 +43,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: 1);
+            container.Register<IService, AnotherService>(serviceKey: 1);
 
             var service = container.Resolve<IService>(1);
 
@@ -54,7 +54,7 @@ namespace DryIoc.UnitTests
         public void When_registered_with_negative_int_key_Then_could_be_resolved_with_that_key()
         {
             var container = new Container();
-            container.Register<Service>(named: -1);
+            container.Register<Service>(serviceKey: -1);
 
             var service = container.Resolve<Service>(-1);
 
@@ -68,17 +68,17 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>();
 
             Assert.DoesNotThrow(() =>
-                container.Register<IService, AnotherService>(named: 0, ifAlreadyRegistered: IfAlreadyRegistered.Keep));
+                container.Register<IService, AnotherService>(serviceKey: 0, ifAlreadyRegistered: IfAlreadyRegistered.Keep));
         }
 
         [Test]
         public void Register_with_the_same_int_key_should_Throw()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: 1);
+            container.Register<IService, Service>(serviceKey: 1);
 
             Assert.Throws<ContainerException>(() => 
-                container.Register<IService, AnotherService>(named: 1));
+                container.Register<IService, AnotherService>(serviceKey: 1));
         }
     }
 

@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
-            container.Register(typeof(IService), typeof(AnotherService), named: "another");
+            container.Register(typeof(IService), typeof(AnotherService), serviceKey: "another");
 
             var services = container.Resolve<Func<IService>[]>();
 
@@ -37,7 +37,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service), Reuse.Singleton);
-            container.Register(typeof(IService), typeof(AnotherService), named: "another");
+            container.Register(typeof(IService), typeof(AnotherService), serviceKey: "another");
 
             var services = container.Resolve<IService[]>();
 
@@ -60,7 +60,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
-            container.Register(typeof(IService), typeof(AnotherService), named: "AnotherService");
+            container.Register(typeof(IService), typeof(AnotherService), serviceKey: "AnotherService");
 
             var services = container.Resolve<IEnumerable<IService>>();
 
@@ -111,7 +111,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IDependency), typeof(Dependency));
-            container.Register(typeof(IDependency), typeof(Dependency), named: "Foo2");
+            container.Register(typeof(IDependency), typeof(Dependency), serviceKey: "Foo2");
             container.Register(typeof(IService), typeof(ServiceWithEnumerableDependencies));
 
             var service = (ServiceWithEnumerableDependencies)container.Resolve<IService>();
@@ -139,7 +139,7 @@ namespace DryIoc.UnitTests
             var servicesBefore = container.Resolve<ServiceAggregator>().Services;
             Assert.AreEqual(1, servicesBefore.Count());
 
-            container.Register(typeof(IService), typeof(AnotherService), named: "another");
+            container.Register(typeof(IService), typeof(AnotherService), serviceKey: "another");
 
             var servicesAfter = container.Resolve<ServiceAggregator>().Services;
             Assert.AreEqual(1, servicesAfter.Count());
@@ -174,8 +174,8 @@ namespace DryIoc.UnitTests
         public void I_should_be_able_to_resolve_Lazy_of_Func_of_IEnumerable()
         {
             var container = new Container();
-            container.Register(typeof(IService), typeof(Service), named: "blah");
-            container.Register(typeof(IService), typeof(Service), named: "crew");
+            container.Register(typeof(IService), typeof(Service), serviceKey: "blah");
+            container.Register(typeof(IService), typeof(Service), serviceKey: "crew");
 
             var result = container.Resolve<Lazy<Func<IEnumerable<IService>>>>();
 
@@ -198,7 +198,7 @@ namespace DryIoc.UnitTests
         public void Resove_func_of_default_service_then_array_of_default_and_named_service_should_Succeed()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: 1);
+            container.Register<IService, Service>(serviceKey: 1);
             container.Register<IService, Service>();
 
             container.Resolve<Func<IService>>();

@@ -89,8 +89,8 @@ namespace DryIoc.Owin
         }
     }
 
-    public static class WebReuse
+    public static class ReuseInWeb
     {
-        public static readonly IReuse InRequest = Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse Request = Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
     }
 }

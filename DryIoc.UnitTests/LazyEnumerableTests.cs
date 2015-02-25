@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
 		{
 			var container = new Container();
 			container.Register(typeof(IService), typeof(Service));
-			container.Register(typeof(IService), typeof(AnotherService), named: "another");
+			container.Register(typeof(IService), typeof(AnotherService), serviceKey: "another");
 
 			var many = container.Resolve<LazyEnumerable<Func<IService>>>();
 
@@ -37,7 +37,7 @@ namespace DryIoc.UnitTests
 		{
 			var container = new Container();
 			container.Register(typeof(IService), typeof(Service), Reuse.Singleton);
-			container.Register(typeof(IService), typeof(AnotherService), named: "another");
+			container.Register(typeof(IService), typeof(AnotherService), serviceKey: "another");
 
 			var many = container.Resolve<LazyEnumerable<IService>>();
 
@@ -88,7 +88,7 @@ namespace DryIoc.UnitTests
 		{
 			var container = new Container();
 			container.Register(typeof(IDependency), typeof(Dependency));
-			container.Register(typeof(IDependency), typeof(Dependency), named: "Foo2");
+			container.Register(typeof(IDependency), typeof(Dependency), serviceKey: "Foo2");
 			container.Register(typeof(IService), typeof(ServiceWithManyDependencies));
 
             var service = (ServiceWithManyDependencies)container.Resolve<IService>();
@@ -114,7 +114,7 @@ namespace DryIoc.UnitTests
             var servicesBefore = container.Resolve<LazyEnumerable<IService>>().Items;
             Assert.That(servicesBefore.Count(), Is.EqualTo(1));
 
-            container.Register(typeof(IService), typeof(AnotherService), named: "another");
+            container.Register(typeof(IService), typeof(AnotherService), serviceKey: "another");
 
             var servicesAfter = container.Resolve<LazyEnumerable<IService>>().Items;
             Assert.That(servicesAfter.Count(), Is.EqualTo(2));

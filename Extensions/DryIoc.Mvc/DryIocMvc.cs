@@ -78,13 +78,13 @@ namespace DryIoc.Mvc
             return container;
         }
 
-        /// <summary>Registers controllers types in container with <see cref="WebReuse.InRequest"/> reuse.</summary>
+        /// <summary>Registers controllers types in container with <see cref="ReuseInWeb.Request"/> reuse.</summary>
         /// <param name="container">Container to register controllers to.</param>
         /// <param name="controllerAssemblies">(optional) Uses <see cref="GetReferencedAssemblies"/> by default.</param>
         public static void RegisterMvcControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
-            container.RegisterMany(controllerAssemblies, typeof(IController), WebReuse.InRequest);
+            container.RegisterMany(controllerAssemblies, typeof(IController), ReuseInWeb.Request);
         }
 
         /// <summary>Replaces default Filter Providers with instance of <see cref="DryIocAggregatedFilterAttributeFilterProvider"/>,

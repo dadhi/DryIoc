@@ -101,8 +101,8 @@ namespace DryIoc.UnitTests
         public void Return_enumerable_of_object_is_possible_with_required_service_type()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: 1);
-            container.Register<IService, AnotherService>(named: '1');
+            container.Register<IService, Service>(serviceKey: 1);
+            container.Register<IService, AnotherService>(serviceKey: '1');
 
             IEnumerable<object> result = container.ResolveMany<object>(typeof(IService));
             var items = result.ToArray();
@@ -116,8 +116,8 @@ namespace DryIoc.UnitTests
         public void Return_enumerable_of_object_is_possible_with_required_service_type_is_fine_fixed_view_too()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: 1);
-            container.Register<IService, AnotherService>(named: '1');
+            container.Register<IService, Service>(serviceKey: 1);
+            container.Register<IService, AnotherService>(serviceKey: '1');
 
             IEnumerable<object> result = container.ResolveMany<object>(typeof(IService), ResolveManyBehavior.AsFixedArray);
             var items = result.ToArray();
@@ -144,7 +144,7 @@ namespace DryIoc.UnitTests
         public void Could_resolve_collection_of_generic_wrappers_if_needed()
         {
             var container = new Container();
-            container.Register<Service>(named: "first");
+            container.Register<Service>(serviceKey: "first");
 
             var items = container.ResolveMany<Func<KeyValuePair<string, object>>>(typeof(Service)).ToArray();
 

@@ -151,7 +151,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(IService), typeof(Service), named: "oh my!");
+            container.Register(typeof(IService), typeof(Service), serviceKey: "oh my!");
 
             Assert.Throws<ContainerException>(
                 () => container.Resolve<Meta<IService, Metadata>>());
@@ -197,7 +197,7 @@ namespace DryIoc.UnitTests
         public void Should_resolve_any_named_service_with_corresponding_metadata_If_name_is_not_specified_in_resolve()
         {
             var container = new Container();
-            container.RegisterMany(typeof(Service<>), named: "some", setup: Setup.With(metadata: 3));
+            container.RegisterMany(typeof(Service<>), serviceKey: "some", setup: Setup.With(metadata: 3));
 
             var meta = container.Resolve<Meta<IService<string>, int>>();
 
@@ -209,7 +209,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<IService, Service>(named: "n", setup: Setup.With(metadata: "m"));
+            container.Register<IService, Service>(serviceKey: "n", setup: Setup.With(metadata: "m"));
             container.Register<IService, Service>();
 
             var services = container.Resolve<Meta<IService, string>[]>();

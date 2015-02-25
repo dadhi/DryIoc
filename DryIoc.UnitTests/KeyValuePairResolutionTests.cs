@@ -25,7 +25,7 @@ namespace DryIoc.UnitTests
         public void Resolve_indexed_registration_as_pair_When_resolving_with_that_index_should_Succeed()
         {
             var container = new Container();
-            container.Register<Service>(named: 0);
+            container.Register<Service>(serviceKey: 0);
 
             var pair = container.Resolve<KeyValuePair<object, Service>>(serviceKey: 0);
 
@@ -37,7 +37,7 @@ namespace DryIoc.UnitTests
         public void Resolve_indexed_registration_as_pair_When_resolving_without_index_should_Throw()
         {
             var container = new Container();
-            container.Register<Service>(named: 0);
+            container.Register<Service>(serviceKey: 0);
 
             Assert.Throws<ContainerException>(() => 
                 container.Resolve<KeyValuePair<object, Service>>());
@@ -47,7 +47,7 @@ namespace DryIoc.UnitTests
         public void Resolve_named_registration_as_pair_When_resolving_with_name_should_Succeed()
         {
             var container = new Container();
-            container.Register<Service>(named: "blah");
+            container.Register<Service>(serviceKey: "blah");
 
             var pair = container.Resolve<KeyValuePair<object, Service>>("blah");
 
@@ -58,7 +58,7 @@ namespace DryIoc.UnitTests
         public void Resolve_named_registration_as_pair_When_resolving_without_name_should_Throw()
         {
             var container = new Container();
-            container.Register<Service>(named: "blah");
+            container.Register<Service>(serviceKey: "blah");
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<KeyValuePair<object, Service>>());
@@ -96,7 +96,7 @@ namespace DryIoc.UnitTests
         public void When_present_default_and_named_registrations_Then_resolving_as_pairs_should_return_both()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: "Yeah!");
+            container.Register<IService, Service>(serviceKey: "Yeah!");
             container.Register<IService, AnotherService>();
 
             var pairs = container.Resolve<IEnumerable<KeyValuePair<object, IService>>>().ToArray();
@@ -110,7 +110,7 @@ namespace DryIoc.UnitTests
         public void When_present_default_and_named_registrations_Then_resolving_as_pairs_with_default_key_should_return_default_only()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: "Yeah!");
+            container.Register<IService, Service>(serviceKey: "Yeah!");
             container.Register<IService, AnotherService>();
 
             var pairs = container.Resolve<KeyValuePair<DefaultKey, IService>[]>();
@@ -123,7 +123,7 @@ namespace DryIoc.UnitTests
         public void When_present_default_and_named_registrations_Then_resolving_as_pairs_with_string_key_should_return_named_only()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: "Yeah!");
+            container.Register<IService, Service>(serviceKey: "Yeah!");
             container.Register<IService, AnotherService>();
 
             var pairs = container.Resolve<KeyValuePair<string, IService>[]>();
@@ -136,7 +136,7 @@ namespace DryIoc.UnitTests
         public void When_present_default_and_enum_registrations_Then_resolving_as_pairs_with_enum_key_should_return_enum_only()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: EnumKey.Some);
+            container.Register<IService, Service>(serviceKey: EnumKey.Some);
             container.Register<IService, AnotherService>();
 
             var pairs = container.Resolve<KeyValuePair<EnumKey, IService>[]>();
@@ -151,8 +151,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: "another");
-            container.Register<IService, DisposableService>(named: EnumKey.Some);
+            container.Register<IService, AnotherService>(serviceKey: "another");
+            container.Register<IService, DisposableService>(serviceKey: EnumKey.Some);
 
             var pairs = container.Resolve<KeyValuePair<object, Func<IService>>[]>();
 

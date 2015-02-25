@@ -56,7 +56,7 @@ namespace DryIoc.UnitTests
             var container = new Container(rules => rules.With(parameters: GetServiceInfoFromImportAttribute));
 
             container.Register(typeof(INamedService), typeof(NamedService));
-            container.Register(typeof(INamedService), typeof(AnotherNamedService), named: "blah");
+            container.Register(typeof(INamedService), typeof(AnotherNamedService), serviceKey: "blah");
             container.Register(typeof(ServiceWithImportedCtorParameter));
 
             var service = container.Resolve<ServiceWithImportedCtorParameter>();

@@ -154,14 +154,14 @@ namespace DryIoc.UnitTests
 
             // two client versions: root and scoped
             container.Register<IClient, Client>();
-            container.Register<IClient, ClientScoped>(named: scopeName);
+            container.Register<IClient, ClientScoped>(serviceKey: scopeName);
 
             // uses
             container.Register<IServ, Serv>(Reuse.Singleton);
 
             // two dependency versions:
             container.Register<IDep, Dep>();
-            container.Register<IDep, DepScoped>(named: scopeName);
+            container.Register<IDep, DepScoped>(serviceKey: scopeName);
 
             var client = container.Resolve<IClient>();
 

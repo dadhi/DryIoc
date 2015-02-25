@@ -23,7 +23,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
-            container.Register(typeof(IService), typeof(AnotherService), named: "named");
+            container.Register(typeof(IService), typeof(AnotherService), serviceKey: "named");
 
             var service = container.Resolve<Lazy<IService>>("named");
 
@@ -50,7 +50,7 @@ namespace DryIoc.UnitTests
             container.Register<Lazy<IService>>(
                 withConstructor: t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) }));
             container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: "named");
+            container.Register<IService, AnotherService>(serviceKey: "named");
 
             var service = container.Resolve<Lazy<IService>>("named");
 

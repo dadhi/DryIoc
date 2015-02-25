@@ -36,7 +36,7 @@ namespace DryIoc.Samples
                 (r, types, type, proceed) =>
                 {
                     if (type == typeof(AnotherPlugin)) // custom registration of specific type
-                        r.Register<IPlugin, AnotherPlugin>(Reuse.Singleton, named: "another");
+                        r.Register<IPlugin, AnotherPlugin>(Reuse.Singleton, serviceKey: "another");
                     else
                         proceed(types, type);
                 });
