@@ -365,7 +365,7 @@ namespace DryIoc.UnitTests
         public void ReRegister_dependency_of_transient()
         {
             var c = new Container();
-            c.Register<ILogger, Logger1>(setup: Setup.With(newResolutionScope: true));
+            c.Register<ILogger, Logger1>(setup: Setup.With(openResolutionScope: true));
             
             c.Register<UseLogger1>();
             var user = c.Resolve<UseLogger1>();
@@ -383,7 +383,7 @@ namespace DryIoc.UnitTests
             var c = new Container();
             
             // If we know that Logger could be changed/re-registered, then register it as dynamic dependency
-            c.Register<ILogger, Logger1>(setup: Setup.With(newResolutionScope: true));
+            c.Register<ILogger, Logger1>(setup: Setup.With(openResolutionScope: true));
 
             c.Register<UseLogger1>(Reuse.Singleton, setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable));
             var user1 = c.Resolve<UseLogger1>();

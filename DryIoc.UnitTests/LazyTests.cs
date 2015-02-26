@@ -180,7 +180,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Dog>();
-            container.Register<Food>(setup: Setup.With(newResolutionScope: true));
+            container.Register<Food>(setup: Setup.With(openResolutionScope: true));
 
             var dog = container.Resolve<Dog>();
             var food = dog.Feed();

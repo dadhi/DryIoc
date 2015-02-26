@@ -193,27 +193,28 @@ namespace DryIoc.IssuesTests
                     .Name("area2", serviceKey: Areas.Second));
 
             container.Register<IArea, Area>(serviceKey: Areas.First,
-                setup: Setup.With(newResolutionScope: true),
+                setup: Setup.With(openResolutionScope: true),
                 with: Parameters.Of
-                    .Name("oneVariant", serviceKey: Areas.First)
-                    .Name("mainViewModel1", serviceKey: Areas.First));
+                    .Type<ITwoVariants>(serviceKey: Areas.First)
+                    .Type<IMainViewModel1>(serviceKey: Areas.First));
 
             container.Register<IArea, Area>(serviceKey: Areas.Second,
-                setup: Setup.With(newResolutionScope: true),
+                setup: Setup.With(openResolutionScope: true),
                 with: Parameters.Of
-                    .Name("oneVariant", serviceKey: Areas.Second)
-                    .Name("mainViewModel1", serviceKey: Areas.Second));
+                    .Type<ITwoVariants>(serviceKey: Areas.Second)
+                    .Type<IMainViewModel1>(serviceKey: Areas.Second));
 
             container.Register<IDatabase, Database>(Reuse.InResolutionScopeOf<IArea>());
 
             container.Register<IMainViewModel1, MainViewModel1>(serviceKey: Areas.First,
-                setup: Setup.With(newResolutionScope: true),
+                setup: Setup.With(openResolutionScope: true),
                 with: Parameters.Of
-                    .Name("oneVariant", serviceKey: Areas.First));
+                .Type<ITwoVariants>(serviceKey: Areas.First));
+
             container.Register<IMainViewModel1, MainViewModel1>(serviceKey: Areas.Second,
-                setup: Setup.With(newResolutionScope: true),
+                setup: Setup.With(openResolutionScope: true),
                 with: Parameters.Of
-                    .Name("oneVariant", serviceKey: Areas.Second));
+                    .Type<ITwoVariants>(serviceKey: Areas.Second));
 
             container.Register<ITwoVariants, FirstVariant>(serviceKey: Areas.First);
             container.Register<ITwoVariants, SecondVariant>(serviceKey: Areas.Second);
@@ -227,7 +228,7 @@ namespace DryIoc.IssuesTests
             container.Register<IChildViewModelWithMainViewModel, ChildViewModelWithMainViewModel>();
 
             container.Register<IMainViewModel2, MainViewModel2>(
-                setup: Setup.With(newResolutionScope: true));
+                setup: Setup.With(openResolutionScope: true));
 
             var component = container.Resolve<IComponent>();
 
@@ -310,7 +311,7 @@ namespace DryIoc.IssuesTests
             // and therefore has its own ResolutionScope! So every dependency (e.g. ICar) down the resolve method 
             // registered with `Reuse.InResolutionScope` will reside in the new resolution scope. 
             container.Register<AreaWithOneCar>(
-                setup: Setup.With(newResolutionScope: true)); // NOTE: remove setup parameter to see what happens
+                setup: Setup.With(openResolutionScope: true)); // NOTE: remove setup parameter to see what happens
 
             container.Register<SomeTool>();
 
@@ -332,14 +333,14 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        /// <summary>Mediator to use as resolution root instead of Area, and resolve Area wrapped in DryIoc.ResolutionScoped disposable wrapper.
+        /// <summary>Mediator to use as resolution root instead of Area, and resolve Area wrapped in DryIoc.CaptureResolutionScope disposable wrapper.
         /// The wrapper is taking care to dispose corresponding ResolutionScope.</summary>
         internal class DisposableArea<TArea> : IDisposable
         {
             public TArea Area { get { return _area.Value; } }
 
-            private readonly ResolutionScoped<TArea> _area;
-            public DisposableArea(ResolutionScoped<TArea> area)
+            private readonly CaptureResolutionScope<TArea> _area;
+            public DisposableArea(CaptureResolutionScope<TArea> area)
             {
                 _area = area;
             }
@@ -376,7 +377,7 @@ namespace DryIoc.IssuesTests
 
             container.Register<ICar, SmallCar>(Reuse.InResolutionScope);
 
-            container.Register(typeof(DisposableArea<>), setup: Setup.With(newResolutionScope: true));
+            container.Register(typeof(DisposableArea<>), setup: Setup.With(openResolutionScope: true));
             container.Register<AreaWithOneCar>();
             container.Register<SomeTool>();
 

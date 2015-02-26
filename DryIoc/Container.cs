@@ -1795,8 +1795,8 @@ namespace DryIoc
                 new ExpressionFactory(GetMetaExpressionOrDefault,
                     setup: SetupWrapper.With(t => t.GetGenericParamsAndArgs()[0])));
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(ResolutionScoped<>),
-                new ExpressionFactory(GetResolutionScopedExpressionOrDefault, setup: SetupWrapper.Default));
+            Wrappers = Wrappers.AddOrUpdate(typeof(CaptureResolutionScope<>),
+                new ExpressionFactory(GetCaptureResolutionScopeExpressionOrDefault, setup: SetupWrapper.Default));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(FactoryExpression<>),
                 new ExpressionFactory(GetFactoryExpression, setup: SetupWrapper.Default));
@@ -2032,7 +2032,7 @@ namespace DryIoc
             return metaExpr;
         }
 
-        private static Expression GetResolutionScopedExpressionOrDefault(Request request)
+        private static Expression GetCaptureResolutionScopeExpressionOrDefault(Request request)
         {
             var wrapperType = request.ServiceType;
             var wrapperCtor = wrapperType.GetSingleConstructorOrNull();
@@ -3745,9 +3745,10 @@ namespace DryIoc
         /// <summary>Predicate to check if factory could be used for resolved request.</summary>
         public virtual Func<Request, bool> Condition { get { return null; } }
 
-        /// <summary>Indicate that dependency expression should be "r.Resolver.Resolve&lt;DependencyServiceType&gt;(...)" 
-        /// instead of actual creation expression.</summary>
-        public virtual bool NewResolutionScope { get { return false; } }
+        /// <summary>Indicates that injected expression should be: 
+        /// <code lang="cs"><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></code>
+        /// instead of: <code lang="cs"><![CDATA[new Dependency(...)]]></code>.</summary>
+        public virtual bool OpenResolutionScope { get { return false; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
         /// or disable disposing with <see cref="ReuseHiddenDisposable"/>, etc.</summary>
@@ -3763,23 +3764,23 @@ namespace DryIoc
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Default"/> setup will be returned.</summary>
         /// <param name="cacheFactoryExpression">(optional)</param> <param name="lazyMetadata">(optional)</param> 
         /// <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param> <param name="condition">(optional)</param>
-        /// <param name="newResolutionScope">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
+        /// <param name="openResolutionScope">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
         /// <param name="reuseWrappers">(optional) Multiple reuse wrappers.</param>       
         /// <returns>New setup object or <see cref="Default"/>.</returns>
         public static Setup With(bool cacheFactoryExpression = true,
             Func<object> lazyMetadata = null, object metadata = null,
-            Func<Request, bool> condition = null, bool newResolutionScope = false,
+            Func<Request, bool> condition = null, bool openResolutionScope = false,
             params Type[] reuseWrappers)
         {
             if (cacheFactoryExpression && lazyMetadata == null && metadata == null &&
-                condition == null && newResolutionScope == false && reuseWrappers == null)
+                condition == null && openResolutionScope == false && reuseWrappers == null)
                 return Default;
 
             if (reuseWrappers != null && reuseWrappers.Length != 0)
                 for (var i = 0; i < reuseWrappers.Length; ++i)
                     typeof(IReuseWrapper).ThrowIfNotOf(reuseWrappers[i], Error.REG_REUSED_OBJ_WRAPPER_IS_NOT_IREUSED, i, reuseWrappers);
 
-            return new Setup(cacheFactoryExpression, lazyMetadata, metadata, condition, newResolutionScope, reuseWrappers);
+            return new Setup(cacheFactoryExpression, lazyMetadata, metadata, condition, openResolutionScope, reuseWrappers);
         }
 
         /// <summary>Default factory type is for service factory.</summary>
@@ -3800,9 +3801,9 @@ namespace DryIoc
             get { return _condition; }
         }
 
-        public override bool NewResolutionScope
+        public override bool OpenResolutionScope
         {
-            get { return _newResolutionScope; }
+            get { return _openResolutionScope; }
         }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
@@ -3813,14 +3814,14 @@ namespace DryIoc
 
         private Setup(bool cacheFactoryExpression = true,
             Func<object> lazyMetadata = null, object metadata = null,
-            Func<Request, bool> condition = null, bool newResolutionScope = false,
+            Func<Request, bool> condition = null, bool openResolutionScope = false,
             Type[] reuseWrappers = null)
         {
             _cacheFactoryExpression = cacheFactoryExpression;
             _lazyMetadata = lazyMetadata;
             _metadata = metadata;
             _condition = condition;
-            _newResolutionScope = newResolutionScope;
+            _openResolutionScope = openResolutionScope;
             _reuseWrappers = reuseWrappers;
         }
 
@@ -3828,7 +3829,7 @@ namespace DryIoc
         private readonly Func<object> _lazyMetadata;
         private object _metadata;
         private readonly Func<Request, bool> _condition;
-        private readonly bool _newResolutionScope;
+        private readonly bool _openResolutionScope;
         private readonly Type[] _reuseWrappers;
 
         #endregion
@@ -4000,7 +4001,7 @@ namespace DryIoc
         public virtual Expression GetExpressionOrDefault(Request request, Type reuseWrapperType = null)
         {
             // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual creation expression.
-            if (Setup.NewResolutionScope && !request.Parent.IsEmpty)
+            if (Setup.OpenResolutionScope && !request.Parent.IsEmpty)
                 return Resolver.CreateResolutionExpression(
                     request.ServiceType, request.IfUnresolved, request.RequiredServiceType,
                     request.Container.GetOrAddStateItemExpression(request.ServiceKey));
@@ -5308,10 +5309,14 @@ namespace DryIoc
 
         /// <summary>Creates new resolution scope reuse with specified type and key.</summary>
         /// <param name="assignableFromServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
-        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null)
+        /// <param name="fathest">(optional)</param> <param name="rootScopeAsLastResort">(optional)</param>
+        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null, 
+            bool fathest = false, bool rootScopeAsLastResort = false)
         {
             _assignableFromServiceType = assignableFromServiceType;
             _serviceKey = serviceKey;
+            _fathest = fathest;
+            _rootScopeAsLastResort = rootScopeAsLastResort;
         }
 
         /// <summary>Creates or returns already created resolution root scope.</summary>
@@ -5320,7 +5325,8 @@ namespace DryIoc
         /// <returns>Created or existing scope.</returns>
         public IScope GetScope(IResolverContext _, ref IScope resolutionScope)
         {
-            return GetMatchingScope(GetOrCreateScope(ref resolutionScope), _assignableFromServiceType, _serviceKey);
+            return GetMatchingScope(GetOrCreateScope(ref resolutionScope), 
+                _assignableFromServiceType, _serviceKey, _fathest, _rootScopeAsLastResort);
         }
 
         /// <summary>Returns <see cref="GetOrCreateScope"/> method call expression.</summary>
@@ -5331,7 +5337,9 @@ namespace DryIoc
             return Expression.Call(typeof(ResolutionScopeReuse), "GetMatchingScope", null,
                 GetOrCreateResolutionScopeExpression,
                 Expression.Constant(_assignableFromServiceType, typeof(Type)),
-                request.Container.GetOrAddStateItemExpression(_serviceKey, typeof(object)));
+                request.Container.GetOrAddStateItemExpression(_serviceKey, typeof(object)),
+                Expression.Constant(_fathest, typeof(bool)),
+                Expression.Constant(_rootScopeAsLastResort, typeof(bool)));
         }
 
         /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
@@ -5355,30 +5363,46 @@ namespace DryIoc
         /// Key equal to <paramref name="serviceKey"/>.</summary>
         /// <param name="scope">Scope to start matching with Type and Key specified.</param>
         /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
-        /// <returns></returns>
-        public static IScope GetMatchingScope(IScope scope, Type assignableFromServiceType, object serviceKey)
+        /// <param name="farthest">If true - commands to look for farthest match instead of nearest.</param>
+        /// <param name="rootScopeAsLastResort">If true and no match found - commands to use root scope.</param>
+        /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
+        public static IScope GetMatchingScope(IScope scope, 
+            Type assignableFromServiceType, object serviceKey, 
+            bool farthest, bool rootScopeAsLastResort)
         {
             if (assignableFromServiceType == null && serviceKey == null)
+            {
                 return scope;
+            }
 
+            var lastScope = scope;
+            IScope matchedScope = null;
             while (scope != null)
             {
                 var name = scope.Name as KV<Type, object>;
                 if (name != null &&
                     (assignableFromServiceType == null || name.Key.IsAssignableTo(assignableFromServiceType)) &&
                     (serviceKey == null || serviceKey.Equals(name.Value)))
-                    break;
+                {
+                    matchedScope = scope;
+                    if (!farthest) // break on first found match.
+                        break;
+                }
+                lastScope = scope;
                 scope = scope.Parent;
             }
 
-            if (scope == null)
-                Throw.Error(Error.NO_MATCHED_SCOPE_FOUND, new KV<Type, object>(assignableFromServiceType, serviceKey));
-
-            return scope;
+            return matchedScope ?? 
+                (rootScopeAsLastResort
+                    ? lastScope
+                    : Throw.Instead<IScope>(Error.NO_MATCHED_SCOPE_FOUND,
+                        new KV<Type, object>(assignableFromServiceType, serviceKey)));
         }
 
         private readonly Type _assignableFromServiceType;
         private readonly object _serviceKey;
+        private readonly bool _fathest;
+        private readonly bool _rootScopeAsLastResort;
     }
 
     /// <summary>Specifies pre-defined reuse behaviors supported by container: 
@@ -5410,21 +5434,27 @@ namespace DryIoc
         /// in existing resolution scope hierarchy. If parameters are not specified or null, then <see cref="InResolutionScope"/> will be returned.</summary>
         /// <param name="assignableFromServiceType">(optional) To search for scope with service type assignable to type specified in parameter.</param>
         /// <param name="serviceKey">(optional) Search for specified key.</param>
+        /// <param name="farthest">If true - commands to look for farthest match instead of nearest.</param>
+        /// <param name="rootScopeAsLastResort">If true and no match found - commands to use root scope.</param>
         /// <returns>New reuse with specified parameters or <see cref="InResolutionScope"/> if nothing specified.</returns>
-        public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null)
+        public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null, 
+            bool farthest = false, bool rootScopeAsLastResort = false)
         {
             return assignableFromServiceType == null && serviceKey == null ? InResolutionScope
-                : new ResolutionScopeReuse(assignableFromServiceType, serviceKey);
+                : new ResolutionScopeReuse(assignableFromServiceType, serviceKey, farthest, rootScopeAsLastResort);
         }
 
         /// <summary>Creates reuse to search for <typeparamref name="TAssignableFromServiceType"/> and <paramref name="serviceKey"/>
         /// in existing resolution scope hierarchy.</summary>
         /// <typeparam name="TAssignableFromServiceType">To search for scope with service type assignable to type specified in parameter.</typeparam>
         /// <param name="serviceKey">(optional) Search for specified key.</param>
+        /// <param name="farthest">If true - commands to look for farthest match instead of nearest.</param>
+        /// <param name="rootScopeAsLastResort">If true and no match found - commands to use root scope.</param>
         /// <returns>New reuse with specified parameters.</returns>
-        public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null)
+        public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null, 
+            bool farthest = false, bool rootScopeAsLastResort = false)
         {
-            return InResolutionScopeOf(typeof(TAssignableFromServiceType), serviceKey);
+            return InResolutionScopeOf(typeof(TAssignableFromServiceType), serviceKey, farthest, rootScopeAsLastResort);
         }
 
         /// <summary>Ensuring single service instance per Thread.</summary>
@@ -5963,7 +5993,7 @@ namespace DryIoc
     /// <summary>Used to wrap resolution scope together with directly resolved service value.
     /// Disposing wrapper means disposing service (if disposable) and disposing scope (all reused disposable dependencies.)</summary>
     /// <typeparam name="T">Type of resolved service.</typeparam>
-    public sealed class ResolutionScoped<T> : IDisposable
+    public sealed class CaptureResolutionScope<T> : IDisposable
     {
         /// <summary>Resolved service.</summary>
         public T Value { get; private set; }
@@ -5974,7 +6004,7 @@ namespace DryIoc
 
         /// <summary>Creates wrapper</summary>
         /// <param name="value">Resolved service.</param> <param name="scope">Resolution root scope.</param>
-        public ResolutionScoped(T value, IScope scope)
+        public CaptureResolutionScope(T value, IScope scope)
         {
             Value = value;
             Scope = scope as IDisposable;

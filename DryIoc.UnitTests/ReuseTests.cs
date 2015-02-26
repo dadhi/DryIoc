@@ -90,7 +90,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<AccountUser>();
-            container.Register<Account>(setup: Setup.With(newResolutionScope: true));
+            container.Register<Account>(setup: Setup.With(openResolutionScope: true));
             container.Register<Log>(Reuse.InResolutionScopeOf<Account>("account"));
 
             var ex = Assert.Throws<ContainerException>(() => 
@@ -105,7 +105,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<AccountUser>(with: Parameters.Of.Type<Account>(serviceKey: "account"));
-            container.Register<Account>(serviceKey: "account", setup: Setup.With(newResolutionScope: true));
+            container.Register<Account>(serviceKey: "account", setup: Setup.With(openResolutionScope: true));
             container.Register<Log>(Reuse.InResolutionScopeOf<Account>("account"));
 
             var user = container.Resolve<AccountUser>();
@@ -119,7 +119,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<AccountUser>(with: Parameters.Of.Type<Account>(serviceKey: "account"));
-            container.Register<Account>(serviceKey: "account", setup: Setup.With(newResolutionScope: true));
+            container.Register<Account>(serviceKey: "account", setup: Setup.With(openResolutionScope: true));
             container.Register<Log>(Reuse.InResolutionScopeOf(serviceKey: "account"));
 
             var user = container.Resolve<AccountUser>();
@@ -133,7 +133,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<AccountUser>();
-            container.Register<Account, CarefulAccount>(setup: Setup.With(newResolutionScope: true));
+            container.Register<Account, CarefulAccount>(setup: Setup.With(openResolutionScope: true));
             container.Register<Log, DisposableLog>(Reuse.InResolutionScopeOf<Account>());
 
             var user = container.Resolve<AccountUser>();
@@ -142,6 +142,54 @@ namespace DryIoc.UnitTests
             ((IDisposable)user.Account).Dispose();
 
             Assert.IsTrue(((DisposableLog)user.Account.Log).IsDisposed);
+        }
+
+        [Test]
+        public void Can_specify_to_reuse_in_farthest_resolution_scope()
+        {
+            var container = new Container();
+            container.Register<ViewModel1Presenter>();
+            container.Register<ViewModel1>(setup: Setup.With(openResolutionScope: true));
+            container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
+            container.Register<Log>(Reuse.InResolutionScopeOf<IViewModel>(farthest: true, rootScopeAsLastResort: true));
+
+            var presenter = container.Resolve<ViewModel1Presenter>();
+
+            Assert.AreNotSame(presenter.VM1.Log, presenter.Log);
+            Assert.AreSame(presenter.VM1.Log, presenter.VM1.VM2.Log);
+        }
+
+        internal class ViewModel1Presenter
+        {
+            public ViewModel1 VM1 { get; set; }
+            public Log Log { get; set; }
+            public ViewModel1Presenter(ViewModel1 vm1, Log log)
+            {
+                VM1 = vm1;
+                Log = log;
+            }
+        }
+
+        internal interface IViewModel {}
+
+        internal class ViewModel1 : IViewModel
+        {
+            public ViewModel2 VM2 { get; set; }
+            public Log Log { get; set; }
+            public ViewModel1(ViewModel2 vm2, Log log)
+            {
+                VM2 = vm2;
+                Log = log;
+            }
+        }
+
+        internal class ViewModel2 : IViewModel
+        {
+            public Log Log { get; set; }
+            public ViewModel2(Log log)
+            {
+                Log = log;
+            }
         }
 
         internal class AccountUser
@@ -165,9 +213,9 @@ namespace DryIoc.UnitTests
 
         internal class CarefulAccount : Account, IDisposable
         {
-            private readonly ResolutionScoped<Log> _disposableLogAndEverything;
+            private readonly CaptureResolutionScope<Log> _disposableLogAndEverything;
 
-            public CarefulAccount(ResolutionScoped<Log> log) : base(log.Value)
+            public CarefulAccount(CaptureResolutionScope<Log> log) : base(log.Value)
             {
                 _disposableLogAndEverything = log;
             }
@@ -338,7 +386,7 @@ namespace DryIoc.UnitTests
             container.Register<SomeDep>(Reuse.InResolutionScope);
             container.Register<SomeRoot>();
 
-            var service = container.Resolve<ResolutionScoped<SomeRoot>>();
+            var service = container.Resolve<CaptureResolutionScope<SomeRoot>>();
             using (service)
                 Assert.That(service.Scope, Is.Not.Null);
 
