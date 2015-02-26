@@ -208,13 +208,11 @@ namespace DryIoc.IssuesTests
 
             container.Register<IMainViewModel1, MainViewModel1>(serviceKey: Areas.First,
                 setup: Setup.With(openResolutionScope: true),
-                with: Parameters.Of
-                .Type<ITwoVariants>(serviceKey: Areas.First));
+                with: Parameters.Of.Type<ITwoVariants>(serviceKey: Areas.First));
 
             container.Register<IMainViewModel1, MainViewModel1>(serviceKey: Areas.Second,
                 setup: Setup.With(openResolutionScope: true),
-                with: Parameters.Of
-                    .Type<ITwoVariants>(serviceKey: Areas.Second));
+                with: Parameters.Of.Type<ITwoVariants>(serviceKey: Areas.Second));
 
             container.Register<ITwoVariants, FirstVariant>(serviceKey: Areas.First);
             container.Register<ITwoVariants, SecondVariant>(serviceKey: Areas.Second);

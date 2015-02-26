@@ -360,6 +360,12 @@ namespace DryIoc
             }
         }
 
+        public bool IsRegistered2(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
+        {
+            ThrowIfContainerDisposed();
+            return _registry.Value.IsRegistered(serviceType.ThrowIfNull(), serviceKey, factoryType, condition);
+        }
+
         /// <summary>Removes specified factory from registry. 
         /// Factory is removed only from registry, if there is relevant cache, it will be kept.
         /// Use <see cref="WithoutCache"/> to remove all the cache.</summary>
@@ -1064,18 +1070,19 @@ namespace DryIoc
         {
             var serviceType = request.ServiceType;
             var serviceKey = request.ServiceKey;
+            var services = _serviceFactories.Value;
 
-            var entry = _serviceFactories.Value.GetValueOrDefault(serviceType);
+            var entry = services.GetValueOrDefault(serviceType);
             if (serviceType.IsGeneric()) // keep entry or find one for open-generic
             {
                 var serviceOpenGenericType = serviceType.GetGenericDefinitionOrNull();
                 if (entry == null) // just find new one for open-generic
-                    entry = _serviceFactories.Value.GetValueOrDefault(serviceOpenGenericType);
+                    entry = services.GetValueOrDefault(serviceOpenGenericType);
                 else if (serviceKey != null && (
                     entry is Factory && !DefaultKey.Value.Equals(serviceKey) ||
                     entry is FactoriesEntry && ((FactoriesEntry)entry).Factories.GetValueOrDefault(serviceKey) == null))
                 {
-                    var genericEntry = _serviceFactories.Value.GetValueOrDefault(serviceOpenGenericType);
+                    var genericEntry = services.GetValueOrDefault(serviceOpenGenericType);
                     if (genericEntry != null)
                         entry = genericEntry;
                 }
@@ -1136,31 +1143,42 @@ namespace DryIoc
 
         public sealed class Registry
         {
-            public readonly HashTree<Type, object> ServiceFactories;
-            public readonly HashTree<Type, Factory[]> DecoratorFactories;
-            public readonly HashTree<Type, Factory> WrapperFactories;
+            public readonly HashTree<Type, object> Services;
+            public readonly HashTree<Type, Factory[]> Decorators;
+            public readonly HashTree<Type, Factory> Wrappers;
 
             public readonly Ref<HashTree<Type, FactoryDelegate>> DefaultFactoryDelegatesCache;
             public readonly Ref<HashTree<KV<Type, object>, FactoryDelegate>> KeyedFactoryDelegatesCache;
             public readonly Ref<IntKeyTree> FactoryExpressionCache;
             public readonly Ref<AppendableArray> ResolutionStateCache;
 
-            public Registry With(
-                HashTree<Type, object> serviceFactories = null,
-                HashTree<Type, Factory[]> decoratorFactories = null,
-                HashTree<Type, Factory> wrapperFactories = null)
+            public Registry WithServices(HashTree<Type, object> services)
             {
-                return new Registry(
-                    serviceFactories ?? ServiceFactories,
-                    decoratorFactories ?? DecoratorFactories,
-                    wrapperFactories ?? WrapperFactories,
-                    DefaultFactoryDelegatesCache.Copy(), KeyedFactoryDelegatesCache.Copy(),
-                    FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
+                return services == Services ? this :
+                    new Registry(services, Decorators, Wrappers,
+                        DefaultFactoryDelegatesCache.Copy(), KeyedFactoryDelegatesCache.Copy(),
+                        FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
+            }
+
+            public Registry WithDecorators(HashTree<Type, Factory[]> decorators)
+            {
+                return decorators == Decorators ? this :
+                    new Registry(Services, decorators, Wrappers,
+                        DefaultFactoryDelegatesCache.Copy(), KeyedFactoryDelegatesCache.Copy(),
+                        FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
+            }
+
+            public Registry WithWrappers(HashTree<Type, Factory> wrappers)
+            {
+                return wrappers == Wrappers ? this :
+                    new Registry(Services, Decorators, wrappers,
+                        DefaultFactoryDelegatesCache.Copy(), KeyedFactoryDelegatesCache.Copy(),
+                        FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
             }
 
             public Registry WithoutCache()
             {
-                return new Registry(ServiceFactories, DecoratorFactories, WrapperFactories,
+                return new Registry(Services, Decorators, Wrappers,
                     Ref.Of(HashTree<Type, FactoryDelegate>.Empty),
                     Ref.Of(HashTree<KV<Type, object>, FactoryDelegate>.Empty),
                     Ref.Of(IntKeyTree.Empty),
@@ -1177,21 +1195,81 @@ namespace DryIoc
                     Ref.Of(AppendableArray.Empty)) { }
 
             public Registry(
-                HashTree<Type, object> serviceFactories,
-                HashTree<Type, Factory[]> decoratorFactories,
-                HashTree<Type, Factory> wrapperFactories,
+                HashTree<Type, object> services,
+                HashTree<Type, Factory[]> decorators,
+                HashTree<Type, Factory> wrappers,
                 Ref<HashTree<Type, FactoryDelegate>> defaultFactoryDelegatesCache,
                 Ref<HashTree<KV<Type, object>, FactoryDelegate>> keyedFactoryDelegatesCache,
                 Ref<IntKeyTree> factoryExpressionCache,
                 Ref<AppendableArray> resolutionStateCache)
             {
-                ServiceFactories = serviceFactories;
-                DecoratorFactories = decoratorFactories;
-                WrapperFactories = wrapperFactories;
+                Services = services;
+                Decorators = decorators;
+                Wrappers = wrappers;
                 DefaultFactoryDelegatesCache = defaultFactoryDelegatesCache;
                 KeyedFactoryDelegatesCache = keyedFactoryDelegatesCache;
                 FactoryExpressionCache = factoryExpressionCache;
                 ResolutionStateCache = resolutionStateCache;
+            }
+
+            public IEnumerable<ServiceTypeKeyFactory> GetServiceRegistrations()
+            {
+                foreach (var factoryEntry in Services.Enumerate())
+                {
+                    var serviceType = factoryEntry.Key;
+                    var factory = factoryEntry.Value as Factory;
+                    if (factory != null)
+                        yield return new ServiceTypeKeyFactory { ServiceType = serviceType, Factory = factory };
+                    else
+                    {
+                        var factories = ((FactoriesEntry)factoryEntry.Value).Factories;
+                        foreach (var f in factories.Enumerate())
+                            yield return new ServiceTypeKeyFactory { ServiceType = serviceType, OptionalServiceKey = f.Key, Factory = f.Value };
+                    }
+                }
+            }
+
+            public Factory GetWrapperOrDefault(Type serviceType)
+            {
+                Factory factory = null;
+                if (serviceType.IsGeneric())
+                    factory = Wrappers.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
+                if (factory == null && !serviceType.IsGenericDefinition())
+                    factory = Wrappers.GetValueOrDefault(serviceType);
+                return factory;
+            }
+
+            public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
+            {
+                serviceType = serviceType.ThrowIfNull();
+                switch (factoryType)
+                {
+                    case FactoryType.Wrapper:
+                        var wrapper = GetWrapperOrDefault(serviceType);
+                        return wrapper != null && (condition == null || condition(wrapper));
+
+                    case FactoryType.Decorator:
+                        var decorators = Decorators.GetValueOrDefault(serviceType);
+                        return decorators != null && decorators.Length != 0
+                            && (condition == null || decorators.Any(condition));
+
+                    default:
+                        var entry = Services.GetValueOrDefault(serviceType);
+                        if (entry == null)
+                            return false;
+
+                        var factory = entry as Factory;
+                        if (factory != null)
+                            return (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
+                                && (condition == null || condition(factory));
+
+                        var factories = ((FactoriesEntry)entry).Factories;
+                        if (serviceKey == null)
+                            return condition == null || factories.Enumerate().Any(f => condition(f.Value));
+
+                        factory = factories.GetValueOrDefault(serviceKey);
+                        return factory != null && (condition == null || condition(factory));
+                }
             }
 
             public Registry Register(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
@@ -1199,25 +1277,23 @@ namespace DryIoc
                 switch (factory.FactoryType)
                 {
                     case FactoryType.Decorator:
-                        var decorators = DecoratorFactories.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append);
-                        return decorators == DecoratorFactories ? this : With(decoratorFactories: DecoratorFactories);
+                        return WithDecorators(Decorators.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append));
 
                     case FactoryType.Wrapper:
-                        var wrappers = WrapperFactories.AddOrUpdate(serviceType, factory);
-                        return wrappers == WrapperFactories ? this : With(wrapperFactories: WrapperFactories);
+                        return WithWrappers(Wrappers.AddOrUpdate(serviceType, factory));
 
                     default:
-                        return AddOrUpdateServiceFactory(factory, serviceType, serviceKey, ifAlreadyRegistered);
+                        return WithService(factory, serviceType, serviceKey, ifAlreadyRegistered);
                 }
             }
 
-            public Registry AddOrUpdateServiceFactory(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
+            public Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
             {
                 Factory replacedFactory = null;
-                HashTree<Type, object> serviceFactories;
+                HashTree<Type, object> services;
                 if (serviceKey == null)
                 {
-                    serviceFactories = ServiceFactories.AddOrUpdate(serviceType, factory, (oldEntry, newFactory) =>
+                    services = Services.AddOrUpdate(serviceType, factory, (oldEntry, newFactory) =>
                     {
                         if (oldEntry == null)
                             return newFactory;
@@ -1262,7 +1338,7 @@ namespace DryIoc
                 else
                 {
                     var factories = new FactoriesEntry(null, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
-                    serviceFactories = ServiceFactories.AddOrUpdate(serviceType, factories, (oldEntry, newEntry) =>
+                    services = Services.AddOrUpdate(serviceType, factories, (oldEntry, newEntry) =>
                     {
                         if (oldEntry == null)
                             return newEntry;
@@ -1298,11 +1374,11 @@ namespace DryIoc
                     });
                 }
 
-                if (serviceFactories == ServiceFactories)
-                    return this; // no update.
+                var registry = WithServices(services);
 
-                var registry = With(serviceFactories);
-                return replacedFactory == null ? registry : RemoveFactoryCache(registry, replacedFactory, serviceType, serviceKey);
+                return registry == this ? this
+                    : replacedFactory == null ? registry
+                        : RemoveFactoryCache(registry, replacedFactory, serviceType, serviceKey);
             }
 
             public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
@@ -1311,7 +1387,7 @@ namespace DryIoc
                 {
                     case FactoryType.Wrapper:
                         Factory removedWrapper = null;
-                        var registry = With(wrapperFactories: WrapperFactories.Update(serviceType, null, (factory, _null) =>
+                        var registry = WithWrappers(Wrappers.Update(serviceType, null, (factory, _null) =>
                         {
                             if (factory != null && condition != null && !condition(factory))
                                 return factory;
@@ -1324,7 +1400,7 @@ namespace DryIoc
 
                     case FactoryType.Decorator:
                         Factory[] removedDecorators = null;
-                        registry = With(decoratorFactories: DecoratorFactories.Update(serviceType, null, (factories, _null) =>
+                        registry = WithDecorators(Decorators.Update(serviceType, null, (factories, _null) =>
                         {
                             var remaining = condition == null ? null : factories.Where(f => !condition(f)).ToArray();
                             removedDecorators = remaining == null || remaining.Length == 0 ? factories : factories.Except(remaining).ToArray();
@@ -1347,16 +1423,16 @@ namespace DryIoc
             {
                 object removed = null; // Factory or FactoriesEntry or Factory[]
 
-                HashTree<Type, object> serviceFactories;
+                HashTree<Type, object> services;
 
                 if (serviceKey == null && condition == null) // simplest case with simplest handling
-                    serviceFactories = ServiceFactories.Update(serviceType, null, (entry, _null) =>
+                    services = Services.Update(serviceType, null, (entry, _null) =>
                     {
                         removed = entry;
                         return null;
                     });
                 else
-                    serviceFactories = ServiceFactories.Update(serviceType, null, (entry, _null) =>
+                    services = Services.Update(serviceType, null, (entry, _null) =>
                     {
                         if (entry == null)
                             return null;
@@ -1418,7 +1494,7 @@ namespace DryIoc
                 if (removed == null)
                     return this;
 
-                var registry = With(serviceFactories);
+                var registry = WithServices(services);
 
                 if (removed is Factory)
                     return RemoveFactoryCache(registry, (Factory)removed, serviceType, serviceKey);
