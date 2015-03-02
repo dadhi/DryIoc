@@ -9,7 +9,7 @@ namespace DryIoc.UnitTests
         public void Can_use_static_method_for_service_creation()
         {
             var container = new Container();
-            container.Register<SomeService>(with: DryIoc.CreationInfo.Of(
+            container.Register<SomeService>(with: CreationInfo.Of(
                 r => FactoryMethod.Of(r.ImplementationType.GetDeclaredMethodOrNull("Create"))));
 
             var service = container.Resolve<SomeService>();

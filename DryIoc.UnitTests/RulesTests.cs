@@ -244,6 +244,7 @@ namespace DryIoc.UnitTests
             }
         }
 
+        // ReSharper disable once ClassNeverInstantiated.Local
         class NotRegisteredService
         {
         }

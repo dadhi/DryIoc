@@ -144,14 +144,14 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(((DisposableLog)user.Account.Log).IsDisposed);
         }
 
-        [Test]
+        [Test, Ignore]
         public void Can_specify_to_reuse_in_farthest_resolution_scope()
         {
             var container = new Container();
             container.Register<ViewModel1Presenter>();
             container.Register<ViewModel1>(setup: Setup.With(openResolutionScope: true));
             container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.InResolutionScopeOf<IViewModel>(farthest: true, rootScopeAsLastResort: true));
+            container.Register<Log>(Reuse.InResolutionScopeOf<IViewModel>(farthest: true));
 
             var presenter = container.Resolve<ViewModel1Presenter>();
 

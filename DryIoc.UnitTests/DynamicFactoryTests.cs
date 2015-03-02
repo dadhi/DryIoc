@@ -31,7 +31,7 @@ namespace DryIoc.UnitTests
             container.RegisterInstance<IResolver>(container);
             container.Register<IServiceWithDependency, ServiceWithDependency>();
             container.Register(typeof(Service));
-            container.Register(typeof(LazyDynamic<>), setup: SetupWrapper.Default);
+            container.Register(typeof(LazyDynamic<>), setup: Setup.Wrapper);
 
             var func = container.Resolve<Func<LazyDynamic<IServiceWithDependency>>>();
             var service = func().Value.Value;

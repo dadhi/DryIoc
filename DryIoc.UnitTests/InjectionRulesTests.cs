@@ -15,7 +15,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<SomeBlah>(with: DryIoc.CreationInfo.Of(propsAndFields:
+            container.Register<SomeBlah>(with: CreationInfo.Of(propsAndFields:
                 r => r.ImplementationType.GetTypeInfo().DeclaredProperties.Select(PropertyOrFieldServiceInfo.Of)));
             container.Register<IService, Service>();
 
@@ -28,7 +28,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<SomeBlah>(with: DryIoc.CreationInfo.Of(propsAndFields:
+            container.Register<SomeBlah>(with: CreationInfo.Of(propsAndFields:
                 r => r.ImplementationType.GetTypeInfo().DeclaredProperties.Select(p =>
                     p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p).WithDetails(ServiceInfoDetails.Of(typeof(Service)), r) : null)));
             container.Register<Service>();

@@ -299,6 +299,10 @@ namespace DryIoc.MefAttributedModel
                     info.ReuseType = reuseAttribute.ReuseType;
                     info.ReuseName = reuseAttribute.ReuseName;
                 }
+                else if (attribute is OpenResolutionScopeAttribute)
+                {
+                    info.OpenResolutionScope = true;
+                }
                 else if (attribute is ReuseWrappersAttribute)
                 {
                     info.ReusedWrappers = ((ReuseWrappersAttribute)attribute).WrapperTypes;
@@ -617,19 +621,22 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Name to pass to reuse factory from <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
         public string ReuseName;
 
+        /// <summary>Corresponds to <see cref="Setup.OpenResolutionScope"/>.</summary>
+        public bool OpenResolutionScope;
+
         /// <summary>Reuse wrappers defined for exported type.</summary>
         public Type[] ReusedWrappers;
 
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
 
-        /// <summary>Factory type to specify <see cref="FactorySetup"/>.</summary>
+        /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
         public FactoryType FactoryType;
 
-        /// <summary>Not null if exported with <see cref="AsDecoratorAttribute"/>, contains info to <see cref="SetupDecorator"/>.</summary>
+        /// <summary>Not null if exported with <see cref="AsDecoratorAttribute"/>, contains info about decorator.</summary>
         public DecoratorInfo Decorator;
 
-        /// <summary>Not null if exported with <see cref="AsWrapperAttribute"/>, contains info to <see cref="SetupWrapper"/>.</summary>
+        /// <summary>Not null if exported with <see cref="AsWrapperAttribute"/>, contains info about wrapper.</summary>
         public WrapperInfo Wrapper;
         
         /// <summary>True if exported with <see cref="AsFactoryAttribute"/>.</summary>
@@ -647,20 +654,22 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Create factory setup from DTO data.</summary>
         /// <param name="attributes">Implementation type attributes provided to get optional metadata.</param>
         /// <returns>Created factory setup.</returns>
-        public FactorySetup GetSetup(Attribute[] attributes = null)
+        public Setup GetSetup(Attribute[] attributes = null)
         {
             if (FactoryType == FactoryType.Wrapper)
-                return Wrapper == null ? SetupWrapper.Default : Wrapper.GetSetup();
+                return Wrapper == null ? Setup.Wrapper : Wrapper.GetSetup();
 
             var lazyMetadata = HasMetadataAttribute ? (Func<object>)(() => GetMetadata(attributes)) : null;
 
             if (FactoryType == FactoryType.Decorator)
-                return Decorator == null ? SetupDecorator.Default : Decorator.GetSetup(lazyMetadata);
+                return Decorator == null ? Setup.Decorator : Decorator.GetSetup(lazyMetadata);
 
-            if (lazyMetadata == null && ReusedWrappers.IsNullOrEmpty())
+            if (!OpenResolutionScope && lazyMetadata == null && ReusedWrappers.IsNullOrEmpty())
                 return Setup.Default;
 
-            return Setup.With(lazyMetadata: lazyMetadata, reuseWrappers: ReusedWrappers);
+            return Setup.With(lazyMetadata: lazyMetadata,
+                openResolutionScope: OpenResolutionScope,
+                reuseWrappers: ReusedWrappers);
         }
 
         /// <summary>Compares with another info for equality.</summary>
@@ -766,7 +775,7 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
-    /// <summary>Describes <see cref="SetupWrapper"/> in serializable way.</summary>
+    /// <summary>Defines wrapper setup in serializable way.</summary>
     public sealed class WrapperInfo
     {
         /// <summary>Concrete wrapped type for non generic wrapper</summary>
@@ -776,9 +785,9 @@ namespace DryIoc.MefAttributedModel
         public int WrappedServiceTypeGenericArgIndex;
 
         /// <summary>Creates Wrapper setup from this info.</summary> <returns>Setup.</returns>
-        public SetupWrapper GetSetup()
+        public Setup GetSetup()
         {
-            return SetupWrapper.With(UnwrapServiceType);
+            return Setup.WrapperWith(UnwrapServiceType);
         }
 
         /// <summary>Used to compare wrappers info for equality.</summary> <param name="obj">Other info to compare.</param>
@@ -830,17 +839,17 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Converts info to corresponding decorator setup.</summary>
         /// <param name="lazyMetadata">(optional) Metadata that may be associated by decorator.</param> <returns>Setup.</returns>
-        public SetupDecorator GetSetup(Func<object> lazyMetadata = null)
+        public Setup GetSetup(Func<object> lazyMetadata = null)
         {
             if (DecoratedServiceConditionType != null)
-                return SetupDecorator.With(((IDecoratorCondition)Activator.CreateInstance(DecoratedServiceConditionType)).Match);
+                return Setup.DecoratorWith(((IDecoratorCondition)Activator.CreateInstance(DecoratedServiceConditionType)).Match);
 
             if (DecoratedServiceKeyInfo != ServiceKeyInfo.Default || lazyMetadata != null)
-                return SetupDecorator.With(request =>
+                return Setup.DecoratorWith(request =>
                     (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, request.ServiceKey)) &&
                     (lazyMetadata == null || Equals(lazyMetadata(), request.ResolvedFactory.Setup.Metadata)));
 
-            return SetupDecorator.Default;
+            return Setup.Decorator;
         }
 
         /// <summary>Compares this info to other info for equality.</summary> <param name="obj">Other info to compare.</param>
@@ -1124,6 +1133,10 @@ namespace DryIoc.MefAttributedModel
             ContractKey = contractKey;
         }
     }
+
+    /// <summary>Specifies that exported service setup to <see cref="Setup.OpenResolutionScope"/>.</summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
+    public class OpenResolutionScopeAttribute : Attribute {}
 
     #endregion
 }

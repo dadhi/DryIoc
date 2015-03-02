@@ -34,7 +34,7 @@ namespace DryIoc.UnitTests
             container.Register<Wheels>();
             container.Register<Wheels>(
                 with: FactoryMethod.Of(() => CarFactory.DecorateWheels(default(Wheels))), 
-                setup: SetupDecorator.Default);
+                setup: Setup.Decorator);
 
             var car = container.New<Car>();
 

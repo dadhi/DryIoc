@@ -274,7 +274,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IHandler, FastHandler>();
-            container.Register<IHandler, LoggingHandlerDecorator>(setup: SetupDecorator.Default);
+            container.Register<IHandler, LoggingHandlerDecorator>(setup: Setup.Decorator);
 
             container.Unregister<IHandler>(factoryType: FactoryType.Decorator);
 
@@ -286,7 +286,7 @@ namespace DryIoc.UnitTests
         public void Unregister_unregistred_decorator_should_not_throw()
         {
             var container = new Container();
-            container.Register<IHandler, LoggingHandlerDecorator>(setup: SetupDecorator.Default);
+            container.Register<IHandler, LoggingHandlerDecorator>(setup: Setup.Decorator);
 
             container.Unregister<IHandler>(factoryType: FactoryType.Decorator, condition: f => f.ImplementationType == typeof(LoggingHandlerDecorator));
             container.Unregister<IHandler>(factoryType: FactoryType.Decorator, condition: f => f.ImplementationType == typeof(LoggingHandlerDecorator));
@@ -299,8 +299,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IHandler, FastHandler>();
-            container.Register<IHandler, LoggingHandlerDecorator>(setup: SetupDecorator.Default);
-            container.Register<IHandler, NullHandlerDecorator>(setup: SetupDecorator.Default);
+            container.Register<IHandler, LoggingHandlerDecorator>(setup: Setup.Decorator);
+            container.Register<IHandler, NullHandlerDecorator>(setup: Setup.Decorator);
 
             container.Unregister<IHandler>(factoryType: FactoryType.Decorator,
                 condition: f => f.ImplementationType == typeof(NullHandlerDecorator));

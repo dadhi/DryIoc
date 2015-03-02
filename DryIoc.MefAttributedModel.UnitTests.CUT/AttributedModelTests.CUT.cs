@@ -267,4 +267,17 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     [Export, PartCreationPolicy(CreationPolicy.NonShared)]
     public class Me {}
+
+    [Export, PartCreationPolicy(CreationPolicy.NonShared)]
+    public class LazyDepClient
+    {
+        public LazyDep Dep { get; private set; }
+        public LazyDepClient(LazyDep dep)
+        {
+            Dep = dep;
+        }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.NonShared), OpenResolutionScope]
+    public class LazyDep { }
 }

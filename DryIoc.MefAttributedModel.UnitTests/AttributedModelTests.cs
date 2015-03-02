@@ -181,6 +181,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 container.Resolve<UseLazyEnumerable>().Mes.FirstOrDefault());
         }
 
+        [Test]
+        public void Export_as_new_resolution_scope_dependency()
+        {
+            var container = new Container(r => r.WithMefAttributedModel());
+            container.RegisterExports(typeof(LazyDepClient), typeof(LazyDep));
+
+            var clientExpr = container.Resolve<FactoryExpression<LazyDepClient>>();
+
+            StringAssert.Contains(".Resolve", clientExpr.Value.ToString());
+        }
+
         #region Implementation
 
         private void WhenIRegisterAllExportedTypes()
@@ -201,11 +212,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         #endregion
     }
 
-    #region CUT
-
     [ExportWithDisplayName("blah"), WithMetadata("hey")]
     public class OneWithManyMeta { }
-
-    #endregion
 }
 

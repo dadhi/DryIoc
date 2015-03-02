@@ -1,4 +1,5 @@
 using NUnit.Framework;
+// ReSharper disable MemberHidesStaticFromOuterClass
 
 namespace DryIoc.UnitTests
 {
@@ -20,7 +21,7 @@ namespace DryIoc.UnitTests
             c.Register<User1>();
             c.Register<User2>();
 
-            c.Register<ILogger>(with: DryIoc.CreationInfo.Of(r => FactoryMethod.Of(
+            c.Register<ILogger>(with: CreationInfo.Of(r => FactoryMethod.Of(
                 typeof(LofFactory).GetDeclaredMethodOrNull("GetLog")
                 .MakeGenericMethod(r.GetNonWrapperParentOrEmpty().ImplementationType))),
                 setup: Setup.With(cacheFactoryExpression: false));
@@ -29,7 +30,7 @@ namespace DryIoc.UnitTests
             Assert.That(c.Resolve<User1>().Logger, Is.InstanceOf<Logger<User1>>());
         }
 
-        [Test, Explicit("Not implemented yet: #22: Add Resolution condition to Factory setup")]
+        [Test/*, Explicit("Not implemented yet: #22: Add Resolution condition to Factory setup")*/]
         public void Can_select_what_factory_to_use_as_dependency_and_what_as_resolution_root()
         {
             var container = new Container();

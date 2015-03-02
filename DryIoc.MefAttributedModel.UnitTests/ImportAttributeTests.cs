@@ -138,7 +138,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Resolve_custom_generic_wrapper_marked_with_Import()
         {
             var container = new Container().WithMefAttributedModel();
-            container.Register(typeof(MyWrapper<>), setup: SetupWrapper.Default);
+            container.Register(typeof(MyWrapper<>), setup: Setup.Wrapper);
 
             container.RegisterExports(typeof(Service), typeof(CustomWrapperClient));
 

@@ -12,6 +12,11 @@ namespace DryIoc.CompileTimeGeneration.Tests
             get { throw new NotImplementedException(); }
         }
 
+        public IScope GetOrCreateResolutionScope(ref IScope scope)
+        {
+            return scope ?? (scope = new Scope());
+        }
+
         public ServiceFactory()
         {
             SingletonScope = new Scope();
