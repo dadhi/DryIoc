@@ -9,7 +9,7 @@ namespace DryIoc.UnitTests
         public void Can_use_static_method_for_service_creation()
         {
             var container = new Container();
-            container.Register<SomeService>(with: InjectionRules.With(
+            container.Register<SomeService>(with: DryIoc.CreationInfo.Of(
                 r => FactoryMethod.Of(r.ImplementationType.GetDeclaredMethodOrNull("Create"))));
 
             var service = container.Resolve<SomeService>();
@@ -74,8 +74,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ServiceFactory>();
             container.RegisterInstance("parameter");
-            container.Register<IService>(with: FactoryMethod.Of(
-                r => ServiceInfo.Of<ServiceFactory>(), 
+            container.Register<IService>(with: CreationInfo.Of(
+                ServiceInfo.Of<ServiceFactory>(), 
                 f => f.Create(default(string))));
 
             var service = container.Resolve<IService>();
@@ -87,18 +87,35 @@ namespace DryIoc.UnitTests
         public void Can_get_factory_registered_with_key()
         {
             var container = new Container();
-            
+
             container.Register<ServiceFactory>(serviceKey: "factory");
             container.RegisterInstance("parameter");
 
-            container.Register<IService>(with: FactoryMethod.Of(
-                r => ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"), 
+            container.Register<IService>(with: CreationInfo.Of(
+                ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"),
                 f => f.Create(default(string))));
 
             var service = container.Resolve<IService>();
 
             Assert.That(service.Message, Is.EqualTo("parameter"));
         }
+
+        //[Test]
+        //public void Can_get_factory_registered_with_key_and_specify_factory_method_parameter_with_key()
+        //{
+        //    var container = new Container();
+
+        //    container.Register<ServiceFactory>(serviceKey: "factory");
+        //    container.RegisterInstance("parameter", serviceKey: "p");
+
+        //    container.Register<IService>(with: CreationInfo.Of(
+        //        r => ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"),
+        //        r => f => f.Create(Arg.Of<string>("p"))));
+
+        //    var service = container.Resolve<IService>();
+
+        //    Assert.That(service.Message, Is.EqualTo("parameter"));
+        //}
 
         [Test]
         public void Should_throw_if_instance_factory_unresolved()

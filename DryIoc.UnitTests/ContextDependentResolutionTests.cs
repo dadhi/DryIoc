@@ -20,7 +20,7 @@ namespace DryIoc.UnitTests
             c.Register<User1>();
             c.Register<User2>();
 
-            c.Register<ILogger>(with: InjectionRules.With(r => FactoryMethod.Of(
+            c.Register<ILogger>(with: DryIoc.CreationInfo.Of(r => FactoryMethod.Of(
                 typeof(LofFactory).GetDeclaredMethodOrNull("GetLog")
                 .MakeGenericMethod(r.GetNonWrapperParentOrEmpty().ImplementationType))),
                 setup: Setup.With(cacheFactoryExpression: false));

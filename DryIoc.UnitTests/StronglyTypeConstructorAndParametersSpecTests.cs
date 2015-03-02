@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.ObjectModel;
-using System.Linq.Expressions;
-using System.Reflection;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
@@ -14,7 +10,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register2(with: Construct.Of(_ => new Burger()));
+            container.Register2(with: CreationInfo.Of(() => new Burger()));
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Null);
@@ -25,7 +21,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<Burger>(with: Construct.Of(_ => new Burger(default(ICheese))));
+            container.Register<Burger>(with: CreationInfo.Of(() => new Burger(default(ICheese))));
             container.Register<ICheese, BlueCheese>();
 
             var burger = container.Resolve<Burger>();
@@ -38,7 +34,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<Burger>(
-                with: Construct.Of(p => new Burger(p.Of<ICheese>(IfUnresolved.ReturnDefault))));
+                with: CreationInfo.Of(() => new Burger(Arg.Of<ICheese>(IfUnresolved.ReturnDefault))));
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Null);
@@ -53,7 +49,7 @@ namespace DryIoc.UnitTests
             container.RegisterInstance("King");
 
             container.Register<Burger>(
-                with: Construct.Of(p => new Burger("King", p.Of<BlueCheese>("a"))));
+                with: CreationInfo.Of(() => new Burger("King", Arg.Of<BlueCheese>("a"))));
 
             var burger = container.Resolve<Burger>();
             Assert.AreEqual("King", burger.Name);
@@ -64,7 +60,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<Burger>(with: Construct.Of(p => Burger.Create()));
+            container.Register<Burger>(with: CreationInfo.Of(() => Burger.Create()));
 
             Assert.NotNull(container.Resolve<Burger>());
         }
@@ -78,7 +74,7 @@ namespace DryIoc.UnitTests
             container.RegisterInstance("King");
 
             container.Register2(
-                with: Construct.Of(p => Burger.Create("King", p.Of<BlueCheese>("a"))));
+                with: CreationInfo.Of(() => Burger.Create("King", Arg.Of<BlueCheese>("a"))));
 
             var burger = container.Resolve<Burger>();
             Assert.AreEqual("King", burger.Name);
@@ -92,7 +88,7 @@ namespace DryIoc.UnitTests
             container.Register<ICheese, BlueCheese>();
 
             container.Register2(
-                with: Construct.Of(p => Burger.CreateMany(p.Of<ICheese>(), default(int))));
+                with: CreationInfo.Of(() => Burger.CreateMany(Arg.Of<ICheese>(), default(int))));
 
             var burger = container.Resolve<Burger>();
         }
@@ -136,92 +132,5 @@ namespace DryIoc.UnitTests
                 return new Burger("default", cheese) { Number = number };
             }
         }
-    }
-
-    public static class Construct
-    {
-        public static InjectionRules<T> Of<T>(Expression<Func<Params, T>> methodOrCtorCallExpr)
-        {
-            MethodBase methodOrCtor;
-            ReadOnlyCollection<Expression> argExprs;
-
-            var callExpr = methodOrCtorCallExpr.Body;
-            if (!(callExpr is NewExpression) && !(callExpr is MethodCallExpression))
-                return Throw.Instead<InjectionRules<T>>(
-                    Error.Of("Only method calls and new expression are supported, but found: " + callExpr));
-
-            if (callExpr is NewExpression)
-            {
-                var newExpr = (NewExpression)callExpr;
-                argExprs = newExpr.Arguments;
-                methodOrCtor = newExpr.Constructor;
-            }
-            else
-            {
-                var methodCallExpr = (MethodCallExpression)callExpr;
-                argExprs = methodCallExpr.Arguments;
-                methodOrCtor = methodCallExpr.Method;
-            }
-
-            var pars = methodOrCtor.GetParameters();
-            var parameters = Parameters.Of;
-            if (argExprs.Count != 0)
-            {
-                for (var i = 0; i < argExprs.Count; i++)
-                {
-                    var par = pars[i];
-                    var arg = argExprs[i] as MethodCallExpression;
-                    if (arg != null && arg.Method.DeclaringType == typeof(Params))
-                    {
-                        var requiredServiceType = arg.Method.GetGenericArguments()[0];
-                        if (requiredServiceType == par.ParameterType)
-                            requiredServiceType = null;
-                        
-                        var serviceKey = default(object);
-                        var ifUnresolved = IfUnresolved.Throw;
-
-                        var settings = arg.Arguments;
-                        for (var j = 0; j < settings.Count; j++)
-                        {
-                            var setting = settings[j] as ConstantExpression;
-                            if (setting != null)
-                            {
-                                if (setting.Type == typeof(IfUnresolved))
-                                    ifUnresolved = (IfUnresolved)setting.Value;
-                                else // service key
-                                    serviceKey = setting.Value;
-                            }
-                        }
-
-                        parameters = parameters.Condition(par.Equals, requiredServiceType, serviceKey, ifUnresolved);
-                    }
-                    //else
-                    //{
-                    //    var argValue = argExprs[i] as ConstantExpression;
-                    //    if (argValue != null && argValue.Type.IsPrimitive())
-                    //    {
-                    //        parameters = parameters.Condition(par.Equals, defaultValue: argValue.Value);
-                    //    }
-                    //}
-                }
-            }
-
-            return InjectionRules<T>.Of(_ => FactoryMethod.Of(methodOrCtor), parameters);
-        }
-    }
-
-    public sealed class Params
-    {
-        public static readonly Params Default = new Params();
-
-        public T Of<T>() { return default(T); }
-
-        public T Of<T>(IfUnresolved ifUnresolved) { return default(T); }
-        
-        public T Of<T>(object serviceKey) { return default(T); }
-        
-        public T Of<T>(object serviceKey, IfUnresolved ifUnresolved) { return default(T); }
-
-        private Params() { }
     }
 }

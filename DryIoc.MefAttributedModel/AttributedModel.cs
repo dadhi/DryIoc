@@ -442,16 +442,15 @@ namespace DryIoc.MefAttributedModel
 
                 var factoryMethod = method;
                 var factoryExport = factoryInfo.Exports[0];
-                var rules = InjectionRules.With(r => FactoryMethod.Of(factoryMethod, 
-                    ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key)));
-                
-                var serviceFactory = serviceInfo.CreateFactory(rules);
+                var factoryServiceInfo = ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
+                var creationInfo = CreationInfo.Of(_ => FactoryMethod.Of(factoryMethod, factoryServiceInfo));
+                var factory = serviceInfo.CreateFactory(creationInfo);
 
                 var serviceExports = serviceInfo.Exports;
                 for (var i = 0; i < serviceExports.Length; i++)
                 {
                     var export = serviceExports[i];
-                    registrator.Register(serviceFactory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
+                    registrator.Register(factory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
                 }
             }
         }
@@ -639,7 +638,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Creates factory out of registration info.</summary>
         /// <param name="rules">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
         /// <returns>Created factory.</returns>
-        public Factory CreateFactory(InjectionRules rules = null)
+        public Factory CreateFactory(CreationInfo rules = null)
         {
             var reuse = AttributedModel.GetReuse(ReuseType, ReuseName);
             return new ReflectionFactory(ImplementationType, reuse, rules, GetSetup());
