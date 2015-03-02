@@ -30,7 +30,7 @@ namespace DryIoc.UnitTests
             Assert.That(c.Resolve<User1>().Logger, Is.InstanceOf<Logger<User1>>());
         }
 
-        [Test/*, Explicit("Not implemented yet: #22: Add Resolution condition to Factory setup")*/]
+        [Test]
         public void Can_select_what_factory_to_use_as_dependency_and_what_as_resolution_root()
         {
             var container = new Container();
@@ -39,7 +39,8 @@ namespace DryIoc.UnitTests
             container.Register<Y>();
 
             var y = container.Resolve<Y>();
-            Assert.IsInstanceOf<B>(y.X);
+
+            Assert.IsInstanceOf<A>(y.X);
         }
 
         internal interface IX { }

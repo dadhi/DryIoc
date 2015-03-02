@@ -1109,21 +1109,30 @@ namespace DryIoc
                 var allFactories = entry is Factory
                     ? new[] { new KeyValuePair<object, Factory>(DefaultKey.Value, (Factory)entry) }
                     : ((FactoriesEntry)entry).Factories.Enumerate()
-                        .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value)).ToArray();
-
-                var factory = factorySelector(request, allFactories);
-                return factory;
+                        .Where(f => f.Value.Setup.Condition == null || f.Value.Setup.Condition(request))
+                        .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
+                        .ToArray();
+                return factorySelector(request, allFactories);
             }
 
-            if (entry is Factory)
-                return serviceKey != null && !DefaultKey.Value.Equals(serviceKey) ? null : (Factory)entry;
+            var factory = entry as Factory;
+            if (factory != null)
+                return serviceKey != null && !DefaultKey.Value.Equals(serviceKey) ? null 
+                    : factory.Setup.Condition != null && !factory.Setup.Condition(request) ? null
+                    : factory;
 
             var factories = ((FactoriesEntry)entry).Factories;
             if (serviceKey != null)
-                return factories.GetValueOrDefault(serviceKey);
+            {
+                factory = factories.GetValueOrDefault(serviceKey);
+                return factory != null && factory.Setup.Condition != null && !factory.Setup.Condition(request) ? null
+                    : factory;
+            }
 
             var defaultFactories = factories.Enumerate()
-                .Where(x => x.Key is DefaultKey).ToArray();
+                .Where(x => x.Key is DefaultKey &&
+                    (x.Value.Setup.Condition == null || x.Value.Setup.Condition(request)))
+                    .ToArray();
 
             if (defaultFactories.Length != 0)
                 return defaultFactories.Length == 1
