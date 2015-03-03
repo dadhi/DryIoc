@@ -157,7 +157,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_specify_to_reuse_in_farthest_resolution_scope()
+        public void Can_specify_to_reuse_in_outermost_resolution_scope()
         {
             var container = new Container();
             container.Register<ViewModel1Presenter>();
@@ -167,9 +167,40 @@ namespace DryIoc.UnitTests
             container.Register<Log>(Reuse.Transient,
                 setup: Setup.With(condition: request => request.IsResolutionRoot));
 
-            var logReuse = Reuse.InResolutionScopeOf<IViewModel>(topmost: true);
+            var logReuse = Reuse.InResolutionScopeOf<IViewModel>(outermost: true);
             container.Register<Log>(logReuse,
-                setup: Setup.With(condition: request => logReuse.GetScope(request) != null));
+                setup: Setup.With(condition: request => logReuse.GetScopeOrDefault(request) != null));
+
+            var presenter = container.Resolve<ViewModel1Presenter>();
+
+            Assert.AreSame(presenter.VM1.Log, presenter.VM1.VM2.Log);
+        }
+
+        [Test]
+        public void Can_correctly_handle_resolution_scope_condition()
+        {
+            var container = new Container();
+            container.Register<ViewModel2>(with: CreationInfo.Of(() => new ViewModel2(Arg.Of<Log>(IfUnresolved.ReturnDefault))));
+
+            var logReuse = Reuse.InResolutionScopeOf<ViewModel1>();
+            container.Register<Log>(logReuse, setup: Setup.With(condition: request => logReuse.GetScopeOrDefault(request) != null));
+
+            var vm = container.Resolve<ViewModel2>();
+
+            Assert.IsNull(vm.Log);
+        }
+
+        [Test, Ignore]
+        public void Can_specify_to_resolve_corresponding_log_in_resolution_scope_automagically_Without_condition()
+        {
+            var container = new Container();
+            container.Register<ViewModel1Presenter>();
+            container.Register<ViewModel1>(setup: Setup.With(openResolutionScope: true));
+            container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
+
+            container.Register<Log>(Reuse.InResolutionScopeOf<IViewModel>(outermost: true));
+
+            container.Register<Log>(setup: Setup.With(condition: request => request.IsResolutionRoot));
 
             var presenter = container.Resolve<ViewModel1Presenter>();
 

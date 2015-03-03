@@ -262,13 +262,9 @@ namespace DryIoc
 
         internal static MethodCallExpression GetCallGetOrNewExpression(Request request)
         {
-            var parent = request;
-            while (!parent.Parent.IsEmpty)
-                parent = parent.Parent;
-
+            var parent = request.Enumerate().Last();
             var parentServiceTypeExpr = Expression.Constant(parent.ServiceType, typeof(Type));
             var parentServiceKeyExpr = request.Container.GetOrAddStateItemExpression(parent.ServiceKey, typeof(object));
-
             return Expression.Call(ResolverContextExpr, "GetOrNew", null,
                 ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
@@ -314,9 +310,11 @@ namespace DryIoc
             switch (factory.FactoryType)
             {
                 case FactoryType.Decorator:
-                    _decoratorFactories.Swap(x => x.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append)); break;
+                    _decoratorFactories.Swap(x => x.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append)); 
+                    break;
                 case FactoryType.Wrapper:
-                    _wrapperFactories.Swap(x => x.AddOrUpdate(serviceType, factory)); break;
+                    _wrapperFactories.Swap(x => x.AddOrUpdate(serviceType, factory)); 
+                    break;
                 default:
                     return AddOrUpdateServiceFactory(factory, serviceType, serviceKey, ifAlreadyRegistered);
             }
@@ -2930,7 +2928,7 @@ namespace DryIoc
                     registeredFactory.Reuse == reuse &&
                     registeredFactory.Setup == Setup.Default)
                 {
-                    reuse.GetScope(container.EmptyRequest).SetOrAdd(registeredFactory.FactoryID, instance);
+                    reuse.GetScopeOrDefault(container.EmptyRequest).ThrowIfNull().SetOrAdd(registeredFactory.FactoryID, instance);
                     return;
                 }
             }
@@ -2938,7 +2936,7 @@ namespace DryIoc
             // Create factory to locate instance in scope.
             var locatorFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse);
             if (container.Register(locatorFactory, serviceType, serviceKey, ifAlreadyRegistered))
-                reuse.GetScope(container.EmptyRequest).SetOrAdd(locatorFactory.FactoryID, instance);
+                reuse.GetScopeOrDefault(container.EmptyRequest).ThrowIfNull().SetOrAdd(locatorFactory.FactoryID, instance);
         }
 
         private static Expression GetThrowInstanceNoLongerAvailable(Request r)
@@ -5338,9 +5336,9 @@ namespace DryIoc
         /// <summary>Locates or creates scope to store reused service objects.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Located scope.</returns>
-        IScope GetScope(Request request);
+        IScope GetScopeOrDefault(Request request);
 
-        /// <summary>Supposed to create in-line expression with the same code as body of <see cref="GetScope"/> method.</summary>
+        /// <summary>Supposed to create in-line expression with the same code as body of <see cref="GetScopeOrDefault"/> method.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Expression of type <see cref="IScope"/>.</returns>
         /// <remarks>Result expression should be static: should Not create closure on any objects. 
@@ -5360,7 +5358,7 @@ namespace DryIoc
         /// <summary>Returns container bound Singleton scope.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Container singleton scope.</returns>
-        public IScope GetScope(Request request)
+        public IScope GetScopeOrDefault(Request request)
         {
             return request.Container.SingletonScope;
         }
@@ -5402,7 +5400,7 @@ namespace DryIoc
         /// <returns>Found current scope or its parent.</returns>
         /// <exception cref="ContainerException">with the code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/> if <see cref="Name"/> specified but
         /// no matching scope or its parent found.</exception>
-        public IScope GetScope(Request request)
+        public IScope GetScopeOrDefault(Request request)
         {
             return GetMatchingScope(request.Container.CurrentScope, Name);
         }
@@ -5454,21 +5452,27 @@ namespace DryIoc
 
         /// <summary>Creates new resolution scope reuse with specified type and key.</summary>
         /// <param name="assignableFromServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
-        /// <param name="topmost">(optional)</param>
-        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null, bool topmost = false)
+        /// <param name="outermost">(optional)</param>
+        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null, bool outermost = false)
         {
             _assignableFromServiceType = assignableFromServiceType;
             _serviceKey = serviceKey;
-            _topmost = topmost;
+            _outermost = outermost;
         }
 
         /// <summary>Creates or returns already created resolution root scope.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Created or existing scope.</returns>
-        public IScope GetScope(Request request)
+        public IScope GetScopeOrDefault(Request request)
         {
-            return request.Scope == null ? null 
-                : GetMatchingScope(request.Scope,  _assignableFromServiceType, _serviceKey, _topmost);
+            var scope = request.Scope;
+            if (scope == null)
+            {
+                var parent = request.Enumerate().Last();
+                request.Container.GetOrNew(ref scope, parent.ServiceType, parent.ServiceKey);
+            }
+
+            return GetMatchingScopeOrDefault(scope, _assignableFromServiceType, _serviceKey, _outermost);
         }
 
         /// <summary>Returns <see cref="GetMatchingScope"/> method call expression.</summary>
@@ -5480,7 +5484,7 @@ namespace DryIoc
                 Container.GetCallGetOrNewExpression(request),
                 Expression.Constant(_assignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(_serviceKey, typeof(object)),
-                Expression.Constant(_topmost, typeof(bool)));
+                Expression.Constant(_outermost, typeof(bool)));
         }
 
         /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
@@ -5491,9 +5495,15 @@ namespace DryIoc
         /// Key equal to <paramref name="serviceKey"/>.</summary>
         /// <param name="scope">Scope to start matching with Type and Key specified.</param>
         /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
-        /// <param name="topmost">If true - commands to look for topmost match instead of nearest.</param>
+        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
         /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
-        public static IScope GetMatchingScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool topmost)
+        public static IScope GetMatchingScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost)
+        {
+            return GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost) 
+                ?? Throw.Instead<IScope>(Error.NO_MATCHED_SCOPE_FOUND, new KV<Type, object>(assignableFromServiceType, serviceKey));
+        }
+
+        private static IScope GetMatchingScopeOrDefault(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost)
         {
             if (assignableFromServiceType == null && serviceKey == null)
                 return scope;
@@ -5507,20 +5517,18 @@ namespace DryIoc
                     (serviceKey == null || serviceKey.Equals(name.Value)))
                 {
                     matchedScope = scope;
-                    if (!topmost) // break on first found match.
+                    if (!outermost) // break on first found match.
                         break;
                 }
                 scope = scope.Parent;
             }
-
-            return matchedScope ?? 
-                Throw.Instead<IScope>(Error.NO_MATCHED_SCOPE_FOUND,
-                    new KV<Type, object>(assignableFromServiceType, serviceKey));
+            
+            return matchedScope;
         }
 
         private readonly Type _assignableFromServiceType;
         private readonly object _serviceKey;
-        private readonly bool _topmost;
+        private readonly bool _outermost;
     }
 
     /// <summary>Specifies pre-defined reuse behaviors supported by container: 
@@ -5552,23 +5560,23 @@ namespace DryIoc
         /// in existing resolution scope hierarchy. If parameters are not specified or null, then <see cref="InResolutionScope"/> will be returned.</summary>
         /// <param name="assignableFromServiceType">(optional) To search for scope with service type assignable to type specified in parameter.</param>
         /// <param name="serviceKey">(optional) Search for specified key.</param>
-        /// <param name="topmost">If true - commands to look for topmost match instead of nearest.</param>
+        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
         /// <returns>New reuse with specified parameters or <see cref="InResolutionScope"/> if nothing specified.</returns>
-        public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null, bool topmost = false)
+        public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null, bool outermost = false)
         {
             return assignableFromServiceType == null && serviceKey == null ? InResolutionScope
-                : new ResolutionScopeReuse(assignableFromServiceType, serviceKey, topmost);
+                : new ResolutionScopeReuse(assignableFromServiceType, serviceKey, outermost);
         }
 
         /// <summary>Creates reuse to search for <typeparamref name="TAssignableFromServiceType"/> and <paramref name="serviceKey"/>
         /// in existing resolution scope hierarchy.</summary>
         /// <typeparam name="TAssignableFromServiceType">To search for scope with service type assignable to type specified in parameter.</typeparam>
         /// <param name="serviceKey">(optional) Search for specified key.</param>
-        /// <param name="topmost">If true - commands to look for topmost match instead of nearest.</param>
+        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
         /// <returns>New reuse with specified parameters.</returns>
-        public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null, bool topmost = false)
+        public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null, bool outermost = false)
         {
-            return InResolutionScopeOf(typeof(TAssignableFromServiceType), serviceKey, topmost);
+            return InResolutionScopeOf(typeof(TAssignableFromServiceType), serviceKey, outermost);
         }
 
         /// <summary>Ensuring single service instance per Thread.</summary>
@@ -6360,7 +6368,7 @@ namespace DryIoc
             WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE = Of(
                 "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}."),
             NO_MATCHED_SCOPE_FOUND = Of(
-                "When resolving unable to find scope matching name: {0}."),
+                "Unable to find scope with matching name: {0}."),
             UNABLE_TO_NEW_OPEN_GENERIC = Of(
                 "Unable to New not concrete/open-generic type {0}."),
             REG_REUSED_OBJ_WRAPPER_IS_NOT_IREUSED = Of(
