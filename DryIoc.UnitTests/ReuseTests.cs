@@ -151,7 +151,9 @@ namespace DryIoc.UnitTests
             container.Register<ViewModel2>();
             container.Register<Log>(Reuse.InResolutionScopeOf<ViewModel2>());
 
-            container.Resolve<ViewModel2>();
+            var vm = container.Resolve<ViewModel2>();
+
+            Assert.IsNotNull(vm.Log);
         }
 
         [Test]

@@ -12,9 +12,9 @@ namespace DryIoc.CompileTimeGeneration.Tests
             get { throw new NotImplementedException(); }
         }
 
-        public IScope GetOrNew(ref IScope scope)
+        public IScope GetOrNew(ref IScope scope, Type serviceType, object serviceKey)
         {
-            return scope ?? (scope = new Scope());
+            return scope ?? (scope = new Scope(name: new KV<Type, object>(serviceType, serviceKey)));
         }
 
         public ServiceFactory()

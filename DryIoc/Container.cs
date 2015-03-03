@@ -254,11 +254,24 @@ namespace DryIoc
         internal static readonly Expression ResolverContextExpr = 
             Expression.Property(ResolverContextProviderParamExpr, "Resolver");
 
+        internal static readonly Expression ResolverExpr =
+            Expression.Convert(ResolverContextExpr, typeof(IResolver));
+
         internal static readonly ParameterExpression ResolutionScopeParamExpr = 
             Expression.Parameter(typeof(IScope), "scope");
 
-        internal static readonly MethodCallExpression GetOrNewResolutionScopeExpression =
-            Expression.Call(ResolverContextExpr, "GetOrNew", null, ResolutionScopeParamExpr);
+        internal static MethodCallExpression GetCallGetOrNewExpression(Request request)
+        {
+            var parent = request;
+            while (!parent.Parent.IsEmpty)
+                parent = parent.Parent;
+
+            var parentServiceTypeExpr = Expression.Constant(parent.ServiceType, typeof(Type));
+            var parentServiceKeyExpr = request.Container.GetOrAddStateItemExpression(parent.ServiceKey, typeof(object));
+
+            return Expression.Call(ResolverContextExpr, "GetOrNew", null,
+                ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
+        }
 
         #endregion
 
@@ -667,10 +680,12 @@ namespace DryIoc
         /// <summary>Check if referenced resolution <see cref="scope"/> is not null, then just returns it, otherwise creates it,
         /// sets <paramref name="scope"/> and returns it.</summary>
         /// <param name="scope">May be null scope.</param>
+        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
-        IScope IResolverContext.GetOrNew(ref IScope scope)
+        IScope IResolverContext.GetOrNew(ref IScope scope, Type serviceType, object serviceKey)
         {
-            return scope ?? (scope = new Scope());
+            return scope ?? (scope = new Scope(name: new KV<Type, object>(serviceType, serviceKey)));
         }
 
         /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
@@ -2022,7 +2037,7 @@ namespace DryIoc
                 request.Container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(itemRequiredServiceType),
                 request.Container.GetOrAddStateItemExpression(compositeParentKey),
-                Container.GetOrNewResolutionScopeExpression);
+                Container.GetCallGetOrNewExpression(request));
 
             if (itemServiceType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
                 callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemServiceType }, callResolveManyExpr);
@@ -2038,13 +2053,8 @@ namespace DryIoc
 
             var wrapperType = request.ServiceType;
             var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
-
-            var serviceExpr = Resolver.CreateResolutionExpression(
-                serviceType, request.IfUnresolved, request.RequiredServiceType,
-                request.Container.GetOrAddStateItemExpression(request.ServiceKey));
-
+            var serviceExpr = Resolver.CreateResolutionExpression(request, serviceType);
             var factoryExpr = Expression.Lambda(serviceExpr, null);
-
             var wrapperCtor = wrapperType.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(serviceType));
             return Expression.New(wrapperCtor, factoryExpr);
         }
@@ -3171,24 +3181,22 @@ namespace DryIoc
             return (T)container.New(typeof(T), with);
         }
 
-        internal static Expression CreateResolutionExpression(Type serviceType, IfUnresolved ifUnresolved, Type requiredServiceType, 
-            Expression serviceKeyExpr)
+        internal static Expression CreateResolutionExpression(Request request, Type serviceType = null)
         {
+            serviceType = serviceType ?? request.ServiceType;
             var serviceTypeExpr = Expression.Constant(serviceType, typeof(Type));
-            var ifUnresolvedExpr = Expression.Constant(ifUnresolved);
-            var requiredServiceTypeExpr = Expression.Constant(requiredServiceType, typeof(Type));
-            serviceKeyExpr = Expression.Convert(serviceKeyExpr, typeof(object));
+            var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved);
+            var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
+            var serviceKeyExpr = request.Container.GetOrAddStateItemExpression(request.ServiceKey, typeof(object));
 
-            var resolveExpr = Expression.Call(Container.ResolverContextExpr, _resolveKeyedMethod,
+            var getOrNewCallExpr = Container.GetCallGetOrNewExpression(request);
+
+            var resolveExpr = Expression.Call(Container.ResolverExpr, "ResolveKeyed", null,
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr,
-                Container.GetOrNewResolutionScopeExpression);
+                getOrNewCallExpr);
 
             return Expression.Convert(resolveExpr, serviceType);
         }
-
-        private static readonly MethodInfo _resolveKeyedMethod = typeof(IResolver)
-            .GetDeclaredMethodOrNull("ResolveKeyed", typeof(Type), typeof(object), typeof(IfUnresolved), typeof(Type), typeof(IScope))
-            .ThrowIfNull();
     }
 
     /// <summary>Specifies result of <see cref="Resolver.ResolveMany{TService}"/>: either dynamic(lazy) or fixed view.</summary>
@@ -4146,9 +4154,7 @@ namespace DryIoc
         {
             // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual creation expression.
             if (Setup.OpenResolutionScope && !request.Parent.IsEmpty)
-                return Resolver.CreateResolutionExpression(
-                    request.ServiceType, request.IfUnresolved, request.RequiredServiceType,
-                    request.Container.GetOrAddStateItemExpression(request.ServiceKey));
+                return Resolver.CreateResolutionExpression(request);
 
             request = request.ResolveWithFactory(this);
 
@@ -5466,7 +5472,7 @@ namespace DryIoc
         public Expression GetScopeExpression(Request request)
         {
             return Expression.Call(typeof(ResolutionScopeReuse), "GetMatchingScope", null,
-                Container.GetOrNewResolutionScopeExpression,
+                Container.GetCallGetOrNewExpression(request),
                 Expression.Constant(_assignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(_serviceKey, typeof(object)),
                 Expression.Constant(_fathest, typeof(bool)));
@@ -5939,8 +5945,10 @@ namespace DryIoc
         /// <summary>Check if referenced resolution <see cref="scope"/> is not null, then just returns it, otherwise creates it,
         /// sets <paramref name="scope"/> and returns it.</summary>
         /// <param name="scope">May be null scope.</param>
+        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
-        IScope GetOrNew(ref IScope scope);
+        IScope GetOrNew(ref IScope scope, Type serviceType, object serviceKey);
     }
 
     /// <summary>Exposes operations required for internal registry access. 
@@ -6823,8 +6831,8 @@ namespace DryIoc
         /// <param name="args">Argument types</param> <returns>Found method or null.</returns>
         public static MethodInfo GetDeclaredMethodOrNull(this Type type, string name, params Type[] args)
         {
-            return type.GetTypeInfo().DeclaredMethods.FirstOrDefault(m =>
-                m.Name == name && m.GetParameters().Select(p => p.ParameterType).SequenceEqual(args));
+            return type.GetTypeInfo().DeclaredMethods.FirstOrDefault(m => 
+                m.Name == name && args.SequenceEqual(m.GetParameters().Select(p => p.ParameterType)));
         }
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
