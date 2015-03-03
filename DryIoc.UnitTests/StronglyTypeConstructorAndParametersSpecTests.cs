@@ -80,19 +80,6 @@ namespace DryIoc.UnitTests
             Assert.AreEqual("King", burger.Name);
         }
 
-        [Test, Ignore]
-        public void Can_specify_default_value()
-        {
-            var container = new Container();
-
-            container.Register<ICheese, BlueCheese>();
-
-            container.Register2(
-                with: CreationInfo.Of(() => Burger.CreateMany(Arg.Of<ICheese>(), default(int))));
-
-            var burger = container.Resolve<Burger>();
-        }
-
         internal interface ICheese { }
 
         internal class BlueCheese : ICheese { }

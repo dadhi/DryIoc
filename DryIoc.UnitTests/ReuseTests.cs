@@ -144,7 +144,17 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(((DisposableLog)user.Account.Log).IsDisposed);
         }
 
-        [Test, Ignore]
+        [Test]
+        public void Can_use_resolution_scope_reuse_bound_to_resolution_root()
+        {
+            var container = new Container();
+            container.Register<ViewModel2>();
+            container.Register<Log>(Reuse.InResolutionScopeOf<ViewModel2>());
+
+            container.Resolve<ViewModel2>();
+        }
+
+        [Test]
         public void Can_specify_to_reuse_in_farthest_resolution_scope()
         {
             var container = new Container();
@@ -155,18 +165,15 @@ namespace DryIoc.UnitTests
 
             var presenter = container.Resolve<ViewModel1Presenter>();
 
-            Assert.AreNotSame(presenter.VM1.Log, presenter.Log);
             Assert.AreSame(presenter.VM1.Log, presenter.VM1.VM2.Log);
         }
 
         internal class ViewModel1Presenter
         {
             public ViewModel1 VM1 { get; set; }
-            public Log Log { get; set; }
-            public ViewModel1Presenter(ViewModel1 vm1, Log log)
+            public ViewModel1Presenter(ViewModel1 vm1)
             {
                 VM1 = vm1;
-                Log = log;
             }
         }
 

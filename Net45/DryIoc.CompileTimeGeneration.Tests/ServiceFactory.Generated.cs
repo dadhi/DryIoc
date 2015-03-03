@@ -236,7 +236,7 @@ Please register service, or specify @requiredServiceType while resolving, or add
 
             DefaultResolutions = DefaultResolutions.AddOrUpdate(
                 typeof(DryIoc.MefAttributedModel.UnitTests.CUT.LazyDepClient),
-                (state, r, scope) => new DryIoc.MefAttributedModel.UnitTests.CUT.LazyDepClient((DryIoc.MefAttributedModel.UnitTests.CUT.LazyDep)r.Resolver.ResolveKeyed(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.LazyDep), (object)null, DryIoc.IfUnresolved.Throw, default(System.Type), r.Resolver.GetOrCreateResolutionScope(ref scope))));
+                (state, r, scope) => new DryIoc.MefAttributedModel.UnitTests.CUT.LazyDepClient((DryIoc.MefAttributedModel.UnitTests.CUT.LazyDep)r.Resolver.ResolveKeyed(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.LazyDep), (object)null, DryIoc.IfUnresolved.Throw, default(System.Type), r.Resolver.GetOrNew(ref scope))));
 
 /* Exception: typeof(ContainerException)
 ----------------------
@@ -287,7 +287,7 @@ Unable to resolve dependency DryIoc.MefAttributedModel.UnitTests.CUT.IFooService
 
             DefaultResolutions = DefaultResolutions.AddOrUpdate(
                 typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FooConsumer),
-                (state, r, scope) => r.Resolver.SingletonScope.GetOrAdd(91, () => new DryIoc.MefAttributedModel.UnitTests.CUT.FooConsumer(new System.Lazy<DryIoc.MefAttributedModel.UnitTests.CUT.IFooService>(() => (DryIoc.MefAttributedModel.UnitTests.CUT.IFooService)r.Resolver.ResolveKeyed(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IFooService), (object)DryIoc.DefaultKey.Of(1), DryIoc.IfUnresolved.Throw, default(System.Type), r.Resolver.GetOrCreateResolutionScope(ref scope))))));
+                (state, r, scope) => r.Resolver.SingletonScope.GetOrAdd(91, () => new DryIoc.MefAttributedModel.UnitTests.CUT.FooConsumer(new System.Lazy<DryIoc.MefAttributedModel.UnitTests.CUT.IFooService>(() => (DryIoc.MefAttributedModel.UnitTests.CUT.IFooService)r.Resolver.ResolveKeyed(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IFooService), (object)DryIoc.DefaultKey.Of(1), DryIoc.IfUnresolved.Throw, default(System.Type), r.Resolver.GetOrNew(ref scope))))));
 
             DefaultResolutions = DefaultResolutions.AddOrUpdate(
                 typeof(DryIoc.MefAttributedModel.UnitTests.CUT.SingleServiceWithMetadata),
@@ -313,7 +313,7 @@ Unable to resolve dependency DryIoc.MefAttributedModel.UnitTests.CUT.IFooService
 
             DefaultResolutions = DefaultResolutions.AddOrUpdate(
                 typeof(DryIoc.MefAttributedModel.UnitTests.CUT.LazyDep),
-                (state, r, scope) => r.Resolver.ResolveKeyed(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.LazyDep), (object)null, DryIoc.IfUnresolved.Throw, default(System.Type), r.Resolver.GetOrCreateResolutionScope(ref scope)));
+                (state, r, scope) => r.Resolver.ResolveKeyed(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.LazyDep), (object)null, DryIoc.IfUnresolved.Throw, default(System.Type), r.Resolver.GetOrNew(ref scope)));
 
             KeyedResolutions = KeyedResolutions.AddOrUpdate(
                 typeof(DryIoc.MefAttributedModel.UnitTests.CUT.SlowHandler),     HashTree<object, FactoryDelegate>.Empty.AddOrUpdate(
@@ -335,7 +335,7 @@ Please register service, or specify @requiredServiceType while resolving, or add
 
             DefaultResolutions = DefaultResolutions.AddOrUpdate(
                 typeof(DryIoc.MefAttributedModel.UnitTests.CUT.UseLazyEnumerable),
-                (state, r, scope) => r.Resolver.SingletonScope.GetOrAdd(39, () => new DryIoc.MefAttributedModel.UnitTests.CUT.UseLazyEnumerable(new DryIoc.LazyEnumerable<DryIoc.MefAttributedModel.UnitTests.CUT.Me>(r.Resolver.ResolveMany(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Me), null, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Me), null, r.Resolver.GetOrCreateResolutionScope(ref scope)).Cast<DryIoc.MefAttributedModel.UnitTests.CUT.Me>()))));
+                (state, r, scope) => r.Resolver.SingletonScope.GetOrAdd(39, () => new DryIoc.MefAttributedModel.UnitTests.CUT.UseLazyEnumerable(new DryIoc.LazyEnumerable<DryIoc.MefAttributedModel.UnitTests.CUT.Me>(r.Resolver.ResolveMany(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Me), null, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Me), null, r.Resolver.GetOrNew(ref scope)).Cast<DryIoc.MefAttributedModel.UnitTests.CUT.Me>()))));
 
 /* Exception: typeof(ContainerException)
 ----------------------

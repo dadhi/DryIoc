@@ -12,7 +12,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
             get { throw new NotImplementedException(); }
         }
 
-        public IScope GetOrCreateResolutionScope(ref IScope scope)
+        public IScope GetOrNew(ref IScope scope)
         {
             return scope ?? (scope = new Scope());
         }
