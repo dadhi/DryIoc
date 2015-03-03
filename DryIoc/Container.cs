@@ -3745,6 +3745,9 @@ namespace DryIoc
         /// <summary>Resolution scope.</summary>
         public readonly IScope Scope;
 
+        /// <summary>Returns true if request originated from first Resolve call.</summary>
+        public bool IsResolutionRoot { get { return Scope == null; }  }
+
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
         /// <param name="info">Info about service to resolve.</param> <param name="scope">(optional) Resolution scope.</param>
         /// <returns>New request for provided info.</returns>
@@ -3752,11 +3755,13 @@ namespace DryIoc
         public Request Push(IServiceInfo info, IScope scope = null)
         {
             if (IsEmpty)
-                return new Request(this, ContainerWeakRef, info.ThrowIfNull(), null, null, scope);
+                return new Request(this, ContainerWeakRef, info.ThrowIfNull(), null, null, 
+                    scope /* input scope provided only for first request when Resolve called */);
 
             ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info.ThrowIfNull(), this);
             var inheritedInfo = info.InheritInfo(ServiceInfo, ResolvedFactory.Setup.FactoryType != FactoryType.Service);
-            return new Request(this, ContainerWeakRef, inheritedInfo, null, FuncArgs, scope);
+            return new Request(this, ContainerWeakRef, inheritedInfo, null, FuncArgs, 
+                Scope /* then scope is copied into dependency requests */);
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls Push.</summary>
@@ -3771,7 +3776,7 @@ namespace DryIoc
             IScope scope = null)
         {
             var details = ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
-            return Push(DryIoc.ServiceInfo.Of(serviceType).WithDetails(details, this), scope);
+            return Push(DryIoc.ServiceInfo.Of(serviceType).WithDetails(details, this), scope ?? Scope);
         }
 
         /// <summary>Allow to switch current service info to new one: for instance it is used be decorators.</summary>
@@ -5416,16 +5421,16 @@ namespace DryIoc
         /// <summary>Returns current scope, or current scope parent matched by name, 
         /// or throws exception if no current scope is available.</summary>
         /// <param name="scope">Current scope to start match from.</param>
-        /// <param name="nameToMatch">Name to match with current scopes stack names.</param>
+        /// <param name="name">Name to match with current scopes stack names.</param>
         /// <returns>Current scope or its ancestor.</returns>
         /// <exception cref="ContainerException"> with code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/>.</exception>
-        public static IScope GetMatchingScope(IScope scope, object nameToMatch)
+        public static IScope GetMatchingScope(IScope scope, object name)
         {
-            if (nameToMatch == null)
+            if (name == null)
                 return scope;
-            while (scope != null && !nameToMatch.Equals(scope.Name))
+            while (scope != null && !name.Equals(scope.Name))
                 scope = scope.Parent;
-            return scope.ThrowIfNull(Error.NO_MATCHED_SCOPE_FOUND, nameToMatch);
+            return scope.ThrowIfNull(Error.NO_MATCHED_SCOPE_FOUND, name);
         }
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
@@ -5449,12 +5454,12 @@ namespace DryIoc
 
         /// <summary>Creates new resolution scope reuse with specified type and key.</summary>
         /// <param name="assignableFromServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
-        /// <param name="fathest">(optional)</param>
-        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null, bool fathest = false)
+        /// <param name="topmost">(optional)</param>
+        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null, bool topmost = false)
         {
             _assignableFromServiceType = assignableFromServiceType;
             _serviceKey = serviceKey;
-            _fathest = fathest;
+            _topmost = topmost;
         }
 
         /// <summary>Creates or returns already created resolution root scope.</summary>
@@ -5462,8 +5467,8 @@ namespace DryIoc
         /// <returns>Created or existing scope.</returns>
         public IScope GetScope(Request request)
         {
-            var scope = request.Scope ?? new Scope(); // TODO review
-            return GetMatchingScope(scope, _assignableFromServiceType, _serviceKey, _fathest);
+            return request.Scope == null ? null 
+                : GetMatchingScope(request.Scope,  _assignableFromServiceType, _serviceKey, _topmost);
         }
 
         /// <summary>Returns <see cref="GetMatchingScope"/> method call expression.</summary>
@@ -5475,7 +5480,7 @@ namespace DryIoc
                 Container.GetCallGetOrNewExpression(request),
                 Expression.Constant(_assignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(_serviceKey, typeof(object)),
-                Expression.Constant(_fathest, typeof(bool)));
+                Expression.Constant(_topmost, typeof(bool)));
         }
 
         /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
@@ -5486,9 +5491,9 @@ namespace DryIoc
         /// Key equal to <paramref name="serviceKey"/>.</summary>
         /// <param name="scope">Scope to start matching with Type and Key specified.</param>
         /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
-        /// <param name="farthest">If true - commands to look for farthest match instead of nearest.</param>
+        /// <param name="topmost">If true - commands to look for topmost match instead of nearest.</param>
         /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
-        public static IScope GetMatchingScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool farthest)
+        public static IScope GetMatchingScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool topmost)
         {
             if (assignableFromServiceType == null && serviceKey == null)
                 return scope;
@@ -5502,7 +5507,7 @@ namespace DryIoc
                     (serviceKey == null || serviceKey.Equals(name.Value)))
                 {
                     matchedScope = scope;
-                    if (!farthest) // break on first found match.
+                    if (!topmost) // break on first found match.
                         break;
                 }
                 scope = scope.Parent;
@@ -5515,7 +5520,7 @@ namespace DryIoc
 
         private readonly Type _assignableFromServiceType;
         private readonly object _serviceKey;
-        private readonly bool _fathest;
+        private readonly bool _topmost;
     }
 
     /// <summary>Specifies pre-defined reuse behaviors supported by container: 
@@ -5547,25 +5552,23 @@ namespace DryIoc
         /// in existing resolution scope hierarchy. If parameters are not specified or null, then <see cref="InResolutionScope"/> will be returned.</summary>
         /// <param name="assignableFromServiceType">(optional) To search for scope with service type assignable to type specified in parameter.</param>
         /// <param name="serviceKey">(optional) Search for specified key.</param>
-        /// <param name="farthest">If true - commands to look for farthest match instead of nearest.</param>
-        /// <param name="rootScopeAsLastResort">If true and no match found - commands to use root scope.</param>
+        /// <param name="topmost">If true - commands to look for topmost match instead of nearest.</param>
         /// <returns>New reuse with specified parameters or <see cref="InResolutionScope"/> if nothing specified.</returns>
-        public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null, 
-            bool farthest = false, bool rootScopeAsLastResort = false)
+        public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null, bool topmost = false)
         {
             return assignableFromServiceType == null && serviceKey == null ? InResolutionScope
-                : new ResolutionScopeReuse(assignableFromServiceType, serviceKey, farthest);
+                : new ResolutionScopeReuse(assignableFromServiceType, serviceKey, topmost);
         }
 
         /// <summary>Creates reuse to search for <typeparamref name="TAssignableFromServiceType"/> and <paramref name="serviceKey"/>
         /// in existing resolution scope hierarchy.</summary>
         /// <typeparam name="TAssignableFromServiceType">To search for scope with service type assignable to type specified in parameter.</typeparam>
         /// <param name="serviceKey">(optional) Search for specified key.</param>
-        /// <param name="farthest">If true - commands to look for farthest match instead of nearest.</param>
+        /// <param name="topmost">If true - commands to look for topmost match instead of nearest.</param>
         /// <returns>New reuse with specified parameters.</returns>
-        public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null, bool farthest = false)
+        public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null, bool topmost = false)
         {
-            return InResolutionScopeOf(typeof(TAssignableFromServiceType), serviceKey, farthest);
+            return InResolutionScopeOf(typeof(TAssignableFromServiceType), serviceKey, topmost);
         }
 
         /// <summary>Ensuring single service instance per Thread.</summary>
