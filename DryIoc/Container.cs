@@ -770,7 +770,8 @@ namespace DryIoc
                 {
                     var decorator = serviceDecorators[i];
                     var decoratorRequest = request.ResolveWithFactory(decorator);
-                    if (decorator.Setup.Condition(request))
+                    var decoratorCondition = decorator.Setup.Condition;
+                    if (decoratorCondition == null || decoratorCondition(request))
                     {
                         // Cache closed generic registration produced by open-generic decorator.
                         if (i >= openGenericDecoratorIndex && decorator.Provider != null)
@@ -928,7 +929,8 @@ namespace DryIoc
                     for (var j = 0; j < initializerFactories.Length; j++)
                     {
                         var initializerFactory = initializerFactories[j];
-                        if (initializerFactory.Setup.Condition(request))
+                        var condition = initializerFactory.Setup.Condition;
+                        if (condition == null || condition(request))
                         {
                             var decoratorRequest =
                                 request.UpdateServiceInfo(_ => ServiceInfo.Of(initializerActionType))
@@ -950,7 +952,8 @@ namespace DryIoc
                 {
                     var decoratorFactory = funcDecoratorFactories[i];
                     var decoratorRequest = request.UpdateServiceInfo(_ => ServiceInfo.Of(decoratorFuncType)).ResolveWithFactory(decoratorFactory);
-                    if (decoratorFactory.Setup.Condition(request))
+                    var condition = decoratorFactory.Setup.Condition;
+                    if (condition == null || condition(request))
                     {
                         var funcExpr = decoratorFactory.GetExpressionOrDefault(decoratorRequest);
                         if (funcExpr != null)
@@ -2162,7 +2165,8 @@ namespace DryIoc
             if (serviceFactory == null)
                 return null;
 
-            var reuse = request.Container.Rules.ReuseMapping == null ? serviceFactory.Reuse
+            var reuse = request.Container.Rules.ReuseMapping == null 
+                ? serviceFactory.Reuse
                 : request.Container.Rules.ReuseMapping(serviceFactory.Reuse, serviceRequest);
 
             if (reuse != null && serviceFactory.Setup.ReuseWrappers.IndexOf(wrapperType) != -1)
@@ -2490,16 +2494,16 @@ namespace DryIoc
                         var serviceKey = default(object);
                         var ifUnresolved = IfUnresolved.Throw;
 
-                        var settings = arg.Arguments;
-                        for (var j = 0; j < settings.Count; j++)
+                        var argExpr = arg.Arguments;
+                        for (var j = 0; j < argExpr.Count; j++)
                         {
-                            var setting = settings[j] as ConstantExpression;
-                            if (setting != null)
+                            var argValueExpr = GetArgConstantExpressionOrDefault(argExpr[j]);
+                            if (argValueExpr != null)
                             {
-                                if (setting.Type == typeof(IfUnresolved))
-                                    ifUnresolved = (IfUnresolved)setting.Value;
+                                if (argValueExpr.Type == typeof(IfUnresolved))
+                                    ifUnresolved = (IfUnresolved)argValueExpr.Value;
                                 else // service key
-                                    serviceKey = setting.Value;
+                                    serviceKey = argValueExpr.Value;
                             }
                         }
 
@@ -2508,7 +2512,18 @@ namespace DryIoc
                 }
             }
 
-            return new CreationInfo<T>(_ => DryIoc.FactoryMethodInfo.Of(methodOrCtor), parameters, propertiesAndFields);
+            return new CreationInfo<T>(_ => FactoryMethodInfo.Of(methodOrCtor), parameters, propertiesAndFields);
+        }
+
+        private static ConstantExpression GetArgConstantExpressionOrDefault(Expression arg)
+        {
+            var valueExpr = arg as ConstantExpression;
+            if (valueExpr != null) 
+                return valueExpr;
+            var convert = arg as UnaryExpression;
+            if (convert != null && convert.NodeType == ExpressionType.Convert)
+                valueExpr = convert.Operand as ConstantExpression;
+            return valueExpr;
         }
 
         /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
@@ -2575,7 +2590,7 @@ namespace DryIoc
 
         public static T Of<T>(object serviceKey) { return default(T); }
 
-        public static T Of<T>(object serviceKey, IfUnresolved ifUnresolved) { return default(T); }
+        public static T Of<T>(IfUnresolved ifUnresolved, object serviceKey) { return default(T); }
     }
 
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
@@ -3900,7 +3915,7 @@ namespace DryIoc
         public virtual object Metadata { get { return null; } }
 
         /// <summary>Predicate to check if factory could be used for resolved request.</summary>
-        public virtual Func<Request, bool> Condition { get { return null; } }
+        public virtual Func<Request, bool> Condition { get; private set; }
 
         /// <summary>Indicates that injected expression should be: 
         /// <code lang="cs"><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></code>
@@ -3910,6 +3925,15 @@ namespace DryIoc
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
         /// or disable disposing with <see cref="ReuseHiddenDisposable"/>, etc.</summary>
         public virtual Type[] ReuseWrappers { get { return null; } }
+
+        public Setup WithCondition(Func<Request, bool> condition)
+        {
+            condition.ThrowIfNull();
+            var oldCondition = Condition;
+            var setup = (Setup)MemberwiseClone();
+            setup.Condition = oldCondition == null ? condition : (r => oldCondition(r) && condition(r));
+            return setup;
+        }
 
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
@@ -3967,8 +3991,6 @@ namespace DryIoc
 
             public override object Metadata { get { return _metadata ?? (_metadata = _lazyMetadata == null ? null : _lazyMetadata()); }}
 
-            public override Func<Request, bool> Condition { get { return _condition; } }
-
             public override bool OpenResolutionScope { get { return _openResolutionScope; } }
 
             public override Type[] ReuseWrappers { get { return _reuseWrappers; } }
@@ -3981,7 +4003,7 @@ namespace DryIoc
                 _cacheFactoryExpression = cacheFactoryExpression;
                 _lazyMetadata = lazyMetadata;
                 _metadata = metadata;
-                _condition = condition;
+                Condition = condition;
                 _openResolutionScope = openResolutionScope;
                 _reuseWrappers = reuseWrappers;
             }
@@ -3989,7 +4011,6 @@ namespace DryIoc
             private readonly bool _cacheFactoryExpression;
             private readonly Func<object> _lazyMetadata;
             private object _metadata;
-            private readonly Func<Request, bool> _condition;
             private readonly bool _openResolutionScope;
             private readonly Type[] _reuseWrappers;
         }
@@ -4026,13 +4047,9 @@ namespace DryIoc
         {
             public override FactoryType FactoryType { get { return FactoryType.Decorator; } }
 
-            public override Func<Request, bool> Condition { get { return _condition; } }
-
-            private readonly Func<Request, bool> _condition;
-
             public DecoratorSetup(Func<Request, bool> condition = null)
             {
-                _condition = condition ?? (_ => true);
+                Condition = condition;
             }
         }
     }
@@ -4096,6 +4113,16 @@ namespace DryIoc
             FactoryID = Interlocked.Increment(ref _lastFactoryID);
             Reuse = reuse;
             Setup = setup ?? Setup.Default;
+
+            if (reuse != null)
+                Setup = Setup.WithCondition(HasMatchingResolutionScope);
+        }
+
+        private bool HasMatchingResolutionScope(Request request)
+        {
+            var reuseMappingRule = request.Container.Rules.ReuseMapping;
+            var reuse = reuseMappingRule == null ? Reuse : reuseMappingRule(Reuse, request);
+            return !(reuse is ResolutionScopeReuse) || reuse.GetScopeOrDefault(request) != null;
         }
 
         /// <summary>Validates that factory is OK for registered service type.</summary>
@@ -4387,7 +4414,7 @@ namespace DryIoc
         private static Expression ResolveParameter(ParameterInfo p, ReflectionFactory factory, Request request)
         {
             var container = request.Container;
-            var getParamInfo = container.Rules.Parameters.OverrideWith(factory.Rules.Parameters);
+            var getParamInfo = container.Rules.Parameters.OverrideWith(factory.CreationInfo.Parameters);
             var paramInfo = getParamInfo(p, request) ?? ParameterServiceInfo.Of(p);
             var paramRequest = request.Push(paramInfo.WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
             var paramFactory = container.ResolveFactory(paramRequest);
@@ -4630,18 +4657,18 @@ namespace DryIoc
         public override IConcreteFactoryProvider Provider { get { return _provider; } }
 
         /// <summary>Injection rules set for Constructor, Parameters, Properties and Fields.</summary>
-        public readonly CreationInfo Rules;
+        public readonly CreationInfo CreationInfo;
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">Non-abstract close or open generic type.</param>
-        /// <param name="reuse">(optional)</param> <param name="rules">(optional)</param> <param name="setup">(optional)</param>
-        public ReflectionFactory(Type implementationType, IReuse reuse = null, CreationInfo rules = null, Setup setup = null)
+        /// <param name="reuse">(optional)</param> <param name="creationInfo">(optional)</param> <param name="setup">(optional)</param>
+        public ReflectionFactory(Type implementationType, IReuse reuse = null, CreationInfo creationInfo = null, Setup setup = null)
             : base(reuse, setup)
         {
             _implementationType = implementationType;
-            Rules = rules ?? CreationInfo.Default;
+            CreationInfo = creationInfo ?? CreationInfo.Default;
 
-            if (Rules.FactoryMethod == null)
+            if (CreationInfo.FactoryMethod == null)
                 implementationType.ThrowIf(implementationType.IsAbstract(), Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE);
 
             if (implementationType != null && implementationType.IsGenericDefinition())
@@ -4702,7 +4729,7 @@ namespace DryIoc
                     Throw.Error(Error.REG_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, implType, serviceType);
             }
 
-            if (container.Rules.FactoryMethod == null && Rules.FactoryMethod == null)
+            if (container.Rules.FactoryMethod == null && CreationInfo.FactoryMethod == null)
             {
                 var publicCtorCount = implType.GetAllConstructors().Count();
                 Throw.If(publicCtorCount != 1, Error.NO_CTOR_SELECTOR_FOR_IMPL_WITH_MULTIPLE_CTORS, implType, publicCtorCount);
@@ -4735,7 +4762,7 @@ namespace DryIoc
             {
                 paramExprs = new Expression[parameters.Length];
 
-                var getParamInfo = request.Container.Rules.Parameters.OverrideWith(Rules.Parameters);
+                var getParamInfo = request.Container.Rules.Parameters.OverrideWith(CreationInfo.Parameters);
 
                 var funcArgs = request.FuncArgs;
                 var funcArgsUsedMask = 0;
@@ -4833,7 +4860,7 @@ namespace DryIoc
                        Error.NO_MATCHED_GENERIC_PARAM_CONSTRAINTS, implType, request);
                 }
 
-                var factory = new ReflectionFactory(closedImplType, _factory.Reuse, _factory.Rules, _factory.Setup);
+                var factory = new ReflectionFactory(closedImplType, _factory.Reuse, _factory.CreationInfo, _factory.Setup);
                 _providedFactories.Swap(_ => _.AddOrUpdate(factory.FactoryID,
                     new KV<Type, object>(serviceType, request.ServiceKey)));
                 return factory;
@@ -4848,7 +4875,7 @@ namespace DryIoc
         private FactoryMethodInfo GetFactoryMethod(Request request)
         {
             var implType = _implementationType;
-            var getMethodOrNull = Rules.FactoryMethod ?? request.Container.Rules.FactoryMethod;
+            var getMethodOrNull = CreationInfo.FactoryMethod ?? request.Container.Rules.FactoryMethod;
             if (getMethodOrNull != null)
             {
                 var method = getMethodOrNull(request);
@@ -4875,7 +4902,7 @@ namespace DryIoc
 
         private Expression SetPropertiesAndFields(NewExpression newServiceExpr, Request request)
         {
-            var getMemberInfos = request.Container.Rules.PropertiesAndFields.OverrideWith(Rules.PropertiesAndFields);
+            var getMemberInfos = request.Container.Rules.PropertiesAndFields.OverrideWith(CreationInfo.PropertiesAndFields);
             var memberInfos = getMemberInfos(request);
             if (memberInfos == null)
                 return newServiceExpr;

@@ -96,7 +96,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<AccountUser>());
 
-            Assert.AreEqual(ex.Error, Error.NO_MATCHED_SCOPE_FOUND);
+            Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
         }
 
         [Test]
@@ -190,7 +190,7 @@ namespace DryIoc.UnitTests
             Assert.IsNull(vm.Log);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_specify_to_resolve_corresponding_log_in_resolution_scope_automagically_Without_condition()
         {
             var container = new Container();
