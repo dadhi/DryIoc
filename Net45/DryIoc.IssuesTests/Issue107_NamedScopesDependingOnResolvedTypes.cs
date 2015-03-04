@@ -182,7 +182,7 @@ namespace DryIoc.IssuesTests
 
         internal enum Areas { First, Second }
 
-        [Test, Ignore]
+        [Test]
         public void Can_reuse_and_locate_based_on_object_graph_itself()
         {
             var container = new Container();
@@ -200,16 +200,20 @@ namespace DryIoc.IssuesTests
                 setup: Setup.With(openResolutionScope: true));
 
             container.Register<IDatabase, Database>(
-                Reuse.InResolutionScopeOf<IArea>());
+                Reuse.InResolutionScopeOf<IArea>(),
+                setup: Setup.With(openResolutionScope: true));
 
             container.Register<ITwoVariants, FirstVariant>(
-                Reuse.InResolutionScopeOf<IArea>(Areas.First));
+                Reuse.InResolutionScopeOf<IArea>(Areas.First),
+                setup: Setup.With(openResolutionScope: true));
             
             container.Register<ITwoVariants, SecondVariant>(
-                Reuse.InResolutionScopeOf<IArea>(Areas.Second));
+                Reuse.InResolutionScopeOf<IArea>(Areas.Second),
+                setup: Setup.With(openResolutionScope: true));
 
             container.Register<IViewModelPresenter, ViewModelPresenter>(
-                Reuse.InResolutionScopeOf<IMainViewModel>());
+                Reuse.InResolutionScopeOf<IMainViewModel>(),
+                setup: Setup.With(openResolutionScope: true));
 
             container.Register<IChildViewModelSimple, ChildViewModelSimple>();
 

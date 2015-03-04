@@ -579,7 +579,8 @@ namespace DryIoc
             var resultService = factoryDelegate(request.Container.ResolutionStateCache, _containerWeakRef, scope);
 
             // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
-            if (factory.Setup.CacheFactoryExpression)
+            if (factory.Setup.CacheFactoryExpression &&
+                scope == null/* cache only resolution root delegate: not null scope is indication of nested Resolve */)
                 _keyedFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(cacheKey, factoryDelegate));
 
             return resultService;
@@ -639,7 +640,8 @@ namespace DryIoc
 
             var resultService = factoryDelegate(_resolutionStateCache.Value, _containerWeakRef, scope);
 
-            if (factory.Setup.CacheFactoryExpression)
+            if (factory.Setup.CacheFactoryExpression && 
+                scope == null /* cache only resolution root delegate: not null scope is indication of nested Resolve */)
                 _defaultFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
 
             return resultService;
@@ -3907,15 +3909,15 @@ namespace DryIoc
         /// <see cref="ServiceSetup"/>, <see cref="DecoratorSetup"/>, <see cref="WrapperSetup"/>.</summary>
         public abstract FactoryType FactoryType { get; }
 
+        /// <summary>Predicate to check if factory could be used for resolved request.</summary>
+        public virtual Func<Request, bool> Condition { get; private set; }
+
         /// <summary>Set to true allows to cache and use cached factored service expression.</summary>
         public virtual bool CacheFactoryExpression { get { return false; } }
 
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
-
-        /// <summary>Predicate to check if factory could be used for resolved request.</summary>
-        public virtual Func<Request, bool> Condition { get; private set; }
-
+        
         /// <summary>Indicates that injected expression should be: 
         /// <code lang="cs"><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></code>
         /// instead of: <code lang="cs"><![CDATA[new Dependency(...)]]></code>.</summary>
