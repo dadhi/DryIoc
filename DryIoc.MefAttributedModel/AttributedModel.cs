@@ -167,10 +167,10 @@ namespace DryIoc.MefAttributedModel
         {
             var implementationType = request.ImplementationType;
             var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
-            return constructors.Length == 1 
-                ? constructors[0]
+            var constructor = constructors.Length == 1 ? constructors[0]
                 : constructors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
                     .ThrowIfNull(Error.NO_SINGLE_CTOR_WITH_IMPORTING_ATTR, implementationType);
+            return FactoryMethodInfo.Of(constructor);
         }
 
         private static ParameterServiceInfo GetImportedParameter(ParameterInfo parameter, Request request)
@@ -251,8 +251,7 @@ namespace DryIoc.MefAttributedModel
                     : CreationInfo.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
                 registry.Register(serviceType, implementationType,
-                    reuse, creationInfo, Setup.With(metadata: import.Metadata),
-                    serviceKey, IfAlreadyRegistered.Keep);
+                    reuse, creationInfo, Setup.With(metadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
             }
 
             return ServiceInfoDetails.Of(serviceType, serviceKey);
