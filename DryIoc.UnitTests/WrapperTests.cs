@@ -34,8 +34,8 @@ namespace DryIoc.UnitTests
         public void Given_the_same_type_service_and_wrapper_registered_When_resolved_Then_service_will_preferred_over_wrapper()
         {
             var container = new Container();
-            container.Register<Lazy<IService>>(
-                withConstructor: t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) }));
+            container.Register<Lazy<IService>>(with: CreationInfo.Of(
+                t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) })));
             container.Register<IService, Service>();
 
             var service = container.Resolve<Lazy<IService>>();
@@ -47,8 +47,8 @@ namespace DryIoc.UnitTests
         public void Given_the_same_type_service_and_wrapper_registered_Wrapper_will_be_used_to_for_names_other_than_one_with_registered_service()
         {
             var container = new Container();
-            container.Register<Lazy<IService>>(
-                withConstructor: t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) }));
+            container.Register<Lazy<IService>>(with: CreationInfo.Of(
+                t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()) })));
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(serviceKey: "named");
 
@@ -87,7 +87,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(WeakReference), 
-                withConstructor: t => t.GetConstructorOrNull(args: typeof(object)),
+                with: CreationInfo.Of(t => t.GetConstructorOrNull(args: typeof(object))),
                 setup: Setup.WrapperWith(_ => typeof(object)));
 
             container.Register<Service>();

@@ -27,8 +27,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(Bla<>),
-                withConstructor: t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()[0]) }));
+            container.Register(typeof(Bla<>), with: CreationInfo.Of(
+                t => t.GetConstructorOrNull(args: new[] { typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()[0]) })));
 
             container.Register(typeof(SomeService), typeof(SomeService));
 

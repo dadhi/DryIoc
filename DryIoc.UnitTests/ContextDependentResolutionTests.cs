@@ -21,7 +21,7 @@ namespace DryIoc.UnitTests
             c.Register<User1>();
             c.Register<User2>();
 
-            c.Register<ILogger>(with: CreationInfo.Of(r => FactoryMethod.Of(
+            c.Register<ILogger>(with: CreationInfo.Of(r => FactoryMethodInfo.Of(
                 typeof(LofFactory).GetDeclaredMethodOrNull("GetLog")
                 .MakeGenericMethod(r.GetNonWrapperParentOrEmpty().ImplementationType))),
                 setup: Setup.With(cacheFactoryExpression: false));

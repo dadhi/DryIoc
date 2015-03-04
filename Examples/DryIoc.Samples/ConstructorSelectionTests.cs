@@ -12,7 +12,7 @@ namespace DryIoc.Samples
             container.Register<IService, SomeService>();
 
             container.Register<ClassWithMultipleConstructors>(
-                withConstructor: t => t.GetConstructor(new[] { typeof(IService) }));
+                with: CreationInfo.Of(t => t.GetConstructor(new[] { typeof(IService) })));
 
             var service = container.Resolve<ClassWithMultipleConstructors>();
             Assert.That(service, Is.Not.Null);
@@ -33,7 +33,7 @@ namespace DryIoc.Samples
             var container = new Container();
             container.Register<IService, SomeService>();
 
-            container.Register<ClassWithInternalConstructor>(withConstructor: t => t.GetSingleConstructorOrNull(true));
+            container.Register<ClassWithInternalConstructor>(with: CreationInfo.Of(t => t.GetSingleConstructorOrNull(true)));
 
             var obj = container.Resolve<ClassWithInternalConstructor>();
             Assert.IsNotNull(obj);

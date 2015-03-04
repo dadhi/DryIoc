@@ -15,9 +15,9 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(serviceKey: "another");
-            container.Register<ClientWithAssignedProperty>(with: CreationInfo.Of(
-                FactoryMethod.Of(() => ClientWithAssignedProperty.Create(default(IService))),
-                propsAndFields: PropertiesAndFields.Of.The<ClientWithAssignedProperty>(c => c.Prop, serviceKey: "another")));
+            container.Register2(with: CreationInfo.Of(
+                () => ClientWithAssignedProperty.Create(default(IService)), 
+                PropertiesAndFields.Of.The<ClientWithAssignedProperty>(c => c.Prop, serviceKey: "another")));
 
             var client = container.Resolve<ClientWithAssignedProperty>();
 

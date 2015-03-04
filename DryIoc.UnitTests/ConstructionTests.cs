@@ -10,7 +10,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<SomeService>(with: CreationInfo.Of(
-                r => FactoryMethod.Of(r.ImplementationType.GetDeclaredMethodOrNull("Create"))));
+                r => FactoryMethodInfo.Of(r.ImplementationType.GetDeclaredMethodOrNull("Create"))));
 
             var service = container.Resolve<SomeService>();
 
@@ -32,7 +32,7 @@ namespace DryIoc.UnitTests
         public void Can_use_any_type_static_method_for_service_creation_Refactoring_friendly()
         {
             var container = new Container();
-            container.Register<IService>(with: FactoryMethod.Of(() => ServiceFactory.CreateService()));
+            container.Register<IService>(with: CreationInfo.Of(() => ServiceFactory.CreateService()));
 
             var service = container.Resolve<IService>();
 
@@ -44,7 +44,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ServiceFactory>();
-            container.Register<IService>(with: FactoryMethod.Of(
+            container.Register<IService>(with: FactoryMethodInfo.Of(
                 typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), 
                 ServiceInfo.Of<ServiceFactory>()));
 
@@ -59,7 +59,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ServiceFactory>();
             container.RegisterInstance("parameter");
-            container.Register<IService>(with: FactoryMethod.Of(
+            container.Register<IService>(with: FactoryMethodInfo.Of(
                 typeof(ServiceFactory).GetDeclaredMethodOrNull("Create", typeof(string)), 
                 ServiceInfo.Of<ServiceFactory>()));
 
@@ -122,7 +122,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<IService, SomeService>(with: FactoryMethod.Of(
+            container.Register<IService, SomeService>(with: FactoryMethodInfo.Of(
                 typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), 
                 ServiceInfo.Of<ServiceFactory>()));
 
@@ -150,7 +150,7 @@ namespace DryIoc.UnitTests
         public void Should_return_null_if_instance_factory_is_not_resolved_on_TryResolve()
         {
             var container = new Container();
-            container.Register<IService>(with: FactoryMethod.Of(
+            container.Register<IService>(with: FactoryMethodInfo.Of(
                 typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), 
                 ServiceInfo.Of<ServiceFactory>()));
 

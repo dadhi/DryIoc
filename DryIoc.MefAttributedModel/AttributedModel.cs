@@ -163,7 +163,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static FactoryMethod GetImportingConstructor(Request request)
+        private static FactoryMethodInfo GetImportingConstructor(Request request)
         {
             var implementationType = request.ImplementationType;
             var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
@@ -247,11 +247,11 @@ namespace DryIoc.MefAttributedModel
                 var reuseName = reuseAttr == null ? null : reuseAttr.ReuseName;
                 var reuse = GetReuse(reuseType, reuseName);
 
-                var withConstructor = import.ConstructorSignature == null ? null
-                    : (Func<Type, ConstructorInfo>)(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
+                var creationInfo = import.ConstructorSignature == null ? null
+                    : CreationInfo.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
                 registry.Register(serviceType, implementationType,
-                    reuse, withConstructor, null, Setup.With(metadata: import.Metadata),
+                    reuse, creationInfo, Setup.With(metadata: import.Metadata),
                     serviceKey, IfAlreadyRegistered.Keep);
             }
 
@@ -447,7 +447,7 @@ namespace DryIoc.MefAttributedModel
                 var factoryMethod = method;
                 var factoryExport = factoryInfo.Exports[0];
                 var factoryServiceInfo = ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
-                var creationInfo = CreationInfo.Of(_ => FactoryMethod.Of(factoryMethod, factoryServiceInfo));
+                var creationInfo = CreationInfo.Of(_ => FactoryMethodInfo.Of(factoryMethod, factoryServiceInfo));
                 var factory = serviceInfo.CreateFactory(creationInfo);
 
                 var serviceExports = serviceInfo.Exports;
