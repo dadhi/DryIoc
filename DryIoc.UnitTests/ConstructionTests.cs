@@ -100,22 +100,22 @@ namespace DryIoc.UnitTests
             Assert.That(service.Message, Is.EqualTo("parameter"));
         }
 
-        //[Test]
-        //public void Can_get_factory_registered_with_key_and_specify_factory_method_parameter_with_key()
-        //{
-        //    var container = new Container();
+        [Test]
+        public void Can_get_factory_registered_with_key_and_specify_factory_method_parameter_with_key()
+        {
+            var container = new Container();
 
-        //    container.Register<ServiceFactory>(serviceKey: "factory");
-        //    container.RegisterInstance("parameter", serviceKey: "p");
+            container.Register<ServiceFactory>(serviceKey: "factory");
+            container.RegisterInstance("XXX", serviceKey: "myKey");
 
-        //    container.Register<IService>(with: CreationInfo.Of(
-        //        r => ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"),
-        //        r => f => f.Create(Arg.Of<string>("p"))));
+            container.Register<IService>(with: CreationInfo.Of(
+                ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"),
+                f => f.Create(Arg.Of<string>("myKey"))));
 
-        //    var service = container.Resolve<IService>();
+            var service = container.Resolve<IService>();
 
-        //    Assert.That(service.Message, Is.EqualTo("parameter"));
-        //}
+            Assert.That(service.Message, Is.EqualTo("XXX"));
+        }
 
         [Test]
         public void Should_throw_if_instance_factory_unresolved()

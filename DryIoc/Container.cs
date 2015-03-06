@@ -158,9 +158,9 @@ namespace DryIoc
         /// <summary>Provide root scope name for <see cref="OpenScopeWithoutContext"/></summary>
         public static readonly object NO_CONTEXT_ROOT_SCOPE_NAME = typeof(IContainer);
 
-        /// <summary>Creates child container using the same rules as its created from.
-        /// Additionally child container will fallback for not registered service to it parent.</summary>
-        /// <param name="shareSingletons">If set allow to share singletons from parent container.</param>
+        /// <summary>Creates child container using the rules from this container (parent).
+        /// Additionally child container will fallback for not registered service to its parent.</summary>
+        /// <param name="shareSingletons">If set allows to share singletons from parent container.</param>
         /// <returns>New child container.</returns>
         public IContainer CreateChildContainer(bool shareSingletons = false)
         {
@@ -263,8 +263,9 @@ namespace DryIoc
         internal static MethodCallExpression GetCallGetOrNewExpression(Request request)
         {
             var parent = request.Enumerate().Last();
-            var parentServiceTypeExpr = Expression.Constant(parent.ServiceType, typeof(Type));
-            var parentServiceKeyExpr = request.Container.GetOrAddStateItemExpression(parent.ServiceKey, typeof(object));
+            var registeredServiceType = request.Container.UnwrapServiceType(parent.RequiredServiceType ?? parent.ServiceType);
+            var parentServiceTypeExpr = request.Container.GetOrAddStateItemExpression(registeredServiceType, typeof(Type));
+            var parentServiceKeyExpr = Expression.Convert(request.Container.GetOrAddStateItemExpression(parent.ServiceKey), typeof(object));
             return Expression.Call(ResolverContextExpr, "GetOrNew", null,
                 ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
@@ -579,8 +580,7 @@ namespace DryIoc
             var resultService = factoryDelegate(request.Container.ResolutionStateCache, _containerWeakRef, scope);
 
             // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
-            if (factory.Setup.CacheFactoryExpression &&
-                scope == null/* cache only resolution root delegate: not null scope is indication of nested Resolve */)
+            if (factory.Setup.CacheFactoryExpression)
                 _keyedFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(cacheKey, factoryDelegate));
 
             return resultService;
@@ -614,10 +614,10 @@ namespace DryIoc
             var serviceFactories = ((IContainer)this).GetAllServiceFactories(registeredServiceType);
 
             if (serviceKey != null) // include only single item matching key.
-                serviceFactories = serviceFactories.Where(kv => serviceKey.Equals(kv.Key));
+                serviceFactories = serviceFactories.Where(f => serviceKey.Equals(f.Key));
 
             if (compositeParentKey != null) // exclude composite parent from items
-                serviceFactories = serviceFactories.Where(kv => !compositeParentKey.Equals(kv.Key));
+                serviceFactories = serviceFactories.Where(f => !compositeParentKey.Equals(f.Key));
 
             foreach (var item in serviceFactories)
             {
@@ -640,8 +640,7 @@ namespace DryIoc
 
             var resultService = factoryDelegate(_resolutionStateCache.Value, _containerWeakRef, scope);
 
-            if (factory.Setup.CacheFactoryExpression && 
-                scope == null /* cache only resolution root delegate: not null scope is indication of nested Resolve */)
+            if (factory.Setup.CacheFactoryExpression)
                 _defaultFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
 
             return resultService;
@@ -888,8 +887,12 @@ namespace DryIoc
         /// <returns>Returns constant or state access expression for added items.</returns>
         public Expression GetOrAddStateItemExpression(object item, Type itemType = null)
         {
-            itemType = itemType ?? (item == null ? typeof(object) : item.GetType());
-            if (item == null || itemType.IsPrimitive() || itemType == typeof(Type))
+            if (item == null)
+                return itemType == null ? Expression.Constant(null) 
+                    : (Expression)Expression.Convert(Expression.Constant(null), itemType);
+
+            itemType = itemType ?? item.GetType();
+            if (itemType.IsPrimitive() || itemType == typeof(Type))
                 return Expression.Constant(item, itemType);
 
             if (item is DefaultKey) // Recreate default key using constant order instead of putting it state.
@@ -1147,8 +1150,9 @@ namespace DryIoc
             if (serviceKey != null)
             {
                 factory = factories.GetValueOrDefault(serviceKey);
-                return factory != null && factory.Setup.Condition != null && !factory.Setup.Condition(request) ? null
-                    : factory;
+                return factory != null && 
+                    factory.Setup.Condition != null && !factory.Setup.Condition(request) 
+                    ? null : factory;
             }
 
             var defaultFactories = factories.Enumerate()
@@ -1157,9 +1161,13 @@ namespace DryIoc
                     .ToArray();
 
             if (defaultFactories.Length != 0)
+            {
+                // TODO: Set request service key to specific DefaultKey.
+                
                 return defaultFactories.Length == 1
                     ? defaultFactories[0].Value
                     : Throw.Instead<Factory>(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
+            }
 
             return null;
         }
@@ -2417,7 +2425,7 @@ namespace DryIoc
                 : new CreationInfo(factoryMethod, parameters, propertiesAndFields);
         }
 
-        /// <summary>Sets rule how to select constructor with simplified signature without <see cref="Request"/> 
+        /// <summary>Defines how to select constructor with simplified signature without <see cref="Request"/> 
         /// and <see cref="IContainer"/> parameters.</summary>
         /// <param name="getConstructor">Rule delegate taking implementation type as input and returning selected constructor info.</param>
         /// <param name="parameters">(optional)</param> 
@@ -2429,27 +2437,27 @@ namespace DryIoc
             return Of(r => FactoryMethodInfo.Of(getConstructor(r.ImplementationType)), parameters, propertiesAndFields);
         }
 
-        /// <summary>Creates factory method using refactoring friendly instance method call expression (without string method name).
+        /// <summary>Builds creation info from factory method call expression (without using strings).
         /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
         /// <typeparam name="TFactory">Factory type.</typeparam> <typeparam name="TService">Factory product type.</typeparam>
-        /// <param name="factoryInfo">Returns or resolves factory instance.</param> <param name="factoryCallExpression">Get a method call expression.</param>
-        /// <param name="propertiesAndFields"></param>
-        /// <returns>New factory method wrapper.</returns>
+        /// <param name="factoryInfo">Returns or resolves factory instance.</param> <param name="factoryCallExpr">Get a method call expression.</param>
+        /// <param name="propertiesAndFields">(optional) Properties and fields selector.</param> <returns>New creation info.</returns>
         public static CreationInfo Of<TFactory, TService>(
-            ServiceInfo<TFactory> factoryInfo,
-            Expression<Func<TFactory, TService>> factoryCallExpression,
+            ServiceInfo<TFactory> factoryInfo, Expression<Func<TFactory, TService>> factoryCallExpr,
             PropertiesAndFieldsSelector propertiesAndFields = null)
             where TFactory : class
         {
-            factoryInfo.ThrowIfNull();
-            var factoryMethod = ExpressionTools.GetCalledMethodOrNull(factoryCallExpression).ThrowIfNull();
-            return Of(r => DryIoc.FactoryMethodInfo.Of(factoryMethod, factoryInfo), 
-                propertiesAndFields: propertiesAndFields);
+            return Of<TService>(factoryCallExpr, factoryInfo.ThrowIfNull(), propertiesAndFields);
         }
 
-        public static CreationInfo<T> Of<T>(
-            Expression<Func<T>> methodOrCtorCallExpr,
+        public static CreationInfo<TService> Of<TService>(Expression<Func<TService>> methodOrCtorCallExpr, 
             PropertiesAndFieldsSelector propertiesAndFields = null)
+        {
+            return Of<TService>((LambdaExpression)methodOrCtorCallExpr, propertiesAndFields: propertiesAndFields);
+        }
+
+        private static CreationInfo<T> Of<T>(LambdaExpression methodOrCtorCallExpr, 
+            ServiceInfo factoryInfo = null, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             MethodBase methodOrCtor;
             IList<Expression> argExprs;
@@ -2507,7 +2515,7 @@ namespace DryIoc
                 }
             }
 
-            return new CreationInfo<T>(_ => FactoryMethodInfo.Of(methodOrCtor), parameters, propertiesAndFields);
+            return new CreationInfo<T>(_ => FactoryMethodInfo.Of(methodOrCtor, factoryInfo), parameters, propertiesAndFields);
         }
 
         private static ConstantExpression GetArgConstantExpressionOrDefault(Expression arg)
@@ -3165,10 +3173,10 @@ namespace DryIoc
         internal static Expression CreateResolutionExpression(Request request, Type serviceType = null)
         {
             serviceType = serviceType ?? request.ServiceType;
-            var serviceTypeExpr = Expression.Constant(serviceType, typeof(Type));
+            var serviceTypeExpr = request.Container.GetOrAddStateItemExpression(serviceType, typeof(Type));
             var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved);
-            var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
-            var serviceKeyExpr = request.Container.GetOrAddStateItemExpression(request.ServiceKey, typeof(object));
+            var requiredServiceTypeExpr = request.Container.GetOrAddStateItemExpression(request.RequiredServiceType, typeof(Type));
+            var serviceKeyExpr = Expression.Convert(request.Container.GetOrAddStateItemExpression(request.ServiceKey), typeof(object));
 
             var getOrNewCallExpr = Container.GetCallGetOrNewExpression(request);
 
@@ -4151,7 +4159,7 @@ namespace DryIoc
         public virtual Expression GetExpressionOrDefault(Request request, Type reuseWrapperType = null)
         {
             // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual creation expression.
-            if (Setup.OpenResolutionScope && !request.Parent.IsEmpty)
+            if (Setup.OpenResolutionScope && !request.GetNonWrapperParentOrEmpty().IsEmpty)
                 return Resolver.CreateResolutionExpression(request);
 
             request = request.ResolveWithFactory(this);
@@ -5395,7 +5403,7 @@ namespace DryIoc
         /// no matching scope or its parent found.</exception>
         public IScope GetScopeOrDefault(Request request)
         {
-            return GetMatchingScope(request.Container.CurrentScope, Name);
+            return GetMatchingScopeOrDefault(request.Container.CurrentScope, Name);
         }
 
         /// <summary>Returns <see cref="GetMatchingScope"/> method call expression, which returns current scope,
@@ -5417,11 +5425,17 @@ namespace DryIoc
         /// <exception cref="ContainerException"> with code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/>.</exception>
         public static IScope GetMatchingScope(IScope scope, object name)
         {
+            return GetMatchingScopeOrDefault(scope, name)
+                ?? Throw.Instead<IScope>(Error.NO_MATCHED_SCOPE_FOUND, name);
+        }
+
+        public static IScope GetMatchingScopeOrDefault(IScope scope, object name)
+        {
             if (name == null)
                 return scope;
             while (scope != null && !name.Equals(scope.Name))
                 scope = scope.Parent;
-            return scope.ThrowIfNull(Error.NO_MATCHED_SCOPE_FOUND, name);
+            return scope;
         }
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>

@@ -203,7 +203,55 @@ namespace DryIoc.UnitTests
             Assert.That(orange, Is.InstanceOf<Orange>());
         }
 
+        [Test]
+        public void Resolving_singleton_registered_in_parent_from_second_child_with_first_child_having_resolved_and_is_disposed_do_not_throw()
+        {
+            var parent = new Container();
+            parent.Register<Foo>(Reuse.Singleton);
+
+            var parentFoo = parent.Resolve<Foo>(); // Stores resolved instance in Parent singletons.
+            
+            var firstChild = parent.CreateChildContainer(shareSingletons: false); // Child and Parent have their own singletons. 
+            var firstChildFoo = firstChild.Resolve<Foo>(); // Stores resolved instance in Child singletons. 
+            Assert.AreNotSame(firstChildFoo, parentFoo);   // Child and Parent singletons are different.
+            
+            firstChild.Dispose();                   // Disposes Child with its singletons, Parent stays intact.
+            Assert.IsTrue(firstChildFoo.Disposed);  // firstFoo shouldn't be disposed (No it is by design).
+
+            var secondChild = parent.CreateChildContainer(shareSingletons: true); // Second Child reference to Parent singletons. 
+                                                                                  // So disposing Child affects Parent, that's why it is not a default option.
+            var secondChildFoo = secondChild.Resolve<Foo>();                      // Resolves Parent singleton.
+            Assert.AreSame(secondChildFoo, parentFoo);       
+            secondChildFoo.Dispose();               // Disposes Child singletons, and effectively the Parent singletons too because of sharing.
+            Assert.IsTrue(parentFoo.Disposed);
+        }
+
+        [Test]
+        public void Reusing_singletons_from_parent_and_not_disposing_them_with_Child()
+        {
+            var parent = new Container();
+            parent.Register<Foo>(Reuse.Singleton);
+
+            var firstChild = parent.CreateChildContainer(true);
+            var firstFoo = firstChild.Resolve<Foo>();
+            firstChild.Dispose();
+
+            Assert.IsFalse(firstFoo.Disposed); // firstFoo shouldn't be disposed
+
+            var secondChild = parent.CreateChildContainer(true);
+            secondChild.Resolve<Foo>(); // Resolve<Foo>() shouldn't throw
+        }
+
         #region CUT
+
+        internal class Foo : IDisposable
+        {
+            public bool Disposed { get; set; }
+            public void Dispose()
+            {
+                Disposed = true;
+            }
+        }
 
         public interface IFruit { }
         public class Orange : IFruit { }
