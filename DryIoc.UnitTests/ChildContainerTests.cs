@@ -226,7 +226,7 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(parentFoo.Disposed);
         }
 
-        [Test]
+        [Test, Ignore]
         public void Reusing_singletons_from_parent_and_not_disposing_them_with_Child()
         {
             var parent = new Container();

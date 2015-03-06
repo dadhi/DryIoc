@@ -225,42 +225,34 @@ namespace DryIoc.IssuesTests
 
             var component = container.Resolve<IComponent>();
 
-            var compCode = ExpressionToCodeLib.ExpressionToCode.ToCode(container.Resolve<FactoryExpression<IComponent>>().Value);
+            // Database: Same in Area1 and Area2
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.Simple.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.Database, "Inside of area always the same database");
+            Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.Simple.Database, "Inside of area always the same database");
+            Assert.AreNotSame(component.Area1.Database, component.Area2.Database, "Each area with own database");
 
-            var areaCode = ExpressionToCodeLib.ExpressionToCode.ToCode(container.Resolve<FactoryExpression<IArea>>(Areas.Second).Value);
+            // ViewModelPrsenter (LifestyleBoundToNearest): Same in Area1 and Area 2
+            Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
+            Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
+            Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
+            Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
+            Assert.AreNotSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area2.MainViewModel1.ViewModelPresenter, "Each MainViewModel has own ViewModelPresenter");
+            Assert.AreNotSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.ViewModelPresenter, "Each MainViewModel has own ViewModelPresenter");
+            Assert.AreSame(component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
 
-            var mvm1Code = ExpressionToCodeLib.ExpressionToCode.ToCode(container.Resolve<FactoryExpression<IMainViewModel1>>().Value);
+            // Dynamic: Same in Area1 and Area2
+            var child = component.Area1.MainViewModel1.CreateDynamicChild();
+            Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, child.ViewModelPresenter, "Also dynamic created objects should follow the normal rules");
+            Assert.AreSame(component.Area1.Database, child.Database, "Also dynamic created objects should follow the normal rules");
 
-            Assert.Fail();
-
-            //// Database: Same in Area1 and Area2
-            //Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.Database, "Inside of area always the same database");
-            //Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.Simple.Database, "Inside of area always the same database");
-            //Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.Database, "Inside of area always the same database");
-            //Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.Database, "Inside of area always the same database");
-            //Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.Database, "Inside of area always the same database");
-            //Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.Simple.Database, "Inside of area always the same database");
-            //Assert.AreNotSame(component.Area1.Database, component.Area2.Database, "Each area with own database");
-
-            //// ViewModelPrsenter (LifestyleBoundToNearest): Same in Area1 and Area 2
-            //Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            //Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            //Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            //Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-            //Assert.AreNotSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area2.MainViewModel1.ViewModelPresenter, "Each MainViewModel has own ViewModelPresenter");
-            //Assert.AreNotSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.ViewModelPresenter, "Each MainViewModel has own ViewModelPresenter");
-            //Assert.AreSame(component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ChildWithMainViewModel.MainViewModel.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
-
-            //// Dynamic: Same in Area1 and Area2
-            //var child = component.Area1.MainViewModel1.CreateDynamicChild();
-            //Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, child.ViewModelPresenter, "Also dynamic created objects should follow the normal rules");
-            //Assert.AreSame(component.Area1.Database, child.Database, "Also dynamic created objects should follow the normal rules");
-
-            //// Area1 should use FirstVariant as ITwoVariants, Area2 SecondVariant
-            //Assert.IsInstanceOf<FirstVariant>(component.Area1.OneVariant);
-            //Assert.IsInstanceOf<FirstVariant>(component.Area1.MainViewModel1.OneVariant);
-            //Assert.IsInstanceOf<SecondVariant>(component.Area2.OneVariant);
-            //Assert.IsInstanceOf<SecondVariant>(component.Area2.MainViewModel1.OneVariant);
+            // Area1 should use FirstVariant as ITwoVariants, Area2 SecondVariant
+            Assert.IsInstanceOf<FirstVariant>(component.Area1.OneVariant);
+            Assert.IsInstanceOf<FirstVariant>(component.Area1.MainViewModel1.OneVariant);
+            Assert.IsInstanceOf<SecondVariant>(component.Area2.OneVariant);
+            Assert.IsInstanceOf<SecondVariant>(component.Area2.MainViewModel1.OneVariant);
         }
 
         [Test]

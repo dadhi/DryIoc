@@ -191,8 +191,8 @@ namespace DryIoc
 
                     // Enable continue to next parent if factory is not found in first parent.
                     if (parentRequest.IfUnresolved != IfUnresolved.ReturnDefault)
-                        parentRequest = parentRequest.UpdateServiceInfo(info =>
-                            ServiceInfo.Of(info.ServiceType, ifUnresolved: IfUnresolved.ReturnDefault).InheritInfo(info));
+                        parentRequest = parentRequest.UpdateServiceInfo(info => // TODO remove this InheritInfo thing.
+                            ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfo(info));
 
                     var parent = parentWeakRef.GetTarget();
                     factory = parent.ResolveFactory(parentRequest);
@@ -541,6 +541,29 @@ namespace DryIoc
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, scope);
         }
 
+        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
+        {
+            ThrowIfContainerDisposed();
+
+            var request = _emptyRequest.Push(serviceType, ifUnresolved: ifUnresolved, scope: scope);
+            var factory = ((IContainer)this).ResolveFactory(request);
+
+            // suddenly - request service key may change. TODO remove this hack/slash
+            if (request.ServiceKey != null)
+                return ((IResolver)this).ResolveKeyed(serviceType, request.ServiceKey, ifUnresolved, null, scope);
+
+            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
+            if (factoryDelegate == null)
+                return null;
+
+            var resultService = factoryDelegate(_resolutionStateCache.Value, _containerWeakRef, scope);
+
+            if (factory.Setup.CacheFactoryExpression)
+                _defaultFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+
+            return resultService;
+        }
+
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
         {
             var cacheServiceKey = serviceKey;
@@ -563,12 +586,12 @@ namespace DryIoc
             if (cacheServiceKey == null)
                 return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, scope);
 
-            ThrowIfContainerDisposed();
-
             var cacheKey = new KV<Type, object>(serviceType, cacheServiceKey);
             var factoryDelegate = _keyedFactoryDelegatesCache.Value.GetValueOrDefault(cacheKey);
             if (factoryDelegate != null)
                 return factoryDelegate(_resolutionStateCache.Value, _containerWeakRef, scope);
+
+            ThrowIfContainerDisposed();
 
             var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType, scope);
 
@@ -625,25 +648,6 @@ namespace DryIoc
                 if (service != null) // skip unresolved items
                     yield return service;
             }
-        }
-
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
-        {
-            ThrowIfContainerDisposed();
-
-            var request = _emptyRequest.Push(serviceType, ifUnresolved: ifUnresolved, scope: scope);
-
-            var factory = ((IContainer)this).ResolveFactory(request);
-            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
-            if (factoryDelegate == null)
-                return null;
-
-            var resultService = factoryDelegate(_resolutionStateCache.Value, _containerWeakRef, scope);
-
-            if (factory.Setup.CacheFactoryExpression)
-                _defaultFactoryDelegatesCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
-
-            return resultService;
         }
 
         private void ThrowIfContainerDisposed()
@@ -956,7 +960,10 @@ namespace DryIoc
                 for (var i = 0; i < funcDecoratorFactories.Length; i++)
                 {
                     var decoratorFactory = funcDecoratorFactories[i];
-                    var decoratorRequest = request.UpdateServiceInfo(_ => ServiceInfo.Of(decoratorFuncType)).ResolveWithFactory(decoratorFactory);
+                    var decoratorRequest = request
+                        .UpdateServiceInfo(_ => ServiceInfo.Of(decoratorFuncType))
+                        .ResolveWithFactory(decoratorFactory);
+
                     var condition = decoratorFactory.Setup.Condition;
                     if (condition == null || condition(request))
                     {
@@ -1162,11 +1169,15 @@ namespace DryIoc
 
             if (defaultFactories.Length != 0)
             {
-                // TODO: Set request service key to specific DefaultKey.
-                
-                return defaultFactories.Length == 1
-                    ? defaultFactories[0].Value
-                    : Throw.Instead<Factory>(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
+                if (defaultFactories.Length > 1)
+                    Throw.Error(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
+
+                var defaultFactory = defaultFactories[0];
+
+                if (request.Parent.IsEmpty)
+                    request.MutateServiceKey(defaultFactory.Key);
+
+                return defaultFactory.Value;
             }
 
             return null;
@@ -3229,7 +3240,8 @@ namespace DryIoc
         /// if specified it will automatically sets <paramref name="ifUnresolved"/> to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</param>
         /// <returns>Created details DTO.</returns>
         public static ServiceInfoDetails Of(Type requiredServiceType = null,
-            object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
+            object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, 
+            object defaultValue = null)
         {
             return ifUnresolved == IfUnresolved.Throw && defaultValue == null
                 ? (requiredServiceType == null
@@ -3445,17 +3457,11 @@ namespace DryIoc
 
         protected class WithDetails : ServiceInfo
         {
-            public override ServiceInfoDetails Details
-            {
-                get { return _details; }
-            }
-
-            public WithDetails(Type serviceType, ServiceInfoDetails details)
-                : base(serviceType)
+            public override ServiceInfoDetails Details { get { return _details; } }
+            public WithDetails(Type serviceType, ServiceInfoDetails details) : base(serviceType)
             {
                 _details = details;
             }
-
             private readonly ServiceInfoDetails _details;
         }
 
@@ -3700,7 +3706,7 @@ namespace DryIoc
         public readonly Request Parent;
 
         /// <summary>Requested service id info and commanded resolution behavior.</summary>
-        public readonly IServiceInfo ServiceInfo;
+        public IServiceInfo ServiceInfo { get; private set; }
 
         /// <summary>Factory found in container to resolve this request.</summary>
         public readonly Factory ResolvedFactory;
@@ -3774,6 +3780,13 @@ namespace DryIoc
         public Request UpdateServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
             return new Request(Parent, ContainerWeakRef, getInfo(ServiceInfo), ResolvedFactory, FuncArgs, Scope);
+        }
+
+        public void MutateServiceKey(object serviceKey)
+        {
+            var details = ServiceInfo.Details;
+            ServiceInfo = ServiceInfo.Create(ServiceInfo.ServiceType,
+                ServiceInfoDetails.Of(details.RequiredServiceType, serviceKey, details.IfUnresolved, details.DefaultValue));
         }
 
         /// <summary>Returns new request with parameter expressions created for <paramref name="funcType"/> input arguments.
