@@ -139,7 +139,7 @@ namespace DryIoc
                 _disposed, _defaultFactoryDelegatesCache, _keyedFactoryDelegatesCache, _factoryExpressionCache, _resolutionStateCache);
         }
 
-        /// <summary>Creates scoped container with new current scope independent of any scope context.
+        /// <summary>Creates scoped container with scope bound to container itself, and not some ambient context.
         /// Current container scope will become parent for new scope.</summary>
         /// <param name="scopeName">(optional) Scope name.</param>
         /// <returns>New container with all state shared except new created scope and context.</returns>
@@ -208,7 +208,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
 
-            if (_openedScope != null)
+            if (_openedScope != null) // for container created with Open(Bound)Scope
             {
                 if (_scopeContext != null)
                 {
@@ -218,29 +218,26 @@ namespace DryIoc
                 }
 
                 _openedScope.Dispose();
-                _openedScope = null;
-                return; // Skip the rest for scoped container
             }
+            else // for Container created with constructor.
+            {
+                if (_scopeContext is IDisposable)
+                    ((IDisposable)_scopeContext).Dispose();
 
-            if (_scopeContext is IDisposable)
-                ((IDisposable)_scopeContext).Dispose();
-            _scopeContext = null;
+                _singletonScope.Dispose();
 
-            _singletonScope.Dispose();
+                _serviceFactories.Swap(_ => HashTree<Type, object>.Empty);
+                _decoratorFactories.Swap(_ => HashTree<Type, Factory[]>.Empty);
+                _wrapperFactories.Swap(_ => HashTree<Type, Factory>.Empty);
 
-            _serviceFactories.Swap(_ => HashTree<Type, object>.Empty);
-            _decoratorFactories.Swap(_ => HashTree<Type, Factory[]>.Empty);
-            _wrapperFactories.Swap(_ => HashTree<Type, Factory>.Empty);
+                _defaultFactoryDelegatesCache = Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
+                _keyedFactoryDelegatesCache = Ref.Of(HashTree<KV<Type, object>, FactoryDelegate>.Empty);
 
-            _defaultFactoryDelegatesCache = Ref.Of(HashTree<Type, FactoryDelegate>.Empty);
-            _keyedFactoryDelegatesCache = Ref.Of(HashTree<KV<Type, object>, FactoryDelegate>.Empty);
+                _factoryExpressionCache = Ref.Of(IntKeyTree.Empty);
+                _resolutionStateCache = Ref.Of(AppendableArray.Empty);
 
-            _factoryExpressionCache = Ref.Of(IntKeyTree.Empty);
-            _resolutionStateCache = Ref.Of(AppendableArray.Empty);
-
-            _containerWeakRef = null;
-
-            Rules = Rules.Empty;
+                Rules = Rules.Empty;
+            }
         }
 
         #region Static state
@@ -2859,7 +2856,7 @@ namespace DryIoc
         /// <remarks>The method should be used as the last resort only! Though powerful it is easy to get memory leaks
         /// (due variables captured in delegate closure) and impossible to use in generation scenarios.
         /// Consider using FactoryMethod instead: 
-        /// <code lang="cs"><![CDATA[container.Register<ICar>(with: CreationInfo.Of(p => new Car(p.Of<IEngine>())))]]></code>.</remarks>
+        /// <code lang="cs"><![CDATA[container.Register<ICar>(with: CreationInfo.Of(() => new Car(Arg.Of<IEngine>())))]]></code>.</remarks>
         public static void RegisterDelegate<TService>(this IRegistrator registrator, Func<IResolver, TService> factoryDelegate, 
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, 
             object serviceKey = null)
@@ -2915,7 +2912,8 @@ namespace DryIoc
 
             if (reuse == null || reuse is ResolutionScopeReuse)
             {
-                var factory = new DelegateFactory(_ => instance, setup: Setup.Default);
+                var instanceType = instance == null ? null : instance.GetType();
+                var factory = new DelegateFactory(_ => instance, implementationType: instanceType);
                 container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered);
                 return;
             }
@@ -3948,7 +3946,7 @@ namespace DryIoc
         /// or disable disposing with <see cref="ReuseHiddenDisposable"/>, etc.</summary>
         public virtual Type[] ReuseWrappers { get { return null; } }
 
-        public Setup WithCondition(Func<Request, bool> condition)
+        public Setup WithReuseCondition(Func<Request, bool> condition)
         {
             condition.ThrowIfNull();
             var oldCondition = Condition;
@@ -3986,8 +3984,7 @@ namespace DryIoc
         public static readonly Setup Wrapper = new WrapperSetup();
 
         /// <summary>Creates setup with all settings specified. If all is omitted: then <see cref="Setup.Wrapper"/> will be used.</summary>
-        /// <param name="unwrapServiceType">Wrapped service selector rule.</param>
-        /// <param name="reuseWrapperFactory"></param>
+        /// <param name="unwrapServiceType">Wrapped service selector rule.</param> <param name="reuseWrapperFactory"></param>
         /// <returns>New setup with non-default settings or <see cref="Setup.Wrapper"/> otherwise.</returns>
         public static Setup WrapperWith(Func<Type, Type> unwrapServiceType = null, IReuseWrapperFactory reuseWrapperFactory = null)
         {
@@ -4137,10 +4134,10 @@ namespace DryIoc
             Setup = setup ?? Setup.Default;
 
             if (reuse != null)
-                Setup = Setup.WithCondition(HasMatchingResolutionScope);
+                Setup = Setup.WithReuseCondition(HasMatchingScope);
         }
 
-        private bool HasMatchingResolutionScope(Request request)
+        private bool HasMatchingScope(Request request)
         {
             var reuseMappingRule = request.Container.Rules.ReuseMapping;
             var reuse = reuseMappingRule == null ? Reuse : reuseMappingRule(Reuse, request);
@@ -5067,14 +5064,19 @@ namespace DryIoc
     /// and where possible it uses delegate directly: without converting it to expression.</summary>
     public sealed class DelegateFactory : Factory
     {
+        public override Type ImplementationType { get { return _implementationType; } }
+
         /// <summary>Creates factory by providing:</summary>
         /// <param name="factoryDelegate">User specified service creation delegate.</param>
-        /// <param name="reuse">Reuse behavior for created service.</param>
-        /// <param name="setup">Additional settings.</param>
-        public DelegateFactory(Func<IResolver, object> factoryDelegate, IReuse reuse = null, Setup setup = null)
+        /// <param name="reuse">(optional) Reuse behavior for created service.</param>
+        /// <param name="setup">(optional) Additional settings.</param>
+        /// <param name="implementationType">(optional) Implementation type if known, e.g. when registering existing instance.</param>
+        public DelegateFactory(Func<IResolver, object> factoryDelegate, 
+            IReuse reuse = null, Setup setup = null, Type implementationType = null)
             : base(reuse, setup)
         {
             _factoryDelegate = factoryDelegate.ThrowIfNull();
+            _implementationType = implementationType;
         }
 
         /// <summary>Create expression by wrapping call to stored delegate with provided request.</summary>
@@ -5108,6 +5110,7 @@ namespace DryIoc
         }
 
         private readonly Func<IResolver, object> _factoryDelegate;
+        private readonly Type _implementationType;
     }
 
     /// <summary>Lazy object storage that will create object with provided factory on first access, 
@@ -5545,6 +5548,29 @@ namespace DryIoc
             
             return matchedScope;
         }
+
+        //private static IScope GetMatchingScopeOrDefault(IScope scope, object name1, bool outermost)
+        //{
+        //    if (name1 == null)
+        //        return scope;
+
+        //    IScope matchedScope = null;
+        //    while (scope != null)
+        //    {
+        //        var name = scope.Name as KV<Type, object>;
+        //        if (name != null &&
+        //            (assignableFromServiceType == null || name.Key.IsAssignableTo(assignableFromServiceType)) &&
+        //            (serviceKey == null || serviceKey.Equals(name.Value)))
+        //        {
+        //            matchedScope = scope;
+        //            if (!outermost) // break on first found match.
+        //                break;
+        //        }
+        //        scope = scope.Parent;
+        //    }
+
+        //    return matchedScope;
+        //}
 
         private readonly Type _assignableFromServiceType;
         private readonly object _serviceKey;
@@ -6095,6 +6121,12 @@ namespace DryIoc
         /// <param name="item">Item to find in existing items with <see cref="object.Equals(object, object)"/> or add if not found.</param>
         /// <returns>Index of found or added item.</returns>
         int GetOrAddStateItem(object item);
+
+        /// <summary>Creates scoped container with scope bound to container itself, and not some ambient context.
+        /// Current container scope will become parent for new scope.</summary>
+        /// <param name="scopeName">(optional) Scope name.</param>
+        /// <returns>New container with all state shared except new created scope and context.</returns>
+        IContainer OpenScopeWithoutContext(object scopeName = null);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand, 

@@ -200,8 +200,7 @@ namespace DryIoc.IssuesTests
                 setup: Setup.With(openResolutionScope: true));
 
             container.Register<IDatabase, Database>(
-                Reuse.InResolutionScopeOf<IArea>(),
-                setup: Setup.With(openResolutionScope: true));
+                Reuse.InResolutionScopeOf<IArea>());
 
             container.Register<ITwoVariants, FirstVariant>(
                 Reuse.InResolutionScopeOf<IArea>(Areas.First),
@@ -212,16 +211,14 @@ namespace DryIoc.IssuesTests
                 setup: Setup.With(openResolutionScope: true));
 
             container.Register<IViewModelPresenter, ViewModelPresenter>(
-                Reuse.InResolutionScopeOf<IMainViewModel>(),
-                setup: Setup.With(openResolutionScope: true));
+                Reuse.InResolutionScopeOf<IMainViewModel>());
 
             container.Register<IChildViewModelSimple, ChildViewModelSimple>();
-
             container.Register<IChildViewModelWithChildren, ChildViewModelWithChildren>();
-
             container.Register<IChildViewModelWithMainViewModel, ChildViewModelWithMainViewModel>();
 
-            container.Register<IMainViewModel2, MainViewModel2>(setup: Setup.With(openResolutionScope: true));
+            container.Register<IMainViewModel2, MainViewModel2>(
+                setup: Setup.With(openResolutionScope: true));
 
             var component = container.Resolve<IComponent>();
 

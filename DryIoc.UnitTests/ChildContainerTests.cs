@@ -226,7 +226,7 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(parentFoo.Disposed);
         }
 
-        [Test, Ignore]
+        [Test, Explicit("Not supported")]
         public void Reusing_singletons_from_parent_and_not_disposing_them_with_Child()
         {
             var parent = new Container();
@@ -242,6 +242,34 @@ namespace DryIoc.UnitTests
             secondChild.Resolve<Foo>(); // Resolve<Foo>() shouldn't throw
         }
 
+        [Test]
+        public void Reusing_singletons_from_parent_and_not_disposing_them_in_scoped_container()
+        {
+            var container = new Container();
+
+            var parent = container.OpenScopeWithoutContext("parent");
+            parent.Register<Foo>(Reuse.InCurrentNamedScope("parent"));
+
+            var firstChild = parent.OpenScopeWithoutContext();
+            var firstFoo = firstChild.Resolve<Foo>();
+
+            firstChild.Register<Blah>(Reuse.InCurrentScope);
+            var firstBlah = firstChild.Resolve<Blah>();
+
+            firstChild.Dispose();
+
+            Assert.IsFalse(firstFoo.Disposed); // firstFoo shouldn't be disposed
+            Assert.IsTrue(firstBlah.Disposed); // firstBlah should be disposed
+
+            var secondChild = parent.OpenScopeWithoutContext();
+            secondChild.Resolve<Foo>(); // Resolve<Foo>() shouldn't throw
+
+            parent.Dispose();   // Parent scope is disposed.
+            Assert.IsTrue(firstFoo.Disposed); 
+
+            container.Dispose(); // singletons, registry, cache, is gone
+        }
+
         #region CUT
 
         internal class Foo : IDisposable
@@ -252,6 +280,16 @@ namespace DryIoc.UnitTests
                 Disposed = true;
             }
         }
+
+        internal class Blah : IDisposable
+        {
+            public bool Disposed { get; set; }
+            public void Dispose()
+            {
+                Disposed = true;
+            }
+        }
+
 
         public interface IFruit { }
         public class Orange : IFruit { }
