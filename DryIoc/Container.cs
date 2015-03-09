@@ -2275,6 +2275,7 @@ namespace DryIoc
         /// <returns>Found factory or null.</returns>
         public static FactorySelectorRule PreferKeyOverDefault(object serviceKey)
         {
+            // TODO add check outside of resolution scope 
             return (request, factories) => request.ServiceKey != null
                 // if service key is not default, then look for it
                 ? factories.FirstOrDefault(f => f.Key.Equals(request.ServiceKey)).Value

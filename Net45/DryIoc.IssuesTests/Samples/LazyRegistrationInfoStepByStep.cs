@@ -5,7 +5,7 @@ using System.Reflection;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
-namespace DryIoc.Samples
+namespace DryIoc.IssuesTests.Samples
 {
     public interface IAddin
     {
@@ -31,7 +31,7 @@ namespace DryIoc.Samples
             Assert.That(registrationInfo.ImplementationTypeFullName, Is.Not.Null);
             Assert.That(registrationInfo.Exports[0].ServiceTypeFullName, Is.Not.Null);
 
-            var asm = Assembly.LoadFrom("DryIoc.Samples.dll");
+            var asm = Assembly.LoadFrom("DryIoc.IssuesTests.dll");
             var type = asm.GetType(registrationInfo.ImplementationTypeFullName);
             Assert.That(type, Is.Not.Null);
         }

@@ -32,8 +32,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="ExpressionToCodeLib">
-      <HintPath>..\..\packages\ExpressionToCodeLib.1.4.8.0\lib\net40-Client\ExpressionToCodeLib.dll</HintPath>
+    <Reference Include="ExpressionToCodeLib, Version=1.5.0.0, Culture=neutral, PublicKeyToken=b43a6eb33831e563, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\packages\ExpressionToCodeLib.1.5.0.0\lib\net40-Client\ExpressionToCodeLib.dll</HintPath>
     </Reference>
     <Reference Include="nunit.framework, Version=2.6.3.13283, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -43,7 +44,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
     <None Include="ServiceFactory.Generated.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>ServiceFactory.Generated.cs</LastGenOutput>

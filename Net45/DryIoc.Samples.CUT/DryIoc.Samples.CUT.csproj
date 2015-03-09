@@ -10,8 +10,9 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>DryIoc.Samples.CUT</RootNamespace>
     <AssemblyName>DryIoc.Samples.CUT</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -21,6 +22,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -29,6 +31,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -40,14 +43,17 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
-      <Project>{13516F3C-E48D-43DC-89D4-5FE00DE3C7D2}</Project>
-      <Name>DryIoc.MefAttributedModel</Name>
-      <Private>False</Private>
+    <ProjectReference Include="..\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj">
+      <Project>{69ecca75-698f-41bc-b25f-565aec01e3ea}</Project>
+      <Name>DryIoc.IssuesTests</Name>
     </ProjectReference>
-    <ProjectReference Include="..\DryIoc.Samples\DryIoc.Samples.csproj">
-      <Project>{022fd983-8d10-493f-b9d5-7d5593736d58}</Project>
-      <Name>DryIoc.Samples</Name>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
+      <Project>{bfb1206a-3545-4369-8f23-49fd1bffc362}</Project>
+      <Name>DryIoc.MefAttributedModel</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
+      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
+      <Name>DryIoc</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

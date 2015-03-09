@@ -1,6 +1,6 @@
 ﻿using NUnit.Framework;
 
-namespace DryIoc.Samples
+namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
     public class GettingStarted
@@ -68,8 +68,8 @@ namespace DryIoc.Samples
                 container.Resolve<IClient>());
 
             Assert.That(exception.Message, Is.EqualTo(
-@"Unable to resolve DryIoc.Samples.IService as parameter ""service""
- in DryIoc.Samples.SomeClient: DryIoc.Samples.IClient.
+@"Unable to resolve DryIoc.IssuesTests.Samples.IService as parameter ""service""
+ in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient.
 Please register service, or specify @requiredServiceType while resolving, or add Rules.WithUnknownServiceResolver(MyRule)."));
         }
     }

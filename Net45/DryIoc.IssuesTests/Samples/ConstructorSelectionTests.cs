@@ -1,6 +1,6 @@
 ﻿using NUnit.Framework;
 
-namespace DryIoc.Samples
+namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
     public class ConstructorSelectionTests

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
-namespace DryIoc.Samples
+namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
     public class PubSub
@@ -34,7 +34,7 @@ namespace DryIoc.Samples
                 {
                     var receive = s.GetType().GetMethods()
                         .FirstOrDefault(m => m.GetAttributes(typeof(ReceiveAttribute)).Count() == 1);
-                    r.Resolve<PubSubHub>().Subscribe(message => receive.Invoke(s, new[] { message }));
+                    r.Resolve<PubSubHub>().Subscribe(message => receive.ThrowIfNull().Invoke(s, new[] { message }));
                 }, 
                 r => r.ImplementationType != null 
                   && r.ImplementationType.GetAttributes(typeof(SubscriberAttribute)).Count() == 1);
