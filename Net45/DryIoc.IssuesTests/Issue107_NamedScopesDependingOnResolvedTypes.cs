@@ -22,12 +22,12 @@ namespace DryIoc.IssuesTests
             IArea Area2 { get; set; }
         }
 
-        internal class Component : IComponent
+        public class Component : IComponent
         {
             public IArea Area1 { get; set; }
             public IArea Area2 { get; set; }
 
-            public Component(IArea area1, IArea area2)
+            public Component(IArea1 area1, IArea2 area2)
             {
                 Area1 = area1;
                 Area2 = area2;
@@ -41,7 +41,17 @@ namespace DryIoc.IssuesTests
             ITwoVariants OneVariant { get; set; }
         }
 
-        public class Area : IArea
+        public interface IArea1 : IArea
+        {
+
+        }
+
+        public interface IArea2 : IArea
+        {
+
+        }
+
+        public class Area
         {
             public IDatabase Database { get; set; }
             public IMainViewModel1 MainViewModel1 { get; set; }
@@ -52,6 +62,22 @@ namespace DryIoc.IssuesTests
                 Database = database;
                 MainViewModel1 = mainViewModel1;
                 OneVariant = oneVariant;
+            }
+        }
+
+        public class Area1 : Area, IArea1
+        {
+            public Area1(IDatabase database, IMainViewModel1 mainViewModel1, ITwoVariants oneVariant)
+                : base(database, mainViewModel1, oneVariant)
+            {
+            }
+        }
+
+        public class Area2 : Area, IArea2
+        {
+            public Area2(IDatabase database, IMainViewModel1 mainViewModel1, ITwoVariants oneVariant)
+                : base(database, mainViewModel1, oneVariant)
+            {
             }
         }
 
@@ -187,14 +213,10 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<IComponent, Component>(
-                with: CreationInfo.Of(() => new Component(Arg.Of<IArea>(Areas.First), Arg.Of<IArea>(Areas.Second))));
+            container.Register<IComponent, Component>();
 
-            container.Register<IArea, Area>(serviceKey: Areas.First,
-                setup: Setup.With(openResolutionScope: true));
-
-            container.Register<IArea, Area>(serviceKey: Areas.Second,
-                setup: Setup.With(openResolutionScope: true));
+            container.Register<IArea1, Area1>(setup: Setup.With(openResolutionScope: true));
+            container.Register<IArea2, Area2>(setup: Setup.With(openResolutionScope: true));
 
             container.Register<IMainViewModel1, MainViewModel1>(
                 setup: Setup.With(openResolutionScope: true));
@@ -203,11 +225,11 @@ namespace DryIoc.IssuesTests
                 Reuse.InResolutionScopeOf<IArea>());
 
             container.Register<ITwoVariants, FirstVariant>(
-                Reuse.InResolutionScopeOf<IArea>(Areas.First),
+                Reuse.InResolutionScopeOf<IArea1>(),
                 setup: Setup.With(openResolutionScope: true));
             
             container.Register<ITwoVariants, SecondVariant>(
-                Reuse.InResolutionScopeOf<IArea>(Areas.Second),
+                Reuse.InResolutionScopeOf<IArea2>(),
                 setup: Setup.With(openResolutionScope: true));
 
             container.Register<IViewModelPresenter, ViewModelPresenter>(
@@ -262,13 +284,13 @@ namespace DryIoc.IssuesTests
                     .Name("area1", serviceKey: Areas.First)
                     .Name("area2", serviceKey: Areas.Second));
 
-            container.Register<IArea, Area>(serviceKey: Areas.First,
+            container.Register<IArea1, Area1>(serviceKey: Areas.First,
                 setup: Setup.With(openResolutionScope: true),
                 with: Parameters.Of
                     .Type<ITwoVariants>(serviceKey: Areas.First)
                     .Type<IMainViewModel1>(serviceKey: Areas.First));
 
-            container.Register<IArea, Area>(serviceKey: Areas.Second,
+            container.Register<IArea2, Area2>(serviceKey: Areas.Second,
                 setup: Setup.With(openResolutionScope: true),
                 with: Parameters.Of
                     .Type<ITwoVariants>(serviceKey: Areas.Second)
@@ -329,7 +351,6 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<SecondVariant>(component.Area2.OneVariant);
             Assert.IsInstanceOf<SecondVariant>(component.Area2.MainViewModel1.OneVariant);
         }
-
 
         internal interface ICar { }
         internal class FastCar : ICar { }

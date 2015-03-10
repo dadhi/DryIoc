@@ -2275,13 +2275,12 @@ namespace DryIoc
         /// <returns>Found factory or null.</returns>
         public static FactorySelectorRule PreferKeyOverDefault(object serviceKey)
         {
-            // TODO add check outside of resolution scope 
             return (request, factories) => request.ServiceKey != null
                 // if service key is not default, then look for it
                 ? factories.FirstOrDefault(f => f.Key.Equals(request.ServiceKey)).Value
                 // otherwise look for specified service key, and if no found look for default.
                 : factories.FirstOrDefault(f => f.Key.Equals(serviceKey)).Value
-                  ?? factories.FirstOrDefault(f => f.Key.Equals(null)).Value;
+                ?? factories.FirstOrDefault(f => f.Key.Equals(null)).Value;
         }
 
         /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
@@ -2459,15 +2458,23 @@ namespace DryIoc
             return Of<TService>(factoryCallExpr, factoryInfo.ThrowIfNull(), propertiesAndFields);
         }
 
-        public static CreationInfo<TService> Of<TService>(Expression<Func<TService>> methodOrCtorCallExpr, 
+        public static CreationInfo<T> Of<T>(Expression<Func<T>> methodOrCtorCallExpr, 
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            return Of<TService>((LambdaExpression)methodOrCtorCallExpr, propertiesAndFields: propertiesAndFields);
+            return Of<T>(methodOrCtorCallExpr as LambdaExpression, propertiesAndFields: propertiesAndFields);
+        }
+
+        public static CreationInfo<T> Of<T>(PropertiesAndFieldsSelector propertiesAndFields)
+        {
+            return Of<T>(null, propertiesAndFields);
         }
 
         private static CreationInfo<T> Of<T>(LambdaExpression methodOrCtorCallExpr, 
             ServiceInfo factoryInfo = null, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
+            if (methodOrCtorCallExpr == null)
+                return new CreationInfo<T>(propertiesAndFields: propertiesAndFields);
+
             MethodBase methodOrCtor;
             IList<Expression> argExprs;
 
@@ -2744,6 +2751,15 @@ namespace DryIoc
         public static void RegisterMany<TImplementation>(this IRegistrator registrator, 
             IReuse reuse = null, CreationInfo with = null, Setup setup = null, Func<Type, bool> serviceTypeCondition = null, 
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, 
+            object serviceKey = null)
+        {
+            registrator.RegisterMany(typeof(TImplementation), reuse, with, setup, serviceTypeCondition, ifAlreadyRegistered, serviceKey);
+        }
+
+        public static void RegisterMany2<TImplementation>(this IRegistrator registrator,
+            IReuse reuse = null, CreationInfo<TImplementation> with = null, 
+            Setup setup = null, Func<Type, bool> serviceTypeCondition = null,
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null)
         {
             registrator.RegisterMany(typeof(TImplementation), reuse, with, setup, serviceTypeCondition, ifAlreadyRegistered, serviceKey);
@@ -5208,6 +5224,25 @@ namespace DryIoc
                 : items.AddOrUpdate(id, value));
         }
 
+        public IScope GetMatchingScopeOrDefault(object name, bool outermost)
+        {
+            if (name == null)
+                return this;
+
+            IScope matchingScope = null;
+            for (IScope currentScope = this; currentScope != null; currentScope = currentScope.Parent)
+            {
+                if (name.Equals(currentScope.Name))
+                {
+                    matchingScope = currentScope;
+                    if (!outermost) // break on first found match.
+                        break;
+                }
+            }
+
+            return matchingScope;
+        }
+
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
         /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.
         /// Rather all thrown exceptions are aggregated in <see cref="DisposingExceptions"/> array. If no exceptions, array is null.</remarks>
@@ -5492,7 +5527,7 @@ namespace DryIoc
             var scope = request.Scope;
             if (scope == null)
             {
-                var parent = request.Enumerate().Last();
+                var parent = request.Enumerate().Last(); // TODO
                 request.Container.GetOrNew(ref scope, parent.ServiceType, parent.ServiceKey);
             }
 
@@ -5532,13 +5567,12 @@ namespace DryIoc
             if (assignableFromServiceType == null && serviceKey == null)
                 return scope;
 
+            var otherName = new KV<Type, object>(assignableFromServiceType, serviceKey);
             IScope matchedScope = null;
             while (scope != null)
             {
                 var name = scope.Name as KV<Type, object>;
-                if (name != null &&
-                    (assignableFromServiceType == null || name.Key.IsAssignableTo(assignableFromServiceType)) &&
-                    (serviceKey == null || serviceKey.Equals(name.Value)))
+                if (MatchScopeByName(name, otherName))
                 {
                     matchedScope = scope;
                     if (!outermost) // break on first found match.
@@ -5550,28 +5584,14 @@ namespace DryIoc
             return matchedScope;
         }
 
-        //private static IScope GetMatchingScopeOrDefault(IScope scope, object name1, bool outermost)
-        //{
-        //    if (name1 == null)
-        //        return scope;
-
-        //    IScope matchedScope = null;
-        //    while (scope != null)
-        //    {
-        //        var name = scope.Name as KV<Type, object>;
-        //        if (name != null &&
-        //            (assignableFromServiceType == null || name.Key.IsAssignableTo(assignableFromServiceType)) &&
-        //            (serviceKey == null || serviceKey.Equals(name.Value)))
-        //        {
-        //            matchedScope = scope;
-        //            if (!outermost) // break on first found match.
-        //                break;
-        //        }
-        //        scope = scope.Parent;
-        //    }
-
-        //    return matchedScope;
-        //}
+        public static bool MatchScopeByName(object scopeName, object otherName)
+        {
+            var name = scopeName as KV<Type, object>;
+            var other = otherName as KV<Type, object>;
+            return name != null && other != null &&
+                (other.Key == null || name.Key.IsAssignableTo(other.Key)) &&
+                (other.Value == null || other.Value.Equals(name.Value));
+        }
 
         private readonly Type _assignableFromServiceType;
         private readonly object _serviceKey;
@@ -6013,9 +6033,6 @@ namespace DryIoc
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
     public interface IContainer : IRegistrator, IResolver, IResolverContext, IDisposable
     {
-        /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
-        Request EmptyRequest { get; }
-
         /// <summary>Returns true if container is disposed.</summary>
         bool IsDisposed { get; }
 
@@ -6024,6 +6041,9 @@ namespace DryIoc
 
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
+
+        /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
+        Request EmptyRequest { get; }
 
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
         AppendableArray ResolutionStateCache { get; }
@@ -6061,6 +6081,12 @@ namespace DryIoc
         /// }
         /// ]]></code></example>
         IContainer OpenScope(object name = null, Func<Rules, Rules> configure = null);
+
+        /// <summary>Creates scoped container with scope bound to container itself, and not some ambient context.
+        /// Current container scope will become parent for new scope.</summary>
+        /// <param name="scopeName">(optional) Scope name.</param>
+        /// <returns>New container with all state shared except new created scope and context.</returns>
+        IContainer OpenScopeWithoutContext(object scopeName = null);
 
         /// <summary>Creates child container using the same rules as its created from.
         /// Additionally child container will fallback for not registered service to it parent.</summary>
@@ -6122,12 +6148,6 @@ namespace DryIoc
         /// <param name="item">Item to find in existing items with <see cref="object.Equals(object, object)"/> or add if not found.</param>
         /// <returns>Index of found or added item.</returns>
         int GetOrAddStateItem(object item);
-
-        /// <summary>Creates scoped container with scope bound to container itself, and not some ambient context.
-        /// Current container scope will become parent for new scope.</summary>
-        /// <param name="scopeName">(optional) Scope name.</param>
-        /// <returns>New container with all state shared except new created scope and context.</returns>
-        IContainer OpenScopeWithoutContext(object scopeName = null);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand, 
@@ -6321,7 +6341,10 @@ namespace DryIoc
 
             UNABLE_TO_RESOLVE_SERVICE = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
-                "Please register service, or specify @requiredServiceType while resolving, or add Rules.WithUnknownServiceResolver(MyRule)."),
+                "Please ensure that you have registered service, and with expected key and Setup.With(condition);" + Environment.NewLine +
+                "Or have specified requiredServiceType on resolution; " + Environment.NewLine +
+                "Or service actually matches the reuse scope; " + Environment.NewLine +
+                "Or exist Rules.WithUnknownServiceResolver(ResolveMyService)."),
             EXPECTED_SINGLE_DEFAULT_FACTORY = Of(
                 "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),

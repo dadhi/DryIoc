@@ -70,7 +70,10 @@ namespace DryIoc.IssuesTests.Samples
             Assert.That(exception.Message, Is.EqualTo(
 @"Unable to resolve DryIoc.IssuesTests.Samples.IService as parameter ""service""
  in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient.
-Please register service, or specify @requiredServiceType while resolving, or add Rules.WithUnknownServiceResolver(MyRule)."));
+Please ensure that you have registered service, and with expected key and Setup.With(condition);
+Or have specified requiredServiceType on resolution; 
+Or service actually matches the reuse scope; 
+Or exist Rules.WithUnknownServiceResolver(ResolveMyService)."));
         }
     }
 

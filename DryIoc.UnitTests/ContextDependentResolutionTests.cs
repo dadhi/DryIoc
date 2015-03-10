@@ -43,6 +43,8 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<A>(y.X);
         }
 
+        #region CUT
+
         internal interface IX { }
         internal class A : IX { }
         internal class B : IX { }
@@ -51,8 +53,6 @@ namespace DryIoc.UnitTests
             public IX X;
             public Y(IX x) { X = x; }
         }
-
-        #region CUT
 
         public interface ILogger
         {
