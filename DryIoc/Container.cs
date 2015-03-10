@@ -266,7 +266,7 @@ namespace DryIoc
             var registeredServiceType = request.Container.UnwrapServiceType(parent.RequiredServiceType ?? parent.ServiceType);
             var parentServiceTypeExpr = request.Container.GetOrAddStateItemExpression(registeredServiceType, typeof(Type));
             var parentServiceKeyExpr = Expression.Convert(request.Container.GetOrAddStateItemExpression(parent.ServiceKey), typeof(object));
-            return Expression.Call(ResolverContextExpr, "GetOrNew", null, ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
+            return Expression.Call(ResolverContextExpr, "GetOrCreateResolutionScope", null, ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
 
         #endregion
@@ -656,16 +656,7 @@ namespace DryIoc
 
         #endregion
 
-        #region IContainer
-
-        /// <summary>The rules object defines policies per container for registration and resolution.</summary>
-        public Rules Rules { get; private set; }
-
-        /// <summary>Indicates that container is disposed.</summary>
-        public bool IsDisposed
-        {
-            get { return _disposed == 1; }
-        }
+        #region IResolverContext
 
         /// <summary>Scope associated with container.</summary>
         IScope IResolverContext.SingletonScope
@@ -673,22 +664,25 @@ namespace DryIoc
             get { return _singletonScope; }
         }
 
+        /// <summary>Gets current scope matching the <paramref name="name"/>. 
+        /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
+        /// <param name="name">May be null</param> <returns>Found scope or throws exception.</returns>
+        /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
+        /// <exception cref="ContainerException"> with code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/>.</exception>
         IScope IResolverContext.GetCurrentNamedScope(object name, bool throwIfNotFound)
         {
             var currentScope = _scopeContext == null ? _openedScope : _scopeContext.GetCurrentOrDefault();
-            
-            return currentScope == null 
-                ?  (throwIfNotFound ? Throw.Instead<IScope>(Error.NO_CURRENT_SCOPE) : null)
-                : GetMatchingScopeOrDefault(currentScope, name) 
+            return currentScope == null
+                ? (throwIfNotFound ? Throw.Instead<IScope>(Error.NO_CURRENT_SCOPE) : null)
+                : GetMatchingScopeOrDefault(currentScope, name)
                 ?? (throwIfNotFound ? Throw.Instead<IScope>(Error.NO_MATCHED_SCOPE_FOUND, name) : null);
         }
 
         public static IScope GetMatchingScopeOrDefault(IScope scope, object name)
         {
-            if (name == null)
-                return scope;
-            while (scope != null && !name.Equals(scope.Name))
-                scope = scope.Parent;
+            if (name != null)
+                while (scope != null && !name.Equals(scope.Name))
+                    scope = scope.Parent;
             return scope;
         }
 
@@ -698,9 +692,62 @@ namespace DryIoc
         /// <param name="serviceType">Marking scope with resolved service type.</param> 
         /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
-        IScope IResolverContext.GetOrNew(ref IScope scope, Type serviceType, object serviceKey)
+        IScope IResolverContext.GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
         {
             return scope ?? (scope = new Scope(name: new KV<Type, object>(serviceType, serviceKey)));
+        }
+
+        /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
+        /// then returns input <paramref name="scope"/>.
+        /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and 
+        /// Key equal to <paramref name="serviceKey"/>.</summary>
+        /// <param name="scope">Scope to start matching with Type and Key specified.</param>
+        /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
+        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
+        /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
+        /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
+        IScope IResolverContext.GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey,
+            bool outermost, bool throwIfNotFound)
+        {
+            return GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost)
+                ?? (!throwIfNotFound ? null : Throw.Instead<IScope>(Error.NO_MATCHED_SCOPE_FOUND,
+                new KV<Type, object>(assignableFromServiceType, serviceKey)));
+        }
+
+        private static IScope GetMatchingScopeOrDefault(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost)
+        {
+            if (assignableFromServiceType == null && serviceKey == null)
+                return scope;
+
+            IScope matchedScope = null;
+            while (scope != null)
+            {
+                var name = scope.Name as KV<Type, object>;
+                if (name != null &&
+                    (assignableFromServiceType == null || name.Key.IsAssignableTo(assignableFromServiceType)) &&
+                    (serviceKey == null || serviceKey.Equals(name.Value)))
+                {
+                    matchedScope = scope;
+                    if (!outermost) // break on first found match.
+                        break;
+                }
+                scope = scope.Parent;
+            }
+
+            return matchedScope;
+        }       
+
+        #endregion
+
+        #region IContainer
+
+        /// <summary>The rules object defines policies per container for registration and resolution.</summary>
+        public Rules Rules { get; private set; }
+
+        /// <summary>Indicates that container is disposed.</summary>
+        public bool IsDisposed
+        {
+            get { return _disposed == 1; }
         }
 
         /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
@@ -3817,7 +3864,7 @@ namespace DryIoc
             return new Request(Parent, ContainerWeakRef, getInfo(ServiceInfo), ResolvedFactory, FuncArgs, Scope);
         }
 
-        public void MutateServiceKey(object serviceKey)
+        public void MutateServiceKey(object serviceKey) // TODO Smells
         {
             var details = ServiceInfo.Details;
             ServiceInfo = ServiceInfo.Create(ServiceInfo.ServiceType,
@@ -5525,71 +5572,28 @@ namespace DryIoc
             var scope = request.Scope;
             if (scope == null)
             {
-                var parent = request.Enumerate().Last(); // TODO
-                request.Container.GetOrNew(ref scope, parent.ServiceType, parent.ServiceKey);
+                var parent = request.Enumerate().Last(); // TODO Is it fine for wrapper parent?
+                request.Container.GetOrCreateResolutionScope(ref scope, parent.ServiceType, parent.ServiceKey);
             }
 
-            return GetMatchingScopeOrDefault(scope, _assignableFromServiceType, _serviceKey, _outermost);
+            return request.Container.GetMatchingResolutionScope(scope, _assignableFromServiceType, _serviceKey, _outermost, false);
         }
 
-        /// <summary>Returns <see cref="GetMatchingScope"/> method call expression.</summary>
+        /// <summary>Returns <see cref="IResolverContext.GetMatchingResolutionScope"/> method call expression.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Method call expression returning existing or newly created resolution scope.</returns>
         public Expression GetScopeExpression(Request request)
         {
-            return Expression.Call(typeof(ResolutionScopeReuse), "GetMatchingScope", null,
+            return Expression.Call(Container.ResolverContextExpr, "GetMatchingResolutionScope", null,
                 Container.GetResolutionScopeExpression(request),
                 Expression.Constant(_assignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(_serviceKey, typeof(object)),
-                Expression.Constant(_outermost, typeof(bool)));
+                Expression.Constant(_outermost, typeof(bool)),
+                Expression.Constant(true, typeof(bool)));
         }
 
         /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
         public override string ToString() { return GetType().Name + ":" + Lifespan; }
-
-        /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, then returns input <paramref name="scope"/>.
-        /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and 
-        /// Key equal to <paramref name="serviceKey"/>.</summary>
-        /// <param name="scope">Scope to start matching with Type and Key specified.</param>
-        /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
-        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
-        /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
-        public static IScope GetMatchingScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost)
-        {
-            return GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost) 
-                ?? Throw.Instead<IScope>(Error.NO_MATCHED_SCOPE_FOUND, new KV<Type, object>(assignableFromServiceType, serviceKey));
-        }
-
-        private static IScope GetMatchingScopeOrDefault(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost)
-        {
-            if (assignableFromServiceType == null && serviceKey == null)
-                return scope;
-
-            var otherName = new KV<Type, object>(assignableFromServiceType, serviceKey);
-            IScope matchedScope = null;
-            while (scope != null)
-            {
-                var name = scope.Name as KV<Type, object>;
-                if (MatchScopeByName(name, otherName))
-                {
-                    matchedScope = scope;
-                    if (!outermost) // break on first found match.
-                        break;
-                }
-                scope = scope.Parent;
-            }
-            
-            return matchedScope;
-        }
-
-        public static bool MatchScopeByName(object scopeName, object otherName)
-        {
-            var name = scopeName as KV<Type, object>;
-            var other = otherName as KV<Type, object>;
-            return name != null && other != null &&
-                (other.Key == null || name.Key.IsAssignableTo(other.Key)) &&
-                (other.Value == null || other.Value.Equals(name.Value));
-        }
 
         private readonly Type _assignableFromServiceType;
         private readonly object _serviceKey;
@@ -6027,7 +6031,19 @@ namespace DryIoc
         /// <param name="serviceType">Marking scope with resolved service type.</param> 
         /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
-        IScope GetOrNew(ref IScope scope, Type serviceType, object serviceKey);
+        IScope GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey);
+
+        /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
+        /// then returns input <paramref name="scope"/>.
+        /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and 
+        /// Key equal to <paramref name="serviceKey"/>.</summary>
+        /// <param name="scope">Scope to start matching with Type and Key specified.</param>
+        /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
+        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
+        /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
+        /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
+        IScope GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey,
+            bool outermost, bool throwIfNotFound);
     }
 
     /// <summary>Exposes operations required for internal registry access. 

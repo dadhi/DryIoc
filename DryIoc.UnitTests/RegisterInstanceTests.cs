@@ -30,11 +30,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance("a", Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.RegisterInstance("a", Reuse.Singleton, IfAlreadyRegistered.Replace);
 
             using (container.OpenScope())
             {
-                container.RegisterInstance("b", Reuse.InCurrentScope, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+                container.RegisterInstance("b", Reuse.InCurrentScope, IfAlreadyRegistered.Replace);
                 Assert.AreEqual("b", container.Resolve<string>());
             }
 

@@ -12,9 +12,15 @@ namespace DryIoc.CompileTimeGeneration.Tests
             throw new NotImplementedException();
         }
 
-        public IScope GetOrNew(ref IScope scope, Type serviceType, object serviceKey)
+        public IScope GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
         {
             return scope ?? (scope = new Scope(name: new KV<Type, object>(serviceType, serviceKey)));
+        }
+
+        public IScope GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost,
+            bool throwIfNotFound)
+        {
+            throw new NotImplementedException();
         }
 
         public ServiceFactory()
