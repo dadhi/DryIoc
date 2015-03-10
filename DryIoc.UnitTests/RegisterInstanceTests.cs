@@ -6,13 +6,12 @@ namespace DryIoc.UnitTests
     public class RegisterInstanceTests
     {
         [Test]
-        public void Can_replace_instance_without_replacing_factory()
+        public void Can_replace_instance_without_replacing_factory_and_without_exceptions()
         {
             var container = new Container();
 
-            container.RegisterInstance("a", Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-
-            container.RegisterInstance("b", Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.RegisterInstance("a", Reuse.Singleton, IfAlreadyRegistered.Replace);
+            container.RegisterInstance("b", Reuse.Singleton, IfAlreadyRegistered.Replace);
         }
 
         [Test]
@@ -23,7 +22,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.RegisterInstance("a", Reuse.InCurrentNamedScope("b")));
 
-            Assert.AreEqual(ex.Error, Error.NO_CURRENT_SCOPE);
+            Assert.AreEqual(ex.Error, Error.NO_SCOPE_WHEN_REGISTERING_INSTANCE);
         }
 
         [Test]

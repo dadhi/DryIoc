@@ -7,9 +7,9 @@ namespace DryIoc.CompileTimeGeneration.Tests
     {
         public IScope SingletonScope { get; private set; }
 
-        public IScope CurrentScope
+        public IScope GetCurrentNamedScope(object name, bool throwIfNotFound)
         {
-            get { throw new NotImplementedException(); }
+            throw new NotImplementedException();
         }
 
         public IScope GetOrNew(ref IScope scope, Type serviceType, object serviceKey)
