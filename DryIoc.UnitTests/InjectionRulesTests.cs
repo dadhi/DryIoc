@@ -15,7 +15,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<SomeBlah>(with: CreationInfo.Of(propertiesAndFields:
+            container.Register<SomeBlah>(with: Impl.Of(propertiesAndFields:
                 r => r.ImplementationType.GetTypeInfo().DeclaredProperties.Select(PropertyOrFieldServiceInfo.Of)));
             container.Register<IService, Service>();
 
@@ -28,7 +28,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<SomeBlah>(with: CreationInfo.Of(propertiesAndFields:
+            container.Register<SomeBlah>(with: Impl.Of(propertiesAndFields:
                 r => r.ImplementationType.GetTypeInfo().DeclaredProperties.Select(p =>
                     p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p)
                         .WithDetails(ServiceInfoDetails.Of(typeof(Service)), r) : null)));
@@ -43,7 +43,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterMany<ClientWithPropsAndFields>(with: PropertiesAndFields.Auto);
+            container.RegisterMany<ClientWithPropsAndFields>(with: Impl.Of(propertiesAndFields: PropertiesAndFields.Auto));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -58,7 +58,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.RegisterMany2(with: 
-                CreationInfo.Of<ClientWithPropsAndFields>(PropertiesAndFields.Of.The<ClientWithPropsAndFields>(x => x.PWithInternalSetter)));
+                Impl.Of<ClientWithPropsAndFields>(PropertiesAndFields.Of.The<ClientWithPropsAndFields>(x => x.PWithInternalSetter)));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -70,7 +70,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterMany<ClientWithPropsAndFields>(with: CreationInfo.Of(propertiesAndFields: 
+            container.RegisterMany<ClientWithPropsAndFields>(with: Impl.Of(propertiesAndFields: 
                 PropertiesAndFields.Of.The<ClientWithPropsAndFields>(x => x.PInternal)));
 
             var client = container.Resolve<ClientWithPropsAndFields>();

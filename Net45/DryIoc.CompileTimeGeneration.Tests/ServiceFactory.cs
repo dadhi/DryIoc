@@ -93,15 +93,10 @@ namespace DryIoc.CompileTimeGeneration.Tests
             }
         }
 
-        public object ResolvePropertiesAndFields(object instance, PropertiesAndFieldsSelector selectPropertiesAndFields)
-        {
-            throw new NotImplementedException();
-        }
-
         private static object GetDefaultOrThrowIfUnresolved(Type serviceType, IfUnresolved ifUnresolved)
         {
             return ifUnresolved == IfUnresolved.ReturnDefault ? null
-                : Throw.Instead<object>(Error.UNABLE_TO_RESOLVE_SERVICE, serviceType);
+                : Throw.For<object>(Error.UNABLE_TO_RESOLVE_SERVICE, serviceType);
         }
     }
 }

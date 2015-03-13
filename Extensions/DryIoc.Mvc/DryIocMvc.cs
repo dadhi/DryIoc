@@ -129,19 +129,19 @@ namespace DryIoc.Mvc
     [ComVisible(false)]
     public class DryIocAggregatedFilterAttributeFilterProvider : FilterAttributeFilterProvider
     {
-        public DryIocAggregatedFilterAttributeFilterProvider(IResolver resolver)
+        public DryIocAggregatedFilterAttributeFilterProvider(IContainer container)
         {
-            _resolver = resolver;
+            _container = container;
         }
 
         public override IEnumerable<Filter> GetFilters(ControllerContext controllerContext, ActionDescriptor actionDescriptor)
         {
             var filters = base.GetFilters(controllerContext, actionDescriptor).ToArray();
             for (var i = 0; i < filters.Length; i++)
-                _resolver.ResolvePropertiesAndFields(filters[i].Instance);
+                _container.ResolvePropertiesAndFields(filters[i].Instance);
             return filters;
         }
 
-        private readonly IResolver _resolver;
+        private readonly IContainer _container;
     }
 }

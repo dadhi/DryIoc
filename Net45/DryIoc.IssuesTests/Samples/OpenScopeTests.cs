@@ -57,7 +57,7 @@ namespace DryIoc.IssuesTests.Samples
             container.Register<ISessionFactory, TestSessionFactory>();
 
             container.Register<ISession>(Reuse.InCurrentScope,
-                with: CreationInfo.Of(ServiceInfo.Of<ISessionFactory>(), f => f.OpenSession()));
+                with: Impl.Of(ServiceInfo.Of<ISessionFactory>(), f => f.OpenSession()));
 
             ISession scopeOneSession;
             using (var scoped = container.OpenScope())

@@ -180,7 +180,7 @@ namespace DryIoc.UnitTests
         public void Can_correctly_handle_resolution_scope_condition()
         {
             var container = new Container();
-            container.Register<ViewModel2>(with: CreationInfo.Of(() => new ViewModel2(Arg.Of<Log>(IfUnresolved.ReturnDefault))));
+            container.Register<ViewModel2>(with: Impl.Of(() => new ViewModel2(Arg.Of<Log>(IfUnresolved.ReturnDefault))));
 
             var logReuse = Reuse.InResolutionScopeOf<ViewModel1>();
             container.Register<Log>(logReuse, setup: Setup.With(condition: request => logReuse.GetScopeOrDefault(request) != null));

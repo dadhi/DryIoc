@@ -163,14 +163,14 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static FactoryMethodInfo GetImportingConstructor(Request request)
+        private static FactoryMethod GetImportingConstructor(Request request)
         {
             var implementationType = request.ImplementationType;
             var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
             var constructor = constructors.Length == 1 ? constructors[0]
                 : constructors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
                     .ThrowIfNull(Error.NO_SINGLE_CTOR_WITH_IMPORTING_ATTR, implementationType);
-            return FactoryMethodInfo.Of(constructor);
+            return FactoryMethod.Of(constructor);
         }
 
         private static ParameterServiceInfo GetImportedParameter(ParameterInfo parameter, Request request)
@@ -247,11 +247,11 @@ namespace DryIoc.MefAttributedModel
                 var reuseName = reuseAttr == null ? null : reuseAttr.ReuseName;
                 var reuse = GetReuse(reuseType, reuseName);
 
-                var creationInfo = import.ConstructorSignature == null ? null
-                    : CreationInfo.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
+                var method = import.ConstructorSignature == null ? null
+                    : Impl.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
                 registry.Register(serviceType, implementationType,
-                    reuse, creationInfo, Setup.With(metadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
+                    reuse, method, Setup.With(metadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
             }
 
             return ServiceInfoDetails.Of(serviceType, serviceKey);
@@ -446,7 +446,7 @@ namespace DryIoc.MefAttributedModel
                 var factoryMethod = method;
                 var factoryExport = factoryInfo.Exports[0];
                 var factoryServiceInfo = ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
-                var creationInfo = CreationInfo.Of(_ => FactoryMethodInfo.Of(factoryMethod, factoryServiceInfo));
+                var creationInfo = Impl.Of(_ => FactoryMethod.Of(factoryMethod, factoryServiceInfo));
                 var factory = serviceInfo.CreateFactory(creationInfo);
 
                 var serviceExports = serviceInfo.Exports;
@@ -644,7 +644,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Creates factory out of registration info.</summary>
         /// <param name="rules">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
         /// <returns>Created factory.</returns>
-        public Factory CreateFactory(CreationInfo rules = null)
+        public Factory CreateFactory(Impl rules = null)
         {
             var reuse = AttributedModel.GetReuse(ReuseType, ReuseName);
             return new ReflectionFactory(ImplementationType, reuse, rules, GetSetup());

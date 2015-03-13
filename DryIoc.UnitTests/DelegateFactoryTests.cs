@@ -110,18 +110,6 @@ namespace DryIoc.UnitTests
                 container.Resolve<IService>());
         }
 
-        [Test]
-        public void Can_use_props_and_fields_resolution_in_delegate_factory()
-        {
-            var container = new Container();
-            container.RegisterDelegate(r => r.ResolvePropertiesAndFields(new MyClass()));
-            container.Register<IService, Service>();
-
-            var myClass = container.Resolve<MyClass>();
-
-            Assert.That(myClass.MyService, Is.InstanceOf<Service>());
-        }
-
         internal class MyClass
         {
             public IService MyService { get; set; }

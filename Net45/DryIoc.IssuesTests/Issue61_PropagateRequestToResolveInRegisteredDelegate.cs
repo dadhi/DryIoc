@@ -19,19 +19,6 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void Recursive_dependency_could_be_detected_when_resolving_properties_in_delegate_factory()
-        {
-            var container = new Container();
-            container.RegisterDelegate(r => r.ResolvePropertiesAndFields(new SomeClientWithProps()));
-            container.Register<ServiceWithClientWithProps>();
-
-            var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<SomeClientWithProps>());
-
-            Assert.That(ex.Message, Is.StringContaining("Recursive dependency is detected"));
-        }
-
-        [Test]
         public void Detect_recursive_dependency_when_dependency_registered_as_delegate()
         {
             var container = new Container();

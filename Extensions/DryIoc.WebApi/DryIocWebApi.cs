@@ -128,9 +128,9 @@ namespace DryIoc.WebApi
 
     internal class DryIocAggregatedFilterProvider : IFilterProvider
     {
-        public DryIocAggregatedFilterProvider(IResolver resolver, IEnumerable<IFilterProvider> providers)
+        public DryIocAggregatedFilterProvider(IContainer container, IEnumerable<IFilterProvider> providers)
         {
-            _resolver = resolver;
+            _container = container;
             _providers = providers;
         }
 
@@ -138,11 +138,11 @@ namespace DryIoc.WebApi
         {
             var filters = _providers.SelectMany(p => p.GetFilters(configuration, actionDescriptor)).ToArray();
             for (var i = 0; i < filters.Length; i++)
-                _resolver.ResolvePropertiesAndFields(filters[i].Instance);
+                _container.ResolvePropertiesAndFields(filters[i].Instance);
             return filters;
         }
 
-        private readonly IResolver _resolver;
+        private readonly IContainer _container;
         private readonly IEnumerable<IFilterProvider> _providers;
     }
 
