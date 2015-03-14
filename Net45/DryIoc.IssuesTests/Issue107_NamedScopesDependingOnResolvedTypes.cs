@@ -484,5 +484,26 @@ namespace DryIoc.IssuesTests
             Assert.IsTrue(((SmallCar)area.Tool.Car).IsDisposed);
             Assert.IsFalse(((SmallCar)manager.ReferenceCar).IsDisposed);
         }
+
+        [Test]
+        public void SingletonWithSeveralInterfaces_ResolveEachInterface_EachResolveReturnsSameInstance()
+        {
+            var container = new Container();
+
+            container.RegisterMany<SingletonWithTwoInterfaces>(Reuse.Singleton);
+
+            var singletonViaFirstInterface = container.Resolve<ISingletonFirstInterface>();
+            var singletonViaSecondInterface = container.Resolve<ISingletonSecondInterface>();
+
+            Assert.AreSame(singletonViaFirstInterface, singletonViaSecondInterface, "Singleton resolved via independent interfaces shall still a Singleton");
+        }
+
+        public interface ISingletonFirstInterface {}
+
+        public interface ISingletonSecondInterface {}
+
+        public interface ISingletonCombinedInterface : ISingletonFirstInterface, ISingletonSecondInterface { }
+
+        public class SingletonWithTwoInterfaces : ISingletonFirstInterface, ISingletonSecondInterface, ISingletonCombinedInterface {}
     }
 }
