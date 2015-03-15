@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
+using Me;
 using NUnit.Framework;
 
 #pragma warning disable 0649 // Field '...' is never assigned to, and will always have its default value null
@@ -205,6 +206,33 @@ namespace DryIoc.UnitTests
             Assert.That(client.Dep, Is.SameAs(defaultDep));
         }
 
+        [Test]
+        public void Can_pass_parent_type_as_string_param_to_dependency()
+        {
+            var container = new Container();
+
+            container.Register<MyService>();
+            container.Register<ConnectionStringProvider>(Reuse.Singleton);
+            container.Register<IConnectionStringProvider, ConnectionNamingConnectionStringProvider>(
+                setup: Setup.With(cacheFactoryExpression: false),
+                with: Impl.Of(parameters: (parameter, request) =>
+                {
+                    if (parameter.ParameterType != typeof(string)) 
+                        return null;
+                    var targetType = request.Parent.ImplementationType;
+                    var targetName = string.Format("{0}.{1}", targetType.Namespace, targetType.Name);
+                    return ParameterServiceInfo.Of(parameter)
+                        .WithDetails(ServiceInfoDetails.Of(defaultValue: targetName), request);
+                }));
+            
+
+            var service = container.Resolve<MyService>();
+
+            var provider = service.ConnectionProvider as ConnectionNamingConnectionStringProvider;
+            Assert.NotNull(provider);
+            Assert.AreEqual("Me.MyService", provider.TargetName);
+        }
+
         #region CUT
 
         internal class FooWithIndexer
@@ -282,5 +310,33 @@ namespace DryIoc.UnitTests
         public class Dep { }
 
         #endregion
+    }
+}
+
+namespace Me
+{
+    public class ConnectionStringProvider { }
+
+    public interface IConnectionStringProvider {}
+
+    internal class ConnectionNamingConnectionStringProvider : IConnectionStringProvider
+    {
+        public ConnectionStringProvider ConnectionStringProvider { get; private set; }
+        public string TargetName { get; private set; }
+
+        public ConnectionNamingConnectionStringProvider(ConnectionStringProvider connectionStringProvider, string targetName)
+        {
+            ConnectionStringProvider = connectionStringProvider;
+            TargetName = targetName;
+        }
+    }
+
+    public class MyService
+    {
+        public IConnectionStringProvider ConnectionProvider { get; private set; }
+        public MyService(IConnectionStringProvider connectionProvider)
+        {
+            ConnectionProvider = connectionProvider;
+        }
     }
 }
