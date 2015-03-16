@@ -233,6 +233,37 @@ namespace DryIoc.UnitTests
             Assert.AreEqual("Me.MyService", provider.TargetName);
         }
 
+        [Test]
+        public void Can_pass_parent_type_as_string_param_to_dependency_using_factory_method()
+        {
+            var container = new Container();
+
+            container.Register<MyService>();
+            container.Register<ConnectionStringProvider>(Reuse.Singleton);
+            container.Register2<IConnectionStringProvider, ConnectionNamingConnectionStringProvider>(
+                with: Impl.Of(() => new ConnectionNamingConnectionStringProvider(default(ConnectionStringProvider), Arg.Of<string>("targetName"))));
+
+            container.Register<string>(serviceKey: "targetName",
+                setup: Setup.With(cacheFactoryExpression: false),
+                with: Impl.Of(r =>
+                {
+                    var method = GetType().GetDeclaredMethodOrNull("GetTargetName");
+                    var targetType = r.Parent.Parent.ImplementationType;
+                    return FactoryMethod.Of(method.MakeGenericMethod(targetType));
+                }));
+
+            var service = container.Resolve<MyService>();
+
+            var provider = service.ConnectionProvider as ConnectionNamingConnectionStringProvider;
+            Assert.NotNull(provider);
+            Assert.AreEqual("Me.MyService", provider.TargetName);
+        }
+
+        public static string GetTargetName<TTarget>()
+        {
+            return string.Format("{0}.{1}", typeof(TTarget).Namespace, typeof(TTarget).Name);
+        }
+
         #region CUT
 
         internal class FooWithIndexer
