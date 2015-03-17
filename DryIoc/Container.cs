@@ -34,6 +34,7 @@ namespace DryIoc
     using System.Reflection;
     using System.Text;
     using System.Threading;
+    using System.Collections.ObjectModel;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IContainer
@@ -2525,7 +2526,7 @@ namespace DryIoc
         private static Expression ResolveParameter(ParameterInfo p, ReflectionFactory factory, Request request)
         {
             var container = request.Container;
-            var getParamInfo = container.Rules.Parameters.OverrideWith(factory.Impl.Parameters);
+            var getParamInfo = container.Rules.Parameters.CombineWith(factory.Impl.Parameters);
             var paramInfo = getParamInfo(p, request) ?? ParameterServiceInfo.Of(p);
             var paramRequest = request.Push(paramInfo.WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
             var paramFactory = container.ResolveFactory(paramRequest);
@@ -2578,124 +2579,110 @@ namespace DryIoc
         /// <param name="methodOrConstructorCallExpr">Expression tree with call to constructor with properties: 
         /// <code lang="cs"><![CDATA[() => new Car(Arg.Of<IEngine>()) { Color = Arg.Of<Color>("CarColor") }]]></code>
         /// or static method call <code lang="cs"><![CDATA[() => Car.Create(Arg.Of<IEngine>())]]></code></param>
-        /// <param name="propertiesAndFields"></param>
         /// <returns></returns>
-        public static Impl<T> Of<T>(Expression<Func<T>> methodOrConstructorCallExpr,
-            PropertiesAndFieldsSelector propertiesAndFields = null)
+        public static Impl<T> Of<T>(Expression<Func<T>> methodOrConstructorCallExpr)
         {
-            return Of<T>(methodOrConstructorCallExpr as LambdaExpression, propertiesAndFields: propertiesAndFields);
+            return Of<T>(methodOrConstructorCallExpr as LambdaExpression);
         }
 
         /// <summary>Builds creation info from factory method call expression (without using strings).
         /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
         /// <typeparam name="TFactory">Factory type.</typeparam> <typeparam name="TService">Factory product type.</typeparam>
-        /// <param name="factoryInfo">Returns or resolves factory instance.</param> <param name="factoryCallExpr">Get a method call expression.</param>
-        /// <param name="propertiesAndFields">(optional) Properties and fields selector.</param> <returns>New creation info.</returns>
-        public static Impl Of<TFactory, TService>(
-            ServiceInfo<TFactory> factoryInfo, Expression<Func<TFactory, TService>> factoryCallExpr,
-            PropertiesAndFieldsSelector propertiesAndFields = null)
+        /// <param name="factoryInfo">Returns or resolves factory instance.</param> <param name="factoryMethodCallExpr">Get a method call expression.</param>
+        public static Impl Of<TFactory, TService>(ServiceInfo<TFactory> factoryInfo, Expression<Func<TFactory, TService>> factoryMethodCallExpr)
             where TFactory : class
         {
-            return Of<TService>(factoryCallExpr, factoryInfo.ThrowIfNull(), propertiesAndFields);
+            return Of<TService>(factoryMethodCallExpr, factoryInfo.ThrowIfNull());
         }
 
-        public static Impl<T> Of<T>(PropertiesAndFieldsSelector propertiesAndFields)
+        private static Impl<T> Of<T>(LambdaExpression constructorOrMethodCallExpr, ServiceInfo factoryInfo = null)
         {
-            return Of<T>(null, propertiesAndFields);
-        }
+            var callExpr = constructorOrMethodCallExpr.Body;
 
-        private static Impl<T> Of<T>(LambdaExpression methodOrConstructorCallExpr, 
-            ServiceInfo factoryInfo = null, PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            if (methodOrConstructorCallExpr == null)
-                return new Impl<T>(propertiesAndFields: propertiesAndFields);
+            if (!(callExpr is NewExpression) && !(callExpr is MemberInitExpression) &&
+                !(callExpr is MethodCallExpression))
+                Throw.It(Error.Of("Only method calls and new expression are supported, but found: {0}"), callExpr);
 
             MethodBase methodOrCtor;
             IList<Expression> argExprs;
-
-            var callExpr = methodOrConstructorCallExpr.Body;
-            if (!(callExpr is NewExpression) &&
-                !(callExpr is MemberInitExpression) &&
-                !(callExpr is MethodCallExpression))
-                return Throw.For<Impl<T>>(
-                    Error.Of("Only method calls and new expression are supported, but found: {0}"), callExpr);
-
-            if (callExpr is NewExpression || callExpr is MemberInitExpression)
+            var methodCallExpr = callExpr as MethodCallExpression;
+            if (methodCallExpr != null)
             {
-                var newExpr = callExpr as NewExpression ?? ((MemberInitExpression)callExpr).NewExpression;
-                argExprs = newExpr.Arguments;
-                methodOrCtor = newExpr.Constructor;
-                var memberInitExpr = callExpr as MemberInitExpression;
-                if (memberInitExpr != null)
-                {
-                    var memberBindings = memberInitExpr.Bindings;
-                    if (memberBindings.Count != 0)
-                    {
-                        for (var i = 0; i < memberBindings.Count; i++)
-                        {
-                            var memberAssignment = (memberBindings[i] as MemberAssignment).ThrowIfNull();
-                            var member = memberAssignment.Member;
-
-                            var methodCallExpr = memberAssignment.Expression as MethodCallExpression;
-                            if (methodCallExpr != null)
-                            {
-                                Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg));
-
-                                var requiredServiceType = methodCallExpr.Method.GetGenericArguments()[0];
-                                if (requiredServiceType == member.GetPropertyOrFieldType())
-                                    requiredServiceType = null;
-
-                                var serviceKey = default(object);
-                                var ifUnresolved = IfUnresolved.ReturnDefault;
-
-                                var argExpr = methodCallExpr.Arguments;
-                                for (var j = 0; j < argExpr.Count; j++)
-                                {
-                                    var argValueExpr = GetArgConstantExpressionOrDefault(argExpr[j]);
-                                    if (argValueExpr != null)
-                                    {
-                                        if (argValueExpr.Type == typeof(IfUnresolved))
-                                            ifUnresolved = (IfUnresolved)argValueExpr.Value;
-                                        else // service key
-                                            serviceKey = argValueExpr.Value;
-                                    }
-                                }
-
-                                propertiesAndFields = propertiesAndFields.CombineWith(r =>
-                                    new[]
-                                    {
-                                        PropertyOrFieldServiceInfo.Of(member).WithDetails(
-                                            ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), r)
-                                    });
-                            }
-                            else
-                            {
-                                var constExpr = GetArgConstantExpressionOrDefault(memberAssignment.Expression);
-                                if (constExpr != null)
-                                {
-                                    propertiesAndFields = propertiesAndFields.CombineWith(r => new[]
-                                    {
-                                        PropertyOrFieldServiceInfo.Of(member)
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
+                methodOrCtor = methodCallExpr.Method;
+                argExprs = methodCallExpr.Arguments;
             }
             else
             {
-                var methodCallExpr = (MethodCallExpression)callExpr;
-                argExprs = methodCallExpr.Arguments;
-                methodOrCtor = methodCallExpr.Method;
+                var newExpr = callExpr as NewExpression ?? ((MemberInitExpression)callExpr).NewExpression;
+                methodOrCtor = newExpr.Constructor;
+                argExprs = newExpr.Arguments;
             }
 
-            var pars = methodOrCtor.GetParameters();
-            var parameters = DryIoc.Parameters.Of;
+            ParameterSelector parameters = null;
             if (argExprs.Count != 0)
-                parameters = GetParameterSelector(argExprs, pars);
+                parameters = GetParameterSelector(argExprs, methodOrCtor.GetParameters());
 
-            return new Impl<T>(_ => DryIoc.FactoryMethod.Of(methodOrCtor, factoryInfo), parameters, propertiesAndFields);
+            PropertiesAndFieldsSelector propertiesAndFields = null;
+            var memberBindings = callExpr is MemberInitExpression ? ((MemberInitExpression)callExpr).Bindings : null;
+            if (memberBindings != null && memberBindings.Count != 0)
+                propertiesAndFields = GetPropertiesAndFields(memberBindings);
+
+            return new Impl<T>(r => DryIoc.FactoryMethod.Of(methodOrCtor, factoryInfo), parameters, propertiesAndFields);
+        }
+
+        private static PropertiesAndFieldsSelector GetPropertiesAndFields(ReadOnlyCollection<MemberBinding> memberBindings)
+        {
+            var propertiesAndFields = DryIoc.PropertiesAndFields.Of;
+            for (var i = 0; i < memberBindings.Count; i++)
+            {
+                var memberAssignment = (memberBindings[i] as MemberAssignment).ThrowIfNull();
+                var member = memberAssignment.Member;
+
+                var methodCallExpr = memberAssignment.Expression as MethodCallExpression;
+                if (methodCallExpr != null)
+                {
+                    Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg));
+
+                    var requiredServiceType = methodCallExpr.Method.GetGenericArguments()[0];
+                    if (requiredServiceType == member.GetPropertyOrFieldType())
+                        requiredServiceType = null;
+
+                    var serviceKey = default(object);
+                    var ifUnresolved = IfUnresolved.ReturnDefault;
+
+                    var argExpr = methodCallExpr.Arguments;
+                    for (var j = 0; j < argExpr.Count; j++)
+                    {
+                        var argValueExpr = GetArgConstantExpressionOrDefault(argExpr[j]);
+                        if (argValueExpr != null)
+                        {
+                            if (argValueExpr.Type == typeof(IfUnresolved))
+                                ifUnresolved = (IfUnresolved)argValueExpr.Value;
+                            else // service key
+                                serviceKey = argValueExpr.Value;
+                        }
+                    }
+
+                    propertiesAndFields = propertiesAndFields.CombineWith(r =>
+                        new[]
+                        {
+                            PropertyOrFieldServiceInfo.Of(member).WithDetails(
+                                ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), r)
+                        });
+                }
+                else
+                {
+                    var constExpr = GetArgConstantExpressionOrDefault(memberAssignment.Expression);
+                    if (constExpr != null)
+                    {
+                        propertiesAndFields = propertiesAndFields.CombineWith(r => new[]
+                        {
+                            PropertyOrFieldServiceInfo.Of(member)
+                        });
+                    }
+                }
+            }
+            return propertiesAndFields;
         }
 
         private static ParameterSelector GetParameterSelector(IList<Expression> argExprs, ParameterInfo[] pars)
@@ -4613,7 +4600,7 @@ namespace DryIoc
         public static ParameterSelector DefaultIfUnresolved = ((p, req) =>
             ParameterServiceInfo.Of(p).WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, req));
 
-        public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other)
+        public static ParameterSelector CombineWith(this ParameterSelector source, ParameterSelector other)
         {
             return source == null || source == Of ? other ?? Of
                 : other == null || other == Of ? source
@@ -4941,7 +4928,7 @@ namespace DryIoc
             {
                 paramExprs = new Expression[parameters.Length];
 
-                var getParamInfo = request.Container.Rules.Parameters.OverrideWith(Impl.Parameters);
+                var getParamInfo = request.Container.Rules.Parameters.CombineWith(Impl.Parameters);
 
                 var funcArgs = request.FuncArgs;
                 var funcArgsUsedMask = 0;
