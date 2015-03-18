@@ -2568,8 +2568,8 @@ namespace DryIoc
         /// <param name="getConstructor">Delegate taking implementation type as input and returning selected constructor info.</param>
         /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
         /// <returns>New instance of <see cref="Impl"/> with <see cref="FactoryMethod"/> set to specified delegate.</returns>
-        public static Impl Of(Func<Type, ConstructorInfo> getConstructor,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
+        public static Impl Of(Func<Type, ConstructorInfo> getConstructor, ParameterSelector parameters = null, 
+            PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             return Of(r => DryIoc.FactoryMethod.Of(getConstructor(r.ImplementationType)), parameters, propertiesAndFields);
         }
@@ -4705,14 +4705,6 @@ namespace DryIoc
                             .Where(info => info != null && otherMembers.All(o => o == null || !info.Member.Name.Equals(o.Member.Name)))
                             .Concat(otherMembers);
                 };
-        }
-
-        public static PropertiesAndFieldsSelector The<T>(this PropertiesAndFieldsSelector s, Expression<Func<T, object>> getterExpression,
-            Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, object defaultValue = null)
-        {
-            var member = ExpressionTools.GetAccessedMemberOrNull(getterExpression.ThrowIfNull());
-            return s.CombineWith(r => new[] { PropertyOrFieldServiceInfo.Of(member)
-                .WithDetails(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue), r) });
         }
 
         public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector s, string name,

@@ -58,8 +58,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterMany<ClientWithPropsAndFields>(with: 
-                PropertiesAndFields.Of.The<ClientWithPropsAndFields>(x => x.PWithInternalSetter));
+            container.RegisterMany2(
+                with: Impl.Of(() => new ClientWithPropsAndFields { PWithInternalSetter = default(IService) }));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -71,8 +71,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterMany<ClientWithPropsAndFields>(with: Impl.Of(propertiesAndFields: 
-                PropertiesAndFields.Of.The<ClientWithPropsAndFields>(x => x.PInternal)));
+            container.RegisterMany<ClientWithPropsAndFields>(
+                with: Impl.Of(() => new ClientWithPropsAndFields {PInternal = default(IService)})); 
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -98,8 +98,8 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(serviceKey: "another");
 
-            container.RegisterMany<ClientWithPropsAndFields>(with: 
-                PropertiesAndFields.All(withFields: false).The<ClientWithPropsAndFields>(_ => _.PInternal, serviceKey: "another"));
+            container.RegisterMany<ClientWithPropsAndFields>(
+                with: PropertiesAndFields.All(withFields: false).CombineWith(PropertiesAndFields.Of.Name("PInternal", serviceKey: "another")));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -144,7 +144,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ClientWithServiceAndStringProperty>(with: PropertiesAndFields.All(ifUnresolved: IfUnresolved.Throw));
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
                 container.Resolve<ClientWithServiceAndStringProperty>());
         }
 
@@ -152,10 +152,10 @@ namespace DryIoc.UnitTests
         public void Indexer_properties_should_be_ignored_by_All_properties_discovery()
         {
             var container = new Container();
-            container.Register<FooWithIndexer>(with: 
+            container.Register<FooWithIndexer>(with:
                 PropertiesAndFields.All(ifUnresolved: IfUnresolved.Throw));
 
-            Assert.DoesNotThrow(() => 
+            Assert.DoesNotThrow(() =>
                 container.Resolve<FooWithIndexer>());
         }
 
@@ -217,14 +217,14 @@ namespace DryIoc.UnitTests
                 setup: Setup.With(cacheFactoryExpression: false),
                 with: Impl.Of(parameters: (parameter, request) =>
                 {
-                    if (parameter.ParameterType != typeof(string)) 
+                    if (parameter.ParameterType != typeof(string))
                         return null;
                     var targetType = request.Parent.ImplementationType;
                     var targetName = string.Format("{0}.{1}", targetType.Namespace, targetType.Name);
                     return ParameterServiceInfo.Of(parameter)
                         .WithDetails(ServiceInfoDetails.Of(defaultValue: targetName), request);
                 }));
-            
+
 
             var service = container.Resolve<MyService>();
 
@@ -348,7 +348,7 @@ namespace Me
 {
     public class ConnectionStringProvider { }
 
-    public interface IConnectionStringProvider {}
+    public interface IConnectionStringProvider { }
 
     internal class ConnectionNamingConnectionStringProvider : IConnectionStringProvider
     {
