@@ -99,7 +99,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, AnotherService>(serviceKey: "another");
 
             container.RegisterMany<ClientWithPropsAndFields>(
-                with: PropertiesAndFields.All(withFields: false).CombineWith(PropertiesAndFields.Of.Name("PInternal", serviceKey: "another")));
+                with: PropertiesAndFields.All(withFields: false).And(PropertiesAndFields.Of.Name("PInternal", serviceKey: "another")));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -199,7 +199,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             var defaultDep = new Dep();
-            container.Register<Client>(with: Parameters.Of.Type(typeof(Dep), defaultValue: defaultDep));
+            container.Register<Client>(with: Parameters.Of.Type<Dep>(defaultValue: defaultDep));
 
             var client = container.Resolve<Client>();
 

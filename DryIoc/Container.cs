@@ -890,7 +890,7 @@ namespace DryIoc
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
         /// <returns>Instance with assigned properties and fields.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.CombineWith"/> method.</remarks>        
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.And"/> method.</remarks>        
         public object InjectPropertiesAndFields(object instance, PropertiesAndFieldsSelector propertiesAndFields)
         {
             propertiesAndFields = propertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.Auto;
@@ -2526,7 +2526,7 @@ namespace DryIoc
         private static Expression ResolveParameter(ParameterInfo p, ReflectionFactory factory, Request request)
         {
             var container = request.Container;
-            var getParamInfo = container.Rules.Parameters.CombineWith(factory.Impl.Parameters);
+            var getParamInfo = container.Rules.Parameters.And(factory.Impl.Parameters);
             var paramInfo = getParamInfo(p, request) ?? ParameterServiceInfo.Of(p);
             var paramRequest = request.Push(paramInfo.WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
             var paramFactory = container.ResolveFactory(paramRequest);
@@ -2630,6 +2630,46 @@ namespace DryIoc
             return new Impl<T>(r => DryIoc.FactoryMethod.Of(methodOrCtor, factoryInfo), parameters, propertiesAndFields);
         }
 
+        private static ParameterSelector GetParameterSelector(IList<Expression> argExprs, ParameterInfo[] parameterInfos)
+        {
+            var parameters = DryIoc.Parameters.Of;
+            for (var i = 0; i < argExprs.Count; i++)
+            {
+                var parameter = parameterInfos[i];
+                var methodCallExpr = argExprs[i] as MethodCallExpression;
+                if (methodCallExpr != null)
+                {
+                    Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg));
+
+                    var requiredServiceType = methodCallExpr.Method.GetGenericArguments()[0];
+                    if (requiredServiceType == parameter.ParameterType)
+                        requiredServiceType = null;
+
+                    var serviceKey = default(object);
+                    var ifUnresolved = IfUnresolved.Throw;
+
+                    var argExpr = methodCallExpr.Arguments;
+                    for (var j = 0; j < argExpr.Count; j++)
+                    {
+                        var argValueExpr = GetArgConstantExpressionOrDefault(argExpr[j]);
+                        if (argValueExpr != null)
+                        {
+                            if (argValueExpr.Type == typeof(IfUnresolved))
+                                ifUnresolved = (IfUnresolved)argValueExpr.Value;
+                            else // service key
+                                serviceKey = argValueExpr.Value;
+                        }
+                    }
+
+                    var defaultValue = ifUnresolved == IfUnresolved.ReturnDefault
+                        && parameter.IsOptional ? parameter.DefaultValue : null;
+
+                    parameters = parameters.Condition(parameter.Equals, requiredServiceType, serviceKey, ifUnresolved, defaultValue);
+                }
+            }
+            return parameters;
+        }
+
         private static PropertiesAndFieldsSelector GetPropertiesAndFields(ReadOnlyCollection<MemberBinding> memberBindings)
         {
             var propertiesAndFields = DryIoc.PropertiesAndFields.Of;
@@ -2663,7 +2703,7 @@ namespace DryIoc
                         }
                     }
 
-                    propertiesAndFields = propertiesAndFields.CombineWith(r =>
+                    propertiesAndFields = propertiesAndFields.And(r =>
                         new[]
                         {
                             PropertyOrFieldServiceInfo.Of(member).WithDetails(
@@ -2675,7 +2715,7 @@ namespace DryIoc
                     var constExpr = GetArgConstantExpressionOrDefault(memberAssignment.Expression);
                     if (constExpr != null)
                     {
-                        propertiesAndFields = propertiesAndFields.CombineWith(r => new[]
+                        propertiesAndFields = propertiesAndFields.And(r => new[]
                         {
                             PropertyOrFieldServiceInfo.Of(member)
                         });
@@ -2683,46 +2723,6 @@ namespace DryIoc
                 }
             }
             return propertiesAndFields;
-        }
-
-        private static ParameterSelector GetParameterSelector(IList<Expression> argExprs, ParameterInfo[] pars)
-        {
-            var parameters = DryIoc.Parameters.Of;
-            for (var i = 0; i < argExprs.Count; i++)
-            {
-                var parameter = pars[i];
-                var methodCallExpr = argExprs[i] as MethodCallExpression;
-                if (methodCallExpr != null)
-                {
-                    Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg));
-
-                    var requiredServiceType = methodCallExpr.Method.GetGenericArguments()[0];
-                    if (requiredServiceType == parameter.ParameterType)
-                        requiredServiceType = null;
-
-                    var serviceKey = default(object);
-                    var ifUnresolved = IfUnresolved.Throw;
-
-                    var argExpr = methodCallExpr.Arguments;
-                    for (var j = 0; j < argExpr.Count; j++)
-                    {
-                        var argValueExpr = GetArgConstantExpressionOrDefault(argExpr[j]);
-                        if (argValueExpr != null)
-                        {
-                            if (argValueExpr.Type == typeof(IfUnresolved))
-                                ifUnresolved = (IfUnresolved)argValueExpr.Value;
-                            else // service key
-                                serviceKey = argValueExpr.Value;
-                        }
-                    }
-
-                    var defaultValue = ifUnresolved == IfUnresolved.ReturnDefault 
-                        && parameter.IsOptional ? parameter.DefaultValue : null;
-
-                    parameters = parameters.Condition(parameter.Equals, requiredServiceType, serviceKey, ifUnresolved, defaultValue);
-                }
-            }
-            return parameters;
         }
 
         private static ConstantExpression GetArgConstantExpressionOrDefault(Expression arg)
@@ -3368,7 +3368,7 @@ namespace DryIoc
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
         /// <returns>Input instance with resolved dependencies, to enable fluent method composition.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.CombineWith"/> method.</remarks>        
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.And"/> method.</remarks>        
         public static TService ResolvePropertiesAndFields<TService>(this IContainer container,
             TService instance, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
@@ -3456,8 +3456,7 @@ namespace DryIoc
         /// <summary>Creates new DTO out of provided settings, or returns default if all settings have default value.</summary>
         /// <param name="requiredServiceType">Registered service type to search for.</param>
         /// <param name="serviceKey">Service key.</param> <param name="ifUnresolved">If unresolved policy.</param>
-        /// <param name="defaultValue">Custom default value, 
-        /// if specified it will automatically sets <paramref name="ifUnresolved"/> to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</param>
+        /// <param name="defaultValue">Custom default value, if specified it will automatically set <paramref name="ifUnresolved"/> to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</param>
         /// <returns>Created details DTO.</returns>
         public static ServiceInfoDetails Of(Type requiredServiceType = null,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, 
@@ -4594,44 +4593,64 @@ namespace DryIoc
     public static partial class Parameters
     {
         /// <summary>Specifies to return default details <see cref="ServiceInfoDetails.Default"/> for all parameters.</summary>
-        public static ParameterSelector Of = (p, req) => null;
+        public static ParameterSelector Of = (parameter, request) => null;
 
         /// <summary>Specifies that all parameters could be set to default if unresolved.</summary>
-        public static ParameterSelector DefaultIfUnresolved = ((p, req) =>
-            ParameterServiceInfo.Of(p).WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, req));
+        public static ParameterSelector DefaultIfUnresolved = ((parameter, request) =>
+            ParameterServiceInfo.Of(parameter).WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
 
-        public static ParameterSelector CombineWith(this ParameterSelector source, ParameterSelector other)
+        /// <summary>Combines source selector with other. Other will override the source.</summary>
+        /// <param name="source">Source selector.</param> <param name="other">Specific other selector to add.</param>
+        /// <returns>Combined result selector.</returns>
+        public static ParameterSelector And(this ParameterSelector source, ParameterSelector other)
         {
             return source == null || source == Of ? other ?? Of
                 : other == null || other == Of ? source
                 : (p, req) => other(p, req) ?? source(p, req);
         }
 
+        /// <summary>Adds to <paramref name="source"/> selector service info for parameters identified by <paramref name="condition"/>.</summary>
+        /// <param name="source">Source selector.</param> <param name="condition">Way to identify parameters.</param>
+        /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
+        /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
+        /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
+        /// <returns>Combined selector.</returns>
         public static ParameterSelector Condition(this ParameterSelector source, Func<ParameterInfo, bool> condition,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
-            return source.CombineWith(condition, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+            return source.And(condition, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
         }
 
+        /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by <paramref name="name"/>.</summary>
+        /// <param name="source">Source selector.</param> <param name="name">Name to identify parameter.</param>
+        /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
+        /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
+        /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
+        /// <returns>Combined selector.</returns>
         public static ParameterSelector Name(this ParameterSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
             return source.Condition(p => p.Name.Equals(name), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
-        public static ParameterSelector Type(this ParameterSelector source, Type type,
-            Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
-        {
-            type.ThrowIfNull();
-            return source.Condition(p => type.IsAssignableTo(p.ParameterType), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
-        }
-
+        /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <typeparamref name="T"/>.</summary>
+        /// <typeparam name="T">Type of parameter.</typeparam> <param name="source">Source selector.</param> 
+        /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
+        /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
+        /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
+        /// <returns>Combined selector.</returns>
         public static ParameterSelector Type<T>(this ParameterSelector source,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
-            return source.Type(typeof(T), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
+            return source.Condition(p => typeof(T).IsAssignableTo(p.ParameterType), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
+        #region Tools
+
+        /// <summary>Returns attributes defined for parameter.</summary>
+        ///  <param name="parameter">Target parameter.</param> 
+        /// <param name="attributeType">(optional) Specific attribute type to return, any attribute otherwise.</param>
+        /// <param name="inherit">Check for inherited attributes.</param> <returns>Found attributes or empty.</returns>
         public static IEnumerable<Attribute> GetAttributes(this ParameterInfo parameter, Type attributeType = null, bool inherit = false)
         {
             return parameter.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit)
@@ -4639,9 +4658,11 @@ namespace DryIoc
                 .Cast<Attribute>();
         }
 
+        #endregion
+
         #region Implementation
 
-        private static ParameterSelector CombineWith(this ParameterSelector source,
+        private static ParameterSelector And(this ParameterSelector source,
             Func<ParameterInfo, bool> condition, ServiceInfoDetails details)
         {
             condition.ThrowIfNull();
@@ -4662,6 +4683,8 @@ namespace DryIoc
         /// <summary>Public assignable instance members of any type except object, string, primitives types, and arrays of those.</summary>
         public static PropertiesAndFieldsSelector Auto = All(false, false);
 
+        /// <summary>Should return service info for input member (property or field).</summary>
+        /// <param name="member">Input member.</param> <param name="request">Request to provide context.</param> <returns>Service info.</returns>
         public delegate PropertyOrFieldServiceInfo GetInfo(MemberInfo member, Request request);
 
         /// <summary>Generates selector property and field selector with settings specified by parameters.
@@ -4691,13 +4714,16 @@ namespace DryIoc
             };
         }
 
-        public static PropertiesAndFieldsSelector CombineWith(this PropertiesAndFieldsSelector s, PropertiesAndFieldsSelector other)
+        /// <summary>Combines source properties and fields with other. Other will override the source condition.</summary>
+        /// <param name="source">Source selector.</param> <param name="other">Specific other selector to add.</param>
+        /// <returns>Combined result selector.</returns>
+        public static PropertiesAndFieldsSelector And(this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
         {
-            return s == null || s == Of ? (other ?? Of)
-                 : other == null || other == Of ? s
+            return source == null || source == Of ? (other ?? Of)
+                 : other == null || other == Of ? source
                  : r =>
                 {
-                    var sourceMembers = s(r).ToArrayOrSelf();
+                    var sourceMembers = source(r).ToArrayOrSelf();
                     var otherMembers = other(r).ToArrayOrSelf();
                     return sourceMembers == null || sourceMembers.Length == 0 ? otherMembers
                         : otherMembers == null || otherMembers.Length == 0 ? sourceMembers
@@ -4707,10 +4733,16 @@ namespace DryIoc
                 };
         }
 
-        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector s, string name,
+        /// <summary>Adds to <paramref name="source"/> selector service info for property/field identified by <paramref name="name"/>.</summary>
+        /// <param name="source">Source selector.</param> <param name="name">Name to identify member.</param>
+        /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
+        /// <param name="ifUnresolved">(optional) By default returns default value if unresolved.</param>
+        /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
+        /// <returns>Combined selector.</returns>
+        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, object defaultValue = null)
         {
-            return s.WithDetails(name, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+            return source.WithDetails(name, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
         }
 
         #region Tools
@@ -4783,11 +4815,10 @@ namespace DryIoc
 
         #region Implementation
 
-        private static PropertiesAndFieldsSelector WithDetails(this PropertiesAndFieldsSelector source,
-            string name, ServiceInfoDetails details)
+        private static PropertiesAndFieldsSelector WithDetails(this PropertiesAndFieldsSelector source, string name, ServiceInfoDetails details)
         {
             name.ThrowIfNull();
-            return source.CombineWith(r =>
+            return source.And(r =>
             {
                 var implementationType = r.ImplementationType;
                 var property = implementationType.GetPropertyOrNull(name);
@@ -4920,7 +4951,7 @@ namespace DryIoc
             {
                 paramExprs = new Expression[parameters.Length];
 
-                var getParamInfo = request.Container.Rules.Parameters.CombineWith(Impl.Parameters);
+                var getParamInfo = request.Container.Rules.Parameters.And(Impl.Parameters);
 
                 var funcArgs = request.FuncArgs;
                 var funcArgsUsedMask = 0;
@@ -5060,7 +5091,7 @@ namespace DryIoc
 
         private Expression SetPropertiesAndFields(NewExpression newServiceExpr, Request request)
         {
-            var getMemberInfos = request.Container.Rules.PropertiesAndFields.CombineWith(Impl.PropertiesAndFields);
+            var getMemberInfos = request.Container.Rules.PropertiesAndFields.And(Impl.PropertiesAndFields);
             var memberInfos = getMemberInfos(request);
             if (memberInfos == null)
                 return newServiceExpr;
@@ -6191,7 +6222,7 @@ namespace DryIoc
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
         /// <returns>Instance with assigned properties and fields.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.CombineWith"/> method.</remarks>     
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.And"/> method.</remarks>     
         object InjectPropertiesAndFields(object instance, PropertiesAndFieldsSelector propertiesAndFields);
 
         /// <summary>If <paramref name="type"/> is generic type then this method checks if the type registered as generic wrapper,
