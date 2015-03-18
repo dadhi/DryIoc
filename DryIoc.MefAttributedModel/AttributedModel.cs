@@ -139,7 +139,6 @@ namespace DryIoc.MefAttributedModel
         {
             if (implementationType.IsValueType() || implementationType.IsAbstract()) 
                 return null;
-
             var attributes = GetAllExportRelatedAttributes(implementationType);
             return !IsExportDefined(attributes) ? null : GetRegistrationInfoOrDefault(implementationType, attributes);
         }
@@ -218,10 +217,10 @@ namespace DryIoc.MefAttributedModel
             if (meta == null)
                 return null;
 
-            var registry = request.Container;
-            reflectedType = registry.UnwrapServiceType(reflectedType);
+            var container = request.Container;
+            reflectedType = container.UnwrapServiceType(reflectedType);
             var metadata = meta.Metadata;
-            var factory = registry.GetAllServiceFactories(reflectedType)
+            var factory = container.GetAllServiceFactories(reflectedType)
                 .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
                 .ThrowIfNull(Error.NOT_FIND_DEPENDENCY_WITH_METADATA, reflectedType, metadata, request);
 
@@ -234,11 +233,11 @@ namespace DryIoc.MefAttributedModel
             if (import == null)
                 return null;
 
-            var registry = request.Container;
-            serviceType = import.ContractType ?? registry.UnwrapServiceType(serviceType);
+            var container = request.Container;
+            serviceType = import.ContractType ?? container.UnwrapServiceType(serviceType);
             var serviceKey = import.ContractKey;
 
-            if (!registry.IsRegistered(serviceType, serviceKey))
+            if (!container.IsRegistered(serviceType, serviceKey))
             {
                 var implementationType = import.ImplementationType ?? serviceType;
 
@@ -247,11 +246,11 @@ namespace DryIoc.MefAttributedModel
                 var reuseName = reuseAttr == null ? null : reuseAttr.ReuseName;
                 var reuse = GetReuse(reuseType, reuseName);
 
-                var method = import.ConstructorSignature == null ? null
+                var impl = import.ConstructorSignature == null ? null
                     : Impl.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
-                registry.Register(serviceType, implementationType,
-                    reuse, method, Setup.With(metadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
+                container.Register(serviceType, implementationType, reuse, impl, 
+                    Setup.With(metadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
             }
 
             return ServiceInfoDetails.Of(serviceType, serviceKey);

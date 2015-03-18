@@ -2515,20 +2515,20 @@ namespace DryIoc
             return new StringBuilder().Print(ConstructorOrMethod.DeclaringType).Append("::").Append(ConstructorOrMethod).ToString();
         }
 
+        private static Expression ResolveParameter(ParameterInfo parameter, ReflectionFactory factory, Request request)
+        {
+            var container = request.Container;
+            var paramSelector = container.Rules.Parameters.And(factory.Impl.Parameters);
+            var paramInfo = paramSelector(parameter, request) ?? ParameterServiceInfo.Of(parameter);
+            var paramRequest = request.Push(paramInfo.WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
+            var paramFactory = container.ResolveFactory(paramRequest);
+            return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
+        }
+
         private FactoryMethod(MethodBase constructorOrMethod, ServiceInfo factoryInfo = null)
         {
             ConstructorOrMethod = constructorOrMethod;
             FactoryInfo = factoryInfo;
-        }
-
-        private static Expression ResolveParameter(ParameterInfo p, ReflectionFactory factory, Request request)
-        {
-            var container = request.Container;
-            var paramSelector = container.Rules.Parameters.And(factory.Impl.Parameters);
-            var paramInfo = paramSelector(p, request) ?? ParameterServiceInfo.Of(p);
-            var paramRequest = request.Push(paramInfo.WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
-            var paramFactory = container.ResolveFactory(paramRequest);
-            return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
         }
     }
 
@@ -2574,13 +2574,13 @@ namespace DryIoc
 
         /// <summary>Specify factory method using expression of: constructor call with properties, or static method call.</summary>
         /// <typeparam name="T">Type with constructor or static method.</typeparam>
-        /// <param name="methodOrConstructorCallExpr">Expression tree with call to constructor with properties: 
+        /// <param name="constructorOrMethodCallExpr">Expression tree with call to constructor with properties: 
         /// <code lang="cs"><![CDATA[() => new Car(Arg.Of<IEngine>()) { Color = Arg.Of<Color>("CarColor") }]]></code>
         /// or static method call <code lang="cs"><![CDATA[() => Car.Create(Arg.Of<IEngine>())]]></code></param>
         /// <returns></returns>
-        public static Impl<T> Of<T>(Expression<Func<T>> methodOrConstructorCallExpr)
+        public static Impl<T> Of<T>(Expression<Func<T>> constructorOrMethodCallExpr)
         {
-            return Of<T>(methodOrConstructorCallExpr as LambdaExpression);
+            return Of<T>(constructorOrMethodCallExpr as LambdaExpression);
         }
 
         /// <summary>Builds creation info from factory method call expression (without using strings).
@@ -2600,31 +2600,32 @@ namespace DryIoc
             if (!(callExpr is NewExpression) && !(callExpr is MemberInitExpression) && !(callExpr is MethodCallExpression))
                 Throw.It(Error.Of("Only method calls and new expression are supported, but found: {0}"), callExpr);
 
-            MethodBase methodOrCtor;
+            MethodBase constuctorOrMethod;
             IList<Expression> argExprs;
             var methodCallExpr = callExpr as MethodCallExpression;
             if (methodCallExpr != null)
             {
-                methodOrCtor = methodCallExpr.Method;
+                constuctorOrMethod = methodCallExpr.Method;
                 argExprs = methodCallExpr.Arguments;
             }
             else
             {
                 var newExpr = callExpr as NewExpression ?? ((MemberInitExpression)callExpr).NewExpression;
-                methodOrCtor = newExpr.Constructor;
+                constuctorOrMethod = newExpr.Constructor;
                 argExprs = newExpr.Arguments;
             }
 
+            FactoryMethodSelector factoryMethod = r => DryIoc.FactoryMethod.Of(constuctorOrMethod, factoryInfo);
+
             ParameterSelector parameters = null;
             if (argExprs.Count != 0)
-                parameters = GetParameters(argExprs, methodOrCtor.GetParameters());
+                parameters = GetParameters(argExprs, constuctorOrMethod.GetParameters());
 
             PropertiesAndFieldsSelector propertiesAndFields = null;
             var memberBindings = callExpr is MemberInitExpression ? ((MemberInitExpression)callExpr).Bindings : null;
             if (memberBindings != null && memberBindings.Count != 0)
                 propertiesAndFields = GetPropertiesAndFields(memberBindings);
 
-            FactoryMethodSelector factoryMethod = r => DryIoc.FactoryMethod.Of(methodOrCtor, factoryInfo);
             return new Impl<T>(factoryMethod, parameters, propertiesAndFields);
         }
 
