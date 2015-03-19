@@ -2471,6 +2471,9 @@ namespace DryIoc
                 .Select(c => new { Ctor = c, Params = c.GetParameters() })
                 .OrderByDescending(x => x.Params.Length);
 
+            var factory = (request.ResolvedFactory as ReflectionFactory).ThrowIfNull();
+            var parameterSelector = request.Container.Rules.Parameters.And(factory.Impl.Parameters)(request);
+
             if (request.IsNestedInFuncWithArgs())
             {
                 // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
@@ -2493,8 +2496,7 @@ namespace DryIoc
                                     return false;
                                 matchedIndecesMask |= inputArgIndex << 1;
                                 return true;
-                            }))
-                            .All(p => ResolveParameter(p, (ReflectionFactory)request.ResolvedFactory, request) != null);
+                            })).All(p => ResolveParameter(p, parameterSelector, request) != null);
                     });
 
                 var ctor = matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS, funcType, request).Ctor;
@@ -2503,7 +2505,7 @@ namespace DryIoc
             else
             {
                 var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(x =>
-                    x.Params.All(p => ResolveParameter(p, (ReflectionFactory)request.ResolvedFactory, request) != null));
+                    x.Params.All(p => ResolveParameter(p, parameterSelector, request) != null));
                 var ctor = matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
                 return Of(ctor);
             }
@@ -2515,14 +2517,13 @@ namespace DryIoc
             return new StringBuilder().Print(ConstructorOrMethod.DeclaringType).Append("::").Append(ConstructorOrMethod).ToString();
         }
 
-        private static Expression ResolveParameter(ParameterInfo parameter, ReflectionFactory factory, Request request)
+        private static Expression ResolveParameter(ParameterInfo parameter, 
+            Func<ParameterInfo, ParameterServiceInfo> parameterSelector, Request request)
         {
-            var container = request.Container;
-            var paramSelector = container.Rules.Parameters.And(factory.Impl.Parameters);
-            var paramInfo = paramSelector(parameter, request) ?? ParameterServiceInfo.Of(parameter);
-            var paramRequest = request.Push(paramInfo.WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
-            var paramFactory = container.ResolveFactory(paramRequest);
-            return paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
+            var parameterServiceInfo = parameterSelector(parameter) ?? ParameterServiceInfo.Of(parameter);
+            var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
+            var parameterFactory = request.Container.ResolveFactory(parameterRequest);
+            return parameterFactory == null ? null : parameterFactory.GetExpressionOrDefault(parameterRequest);
         }
 
         private FactoryMethod(MethodBase constructorOrMethod, ServiceInfo factoryInfo = null)
@@ -2593,40 +2594,95 @@ namespace DryIoc
             return Of<TService>(factoryMethodCallExpr, factoryInfo.ThrowIfNull());
         }
 
-        private static Impl<T> Of<T>(LambdaExpression constructorOrMethodCallExpr, ServiceInfo factoryInfo = null)
+        private static Impl<T> Of2<T>(Func<Request, LambdaExpression> getConstructorOrMethodCallExpr, Func<Request, ServiceInfo> getFactoryInfo = null)
         {
-            var callExpr = constructorOrMethodCallExpr.Body;
-
-            if (!(callExpr is NewExpression) && !(callExpr is MemberInitExpression) && !(callExpr is MethodCallExpression))
-                Throw.It(Error.Of("Only method calls and new expression are supported, but found: {0}"), callExpr);
-
-            MethodBase constuctorOrMethod;
-            IList<Expression> argExprs;
-            var methodCallExpr = callExpr as MethodCallExpression;
-            if (methodCallExpr != null)
+            FactoryMethodSelector factoryMethod = request =>
             {
+                ReadOnlyCollection<Expression> argExprs;
+                ReadOnlyCollection<MemberBinding> memberBindings;
+                return DryIoc.FactoryMethod.Of(
+                    GetConstuctorOrMethod(getConstructorOrMethodCallExpr, request, out argExprs, out memberBindings),
+                    getFactoryInfo == null ? null : getFactoryInfo(request));
+            };
+
+            ParameterSelector parameters = request =>
+            {
+                ReadOnlyCollection<Expression> argExprs;      
+                ReadOnlyCollection<MemberBinding> memberBindings;
+                var constuctorOrMethod = GetConstuctorOrMethod(getConstructorOrMethodCallExpr, request, out argExprs, out memberBindings);
+                return argExprs.Count == 0 ? null : 
+                    GetParameters(argExprs, constuctorOrMethod.GetParameters())(request);
+            };
+
+            PropertiesAndFieldsSelector propertiesAndFields = request =>
+            {
+                ReadOnlyCollection<Expression> argExprs;
+                ReadOnlyCollection<MemberBinding> memberBindings;
+                GetConstuctorOrMethod(getConstructorOrMethodCallExpr, request, out argExprs, out memberBindings);
+                return memberBindings == null || memberBindings.Count == 0 ? null :
+                    GetPropertiesAndFields(memberBindings)(request);
+            };
+
+            return new Impl<T>(factoryMethod, parameters, propertiesAndFields);
+        }
+
+        private static MethodBase GetConstuctorOrMethod(Func<Request, LambdaExpression> getConstructorOrMethodCallExpr, Request request,
+            out ReadOnlyCollection<Expression> argExprs, out ReadOnlyCollection<MemberBinding> memberBindings)
+        {
+            var callExpr = getConstructorOrMethodCallExpr(request).ThrowIfNull().Body;
+
+            MethodBase constuctorOrMethod = null; argExprs = null; memberBindings = null;
+            if (callExpr is MethodCallExpression)
+            {
+                var methodCallExpr = ((MethodCallExpression)callExpr);
                 constuctorOrMethod = methodCallExpr.Method;
                 argExprs = methodCallExpr.Arguments;
             }
-            else
+            else if (callExpr is NewExpression || callExpr is MemberInitExpression)
             {
                 var newExpr = callExpr as NewExpression ?? ((MemberInitExpression)callExpr).NewExpression;
                 constuctorOrMethod = newExpr.Constructor;
                 argExprs = newExpr.Arguments;
+                if (callExpr is MemberInitExpression)
+                    memberBindings = ((MemberInitExpression)callExpr).Bindings;
+            }
+            else Throw.It(Error.Of("Only method calls and new expression are supported, but found: {0}"), callExpr);
+            
+            return constuctorOrMethod;
+        }
+
+        private static Impl<T> Of<T>(LambdaExpression constructorOrMethodCallExpr, ServiceInfo factoryInfo = null)
+        {
+            var callExpr = constructorOrMethodCallExpr.Body;
+
+            MethodBase constuctorOrMethod;
+            IList<Expression> argExprs;
+            ReadOnlyCollection<MemberBinding> memberBindings = null;
+            
+            if (callExpr is MethodCallExpression)
+            {
+                var methodCallExpr = ((MethodCallExpression)callExpr);
+                constuctorOrMethod = methodCallExpr.Method;
+                argExprs = methodCallExpr.Arguments;
+            }
+            else if (callExpr is NewExpression || callExpr is MemberInitExpression)
+            {
+                var newExpr = callExpr as NewExpression ?? ((MemberInitExpression)callExpr).NewExpression;
+                constuctorOrMethod = newExpr.Constructor;
+                argExprs = newExpr.Arguments;
+                if (callExpr is MemberInitExpression)
+                    memberBindings = ((MemberInitExpression)callExpr).Bindings;
+            }
+            else
+            {
+                return Throw.For<Impl<T>>(Error.Of("Only method calls and new expression are supported, but found: {0}"), callExpr);
             }
 
-            FactoryMethodSelector factoryMethod = r => DryIoc.FactoryMethod.Of(constuctorOrMethod, factoryInfo);
+            var factoryMethod = DryIoc.FactoryMethod.Of(constuctorOrMethod, factoryInfo);
+            var parameters = argExprs.Count == 0 ? null : GetParameters(argExprs, constuctorOrMethod.GetParameters());
+            var propertiesAndFields = (memberBindings == null || memberBindings.Count == 0) ? null : GetPropertiesAndFields(memberBindings);
 
-            ParameterSelector parameters = null;
-            if (argExprs.Count != 0)
-                parameters = GetParameters(argExprs, constuctorOrMethod.GetParameters());
-
-            PropertiesAndFieldsSelector propertiesAndFields = null;
-            var memberBindings = callExpr is MemberInitExpression ? ((MemberInitExpression)callExpr).Bindings : null;
-            if (memberBindings != null && memberBindings.Count != 0)
-                propertiesAndFields = GetPropertiesAndFields(memberBindings);
-
-            return new Impl<T>(factoryMethod, parameters, propertiesAndFields);
+            return new Impl<T>(r => factoryMethod, parameters, propertiesAndFields);
         }
 
         private static ParameterSelector GetParameters(IList<Expression> argExprs, ParameterInfo[] parameterInfos)
@@ -4578,10 +4634,9 @@ namespace DryIoc
 
     /// <summary>Specifies how to get parameter info for injected parameter and resolved request</summary>
     /// <remarks>Request is for parameter method owner not for parameter itself.</remarks>
-    /// <param name="parameter">Parameter to inject.</param>
     /// <param name="request">Request for parameter method/constructor owner.</param>
     /// <returns>Service info describing how to inject parameter.</returns>
-    public delegate ParameterServiceInfo ParameterSelector(ParameterInfo parameter, Request request);
+    public delegate Func<ParameterInfo, ParameterServiceInfo> ParameterSelector(Request request);
 
     /// <summary>Specifies what properties or fields to inject and how.</summary>
     /// <param name="request">Request for property/field owner.</param>
@@ -4592,11 +4647,7 @@ namespace DryIoc
     public static partial class Parameters
     {
         /// <summary>Specifies to return default details <see cref="ServiceInfoDetails.Default"/> for all parameters.</summary>
-        public static ParameterSelector Of = (parameter, request) => null;
-
-        /// <summary>Specifies that all parameters could be set to default if unresolved.</summary>
-        public static ParameterSelector DefaultIfUnresolved = ((parameter, request) =>
-            ParameterServiceInfo.Of(parameter).WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
+        public static ParameterSelector Of = request => ParameterServiceInfo.Of;
 
         /// <summary>Combines source selector with other. Other will override the source.</summary>
         /// <param name="source">Source selector.</param> <param name="other">Specific other selector to add.</param>
@@ -4605,7 +4656,7 @@ namespace DryIoc
         {
             return source == null || source == Of ? other ?? Of
                 : other == null || other == Of ? source
-                : (p, req) => other(p, req) ?? source(p, req);
+                : request => other(request) ?? source(request);
         }
 
         /// <summary>Adds to <paramref name="source"/> selector service info for parameters identified by <paramref name="condition"/>.</summary>
@@ -4617,7 +4668,10 @@ namespace DryIoc
         public static ParameterSelector Condition(this ParameterSelector source, Func<ParameterInfo, bool> condition,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
-            return source.And(condition, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+            condition.ThrowIfNull();
+            return request => parameter => condition(parameter) 
+                ? ParameterServiceInfo.Of(parameter).WithDetails(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue), request)
+                : source(request)(parameter);
         }
 
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by <paramref name="name"/>.</summary>
@@ -4655,19 +4709,6 @@ namespace DryIoc
             return parameter.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit)
                 // ReSharper disable once RedundantEnumerableCastCall
                 .Cast<Attribute>();
-        }
-
-        #endregion
-
-        #region Implementation
-
-        private static ParameterSelector And(this ParameterSelector source,
-            Func<ParameterInfo, bool> condition, ServiceInfoDetails details)
-        {
-            condition.ThrowIfNull();
-            return (parameter, request) => condition(parameter)
-                ? ParameterServiceInfo.Of(parameter).WithDetails(details, request)
-                : source(parameter, request);
         }
 
         #endregion
@@ -4951,14 +4992,13 @@ namespace DryIoc
             {
                 paramExprs = new Expression[parameters.Length];
 
-                var parameterSelector = request.Container.Rules.Parameters.And(Impl.Parameters);
-
+                var parameterSelector = request.Container.Rules.Parameters.And(Impl.Parameters)(request);
                 var funcArgs = request.FuncArgs;
                 var funcArgsUsedMask = 0;
 
                 for (var i = 0; i < parameters.Length; i++)
                 {
-                    var ctorParam = parameters[i];
+                    var param = parameters[i];
                     Expression paramExpr = null;
 
                     if (funcArgs != null)
@@ -4967,7 +5007,7 @@ namespace DryIoc
                         {
                             var funcArg = funcArgs.Value[fa];
                             if ((funcArgsUsedMask & 1 << fa) == 0 &&                  // not yet used func argument
-                                funcArg.Type.IsAssignableTo(ctorParam.ParameterType)) // and it assignable to parameter
+                                funcArg.Type.IsAssignableTo(param.ParameterType)) // and it assignable to parameter
                             {
                                 paramExpr = funcArg;
                                 funcArgsUsedMask |= 1 << fa;  // mark that argument was used
@@ -4979,7 +5019,8 @@ namespace DryIoc
                     // If parameter expression still null (no Func argument to substitute), try to resolve it
                     if (paramExpr == null)
                     {
-                        var paramInfo = parameterSelector(ctorParam, request) ?? ParameterServiceInfo.Of(ctorParam);
+
+                        var paramInfo = parameterSelector(param) ?? ParameterServiceInfo.Of(param);
                         var paramRequest = request.Push(paramInfo);
 
                         var paramFactory = paramRequest.Container.ResolveFactory(paramRequest);

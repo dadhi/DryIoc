@@ -103,30 +103,37 @@ namespace DryIoc.UnitTests
             Assert.That(service, Is.Null);
         }
 
-        public static ParameterServiceInfo GetServiceInfoFromImportAttribute(ParameterInfo parameter, Request request)
+        public static Func<ParameterInfo, ParameterServiceInfo> GetServiceInfoFromImportAttribute(Request request)
         {
-            var import = (ImportAttribute)parameter.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
-            var details = import == null ? ServiceInfoDetails.Default
-                : ServiceInfoDetails.Of(import.ContractType, import.ContractName);
-            return ParameterServiceInfo.Of(parameter).WithDetails(details, request);
+            return parameter =>
+            {
+                var import = (ImportAttribute)parameter.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
+                var details = import == null ? ServiceInfoDetails.Default
+                    : ServiceInfoDetails.Of(import.ContractType, import.ContractName);
+                return ParameterServiceInfo.Of(parameter).WithDetails(details, request);
+            };
         }
 
-        public static ParameterServiceInfo GetServiceFromWithMetadataAttribute(ParameterInfo parameter, Request request)
+        public static Func<ParameterInfo, ParameterServiceInfo> GetServiceFromWithMetadataAttribute(Request request)
         {
-            var import = (ImportWithMetadataAttribute)parameter.GetAttributes(typeof(ImportWithMetadataAttribute))
-                .FirstOrDefault();
-            if (import == null)
-                return null;
+            return parameter =>
+            {
+                var import = (ImportWithMetadataAttribute)parameter.GetAttributes(typeof(ImportWithMetadataAttribute))
+                    .FirstOrDefault();
+                if (import == null)
+                    return null;
 
-            var registry = request.Container;
-            var serviceType = parameter.ParameterType;
-            serviceType = registry.UnwrapServiceType(serviceType);
-            var metadata = import.Metadata;
-            var factory = registry.GetAllServiceFactories(serviceType)
-                .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
-                .ThrowIfNull();
+                var registry = request.Container;
+                var serviceType = parameter.ParameterType;
+                serviceType = registry.UnwrapServiceType(serviceType);
+                var metadata = import.Metadata;
+                var factory = registry.GetAllServiceFactories(serviceType)
+                    .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
+                    .ThrowIfNull();
 
-            return ParameterServiceInfo.Of(parameter).WithDetails(ServiceInfoDetails.Of(serviceType, factory.Key), request);
+                return ParameterServiceInfo.Of(parameter)
+                    .WithDetails(ServiceInfoDetails.Of(serviceType, factory.Key), request);
+            };
         }
 
         [Test]

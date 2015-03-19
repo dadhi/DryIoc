@@ -172,12 +172,15 @@ namespace DryIoc.MefAttributedModel
             return FactoryMethod.Of(constructor);
         }
 
-        private static ParameterServiceInfo GetImportedParameter(ParameterInfo parameter, Request request)
+        private static Func<ParameterInfo, ParameterServiceInfo> GetImportedParameter(Request request)
         {
-            var serviceInfo = ParameterServiceInfo.Of(parameter);
-            var attrs = parameter.GetAttributes().ToArray();
-            return attrs.Length == 0 ? serviceInfo
-                : serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
+            return parameter =>
+            {
+                var serviceInfo = ParameterServiceInfo.Of(parameter);
+                var attrs = parameter.GetAttributes().ToArray();
+                return attrs.Length == 0 ? serviceInfo : 
+                    serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
+            };
         }
 
         private static readonly PropertiesAndFieldsSelector _getImportedPropertiesAndFields =

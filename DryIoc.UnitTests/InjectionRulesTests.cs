@@ -215,7 +215,7 @@ namespace DryIoc.UnitTests
             container.Register<ConnectionStringProvider>(Reuse.Singleton);
             container.Register<IConnectionStringProvider, ConnectionNamingConnectionStringProvider>(
                 setup: Setup.With(cacheFactoryExpression: false),
-                with: Impl.Of(parameters: (parameter, request) =>
+                with: Impl.Of(parameters: request => parameter =>
                 {
                     if (parameter.ParameterType != typeof(string))
                         return null;
