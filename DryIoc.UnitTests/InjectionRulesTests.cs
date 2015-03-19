@@ -54,12 +54,12 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void I_can_resolve_property_with_private_setter()
+        public void I_can_resolve_property_with_internal_setter()
         {
             var container = new Container();
-            container.Register<IService, Service>();
+            container.Register<IService, Service>(serviceKey: "key");
             container.RegisterMany2(
-                with: Impl.Of(() => new ClientWithPropsAndFields { PWithInternalSetter = default(IService) }));
+                with: Impl.Of(() => new ClientWithPropsAndFields { PWithInternalSetter = Arg.Of<IService>(IfUnresolved.Throw, "key") }));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -67,7 +67,20 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void I_can_resolve_private_property()
+        public void I_can_specify_to_throw_if_property_is_unresolved()
+        {
+            var container = new Container();
+            container.RegisterMany2(
+                with: Impl.Of(() => new ClientWithPropsAndFields { PWithInternalSetter = Arg.Of<IService>(IfUnresolved.Throw, "key") }));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<ClientWithPropsAndFields>());
+
+            Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
+        }
+
+        [Test]
+        public void I_can_resolve_internal_property()
         {
             var container = new Container();
             container.Register<IService, Service>();

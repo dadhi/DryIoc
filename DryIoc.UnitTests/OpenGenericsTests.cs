@@ -368,7 +368,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
             container.Register(typeof(ICommandHandler<>), typeof(ReplayCommandHandler<,>)));
 
-            Assert.AreEqual(ex.Error, Error.REG_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS);
+            Assert.AreEqual(ex.Error, Error.REGISTERING_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS);
         }
 
         internal class ReplayCommand<T> { }
