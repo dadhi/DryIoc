@@ -3,12 +3,12 @@
 namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
-    class OpenScopeTests
+    public class OpenScopeTests
     {
         [Test]
         public void Session_example_of_scope_usage()
         {
-            var container = new Container();
+            var container = new Container(scopeContext: new ThreadScopeContext());
             container.Register<ISessionFactory, TestSessionFactory>();
             container.RegisterDelegate(r => r.Resolve<ISessionFactory>().OpenSession(), Reuse.InCurrentScope);
 
@@ -30,7 +30,7 @@ namespace DryIoc.IssuesTests.Samples
         [Test]
         public void Session_example_of_scope_usage_when_factory_is_not_resolution_root()
         {
-            var container = new Container();
+            var container = new Container(scopeContext: new ThreadScopeContext());
             container.Register<SessionClient>();
             container.Register<ISessionFactory, TestSessionFactory>();
             container.RegisterDelegate(r => r.Resolve<ISessionFactory>().OpenSession(), Reuse.InCurrentScope);
@@ -53,7 +53,7 @@ namespace DryIoc.IssuesTests.Samples
         [Test]
         public void Session_example_of_scope_usage_using_factory_method()
         {
-            var container = new Container();
+            var container = new Container(scopeContext: new ThreadScopeContext());
             container.Register<ISessionFactory, TestSessionFactory>();
 
             container.Register<ISession>(Reuse.InCurrentScope,

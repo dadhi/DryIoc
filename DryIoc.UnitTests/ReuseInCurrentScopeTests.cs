@@ -85,7 +85,6 @@ namespace DryIoc.UnitTests
             {
                 var ex = Assert.Throws<ContainerException>(() => container.OpenScope());
                 Assert.That(ex.Error, Is.EqualTo(Error.NOT_DIRECT_SCOPE_PARENT));
-                Assert.That(ex.Message, Is.StringContaining("Unable to Open Scope from not a direct parent container"));
             }
         }
 

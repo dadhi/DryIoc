@@ -131,7 +131,7 @@ namespace DryIoc
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             _scopeContext.SetCurrent(scope =>
-                nestedOpenedScope.ThrowIf(scope != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT));
+                nestedOpenedScope.ThrowIf(scope != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT, _openedScope));
 
             var rules = configure == null ? Rules : configure(Rules);
             return new Container(rules, _serviceFactories, _decoratorFactories, _wrapperFactories,
@@ -158,44 +158,40 @@ namespace DryIoc
         /// <summary>Provide root scope name for <see cref="OpenScopeWithoutContext"/></summary>
         public static readonly object NO_CONTEXT_ROOT_SCOPE_NAME = typeof(IContainer);
 
-        /// <summary>Creates child container using the rules from this container (parent).
-        /// Additionally child container will fallback for not registered service to its parent.</summary>
-        /// <param name="shareSingletons">If set allows to share singletons from parent container.</param>
-        /// <returns>New child container.</returns>
-        public IContainer CreateChildContainer(bool shareSingletons = false)
+        /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
+        /// Facade shares rules with this container, everything else is its own. 
+        /// It could be used for instance to create Test facade over original container with replacing some services with test ones.</summary>
+        /// <remarks>Singletons from container are not reused by facade, to achieve that rather use <see cref="IContainer.OpenScope"/> with <see cref="Reuse.InCurrentScope"/>.</remarks>
+        /// <returns>New facade container.</returns>
+        public IContainer CreateFacade()
         {
             ThrowIfContainerDisposed();
-            var newRules = Rules.WithUnknownServiceResolver(ResolveFromParents(this));
-            return !shareSingletons
-                ? new Container(newRules)
-                : new Container(newRules,
-                    Ref.Of(HashTree<Type, object>.Empty), Ref.Of(HashTree<Type, Factory[]>.Empty), Ref.Of(WrappersSupport.Wrappers),
-                    _singletonScope, _scopeContext);
+            return new Container(Rules.WithUnknownServiceResolver(FallbackToContainers(this)));
         }
 
-        /// <summary>The rule to fallback to multiple parent containers in order to resolve service unresolved in rule owner.</summary>
-        /// <param name="parents">One or many container to resolve from if service is not resolved from original container.</param>
-        /// <returns>New rule with fallback to resolve service from specified parent containers.</returns>
-        /// <remarks>There are two options to detach parents link: 1st - save original container before linking to parents and use it; 
+        /// <summary>The rule to fallback to multiple containers in order to resolve service unresolved in rule owner.</summary>
+        /// <param name="containers">One or many container to resolve from if service is not resolved from original container.</param>
+        /// <returns>New rule with fallback to resolve service from specified containers.</returns>
+        /// <remarks>There are two options to detach containers link: 1st - save original container before linking to containers and use it; 
         /// 2nd - save rule returned by this method and then remove saved rule from container using <see cref="DryIoc.Rules.WithoutUnknownServiceResolver"/>.</remarks>
-        public static Rules.UnknownServiceResolver ResolveFromParents(params IContainer[] parents)
+        public static Rules.UnknownServiceResolver FallbackToContainers(params IContainer[] containers)
         {
-            var parentWeakRefs = parents.ThrowIf(ArrayTools.IsNullOrEmpty).Select(p => p.ContainerWeakRef).ToArray();
+            var containerWeakRefs = containers.ThrowIf(ArrayTools.IsNullOrEmpty).Select(p => p.ContainerWeakRef).ToArray();
             return request =>
             {
                 Factory factory = null;
-                for (var i = 0; i < parentWeakRefs.Length && factory == null; i++)
+                for (var i = 0; i < containerWeakRefs.Length && factory == null; i++)
                 {
-                    var parentWeakRef = parentWeakRefs[i];
-                    var parentRequest = request.SwitchContainer(parentWeakRef);
+                    var containerWeakRef = containerWeakRefs[i];
+                    var containerRequest = request.SwitchContainer(containerWeakRef);
 
                     // Enable continue to next parent if factory is not found in first parent.
-                    if (parentRequest.IfUnresolved != IfUnresolved.ReturnDefault)
-                        parentRequest = parentRequest.UpdateServiceInfo(info => // TODO remove this InheritInfo thing.
+                    if (containerRequest.IfUnresolved != IfUnresolved.ReturnDefault)
+                        containerRequest = containerRequest.UpdateServiceInfo(info => // TODO remove this InheritInfo thing.
                             ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfo(info));
 
-                    var parent = parentWeakRef.GetTarget();
-                    factory = parent.ResolveFactory(parentRequest);
+                    var container = containerWeakRef.GetTarget();
+                    factory = container.ResolveFactory(containerRequest);
                 }
 
                 return factory == null ? null : new ExpressionFactory(r => factory.GetExpressionOrDefault(r));
@@ -6172,11 +6168,12 @@ namespace DryIoc
         /// <returns>New container with all state shared except new created scope and context.</returns>
         IContainer OpenScopeWithoutContext(object scopeName = null);
 
-        /// <summary>Creates child container using the same rules as its created from.
-        /// Additionally child container will fallback for not registered service to it parent.</summary>
-        /// <param name="shareSingletons">If set allow to share singletons from parent container.</param>
-        /// <returns>New child container.</returns>
-        IContainer CreateChildContainer(bool shareSingletons = false);
+        /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
+        /// Facade shares rules with this container, everything else is its own. 
+        /// It could be used for instance to create Test facade over original container with replacing some services with test ones.</summary>
+        /// <remarks>Singletons from container are not reused by facade, to achieve that rather use <see cref="OpenScope"/> with <see cref="Reuse.InCurrentScope"/>.</remarks>
+        /// <returns>New facade container.</returns>
+        IContainer CreateFacade();
 
         /// <summary>Searches for requested factory in registry, and then using <see cref="DryIoc.Rules.UnknownServiceResolvers"/>.</summary>
         /// <param name="request">Factory lookup info.</param>
@@ -6530,7 +6527,7 @@ namespace DryIoc
             UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE = Of(
                 "Unable to dispose not a current opened scope."),
             NOT_DIRECT_SCOPE_PARENT = Of(
-                "Unable to Open Scope from not a direct parent container."),
+                "Unable to Open Scope ({0}) from not a direct parent scope ({1})."),
             UNABLE_TO_RESOLVE_REUSE_WRAPPER = Of(
                 "Unable to resolve reuse wrapper {0} for: {1}"),
             WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE = Of(

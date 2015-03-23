@@ -15,7 +15,7 @@ namespace DryIoc.IssuesTests
                 c.Register<XProvider>(Reuse.Singleton);
 
                 Task t;
-                using (var b = c.CreateChildContainer())
+                using (var b = c.CreateFacade())
                 {
 
                     t = Task.Run(async () =>
@@ -85,7 +85,7 @@ namespace DryIoc.IssuesTests
 
                 Task t;
                 object result = null;
-                using (var b = c.CreateChildContainer())
+                using (var b = c.CreateFacade())
                 {
 
                     t = Task.Run(async () =>

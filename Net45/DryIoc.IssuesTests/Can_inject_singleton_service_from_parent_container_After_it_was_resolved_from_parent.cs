@@ -5,13 +5,28 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class IssueNo2_Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent
     {
-        [Test]
+        [Test, Explicit("Child container are not supported")]
         public void Test()
         {
             var parent = new Container();
             parent.Register(typeof(IFruit), typeof(Melon), Reuse.Singleton);
 
-            var child = parent.CreateChildContainer(shareSingletons: true);
+            var child = parent.CreateFacade();
+            child.Register(typeof(IJuice), typeof(FruitJuice));
+
+            var parentFruit = parent.Resolve<IFruit>();
+            var snd = child.Resolve<IJuice>();
+
+            Assert.That(parentFruit, Is.SameAs(snd.Fruit));
+        }
+
+        [Test]
+        public void Test_using_open_scope()
+        {
+            var parent = new Container().OpenScope("parent");
+            parent.Register(typeof(IFruit), typeof(Melon), Reuse.InCurrentNamedScope("parent"));
+
+            var child = parent.OpenScope();
             child.Register(typeof(IJuice), typeof(FruitJuice));
 
             var parentFruit = parent.Resolve<IFruit>();

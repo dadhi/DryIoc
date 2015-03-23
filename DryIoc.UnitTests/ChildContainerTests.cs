@@ -12,7 +12,7 @@ namespace DryIoc.UnitTests
             var parent = new Container();
             parent.Register(typeof(IFruit), typeof(Orange));
 
-            var child = parent.CreateChildContainer();
+            var child = parent.CreateFacade();
             child.Register(typeof(IJuice), typeof(FruitJuice));
 
             var juice = child.Resolve<IJuice>();
@@ -26,7 +26,7 @@ namespace DryIoc.UnitTests
             var parent = new Container();
             parent.Register(typeof(IFruit), typeof(Orange));
 
-            var child = parent.CreateChildContainer();
+            var child = parent.CreateFacade();
             child.Register(typeof(IJuice), typeof(FruitJuice));
 
             var juice = child.Resolve<Func<IJuice>>();
@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
             var parent = new Container();
             parent.Register(typeof(IFruit), typeof(Mango), Reuse.Singleton);
 
-            var child = parent.CreateChildContainer();
+            var child = parent.CreateFacade();
             child.Register(typeof(IJuice), typeof(FruitJuice));
 
             var fst = child.Resolve<IJuice>();
@@ -50,27 +50,12 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_share_resolved_singletons_from_parent_container()
-        {
-            var parent = new Container();
-            parent.Register<IFruit, Mango>(Reuse.Singleton);
-
-            var child = parent.CreateChildContainer(shareSingletons: true);
-            child.Register<IJuice, FruitJuice>();
-
-            var parentFruit = parent.Resolve<IFruit>();
-            var childJuice = child.Resolve<IJuice>();
-
-            Assert.That(parentFruit, Is.SameAs(childJuice.Fruit));
-        }
-
-        [Test]
         public void Can_inject_current_scope_service_from_parent_container_After_it_was_resolved_from_parent2()
         {
             var container = new Container();
             container.Register<IFruit, Mango>(Reuse.InCurrentScope);
 
-            var child = container.CreateChildContainer();
+            var child = container.CreateFacade();
             child.Register<IJuice, FruitJuice>();
 
             using (var scoped = child.OpenScope())
@@ -91,7 +76,7 @@ namespace DryIoc.UnitTests
             container.Register<FruitJuice>();
             container.Register<IFruit, Melon>();
 
-            var childContainer = container.CreateChildContainer();
+            var childContainer = container.CreateFacade();
             childContainer.Register<IFruit, Orange>();
 
             Assert.That(container.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
@@ -105,7 +90,7 @@ namespace DryIoc.UnitTests
             container.Register<FruitJuice>();
             container.Register<IFruit, Melon>();
 
-            var childContainer = container.CreateChildContainer();
+            var childContainer = container.CreateFacade();
             childContainer.Register<IFruit, Orange>();
 
             container.Dispose();
@@ -127,7 +112,7 @@ namespace DryIoc.UnitTests
 
             var container = new Container();
 
-            var attachParents = Container.ResolveFromParents(parent, anotherParent);
+            var attachParents = Container.FallbackToContainers(parent, anotherParent);
             var childContainer = container.With(rules => 
                 rules.WithUnknownServiceResolver(attachParents));
 
@@ -145,7 +130,7 @@ namespace DryIoc.UnitTests
             container.Register<IFruit, Orange>();
 
             var childContainer = container.With(rules => 
-                rules.WithUnknownServiceResolver(Container.ResolveFromParents(parent)));
+                rules.WithUnknownServiceResolver(Container.FallbackToContainers(parent)));
 
             Assert.That(parent.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
             Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Orange>());
@@ -164,7 +149,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IFruit, Orange>();
 
-            var resolveFromParents = Container.ResolveFromParents(parent) ;
+            var resolveFromParents = Container.FallbackToContainers(parent) ;
             var childContainer = container.With(rules => rules.WithUnknownServiceResolver(resolveFromParents));
 
             Assert.That(parent.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
@@ -203,46 +188,7 @@ namespace DryIoc.UnitTests
             Assert.That(orange, Is.InstanceOf<Orange>());
         }
 
-        [Test]
-        public void Resolving_singleton_registered_in_parent_from_second_child_with_first_child_having_resolved_and_is_disposed_do_not_throw()
-        {
-            var parent = new Container();
-            parent.Register<Foo>(Reuse.Singleton);
-
-            var parentFoo = parent.Resolve<Foo>(); // Stores resolved instance in Parent singletons.
-            
-            var firstChild = parent.CreateChildContainer(shareSingletons: false); // Child and Parent have their own singletons. 
-            var firstChildFoo = firstChild.Resolve<Foo>(); // Stores resolved instance in Child singletons. 
-            Assert.AreNotSame(firstChildFoo, parentFoo);   // Child and Parent singletons are different.
-            
-            firstChild.Dispose();                   // Disposes Child with its singletons, Parent stays intact.
-            Assert.IsTrue(firstChildFoo.Disposed);  // firstFoo shouldn't be disposed (No it is by design).
-
-            var secondChild = parent.CreateChildContainer(shareSingletons: true); // Second Child reference to Parent singletons. 
-                                                                                  // So disposing Child affects Parent, that's why it is not a default option.
-            var secondChildFoo = secondChild.Resolve<Foo>();                      // Resolves Parent singleton.
-            Assert.AreSame(secondChildFoo, parentFoo);       
-            secondChildFoo.Dispose();               // Disposes Child singletons, and effectively the Parent singletons too because of sharing.
-            Assert.IsTrue(parentFoo.Disposed);
-        }
-
-        [Test, Explicit("Not supported")]
-        public void Reusing_singletons_from_parent_and_not_disposing_them_with_Child()
-        {
-            var parent = new Container();
-            parent.Register<Foo>(Reuse.Singleton);
-
-            var firstChild = parent.CreateChildContainer(true);
-            var firstFoo = firstChild.Resolve<Foo>();
-            firstChild.Dispose();
-
-            Assert.IsFalse(firstFoo.Disposed); // firstFoo shouldn't be disposed
-
-            var secondChild = parent.CreateChildContainer(true);
-            secondChild.Resolve<Foo>(); // Resolve<Foo>() shouldn't throw
-        }
-
-        [Test]
+        [Test(Description = "Issue 107")]
         public void Reusing_singletons_from_parent_and_not_disposing_them_in_scoped_container()
         {
             var container = new Container();
