@@ -5,6 +5,21 @@ namespace DryIoc.CompileTimeGeneration.Tests
 {
     public partial class ServiceFactory : IResolverContext, IResolverContextProvider, IDisposable
     {
+        public ServiceFactory()
+        {
+            SingletonScope = new Scope();
+        }
+
+        public IResolverContext Resolver
+        {
+            get { return this; }
+        }
+
+        public void Dispose()
+        {
+            SingletonScope.Dispose();
+        }
+
         public IScope SingletonScope { get; private set; }
 
         public IScope GetCurrentNamedScope(object name, bool throwIfNotFound)
@@ -21,21 +36,6 @@ namespace DryIoc.CompileTimeGeneration.Tests
             bool throwIfNotFound)
         {
             throw new NotImplementedException();
-        }
-
-        public ServiceFactory()
-        {
-            SingletonScope = new Scope();
-        }
-
-        public void Dispose()
-        {
-            SingletonScope.Dispose();
-        }
-
-        public IResolverContext Resolver
-        {
-            get { return this; }
         }
 
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, IScope scope)

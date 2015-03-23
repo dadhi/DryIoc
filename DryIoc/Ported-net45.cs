@@ -49,13 +49,14 @@ namespace System.Reflection
         }
     }
 
+
     public struct TypeInfo
     {
         public TypeInfo(Type type)
         {
             _type = type;
         }
-
+#pragma warning disable 1591 // "Missing XML-comment"
         public Type AsType() { return _type; }
 
         public Assembly Assembly { get { return _type.Assembly; } }
@@ -104,6 +105,7 @@ namespace System.Reflection
         public Type[] GetGenericParameterConstraints() { return _type.GetGenericParameterConstraints(); }
 
         public bool IsAssignableFrom(TypeInfo typeInfo) { return _type.IsAssignableFrom(typeInfo.AsType()); }
+#pragma warning restore 1591 // "Missing XML-comment"
 
         private readonly Type _type;
 

@@ -11,7 +11,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<SomeClient>(with: FactoryMethod.ConstructorWithResolvableArguments);
+            container.Register<SomeClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
 
             var client = container.Resolve<SomeClient>();
             Assert.That(client.Seed, Is.EqualTo(1));
@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<AnotherClient>(with: FactoryMethod.ConstructorWithResolvableArguments);
+            container.Register<AnotherClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<AnotherClient>());
@@ -35,7 +35,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<YetAnotherClient>(with: FactoryMethod.ConstructorWithResolvableArguments);
+            container.Register<YetAnotherClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<YetAnotherClient>());
 
@@ -47,7 +47,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<InternalClient>(with: FactoryMethod.ConstructorWithResolvableArguments);
+            container.Register<InternalClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<InternalClient>());
@@ -59,7 +59,7 @@ namespace DryIoc.UnitTests
         public void For_func_with_arguments_Constructor_containing_all_func_args_should_be_selected()
         {
             var container = new Container();
-            container.Register<SomeClient>(with: FactoryMethod.ConstructorWithResolvableArguments);
+            container.Register<SomeClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
 
             var func = container.Resolve<Func<int, SomeService, SomeClient>>();
 
@@ -70,7 +70,7 @@ namespace DryIoc.UnitTests
         public void For_func_with_arguments_Constructor_with_more_resolvable_arguments_should_be_preferred_over_less_or_no_args()
         {
             var container = new Container();
-            container.Register<SomeClient>(with: FactoryMethod.ConstructorWithResolvableArguments);
+            container.Register<SomeClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
             container.Register<IDependency, SomeDependency>();
 
             var func = container.Resolve<Func<int, SomeClient>>();
@@ -82,7 +82,7 @@ namespace DryIoc.UnitTests
         public void For_func_with_arguments_When_no_matching_constructor_found_Then_it_should_throw()
         {
             var container = new Container();
-            container.Register<SomeClient>(with: FactoryMethod.ConstructorWithResolvableArguments);
+            container.Register<SomeClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Func<string, SomeClient>>());
 

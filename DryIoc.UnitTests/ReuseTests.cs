@@ -104,7 +104,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<AccountUser>(with: Parameters.Of.Type<Account>(serviceKey: "account"));
+            container.Register<AccountUser>(made: Parameters.Of.Type<Account>(serviceKey: "account"));
             container.Register<Account>(serviceKey: "account", setup: Setup.With(openResolutionScope: true));
             container.Register<Log>(Reuse.InResolutionScopeOf<Account>("account"));
 
@@ -118,7 +118,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<AccountUser>(with: Parameters.Of.Type<Account>(serviceKey: "account"));
+            container.Register<AccountUser>(made: Parameters.Of.Type<Account>(serviceKey: "account"));
             container.Register<Account>(serviceKey: "account", setup: Setup.With(openResolutionScope: true));
             container.Register<Log>(Reuse.InResolutionScopeOf(serviceKey: "account"));
 
@@ -180,7 +180,7 @@ namespace DryIoc.UnitTests
         public void Can_correctly_handle_resolution_scope_condition()
         {
             var container = new Container();
-            container.Register<ViewModel2>(with: Impl.Of(() => new ViewModel2(Arg.Of<Log>(IfUnresolved.ReturnDefault))));
+            container.Register<ViewModel2>(made: Made.Of(() => new ViewModel2(Arg.Of<Log>(IfUnresolved.ReturnDefault))));
 
             var logReuse = Reuse.InResolutionScopeOf<ViewModel1>();
             container.Register<Log>(logReuse, setup: Setup.With(condition: request => logReuse.GetScopeOrDefault(request) != null));

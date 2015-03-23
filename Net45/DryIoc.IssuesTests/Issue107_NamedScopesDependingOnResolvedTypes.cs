@@ -280,19 +280,19 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register<IComponent, Component>(
-                with: Parameters.Of
+                made: Parameters.Of
                     .Name("area1", serviceKey: Areas.First)
                     .Name("area2", serviceKey: Areas.Second));
 
             container.Register<IArea1, Area1>(serviceKey: Areas.First,
                 setup: Setup.With(openResolutionScope: true),
-                with: Parameters.Of
+                made: Parameters.Of
                     .Type<ITwoVariants>(serviceKey: Areas.First)
                     .Type<IMainViewModel1>(serviceKey: Areas.First));
 
             container.Register<IArea2, Area2>(serviceKey: Areas.Second,
                 setup: Setup.With(openResolutionScope: true),
-                with: Parameters.Of
+                made: Parameters.Of
                     .Type<ITwoVariants>(serviceKey: Areas.Second)
                     .Type<IMainViewModel1>(serviceKey: Areas.Second));
 
@@ -300,11 +300,11 @@ namespace DryIoc.IssuesTests
 
             container.Register<IMainViewModel1, MainViewModel1>(serviceKey: Areas.First,
                 setup: Setup.With(openResolutionScope: true),
-                with: Parameters.Of.Type<ITwoVariants>(serviceKey: Areas.First));
+                made: Parameters.Of.Type<ITwoVariants>(serviceKey: Areas.First));
 
             container.Register<IMainViewModel1, MainViewModel1>(serviceKey: Areas.Second,
                 setup: Setup.With(openResolutionScope: true),
-                with: Parameters.Of.Type<ITwoVariants>(serviceKey: Areas.Second));
+                made: Parameters.Of.Type<ITwoVariants>(serviceKey: Areas.Second));
 
             container.Register<ITwoVariants, FirstVariant>(serviceKey: Areas.First);
             container.Register<ITwoVariants, SecondVariant>(serviceKey: Areas.Second);
@@ -505,5 +505,39 @@ namespace DryIoc.IssuesTests
         public interface ISingletonCombinedInterface : ISingletonFirstInterface, ISingletonSecondInterface { }
 
         public class SingletonWithTwoInterfaces : ISingletonFirstInterface, ISingletonSecondInterface, ISingletonCombinedInterface {}
+
+        [Test]
+        public void Can_inject_property_of_larger_interface_without_register_delegate()
+        {
+            var container = new Container();
+
+            container.Register<IBigInterfaceWhichProvidesSmallerInterfaces, BigInterfaceWhichProvidesSmallerInterfaces>(Reuse.Singleton);
+
+            container.Register<ISmallInterface>(made: Made.Of(
+                r => ServiceInfo.Of<IBigInterfaceWhichProvidesSmallerInterfaces>(),
+                b => b.Small));
+
+            var smallInterface = container.Resolve<ISmallInterface>();
+            Assert.NotNull(smallInterface);
+        }
+
+        public interface ISmallInterface { }
+
+        public interface IBigInterfaceWhichProvidesSmallerInterfaces
+        {
+           ISmallInterface Small { get; }
+        }
+
+        internal class BigInterfaceWhichProvidesSmallerInterfaces : IBigInterfaceWhichProvidesSmallerInterfaces
+        {
+            public ISmallInterface Small { get; private set; }
+
+            public BigInterfaceWhichProvidesSmallerInterfaces()
+            {
+                Small = new LimitedFunctional();
+            }
+
+            class LimitedFunctional : ISmallInterface { }
+        }
     }
 }

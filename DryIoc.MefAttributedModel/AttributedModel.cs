@@ -250,7 +250,7 @@ namespace DryIoc.MefAttributedModel
                 var reuse = GetReuse(reuseType, reuseName);
 
                 var impl = import.ConstructorSignature == null ? null
-                    : Impl.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
+                    : Made.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
                 container.Register(serviceType, implementationType, reuse, impl, 
                     Setup.With(metadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
@@ -448,7 +448,7 @@ namespace DryIoc.MefAttributedModel
                 var factoryMethod = method;
                 var factoryExport = factoryInfo.Exports[0];
                 var factoryServiceInfo = ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
-                var creationInfo = Impl.Of(_ => FactoryMethod.Of(factoryMethod, factoryServiceInfo));
+                var creationInfo = Made.Of(_ => FactoryMethod.Of(factoryMethod, factoryServiceInfo));
                 var factory = serviceInfo.CreateFactory(creationInfo);
 
                 var serviceExports = serviceInfo.Exports;
@@ -646,7 +646,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Creates factory out of registration info.</summary>
         /// <param name="rules">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
         /// <returns>Created factory.</returns>
-        public Factory CreateFactory(Impl rules = null)
+        public Factory CreateFactory(Made rules = null)
         {
             var reuse = AttributedModel.GetReuse(ReuseType, ReuseName);
             return new ReflectionFactory(ImplementationType, reuse, rules, GetSetup());
@@ -1001,7 +1001,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="implementationType">To get contract types from.</param> <returns>Exported contract types.</returns>
         public IEnumerable<Type> GetContractTypes(Type implementationType)
         {
-            var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeFlags.SourceType).Where(ExportedContractTypes);
+            var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeInImplementedTypes.SourceType).Where(ExportedContractTypes);
             return Except == null || Except.Length == 0 ? contractTypes : contractTypes.Except(Except);
         }
     }

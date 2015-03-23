@@ -37,18 +37,28 @@ namespace DryIoc
         }
     }
 
+    /// <summary>Context propagated though async-await boundaries.</summary>
     public sealed class AsyncExecutionFlowScopeContext : IScopeContext
     {
+        /// <summary>Statically known name of root scope in this context.</summary>
         public static readonly object ROOT_SCOPE_NAME = typeof(AsyncExecutionFlowScopeContext);
 
+        /// <summary>Name associated with context root scope - so the reuse may find scope context.</summary>
         public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
 
+        /// <summary>Returns current scope or null if no ambient scope available at the moment.</summary>
+        /// <returns>Current scope or null.</returns>
         public IScope GetCurrentOrDefault()
         {
             var scope = (Copyable<IScope>)CallContext.LogicalGetData(_key);
             return scope == null ? null : scope.Value;
         }
 
+        /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and  should return new current scope.</summary>
+        /// <param name="getNewCurrentScope">Delegate to change the scope.</param>
+        /// <remarks>Important: <paramref name="getNewCurrentScope"/> may be called multiple times in concurrent environment.
+        /// Make it predictable by removing any side effects.</remarks>
+        /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
         public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
         {
             var oldScope = GetCurrentOrDefault();

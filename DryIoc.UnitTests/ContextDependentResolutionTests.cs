@@ -1,3 +1,5 @@
+using System;
+using System.Linq.Expressions;
 using NUnit.Framework;
 // ReSharper disable MemberHidesStaticFromOuterClass
 
@@ -21,7 +23,7 @@ namespace DryIoc.UnitTests
             c.Register<User1>();
             c.Register<User2>();
 
-            c.Register<ILogger>(with: Impl.Of(r => FactoryMethod.Of(
+            c.Register<ILogger>(made: Made.Of(r => FactoryMethod.Of(
                 typeof(LofFactory).GetDeclaredMethodOrNull("GetLog")
                 .MakeGenericMethod(r.GetNonWrapperParentOrEmpty().ImplementationType))),
                 setup: Setup.With(cacheFactoryExpression: false));
@@ -43,7 +45,61 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<A>(y.X);
         }
 
+        [Test]
+        public void Can_use_different_imlementations_based_on_context_using_condition()
+        {
+            var container = new Container();
+
+            container.Register<ImportConditionObject1>();
+            container.Register<ImportConditionObject2>();
+            container.Register<ImportConditionObject3>();
+
+            container.Register<IExportConditionInterface, ExportConditionalObject>(
+                setup: Setup.With(condition: r => r.GetNonWrapperParentOrEmpty().ImplementationType == typeof(ImportConditionObject1)));
+
+            container.Register<IExportConditionInterface, ExportConditionalObject2>(
+                setup: Setup.With(condition: r => r.GetNonWrapperParentOrEmpty().ImplementationType == typeof(ImportConditionObject2)));
+
+            container.Register<IExportConditionInterface, ExportConditionalObject3>(
+                setup: Setup.With(condition: r => r.GetNonWrapperParentOrEmpty().ImplementationType == typeof(ImportConditionObject3)));
+
+            Assert.IsInstanceOf<ExportConditionalObject>(container.Resolve<ImportConditionObject1>().ExportConditionInterface);
+            Assert.IsInstanceOf<ExportConditionalObject2>(container.Resolve<ImportConditionObject2>().ExportConditionInterface);
+            Assert.IsInstanceOf<ExportConditionalObject3>(container.Resolve<ImportConditionObject3>().ExportConditionInterface);
+        }
+
         #region CUT
+
+        public interface IExportConditionInterface {}
+        public class ExportConditionalObject : IExportConditionInterface {}
+        public class ExportConditionalObject2 : IExportConditionInterface {}
+        public class ExportConditionalObject3 : IExportConditionInterface {}
+        public class ImportConditionObject1
+        {
+            public IExportConditionInterface ExportConditionInterface { get; set; }
+            public ImportConditionObject1(IExportConditionInterface exportConditionInterface)
+            {
+                ExportConditionInterface = exportConditionInterface;
+            }
+        }
+
+        public class ImportConditionObject2
+        {
+            public IExportConditionInterface ExportConditionInterface { get; set; }
+            public ImportConditionObject2(IExportConditionInterface exportConditionInterface)
+            {
+                ExportConditionInterface = exportConditionInterface;
+            }
+        }
+
+        public class ImportConditionObject3
+        {
+            public IExportConditionInterface ExportConditionInterface { get; set; }
+            public ImportConditionObject3(IExportConditionInterface exportConditionInterface)
+            {
+                ExportConditionInterface = exportConditionInterface;
+            }
+        }
 
         internal interface IX { }
         internal class A : IX { }

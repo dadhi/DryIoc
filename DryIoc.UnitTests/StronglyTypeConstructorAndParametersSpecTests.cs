@@ -10,10 +10,21 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register2(with: Impl.Of(() => new Burger()));
+            container.Register<Burger>(made: Made.Of(() => new Burger()));
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Null);
+        }
+
+        [Test]
+        public void Specifying_constructor_of_wrong_type_should_throw()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.Register<NewBurger>(made: Made.Of(() => new Burger())));
+
+            Assert.AreEqual(ex.Error, Error.MADE_OF_TYPE_NOT_ASSIGNABLE_TO_IMPLEMENTATION_TYPE);
         }
 
         [Test]
@@ -21,12 +32,12 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<Burger>(with: Impl.Of(() => new Burger(default(ICheese))));
+            container.Register<Burger>(made: Made.Of(() => new Burger(default(ICheese))));
             container.Register<ICheese, BlueCheese>();
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Not.Null);
-        }
+        }                       
 
         [Test]
         public void Specify_parameter_ifUnresolved_behavior_without_reflection()
@@ -34,7 +45,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<Burger>(
-                with: Impl.Of(() => new Burger(Arg.Of<ICheese>(IfUnresolved.ReturnDefault))));
+                made: Made.Of(() => new Burger(Arg.Of<ICheese>(IfUnresolved.ReturnDefault))));
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Null);
@@ -49,7 +60,7 @@ namespace DryIoc.UnitTests
             container.RegisterInstance("King");
 
             container.Register<Burger>(
-                with: Impl.Of(() => new Burger("King", Arg.Of<BlueCheese>("a"))));
+                made: Made.Of(() => new Burger("King", Arg.Of<BlueCheese>("a"))));
 
             var burger = container.Resolve<Burger>();
             Assert.AreEqual("King", burger.Name);
@@ -60,7 +71,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<Burger>(with: Impl.Of(() => Burger.Create()));
+            container.Register<Burger>(made: Made.Of(() => Burger.Create()));
 
             Assert.NotNull(container.Resolve<Burger>());
         }
@@ -73,8 +84,8 @@ namespace DryIoc.UnitTests
             container.Register<BlueCheese>(serviceKey: "a");
             container.RegisterInstance("King");
 
-            container.Register2(
-                with: Impl.Of(() => Burger.Create("King", Arg.Of<BlueCheese>("a"))));
+            container.Register<Burger>(
+                made: Made.Of(() => Burger.Create("King", Arg.Of<BlueCheese>("a"))));
 
             var burger = container.Resolve<Burger>();
             Assert.AreEqual("King", burger.Name);
@@ -84,7 +95,8 @@ namespace DryIoc.UnitTests
         public void Can_specify_properties_and_fields_together_with_constructor()
         {
             var container = new Container();
-            container.Register2(with: Impl.Of(() => new Burger { Name = "", Cheese = Arg.Of<BlueCheese>() }));
+            container.Register<Burger>(
+                made: Made.Of(() => new Burger { Name = "", Cheese = Arg.Of<BlueCheese>() }));
 
             container.RegisterInstance("King");
             container.Register<BlueCheese>();
@@ -99,7 +111,7 @@ namespace DryIoc.UnitTests
         public void Can_handle_default_parameters()
         {
             var container = new Container();
-            container.Register2<IBurger, Burger>(with: Impl.Of(() => new Burger(Arg.Of<string>("key"), default(int))));
+            container.Register<IBurger, Burger>(made: Made.Of(() => new Burger(Arg.Of<string>("key"), default(int))));
             container.RegisterInstance("King", serviceKey: "key");
 
             var burger = container.Resolve<IBurger>();
@@ -111,7 +123,7 @@ namespace DryIoc.UnitTests
         public void Can_handle_default_parameters_with_explicit_specification()
         {
             var container = new Container();
-            container.Register2<IBurger, Burger>(with: Impl.Of(() => new Burger(Arg.Of<string>("key"), Arg.Of<int>(IfUnresolved.ReturnDefault))));
+            container.Register<IBurger, Burger>(made: Made.Of(() => new Burger(Arg.Of<string>("key"), Arg.Of<int>(IfUnresolved.ReturnDefault))));
             container.RegisterInstance("King", serviceKey: "key");
 
             var burger = container.Resolve<IBurger>();
@@ -172,6 +184,10 @@ namespace DryIoc.UnitTests
             {
                 return new Burger("default", cheese) { Number = number };
             }
+        }
+
+        internal class NewBurger : Burger
+        {
         }
     }
 }
