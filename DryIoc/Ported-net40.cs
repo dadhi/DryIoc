@@ -24,16 +24,25 @@ THE SOFTWARE.
 
 namespace System
 {
+    /// <summary>Wrapper for value computation required on-demand. Since computed the same value will be returned over and over again.</summary>
+    /// <typeparam name="T">Type of value.</typeparam>
     public sealed class Lazy<T>
     {
+        /// <summary>Creates lazy object with passed value computation delegate.</summary>
+        /// <param name="valueFactory">Value computation. Will be stored until computation is done.</param>
+        /// <exception cref="ArgumentNullException">Throws for null computation.</exception>
         public Lazy(Func<T> valueFactory)
         {
             if (valueFactory == null) throw new ArgumentNullException("valueFactory");
             _valueFactory = valueFactory;
         }
 
+        /// <summary>Indicates if value is computed already, or not.</summary>
         public bool IsValueCreated { get; private set; }
 
+        /// <summary>Computes value if it was not before, and returns it. 
+        /// Value is guaranteed to be computed only once despite possible thread contention.</summary>
+        /// <exception cref="InvalidOperationException">Throws if value computation is recursive.</exception>
         public T Value
         {
             get { return IsValueCreated ? _value : Create(); }
