@@ -391,26 +391,48 @@ namespace DryIoc
 
         IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, IScope scope)
         {
-            var registeredServiceType = requiredServiceType ?? serviceType;
-            var serviceFactories = ((IContainer)this).GetAllServiceFactories(registeredServiceType);
+            var container = ((IContainer)this);
+            var itemServiceType = requiredServiceType ?? serviceType;
+            var items = container.GetAllServiceFactories(itemServiceType);
+            var itemsWithVariance = !itemServiceType.IsGeneric() ? null :
+                container.GetServiceRegistrations().Where(x =>
+                    itemServiceType != x.ServiceType && x.ServiceType.IsClosedGeneric() &&
+                    itemServiceType.GetGenericTypeDefinition() == x.ServiceType.GetGenericTypeDefinition() &&
+                    x.ServiceType.IsAssignableTo(itemServiceType));
 
             if (serviceKey != null) // include only single item matching key.
-                serviceFactories = serviceFactories.Where(f => serviceKey.Equals(f.Key));
+            {
+                items = items.Where(x => serviceKey.Equals(x.Key));
+                if (itemsWithVariance != null)
+                    itemsWithVariance = itemsWithVariance.Where(x => serviceKey.Equals(x.OptionalServiceKey));
+            }
 
             if (compositeParentKey != null) // exclude composite parent from items
-                serviceFactories = serviceFactories.Where(f => !compositeParentKey.Equals(f.Key));
+            {
+                items = items.Where(x => !compositeParentKey.Equals(x.Key));
+                if (itemsWithVariance != null)
+                    itemsWithVariance = itemsWithVariance.Where(x => !compositeParentKey.Equals(x.OptionalServiceKey));
+            }
 
-            foreach (var item in serviceFactories)
+            foreach (var item in items)
             {
                 var service = ((IResolver)this).ResolveKeyed(serviceType, item.Key, IfUnresolved.ReturnDefault, requiredServiceType, scope);
                 if (service != null) // skip unresolved items
                     yield return service;
             }
+
+            if (itemsWithVariance != null)
+                foreach (var item in itemsWithVariance)
+                {
+                    var service = ((IResolver)this).ResolveKeyed(serviceType, item.OptionalServiceKey, IfUnresolved.ReturnDefault, item.ServiceType, scope);
+                    if (service != null) // skip unresolved items
+                        yield return service;
+                }
         }
 
         private void ThrowIfContainerDisposed()
         {
-            this.ThrowIf(IsDisposed, Error.CONTAINER_IS_DISPOSED);
+            Throw.If(IsDisposed, Error.CONTAINER_IS_DISPOSED);
         }
 
         #endregion
@@ -1718,6 +1740,13 @@ namespace DryIoc
             var requiredItemType = container.UnwrapServiceType(request.RequiredServiceType ?? itemType);
 
             var items = container.GetAllServiceFactories(requiredItemType);
+            var itemsWithVariance = !requiredItemType.IsGeneric() ? null :
+                // Check generic type with compatible variance, 
+                // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
+                container.GetServiceRegistrations().Where(x => 
+                    requiredItemType != x.ServiceType && x.ServiceType.IsClosedGeneric() &&
+                    requiredItemType.GetGenericTypeDefinition() == x.ServiceType.GetGenericTypeDefinition() &&
+                    x.ServiceType.IsAssignableTo(requiredItemType));
 
             // Composite pattern support: filter out composite root from available keys.
             var parent = request.GetNonWrapperParentOrEmpty();
@@ -1725,13 +1754,24 @@ namespace DryIoc
             {
                 var parentFactoryID = parent.ResolvedFactory.FactoryID;
                 items = items.Where(x => x.Value.FactoryID != parentFactoryID);
+                if (itemsWithVariance != null)
+                    itemsWithVariance = itemsWithVariance.Where(x => x.Factory.FactoryID != parentFactoryID);
             }
 
             // Return collection of single matched item if key is specified.
             if (request.ServiceKey != null)
-                items = items.Where(kv => request.ServiceKey.Equals(kv.Key));
+            {
+                items = items.Where(x => request.ServiceKey.Equals(x.Key));
+                if (itemsWithVariance != null)
+                    itemsWithVariance = itemsWithVariance.Where(x => request.ServiceKey.Equals(x.OptionalServiceKey));
+            }
 
-            var itemArray = items.ToArray();
+            var allItems = items.Select(kv => new ServiceTypeKeyFactory { 
+                ServiceType = requiredItemType, OptionalServiceKey = kv.Key, Factory = kv.Value });
+            if (itemsWithVariance != null)
+                allItems = allItems.Concat(itemsWithVariance);
+
+            var itemArray = allItems.ToArray();
             List<Expression> itemExprList = null;
             if (itemArray.Length != 0)
             {
@@ -1739,7 +1779,8 @@ namespace DryIoc
                 for (var i = 0; i < itemArray.Length; i++)
                 {
                     var item = itemArray[i];
-                    var itemRequest = request.Push(itemType, item.Key, IfUnresolved.ReturnDefault);
+                    var requiredServiceType = requiredItemType != item.ServiceType ? item.ServiceType : null;
+                    var itemRequest = request.Push(itemType, item.OptionalServiceKey, IfUnresolved.ReturnDefault, requiredServiceType);
                     var itemFactory = container.ResolveFactory(itemRequest);
                     if (itemFactory != null)
                     {
@@ -3039,12 +3080,12 @@ namespace DryIoc
         /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
         /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
         /// <param name="concreteType">Type to instantiate.</param>
-        /// <param name="with">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
         /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
-        public static object New(this IContainer container, Type concreteType, Made with = null)
+        public static object New(this IContainer container, Type concreteType, Made made = null)
         {
             concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UNABLE_TO_NEW_OPEN_GENERIC);
-            var factory = new ReflectionFactory(concreteType, null, with, Setup.With(cacheFactoryExpression: false));
+            var factory = new ReflectionFactory(concreteType, null, made, Setup.With(cacheFactoryExpression: false));
             factory.CheckBeforeRegistration(container, concreteType, null);
             var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).ResolveWithFactory(factory);
             var factoryDelegate = factory.GetDelegateOrDefault(request);
@@ -3055,11 +3096,11 @@ namespace DryIoc
         /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
         /// <typeparam name="T">Type to instantiate.</typeparam>
         /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
-        /// <param name="with">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
         /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
-        public static T New<T>(this IContainer container, Made with = null)
+        public static T New<T>(this IContainer container, Made made = null)
         {
-            return (T)container.New(typeof(T), with);
+            return (T)container.New(typeof(T), made);
         }
 
         internal static Expression CreateResolutionExpression(Request request, Type serviceType = null)
@@ -5680,6 +5721,7 @@ namespace DryIoc
     }
 
     /// <summary>Define registered service structure.</summary>
+    [DebuggerDisplay("{ServiceType}; {OptionalServiceKey}; {Factory}")]
     public struct ServiceTypeKeyFactory
     {
         /// <summary>Required service type.</summary>
@@ -6078,10 +6120,8 @@ namespace DryIoc
 
             UNABLE_TO_RESOLVE_SERVICE = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
-                "Please ensure that you have registered service, and with expected key and Setup.With(condition);" + Environment.NewLine +
-                "Or have specified requiredServiceType on resolution; " + Environment.NewLine +
-                "Or service actually matches the reuse scope; " + Environment.NewLine +
-                "Or exist Rules.WithUnknownServiceResolver(ResolveMyService)."),
+                "Please ensure you have service registered (with proper key) - 95% of cases." + Environment.NewLine +
+                "Remaining 5%: There is no Rules.WithUnknownServiceResolver(ForMyService), or service does not match the reuse scope, or service has wrong Setup.With(condition)."),
             EXPECTED_SINGLE_DEFAULT_FACTORY = Of(
                 "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
@@ -6418,7 +6458,7 @@ namespace DryIoc
 
         /// <summary>Returns true if <paramref name="type"/> contains all generic parameters from <paramref name="genericParams"/>.</summary>
         /// <param name="type">Expected to be open-generic type.</param>
-        /// <param name="genericParams">Generic parameters type to look in.</param>
+        /// <param name="genericParams">Generic parameters.</param>
         /// <returns>Returns true if contains and false otherwise.</returns>
         public static bool ContainsAllGenericTypeParameters(this Type type, Type[] genericParams)
         {
