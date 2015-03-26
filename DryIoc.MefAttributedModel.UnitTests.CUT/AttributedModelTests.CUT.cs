@@ -280,4 +280,72 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     [Export, PartCreationPolicy(CreationPolicy.NonShared), OpenResolutionScope]
     public class LazyDep { }
+
+    [InheritedExport]
+    public interface IExportConditionInterface { }
+
+    public abstract class ForParentImplementationAttribute : ExportConditionAttribute
+    {
+        public override bool Evaluate(Request request)
+        {
+            return request.ParentNonWrapper().ImplementationType == _parentImplementationType;
+        }
+
+        private readonly Type _parentImplementationType;
+        protected ForParentImplementationAttribute(Type parentImplementationType) { _parentImplementationType = parentImplementationType; }
+    }
+
+    public class ForImportCondition1ParentAttribute : ForParentImplementationAttribute
+    {
+        public ForImportCondition1ParentAttribute() : base(typeof(ImportConditionObject1)) { }
+    }
+
+    public class ForImportCondition2ParentAttribute : ForParentImplementationAttribute
+    {
+        public ForImportCondition2ParentAttribute() : base(typeof(ImportConditionObject2)) { }
+    }
+
+    public class ForImportCondition3ParentAttribute : ForParentImplementationAttribute
+    {
+        public ForImportCondition3ParentAttribute() : base(typeof(ImportConditionObject3)) { }
+    }
+
+    [ForImportCondition1Parent]
+    public class ExportConditionalObject : IExportConditionInterface { }
+
+    [ForImportCondition2Parent]
+    public class ExportConditionalObject2 : IExportConditionInterface { }
+
+    [ForImportCondition3Parent]
+    public class ExportConditionalObject3 : IExportConditionInterface { }
+
+    [ExportMany]
+    public class ImportConditionObject1
+    {
+        public IExportConditionInterface ExportConditionInterface { get; set; }
+        public ImportConditionObject1(IExportConditionInterface exportConditionInterface)
+        {
+            ExportConditionInterface = exportConditionInterface;
+        }
+    }
+
+    [ExportMany]
+    public class ImportConditionObject2
+    {
+        public IExportConditionInterface ExportConditionInterface { get; set; }
+        public ImportConditionObject2(IExportConditionInterface exportConditionInterface)
+        {
+            ExportConditionInterface = exportConditionInterface;
+        }
+    }
+
+    [ExportMany]
+    public class ImportConditionObject3
+    {
+        public IExportConditionInterface ExportConditionInterface { get; set; }
+        public ImportConditionObject3(IExportConditionInterface exportConditionInterface)
+        {
+            ExportConditionInterface = exportConditionInterface;
+        }
+    }
 }

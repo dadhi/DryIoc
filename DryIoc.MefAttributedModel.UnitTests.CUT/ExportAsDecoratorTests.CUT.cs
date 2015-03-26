@@ -54,7 +54,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export(typeof(IHandler)), AsDecorator(ConditionType = typeof(Condition))]
+    [Export(typeof(IHandler)), AsDecorator, ForSlowHandler]
     public class CustomHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -64,9 +64,9 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             Handler = handler;
         }
 
-        public class Condition : IDecoratorCondition
+        public sealed class ForSlowHandler : ExportConditionAttribute
         {
-            public bool Match(Request request)
+            public override bool Evaluate(Request request)
             {
                 return request.ImplementationType == typeof(SlowHandler);
             }

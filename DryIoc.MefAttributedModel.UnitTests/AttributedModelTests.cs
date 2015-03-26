@@ -192,6 +192,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
             StringAssert.Contains(".Resolve", clientExpr.Value.ToString());
         }
 
+        [Test]
+        public void Export_condition_should_be_evaluated()
+        {
+            GivenAssemblyWithExportedTypes();
+            WhenIRegisterAllExportedTypes();
+
+            Assert.IsInstanceOf<ExportConditionalObject>(_container.Resolve<ImportConditionObject1>().ExportConditionInterface);
+            Assert.IsInstanceOf<ExportConditionalObject2>(_container.Resolve<ImportConditionObject2>().ExportConditionInterface);
+            Assert.IsInstanceOf<ExportConditionalObject3>(_container.Resolve<ImportConditionObject3>().ExportConditionInterface);
+        }
+
         #region Implementation
 
         private void WhenIRegisterAllExportedTypes()

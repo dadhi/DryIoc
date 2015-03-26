@@ -316,6 +316,10 @@ namespace DryIoc.MefAttributedModel
                 {
                     PopulateDecoratorInfoFromAttribute(info, (AsDecoratorAttribute)attribute, implementationType);
                 }
+                else if (attribute is ExportConditionAttribute)
+                {
+                    info.ConditionType = attribute.GetType();
+                }
                 else if (attribute is AsFactoryAttribute)
                 {
                     info.IsFactory = true;
@@ -400,10 +404,8 @@ namespace DryIoc.MefAttributedModel
         {
             Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
             resultInfo.FactoryType = FactoryType.Decorator;
-            resultInfo.Decorator = new DecoratorInfo {
-                DecoratedServiceConditionType = attribute.ConditionType,
-                DecoratedServiceKeyInfo = ServiceKeyInfo.Of(attribute.ContractName ?? attribute.ContractKey)
-            };
+            var decoratedServiceKeyInfo = ServiceKeyInfo.Of(attribute.ContractName ?? attribute.ContractKey);
+            resultInfo.Decorator = new DecoratorInfo { DecoratedServiceKeyInfo = decoratedServiceKeyInfo };
         }
 
         private static Attribute[] GetAllExportRelatedAttributes(Type type)
@@ -643,6 +645,9 @@ namespace DryIoc.MefAttributedModel
         /// <summary>True if exported with <see cref="AsFactoryAttribute"/>.</summary>
         public bool IsFactory;
 
+        /// <summary>Type consisting of single method compatible with <see cref="Setup.Condition"/> type.</summary>
+        public Type ConditionType; 
+
         /// <summary>Creates factory out of registration info.</summary>
         /// <param name="rules">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
         /// <returns>Created factory.</returns>
@@ -660,17 +665,19 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == FactoryType.Wrapper)
                 return Wrapper == null ? Setup.Wrapper : Wrapper.GetSetup();
 
+            var condition = ConditionType == null ? (Func<Request, bool>)null
+                : ((ExportConditionAttribute)Activator.CreateInstance(ConditionType)).Evaluate;
+
             var lazyMetadata = HasMetadataAttribute ? (Func<object>)(() => GetMetadata(attributes)) : null;
 
             if (FactoryType == FactoryType.Decorator)
-                return Decorator == null ? Setup.Decorator : Decorator.GetSetup(lazyMetadata);
+                return Decorator == null ? Setup.Decorator : Decorator.GetSetup(lazyMetadata, condition);
 
-            if (!OpenResolutionScope && lazyMetadata == null && ReusedWrappers.IsNullOrEmpty())
+            if (lazyMetadata == null && condition == null && !OpenResolutionScope && ReusedWrappers.IsNullOrEmpty())
                 return Setup.Default;
 
-            return Setup.With(lazyMetadata: lazyMetadata,
-                openResolutionScope: OpenResolutionScope,
-                reuseWrappers: ReusedWrappers);
+            return Setup.With(lazyMetadata: lazyMetadata, condition: condition, 
+                openResolutionScope: OpenResolutionScope, reuseWrappers: ReusedWrappers);
         }
 
         /// <summary>Compares with another info for equality.</summary>
@@ -832,25 +839,22 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Provides serializable info about Decorator setup.</summary>
     public sealed class DecoratorInfo
     {
-        /// <summary>Type of condition to match decorated type.</summary>
-        public Type DecoratedServiceConditionType;
-
         /// <summary>Decorated service key info. Info wrapper is required for serialization.</summary>
         public ServiceKeyInfo DecoratedServiceKeyInfo;
 
         /// <summary>Converts info to corresponding decorator setup.</summary>
-        /// <param name="lazyMetadata">(optional) Metadata that may be associated by decorator.</param> <returns>Setup.</returns>
-        public Setup GetSetup(Func<object> lazyMetadata = null)
+        /// <param name="lazyMetadata">(optional) Metadata that may be associated by decorator.</param>
+        /// <param name="condition">(optional) <see cref="Setup.Condition"/>.</param>
+        /// <returns>Setup.</returns>
+        public Setup GetSetup(Func<object> lazyMetadata = null, Func<Request, bool> condition = null)
         {
-            if (DecoratedServiceConditionType != null)
-                return Setup.DecoratorWith(((IDecoratorCondition)Activator.CreateInstance(DecoratedServiceConditionType)).Match);
-
-            if (DecoratedServiceKeyInfo != ServiceKeyInfo.Default || lazyMetadata != null)
-                return Setup.DecoratorWith(request =>
-                    (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, request.ServiceKey)) &&
-                    (lazyMetadata == null || Equals(lazyMetadata(), request.ResolvedFactory.Setup.Metadata)));
-
-            return Setup.Decorator;
+            if (DecoratedServiceKeyInfo == ServiceKeyInfo.Default && lazyMetadata == null && condition == null)
+                return Setup.Decorator;
+            
+            return Setup.DecoratorWith(r =>
+                (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, r.ServiceKey)) &&
+                (lazyMetadata == null || Equals(lazyMetadata(), r.ResolvedFactory.Setup.Metadata)) &&
+                (condition == null || condition(r)));
         }
 
         /// <summary>Compares this info to other info for equality.</summary> <param name="obj">Other info to compare.</param>
@@ -858,9 +862,7 @@ namespace DryIoc.MefAttributedModel
         public override bool Equals(object obj)
         {
             var other = obj as DecoratorInfo;
-            return other != null
-                && other.DecoratedServiceConditionType == DecoratedServiceConditionType
-                && Equals(other.DecoratedServiceKeyInfo.Key, DecoratedServiceKeyInfo.Key);
+            return other != null && Equals(other.DecoratedServiceKeyInfo.Key, DecoratedServiceKeyInfo.Key);
         }
 
         /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
@@ -868,9 +870,7 @@ namespace DryIoc.MefAttributedModel
         public StringBuilder ToCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
-                .Append(@"Decorator = new DecoratorInfo(")
-                .AppendType(DecoratedServiceConditionType).Append(", ")
-                .AppendCode(DecoratedServiceKeyInfo.Key).Append(")");
+                .Append(@"Decorator = new DecoratorInfo(").AppendCode(DecoratedServiceKeyInfo.Key).Append(")");
         }
     }
 
@@ -1042,21 +1042,18 @@ namespace DryIoc.MefAttributedModel
         /// <summary>If <see cref="ContractName"/> specified, it has more priority over <see cref="ContractKey"/>. </summary>
         public string ContractName { get; set; }
 
-        /// <summary>Is type assignable to <see cref="IDecoratorCondition"/> to create condition for matching decorated type.</summary>
-        public Type ConditionType { get; set; }
-        
         /// <summary>Contract key of decorated type.</summary>
         public object ContractKey { get; set; }
     }
 
-    /// <summary>Applies to decorated service request.</summary>
-    public interface IDecoratorCondition
+    /// <summary>Base type for exported type <see cref="Setup.Condition"/>.</summary>
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
+    public abstract class ExportConditionAttribute : Attribute
     {
-        /// <summary>Returns true if decorated service specified by request is the one to be decorated.</summary>
-        /// <param name="request">Request of decorated service.</param> <returns>True if matched.</returns>
-        bool Match(Request request);
+        /// <summary>Returns true to use exported service for request.</summary>
+        /// <param name="request"></param> <returns>True to use exported service for request.</returns>
+        public abstract bool Evaluate(Request request);
     }
-
 
     /// <summary>Imports service Only with equal <see cref="ContractKey"/>.</summary>
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible"), AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property)]

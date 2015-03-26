@@ -593,7 +593,7 @@ namespace DryIoc
                 return null;
 
             // We are already resolving decorator for the service, so stop now.
-            var parent = request.GetNonWrapperParentOrEmpty();
+            var parent = request.ParentNonWrapper();
             if (!parent.IsEmpty && parent.ResolvedFactory.FactoryType == FactoryType.Decorator)
                 return null;
 
@@ -1749,7 +1749,7 @@ namespace DryIoc
                     x.ServiceType.IsAssignableTo(requiredItemType));
 
             // Composite pattern support: filter out composite root from available keys.
-            var parent = request.GetNonWrapperParentOrEmpty();
+            var parent = request.ParentNonWrapper();
             if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
             {
                 var parentFactoryID = parent.ResolvedFactory.FactoryID;
@@ -1808,7 +1808,7 @@ namespace DryIoc
 
             // Composite pattern support: find composite parent key to exclude from result.
             object compositeParentKey = null;
-            var parent = request.GetNonWrapperParentOrEmpty();
+            var parent = request.ParentNonWrapper();
             if (!parent.IsEmpty && parent.ServiceType == itemRequiredServiceType)
                 compositeParentKey = parent.ServiceKey;
 
@@ -3755,7 +3755,7 @@ namespace DryIoc
         /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
         /// If not found returns <see cref="IsEmpty"/> request.</summary>
         /// <returns>Return closest <see cref="FactoryType.Service"/> parent or root.</returns>
-        public Request GetNonWrapperParentOrEmpty()
+        public Request ParentNonWrapper()
         {
             var p = Parent;
             while (!p.IsEmpty && p.ResolvedFactory.FactoryType == FactoryType.Wrapper)
@@ -4088,7 +4088,7 @@ namespace DryIoc
         public virtual Expression GetExpressionOrDefault(Request request, Type reuseWrapperType = null)
         {
             // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual creation expression.
-            if (Setup.OpenResolutionScope && !request.GetNonWrapperParentOrEmpty().IsEmpty)
+            if (Setup.OpenResolutionScope && !request.ParentNonWrapper().IsEmpty)
                 return Resolver.CreateResolutionExpression(request);
 
             request = request.ResolveWithFactory(this);
