@@ -83,11 +83,13 @@ namespace DryIoc.IssuesTests
         {
             // setup
             _subject.Register<Target>();
-            _subject.Register<ILog, Log>(made: Made.Of(request =>
-            {
-                var targetType = request.ParentNonWrapper().Enumerate().First(p => p.ServiceType != typeof(ILog)).ImplementationType;
-                return FactoryMethod.Of(typeof(LoggerFactory).GetDeclaredMethodOrNull("GetLog").MakeGenericMethod(targetType));
-            }));
+            _subject.Register<ILog, Log>(
+                setup: Setup.With(cacheFactoryExpression: false),
+                made: Made.Of(request =>
+                {
+                    var targetType = request.ParentNonWrapper().Enumerate().First(p => p.ServiceType != typeof(ILog)).ImplementationType;
+                    return FactoryMethod.Of(typeof(LoggerFactory).GetDeclaredMethodOrNull("GetLog").MakeGenericMethod(targetType));
+                }));
 
             // exercise
             var resolved = _subject.Resolve<Target>();
