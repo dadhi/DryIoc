@@ -67,6 +67,7 @@
     <Compile Include="Issue81_SupportForOptionalParametersInConstructor.cs" />
     <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
     <Compile Include="Issue_HandleVariance.cs" />
+    <Compile Include="Issue_InjectPrimitiveValueBasedOnRequest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Samples\AutoWiring.cs" />
     <Compile Include="Samples\ConstructorSelectionTests.cs" />
