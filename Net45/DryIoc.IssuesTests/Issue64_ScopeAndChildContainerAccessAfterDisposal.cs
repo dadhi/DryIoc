@@ -67,7 +67,7 @@ namespace DryIoc.IssuesTests
                     {
                         await Task.Delay(100);
                         var provider = new XProvider();
-                        b.ResolvePropertiesAndFields(provider);
+                        b.InjectPropertiesAndFields(provider);
                     });
 
                 }

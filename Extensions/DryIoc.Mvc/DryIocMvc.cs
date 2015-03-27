@@ -138,7 +138,7 @@ namespace DryIoc.Mvc
         {
             var filters = base.GetFilters(controllerContext, actionDescriptor).ToArray();
             for (var i = 0; i < filters.Length; i++)
-                _container.ResolvePropertiesAndFields(filters[i].Instance);
+                _container.InjectPropertiesAndFields(filters[i].Instance);
             return filters;
         }
 

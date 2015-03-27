@@ -91,7 +91,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.RegisterExports(typeof(Service));
 
             var client = new PropertyClient();
-            container.ResolvePropertiesAndFields(client);
+            container.InjectPropertiesAndFields(client);
 
             Assert.That(client.Some, Is.InstanceOf<Service>());
         }
@@ -104,7 +104,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var client = new NamedPropertyClient();
             Assert.Throws<ContainerException>(() =>
-                container.ResolvePropertiesAndFields(client));
+                container.InjectPropertiesAndFields(client));
 
             Assert.That(client.Some, Is.Null);
         }
@@ -116,7 +116,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Register<Service>();
 
             var client = new NamedPropertyClient();
-            container.ResolvePropertiesAndFields(client);
+            container.InjectPropertiesAndFields(client);
 
             Assert.That(client.Some, Is.Null);
         }
@@ -163,7 +163,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var container = new Container().WithMefAttributedModel();
             container.Register<Service>();
 
-            var client = container.ResolvePropertiesAndFields(new ClientWithGenericWrapperProps());
+            var client = container.InjectPropertiesAndFields(new ClientWithGenericWrapperProps());
 
             Assert.That(client.GetService(), Is.InstanceOf<Service>());
         }

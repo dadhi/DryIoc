@@ -3071,7 +3071,7 @@ namespace DryIoc
         /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
         /// <returns>Input instance with resolved dependencies, to enable fluent method composition.</returns>
         /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.And"/> method.</remarks>        
-        public static TService ResolvePropertiesAndFields<TService>(this IContainer container,
+        public static TService InjectPropertiesAndFields<TService>(this IContainer container,
             TService instance, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             return (TService)container.InjectPropertiesAndFields(instance, propertiesAndFields);

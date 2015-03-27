@@ -17,7 +17,7 @@ namespace DryIoc.UnitTests
             var holder = container.Resolve<PropertyHolder>();
             var dependency = holder.Dependency = new Dependency();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.That(holder.Dependency, Is.EqualTo(dependency));
         }
@@ -30,7 +30,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IDependency), typeof(Dependency));
             var holder = container.Resolve<PropertyHolder>();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.IsInstanceOf<Dependency>(holder.Dependency);
         }
@@ -43,7 +43,7 @@ namespace DryIoc.UnitTests
             container.Register<IDependency, Dependency>();
             var holder = container.Resolve<FieldHolder>();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.IsInstanceOf<Dependency>(holder.Dependency);
         }
@@ -56,7 +56,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IBar), typeof(Bar));
             var holder = container.Resolve<PropertyHolder>();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.IsNull(holder.Bar);
         }
@@ -69,7 +69,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IBar), typeof(Bar));
             var holder = container.Resolve<PropertyHolder>();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.IsNull(holder.BarWithoutSet);
         }
@@ -83,7 +83,7 @@ namespace DryIoc.UnitTests
             var holder = container.Resolve<FieldHolder>();
             var bar = container.Resolve<IBar>();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.That(holder.Bar, Is.Not.EqualTo(bar));
         }
