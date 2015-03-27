@@ -36,9 +36,9 @@
         <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net40" />
 
         <!-- net45 -->
-        <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net45" />
-        <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net45" />
-        <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net45" />
+        <file src="..\Net45\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net45" />
+        <file src="..\Net45\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net45" />
+        <file src="..\Net45\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net45" />
 
         <!-- PCL: Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\PCL\bin\Release\DryIoc.MefAttributedModel.dll" 

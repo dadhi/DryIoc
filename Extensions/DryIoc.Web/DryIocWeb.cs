@@ -21,6 +21,14 @@ namespace DryIoc.Web
         }
     }
 
+    /// <summary>Defines web reuse as reuse items in <see cref="HttpContextScopeContext"/>.</summary>
+    public static class ReuseInWeb
+    {
+        /// <summary>Request reuse corresponds to reusing items in root open scope (physically stored in current <see cref="HttpContext"/>).</summary>
+        public static readonly IReuse Request = 
+            Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
+    }
+
     /// <summary>Registers <see cref="DryIocHttpModule"/>.</summary>
     public static class DryIocHttpModuleInitializer
     {
@@ -35,7 +43,7 @@ namespace DryIoc.Web
     }
 
     /// <summary>Hooks up <see cref="Container.OpenScope"/> on begin request and scope dispose on request end.</summary>
-    public class DryIocHttpModule : IHttpModule
+    public sealed class DryIocHttpModule : IHttpModule
     {
         /// <summary>Initializes a module and prepares it to handle requests. </summary>
         /// <param name="context">An <see cref="T:System.Web.HttpApplication"/> that provides access to the methods, properties, and events common to all application objects within an ASP.NET application </param>
@@ -109,12 +117,5 @@ namespace DryIoc.Web
         }
 
         private readonly Func<IDictionary> _getContextItems;
-    }
-
-    /// <summary>Defines web reuse as reuse items in <see cref="HttpContextScopeContext"/>.</summary>
-    public static class ReuseInWeb
-    {
-        /// <summary>Request reuse corresponds to reusing items in root open scope (physically stored in current <see cref="HttpContext"/>).</summary>
-        public static readonly IReuse Request = Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
     }
 }

@@ -5,6 +5,12 @@ namespace DryIoc.CompileTimeGeneration.Tests
 {
     public partial class ServiceFactory : IResolverContext, IResolverContextProvider, IDisposable
     {
+        public static HashTree<Type, FactoryDelegate>
+            DefaultResolutions = HashTree<Type, FactoryDelegate>.Empty;
+
+        public static HashTree<Type, HashTree<object, FactoryDelegate>>
+            KeyedResolutions = HashTree<Type, HashTree<object, FactoryDelegate>>.Empty;
+
         public ServiceFactory()
         {
             SingletonScope = new Scope();

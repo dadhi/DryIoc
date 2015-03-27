@@ -65,6 +65,12 @@ namespace DryIoc.WebApi
         }
     }
 
+    public static class ReuseInWeb
+    {
+        public static readonly IReuse Request =
+            Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
+    }
+
     internal class DryIocDependencyResolver : IDependencyResolver
     {
         internal DryIocDependencyResolver(IContainer container)
@@ -143,10 +149,5 @@ namespace DryIoc.WebApi
 
         private readonly IContainer _container;
         private readonly IEnumerable<IFilterProvider> _providers;
-    }
-
-    public static class ReuseInWeb
-    {
-        public static readonly IReuse Request = Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
     }
 }
