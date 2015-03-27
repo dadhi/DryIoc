@@ -160,7 +160,7 @@ namespace DryIoc.UnitTests
         {
             var import = (ImportAttribute)m.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
             return import == null ? null : PropertyOrFieldServiceInfo.Of(m)
-                .WithDetails(ServiceInfoDetails.Of(import.ContractType, import.ContractName), req);
+                .WithDetails(ServiceDetails.Of(import.ContractType, import.ContractName), req);
         }
     }
 

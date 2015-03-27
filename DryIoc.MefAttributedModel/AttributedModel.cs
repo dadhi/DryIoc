@@ -194,12 +194,12 @@ namespace DryIoc.MefAttributedModel
             return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details, request);
         }
 
-        private static ServiceInfoDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
+        private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
         {
             return GetImportDetails(type, attributes, request) ?? GetImportExternalDetails(type, attributes, request);
         }
 
-        private static ServiceInfoDetails GetImportDetails(Type reflectedType, Attribute[] attributes, Request request)
+        private static ServiceDetails GetImportDetails(Type reflectedType, Attribute[] attributes, Request request)
         {
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
             if (import == null)
@@ -211,7 +211,7 @@ namespace DryIoc.MefAttributedModel
 
             var ifUnresolved = import.AllowDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
 
-            return ServiceInfoDetails.Of(import.ContractType, serviceKey, ifUnresolved);
+            return ServiceDetails.Of(import.ContractType, serviceKey, ifUnresolved);
         }
 
         private static object GetServiceKeyWithMetadataAttribute(Type reflectedType, Attribute[] attributes, Request request)
@@ -230,7 +230,7 @@ namespace DryIoc.MefAttributedModel
             return factory.Key;
         }
 
-        private static ServiceInfoDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, Request request)
+        private static ServiceDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, Request request)
         {
             var import = GetSingleAttributeOrDefault<ImportExternalAttribute>(attributes);
             if (import == null)
@@ -256,7 +256,7 @@ namespace DryIoc.MefAttributedModel
                     Setup.With(metadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
             }
 
-            return ServiceInfoDetails.Of(serviceType, serviceKey);
+            return ServiceDetails.Of(serviceType, serviceKey);
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(Attribute[] attributes) where TAttribute : Attribute

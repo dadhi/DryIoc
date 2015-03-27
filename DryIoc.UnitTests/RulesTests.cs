@@ -108,8 +108,8 @@ namespace DryIoc.UnitTests
             return parameter =>
             {
                 var import = (ImportAttribute)parameter.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
-                var details = import == null ? ServiceInfoDetails.Default
-                    : ServiceInfoDetails.Of(import.ContractType, import.ContractName);
+                var details = import == null ? ServiceDetails.Default
+                    : ServiceDetails.Of(import.ContractType, import.ContractName);
                 return ParameterServiceInfo.Of(parameter).WithDetails(details, request);
             };
         }
@@ -132,7 +132,7 @@ namespace DryIoc.UnitTests
                     .ThrowIfNull();
 
                 return ParameterServiceInfo.Of(parameter)
-                    .WithDetails(ServiceInfoDetails.Of(serviceType, factory.Key), request);
+                    .WithDetails(ServiceDetails.Of(serviceType, factory.Key), request);
             };
         }
 

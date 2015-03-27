@@ -33,7 +33,7 @@ namespace DryIoc.WebApi
     using System.Web.Http.Controllers;
     using System.Web.Http.Filters;
 
-    internal static class DryIocWebApi
+    public static class DryIocWebApi
     {
         public static IContainer WithWebApi(this IContainer container, HttpConfiguration config,
             IEnumerable<Assembly> controllerAssemblies = null)

@@ -752,11 +752,12 @@ namespace DryIoc
         /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings), 
         /// otherwise invokes <see cref="GetOrAddStateItem"/> and wraps access to added item (by returned index) into expression: state => state.Get(index).</summary>
         /// <param name="item">Item to wrap or to add.</param> <param name="itemType">(optional) Specific type of item, otherwise item <see cref="object.GetType()"/>.</param>
+        /// <param name="throwIfStateRequired">(optional) Enable filtering of stateful items.</param>
         /// <returns>Returns constant or state access expression for added items.</returns>
-        public Expression GetOrAddStateItemExpression(object item, Type itemType = null)
+        public Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
             if (item == null)
-                return itemType == null ? Expression.Constant(null) 
+                return itemType == null ? Expression.Constant(null)
                     : (Expression)Expression.Convert(Expression.Constant(null), itemType);
 
             itemType = itemType ?? item.GetType();
@@ -766,6 +767,9 @@ namespace DryIoc
             if (item is DefaultKey) // Recreate default key using constant order instead of putting it state.
                 return Expression.Call(typeof(DefaultKey), "Of", null,
                     Expression.Constant(((DefaultKey)item).RegistrationOrder, typeof(int)));
+
+            if (throwIfStateRequired)
+                Throw.It(Error.STATE_IS_REQUIRED_TO_USE_ITEM, item);
 
             var itemIndex = GetOrAddStateItem(item);
             var indexExpr = Expression.Constant(itemIndex, typeof(int));
@@ -2215,7 +2219,7 @@ namespace DryIoc
             Func<ParameterInfo, ParameterServiceInfo> parameterSelector, Request request)
         {
             var parameterServiceInfo = parameterSelector(parameter) ?? ParameterServiceInfo.Of(parameter);
-            var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceInfoDetails.IfUnresolvedReturnDefault, request));
+            var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault, request));
             var parameterFactory = request.Container.ResolveFactory(parameterRequest);
             return parameterFactory == null ? null : parameterFactory.GetExpressionOrDefault(parameterRequest);
         }
@@ -2419,13 +2423,9 @@ namespace DryIoc
                         }
                     }
 
-                    var defaultValue = ifUnresolved == IfUnresolved.ReturnDefault
-                                       && parameter.IsOptional
-                        ? parameter.DefaultValue
-                        : null;
-
-                    parameters = parameters.Condition(parameter.Equals, requiredServiceType, serviceKey, ifUnresolved,
-                        defaultValue);
+                    var defaultValue = ifUnresolved == IfUnresolved.ReturnDefault && parameter.IsOptional ? parameter.DefaultValue : null;
+                    parameters = parameters.Details((r, p) => !p.Equals(parameter) ? null : 
+                        ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
                 }
                 else
                 {
@@ -2473,7 +2473,7 @@ namespace DryIoc
                     propertiesAndFields = propertiesAndFields.And(r => new[]
                     {
                         PropertyOrFieldServiceInfo.Of(member).WithDetails(
-                            ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved), r)
+                            ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved), r)
                     });
                 }
                 else
@@ -3131,36 +3131,36 @@ namespace DryIoc
     }
 
     /// <summary>Provides information required for service resolution: service type, 
-    /// and optional <see cref="ServiceInfoDetails"/>: key, what to do if service unresolved, and required service type.</summary>
+    /// and optional <see cref="ServiceDetails"/>: key, what to do if service unresolved, and required service type.</summary>
     public interface IServiceInfo
     {
         /// <summary>The required piece of info: service type.</summary>
         Type ServiceType { get; }
 
         /// <summary>Additional optional details: service key, if-unresolved policy, required service type.</summary>
-        ServiceInfoDetails Details { get; }
+        ServiceDetails Details { get; }
 
         /// <summary>Creates info from service type and details.</summary>
         /// <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
-        IServiceInfo Create(Type serviceType, ServiceInfoDetails details);
+        IServiceInfo Create(Type serviceType, ServiceDetails details);
     }
 
     /// <summary>Provides optional service resolution details: service key, required service type, what return when service is unresolved,
     /// default value if service is unresolved, custom service value.</summary>
-    public class ServiceInfoDetails
+    public class ServiceDetails
     {
         /// <summary>Default details if not specified, use default setting values, e.g. <see cref="DryIoc.IfUnresolved.Throw"/></summary>
-        public static readonly ServiceInfoDetails Default = new ServiceInfoDetails();
+        public static readonly ServiceDetails Default = new ServiceDetails();
 
         /// <summary>The same as <see cref="Default"/> with only difference <see cref="IfUnresolved"/> set to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</summary>
-        public static readonly ServiceInfoDetails IfUnresolvedReturnDefault = new WithIfUnresolvedReturnDefault();
+        public static readonly ServiceDetails IfUnresolvedReturnDefault = new WithIfUnresolvedReturnDefault();
 
         /// <summary>Creates new DTO out of provided settings, or returns default if all settings have default value.</summary>
         /// <param name="requiredServiceType">Registered service type to search for.</param>
         /// <param name="serviceKey">Service key.</param> <param name="ifUnresolved">If unresolved policy.</param>
         /// <param name="defaultValue">Custom default value, if specified it will automatically set <paramref name="ifUnresolved"/> to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</param>
         /// <returns>Created details DTO.</returns>
-        public static ServiceInfoDetails Of(Type requiredServiceType = null,
+        public static ServiceDetails Of(Type requiredServiceType = null,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, 
             object defaultValue = null)
         {
@@ -3175,6 +3175,13 @@ namespace DryIoc
                     : new WithTypeReturnDefault(requiredServiceType, serviceKey, defaultValue));
         }
 
+        /// <summary>Sets custom value for service. This setting is orthogonal to the rest.</summary>
+        /// <param name="value">Custom value.</param> <returns>Details with custom value.</returns>
+        public static ServiceDetails Of(object value)
+        {
+            return new WithCustomValue(value);
+        }
+
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
         public virtual Type RequiredServiceType { get { return null; } }
 
@@ -3187,9 +3194,15 @@ namespace DryIoc
         /// <summary>Value to use in case <see cref="IfUnresolved"/> is set to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</summary>
         public virtual object DefaultValue { get { return null; } }
 
+        /// <summary>Custom value specified for dependency.</summary>
+        public virtual object CustomValue { get { return null; } }
+
         /// <summary>Pretty prints service details to string for debugging and errors.</summary> <returns>Details string.</returns>
         public override string ToString()
         {
+            if (CustomValue != null)
+                return "{with custom value: " + CustomValue + "}";
+
             var s = new StringBuilder();
             if (RequiredServiceType != null)
                 s.Append("{required: ").Print(RequiredServiceType);
@@ -3202,12 +3215,19 @@ namespace DryIoc
 
         #region Implementation
 
-        private sealed class WithIfUnresolvedReturnDefault : ServiceInfoDetails
+        private sealed class WithIfUnresolvedReturnDefault : ServiceDetails
         {
             public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnDefault; } }
         }
 
-        private class WithKey : ServiceInfoDetails
+        private class WithCustomValue : ServiceDetails
+        {
+            public override object CustomValue { get { return _value; } }
+            public WithCustomValue(object value) { _value = value; }
+            private readonly object _value;
+        }
+
+        private class WithKey : ServiceDetails
         {
             public override object ServiceKey { get { return _serviceKey; } }
             public WithKey(object serviceKey) { _serviceKey = serviceKey; }
@@ -3250,7 +3270,7 @@ namespace DryIoc
         /// <typeparam name="T">Type of <see cref="IServiceInfo"/>.</typeparam>
         /// <param name="info">Source info.</param> <param name="details">Details to combine with info.</param> 
         /// <param name="request">Owner request.</param> <returns>Original source or new combined info.</returns>
-        public static T WithDetails<T>(this T info, ServiceInfoDetails details, Request request)
+        public static T WithDetails<T>(this T info, ServiceDetails details, Request request)
             where T : IServiceInfo
         {
             var serviceType = info.ServiceType;
@@ -3265,7 +3285,7 @@ namespace DryIoc
                 if (requiredServiceType.IsAssignableTo(serviceType))
                 {
                     serviceType = requiredServiceType; // override service type with required one
-                    details = ServiceInfoDetails.Of(null, details.ServiceKey, details.IfUnresolved);
+                    details = ServiceDetails.Of(null, details.ServiceKey, details.IfUnresolved);
                 }
             }
 
@@ -3275,7 +3295,7 @@ namespace DryIoc
         }
 
         /// <summary>Enables propagation/inheritance of info between dependency and its owner: 
-        /// for instance <see cref="ServiceInfoDetails.RequiredServiceType"/> for wrappers.</summary>
+        /// for instance <see cref="ServiceDetails.RequiredServiceType"/> for wrappers.</summary>
         /// <param name="dependency">Dependency info.</param>
         /// <param name="owner">Dependency holder/owner info.</param>
         /// <param name="shouldInheritServiceKey">(optional) Self-explanatory. Usually set to true for wrapper and decorator info.</param>
@@ -3283,7 +3303,7 @@ namespace DryIoc
         public static IServiceInfo InheritInfo(this IServiceInfo dependency, IServiceInfo owner, bool shouldInheritServiceKey = false)
         {
             var ownerDetails = owner.Details;
-            if (ownerDetails == null || ownerDetails == ServiceInfoDetails.Default)
+            if (ownerDetails == null || ownerDetails == ServiceDetails.Default)
                 return dependency;
 
             var dependencyDetails = dependency.Details;
@@ -3312,7 +3332,7 @@ namespace DryIoc
                 ifUnresolved == dependencyDetails.IfUnresolved && requiredServiceType == dependencyDetails.RequiredServiceType)
                 return dependency;
 
-            return dependency.Create(serviceType, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
+            return dependency.Create(serviceType, ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
         }
 
         /// <summary>Appends info string representation into provided builder.</summary>
@@ -3340,7 +3360,7 @@ namespace DryIoc
             serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE);
             return serviceKey == null && ifUnresolved == IfUnresolved.Throw
                 ? new ServiceInfo(serviceType)
-                : new WithDetails(serviceType, ServiceInfoDetails.Of(null, serviceKey, ifUnresolved));
+                : new WithDetails(serviceType, ServiceDetails.Of(null, serviceKey, ifUnresolved));
         }
 
         /// <summary>Creates service info using typed <typeparamref name="TService"/>.</summary>
@@ -3351,7 +3371,7 @@ namespace DryIoc
         {
             return serviceKey == null && ifUnresolved == IfUnresolved.Throw
                 ? new Typed<TService>()
-                : new TypedWithDetails<TService>(ServiceInfoDetails.Of(null, serviceKey, ifUnresolved));
+                : new TypedWithDetails<TService>(ServiceDetails.Of(null, serviceKey, ifUnresolved));
         }
 
         /// <summary>Strongly-typed version of Service Info.</summary> <typeparam name="TService">Service type.</typeparam>
@@ -3364,14 +3384,14 @@ namespace DryIoc
         /// <summary>Type of service to create. Indicates registered service in registry.</summary>
         public Type ServiceType { get; private set; }
 
-        /// <summary>Additional settings. If not specified uses <see cref="ServiceInfoDetails.Default"/>.</summary>
-        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.Default; } }
+        /// <summary>Additional settings. If not specified uses <see cref="ServiceDetails.Default"/>.</summary>
+        public virtual ServiceDetails Details { get { return ServiceDetails.Default; } }
 
         /// <summary>Creates info from service type and details.</summary>
         /// <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
-        public IServiceInfo Create(Type serviceType, ServiceInfoDetails details)
+        public IServiceInfo Create(Type serviceType, ServiceDetails details)
         {
-            return details == ServiceInfoDetails.Default
+            return details == ServiceDetails.Default
                 ? new ServiceInfo(serviceType)
                 : new WithDetails(serviceType, details);
         }
@@ -3391,16 +3411,16 @@ namespace DryIoc
 
         private class WithDetails : ServiceInfo
         {
-            public override ServiceInfoDetails Details { get { return _details; } }
-            public WithDetails(Type serviceType, ServiceInfoDetails details) : base(serviceType) { _details = details; }
-            private readonly ServiceInfoDetails _details;
+            public override ServiceDetails Details { get { return _details; } }
+            public WithDetails(Type serviceType, ServiceDetails details) : base(serviceType) { _details = details; }
+            private readonly ServiceDetails _details;
         }
 
         private class TypedWithDetails<TService> : Typed<TService>
         {
-            public override ServiceInfoDetails Details { get { return _details; } }
-            public TypedWithDetails(ServiceInfoDetails details) { _details = details; }
-            private readonly ServiceInfoDetails _details;
+            public override ServiceDetails Details { get { return _details; } }
+            public TypedWithDetails(ServiceDetails details) { _details = details; }
+            private readonly ServiceDetails _details;
         }
 
         #endregion
@@ -3408,7 +3428,7 @@ namespace DryIoc
 
     /// <summary>Provides <see cref="IServiceInfo"/> for parameter, 
     /// by default using parameter name as <see cref="IServiceInfo.ServiceType"/>.</summary>
-    /// <remarks>For parameter default setting <see cref="ServiceInfoDetails.IfUnresolved"/> is <see cref="IfUnresolved.Throw"/>.</remarks>
+    /// <remarks>For parameter default setting <see cref="ServiceDetails.IfUnresolved"/> is <see cref="IfUnresolved.Throw"/>.</remarks>
     public class ParameterServiceInfo : IServiceInfo
     {
         /// <summary>Creates service info from parameter alone, setting service type to parameter type,
@@ -3425,19 +3445,19 @@ namespace DryIoc
 
             return !isOptional ? new ParameterServiceInfo(parameter)
                 : new WithDetails(parameter, !hasDefaultValue
-                    ? ServiceInfoDetails.IfUnresolvedReturnDefault
-                    : ServiceInfoDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: defaultValue));
+                    ? ServiceDetails.IfUnresolvedReturnDefault
+                    : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: defaultValue));
         }
 
         /// <summary>Service type specified by <see cref="ParameterInfo.ParameterType"/>.</summary>
         public virtual Type ServiceType { get { return _parameter.ParameterType; } }
 
         /// <summary>Optional service details.</summary>
-        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.Default; } }
+        public virtual ServiceDetails Details { get { return ServiceDetails.Default; } }
 
         /// <summary>Creates info from service type and details.</summary>
         /// <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
-        public IServiceInfo Create(Type serviceType, ServiceInfoDetails details)
+        public IServiceInfo Create(Type serviceType, ServiceDetails details)
         {
             return serviceType == ServiceType
                 ? new WithDetails(_parameter, details)
@@ -3458,16 +3478,16 @@ namespace DryIoc
 
         private class WithDetails : ParameterServiceInfo
         {
-            public override ServiceInfoDetails Details { get { return _details; } }
-            public WithDetails(ParameterInfo parameter, ServiceInfoDetails details)
+            public override ServiceDetails Details { get { return _details; } }
+            public WithDetails(ParameterInfo parameter, ServiceDetails details)
                 : base(parameter) { _details = details; }
-            private readonly ServiceInfoDetails _details;
+            private readonly ServiceDetails _details;
         }
 
         private sealed class TypeWithDetails : WithDetails
         {
             public override Type ServiceType { get { return _serviceType; } }
-            public TypeWithDetails(ParameterInfo parameter, Type serviceType, ServiceInfoDetails details)
+            public TypeWithDetails(ParameterInfo parameter, Type serviceType, ServiceDetails details)
                 : base(parameter, details) { _serviceType = serviceType; }
             private readonly Type _serviceType;
         }
@@ -3490,11 +3510,11 @@ namespace DryIoc
         public abstract Type ServiceType { get; }
 
         /// <summary>Optional details: service key, if-unresolved policy, required service type.</summary>
-        public virtual ServiceInfoDetails Details { get { return ServiceInfoDetails.IfUnresolvedReturnDefault; } }
+        public virtual ServiceDetails Details { get { return ServiceDetails.IfUnresolvedReturnDefault; } }
 
         /// <summary>Creates info from service type and details.</summary>
         /// <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
-        public abstract IServiceInfo Create(Type serviceType, ServiceInfoDetails details);
+        public abstract IServiceInfo Create(Type serviceType, ServiceDetails details);
 
         /// <summary>Either <see cref="PropertyInfo"/> or <see cref="FieldInfo"/>.</summary>
         public abstract MemberInfo Member { get; }
@@ -3508,7 +3528,7 @@ namespace DryIoc
         private class Property : PropertyOrFieldServiceInfo
         {
             public override Type ServiceType { get { return _property.PropertyType; } }
-            public override IServiceInfo Create(Type serviceType, ServiceInfoDetails details)
+            public override IServiceInfo Create(Type serviceType, ServiceDetails details)
             {
                 return serviceType == ServiceType
                     ? new WithDetails(_property, details)
@@ -3534,16 +3554,16 @@ namespace DryIoc
 
             private class WithDetails : Property
             {
-                public override ServiceInfoDetails Details { get { return _details; } }
-                public WithDetails(PropertyInfo property, ServiceInfoDetails details)
+                public override ServiceDetails Details { get { return _details; } }
+                public WithDetails(PropertyInfo property, ServiceDetails details)
                     : base(property) { _details = details; }
-                private readonly ServiceInfoDetails _details;
+                private readonly ServiceDetails _details;
             }
 
             private sealed class TypeWithDetails : WithDetails
             {
                 public override Type ServiceType { get { return _serviceType; } }
-                public TypeWithDetails(PropertyInfo property, Type serviceType, ServiceInfoDetails details)
+                public TypeWithDetails(PropertyInfo property, Type serviceType, ServiceDetails details)
                     : base(property, details) { _serviceType = serviceType; }
                 private readonly Type _serviceType;
             }
@@ -3552,7 +3572,7 @@ namespace DryIoc
         private class Field : PropertyOrFieldServiceInfo
         {
             public override Type ServiceType { get { return _field.FieldType; } }
-            public override IServiceInfo Create(Type serviceType, ServiceInfoDetails details)
+            public override IServiceInfo Create(Type serviceType, ServiceDetails details)
             {
                 return serviceType == null
                     ? new WithDetails(_field, details)
@@ -3578,16 +3598,16 @@ namespace DryIoc
 
             private class WithDetails : Field
             {
-                public override ServiceInfoDetails Details { get { return _details; } }
-                public WithDetails(FieldInfo field, ServiceInfoDetails details)
+                public override ServiceDetails Details { get { return _details; } }
+                public WithDetails(FieldInfo field, ServiceDetails details)
                     : base(field) { _details = details; }
-                private readonly ServiceInfoDetails _details;
+                private readonly ServiceDetails _details;
             }
 
             private sealed class TypeWithDetails : WithDetails
             {
                 public override Type ServiceType { get { return _serviceType; } }
-                public TypeWithDetails(FieldInfo field, Type serviceType, ServiceInfoDetails details)
+                public TypeWithDetails(FieldInfo field, Type serviceType, ServiceDetails details)
                     : base(field, details) { _serviceType = serviceType; }
                 private readonly Type _serviceType;
             }
@@ -3636,13 +3656,13 @@ namespace DryIoc
         /// <summary>Shortcut access to <see cref="IServiceInfo.ServiceType"/>.</summary>
         public Type ServiceType { get { return ServiceInfo == null ? null : ServiceInfo.ServiceType; } }
 
-        /// <summary>Shortcut access to <see cref="ServiceInfoDetails.ServiceKey"/>.</summary>
+        /// <summary>Shortcut access to <see cref="ServiceDetails.ServiceKey"/>.</summary>
         public object ServiceKey { get { return ServiceInfo.ThrowIfNull().Details.ServiceKey; } }
 
-        /// <summary>Shortcut access to <see cref="ServiceInfoDetails.IfUnresolved"/>.</summary>
+        /// <summary>Shortcut access to <see cref="ServiceDetails.IfUnresolved"/>.</summary>
         public IfUnresolved IfUnresolved { get { return ServiceInfo.ThrowIfNull().Details.IfUnresolved; } }
 
-        /// <summary>Shortcut access to <see cref="ServiceInfoDetails.RequiredServiceType"/>.</summary>
+        /// <summary>Shortcut access to <see cref="ServiceDetails.RequiredServiceType"/>.</summary>
         public Type RequiredServiceType { get { return ServiceInfo.ThrowIfNull().Details.RequiredServiceType; } }
 
         /// <summary>Implementation type of factory, if request was <see cref="ResolveWithFactory"/> factory, or null otherwise.</summary>
@@ -3681,7 +3701,7 @@ namespace DryIoc
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             IScope scope = null)
         {
-            var details = ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
+            var details = ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
             return Push(DryIoc.ServiceInfo.Of(serviceType).WithDetails(details, this), scope ?? Scope);
         }
 
@@ -3700,7 +3720,7 @@ namespace DryIoc
         {
             var details = ServiceInfo.Details;
             ServiceInfo = ServiceInfo.Create(ServiceInfo.ServiceType,
-                ServiceInfoDetails.Of(details.RequiredServiceType, serviceKey, details.IfUnresolved, details.DefaultValue));
+                ServiceDetails.Of(details.RequiredServiceType, serviceKey, details.IfUnresolved, details.DefaultValue));
         }
 
         /// <summary>Returns new request with parameter expressions created for <paramref name="funcType"/> input arguments.
@@ -3753,12 +3773,23 @@ namespace DryIoc
         }
 
         /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
-        /// If not found returns <see cref="IsEmpty"/> request.</summary>
-        /// <returns>Return closest <see cref="FactoryType.Service"/> parent or root.</returns>
+        /// If not found returns <see cref="IsEmpty"/> request.</summary> <returns>Found parent or <see cref="IsEmpty"/> request.</returns>
         public Request ParentNonWrapper()
         {
             var p = Parent;
             while (!p.IsEmpty && p.ResolvedFactory.FactoryType == FactoryType.Wrapper)
+                p = p.Parent;
+            return p;
+        }
+
+        /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
+        /// If not found returns <see cref="IsEmpty"/> request.</summary>
+        /// <param name="condition">Condition, e.g. to find root request condition may be: <code lang="cs"><![CDATA[p => p.Parent.IsEmpty]]></code></param>
+        /// <returns>Found parent or empty request.</returns>
+        public Request ParentNonWrapper(Func<Request, bool> condition)
+        {
+            var p = Parent;
+            while (!p.IsEmpty && (p.ResolvedFactory.FactoryType == FactoryType.Wrapper || !condition(p)))
                 p = p.Parent;
             return p;
         }
@@ -4289,7 +4320,7 @@ namespace DryIoc
     /// <summary>DSL for specifying <see cref="ParameterSelector"/> injection rules.</summary>
     public static partial class Parameters
     {
-        /// <summary>Specifies to return default details <see cref="ServiceInfoDetails.Default"/> for all parameters.</summary>
+        /// <summary>Specifies to return default details <see cref="ServiceDetails.Default"/> for all parameters.</summary>
         public static ParameterSelector Of = request => ParameterServiceInfo.Of;
 
         /// <summary>Combines source selector with other. Other will override the source.</summary>
@@ -4302,31 +4333,41 @@ namespace DryIoc
                 : request => other(request) ?? source(request);
         }
 
-        /// <summary>Adds to <paramref name="source"/> selector service info for parameters identified by <paramref name="condition"/>.</summary>
-        /// <param name="source">Source selector.</param> <param name="condition">Way to identify parameters.</param>
-        /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
-        /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
-        /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
-        /// <returns>Combined selector.</returns>
-        public static ParameterSelector Condition(this ParameterSelector source, Func<ParameterInfo, bool> condition,
-            Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
+        /// <summary>Overrides source parameter rules with specific parameter details. If it is not your parameter just return null.</summary>
+        /// <param name="source">Original parameters rules</param> 
+        /// <param name="getDetailsOrNull">Should return specific details or null.</param>
+        /// <returns>New parameters rules.</returns>
+        public static ParameterSelector Details(this ParameterSelector source, Func<Request, ParameterInfo, ServiceDetails> getDetailsOrNull)
         {
-            condition.ThrowIfNull();
-            return request => parameter => condition(parameter) 
-                ? ParameterServiceInfo.Of(parameter).WithDetails(ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue), request)
-                : source(request)(parameter);
+            getDetailsOrNull.ThrowIfNull();
+            return request => parameter =>
+            {
+                var details = getDetailsOrNull(request, parameter);
+                return details == null ? source(request)(parameter) 
+                    : ParameterServiceInfo.Of(parameter).WithDetails(details, request);
+            };
         }
 
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by <paramref name="name"/>.</summary>
-        /// <param name="source">Source selector.</param> <param name="name">Name to identify parameter.</param>
+        /// <param name="source">Original parameters rules.</param> <param name="name">Name to identify parameter.</param>
         /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
         /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
         /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
-        /// <returns>Combined selector.</returns>
+        /// <returns>New parameters rules.</returns>
         public static ParameterSelector Name(this ParameterSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
-            return source.Condition(p => p.Name.Equals(name), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
+            return source.Details((r, p) => !p.Name.Equals(name) ? null 
+                : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+        }
+
+        /// <summary>Specify parameter by name and set custom value to it.</summary>
+        /// <param name="source">Original parameters rules.</param> <param name="name">Parameter name.</param>
+        /// <param name="getCustomValue">Custom value provider.</param>
+        /// <returns>New parameters rules.</returns>
+        public static ParameterSelector Name(this ParameterSelector source, string name, Func<Request, object> getCustomValue)
+        {
+            return source.Details((r, p) => p.Name.Equals(name) ? ServiceDetails.Of(getCustomValue(r)) : null);
         }
 
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <typeparamref name="T"/>.</summary>
@@ -4338,7 +4379,8 @@ namespace DryIoc
         public static ParameterSelector Type<T>(this ParameterSelector source,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
         {
-            return source.Condition(p => typeof(T).IsAssignableTo(p.ParameterType), requiredServiceType, serviceKey, ifUnresolved, defaultValue);
+            return source.Details((r, p) => !typeof(T).IsAssignableTo(p.ParameterType) ? null
+                : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
         }
 
         #region Tools
@@ -4376,7 +4418,7 @@ namespace DryIoc
         /// <param name="withPrimitive">(optional) Specifies to include members of primitive types. Will include by default.</param>
         /// <param name="withFields">(optional) Specifies to include fields as well as properties. Will include by default.</param>
         /// <param name="ifUnresolved">(optional) Defines ifUnresolved behavior for resolved members.</param>
-        /// <param name="withInfo">(optional) Return service info for a member or null to skip it resolution.</param>
+        /// <param name="withInfo">(optional) Return service info for a member or null to skip member resolution.</param>
         /// <returns>Result selector composed using provided settings.</returns>
         public static PropertiesAndFieldsSelector All(
             bool withNonPublic = true, bool withPrimitive = true, bool withFields = true,
@@ -4384,7 +4426,7 @@ namespace DryIoc
             GetInfo withInfo = null)
         {
             GetInfo getInfo = (m, r) => withInfo != null ? withInfo(m, r) :
-                  PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceInfoDetails.Of(ifUnresolved: ifUnresolved), r);
+                  PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(ifUnresolved: ifUnresolved), r);
             return r =>
             {
                 var properties = r.ImplementationType.GetAll(_ => _.DeclaredProperties)
@@ -4403,8 +4445,8 @@ namespace DryIoc
         public static PropertiesAndFieldsSelector And(this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
         {
             return source == null || source == Of ? (other ?? Of)
-                 : other == null || other == Of ? source
-                 : r =>
+                : other == null || other == Of ? source
+                : r =>
                 {
                     var sourceMembers = source(r).ToArrayOrSelf();
                     var otherMembers = other(r).ToArrayOrSelf();
@@ -4416,6 +4458,37 @@ namespace DryIoc
                 };
         }
 
+        /// <summary>Specifies service details (key, if-unresolved policy, required type) for property/field with the name.</summary>
+        /// <param name="source">Original member selector.</param> <param name="name">Member name.</param> <param name="getDetails">Details.</param>
+        /// <returns>new selector.</returns>
+        public static PropertiesAndFieldsSelector Details(this PropertiesAndFieldsSelector source, string name, Func<Request, ServiceDetails> getDetails)
+        {
+            name.ThrowIfNull();
+            getDetails.ThrowIfNull();
+            return source.And(request =>
+            {
+                var implementationType = request.ImplementationType;
+
+                var property = implementationType.GetPropertyOrNull(name);
+                if (property != null && property.Match(true, true))
+                {
+                    var details = getDetails(request);
+                    return details == null ? null
+                        : new[] { PropertyOrFieldServiceInfo.Of(property).WithDetails(details, request) };
+                }
+
+                var field = implementationType.GetFieldOrNull(name);
+                if (field != null && field.Match(true, true))
+                {
+                    var details = getDetails(request);
+                    return details == null ? null 
+                        : new[] { PropertyOrFieldServiceInfo.Of(field).WithDetails(details, request) };
+                }
+                    
+                return Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(Error.NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD, name, request);
+            });
+        }
+
         /// <summary>Adds to <paramref name="source"/> selector service info for property/field identified by <paramref name="name"/>.</summary>
         /// <param name="source">Source selector.</param> <param name="name">Name to identify member.</param>
         /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
@@ -4425,7 +4498,16 @@ namespace DryIoc
         public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, object defaultValue = null)
         {
-            return source.WithDetails(name, ServiceInfoDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+            return source.Details(name, r => ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+        }
+
+        /// <summary>Specifies custom value for property/field with specific name.</summary>
+        /// <param name="source">Original property/field list.</param>
+        /// <param name="name">Target member name.</param> <param name="getCustomValue">Custom value provider.</param>
+        /// <returns>Return new combined selector.</returns>
+        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name, Func<Request, object> getCustomValue)
+        {
+            return source.Details(name, r => ServiceDetails.Of(getCustomValue(r)));
         }
 
         #region Tools
@@ -4492,27 +4574,6 @@ namespace DryIoc
             return member.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit)
                 // ReSharper disable once RedundantEnumerableCastCall
                 .Cast<Attribute>();
-        }
-
-        #endregion
-
-        #region Implementation
-
-        private static PropertiesAndFieldsSelector WithDetails(this PropertiesAndFieldsSelector source, string name, ServiceInfoDetails details)
-        {
-            name.ThrowIfNull();
-            return source.And(r =>
-            {
-                var implementationType = r.ImplementationType;
-                var property = implementationType.GetPropertyOrNull(name);
-                if (property != null && property.Match(true, true))
-                    return new[] { PropertyOrFieldServiceInfo.Of(property).WithDetails(details, r) };
-
-                var field = implementationType.GetFieldOrNull(name);
-                return field != null && field.Match(true, true)
-                    ? new[] { PropertyOrFieldServiceInfo.Of(field).WithDetails(details, r) }
-                    : Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(Error.NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD, name, r);
-            });
         }
 
         #endregion
@@ -4671,17 +4732,26 @@ namespace DryIoc
                         var paramInfo = parameterSelector(param) ?? ParameterServiceInfo.Of(param);
                         var paramRequest = request.Push(paramInfo);
 
-                        var paramFactory = paramRequest.Container.ResolveFactory(paramRequest);
-                        paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
-                        if (paramExpr == null)
+                        var customValue = paramInfo.Details.CustomValue;
+                        if (customValue != null)
                         {
-                            if (request.IfUnresolved == IfUnresolved.ReturnDefault)
-                                return null;
+                            customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.INJECTED_CUSTOM_VALUE_IS_OF_DIFFERENT_TYPE, paramRequest);
+                            paramExpr = paramRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
+                        }
+                        else
+                        {
+                            var paramFactory = paramRequest.Container.ResolveFactory(paramRequest);
+                            paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
+                            if (paramExpr == null)
+                            {
+                                if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+                                    return null;
 
-                            var defaultValue = paramInfo.Details.DefaultValue;
-                            paramExpr = defaultValue != null
-                                ? paramRequest.Container.GetOrAddStateItemExpression(defaultValue)
-                                : paramRequest.ServiceType.GetDefaultValueExpression();
+                                var defaultValue = paramInfo.Details.DefaultValue;
+                                paramExpr = defaultValue != null
+                                    ? paramRequest.Container.GetOrAddStateItemExpression(defaultValue)
+                                    : paramRequest.ServiceType.GetDefaultValueExpression();
+                            }
                         }
                     }
 
@@ -4790,10 +4860,22 @@ namespace DryIoc
                 if (member != null)
                 {
                     var memberRequest = request.Push(member);
-                    var memberFactory = memberRequest.Container.ResolveFactory(memberRequest);
-                    var memberExpr = memberFactory == null ? null : memberFactory.GetExpressionOrDefault(memberRequest);
-                    if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault)
-                        return null;
+                    Expression memberExpr;
+
+                    var customValue = member.Details.CustomValue;
+                    if (customValue != null)
+                    {
+                        customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.INJECTED_CUSTOM_VALUE_IS_OF_DIFFERENT_TYPE, memberRequest);
+                        memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
+                    }
+                    else
+                    {
+                        var memberFactory = memberRequest.Container.ResolveFactory(memberRequest);
+                        memberExpr = memberFactory == null ? null : memberFactory.GetExpressionOrDefault(memberRequest);
+                        if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault)
+                            return null;
+                    }
+
                     if (memberExpr != null)
                         bindings.Add(Expression.Bind(member.Member, memberExpr));
                 }
@@ -5920,8 +6002,9 @@ namespace DryIoc
         /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings), 
         /// otherwise invokes <see cref="Container.GetOrAddStateItem"/> and wraps access to added item (by returned index) into expression: state => state.Get(index).</summary>
         /// <param name="item">Item to wrap or to add.</param> <param name="itemType">(optional) Specific type of item, otherwise item <see cref="object.GetType()"/>.</param>
+        /// <param name="throwIfStateRequired">(optional) Enable filtering of stateful items.</param>
         /// <returns>Returns constant or state access expression for added items.</returns>
-        Expression GetOrAddStateItemExpression(object item, Type itemType = null);
+        Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false);
 
         /// <summary>Adds item if it is not already added to state, returns added or existing item index.</summary>
         /// <param name="item">Item to find in existing items with <see cref="object.Equals(object, object)"/> or add if not found.</param>
@@ -6238,7 +6321,11 @@ namespace DryIoc
             UNEXPECTED_EXPRESSION_INSTEAD_OF_ARG_METHOD = Of(
                 "Expected DryIoc.Arg method call to specify parameter/property/field, but found: {0}."),
             UNEXPECTED_EXPRESSION_INSTEAD_OF_CONSTANT = Of(
-                "Expected constant expression to specify parameter/property/field, but found something else: {0}.");
+                "Expected constant expression to specify parameter/property/field, but found something else: {0}."),
+            INJECTED_CUSTOM_VALUE_IS_OF_DIFFERENT_TYPE = Of(
+                "Injected value {0} is not assignable to {2}."),
+            STATE_IS_REQUIRED_TO_USE_ITEM = Of(
+                "State is required to use (probably to inject) item {0}.");
 #pragma warning restore 1591 // "Missing XML-comment"
 
         /// <summary>Stores new error message and returns error code for it.</summary>

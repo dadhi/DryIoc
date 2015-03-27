@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -21,18 +19,11 @@ namespace DryIoc.IssuesTests
         {
             // setup
             _subject.Register<Target>();
-            _subject.Register<ILog, Log>(made: Made.Of(parameters: request => parameter =>
-            {
-                if (parameter.Name == "input" && parameter.ParameterType == typeof(string))
-                {
-                    var target = request.Parent.ImplementationType.FullName;
-
-                    return ParameterServiceInfo.Of(parameter)
-                        .WithDetails(ServiceInfoDetails.Of(defaultValue: target), request);
-                }
-
-                return null;
-            }));
+            _subject.Register<ILog, Log>(
+                made: Parameters.Of.Details((request, parameter) => 
+                    parameter.Name == "input" && parameter.ParameterType == typeof(string)
+                    ? ServiceDetails.Of(request.Parent.ImplementationType.FullName)
+                    : null));
 
             // exercise
             var resolved = _subject.Resolve<Target>();
@@ -41,41 +32,25 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual("DryIoc.IssuesTests.Target", resolved.LogInput);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Resolves_For_CollectionType()
         {
             // setup
             _subject.Register<Target>();
-            _subject.Register<ILog, LogWrapper>(made: Made.Of(parameters: request => parameter =>
-            {
-                if (parameter.Name == "loggers" && parameter.ParameterType == typeof(ILog[]))
-                {
-                    var target = request.Parent.ImplementationType.FullName;
-                    var logs = GetLogs(target);
-
-                    CollectionAssert.IsNotEmpty(logs);
-
-                    return ParameterServiceInfo.Of(parameter)
-                        .WithDetails(ServiceInfoDetails.Of(defaultValue: logs), request);
-                }
-
-                return null;
-            }));
+            _subject.Register<ILog, Log>(
+                serviceKey: "normal",
+                made: Parameters.Of.Details((request, parameter) =>
+                    parameter.Name == "input" && parameter.ParameterType == typeof(string)
+                    ? ServiceDetails.Of(request.ParentNonWrapper(p => p.ServiceType != typeof(ILog)).ImplementationType.FullName)
+                    : null));
+            
+            _subject.Register<ILog, LogWrapper>();
 
             // exercise
             var resolved = _subject.Resolve<Target>();
 
             // verify
             Assert.AreEqual("1", resolved.LogInput);
-        }
-
-        public ILog[] GetLogs(string type)
-        {
-            var ret = new List<ILog>();
-
-            ret.Add(new Log(type));
-
-            return ret.ToArray();
         }
 
         [Test]
@@ -87,7 +62,7 @@ namespace DryIoc.IssuesTests
                 setup: Setup.With(cacheFactoryExpression: false),
                 made: Made.Of(request =>
                 {
-                    var targetType = request.ParentNonWrapper().Enumerate().First(p => p.ServiceType != typeof(ILog)).ImplementationType;
+                    var targetType = request.ParentNonWrapper(p => p.ServiceType != typeof(ILog)).ImplementationType;
                     return FactoryMethod.Of(typeof(LoggerFactory).GetDeclaredMethodOrNull("GetLog").MakeGenericMethod(targetType));
                 }));
 

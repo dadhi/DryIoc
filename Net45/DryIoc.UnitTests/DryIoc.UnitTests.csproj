@@ -120,6 +120,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\OpenGenericsTests.cs">
       <Link>OpenGenericsTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\PrimitiveValueInjectionTests.cs">
+      <Link>PrimitiveValueInjectionTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\PrintTests.cs">
       <Link>PrintTests.cs</Link>
     </Compile>
