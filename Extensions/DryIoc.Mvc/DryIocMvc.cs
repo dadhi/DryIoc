@@ -60,7 +60,7 @@ namespace DryIoc.Mvc
 
         /// <summary>Creates new container from original one with <see cref="HttpContextScopeContext"/>.
         /// Then registers MVC controllers in container, 
-        /// sets <see cref="DryIocAggregatedFilterAttributeFilterProvider"/> as filter provider,
+        /// sets <see cref="DryIocFilterAttributeFilterProvider"/> as filter provider,
         /// and at last sets container as <see cref="DependencyResolver"/>.</summary>
         /// <param name="container">Original container.</param>
         /// <param name="controllerAssemblies">(optional) By default uses <see cref="GetReferencedAssemblies"/>.</param>
@@ -87,7 +87,7 @@ namespace DryIoc.Mvc
             container.RegisterMany(controllerAssemblies, typeof(IController), ReuseInWeb.Request);
         }
 
-        /// <summary>Replaces default Filter Providers with instance of <see cref="DryIocAggregatedFilterAttributeFilterProvider"/>,
+        /// <summary>Replaces default Filter Providers with instance of <see cref="DryIocFilterAttributeFilterProvider"/>,
         /// add in addition registers aggregated filter to container..</summary>
         /// <param name="container">Container to register to.</param>
         /// <param name="filterProviders">Original filter providers.</param>
@@ -99,25 +99,34 @@ namespace DryIoc.Mvc
             for (var i = filterAttributeFilterProviders.Length - 1; i >= 0; --i)
                 filterProviders.RemoveAt(i);
 
-            var filterProvider = new DryIocAggregatedFilterAttributeFilterProvider(container);
+            var filterProvider = new DryIocFilterAttributeFilterProvider(container);
             filterProviders.Add(filterProvider);
 
             container.RegisterInstance<IFilterProvider>(filterProvider);
         }
     }
 
+    /// <summary>Resolver delegating to DryIoc container.</summary>
     public class DryIocDependencyResolver : IDependencyResolver
     {
+        /// <summary>Creates resolver from DryIoc resolver.</summary>
+        /// <param name="resolver">DryIoc resolver (container interface).</param>
         public DryIocDependencyResolver(IResolver resolver)
         {
             _resolver = resolver;
         }
 
+        /// <summary> Resolves singly registered services that support arbitrary object creation. </summary>
+        /// <returns> The requested service or object. </returns>
+        /// <param name="serviceType">The type of the requested service or object.</param>
         public object GetService(Type serviceType)
         {
             return _resolver.Resolve(serviceType, IfUnresolved.ReturnDefault);
         }
 
+        /// <summary> Resolves multiply registered services. </summary>
+        /// <returns> The requested services. </returns>
+        /// <param name="serviceType">The type of the requested services.</param>
         public IEnumerable<object> GetServices(Type serviceType)
         {
             return _resolver.ResolveMany<object>(serviceType);
@@ -126,14 +135,19 @@ namespace DryIoc.Mvc
         private readonly IResolver _resolver;
     }
 
+    /// <summary>Defines an filter provider for filter attributes. Uses DryIoc container to inject filter properties.</summary>
     [ComVisible(false)]
-    public class DryIocAggregatedFilterAttributeFilterProvider : FilterAttributeFilterProvider
+    public class DryIocFilterAttributeFilterProvider : FilterAttributeFilterProvider
     {
-        public DryIocAggregatedFilterAttributeFilterProvider(IContainer container)
+        /// <summary>Creates filter provider.</summary> <param name="container"></param>
+        public DryIocFilterAttributeFilterProvider(IContainer container)
         {
             _container = container;
         }
 
+        /// <summary> Aggregates the filters from all of the filter providers into one collection. </summary>
+        /// <returns> The collection filters from all of the filter providers. </returns>
+        /// <param name="controllerContext">The controller context.</param><param name="actionDescriptor">The action descriptor.</param>
         public override IEnumerable<Filter> GetFilters(ControllerContext controllerContext, ActionDescriptor actionDescriptor)
         {
             var filters = base.GetFilters(controllerContext, actionDescriptor).ToArray();

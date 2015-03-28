@@ -59,7 +59,7 @@ namespace DryIoc.WebApi
         {
             var providers = services.GetFilterProviders();
             services.RemoveAll(typeof(IFilterProvider), _ => true);
-            var filterProvider = new DryIocAggregatedFilterProvider(container, providers);
+            var filterProvider = new DryIocFilterProvider(container, providers);
             services.Add(typeof(IFilterProvider), filterProvider);
             container.RegisterInstance<IFilterProvider>(filterProvider);
         }
@@ -131,9 +131,9 @@ namespace DryIoc.WebApi
         private IContainer _scopedContainer;
     }
 
-    public class DryIocAggregatedFilterProvider : IFilterProvider
+    public class DryIocFilterProvider : IFilterProvider
     {
-        public DryIocAggregatedFilterProvider(IContainer container, IEnumerable<IFilterProvider> providers)
+        public DryIocFilterProvider(IContainer container, IEnumerable<IFilterProvider> providers)
         {
             _container = container;
             _providers = providers;

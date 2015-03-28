@@ -9,7 +9,7 @@
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for ASP.NET providing Web Request Reuse</description>
-        <tags>Web Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
+        <tags>Web ASP Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>Initial release.</releaseNotes>
         <dependencies>
           <group>
@@ -25,7 +25,7 @@
         <file src="..\LICENSE.txt" />
 
         <!-- net45 -->
-        <file src="..\Extensions\DryIoc.Web\DryIocWeb.cs" target="content\net45\DryIocWeb.cs" />
+        <file src="..\Extensions\DryIoc.Web\DryIocWeb.cs" target="content\net45" />
 
     </files>
 </package>

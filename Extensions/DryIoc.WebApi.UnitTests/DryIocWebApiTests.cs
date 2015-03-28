@@ -68,16 +68,21 @@ namespace DryIoc.WebApi.UnitTests
             var config = new HttpConfiguration();
             var container = new Container().WithWebApi(config);
             var filterProvider = container.Resolve<IFilterProvider>();
-            Assert.IsInstanceOf<DryIocAggregatedFilterProvider>(filterProvider);
+            Assert.IsInstanceOf<DryIocFilterProvider>(filterProvider);
+
+            var dummyFilter = Substitute.For<IFilter>();
 
             var descriptor = Substitute.For<HttpActionDescriptor>();
-            descriptor.GetFilters().ReturnsForAnyArgs(c => new Collection<IFilter>());
+
+            descriptor.GetFilters().ReturnsForAnyArgs(c => new Collection<IFilter>(new[] { dummyFilter }));
 
             var controllerDescriptor = Substitute.For<HttpControllerDescriptor>();
             controllerDescriptor.GetFilters().ReturnsForAnyArgs(c => new Collection<IFilter>());
             descriptor.ControllerDescriptor = controllerDescriptor;
 
-            filterProvider.GetFilters(config, descriptor);
+            var filters = filterProvider.GetFilters(config, descriptor);
+
+            CollectionAssert.Contains(filters.Select(f => f.Instance), dummyFilter);
         }
 
         public class Blah {}
