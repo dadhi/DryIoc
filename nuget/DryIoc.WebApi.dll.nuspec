@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <metadata>
+        <id>DryIoc.WebApi.dll</id>
+        <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
+        <authors>Maksim Volkau</authors>
+        <copyright>Copyright © 2014 Maksim Volkau</copyright>
+        <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
+        <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>DryIoc extension for ASP.NET WebAPI</description>
+        <tags>Web ASP API Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
+        <releaseNotes>Initial release.</releaseNotes>
+        <dependencies>
+          <group>
+            <dependency id="DryIoc.dll" version="1.5" />
+          </group>
+        </dependencies>
+        <frameworkAssemblies>
+            <frameworkAssembly assemblyName="System.Web.Http" targetFramework="net45" />
+        </frameworkAssemblies>
+    </metadata>
+    <files>
+        <file src="..\LICENSE.txt" />
+
+        <!-- net45 -->
+        <file src="..\Extensions\bin\Release\DryIoc.WebApi.dll" target="lib\net45" />
+        <file src="..\Extensions\bin\Release\DryIoc.WebApi.pdb" target="lib\net45" />
+        <file src="..\Extensions\bin\Release\DryIoc.WebApi.xml" target="lib\net45" />
+
+        <!-- tools -->
+        <file src="..\NuGet\DryIoc.snk" target="tools" />
+        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
+
+    </files>
+</package>

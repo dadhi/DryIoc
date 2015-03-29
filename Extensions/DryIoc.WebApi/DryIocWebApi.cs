@@ -33,8 +33,15 @@ namespace DryIoc.WebApi
     using System.Web.Http.Controllers;
     using System.Web.Http.Filters;
 
+    /// <summary>WebApi DI bootstrapper with DryIoc. </summary>
     public static class DryIocWebApi
     {
+        /// <summary>Given some container creates new one initialized to work with WebApi. 
+        /// Created container will use <see cref="AsyncExecutionFlowScopeContext"/>.</summary>
+        /// <param name="container">Original container.</param>
+        /// <param name="config">Http configuration.</param>
+        /// <param name="controllerAssemblies">Assemblies to look for controllers.</param>
+        /// <returns>New container.</returns>
         public static IContainer WithWebApi(this IContainer container, HttpConfiguration config,
             IEnumerable<Assembly> controllerAssemblies = null)
         {
@@ -49,12 +56,17 @@ namespace DryIoc.WebApi
             return container;
         }
 
+        /// <summary>Registers controllers found in provided assemblies with per-request reuse.</summary>
+        /// <param name="container">Container.</param>
+        /// <param name="controllerAssemblies">Assemblies to look for controllers.</param>
         public static void RegisterHttpControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             controllerAssemblies = controllerAssemblies ?? new[] { Assembly.GetExecutingAssembly() };
             container.RegisterMany(controllerAssemblies, typeof(IHttpController), ReuseInWeb.Request);
         }
 
+        /// <summary>Replaces all filter providers in services with <see cref="DryIocFilterProvider"/>, and registers it in container.</summary>
+        /// <param name="container">DryIoc container.</param> <param name="services">Services</param>
         public static void SetFilterProvider(this IContainer container, ServicesContainer services)
         {
             var providers = services.GetFilterProviders();
@@ -65,8 +77,10 @@ namespace DryIoc.WebApi
         }
     }
 
+    /// <summary>Defines per request scope reuse bound to <see cref="AsyncExecutionFlowScopeContext"/>.</summary>
     public static class ReuseInWeb
     {
+        /// <summary>Reuse object. Actually it is a reuse in top current scope of context.</summary>
         public static readonly IReuse Request =
             Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
     }
@@ -131,14 +145,20 @@ namespace DryIoc.WebApi
         private IContainer _scopedContainer;
     }
 
+    /// <summary>Aggregated filter provider.</summary>
     public class DryIocFilterProvider : IFilterProvider
     {
+        /// <summary>Creates filter provider.</summary>
+        /// <param name="container"></param> <param name="providers"></param>
         public DryIocFilterProvider(IContainer container, IEnumerable<IFilterProvider> providers)
         {
             _container = container;
             _providers = providers;
         }
 
+        /// <summary> Returns an enumeration of filters. </summary>
+        /// <returns> An enumeration of filters. </returns>
+        /// <param name="configuration">The HTTP configuration.</param><param name="actionDescriptor">The action descriptor.</param>
         public IEnumerable<FilterInfo> GetFilters(HttpConfiguration configuration, HttpActionDescriptor actionDescriptor)
         {
             var filters = _providers.SelectMany(p => p.GetFilters(configuration, actionDescriptor)).ToArray();

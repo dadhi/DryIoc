@@ -14,7 +14,6 @@ echo:
 call :ParseVersion "DryIoc\Properties\AssemblyInfo.cs"
 echo:DryIoc v%VER%
 echo:================
-
 %NUGET% pack "NuGet\DryIoc.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 %NUGET% pack "NuGet\DryIoc.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive 
 rem -Symbols
@@ -23,7 +22,6 @@ echo:
 call :ParseVersion "DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs"
 echo:MefAttributedModel v%VER%
 echo:============================
-
 %NUGET% pack "NuGet\DryIoc.MefAttributedModel.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 %NUGET% pack "NuGet\DryIoc.MefAttributedModel.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 rem -Symbols 
@@ -51,6 +49,14 @@ echo:DryIoc.Mvc v%VER%
 echo:============================
 %NUGET% pack "NuGet\DryIoc.Mvc.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 %NUGET% pack "NuGet\DryIoc.Mvc.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+rem -Symbols
+
+echo:
+call :ParseVersion "Extensions\DryIoc.WebApi\Properties\AssemblyInfo.cs"
+echo:DryIoc.WebApi v%VER%
+echo:============================
+%NUGET% pack "NuGet\DryIoc.WebApi.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack "NuGet\DryIoc.WebApi.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 rem -Symbols
 
 echo: 
