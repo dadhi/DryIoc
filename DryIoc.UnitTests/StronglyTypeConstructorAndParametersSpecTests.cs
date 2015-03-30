@@ -131,6 +131,29 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(3, burger.Size);
         }
 
+        [Test]
+        public void Can_use_enum_service_key()
+        {
+            var container = new Container();
+            container.Register<IBurger, Burger>(made: Made.Of(() => new Burger(Arg.Of<ICheese>(BurgerCheese.Blue))));
+            container.Register<ICheese, BlueCheese>(serviceKey: BurgerCheese.Blue);
+
+            var burger = container.Resolve<IBurger>();
+
+            Assert.IsInstanceOf<BlueCheese>(burger.Cheese);
+        }
+
+        enum BurgerCheese {  Blue } 
+
+        [Test]
+        public void Arg_method_do_nothing_and_just_return_default_arg_value()
+        {
+            Assert.AreEqual(default(ICheese), Arg.Of<ICheese>());
+            Assert.AreEqual(default(ICheese), Arg.Of<ICheese>(IfUnresolved.Throw));
+            Assert.AreEqual(default(ICheese), Arg.Of<ICheese>("key"));
+            Assert.AreEqual(default(ICheese), Arg.Of<ICheese>(IfUnresolved.Throw, "key"));
+        }
+
         internal interface ICheese { }
 
         internal class BlueCheese : ICheese { }
@@ -139,6 +162,7 @@ namespace DryIoc.UnitTests
         {
             string Name { get; }
             int Size { get; }
+            ICheese Cheese { get; }
         }
 
         internal class Burger : IBurger

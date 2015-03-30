@@ -447,8 +447,8 @@ namespace DryIoc
 
         /// <summary>Gets current scope matching the <paramref name="name"/>. 
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
-        /// <param name="name">May be null</param> <returns>Found scope or throws exception.</returns>
-        /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
+        /// <param name="name">May be null</param> <param name="throwIfNotFound">Says to throw if no scope found.</param>
+        /// <returns>Found scope or throws exception.</returns>
         /// <exception cref="ContainerException"> with code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/>.</exception>
         IScope IResolverContext.GetCurrentNamedScope(object name, bool throwIfNotFound)
         {
@@ -5238,6 +5238,13 @@ namespace DryIoc
         {
             return context.SetCurrent(getScope
                 ?? (parent => new Scope(parent, parent == null ? context.RootScopeName : null)));
+        }
+
+        /// <summary>Gets current opened scope from container.</summary>
+        /// <param name="container"></param> <returns>Scope or null if no scope was opened.</returns>
+        public static IScope GetCurrentScopeOrDefault(this IContainer container)
+        {
+            return container.GetCurrentNamedScope(name: null, throwIfNotFound: false);
         }
     }
 

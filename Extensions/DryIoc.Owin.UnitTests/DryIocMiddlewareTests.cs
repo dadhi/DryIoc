@@ -30,7 +30,7 @@ namespace DryIoc.Owin.UnitTests
         {
             var container = new Container();
 
-            container.Register<TestMiddleware>();
+            container.Register<TestGreetingMiddleware>();
             container.RegisterInstance(new Greeting { Message = "Hey, DryIoc!" });
 
             using (var server = TestServer.Create(app => app.UseDryIocMiddleware(container)))
@@ -44,7 +44,7 @@ namespace DryIoc.Owin.UnitTests
         public async void Should_ignore_unresolved_middleware_due_missing_dependency()
         {
             var container = new Container();
-            container.Register<TestMiddleware>();
+            container.Register<TestGreetingMiddleware>();
             // Greeting dependency does not registered
 
             using (var server = TestServer.Create(app => app.UseDryIocMiddleware(container)))
@@ -59,7 +59,7 @@ namespace DryIoc.Owin.UnitTests
         {
             var container = new Container();
 
-            container.Register<TestMiddleware>();
+            container.Register<TestGreetingMiddleware>();
 
             using (var server = TestServer.Create(app => app.UseDryIocMiddleware(container,
                 r => r.RegisterInstance(new Greeting { Message = "Hey, DryIoc!" }, ReuseInWeb.Request, IfAlreadyRegistered.Replace))))
@@ -69,11 +69,11 @@ namespace DryIoc.Owin.UnitTests
             }
         }
 
-        internal class TestMiddleware : OwinMiddleware
+        internal class TestGreetingMiddleware : OwinMiddleware
         {
             public Greeting Greeting { get; private set; }
 
-            public TestMiddleware(OwinMiddleware next, Greeting greeting) : base(next)
+            public TestGreetingMiddleware(OwinMiddleware next, Greeting greeting) : base(next)
             {
                 Greeting = greeting;
             }

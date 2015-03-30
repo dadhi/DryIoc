@@ -176,5 +176,11 @@
             Returns a new <see cref="P:Microsoft.Owin.Testing.TestServer.HttpClient"/> which wraps the <see cref="P:Microsoft.Owin.Testing.TestServer.Handler"/> and is capable of submitting requests to the OWIN pipeline.
             </summary>
         </member>
+        <member name="P:Microsoft.Owin.Testing.TestServer.BaseAddress">
+            <summary>
+            Gets or sets the base address used when making requests.
+            The default is 'http://localhost/'.
+            </summary>
+        </member>
     </members>
 </doc>

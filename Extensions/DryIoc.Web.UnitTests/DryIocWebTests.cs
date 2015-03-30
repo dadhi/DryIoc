@@ -27,7 +27,7 @@ namespace DryIoc.Web.UnitTests
                     Assert.AreSame(me, container.Resolve<Me>());
             }
 
-            Assert.AreEqual(Error.NO_CURRENT_SCOPE,
+            Assert.AreEqual(DryIoc.Error.NO_CURRENT_SCOPE,
                 Assert.Throws<ContainerException>(() => container.Resolve<Me>()).Error);
         }
 
@@ -50,7 +50,7 @@ namespace DryIoc.Web.UnitTests
         public void Should_put_new_scope_into_context_on_begin_request()
         {
             var module = new DryIocHttpModule();
-            var app = new FakeHttpApplication(module);
+            var app = new TestHttpApplication(module);
             app.RaiseBeginRequest();
             app.RaiseEndRequest();
         }
@@ -58,20 +58,20 @@ namespace DryIoc.Web.UnitTests
         [Test]
         public void Disposing_module_does_nothing_and_does_not_throw()
         {
-            IHttpModule module = new DryIocHttpModule();
-            var app = new FakeHttpApplication(module);
+            var module = new DryIocHttpModule();
+            var app = new TestHttpApplication(module);
             app.RaiseBeginRequest();
             app.RaiseEndRequest();
-            module.Dispose();
+            app.Dispose();
         }
     }
 
-    internal class FakeHttpApplication : HttpApplication
+    internal class TestHttpApplication : HttpApplication
     {
-        public FakeHttpApplication(IHttpModule httpModule)
+        public TestHttpApplication(IHttpModule httpModule)
         {
-            httpModule.ThrowIfNull().Init(this);
-            _httpModule = httpModule;
+            _httpModule = httpModule.ThrowIfNull();
+            _httpModule.Init(this);
         }
 
         public void RaiseBeginRequest()

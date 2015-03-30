@@ -35,14 +35,14 @@ namespace DryIoc.Web
         /// <summary>Registers once the type of <see cref="DryIocHttpModule"/>.</summary>
         public static void Initialize()
         {
-            if (Interlocked.CompareExchange(ref initialized, 1, 0) == 0)
+            if (Interlocked.CompareExchange(ref _initialized, 1, 0) == 0)
                 DynamicModuleUtility.RegisterModule(typeof(DryIocHttpModule));
         }
 
-        private static int initialized;
+        private static int _initialized;
     }
 
-    /// <summary>Hooks up <see cref="Container.OpenScope"/> on begin request and scope dispose on request end.</summary>
+    /// <summary>Hooks up <see cref="Container.OpenScope"/> on request beginning and scope dispose on request end.</summary>
     public sealed class DryIocHttpModule : IHttpModule
     {
         /// <summary>Initializes a module and prepares it to handle requests. </summary>
@@ -51,21 +51,21 @@ namespace DryIoc.Web
         {
             context.BeginRequest += (sender, _) =>
             {
-                var appHttpContext = (sender as HttpApplication).ThrowIfNull().Context;
-                var scopeContext = new HttpContextScopeContext(() => appHttpContext.Items);
+                var httpContext = (sender as HttpApplication).ThrowIfNull().Context;
+                var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
                 
                 scopeContext.OpenScope()
-                    .ThrowIf(scope => scope.Parent != null, Error.Of(ROOT_SCOPE_IS_ALREADY_OPENED_AT_BEGIN_REQUEST));
+                    .ThrowIf(s => s.Parent != null, Error.ROOT_SCOPE_IS_ALREADY_OPENED);
             };
 
             context.EndRequest += (sender, _) =>
             {
-                var appHttpContext = (sender as HttpApplication).ThrowIfNull().Context;
-                var scopeContext = new HttpContextScopeContext(() => appHttpContext.Items);
+                var httpContext = (sender as HttpApplication).ThrowIfNull().Context;
+                var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
                 
                 var scope = scopeContext.GetCurrentOrDefault()
-                    .ThrowIfNull(Error.Of(NO_OPENED_SCOPE_TO_DISPOSE_AT_END_REQUEST))
-                    .ThrowIf(s => s.Parent != null, Error.Of(NOT_THE_ROOT_OPENED_SCOPE_AT_END_REQUEST));
+                    .ThrowIfNull(Error.NO_OPENED_SCOPE_TO_DISPOSE)
+                    .ThrowIf(s => s.Parent != null, Error.NOT_THE_ROOT_OPENED_SCOPE);
                 
                 scope.Dispose();
             };
@@ -74,10 +74,21 @@ namespace DryIoc.Web
         /// <summary>Disposes of the resources (other than memory) used by the module  that implements <see cref="IHttpModule"/>.</summary>
         void IHttpModule.Dispose() { }
 
-        private static readonly string 
-            ROOT_SCOPE_IS_ALREADY_OPENED_AT_BEGIN_REQUEST = "Probably problems with Web setup: Someone already opened root scope before HttpApplication.BeginRequest.",
-            NO_OPENED_SCOPE_TO_DISPOSE_AT_END_REQUEST = "Probably problems with Web setup: No opened scope to Dispose in HttpApplication.EndRequest.",
-            NOT_THE_ROOT_OPENED_SCOPE_AT_END_REQUEST = "Probably problems with Web setup: Opened scope in HttpApplication.EndRequest is not the root scope.";
+
+    }
+
+    /// <summary>Web-related exceptions.</summary>
+    public static class Error
+    {
+#pragma warning disable 1591 // "Missing XML-comment"
+        public static readonly int
+            ROOT_SCOPE_IS_ALREADY_OPENED = DryIoc.Error.Of(
+                "Probably problems with Web setup: Someone already opened root scope before HttpApplication.BeginRequest."),
+            NO_OPENED_SCOPE_TO_DISPOSE = DryIoc.Error.Of(
+                "Probably problems with Web setup: No opened scope to Dispose."),
+            NOT_THE_ROOT_OPENED_SCOPE = DryIoc.Error.Of(
+                "Probably problems with Web setup: Opened scope is not the root scope.");
+#pragma warning restore 1591
     }
 
     /// <summary>Stores current scope in <see cref="HttpContext.Items"/>.</summary>
