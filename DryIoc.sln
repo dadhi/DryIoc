@@ -127,6 +127,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Samples.CUT", "Net45
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Mvc.Owin", "Extensions\DryIoc.Mvc.Owin\DryIoc.Mvc.Owin.csproj", "{6F7B0845-38AF-430C-BF1A-4A86C7774274}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.WebApi.Owin", "Extensions\DryIoc.WebApi.Owin\DryIoc.WebApi.Owin.csproj", "{34553207-1BE8-42D3-9FE5-B4419CBC7764}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -293,6 +295,10 @@ Global
 		{6F7B0845-38AF-430C-BF1A-4A86C7774274}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6F7B0845-38AF-430C-BF1A-4A86C7774274}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6F7B0845-38AF-430C-BF1A-4A86C7774274}.Release|Any CPU.Build.0 = Release|Any CPU
+		{34553207-1BE8-42D3-9FE5-B4419CBC7764}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{34553207-1BE8-42D3-9FE5-B4419CBC7764}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{34553207-1BE8-42D3-9FE5-B4419CBC7764}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{34553207-1BE8-42D3-9FE5-B4419CBC7764}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -330,5 +336,6 @@ Global
 		{69ECCA75-698F-41BC-B25F-565AEC01E3EA} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
 		{4D1145DB-53DF-414B-8826-A38CF83B4678} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
 		{6F7B0845-38AF-430C-BF1A-4A86C7774274} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
+		{34553207-1BE8-42D3-9FE5-B4419CBC7764} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 	EndGlobalSection
 EndGlobal

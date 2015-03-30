@@ -37,7 +37,7 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Context propagated though async-await boundaries.</summary>
+    /// <summary>Stores scopes propagating through async-await boundaries.</summary>
     public sealed class AsyncExecutionFlowScopeContext : IScopeContext
     {
         /// <summary>Statically known name of root scope in this context.</summary>

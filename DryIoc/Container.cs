@@ -96,10 +96,13 @@ namespace DryIoc
             return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
         }
 
+        /// <summary>Returns scope context associated with container.</summary>
+        public IScopeContext ScopeContext { get { return _scopeContext; } }
+
         /// <summary>Creates new container with new opened scope and set this scope as current in ambient scope context.</summary>
         /// <param name="scopeName">(optional) Name for opened scope to allow reuse to identify the scope.</param>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
-        /// <returns>New container with different current scope.</returns>
+        /// <returns>New container with different current scope and optionally Rules.</returns>
         /// <example><code lang="cs"><![CDATA[
         /// using (var scoped = container.OpenScope())
         /// {
@@ -107,19 +110,21 @@ namespace DryIoc
         ///     handler.Handle(data);
         /// }
         /// ]]></code></example>
+        /// <remarks>Be sure to Dispose returned scope, because if not - ambient context will keep scope with it's items
+        /// introducing memory leaks and likely preventing to open other scopes.</remarks>
         public IContainer OpenScope(object scopeName = null, Func<Rules, Rules> configure = null)
         {
             ThrowIfContainerDisposed();
 
             scopeName = scopeName ?? (_openedScope == null ? _scopeContext.RootScopeName : null);
-            var nestedOpenedScope = new Scope(_openedScope, scopeName);
+            var openedScope = new Scope(parent: _openedScope, name: scopeName);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             _scopeContext.SetCurrent(scope =>
-                nestedOpenedScope.ThrowIf(scope != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT, _openedScope));
+                openedScope.ThrowIf(scope != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT, _openedScope, scope));
 
             var rules = configure == null ? Rules : configure(Rules);
-            return new Container(rules, _registry, _singletonScope, _scopeContext, nestedOpenedScope, _disposed);
+            return new Container(rules, _registry, _singletonScope, _scopeContext, openedScope, _disposed);
         }
 
         /// <summary>Creates scoped container with scope bound to container itself, and not some ambient context.
@@ -5885,8 +5890,7 @@ namespace DryIoc
         /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
         /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
         /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
-        IScope GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey,
-            bool outermost, bool throwIfNotFound);
+        IScope GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost, bool throwIfNotFound);
     }
 
     /// <summary>Exposes operations required for internal registry access. 
@@ -5928,6 +5932,9 @@ namespace DryIoc
         /// <param name="preserveCache">(optional) If set preserves cache if you know what to do.</param>
         /// <returns>New container with copy of all registrations.</returns>
         IContainer WithRegistrationsCopy(bool preserveCache = false);
+
+        /// <summary>Returns scope context associated with container.</summary>
+        IScopeContext ScopeContext { get; }
 
         /// <summary>Creates new container with new opened scope and set this scope as current in ambient scope context.</summary>
         /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
@@ -6306,7 +6313,8 @@ namespace DryIoc
             UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE = Of(
                 "Unable to dispose not a current opened scope."),
             NOT_DIRECT_SCOPE_PARENT = Of(
-                "Unable to Open Scope ({0}) from not a direct parent scope ({1})."),
+                "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." + Environment.NewLine +
+                "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
             UNABLE_TO_RESOLVE_REUSE_WRAPPER = Of(
                 "Unable to resolve reuse wrapper {0} for: {1}"),
             WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE = Of(

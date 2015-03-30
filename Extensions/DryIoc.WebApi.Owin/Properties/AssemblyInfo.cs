@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 
-[assembly: AssemblyTitle("DryIoc.Mvc.Owin")]
-[assembly: AssemblyDescription("DryIoc extension for ASP.NET MVC with OWIN")]
+[assembly: AssemblyTitle("DryIoc.WebApi.Owin")]
+[assembly: AssemblyDescription("DryIoc extension for ASP.NET WebAPI with OWIN")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc")]

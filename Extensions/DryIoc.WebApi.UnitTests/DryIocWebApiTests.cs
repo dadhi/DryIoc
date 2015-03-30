@@ -1,8 +1,10 @@
 ﻿using System.Collections.ObjectModel;
 using System.Linq;
+using System.Net.Http;
 using System.Web.Http;
 using System.Web.Http.Controllers;
 using System.Web.Http.Filters;
+using System.Web.Http.Hosting;
 using NSubstitute;
 using NUnit.Framework;
 
@@ -83,6 +85,23 @@ namespace DryIoc.WebApi.UnitTests
             var filters = filterProvider.GetFilters(config, descriptor);
 
             CollectionAssert.Contains(filters.Select(f => f.Instance), dummyFilter);
+        }
+
+        [Test]
+        public void Can_register_current_request_in_dependency_scope()
+        {
+            var scopedContainer = new Container().OpenScope();
+            using (var dependencyScope = new DryIocDependencyScope(scopedContainer))
+            {
+                var request = new HttpRequestMessage();
+                request.Properties.Add(HttpPropertyKeys.DependencyScope, dependencyScope);
+
+                var handler = new RegisterRequestMessageHandler();
+                handler.RegisterInDependencyScope(request);
+
+                var message = dependencyScope.GetService(typeof(HttpRequestMessage));
+                Assert.AreSame(request, message);
+            }
         }
 
         public class Blah {}

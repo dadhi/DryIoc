@@ -23,16 +23,21 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test_using_open_scope()
         {
-            var parent = new Container().OpenScope("parent");
-            parent.Register(typeof(IFruit), typeof(Melon), Reuse.InCurrentNamedScope("parent"));
+            using (var parent = new Container().OpenScope("parent"))
+            {
+                parent.Register(typeof(IFruit), typeof(Melon), Reuse.InCurrentNamedScope("parent"));
 
-            var child = parent.OpenScope();
-            child.Register(typeof(IJuice), typeof(FruitJuice));
+                using (var child = parent.OpenScope())
+                {
+                    child.Register(typeof(IJuice), typeof(FruitJuice));
 
-            var parentFruit = parent.Resolve<IFruit>();
-            var snd = child.Resolve<IJuice>();
+                    var parentFruit = parent.Resolve<IFruit>();
+                    var snd = child.Resolve<IJuice>();
 
-            Assert.That(parentFruit, Is.SameAs(snd.Fruit));
+
+                    Assert.That(parentFruit, Is.SameAs(snd.Fruit));
+                }
+            }
         }
 
         #region CUT

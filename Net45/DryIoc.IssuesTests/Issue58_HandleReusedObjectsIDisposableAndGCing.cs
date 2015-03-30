@@ -22,7 +22,7 @@ namespace DryIoc.IssuesTests
             c.Register<ITest, Test>();
             var cx = c.OpenScope();
             RunTheTest(out @ref, cx);
-            //cx.Dispose();
+            cx.Dispose();
             GC.Collect();
             Assert.False(@ref.IsAlive);
         }
@@ -35,7 +35,6 @@ namespace DryIoc.IssuesTests
             c.Register<ITest, Test>(Reuse.InCurrentScope);
             var cx = c.OpenScope();
             var scopeRef = new WeakReference(cx);
-
             RunTheTest(out @ref, cx);
             cx.Dispose();
             GC.Collect();
