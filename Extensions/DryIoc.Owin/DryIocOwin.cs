@@ -34,10 +34,13 @@ namespace DryIoc.Owin
     {
         public static readonly string ScopedContainerKey = typeof(DryIocOwin).FullName;
 
-        public static void UseDryIocMiddleware(this IAppBuilder app, IContainer container,
+        public static void UseDryIocOwinMiddleware(
+            this IAppBuilder app, IContainer container,
             Action<IContainer> registerInScope = null)
         {
-            container = container.With(scopeContext: new AsyncExecutionFlowScopeContext());
+            if (!(container.ScopeContext is AsyncExecutionFlowScopeContext))
+                container = container.With(scopeContext: new AsyncExecutionFlowScopeContext());
+            
             app.Use(async (context, next) =>
             {
                 using (var scopedContainer = container.OpenScope())

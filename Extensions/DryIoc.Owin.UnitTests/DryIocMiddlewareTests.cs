@@ -16,7 +16,7 @@ namespace DryIoc.Owin.UnitTests
 
             using (var server = TestServer.Create(app =>
             {
-                app.UseDryIocMiddleware(container);
+                app.UseDryIocOwinMiddleware(container);
                 app.Run(context => context.Response.WriteAsync("Hey, DryIoc!"));
             }))
             {
@@ -33,7 +33,7 @@ namespace DryIoc.Owin.UnitTests
             container.Register<TestGreetingMiddleware>();
             container.RegisterInstance(new Greeting { Message = "Hey, DryIoc!" });
 
-            using (var server = TestServer.Create(app => app.UseDryIocMiddleware(container)))
+            using (var server = TestServer.Create(app => app.UseDryIocOwinMiddleware(container)))
             {
                 var response = await server.HttpClient.GetAsync("/");
                 StringAssert.Contains("Hey, DryIoc!", response.Content.ReadAsStringAsync().Result);
@@ -47,7 +47,7 @@ namespace DryIoc.Owin.UnitTests
             container.Register<TestGreetingMiddleware>();
             // Greeting dependency does not registered
 
-            using (var server = TestServer.Create(app => app.UseDryIocMiddleware(container)))
+            using (var server = TestServer.Create(app => app.UseDryIocOwinMiddleware(container)))
             {
                 var response = await server.HttpClient.GetAsync("/");
                 Assert.IsEmpty(response.Content.ReadAsStringAsync().Result);
@@ -61,7 +61,7 @@ namespace DryIoc.Owin.UnitTests
 
             container.Register<TestGreetingMiddleware>();
 
-            using (var server = TestServer.Create(app => app.UseDryIocMiddleware(container,
+            using (var server = TestServer.Create(app => app.UseDryIocOwinMiddleware(container,
                 r => r.RegisterInstance(new Greeting { Message = "Hey, DryIoc!" }, ReuseInWeb.Request, IfAlreadyRegistered.Replace))))
             {
                 var response = await server.HttpClient.GetAsync("/");
