@@ -57,6 +57,8 @@ namespace DryIoc.WebApi
 
             container.SetFilterProvider(config.Services);
 
+            InsertRegisterRequestMessageHandler(config);
+
             config.DependencyResolver = new DryIocDependencyResolver(container);
 
             return container;
@@ -85,7 +87,7 @@ namespace DryIoc.WebApi
 
         /// <summary>Inserts DryIoc delegating request handler into message handlers.</summary>
         /// <param name="config">Current configuration.</param>
-        public static void RegisterRequestMessage(HttpConfiguration config)
+        public static void InsertRegisterRequestMessageHandler(HttpConfiguration config)
         {
             var handlers = config.ThrowIfNull().MessageHandlers;
             if (!handlers.Any(h => h is RegisterRequestMessageHandler))

@@ -37,14 +37,14 @@ namespace DryIoc.WebApi.Owin
     {
         public static IAppBuilder UseDryIocWebApi(this IAppBuilder app, HttpConfiguration config)
         {
-            var handlers = config.MessageHandlers;
-            if (!handlers.OfType<SetDependencyScopeHandler>().Any())
-                handlers.Insert(0, new SetDependencyScopeHandler());
+            var handlers = config.ThrowIfNull().MessageHandlers;
+            if (!handlers.OfType<SetRequestDependencyScopeHandler>().Any())
+                handlers.Insert(0, new SetRequestDependencyScopeHandler());
             return app;
         }
     }
 
-    internal class SetDependencyScopeHandler : DelegatingHandler
+    internal class SetRequestDependencyScopeHandler : DelegatingHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
