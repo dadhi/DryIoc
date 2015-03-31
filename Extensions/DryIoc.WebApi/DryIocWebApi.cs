@@ -43,14 +43,18 @@ namespace DryIoc.WebApi
         /// setting container scope context to <see cref="AsyncExecutionFlowScopeContext"/>,
         /// registering HTTP controllers, setting filter provider and dependency resolver.</summary>
         /// <param name="container">Original container.</param> <param name="config">Http configuration.</param>
-        /// <param name="controllerAssemblies">Assemblies to look for controllers.</param>
+        /// <param name="controllerAssemblies">(optional) Assemblies to look for controllers, default is Executing Assembly.</param>
+        /// <param name="scopeContext">(optional) Specific scope context to use, if not specified using
+        /// <see cref="AsyncExecutionFlowScopeContext"/> as default in NET 4.5. scope context.</param>
         /// <returns>New container.</returns>
-        public static IContainer WithWebApi(this IContainer container, 
-            HttpConfiguration config, IEnumerable<Assembly> controllerAssemblies = null)
+        public static IContainer WithWebApi(this IContainer container, HttpConfiguration config, 
+            IEnumerable<Assembly> controllerAssemblies = null, IScopeContext scopeContext = null)
         {
             container.ThrowIfNull();
 
-            if (!(container.ScopeContext is AsyncExecutionFlowScopeContext))
+            if (scopeContext != null)
+                container = container.With(scopeContext: scopeContext);
+            else if (!(container.ScopeContext is AsyncExecutionFlowScopeContext))
                 container = container.With(scopeContext: new AsyncExecutionFlowScopeContext());
 
             container.RegisterHttpControllers(controllerAssemblies);
@@ -71,7 +75,7 @@ namespace DryIoc.WebApi
         {
             container.ThrowIfNull();
             controllerAssemblies = controllerAssemblies ?? new[] { Assembly.GetExecutingAssembly() };
-            container.RegisterMany(controllerAssemblies, typeof(IHttpController), ReuseInWeb.Request);
+            container.RegisterMany(controllerAssemblies, typeof(IHttpController), Reuse.InRequest);
         }
 
         /// <summary>Replaces all filter providers in services with <see cref="DryIocFilterProvider"/>, and registers it in container.</summary>
@@ -96,11 +100,11 @@ namespace DryIoc.WebApi
     }
 
     /// <summary>Defines per request scope reuse bound to <see cref="AsyncExecutionFlowScopeContext"/>.</summary>
-    public static class ReuseInWeb
+    public static class Reuse
     {
         /// <summary>Reuse object. Actually it is a reuse in top current scope of context.</summary>
-        public static readonly IReuse Request =
-            Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InRequest =
+            DryIoc.Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
     }
 
     /// <summary>Resolve based on DryIoc container.</summary>
@@ -230,7 +234,7 @@ namespace DryIoc.WebApi
                 Error.REQUEST_MESSAGE_DOESNOT_REFERENCE_DRYIOC_DEPENDENCY_SCOPE);
             
             var container = ((DryIocDependencyScope)dependencyScope).Container;
-            container.RegisterInstance(request, ReuseInWeb.Request, IfAlreadyRegistered.Replace);
+            container.RegisterInstance(request, Reuse.InRequest, IfAlreadyRegistered.Replace);
         }
     }
 

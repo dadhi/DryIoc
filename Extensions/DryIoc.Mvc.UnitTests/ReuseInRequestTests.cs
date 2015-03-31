@@ -13,8 +13,8 @@ namespace DryIoc.Mvc.UnitTests
         {
             var fakeItems = new Dictionary<object, object>();
             var root = new Container(scopeContext: new HttpContextScopeContext(() => fakeItems));
-            root.Register<SomeRoot>(ReuseInWeb.Request);
-            root.Register<SomeDep>(ReuseInWeb.Request);
+            root.Register<SomeRoot>(Web.Reuse.InRequest);
+            root.Register<SomeDep>(Web.Reuse.InRequest);
 
             SomeDep savedOutside;
             using (var scoped = root.OpenScope())

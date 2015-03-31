@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace DryIoc.Owin.UnitTests
 {
     [TestFixture]
-    public class DryIocMiddlewareTests
+    public class DryIocOwinMiddlewareTests
     {
         [Test]
         public async void Scoped_container_is_used_in_pipeline()
@@ -62,7 +62,7 @@ namespace DryIoc.Owin.UnitTests
             container.Register<TestGreetingMiddleware>();
 
             using (var server = TestServer.Create(app => app.UseDryIocOwinMiddleware(container,
-                r => r.RegisterInstance(new Greeting { Message = "Hey, DryIoc!" }, ReuseInWeb.Request, IfAlreadyRegistered.Replace))))
+                r => r.RegisterInstance(new Greeting { Message = "Hey, DryIoc!" }, Reuse.InRequest, IfAlreadyRegistered.Replace))))
             {
                 var response = await server.HttpClient.GetAsync("/");
                 StringAssert.Contains("Hey, DryIoc!", response.Content.ReadAsStringAsync().Result);

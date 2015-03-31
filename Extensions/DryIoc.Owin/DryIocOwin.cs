@@ -30,16 +30,24 @@ namespace DryIoc.Owin
     using global::Owin;
     using Microsoft.Owin;
 
+    /// <summary>Inserts DryIoc container into OWIN pipeline. Enables to Use middleware registered in DryIoc container.</summary>
     public static class DryIocOwin
     {
-        public static readonly string ScopedContainerKey = typeof(DryIocOwin).FullName;
+        public static readonly string ScopedContainerKeyInContext = typeof(DryIocOwin).FullName;
 
+        /// <summary>Inserts scoped container into pipeline and stores scoped container in context.
+        /// Optionally registers instances in scope with provided action.</summary>
+        /// <param name="app">App builder</param> <param name="container">Container</param>
+        /// <param name="registerInScope">(optional) Action for registering something in scope before setting scope into context.</param>
+        /// <param name="scopeContext">(optional) Specific scope context to use. 
+        /// If not specified using current container context - <see cref="AsyncExecutionFlowScopeContext"/> is default in .NET 4.5.</param>
         public static void UseDryIocOwinMiddleware(
             this IAppBuilder app, IContainer container,
-            Action<IContainer> registerInScope = null)
+            Action<IContainer> registerInScope = null,
+            IScopeContext scopeContext = null)
         {
-            if (!(container.ScopeContext is AsyncExecutionFlowScopeContext))
-                container = container.With(scopeContext: new AsyncExecutionFlowScopeContext());
+            if (scopeContext != null)
+                container = container.With(scopeContext: scopeContext);
             
             app.Use(async (context, next) =>
             {
@@ -48,7 +56,7 @@ namespace DryIoc.Owin
                     scopedContainer.RegisterInstance(context);
                     if (registerInScope != null)
                         registerInScope(scopedContainer);
-                    context.Set(ScopedContainerKey, scopedContainer);
+                    context.Set(ScopedContainerKeyInContext, scopedContainer);
                     await next();
                 }
             });
@@ -58,7 +66,7 @@ namespace DryIoc.Owin
 
         public static IContainer GetDryIocScopedContainer(this IOwinContext context)
         {
-            return context.Get<IContainer>(ScopedContainerKey);
+            return context.Get<IContainer>(ScopedContainerKeyInContext);
         }
 
         static void UseRegisteredMiddleware(this IAppBuilder app, IRegistrator registry)
@@ -92,8 +100,9 @@ namespace DryIoc.Owin
         }
     }
 
-    public static class ReuseInWeb
+    public static class Reuse
     {
-        public static readonly IReuse Request = Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InRequest = 
+            DryIoc.Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
     }
 }

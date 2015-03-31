@@ -131,6 +131,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.WebApi.Owin", "Exten
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.WebApi.Owin.UnitTests", "Extensions\DryIoc.WebApi.Owin.UnitTests\DryIoc.WebApi.Owin.UnitTests.csproj", "{14DD4C53-014F-45EE-AF31-47B1B4E4F093}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Mvc.Owin.UnitTests", "Extensions\DryIoc.Mvc.Owin.UnitTests\DryIoc.Mvc.Owin.UnitTests.csproj", "{642F214F-8956-43CF-9011-2C2A9ADB6426}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -305,6 +307,10 @@ Global
 		{14DD4C53-014F-45EE-AF31-47B1B4E4F093}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{14DD4C53-014F-45EE-AF31-47B1B4E4F093}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{14DD4C53-014F-45EE-AF31-47B1B4E4F093}.Release|Any CPU.Build.0 = Release|Any CPU
+		{642F214F-8956-43CF-9011-2C2A9ADB6426}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{642F214F-8956-43CF-9011-2C2A9ADB6426}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{642F214F-8956-43CF-9011-2C2A9ADB6426}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{642F214F-8956-43CF-9011-2C2A9ADB6426}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -344,5 +350,6 @@ Global
 		{6F7B0845-38AF-430C-BF1A-4A86C7774274} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{34553207-1BE8-42D3-9FE5-B4419CBC7764} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{14DD4C53-014F-45EE-AF31-47B1B4E4F093} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
+		{642F214F-8956-43CF-9011-2C2A9ADB6426} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 	EndGlobalSection
 EndGlobal

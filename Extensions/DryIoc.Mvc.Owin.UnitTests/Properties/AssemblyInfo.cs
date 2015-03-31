@@ -1,8 +1,7 @@
 ﻿using System.Reflection;
-using System.Runtime.CompilerServices;
 
-[assembly: AssemblyTitle("DryIoc.Mvc.Owin")]
-[assembly: AssemblyDescription("DryIoc extension for ASP.NET MVC with OWIN")]
+[assembly: AssemblyTitle("DryIoc.Mvc.Owin.UnitTests")]
+[assembly: AssemblyDescription("UnitTests for DryIoc extension for ASP.NET MVC with OWIN")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc")]
@@ -13,5 +12,3 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyVersion("2.0.0")]
 [assembly: AssemblyFileVersion("2.0.0")]
 [assembly: AssemblyInformationalVersion("2.0.0")]
-
-[assembly: InternalsVisibleTo("DryIoc.Mvc.Owin.UnitTests")]

@@ -6328,7 +6328,8 @@ namespace DryIoc
             RECYCLABLE_REUSE_WRAPPER_IS_RECYCLED = Of(
                 "Recyclable wrapper is recycled."),
             NO_SCOPE_WHEN_REGISTERING_INSTANCE = Of(
-                "No scope is available when registering instance [{0}] with [{1}]."),
+                "No scope is available when registering instance [{0}] with [{1}]." + Environment.NewLine + 
+                "You can register delegate returning instance instead, if scope will be available at resolution."),
             UNEXPECTED_EXPRESSION_TO_MAKE_SERVICE = Of(
                 "Only expression of method call, property getter, or new statement (with optional property initializer) is supported, but found: {0}."),
             UNEXPECTED_EXPRESSION_INSTEAD_OF_PROPERTY_GETTER = Of(

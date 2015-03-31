@@ -64,10 +64,19 @@ namespace DryIoc.Mvc
         /// and at last sets container as <see cref="DependencyResolver"/>.</summary>
         /// <param name="container">Original container.</param>
         /// <param name="controllerAssemblies">(optional) By default uses <see cref="GetReferencedAssemblies"/>.</param>
+        /// <param name="scopeContext">Specific scope context to use, by default MVC uses <see cref="HttpContextScopeContext"/>.</param>
         /// <returns>New container with applied Web context.</returns>
-        public static IContainer WithMvc(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
+        public static IContainer WithMvc(this IContainer container, 
+            IEnumerable<Assembly> controllerAssemblies = null, 
+            IScopeContext scopeContext = null)
         {
-            container = container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext());
+            container.ThrowIfNull();
+
+            // use provided context or HttpContextScopeContext if ont specified.
+            if (scopeContext != null)
+                container = container.With(scopeContext: scopeContext);
+            else if (!(container.ScopeContext is HttpContextScopeContext))
+                container = container.With(scopeContext: new HttpContextScopeContext());
 
             container.RegisterMvcControllers(controllerAssemblies);
 
@@ -78,13 +87,13 @@ namespace DryIoc.Mvc
             return container;
         }
 
-        /// <summary>Registers controllers types in container with <see cref="ReuseInWeb.Request"/> reuse.</summary>
+        /// <summary>Registers controllers types in container with <see cref="Reuse.InRequest"/> reuse.</summary>
         /// <param name="container">Container to register controllers to.</param>
         /// <param name="controllerAssemblies">(optional) Uses <see cref="GetReferencedAssemblies"/> by default.</param>
         public static void RegisterMvcControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
-            container.RegisterMany(controllerAssemblies, typeof(IController), ReuseInWeb.Request);
+            container.RegisterMany(controllerAssemblies, typeof(IController), Reuse.InRequest);
         }
 
         /// <summary>Replaces default Filter Providers with instance of <see cref="DryIocFilterAttributeFilterProvider"/>,

@@ -27,7 +27,7 @@ namespace DryIoc.WebApi.UnitTests
             var config = new HttpConfiguration();
             var container = new Container().WithWebApi(config);
 
-            container.Register<Blah>(Reuse.Singleton);
+            container.Register<Blah>(DryIoc.Reuse.Singleton);
             container.Register<Fooh>(serviceKey: 1);
             container.Register<Fooh>(serviceKey: 2);
 
@@ -49,9 +49,9 @@ namespace DryIoc.WebApi.UnitTests
             var config = new HttpConfiguration();
             var container = new Container().WithWebApi(config);
             
-            container.Register<Blah>(ReuseInWeb.Request);
-            container.Register<Fooh>(ReuseInWeb.Request, serviceKey: 1);
-            container.Register<Fooh>(ReuseInWeb.Request, serviceKey: 2);
+            container.Register<Blah>(Reuse.InRequest);
+            container.Register<Fooh>(Reuse.InRequest, serviceKey: 1);
+            container.Register<Fooh>(Reuse.InRequest, serviceKey: 2);
 
             using (var scope = config.DependencyResolver.BeginScope())
             {

@@ -22,11 +22,11 @@ namespace DryIoc.Web
     }
 
     /// <summary>Defines web reuse as reuse items in <see cref="HttpContextScopeContext"/>.</summary>
-    public static class ReuseInWeb
+    public static class Reuse
     {
         /// <summary>Request reuse corresponds to reusing items in root open scope (physically stored in current <see cref="HttpContext"/>).</summary>
-        public static readonly IReuse Request = 
-            Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InRequest = 
+            DryIoc.Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
     }
 
     /// <summary>Registers <see cref="DryIocHttpModule"/>.</summary>
@@ -73,8 +73,6 @@ namespace DryIoc.Web
 
         /// <summary>Disposes of the resources (other than memory) used by the module  that implements <see cref="IHttpModule"/>.</summary>
         void IHttpModule.Dispose() { }
-
-
     }
 
     /// <summary>Web-related exceptions.</summary>
@@ -95,8 +93,9 @@ namespace DryIoc.Web
     /// <remarks>Stateless context, so could be created multiple times and used from different places without side-effects.</remarks>
     public sealed class HttpContextScopeContext : IScopeContext
     {
-        /// <summary>Provides default context items dictionary using <see cref="HttpContext.Current"/>.</summary>
-        public static Func<IDictionary> GetContextItemsDefault = () => HttpContext.Current.ThrowIfNull().Items;
+        /// <summary>Provides default context items dictionary using <see cref="HttpContext.Current"/>.
+        /// Could be overridden with any key-value dictionary where <see cref="HttpContext"/> is not available, e.g. in tests.</summary>
+        public static Func<IDictionary> GetContextItems = () => HttpContext.Current.ThrowIfNull().Items;
 
         /// <summary>Fixed root scope name for the context.</summary>
         public static readonly object ROOT_SCOPE_NAME = typeof(HttpContextScopeContext);
@@ -108,7 +107,7 @@ namespace DryIoc.Web
         /// <param name="getContextItems">(optional) Arbitrary/test items storage.</param>
         public HttpContextScopeContext(Func<IDictionary> getContextItems = null)
         {
-            _getContextItems = getContextItems ?? GetContextItemsDefault;
+            _getContextItems = getContextItems ?? GetContextItems;
         }
 
         /// <summary>Returns current ambient scope stored in item storage.</summary> <returns>Current scope or null if there is no.</returns>
