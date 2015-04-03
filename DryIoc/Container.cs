@@ -5139,9 +5139,10 @@ namespace DryIoc
                     if (item != null)
                         DisposeItem(item);
 
-                    Ref.Swap(ref _items, items => _disposed == 1
-                        ? Throw.For<IntKeyTree>(Error.SCOPE_IS_DISPOSED)
-                        : items.AddOrUpdate(id, item = factory()));
+                    Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
+
+                    item = factory();
+                    Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
                 }
                 return item;
             }
@@ -5151,9 +5152,8 @@ namespace DryIoc
         /// <param name="id">To set value at.</param> <param name="value">Value to set.</param>
         public void SetOrAdd(int id, object value)
         {
-            Ref.Swap(ref _items, items => _disposed == 1
-                ? Throw.For<IntKeyTree>(Error.SCOPE_IS_DISPOSED)
-                : items.AddOrUpdate(id, value));
+            Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
+            Ref.Swap(ref _items, items => items.AddOrUpdate(id, value));
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
@@ -5163,11 +5163,10 @@ namespace DryIoc
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
-
             if (!_items.IsEmpty)
                 foreach (var item in _items.Enumerate().Select(x => x.Value).Where(x => x is IDisposable || x is IReuseWrapper))
                     DisposeItem(item);
-            _items = null;
+            _items = IntKeyTree.Empty;
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
