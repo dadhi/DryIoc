@@ -4,7 +4,6 @@ DryIoc is small, fast, capable IoC Container for .NET
 [![Build status](https://ci.appveyor.com/api/projects/status/jfq01d9wcs4vcwpf/branch/default)](https://ci.appveyor.com/project/MaksimVolkau/dryioc/branch/default)
 [Follow @DryIoc](https://twitter.com/DryIoc)
 
-
 [Autofac]: https://code.google.com/p/autofac/
 [MEF]: http://mef.codeplex.com/
 [DryIoc]: https://www.nuget.org/packages/DryIoc/
@@ -17,34 +16,32 @@ DryIoc is small, fast, capable IoC Container for .NET
 [v2.0]: https://bitbucket.org/dadhi/dryioc/wiki/Home
 
 * Designed for low-ceremony use, performance and extensibility.
-* Supports .NET 3.5, 4.0, 4.5, _([PCL] in v2.0)_.
+* Supports .NET PCL, 3.5, 4.0, 4.5.
 * Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
 * [Wiki documentation][WikiHome] _(being updated for v2.0)_
 * __v1.4.1__ is stable: `PM> Install-Package DryIoc` 
 * __[v2.0]__ is coming: `PM> Install-Package DryIoc -Pre`
 
 #### Benchmarks
-* [Performance](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison).
-* [Features](http://featuretests.apphb.com/DependencyInjection.html) _(v2.0)_.
+* [Performance](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
+* [Features](http://featuretests.apphb.com/DependencyInjection.html)
 
 #### Performance
 * General use-cases optimized for max speed.
 * Call-stack depth preserved as shallow as possible.
-* Memory footprint preserved as low as possible.
+* Memory footprint preserved as minimal as possible.
 
 #### Code/Library
 * Minimal setup requires single source file: *Container.cs*. 
 * Code written to be readable.
-* Public API fully documented _(v2.0)_.
+* Public API is fully documented.
 
 #### Reliability
 * Unit-tested with 100% coverage.
-* Thread-safe (lock-free in _v2.0_): registrations and resolutions could be made in parallel without corrupting container state. 
+* Thread-safe and lock-free: registrations and resolutions could be made in parallel without corrupting container state. 
 * Detects recursive dependencies - cycles in object graph.
-* Error handling with `ContainerException` inherited from `InvalidOperationException` to filter container related exceptions.
-* Throws exceptions as early as possible. 
-* Meaningful error messages with information about problem and context.
-* Resolving as `FactoryExpression<T>` wrapper to look at underlying service creation expression.
+* Throws exceptions as early as possible. Exception provides meaningful information about problem and context.
+* Resolve as `FactoryExpression<T>` to look into underlying service creation expression.
 
 #### Features
 
