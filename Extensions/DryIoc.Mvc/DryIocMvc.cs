@@ -38,7 +38,8 @@ namespace DryIoc.Mvc
     /// <example> <code lang="cs"><![CDATA[
     /// protected void Application_Start()
     /// {
-    ///     var container = new Container().WithMvc();
+    ///     var container = new Container();
+    ///     container.WithMvc();
     ///     
     ///     // Optionally enable support for MEF Export/ImportAttribute with DryIoc.MefAttributedModel package. 
     ///     // container = container.WithMefAttributedModel();
@@ -67,16 +68,14 @@ namespace DryIoc.Mvc
         /// <param name="scopeContext">Specific scope context to use, by default MVC uses <see cref="HttpContextScopeContext"/>.</param>
         /// <returns>New container with applied Web context.</returns>
         public static IContainer WithMvc(this IContainer container, 
-            IEnumerable<Assembly> controllerAssemblies = null, 
-            IScopeContext scopeContext = null)
+            IEnumerable<Assembly> controllerAssemblies = null, IScopeContext scopeContext = null)
         {
             container.ThrowIfNull();
 
-            // use provided context or HttpContextScopeContext if ont specified.
+            if (scopeContext == null && !(container.ScopeContext is HttpContextScopeContext))
+                scopeContext = new HttpContextScopeContext();
             if (scopeContext != null)
                 container = container.With(scopeContext: scopeContext);
-            else if (!(container.ScopeContext is HttpContextScopeContext))
-                container = container.With(scopeContext: new HttpContextScopeContext());
 
             container.RegisterMvcControllers(controllerAssemblies);
 
@@ -93,7 +92,7 @@ namespace DryIoc.Mvc
         public static void RegisterMvcControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
-            container.RegisterMany(controllerAssemblies, typeof(IController), Reuse.InRequest);
+            container.RegisterMany(controllerAssemblies, typeof(IController), Reuse.InRequest, FactoryMethod.ConstructorWithResolvableArguments);
         }
 
         /// <summary>Replaces default Filter Providers with instance of <see cref="DryIocFilterAttributeFilterProvider"/>,

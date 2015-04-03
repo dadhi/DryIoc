@@ -26,7 +26,7 @@
         <file src="..\LICENSE.txt" />
 
         <!-- net45 -->
-        <file src="..\Extensions\DryIoc.Mvc\DryIocMvc.cs" target="content\net45" />
+        <file src="..\Extensions\DryIoc.Mvc\DryIocMvc.cs" target="content\net45\DryIoc\Mvc" />
 
     </files>
 </package>

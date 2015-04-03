@@ -22,7 +22,7 @@
         <file src="..\LICENSE.txt" />
 
         <!--for all platforms-->
-        <file src="..\Extensions\DryIoc.CommonServiceLocator\DryIocServiceLocator.cs" target="content\DryIoc.CommonServiceLocator" />
+        <file src="..\Extensions\DryIoc.CommonServiceLocator\DryIocServiceLocator.cs" target="content\DryIoc\CommonServiceLocator" />
 
     </files>
 </package>

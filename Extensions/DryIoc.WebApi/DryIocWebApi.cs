@@ -52,12 +52,12 @@ namespace DryIoc.WebApi
         {
             container.ThrowIfNull();
 
+            if (scopeContext == null && !(container.ScopeContext is AsyncExecutionFlowScopeContext))
+                scopeContext = new AsyncExecutionFlowScopeContext();
             if (scopeContext != null)
                 container = container.With(scopeContext: scopeContext);
-            else if (!(container.ScopeContext is AsyncExecutionFlowScopeContext))
-                container = container.With(scopeContext: new AsyncExecutionFlowScopeContext());
 
-            container.RegisterHttpControllers(controllerAssemblies);
+            container.RegisterWebApiControllers(controllerAssemblies);
 
             container.SetFilterProvider(config.Services);
 
@@ -71,7 +71,7 @@ namespace DryIoc.WebApi
         /// <summary>Registers controllers found in provided assemblies with per-request reuse.</summary>
         /// <param name="container">Container.</param>
         /// <param name="controllerAssemblies">Assemblies to look for controllers.</param>
-        public static void RegisterHttpControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
+        public static void RegisterWebApiControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             container.ThrowIfNull();
             controllerAssemblies = controllerAssemblies ?? new[] { Assembly.GetExecutingAssembly() };

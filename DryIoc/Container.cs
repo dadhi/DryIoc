@@ -59,8 +59,10 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var rules = configure == null ? Rules : configure(Rules);
-            var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             scopeContext = scopeContext ?? _scopeContext ?? GetDefaultScopeContext();
+            if (rules == Rules && scopeContext == _scopeContext)
+                return this;
+            var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             return new Container(rules, registryWithoutCache, _singletonScope, scopeContext, _openedScope, _disposed);
         }
 
@@ -2660,8 +2662,8 @@ namespace DryIoc
         /// <typeparam name="TImplementation">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="made">(optional) Selects constructor and properties.</param>
-        /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup.Default"/>)</param>
+        /// <param name="made">(optional) Allow to select constructor/method to create service, specify how to inject its parameters and properties/fields.</param>
+        /// <param name="setup">(optional) Factory setup, by default is <see cref="Setup.Default"/>, check <see cref="Setup"/> class for available setups.</param>
         /// <param name="serviceTypeCondition">(optional) condition to include selected types only. Default value is <see cref="RegisterManyPublicServiceTypes"/></param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
@@ -2677,8 +2679,8 @@ namespace DryIoc
         /// <param name="r">Registrator provided to do any arbitrary registration User wants.</param>
         /// <param name="serviceTypes">Valid service type that could be used with <paramref name="implType"/>.</param>
         /// <param name="implType">Concrete or open-generic implementation type.</param>
-        /// <param name="register">Default registration action to be done on service/implementation types.</param>
-        public delegate void RegisterManyAction(IRegistrator r, Type[] serviceTypes, Type implType, Action<Type[], Type> register);
+        /// <param name="registerByDefault">Default registration action to be done on service/implementation types.</param>
+        public delegate void RegisterManyAction(IRegistrator r, Type[] serviceTypes, Type implType, Action<Type[], Type> registerByDefault);
 
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
@@ -2755,15 +2757,17 @@ namespace DryIoc
         /// <param name="implTypeAssemblies">Assemblies with implementation/service types to register.</param>
         /// <param name="serviceType">Service type to register.</param>
         /// <param name="reuse">(optional) Reuse to apply to all service registrations.</param>
+        /// <param name="made">(optional) Allow to select constructor/method to create service, specify how to inject its parameters and properties/fields.</param>
+        /// <param name="setup">(optional) Factory setup, by default is <see cref="Setup.Default"/>, check <see cref="Setup"/> class for available setups.</param>
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with existing service registrations.</param>
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies, Type serviceType,
-            IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
             registrator.RegisterMany(implTypes, (r, serviceTypes, implType, register) =>
             {
                 if (serviceTypes.IndexOf(serviceType) != -1)
-                    r.Register(serviceType, implType, reuse, ifAlreadyRegistered: ifAlreadyRegistered);
+                    r.Register(serviceType, implType, reuse, made, setup, ifAlreadyRegistered);
             },
             nonPublicServiceTypes: true);
         }

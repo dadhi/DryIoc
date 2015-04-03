@@ -24,7 +24,7 @@
         <file src="..\LICENSE.txt" />
 
         <!-- net45 -->
-        <file src="..\Extensions\DryIoc.WebApi\DryIocWebApi.cs" target="content\net45" />
+        <file src="..\Extensions\DryIoc.WebApi\DryIocWebApi.cs" target="content\net45\DryIoc\WebApi" />
 
     </files>
 </package>
