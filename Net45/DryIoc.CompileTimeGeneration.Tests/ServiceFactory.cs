@@ -44,15 +44,18 @@ namespace DryIoc.CompileTimeGeneration.Tests
             throw new NotImplementedException();
         }
 
+        #region IResolver
+
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
         {
             var factoryDelegate = DefaultResolutions.GetValueOrDefault(serviceType);
-            return factoryDelegate == null 
-                ? GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved)
-                : factoryDelegate(AppendableArray.Empty, this, null);
+            return factoryDelegate != null
+                ? factoryDelegate(AppendableArray.Empty, this, null)
+                : GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
         }
 
-        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
+        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
+            Type requiredServiceType, IScope scope)
         {
             if (serviceKey == null && requiredServiceType == null)
                 return ResolveDefault(serviceType, ifUnresolved, scope);
@@ -69,7 +72,8 @@ namespace DryIoc.CompileTimeGeneration.Tests
             return GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
         }
 
-        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, IScope scope)
+        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType,
+            object compositeParentKey, IScope scope)
         {
             serviceType = requiredServiceType ?? serviceType;
 
@@ -101,8 +105,11 @@ namespace DryIoc.CompileTimeGeneration.Tests
 
         private static object GetDefaultOrThrowIfUnresolved(Type serviceType, IfUnresolved ifUnresolved)
         {
-            return ifUnresolved == IfUnresolved.ReturnDefault ? null
+            return ifUnresolved == IfUnresolved.ReturnDefault
+                ? null
                 : Throw.For<object>(Error.UNABLE_TO_RESOLVE_SERVICE, serviceType);
         }
+
+        #endregion
     }
 }

@@ -764,16 +764,18 @@ namespace DryIoc
         public Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
             if (item == null)
-                return itemType == null ? Expression.Constant(null)
-                    : (Expression)Expression.Convert(Expression.Constant(null), itemType);
+                return itemType == null ? (Expression)Expression.Constant(null)
+                    : Expression.Convert(Expression.Constant(null), itemType);
 
             itemType = itemType ?? item.GetType();
-            if (itemType.IsPrimitive() || itemType == typeof(Type))
-                return Expression.Constant(item, itemType);
 
-            if (item is DefaultKey) // Recreate default key using constant order instead of putting it state.
-                return Expression.Call(typeof(DefaultKey), "Of", null,
-                    Expression.Constant(((DefaultKey)item).RegistrationOrder, typeof(int)));
+            var converter = Rules.ItemToExpressionConverter;
+            if (converter != null)
+            {
+                var expression = converter(item, itemType);
+                if (expression != null)
+                    return expression;
+            }
 
             if (throwIfStateRequired)
                 Throw.It(Error.STATE_IS_REQUIRED_TO_USE_ITEM, item);
@@ -1996,7 +1998,9 @@ namespace DryIoc
 
         /// <summary>Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
         /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.</summary>
-        public static readonly Rules Default = Empty.WithUnknownServiceResolver(WrappersSupport.ResolveWrappers);
+        public static readonly Rules Default = Empty
+            .WithUnknownServiceResolver(WrappersSupport.ResolveWrappers)
+            .WithItemToExpressionConverter(PrimitivesToExpressionConverter);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
@@ -2014,12 +2018,12 @@ namespace DryIoc
             ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            var rules = (Rules)MemberwiseClone();
-            rules._made = Made.Of(
-                factoryMethod ?? rules._made.FactoryMethod,
-                parameters ?? rules._made.Parameters,
-                propertiesAndFields ?? rules._made.PropertiesAndFields);
-            return rules;
+            var newRules = (Rules)MemberwiseClone();
+            newRules._made = Made.Of(
+                factoryMethod ?? newRules._made.FactoryMethod,
+                parameters ?? newRules._made.Parameters,
+                propertiesAndFields ?? newRules._made.PropertiesAndFields);
+            return newRules;
         }
 
         /// <summary>Defines single factory selector delegate.</summary>
@@ -2037,9 +2041,9 @@ namespace DryIoc
         /// <param name="rule">Selectors to set, could be null to use default approach.</param> <returns>New rules.</returns>
         public Rules WithFactorySelector(FactorySelectorRule rule)
         {
-            var rules = (Rules)MemberwiseClone();
-            rules.FactorySelector = rule;
-            return rules;
+            var newRules = (Rules)MemberwiseClone();
+            newRules.FactorySelector = rule;
+            return newRules;
         }
 
         //we are watching you...public static
@@ -2069,9 +2073,9 @@ namespace DryIoc
         /// <param name="rule">Rule to append.</param> <returns>New Rules.</returns>
         public Rules WithUnknownServiceResolver(UnknownServiceResolver rule)
         {
-            var rules = (Rules)MemberwiseClone();
-            rules.UnknownServiceResolvers = rules.UnknownServiceResolvers.AppendOrUpdate(rule);
-            return rules;
+            var newRules = (Rules)MemberwiseClone();
+            newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.AppendOrUpdate(rule);
+            return newRules;
         }
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
@@ -2080,9 +2084,9 @@ namespace DryIoc
         /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule)
         {
-            var rules = (Rules)MemberwiseClone();
-            rules.UnknownServiceResolvers = rules.UnknownServiceResolvers.Remove(rule);
-            return rules;
+            var newRules = (Rules)MemberwiseClone();
+            newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.Remove(rule);
+            return newRules;
         }
 
         /// <summary>Turns on/off exception throwing when dependency has shorter reuse lifespan than its parent.</summary>
@@ -2092,9 +2096,9 @@ namespace DryIoc
         /// <returns>New rules with new setting value.</returns>
         public Rules WithoutThrowIfDepenedencyHasShorterReuseLifespan()
         {
-            var rules = (Rules)MemberwiseClone();
-            rules.ThrowIfDepenedencyHasShorterReuseLifespan = false;
-            return rules;
+            var newRules = (Rules)MemberwiseClone();
+            newRules.ThrowIfDepenedencyHasShorterReuseLifespan = false;
+            return newRules;
         }
 
         /// <summary>Defines mapping from registered reuse to what will be actually used.</summary>
@@ -2108,9 +2112,9 @@ namespace DryIoc
         /// <summary>Sets the <see cref="ReuseMapping"/> rule.</summary> <param name="rule">Rule to set, may be null.</param> <returns>New rules.</returns>
         public Rules WithReuseMapping(ReuseMappingRule rule)
         {
-            var rules = (Rules)MemberwiseClone();
-            rules.ReuseMapping = rule;
-            return rules;
+            var newRules = (Rules)MemberwiseClone();
+            newRules.ReuseMapping = rule;
+            return newRules;
         }
 
         /// <summary>Allow to instantiate singletons during resolution (but not inside of Func). Instantiated singletons
@@ -2121,9 +2125,44 @@ namespace DryIoc
         /// <returns>New rules with singleton optimization turned off.</returns>
         public Rules WithoutSingletonOptimization()
         {
-            var rules = (Rules)MemberwiseClone();
-            rules.SingletonOptimization = false;
-            return rules;
+            var newRules = (Rules)MemberwiseClone();
+            newRules.SingletonOptimization = false;
+            return newRules;
+        }
+
+        /// <summary>Given item object and its type should return item "pure" expression presentation, 
+        /// without side-effects or external dependencies. 
+        /// e.g. for string "blah" <code lang="cs"><![CDATA[]]>Expression.Constant("blah", typeof(string))</code>.
+        /// If unable to convert should return null.</summary>
+        /// <param name="item">Item object. Item is not null.</param> 
+        /// <param name="itemType">Item type. Item type is not null.</param>
+        /// <returns>Expression or null.</returns>
+        public delegate Expression ItemToExpressionConverterRule(object item, Type itemType);
+
+        /// <summary>Mapping between Type and its ToExpression converter delegate.</summary>
+        public ItemToExpressionConverterRule ItemToExpressionConverter { get; private set; }
+
+        /// <summary>Overrides previous rule. You may return null from new rule to fallback to old one.</summary>
+        /// <param name="itemToExpressionOrDefault">Converts item to expression or returns null to fallback to old rule.</param>
+        /// <returns>New rules</returns>
+        public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            var currentRule = newRules.ItemToExpressionConverter;
+            newRules.ItemToExpressionConverter = currentRule == null 
+                ? itemToExpressionOrDefault.ThrowIfNull()
+                : (item, itemType) => itemToExpressionOrDefault(item, itemType) ?? currentRule(item, itemType);
+            return newRules;
+        }
+
+        private static Expression PrimitivesToExpressionConverter(object item, Type itemType)
+        {
+            return itemType == typeof(DefaultKey)
+                    ? (Expression)Expression.Call(itemType, "Of", null, 
+                        Expression.Constant(((DefaultKey)item).RegistrationOrder))
+                : (itemType.IsPrimitive() || itemType == typeof(Type)
+                    ? Expression.Constant(item, itemType)
+                    : null);
         }
 
         #region Implementation
