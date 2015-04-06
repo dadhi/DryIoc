@@ -33,6 +33,7 @@ namespace DryIoc.Owin
     /// <summary>Inserts DryIoc container into OWIN pipeline. Enables to Use middleware registered in DryIoc container.</summary>
     public static class DryIocOwin
     {
+        /// <summary>Key of scoped container stored in <see cref="IOwinContext"/>.</summary>
         public static readonly string ScopedContainerKeyInContext = typeof(DryIocOwin).FullName;
 
         /// <summary>Inserts scoped container into pipeline and stores scoped container in context.
@@ -61,15 +62,17 @@ namespace DryIoc.Owin
                 }
             });
 
-            app.UseRegisteredMiddleware(container);
+            app.UseRegisteredMiddlewares(container);
         }
 
+        /// <summary>Retrieves scope container stored in OWIN context.</summary>
+        /// <param name="context"></param> <returns>Scoped container.</returns>
         public static IContainer GetDryIocScopedContainer(this IOwinContext context)
         {
             return context.Get<IContainer>(ScopedContainerKeyInContext);
         }
 
-        static void UseRegisteredMiddleware(this IAppBuilder app, IRegistrator registry)
+        private static void UseRegisteredMiddlewares(this IAppBuilder app, IRegistrator registry)
         {
             var services = registry.GetServiceRegistrations()
                 .Where(r => r.ServiceType.IsAssignableTo(typeof(OwinMiddleware)))
@@ -81,6 +84,14 @@ namespace DryIoc.Owin
                 foreach (var service in services)
                     app.Use(service);
         }
+    }
+
+    /// <summary>Defines per request reuse.</summary>
+    public static class Reuse
+    {
+        /// <summary>Reuse per request in <see cref="AsyncExecutionFlowScopeContext"/>.</summary>
+        public static readonly IReuse InRequest =
+            DryIoc.Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
     }
 
     internal sealed class DryIocWrapperMiddleware<TServiceMiddleware> : OwinMiddleware 
@@ -98,11 +109,5 @@ namespace DryIoc.Owin
             
             return middleware(Next).Invoke(context);
         }
-    }
-
-    public static class Reuse
-    {
-        public static readonly IReuse InRequest = 
-            DryIoc.Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
     }
 }

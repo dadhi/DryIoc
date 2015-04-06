@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 
 [assembly: AssemblyTitle("DryIoc.Owin")]
-[assembly: AssemblyDescription("DryIoc extension for OWIN Middleware")]
+[assembly: AssemblyDescription("DryIoc extension for OWIN")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc")]

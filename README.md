@@ -47,7 +47,7 @@ DryIoc is small, fast, capable IoC Container for .NET
 
 * Register interface/type mapping, additionally supported: registering service once, registration update, unregister. 
 * Register user-defined delegate factory and register existing instance.
-* Register from assembly(ies) to automatically locate implementation types.
+* Register from assembly(ies) implementation types with automatically determined service types.
 * Register with arbitrary key and condition, multiple default registrations.
 * Resolve and ResolveMany. Unknown service resolution with `Rules.WithUnknownServiceResolvers()`. 
 * Instance lifetime control or *Reuse* in DryIoc terms ([wiki](https://bitbucket.org/dadhi/dryioc/wiki/ReuseAndScopes)) :

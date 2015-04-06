@@ -44,7 +44,7 @@ namespace DryIoc.WebApi.Owin
         }
     }
 
-    internal class SetRequestDependencyScopeHandler : DelegatingHandler
+    internal sealed class SetRequestDependencyScopeHandler : DelegatingHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
