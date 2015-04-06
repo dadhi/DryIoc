@@ -2575,21 +2575,21 @@ namespace DryIoc
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered);
         }
 
-        /// <summary>Registers service of <paramref name="implementationAndServiceType"/>. ServiceType will be the same as <paramref name="implementationAndServiceType"/>.</summary>
+        /// <summary>Registers service of <paramref name="implementationType"/>. ServiceType will be the same as <paramref name="implementationType"/>.</summary>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="implementationAndServiceType">Implementation type. Concrete and open-generic class are supported.</param>
+        /// <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="with">(optional) specifies <see cref="Made"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup.Default"/>)</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void Register(this IRegistrator registrator, Type implementationAndServiceType, 
+        public static void Register(this IRegistrator registrator, Type implementationType, 
             IReuse reuse = null, Made with = null, Setup setup = null, 
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, 
             object serviceKey = null)
         {
-            var factory = new ReflectionFactory(implementationAndServiceType, reuse, with, setup);
-            registrator.Register(factory, implementationAndServiceType, serviceKey, ifAlreadyRegistered);
+            var factory = new ReflectionFactory(implementationType, reuse, with, setup);
+            registrator.Register(factory, implementationType, serviceKey, ifAlreadyRegistered);
         }
 
         /// <summary>Registers service of <typeparamref name="TService"/> type implemented by <typeparamref name="TImplementation"/> type.</summary>
@@ -2611,21 +2611,21 @@ namespace DryIoc
             registrator.Register(factory, typeof(TService), serviceKey, ifAlreadyRegistered);
         }
 
-        /// <summary>Registers implementation type <typeparamref name="TServiceAndImplementation"/> with itself as service type.</summary>
-        /// <typeparam name="TServiceAndImplementation">The type of service.</typeparam>
+        /// <summary>Registers implementation type <typeparamref name="TImplementation"/> with itself as service type.</summary>
+        /// <typeparam name="TImplementation">The type of service.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="made">(optional) specifies <see cref="Made"/>.</param>
         /// <param name="setup">(optional) Factory setup, by default is (<see cref="Setup.Default"/>)</param>
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void Register<TServiceAndImplementation>(this IRegistrator registrator,
+        public static void Register<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Made made = null, Setup setup = null, 
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, 
             object serviceKey = null)
         {
-            var factory = new ReflectionFactory(typeof(TServiceAndImplementation), reuse, made, setup);
-            registrator.Register(factory, typeof(TServiceAndImplementation), serviceKey, ifAlreadyRegistered);
+            var factory = new ReflectionFactory(typeof(TImplementation), reuse, made, setup);
+            registrator.Register(factory, typeof(TImplementation), serviceKey, ifAlreadyRegistered);
         }
 
         /// <summary>Returns true if type is public and not an object type. Provides default setting for RegisterMany.</summary>
