@@ -43,6 +43,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51
 		nuget\DryIoc.Web.nuspec = nuget\DryIoc.Web.nuspec
 		nuget\DryIoc.WebApi.dll.nuspec = nuget\DryIoc.WebApi.dll.nuspec
 		nuget\DryIoc.WebApi.nuspec = nuget\DryIoc.WebApi.nuspec
+		NuGet\DryIoc.WebApi.Owin.dll.nuspec = NuGet\DryIoc.WebApi.Owin.dll.nuspec
+		NuGet\DryIoc.WebApi.Owin.nuspec = NuGet\DryIoc.WebApi.Owin.nuspec
 		NuGet\SignPackageAssemblies.ps1 = NuGet\SignPackageAssemblies.ps1
 	EndProjectSection
 EndProject

@@ -33,8 +33,11 @@ namespace DryIoc.WebApi.Owin
     using global::Owin;
     using DryIoc.Owin;
 
+    /// <summary>Set of extension methods for gluing WebApi and OWIN together.</summary>
     public static class DryIocWebApiOwin
     {
+        /// <summary>Inserts delegating handler that uses OWIN scoped container for WebApi dependency scope.</summary>
+        /// <param name="app">App Builder</param> <param name="config"></param> <returns>App Builder</returns>
         public static IAppBuilder UseDryIocWebApi(this IAppBuilder app, HttpConfiguration config)
         {
             var handlers = config.ThrowIfNull().MessageHandlers;

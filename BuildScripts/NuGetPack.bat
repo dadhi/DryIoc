@@ -67,6 +67,14 @@ echo:============================
 %NUGET% pack "NuGet\DryIoc.Owin.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 rem -Symbols
 
+echo:
+call :ParseVersion "Extensions\DryIoc.WebApi.Owin\Properties\AssemblyInfo.cs"
+echo:DryIoc.WebApi.Owin v%VER%
+echo:============================
+%NUGET% pack "NuGet\DryIoc.WebApi.Owin.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack "NuGet\DryIoc.WebApi.Owin.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+rem -Symbols
+
 echo: 
 echo:Packaging succeeded.
 popd
