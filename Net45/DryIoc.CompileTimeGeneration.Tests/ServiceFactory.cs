@@ -35,7 +35,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
 
         public IScope GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
         {
-            return scope ?? (scope = new Scope(name: new KV<Type, object>(serviceType, serviceKey)));
+            return scope ?? (scope = new Scope(null, new KV<Type, object>(serviceType, serviceKey)));
         }
 
         public IScope GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost,

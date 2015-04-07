@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Threading;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -482,7 +481,6 @@ namespace DryIoc.UnitTests
 
             container.Dispose();
             Assert.IsTrue(b.IsDisposed);
-            Assert.IsTrue(container.SingletonScope.DisposingExceptions.OfType<DivideByZeroException>().Any());
         }
 
         [Test]

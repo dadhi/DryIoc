@@ -20,7 +20,7 @@ namespace DryIoc.Web.UnitTests
                 var expected = c.Resolve<Blah>();
                 Assert.AreSame(expected, c.Resolve<Blah>());
 
-                using (contextProxy.SetCurrent(current => new Scope(current)))
+                using (contextProxy.SetCurrent(current => new Scope(current, null)))
                 {
                     Assert.AreSame(expected, c.Resolve<Blah>());                   
                 }

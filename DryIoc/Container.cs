@@ -480,7 +480,7 @@ namespace DryIoc
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
         IScope IResolverContext.GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
         {
-            return scope ?? (scope = new Scope(name: new KV<Type, object>(serviceType, serviceKey)));
+            return scope ?? (scope = new Scope(null, new KV<Type, object>(serviceType, serviceKey)));
         }
 
         /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
@@ -4268,9 +4268,10 @@ namespace DryIoc
             var factoryIDExpr = Expression.Constant(FactoryID);
 
             var wrapperTypes = Setup.ReuseWrappers;
+
             if (wrapperTypes.IsNullOrEmpty())
-                return Expression.Convert(Expression.Call(getScopeExpr, Scope.GetOrAddMethod,
-                    factoryIDExpr, Expression.Lambda<Func<object>>(serviceExpr, null)), serviceType);
+                return Expression.Convert(Expression.Call(getScopeExpr, "GetOrAdd", null,
+                    factoryIDExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, null)), serviceType);
 
             // First wrap serviceExpr with wrapper Wrap method.
             var wrappers = new IReuseWrapperFactory[wrapperTypes.Length];
@@ -4288,8 +4289,8 @@ namespace DryIoc
             }
 
             // Makes call like this: scope.GetOrAdd(id, () => wrapper1.Wrap(wrapper0.Wrap(new Service)))
-            var getServiceExpr = Expression.Lambda(serviceExpr, null);
-            var getScopedServiceExpr = Expression.Call(getScopeExpr, Scope.GetOrAddMethod, factoryIDExpr, getServiceExpr);
+            var getScopedServiceExpr = Expression.Call(getScopeExpr, "GetOrAdd", null, 
+                factoryIDExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, null));
 
             // Unwrap wrapped service in backward order like this: wrapper0.Unwrap(wrapper1.Unwrap(scope.GetOrAdd(...)))
             for (var i = wrapperTypes.Length - 1; i >= 0; --i)
@@ -5105,6 +5106,9 @@ namespace DryIoc
         private readonly Type _implementationType;
     }
 
+    /// <summary>Should return value stored in scope.</summary>
+    public delegate object CreateScopedValue();
+
     /// <summary>Lazy object storage that will create object with provided factory on first access, 
     /// then will be returning the same object for subsequent access.</summary>
     public interface IScope : IDisposable
@@ -5115,16 +5119,13 @@ namespace DryIoc
         /// <summary>Optional name object associated with scope.</summary>
         object Name { get; }
 
-        /// <summary>Accumulates exceptions thrown by disposed items.</summary>
-        Exception[] DisposingExceptions { get; }
-
         /// <summary>Creates, stores, and returns stored object.</summary>
         /// <param name="id">Unique ID to find created object in subsequent calls.</param>
-        /// <param name="factory">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
+        /// <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will not be stored.</param>
         /// <returns>Created and stored object.</returns>
-        /// <remarks>Scope does not store <paramref name="factory"/> (no memory leak here), 
-        /// it stores only result of <paramref name="factory"/> call.</remarks>
-        object GetOrAdd(int id, Func<object> factory);
+        /// <remarks>Scope does not store <paramref name="createValue"/> (no memory leak here), 
+        /// it stores only result of <paramref name="createValue"/> call.</remarks>
+        object GetOrAdd(int id, CreateScopedValue createValue);
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
         /// <param name="id">To set value at.</param> <param name="value">Value to set.</param>
@@ -5147,28 +5148,24 @@ namespace DryIoc
             get { return _disposed == 1; }
         }
 
-        /// <summary>Accumulates exceptions thrown by disposed items.</summary>
-        public Exception[] DisposingExceptions { get; private set; }
+        /// <summary>Creates root scope without name.</summary>
+        public Scope() { }
 
         /// <summary>Create scope with optional parent and name.</summary>
-        /// <param name="parent">(optional) Parent in scope stack.</param>
-        /// <param name="name">(optional) Associated name object, e.g. <see cref="IScopeContext.RootScopeName"/></param>
-        public Scope(IScope parent = null, object name = null)
+        /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
+        public Scope(IScope parent, object name)
         {
             Parent = parent;
             Name = name;
         }
 
-        /// <summary>Provides access to <see cref="GetOrAdd"/> method for reflection client.</summary>
-        public static readonly MethodInfo GetOrAddMethod = typeof(IScope).GetSingleDeclaredMethodOrNull("GetOrAdd");
-
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
         /// Will throw <see cref="ContainerException"/> if scope is disposed.</summary>
         /// <param name="id">Unique ID to find created object in subsequent calls.</param>
-        /// <param name="factory">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
+        /// <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
         /// <returns>Created and stored object.</returns>
         /// <exception cref="ContainerException">if scope is disposed.</exception>
-        public object GetOrAdd(int id, Func<object> factory)
+        public object GetOrAdd(int id, CreateScopedValue createValue)
         {
             if (_disposed == 1)
                 Throw.It(Error.SCOPE_IS_DISPOSED);
@@ -5184,7 +5181,7 @@ namespace DryIoc
 
                     Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
 
-                    item = factory();
+                    item = createValue();
                     Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
                 }
                 return item;
@@ -5200,8 +5197,7 @@ namespace DryIoc
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
-        /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.
-        /// Rather all thrown exceptions are aggregated in <see cref="DisposingExceptions"/> array. If no exceptions, array is null.</remarks>
+        /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
@@ -5245,9 +5241,9 @@ namespace DryIoc
                         disposable.Dispose();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                DisposingExceptions = DisposingExceptions.AppendOrUpdate(ex);
+                // NOTE Ignoring disposing exception, they not so important for program to proceed.
             }
         }
 
@@ -6883,6 +6879,24 @@ namespace DryIoc
         /// <summary>Returns type assembly.</summary> <param name="type">Input type</param> <returns>Type assembly.</returns>
         public static Assembly GetAssembly(this Type type) { return type.GetTypeInfo().Assembly; }
 
+        /// <summary>Get types from assembly that are loaded successfully. 
+        /// Hacks to <see cref="ReflectionTypeLoadException"/> for loaded types.</summary>
+        /// <param name="assembly">Assembly to get types from.</param>
+        /// <returns>Array of loaded types.</returns>
+        public static Type[] GetLoadedTypes(this Assembly assembly)
+        {
+            Type[] types;
+            try
+            {
+                types = Portable.GetTypesFromAssembly(assembly).ToArrayOrSelf();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                types = ex.Types.Where(type => type != null).ToArrayOrSelf();
+            }
+            return types;
+        }
+
         #region Implementation
 
         private static void SetToNullMatchesFoundInGenericParameters(Type[] matchedParams, Type[] genericParams)
@@ -7289,7 +7303,20 @@ namespace DryIoc
         /// <returns>New tree.</returns>
         public IntKeyTree AddOrUpdate(int key, object value)
         {
-            return AddOrUpdate(key, value, false);
+            return AddOrUpdate(key, value, false, null);
+        }
+
+        /// <summary>Delegate to get updated value based on its old and new value.</summary>
+        /// <param name="oldValue">old</param> <param name="newValue">new</param> <returns>result</returns>
+        public delegate object UpdateValue(object oldValue, object newValue);
+
+        /// <summary>Returns new tree with added or updated value for specified key.</summary>
+        /// <param name="key"></param> <param name="value"></param>
+        /// <param name="updateValue">Delegate to get updated value based on its old and new value.</param>
+        /// <returns>New tree.</returns>
+        public IntKeyTree AddOrUpdate(int key, object value, UpdateValue updateValue)
+        {
+            return AddOrUpdate(key, value, false, updateValue);
         }
 
         /// <summary>Returns new tree with updated value for the key, Or the same tree if key was not found.</summary>
@@ -7297,17 +7324,17 @@ namespace DryIoc
         /// <returns>New tree if key is found, or the same tree otherwise.</returns>
         public IntKeyTree Update(int key, object value)
         {
-            return AddOrUpdate(key, value, true);
+            return AddOrUpdate(key, value, true, null);
         }
 
         /// <summary>Get value for found key or null otherwise.</summary>
         /// <param name="key"></param> <returns>Found value or null.</returns>
         public object GetValueOrDefault(int key)
         {
-            var t = this;
-            while (t.Height != 0 && t.Key != key)
-                t = key < t.Key ? t.Left : t.Right;
-            return t.Height != 0 ? t.Value : null;
+            var tree = this;
+            while (tree.Height != 0 && tree.Key != key)
+                tree = key < tree.Key ? tree.Left : tree.Right;
+            return tree.Height != 0 ? tree.Value : null;
         }
 
         /// <summary>Returns all sub-trees enumerated from left to right.</summary> 
@@ -7350,13 +7377,16 @@ namespace DryIoc
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private IntKeyTree AddOrUpdate(int key, object value, bool updateOnly)
+        // If keys is not found and updateOnly is true, it should return current tree without changes.
+        private IntKeyTree AddOrUpdate(int key, object value, bool updateOnly, UpdateValue update)
         {
-            return Height == 0 ? (updateOnly ? this : new IntKeyTree(key, value, Empty, Empty)) // if not found and updateOnly returning current tree.
-                : (key == Key ? new IntKeyTree(key, value, Left, Right) // actual update
-                : (key < Key
-                    ? With(Left.AddOrUpdate(key, value, updateOnly), Right)
-                    : With(Left, Right.AddOrUpdate(key, value, updateOnly))).KeepBalanced());
+            return Height == 0 ? // tree is empty
+                    (updateOnly ? this : new IntKeyTree(key, value, Empty, Empty))
+                : (key == Key ? // actual update
+                    new IntKeyTree(key, update == null ? value : update(Value, value), Left, Right)
+                : (key < Key    // try update on left or right sub-tree
+                    ? With(Left.AddOrUpdate(key, value, updateOnly, update), Right)
+                    : With(Left, Right.AddOrUpdate(key, value, updateOnly, update))).KeepBalanced());
         }
 
         private IntKeyTree KeepBalanced()

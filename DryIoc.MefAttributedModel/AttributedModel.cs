@@ -87,6 +87,7 @@ namespace DryIoc.MefAttributedModel
         /// Then registers found types into registrator/container.</summary>
         /// <param name="registrator">Container to register into</param>
         /// <param name="assemblies">Provides assemblies to scan for exported implementation types.</param>
+        /// <remarks>In case of <see cref="ReflectionTypeLoadException"/> try get type with <see cref="TypeTools.GetLoadedTypes"/>.</remarks>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Assembly> assemblies)
         {
             registrator.RegisterExports(Scan(assemblies));
