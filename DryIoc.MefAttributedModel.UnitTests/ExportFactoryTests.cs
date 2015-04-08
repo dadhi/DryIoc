@@ -90,5 +90,38 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<Apple>());
         }
+
+        [Test]
+        public void Can_export_static_factory_method_from_nonstatic_class()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(BirdFactory));
+
+            var duck = container.Resolve<Duck>();
+
+            Assert.IsInstanceOf<Duck>(duck);
+        }
+
+        [Test]
+        public void Can_export_static_factory_property_from_nonstatic_class()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(BirdFactory));
+
+            var chicken = container.Resolve<Chicken>();
+
+            Assert.IsInstanceOf<Chicken>(chicken);
+        }
+
+        [Test]
+        public void Can_export_static_factory_property_from_static_class()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(StaticBirdFactory));
+
+            var chicken = container.Resolve<Chicken>();
+
+            Assert.IsInstanceOf<Chicken>(chicken);
+        }
     }
 }

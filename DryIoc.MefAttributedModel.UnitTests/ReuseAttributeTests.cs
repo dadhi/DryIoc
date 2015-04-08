@@ -87,7 +87,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 var ex = Assert.Throws<ContainerException>(() => 
                     scoped.Resolve<WithNamedCurrentScope>());
 
-                Assert.AreEqual(ex.Error, DryIoc.Error.NO_MATCHED_SCOPE_FOUND);
+                Assert.AreEqual(DryIoc.Error.NO_MATCHED_SCOPE_FOUND, ex.Error);
             }
         }
 

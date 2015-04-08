@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 // ReSharper disable MemberHidesStaticFromOuterClass
@@ -98,8 +99,8 @@ namespace DryIoc.UnitTests
             using (var containerWithNewScope = container.OpenScope())
                 getLog = containerWithNewScope.Resolve<Func<Log>>();
 
-            Assert.That(Assert.Throws<ContainerException>(() => getLog()).Error, Is.EqualTo(Error.CONTAINER_IS_DISPOSED));
-            Assert.That(Assert.Throws<ContainerException>(() => getLog()).Error, Is.EqualTo(Error.CONTAINER_IS_DISPOSED));
+            Assert.AreEqual(Error.CONTAINER_IS_DISPOSED, Assert.Throws<ContainerException>(() => getLog()).Error);
+            Assert.AreEqual(Error.CONTAINER_IS_DISPOSED, Assert.Throws<ContainerException>(() => getLog()).Error);
         }
 
         [Test]
@@ -180,6 +181,60 @@ namespace DryIoc.UnitTests
 
             client = container.Resolve<IClient>();
             Assert.That(client, Is.InstanceOf<Client>());
+        }
+
+        [Test]
+        public void Can_select_different_service_in_and_out_of_open_scope_based_on_registered_reuse()
+        {
+            var container = new Container();
+
+            // two client versions: root and scoped
+            container.Register<IClient, Client>(setup: Setup.With(condition: r => r.Container.OpenedScope == null));
+            container.Register<IClient, ClientScoped>(Reuse.InCurrentScope);
+
+            // uses
+            container.Register<IServ, Serv>(Reuse.Singleton);
+
+            // two dependency versions:
+            container.Register<IDep, Dep>(setup: Setup.With(condition: r => r.Container.OpenedScope == null));
+            container.Register<IDep, DepScoped>(Reuse.InCurrentScope);
+
+            var client = container.Resolve<IClient>();
+
+            Assert.That(client, Is.InstanceOf<Client>());
+            Assert.That(client.Dep, Is.InstanceOf<Dep>());
+            Assert.That(client.Serv, Is.InstanceOf<Serv>());
+
+            using (var scope = container.OpenScope())
+            {
+                var scopedClient = scope.Resolve<IClient>();
+
+                Assert.That(scopedClient, Is.InstanceOf<ClientScoped>());
+                Assert.That(scopedClient.Dep, Is.InstanceOf<DepScoped>());
+                Assert.That(scopedClient.Serv, Is.InstanceOf<Serv>());
+            }
+
+            client = container.Resolve<IClient>();
+            Assert.That(client, Is.InstanceOf<Client>());
+        }
+
+        [Test]
+        public void Can_resolve_many_filtering_out_not_scoped_services()
+        {
+            var container = new Container();
+            container.Register<IDep, Dep>();
+            container.Register<IDep, DepScoped>(Reuse.InCurrentScope);
+
+            var deps = container.Resolve<LazyEnumerable<IDep>>().ToArray();
+            Assert.AreEqual(1, deps.Length);
+            Assert.IsInstanceOf<Dep>(deps[0]);
+
+            using (var scope = container.OpenScope())
+            {
+                var scopedDeps = scope.Resolve<LazyEnumerable<IDep>>().ToArray();
+                Assert.AreEqual(1, scopedDeps.Length);
+                Assert.IsInstanceOf<Dep>(scopedDeps[0]);
+            }
         }
 
         [Test]

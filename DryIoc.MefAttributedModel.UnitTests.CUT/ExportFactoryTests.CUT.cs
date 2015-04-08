@@ -81,4 +81,33 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     public class Orange { }
     public class Apple { }
+
+    public class Duck {}
+    public class Chicken {}
+
+    [Export, AsFactory]
+    public class BirdFactory
+    {
+        [Export]
+        public static Duck GetDuck()
+        {
+            return new Duck();
+        }
+
+        [Export]
+        public static Chicken Chicken { get { return new Chicken(); } }
+    }
+
+    [Export, AsFactory]
+    public static class StaticBirdFactory
+    {
+        [Export]
+        public static Duck GetDuck()
+        {
+            return new Duck();
+        }
+
+        [Export]
+        public static Chicken Chicken { get { return new Chicken(); } }
+    }
 }

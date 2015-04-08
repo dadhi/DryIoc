@@ -253,7 +253,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve(typeof(IService)));
 
-            Assert.AreEqual(ex.Error, Error.EXPECTED_SINGLE_DEFAULT_FACTORY);
+            Assert.AreEqual(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, ex.Error);
         }
 
         [Test]
@@ -312,7 +312,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
 
-            Assert.AreEqual(ex.Error, Error.EXPECTED_SINGLE_DEFAULT_FACTORY);
+            Assert.AreEqual(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, ex.Error);
         }
 
         [Test]

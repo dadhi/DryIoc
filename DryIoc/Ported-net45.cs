@@ -104,6 +104,7 @@ namespace System.Reflection
         public bool IsNestedPublic { get { return _type.IsNestedPublic; } }
         public Type DeclaringType { get { return _type.DeclaringType; } }
         public bool IsAbstract { get { return _type.IsAbstract; } }
+        public bool IsSealed { get { return _type.IsSealed; } }
         public bool IsEnum { get { return _type.IsEnum; } }
 
         public Type GetElementType() { return _type.GetElementType(); }

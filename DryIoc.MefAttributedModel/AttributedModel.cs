@@ -109,13 +109,15 @@ namespace DryIoc.MefAttributedModel
         /// <param name="info">Registration information provided.</param>
         public static void RegisterInfo(this IRegistrator registrator, RegistrationInfo info)
         {
-            var factory = info.CreateFactory();
-
-            for (var i = 0; i < info.Exports.Length; i++)
+            if (!info.ImplementationType.IsStatic())
             {
-                var export = info.Exports[i];
-                registrator.Register(factory, export.ServiceType,
-                    export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
+                var factory = info.CreateFactory();
+                for (var i = 0; i < info.Exports.Length; i++)
+                {
+                    var export = info.Exports[i];
+                    registrator.Register(factory, export.ServiceType,
+                        export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
+                }
             }
 
             if (info.IsFactory)
@@ -128,7 +130,8 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Lazy collection of registration info DTOs.</returns>
         public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
-            return assemblies.SelectMany(Portable.GetTypesFromAssembly).Select(GetRegistrationInfoOrDefault).Where(x => x != null);
+            return assemblies.SelectMany(Portable.GetTypesFromAssembly)
+                .Select(GetRegistrationInfoOrDefault).Where(info => info != null);
         }
 
         /// <summary>Creates registration info DTO for provided type. To find this info checks type attributes:
@@ -138,7 +141,9 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Created DTO.</returns>
         public static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType)
         {
-            if (implementationType.IsValueType() || implementationType.IsAbstract()) 
+            if (implementationType.IsValueType() || 
+                implementationType.IsAbstract() && !implementationType.IsStatic() ||
+                implementationType.IsCompilerGenerated()) 
                 return null;
             var attributes = GetAllExportRelatedAttributes(implementationType);
             return !IsExportDefined(attributes) ? null : GetRegistrationInfoOrDefault(implementationType, attributes);
@@ -439,22 +444,31 @@ namespace DryIoc.MefAttributedModel
 
         private static void RegisterFactoryMethods(IRegistrator registrator, RegistrationInfo factoryInfo)
         {
-            var methods = factoryInfo.ImplementationType.GetAll(_ => _.DeclaredMethods);
-            foreach (var method in methods)
+            var members = factoryInfo.ImplementationType.GetAll(t => 
+                t.DeclaredMethods.Cast<MemberInfo>().Concat<MemberInfo>(
+                t.DeclaredProperties.Cast<MemberInfo>()));
+
+            foreach (var member in members)
             {
-                var attributes = method.GetAttributes().ToArrayOrSelf();
+                var method = member is PropertyInfo
+                    ? Portable.GetPropertygGetMethod((PropertyInfo)member)
+                    : (MethodInfo)member;
+
+                var attributes = member.GetAttributes().ToArrayOrSelf();
                 if (!IsExportDefined(attributes))
                     continue;
 
-                var serviceInfo = GetRegistrationInfoOrDefault(method.ReturnType, attributes).ThrowIfNull();
+                var registrationInfo = GetRegistrationInfoOrDefault(method.ReturnType, attributes).ThrowIfNull();
 
                 var factoryMethod = method;
                 var factoryExport = factoryInfo.Exports[0];
-                var factoryServiceInfo = ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
-                var creationInfo = Made.Of(_ => FactoryMethod.Of(factoryMethod, factoryServiceInfo));
-                var factory = serviceInfo.CreateFactory(creationInfo);
+                var factoryServiceInfo = factoryMethod.IsStatic ? null :
+                    ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
+                
+                var made = Made.Of(_ => FactoryMethod.Of(factoryMethod, factoryServiceInfo));
+                var factory = registrationInfo.CreateFactory(made);
 
-                var serviceExports = serviceInfo.Exports;
+                var serviceExports = registrationInfo.Exports;
                 for (var i = 0; i < serviceExports.Length; i++)
                 {
                     var export = serviceExports[i];
@@ -650,12 +664,12 @@ namespace DryIoc.MefAttributedModel
         public Type ConditionType; 
 
         /// <summary>Creates factory out of registration info.</summary>
-        /// <param name="rules">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
+        /// <param name="made">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
         /// <returns>Created factory.</returns>
-        public Factory CreateFactory(Made rules = null)
+        public Factory CreateFactory(Made made = null)
         {
             var reuse = AttributedModel.GetReuse(ReuseType, ReuseName);
-            return new ReflectionFactory(ImplementationType, reuse, rules, GetSetup());
+            return new ReflectionFactory(ImplementationType, reuse, made, GetSetup());
         }
 
         /// <summary>Create factory setup from DTO data.</summary>

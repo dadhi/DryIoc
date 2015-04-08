@@ -98,6 +98,9 @@ namespace DryIoc
             return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
         }
 
+        /// <summary>Container opened scope. May or may not be equal to Current Scope.</summary>
+        public IScope OpenedScope { get { return _openedScope; } }
+
         /// <summary>Returns scope context associated with container.</summary>
         public IScopeContext ScopeContext { get { return _scopeContext; } }
 
@@ -3875,7 +3878,7 @@ namespace DryIoc
                 return s;
 
             s = recursiveFactoryID == -1 ? s : s.Append(" <--recursive");
-            return Parent.Enumerate().TakeWhile(r => !r.IsEmpty).Aggregate(s, (a, r) =>
+            return Parent.Enumerate().Aggregate(s, (a, r) =>
             {
                 a = r.PrintCurrent(a.AppendLine().Append(" in "));
                 return r.ResolvedFactory.FactoryID == recursiveFactoryID ? a.Append(" <--recursive") : a;
@@ -3941,15 +3944,15 @@ namespace DryIoc
         /// or disable disposing with <see cref="ReuseHiddenDisposable"/>, etc.</summary>
         public virtual Type[] ReuseWrappers { get { return null; } }
 
-        /// <summary>Specifies condition associated with reused service, for instance for <see cref="Reuse.InResolutionScopeOf"/>.</summary>
-        /// <param name="condition">Condition based on service request.</param>
-        /// <returns>Setup with condition assigned.</returns>
-        public Setup WithReuseCondition(Func<Request, bool> condition)
+        /// <summary>Specifies condition associated with service, for instance for <see cref="Reuse.InResolutionScopeOf"/>.</summary>
+        /// <param name="condition">Condition based on service request.</param> <returns>Setup with condition.</returns>
+        public Setup WithCondition(Func<Request, bool> condition)
         {
             condition.ThrowIfNull();
             var oldCondition = Condition;
             var setup = (Setup)MemberwiseClone();
-            setup.Condition = oldCondition == null ? condition : (r => oldCondition(r) && condition(r));
+            setup.Condition = oldCondition == null ? condition 
+                : (request => oldCondition(request) && condition(request));
             return setup;
         }
 
@@ -4132,14 +4135,28 @@ namespace DryIoc
             Setup = setup ?? Setup.Default;
 
             if (reuse != null)
-                Setup = Setup.WithReuseCondition(HasMatchingScope);
+                Setup = Setup.WithCondition(HasMatchingReuseScope);
         }
 
-        private bool HasMatchingScope(Request request)
+        private bool HasMatchingReuseScope(Request request)
         {
-            var reuseMappingRule = request.Container.Rules.ReuseMapping;
-            var reuse = reuseMappingRule == null ? Reuse : reuseMappingRule(Reuse, request);
-            return !(reuse is ResolutionScopeReuse) || reuse.GetScopeOrDefault(request) != null;
+            var reuseMapping = request.Container.Rules.ReuseMapping;
+            var reuse = reuseMapping == null ? Reuse : reuseMapping(Reuse, request);
+            if (reuse is ResolutionScopeReuse)
+                return reuse.GetScopeOrDefault(request) != null;
+
+            if (reuse is CurrentScopeReuse)
+            {
+                if (!request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc()))
+                {
+                    if (reuse.GetScopeOrDefault(request) == null)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         /// <summary>Validates that factory is OK for registered service type.</summary>
@@ -5971,6 +5988,9 @@ namespace DryIoc
         /// <returns>New container with copy of all registrations.</returns>
         IContainer WithRegistrationsCopy(bool preserveCache = false);
 
+        /// <summary>Container opened scope. May or may not be equal to Current Scope.</summary>
+        IScope OpenedScope { get; }
+
         /// <summary>Returns scope context associated with container.</summary>
         IScopeContext ScopeContext { get; }
 
@@ -6742,6 +6762,14 @@ namespace DryIoc
         public static bool IsAbstract(this Type type)
         {
             return type.GetTypeInfo().IsAbstract;
+        }
+
+        /// <summary>Returns true if type is static.</summary>
+        /// <param name="type">Type</param> <returns>True is static.</returns>
+        public static bool IsStatic(this Type type)
+        {
+            var typeInfo = type.GetTypeInfo();
+            return typeInfo.IsAbstract && typeInfo.IsSealed;
         }
 
         /// <summary>Returns true if type is enum type.</summary>

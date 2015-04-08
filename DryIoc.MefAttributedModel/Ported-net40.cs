@@ -26,7 +26,7 @@ namespace System.ComponentModel.Composition
 {
     /// <summary>Specifies to register annotated type in container. 
     /// Or you could annotate Method with this attribute, and the method will be used as Factory Method for registration.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property, AllowMultiple = true, Inherited = false)]
     public class ExportAttribute : Attribute
     {
         /// <summary>Optional contract name to identify registered service when you are importing it.</summary>
