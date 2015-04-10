@@ -71,7 +71,7 @@ namespace DryIoc.IssuesTests.Samples
 @"Unable to resolve DryIoc.IssuesTests.Samples.IService as parameter ""service""
  in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient.
 Please ensure you have service registered (with proper key) - 95% of cases.
-Remaining 5%: There is no Rules.WithUnknownServiceResolver(ForMyService), or service does not match the reuse scope, or service has wrong Setup.With(condition)."));
+Remaining 5%: Service does not match the reuse scope, or service has wrong Setup.With(condition), or no Rules.WithUnknownServiceResolver(ForMyService)."));
         }
     }
 

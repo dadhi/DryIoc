@@ -122,14 +122,14 @@ namespace DryIoc
             ThrowIfContainerDisposed();
 
             scopeName = scopeName ?? (_openedScope == null ? _scopeContext.RootScopeName : null);
-            var openedScope = new Scope(parent: _openedScope, name: scopeName);
+            var newOpenedScope = new Scope(_openedScope, scopeName);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             _scopeContext.SetCurrent(scope =>
-                openedScope.ThrowIf(scope != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT, _openedScope, scope));
+                 newOpenedScope.ThrowIf(scope != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT, _openedScope, scope));
 
             var rules = configure == null ? Rules : configure(Rules);
-            return new Container(rules, _registry, _singletonScope, _scopeContext, openedScope, _disposed);
+            return new Container(rules, _registry, _singletonScope, _scopeContext, newOpenedScope, _disposed);
         }
 
         /// <summary>Creates scoped container with scope bound to container itself, and not some ambient context.
@@ -150,14 +150,15 @@ namespace DryIoc
         public static readonly object NO_CONTEXT_ROOT_SCOPE_NAME = typeof(IContainer);
 
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
-        /// Facade shares rules with this container, everything else is its own. 
+        /// Facade is the new empty container, with the same rules and scope context as current container. 
         /// It could be used for instance to create Test facade over original container with replacing some services with test ones.</summary>
-        /// <remarks>Singletons from container are not reused by facade, to achieve that rather use <see cref="IContainer.OpenScope"/> with <see cref="Reuse.InCurrentScope"/>.</remarks>
+        /// <remarks>Singletons from container are not reused by facade - when you resolve singleton directly from parent and then ask for it from child, it will return another object.
+        /// To achieve that you may use <see cref="IContainer.OpenScope"/> with <see cref="Reuse.InCurrentScope"/>.</remarks>
         /// <returns>New facade container.</returns>
         public IContainer CreateFacade()
         {
             ThrowIfContainerDisposed();
-            return new Container(Rules.WithUnknownServiceResolver(FallbackToContainers(this)));
+            return new Container(Rules.WithUnknownServiceResolver(FallbackToContainers(this)), _scopeContext);
         }
 
         /// <summary>The rule to fallback to multiple containers in order to resolve service unresolved in rule owner.</summary>
@@ -167,7 +168,10 @@ namespace DryIoc
         /// 2nd - save rule returned by this method and then remove saved rule from container using <see cref="DryIoc.Rules.WithoutUnknownServiceResolver"/>.</remarks>
         public static Rules.UnknownServiceResolver FallbackToContainers(params IContainer[] containers)
         {
-            var containerWeakRefs = containers.ThrowIf(ArrayTools.IsNullOrEmpty).Select(p => p.ContainerWeakRef).ToArray();
+            var containerWeakRefs = containers
+                .ThrowIf(ArrayTools.IsNullOrEmpty)
+                .Select(p => p.ContainerWeakRef).ToArray();
+
             return request =>
             {
                 Factory factory = null;
@@ -352,10 +356,12 @@ namespace DryIoc
             return resultService;
         }
 
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, 
+            IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
         {
             var cacheServiceKey = serviceKey;
-            if (requiredServiceType != null)
+            if (requiredServiceType != null && 
+                requiredServiceType != serviceType)
             {
                 var wrappedServiceType = ((IContainer)this).UnwrapServiceType(serviceType)
                     .ThrowIfNotOf(requiredServiceType, Error.WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE, serviceType);
@@ -463,7 +469,8 @@ namespace DryIoc
         IScope IResolverContext.GetCurrentNamedScope(object name, bool throwIfNotFound)
         {
             var currentScope = _scopeContext == null ? _openedScope : _scopeContext.GetCurrentOrDefault();
-            return currentScope == null ? (throwIfNotFound ? Throw.For<IScope>(Error.NO_CURRENT_SCOPE) : null)
+            return currentScope == null 
+                ? (throwIfNotFound ? Throw.For<IScope>(Error.NO_CURRENT_SCOPE) : null)
                 : GetMatchingScopeOrDefault(currentScope, name)
                 ?? (throwIfNotFound ? Throw.For<IScope>(Error.NO_MATCHED_SCOPE_FOUND, name) : null);
         }
@@ -772,10 +779,9 @@ namespace DryIoc
 
             itemType = itemType ?? item.GetType();
 
-            var converter = Rules.ItemToExpressionConverter;
-            if (converter != null)
+            if (Rules.ItemToExpressionConverter != null)
             {
-                var expression = converter(item, itemType);
+                var expression = Rules.ItemToExpressionConverter(item, itemType);
                 if (expression != null)
                     return expression;
             }
@@ -949,20 +955,19 @@ namespace DryIoc
                     (x.Value.Setup.Condition == null || x.Value.Setup.Condition(request)))
                     .ToArray();
 
-            if (defaultFactories.Length != 0)
-            {
-                if (defaultFactories.Length > 1)
-                    Throw.It(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
+            if (defaultFactories.Length == 0)
+                return null;
 
-                var defaultFactory = defaultFactories[0];
+            if (defaultFactories.Length > 1)
+                Throw.It(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
 
-                if (request.Parent.IsEmpty)
-                    request.ChangeServiceKey(defaultFactory.Key);
+            var defaultFactory = defaultFactories[0];
 
-                return defaultFactory.Value;
-            }
+            // NOTE: For resolution root sets correct default key to be used in delegate cache.
+            if (request.Parent.IsEmpty)
+                request.ChangeServiceKey(defaultFactory.Key);
 
-            return null;
+            return defaultFactory.Value;
         }
 
         #endregion
@@ -2093,14 +2098,14 @@ namespace DryIoc
         }
 
         /// <summary>Turns on/off exception throwing when dependency has shorter reuse lifespan than its parent.</summary>
-        public bool ThrowIfDepenedencyHasShorterReuseLifespan { get; private set; }
+        public bool ThrowIfDependencyHasShorterReuseLifespan { get; private set; }
 
-        /// <summary>Returns new rules with <see cref="ThrowIfDepenedencyHasShorterReuseLifespan"/> set to specified value.</summary>
+        /// <summary>Returns new rules with <see cref="ThrowIfDependencyHasShorterReuseLifespan"/> set to specified value.</summary>
         /// <returns>New rules with new setting value.</returns>
-        public Rules WithoutThrowIfDepenedencyHasShorterReuseLifespan()
+        public Rules WithoutThrowIfDependencyHasShorterReuseLifespan()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.ThrowIfDepenedencyHasShorterReuseLifespan = false;
+            newRules.ThrowIfDependencyHasShorterReuseLifespan = false;
             return newRules;
         }
 
@@ -2158,14 +2163,17 @@ namespace DryIoc
             return newRules;
         }
 
-        private static Expression PrimitivesToExpressionConverter(object item, Type itemType)
+        /// <summary>Flag acting in implicit <see cref="Setup.Condition"/> for service registered with not null <see cref="IReuse"/>.
+        /// Condition skips resolution if no matching scope found.</summary>
+        public bool ImplicitSetupConditionToCheckReuseMatchingScope { get; private set; }
+
+        /// <summary>Removes <see cref="ImplicitSetupConditionToCheckReuseMatchingScope"/></summary>
+        /// <returns>New rules.</returns>
+        public Rules WithoutImplicitSetupConditionToCheckReuseMatchingScope()
         {
-            return itemType == typeof(DefaultKey)
-                    ? (Expression)Expression.Call(itemType, "Of", null, 
-                        Expression.Constant(((DefaultKey)item).RegistrationOrder))
-                : (itemType.IsPrimitive() || itemType == typeof(Type)
-                    ? Expression.Constant(item, itemType)
-                    : null);
+            var newRules = (Rules)MemberwiseClone();
+            newRules.ImplicitSetupConditionToCheckReuseMatchingScope = false;
+            return newRules;
         }
 
         #region Implementation
@@ -2178,8 +2186,19 @@ namespace DryIoc
         private Rules()
         {
             _made = Made.Default;
-            ThrowIfDepenedencyHasShorterReuseLifespan = true;
+            ThrowIfDependencyHasShorterReuseLifespan = true;
+            ImplicitSetupConditionToCheckReuseMatchingScope = true;
             SingletonOptimization = true;
+        }
+
+        private static Expression PrimitivesToExpressionConverter(object item, Type itemType)
+        {
+            return itemType == typeof(DefaultKey)
+                    ? (Expression)Expression.Call(itemType, "Of", null,
+                        Expression.Constant(((DefaultKey)item).RegistrationOrder))
+                : (itemType.IsPrimitive() || itemType == typeof(Type)
+                    ? Expression.Constant(item, itemType)
+                    : null);
         }
 
         #endregion
@@ -3944,7 +3963,7 @@ namespace DryIoc
         /// or disable disposing with <see cref="ReuseHiddenDisposable"/>, etc.</summary>
         public virtual Type[] ReuseWrappers { get { return null; } }
 
-        /// <summary>Specifies condition associated with service, for instance for <see cref="Reuse.InResolutionScopeOf"/>.</summary>
+        /// <summary>Adds new condition to setup using logical AND with old condition.</summary>
         /// <param name="condition">Condition based on service request.</param> <returns>Setup with condition.</returns>
         public Setup WithCondition(Func<Request, bool> condition)
         {
@@ -3952,7 +3971,7 @@ namespace DryIoc
             var oldCondition = Condition;
             var setup = (Setup)MemberwiseClone();
             setup.Condition = oldCondition == null ? condition 
-                : (request => oldCondition(request) && condition(request));
+                : (request => condition(request) && oldCondition(request));
             return setup;
         }
 
@@ -4140,21 +4159,19 @@ namespace DryIoc
 
         private bool HasMatchingReuseScope(Request request)
         {
-            var reuseMapping = request.Container.Rules.ReuseMapping;
+            var rules = request.Container.Rules;
+            if (!rules.ImplicitSetupConditionToCheckReuseMatchingScope)
+                return true;
+
+            var reuseMapping = rules.ReuseMapping;
             var reuse = reuseMapping == null ? Reuse : reuseMapping(Reuse, request);
+
             if (reuse is ResolutionScopeReuse)
                 return reuse.GetScopeOrDefault(request) != null;
 
             if (reuse is CurrentScopeReuse)
-            {
-                if (!request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc()))
-                {
-                    if (reuse.GetScopeOrDefault(request) == null)
-                    {
-                        return false;
-                    }
-                }
-            }
+                return request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc())
+                    || reuse.GetScopeOrDefault(request) != null;
 
             return true;
         }
@@ -4183,7 +4200,7 @@ namespace DryIoc
         /// <returns>Service expression.</returns>
         public virtual Expression GetExpressionOrDefault(Request request, Type reuseWrapperType = null)
         {
-            // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual creation expression.
+            // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual new or method call expression.
             if (Setup.OpenResolutionScope && !request.ParentNonWrapper().IsEmpty)
                 return Resolver.CreateResolutionExpression(request);
 
@@ -4238,7 +4255,7 @@ namespace DryIoc
         protected static void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse, Request request)
         {
             if (reuse != null && !request.Parent.IsEmpty &&
-                request.Container.Rules.ThrowIfDepenedencyHasShorterReuseLifespan)
+                request.Container.Rules.ThrowIfDependencyHasShorterReuseLifespan)
             {
                 var parentReuse = request.Parent.ResolvedFactory.Reuse;
                 if (parentReuse != null)
@@ -5287,27 +5304,6 @@ namespace DryIoc
         IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope);
     }
 
-    /// <summary>Scope context extensions.</summary>
-    public static class ScopeContext
-    {
-        /// <summary>Opens new ambient current scope from context not bound to any container.</summary>
-        /// <param name="context">Context to create new scope in.</param>
-        /// <param name="getScope">Custom scope creation delegate.</param>
-        /// <returns>New ambient current scope.</returns>
-        public static IScope OpenScope(this IScopeContext context, Func<IScope, IScope> getScope = null)
-        {
-            return context.SetCurrent(getScope
-                ?? (parent => new Scope(parent, parent == null ? context.RootScopeName : null)));
-        }
-
-        /// <summary>Gets current opened scope from container.</summary>
-        /// <param name="container"></param> <returns>Scope or null if no scope was opened.</returns>
-        public static IScope GetCurrentScopeOrDefault(this IContainer container)
-        {
-            return container.GetCurrentNamedScope(name: null, throwIfNotFound: false);
-        }
-    }
-
     /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
     /// if not yet tracked. Context actually stores scope references internally, so it should be disposed to free them.</summary>
     public sealed class ThreadScopeContext : IScopeContext, IDisposable
@@ -6276,7 +6272,7 @@ namespace DryIoc
             UNABLE_TO_RESOLVE_SERVICE = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
                 "Please ensure you have service registered (with proper key) - 95% of cases." + Environment.NewLine +
-                "Remaining 5%: There is no Rules.WithUnknownServiceResolver(ForMyService), or service does not match the reuse scope, or service has wrong Setup.With(condition)."),
+                "Remaining 5%: Service does not match the reuse scope, or service has wrong Setup.With(condition), or no Rules.WithUnknownServiceResolver(ForMyService)."),
             EXPECTED_SINGLE_DEFAULT_FACTORY = Of(
                 "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),

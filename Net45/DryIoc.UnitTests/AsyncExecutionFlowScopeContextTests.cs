@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests
             using (var s1 = container.OpenScope())
             {
                 var ex = Assert.Throws<ContainerException>(() => s1.Resolve<Blah>());
-                Assert.That(ex.Error, Is.EqualTo(Error.NO_MATCHED_SCOPE_FOUND));
+                Assert.That(ex.Error, Is.EqualTo(Error.UNABLE_TO_RESOLVE_SERVICE));
             }
         }
 
@@ -47,7 +47,7 @@ namespace DryIoc.UnitTests
             container.Register<Blah>(Reuse.InCurrentNamedScope(1));
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Blah>());
-            Assert.That(ex.Error, Is.EqualTo(Error.NO_CURRENT_SCOPE));
+            Assert.That(ex.Error, Is.EqualTo(Error.UNABLE_TO_RESOLVE_SERVICE));
         }
 
         [Test]

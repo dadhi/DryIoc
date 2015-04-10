@@ -52,15 +52,15 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_inject_current_scope_service_from_parent_container_After_it_was_resolved_from_parent2()
         {
-            var container = new Container();
-            container.Register<IFruit, Mango>(Reuse.InCurrentScope);
+            var parent = new Container();
+            parent.Register<IFruit, Mango>(Reuse.InCurrentScope);
 
-            var child = container.CreateFacade();
+            var child = parent.CreateFacade();
             child.Register<IJuice, FruitJuice>();
 
-            using (var scoped = child.OpenScope())
+            using (var childScope = child.OpenScope())
             {
-                var parentFruit = scoped.Resolve<IFruit>();
+                var parentFruit = childScope.Resolve<IFruit>();
                 var childJuice = child.Resolve<IJuice>();
 
                 Assert.That(parentFruit, Is.SameAs(childJuice.Fruit));

@@ -53,9 +53,10 @@ namespace DryIoc.Web
             {
                 var httpContext = (sender as HttpApplication).ThrowIfNull().Context;
                 var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
-                
-                scopeContext.OpenScope()
-                    .ThrowIf(s => s.Parent != null, Error.ROOT_SCOPE_IS_ALREADY_OPENED);
+
+                scopeContext.SetCurrent(parent => parent != null
+                    ? Throw.For<IScope>(Error.SCOPE_IS_ALREADY_OPENED, parent)
+                    : new Scope(null, scopeContext.RootScopeName));
             };
 
             context.EndRequest += (sender, _) =>
@@ -63,11 +64,10 @@ namespace DryIoc.Web
                 var httpContext = (sender as HttpApplication).ThrowIfNull().Context;
                 var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
                 
-                var scope = scopeContext.GetCurrentOrDefault()
-                    .ThrowIfNull(Error.NO_OPENED_SCOPE_TO_DISPOSE)
-                    .ThrowIf(s => s.Parent != null, Error.NOT_THE_ROOT_OPENED_SCOPE);
+                var currentScope = scopeContext.GetCurrentOrDefault().ThrowIfNull(Error.NO_OPENED_SCOPE_TO_DISPOSE);
+                Throw.If(currentScope.Parent != null, Error.NOT_THE_ROOT_OPENED_SCOPE, currentScope.Parent);
                 
-                scope.Dispose();
+                currentScope.Dispose();
             };
         }
 
@@ -80,8 +80,8 @@ namespace DryIoc.Web
     {
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
-            ROOT_SCOPE_IS_ALREADY_OPENED = DryIoc.Error.Of(
-                "Probably problems with Web setup: Someone already opened root scope before HttpApplication.BeginRequest."),
+            SCOPE_IS_ALREADY_OPENED = DryIoc.Error.Of(
+                "Probably problems with Web setup: Someone already opened scope {0} before HttpApplication.BeginRequest."),
             NO_OPENED_SCOPE_TO_DISPOSE = DryIoc.Error.Of(
                 "Probably problems with Web setup: No opened scope to Dispose."),
             NOT_THE_ROOT_OPENED_SCOPE = DryIoc.Error.Of(

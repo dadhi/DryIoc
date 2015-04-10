@@ -232,9 +232,19 @@ namespace DryIoc.UnitTests
             using (var scope = container.OpenScope())
             {
                 var scopedDeps = scope.Resolve<LazyEnumerable<IDep>>().ToArray();
-                Assert.AreEqual(1, scopedDeps.Length);
-                Assert.IsInstanceOf<Dep>(scopedDeps[0]);
+                Assert.AreEqual(2, scopedDeps.Length);
             }
+        }
+
+        [Test]
+        public void Can_switch_off_filtering_out_not_scoped_services()
+        {
+            var container = new Container(r => r.WithoutImplicitSetupConditionToCheckReuseMatchingScope());
+            container.Register<IDep, DepScoped>(Reuse.InCurrentScope);
+
+            var ex = Assert.Throws<ContainerException>(
+                () => container.Resolve<IDep>());
+            Assert.AreEqual(Error.NO_CURRENT_SCOPE, ex.Error);
         }
 
         [Test]

@@ -282,7 +282,7 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Service>());
 
-            Assert.That(ex.Message, Is.StringContaining("No current scope available"));
+            Assert.That(ex.Message, Is.StringContaining("Unable to resolve DryIoc.UnitTests.CUT.Service"));
         }
 
         [Test]
@@ -404,7 +404,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_Not_throw_if_rule_is_off_and_dependency_lifespan_is_less_than_parents()
         {
-            var container = new Container(rules => rules.WithoutThrowIfDepenedencyHasShorterReuseLifespan());
+            var container = new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan());
             container.Register<Client>(Reuse.Singleton);
             container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
 
