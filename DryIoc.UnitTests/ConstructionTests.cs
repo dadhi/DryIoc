@@ -122,9 +122,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<IService, SomeService>(made: FactoryMethod.Of(
+            container.Register<IService, SomeService>(made: Made.Of(FactoryMethod.Of(
                 typeof(ServiceFactory).GetDeclaredMethodOrNull("Create"), 
-                ServiceInfo.Of<ServiceFactory>()));
+                ServiceInfo.Of<ServiceFactory>())));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());

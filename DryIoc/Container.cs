@@ -2222,6 +2222,13 @@ namespace DryIoc
             return new FactoryMethod(ctorOrMethodOrMember.ThrowIfNull(), factoryInfo);
         }
 
+        /// <summary>Converts method to selector when selector parameter is not required.</summary>
+        /// <param name="method">Method to convert.</param> <returns>Result selector.</returns>
+        public static implicit operator FactoryMethodSelector(FactoryMethod method)
+        {
+            return _ => method;
+        }
+
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
@@ -2381,13 +2388,13 @@ namespace DryIoc
 
         /// <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
         /// <typeparam name="T">Type with constructor or static method.</typeparam>
-        /// <param name="constructorOrMethodCallExpr">Expression tree with call to constructor with properties: 
+        /// <param name="ctorOrMethodOrMethodExpr">Expression tree with call to constructor with properties: 
         /// <code lang="cs"><![CDATA[() => new Car(Arg.Of<IEngine>()) { Color = Arg.Of<Color>("CarColor") }]]></code>
         /// or static method call <code lang="cs"><![CDATA[() => Car.Create(Arg.Of<IEngine>())]]></code></param>
         /// <returns>New Made specification.</returns>
-        public static Made Of<T>(Expression<Func<T>> constructorOrMethodCallExpr)
+        public static Made Of<T>(Expression<Func<T>> ctorOrMethodOrMethodExpr)
         {
-            return FromExpression(typeof(T), constructorOrMethodCallExpr);
+            return FromExpression(typeof(T), ctorOrMethodOrMethodExpr);
         }
 
         /// <summary>Defines creation info from factory method call expression (without using strings).
@@ -2422,42 +2429,44 @@ namespace DryIoc
         {
             var callExpr = constructorOrMethodCallExpr.ThrowIfNull().Body;
 
-            MethodBase constuctorOrMethod;
+            MemberInfo ctorOrMethodOrMember;
             IList<Expression> argumentExprs = null;
             IList<MemberBinding> memberBindingExprs = null;
-            if (callExpr.NodeType == ExpressionType.Call)
+            ParameterInfo[] parameters = null;
+            if (callExpr.NodeType == ExpressionType.New || callExpr.NodeType == ExpressionType.MemberInit)
+            {
+                var newExpr = callExpr as NewExpression ?? ((MemberInitExpression)callExpr).NewExpression;
+                ctorOrMethodOrMember = newExpr.Constructor;
+                parameters = newExpr.Constructor.GetParameters();
+                argumentExprs = newExpr.Arguments;
+                if (callExpr is MemberInitExpression)
+                    memberBindingExprs = ((MemberInitExpression)callExpr).Bindings;
+            }
+            else if (callExpr.NodeType == ExpressionType.Call)
             {
                 var methodCallExpr = ((MethodCallExpression)callExpr);
-                constuctorOrMethod = methodCallExpr.Method;
+                ctorOrMethodOrMember = methodCallExpr.Method;
+                parameters = methodCallExpr.Method.GetParameters();
                 argumentExprs = methodCallExpr.Arguments;
             }
             else if (callExpr.NodeType == ExpressionType.MemberAccess)
             {
                 var member = ((MemberExpression)callExpr).Member;
-                var property = (member as PropertyInfo)
-                    .ThrowIfNull(Error.UNEXPECTED_EXPRESSION_INSTEAD_OF_PROPERTY_GETTER, member);
-                constuctorOrMethod = Portable.GetPropertygGetMethod(property);
-            }
-            else if (callExpr.NodeType == ExpressionType.New || callExpr.NodeType == ExpressionType.MemberInit)
-            {
-                var newExpr = callExpr as NewExpression ?? ((MemberInitExpression)callExpr).NewExpression;
-                constuctorOrMethod = newExpr.Constructor;
-                argumentExprs = newExpr.Arguments;
-                if (callExpr is MemberInitExpression)
-                    memberBindingExprs = ((MemberInitExpression)callExpr).Bindings;
+                Throw.If(!(member is PropertyInfo) && !(member is FieldInfo),
+                    Error.UNEXPECTED_FACTORY_MEMBER_EXPRESSION, member);
+                ctorOrMethodOrMember = member;
             }
             else return Throw.For<Made>(Error.UNEXPECTED_EXPRESSION_TO_MAKE_SERVICE, callExpr);
 
-            var parameters = argumentExprs == null || argumentExprs.Count == 0 ? null
-                : GetParameters(argumentExprs, constuctorOrMethod.GetParameters());
+            FactoryMethodSelector factoryMethod = request =>
+                DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, getFactoryInfo == null ? null : getFactoryInfo(request));
 
-            var propertiesAndFields = memberBindingExprs == null || memberBindingExprs.Count == 0 ? null
+            var parameterSelector = parameters.IsNullOrEmpty() ? null : GetParameters(argumentExprs, parameters);
+
+            var propertiesAndFieldsSelector = memberBindingExprs == null || memberBindingExprs.Count == 0 ? null
                 : GetPropertiesAndFields(memberBindingExprs);
 
-            FactoryMethodSelector factoryMethod = request => 
-                DryIoc.FactoryMethod.Of(constuctorOrMethod, getFactoryInfo == null ? null : getFactoryInfo(request));
-            
-            return new Made(madeOfType, factoryMethod, parameters, propertiesAndFields);
+            return new Made(madeOfType, factoryMethod, parameterSelector, propertiesAndFieldsSelector);
         }
 
         private static ParameterSelector GetParameters(IList<Expression> argExprs, ParameterInfo[] parameterInfos)
@@ -4928,7 +4937,7 @@ namespace DryIoc
                     var member = factoryMethod.ConstructorOrMethodOrMember;
                     var isStaticMember =
                         member is MethodInfo ? ((MethodInfo)member).IsStatic : 
-                        member is PropertyInfo ? Portable.GetPropertygGetMethod((PropertyInfo)member).IsStatic :
+                        member is PropertyInfo ? Portable.GetPropertyGetMethod((PropertyInfo)member).IsStatic :
                         ((FieldInfo)member).IsStatic;
 
                     Throw.If(isStaticMember && factoryMethod.FactoryInfo != null,
@@ -6409,7 +6418,7 @@ namespace DryIoc
                 "You can register delegate returning instance instead, if scope will be available at resolution."),
             UNEXPECTED_EXPRESSION_TO_MAKE_SERVICE = Of(
                 "Only expression of method call, property getter, or new statement (with optional property initializer) is supported, but found: {0}."),
-            UNEXPECTED_EXPRESSION_INSTEAD_OF_PROPERTY_GETTER = Of(
+            UNEXPECTED_FACTORY_MEMBER_EXPRESSION = Of(
                 "Expected property getter, but found {0}."),
             UNEXPECTED_EXPRESSION_INSTEAD_OF_ARG_METHOD = Of(
                 "Expected DryIoc.Arg method call to specify parameter/property/field, but found: {0}."),
@@ -6950,7 +6959,7 @@ namespace DryIoc
         {
             var isStatic =
                 member is MethodInfo ? ((MethodInfo)member).IsStatic : 
-                member is PropertyInfo ? Portable.GetPropertygGetMethod((PropertyInfo)member).IsStatic :
+                member is PropertyInfo ? Portable.GetPropertyGetMethod((PropertyInfo)member).IsStatic :
                 ((FieldInfo)member).IsStatic;
             return isStatic;
         } 
@@ -7195,7 +7204,7 @@ namespace DryIoc
             ExpressionTools.GetMethodDelegateOrNull<Assembly, IEnumerable<Type>>("GetTypes").ThrowIfNull();
 
         /// <summary>Portable version of PropertyInfo.GetGetMethod.</summary>
-        public static readonly Func<PropertyInfo, MethodInfo> GetPropertygGetMethod =
+        public static readonly Func<PropertyInfo, MethodInfo> GetPropertyGetMethod =
             ExpressionTools.GetMethodDelegateOrNull<PropertyInfo, MethodInfo>("GetGetMethod").ThrowIfNull();
 
         /// <summary>Portable version of PropertyInfo.GetSetMethod.</summary>

@@ -62,7 +62,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
             Assert.DoesNotThrow(() => ExpressionStringify.With(true, true).ToCode(factoryExpr.Value));
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_resolve_singleton()
         {
             var factory = new ServiceFactory();
@@ -72,7 +72,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
             Assert.AreSame(service, factory.Resolve<ISomeDb>());
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_resolve_singleton_with_key()
         {
             var factory = new ServiceFactory();
@@ -102,7 +102,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
             Assert.IsNull(nullService);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_resolve_many()
         {
             var factory = new ServiceFactory();

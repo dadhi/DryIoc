@@ -41,6 +41,9 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel\AttributedModel.cs">
       <Link>AttributedModel.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel\Attributes.cs">
+      <Link>Attributes.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel\Ported-net40.cs">
       <Link>Ported-net40.cs</Link>
     </Compile>

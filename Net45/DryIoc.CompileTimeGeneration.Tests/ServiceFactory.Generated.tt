@@ -17,14 +17,13 @@
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 <#
-IContainer container = new Container(rules => rules
+var container = new Container(rules => rules
     .WithoutSingletonOptimization()
     .WithMefAttributedModel());
 
 // NOTE: Specify implementation types to Register:
 var assembly = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport).GetAssembly();
 var types = assembly.GetLoadedTypes();
-
 container.RegisterExports(types);
 #>
 namespace DryIoc.CompileTimeGeneration.Tests

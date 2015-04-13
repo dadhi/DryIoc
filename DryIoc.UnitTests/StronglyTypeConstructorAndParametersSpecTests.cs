@@ -210,8 +210,49 @@ namespace DryIoc.UnitTests
             }
         }
 
-        internal class NewBurger : Burger
+        internal class NewBurger : Burger {}
+
+        [Test]
+        public void Can_specify_to_use_property()
         {
+            var container = new Container();
+            container.Register<FooFactory>(Reuse.Singleton);
+            container.Register<IFoo>(made: Made.Of(r => ServiceInfo.Of<FooFactory>(), factory => factory.Foo));
+
+            var foo = container.Resolve<IFoo>();
+
+            Assert.IsNotNull(foo);
+        }
+
+        [Test]
+        public void Can_specify_to_use_field()
+        {
+            var container = new Container();
+            container.Register<FooFactory>(Reuse.Singleton);
+            container.Register<Blah>(
+                made: Made.Of(
+                    r => ServiceInfo.Of<FooFactory>(IfUnresolved.ReturnDefault), 
+                    factory => factory.Blah));
+
+            var blah = container.Resolve<Blah>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNotNull(blah);
+        }
+
+        public interface IFoo {}
+        internal class Foo : IFoo {}
+        internal class Blah {}
+
+        internal class FooFactory
+        {
+            public readonly IFoo Foo;
+            public Blah Blah { get; private set; }
+
+            public FooFactory()
+            {
+                Foo = new Foo();
+                Blah = new Blah();
+            }
         }
     }
 }

@@ -34,10 +34,12 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AttributedModel.cs" />
+    <Compile Include="Attributes.cs" />
     <Compile Include="Ported-net40.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

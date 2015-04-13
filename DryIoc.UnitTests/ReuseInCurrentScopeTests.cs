@@ -319,6 +319,25 @@ namespace DryIoc.UnitTests
             container.Dispose();
         }
 
+        [Test]
+        public void Open_multiple_context_independent_scopes()
+        {
+            var container = new Container();
+            container.Register<Blah>(Reuse.InCurrentScope);
+
+            var scope1 = container.OpenScopeWithoutContext();
+            var scope2 = container.OpenScopeWithoutContext();
+
+            var blah1 = scope1.Resolve<Blah>();
+            var blah2 = scope2.Resolve<Blah>();
+
+            Assert.AreSame(blah1, scope1.Resolve<Blah>());
+            Assert.AreNotSame(blah1, blah2);
+
+            scope1.Dispose();
+            scope2.Dispose(); 
+        }
+
         internal class IndependentService : IService { }
 
         internal class ServiceWithFuncConstructorDependency
