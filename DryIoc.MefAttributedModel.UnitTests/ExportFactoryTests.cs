@@ -109,12 +109,13 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.RegisterExports(typeof(BirdFactory));
 
             var chicken = container.Resolve<Chicken>();
+            container.Resolve<FactoryExpression<object>>(requiredServiceType: typeof(Chicken));
 
             Assert.IsInstanceOf<Chicken>(chicken);
         }
 
         [Test]
-        public void Can_export_static_factory_property_from_static_class()
+        public void Can_export_property_as_factory_from_static_class()
         {
             var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(StaticBirdFactory));
@@ -122,6 +123,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var chicken = container.Resolve<Chicken>();
 
             Assert.IsInstanceOf<Chicken>(chicken);
+        }
+
+        [Test]
+        public void Can_export_field_as_factory_from_static_class()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(StaticBirdFactory));
+
+            var duck = container.Resolve<Duck>();
+
+            Assert.IsInstanceOf<Duck>(duck);
         }
     }
 }

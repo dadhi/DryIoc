@@ -445,28 +445,27 @@ namespace DryIoc.MefAttributedModel
         private static void RegisterFactoryMethods(IRegistrator registrator, RegistrationInfo factoryInfo)
         {
             var members = factoryInfo.ImplementationType.GetAll(t => 
-                t.DeclaredMethods.Cast<MemberInfo>().Concat<MemberInfo>(
-                t.DeclaredProperties.Cast<MemberInfo>()));
+                t.DeclaredMethods.Cast<MemberInfo>().Concat(
+                t.DeclaredProperties.Cast<MemberInfo>().Concat(
+                t.DeclaredFields.Cast<MemberInfo>())));
 
             foreach (var member in members)
             {
-                var method = member is PropertyInfo
-                    ? Portable.GetPropertygGetMethod((PropertyInfo)member)
-                    : (MethodInfo)member;
-
                 var attributes = member.GetAttributes().ToArrayOrSelf();
                 if (!IsExportDefined(attributes))
                     continue;
 
-                var registrationInfo = GetRegistrationInfoOrDefault(method.ReturnType, attributes).ThrowIfNull();
+                var memberReturnType = member is MethodInfo
+                    ? ((MethodInfo)member).ReturnType
+                    : member.GetPropertyOrFieldType();
+                var registrationInfo = GetRegistrationInfoOrDefault(memberReturnType, attributes).ThrowIfNull();
 
-                var factoryMethod = method;
                 var factoryExport = factoryInfo.Exports[0];
-                var factoryServiceInfo = factoryMethod.IsStatic ? null :
+                var factoryServiceInfo = member.IsStatic() ? null :
                     ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
-                
-                var made = Made.Of(_ => FactoryMethod.Of(factoryMethod, factoryServiceInfo));
-                var factory = registrationInfo.CreateFactory(made);
+
+                var factoryMethod = FactoryMethod.Of(member, factoryServiceInfo);
+                var factory = registrationInfo.CreateFactory(Made.Of(_ => factoryMethod));
 
                 var serviceExports = registrationInfo.Exports;
                 for (var i = 0; i < serviceExports.Length; i++)

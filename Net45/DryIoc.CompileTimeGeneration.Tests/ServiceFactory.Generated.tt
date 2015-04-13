@@ -21,11 +21,11 @@ IContainer container = new Container(rules => rules
     .WithoutSingletonOptimization()
     .WithMefAttributedModel());
 
-container.RegisterExports(new[]
-{
-    typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport).GetAssembly() // MefAttrModel.UnitTests.CUT
-});
+// NOTE: Specify implementation types to Register:
+var assembly = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IForExport).GetAssembly();
+var types = assembly.GetLoadedTypes();
 
+container.RegisterExports(types);
 #>
 namespace DryIoc.CompileTimeGeneration.Tests
 {
@@ -37,7 +37,7 @@ namespace DryIoc.CompileTimeGeneration.Tests
         static ServiceFactory()
         {
 <#
-    var exprToCode = ExpressionStringify.With(true, true);
+    var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 
     var registrations = container.GetServiceRegistrations().Where(r => !r.ServiceType.IsGenericDefinition());
     foreach (var r in registrations)
@@ -53,29 +53,25 @@ namespace DryIoc.CompileTimeGeneration.Tests
             {
 #>
 
-            DefaultResolutions = DefaultResolutions.AddOrUpdate(
-                <#=serviceTypeName #>,
-                <#=code #>);
+            Register(<#=serviceTypeName #>, <#=code #>);
 <#
             }
             else
             {
-                var serviceKeyString = new StringBuilder().AppendCode(r.OptionalServiceKey);
+                var serviceKeyString = new StringBuilder().AppendCode(r.OptionalServiceKey).ToString();
+                //var serviceKeyString = ObjectStringify.WithFullTypeNames.PlainObjectToCode(r.OptionalServiceKey, null);
 #>
 
-            KeyedResolutions = KeyedResolutions.AddOrUpdate(
-                <#=serviceTypeName#>,     HashTree<object, FactoryDelegate>.Empty.AddOrUpdate(
-                <#=serviceKeyString#>,
-                <#=code#>),
-                (oldEntry, newEntry) => oldEntry.AddOrUpdate(newEntry.Key, newEntry.Value));
+            Register(<#=serviceTypeName #>, <#=serviceKeyString#>, <#=code #>);
 <#
             }
         }
         catch (Exception ex)
         {
 #>
-
-/* Exception: <#=ObjectToCode.PlainObjectToCode(ex.GetType())#>
+/* 
+Resolution of <#=ObjectStringify.WithFullTypeNames.TypeNameToCode(r.ServiceType)#>
+Failed with: <#=ObjectStringify.WithFullTypeNames.TypeNameToCode(ex.GetType())#>
 ----------------------
 <#=ex.Message#>
 */

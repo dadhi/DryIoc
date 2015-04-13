@@ -102,10 +102,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     public static class StaticBirdFactory
     {
         [Export]
-        public static Duck GetDuck()
-        {
-            return new Duck();
-        }
+        public static readonly Duck Duck = new Duck();
 
         [Export]
         public static Chicken Chicken { get { return new Chicken(); } }

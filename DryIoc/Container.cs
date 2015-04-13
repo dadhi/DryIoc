@@ -2208,24 +2208,25 @@ namespace DryIoc
     public sealed class FactoryMethod
     {
         /// <summary>Constructor or method to use for service creation.</summary>
-        public readonly MethodBase ConstructorOrMethod;
+        public readonly MemberInfo ConstructorOrMethodOrMember;
 
-        /// <summary>Factory info to resolve if <see cref="ConstructorOrMethod"/> is instance method.</summary>
+        /// <summary>Factory info to resolve if factory method is instance member.</summary>
         public readonly ServiceInfo FactoryInfo;
 
         /// <summary>Wraps method and factory instance.</summary>
-        /// <param name="constuctorOrMethod">Static or instance method.</param>
-        /// <param name="factoryInfo">Factory info to resolve in case of instance <paramref name="constuctorOrMethod"/>.</param>
+        /// <param name="ctorOrMethodOrMember">Constructor, static or instance method, property or field.</param>
+        /// <param name="factoryInfo">Factory info to resolve in case of instance <paramref name="ctorOrMethodOrMember"/>.</param>
         /// <returns>New factory method wrapper.</returns>
-        public static FactoryMethod Of(MethodBase constuctorOrMethod, ServiceInfo factoryInfo = null)
+        public static FactoryMethod Of(MemberInfo ctorOrMethodOrMember, ServiceInfo factoryInfo = null)
         {
-            return new FactoryMethod(constuctorOrMethod.ThrowIfNull(), factoryInfo);
+            return new FactoryMethod(ctorOrMethodOrMember.ThrowIfNull(), factoryInfo);
         }
 
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
-            return new StringBuilder().Print(ConstructorOrMethod.DeclaringType).Append("::").Append(ConstructorOrMethod).ToString();
+            return new StringBuilder().Print(ConstructorOrMethodOrMember.DeclaringType)
+                .Append("::").Append(ConstructorOrMethodOrMember).ToString();
         }
 
         /// <summary>Searches for constructor with all resolvable parameters or throws <see cref="ContainerException"/> if not found.
@@ -2292,9 +2293,9 @@ namespace DryIoc
             return parameterFactory == null ? null : parameterFactory.GetExpressionOrDefault(parameterRequest);
         }
 
-        private FactoryMethod(MethodBase constructorOrMethod, ServiceInfo factoryInfo = null)
+        private FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryInfo = null)
         {
-            ConstructorOrMethod = constructorOrMethod;
+            ConstructorOrMethodOrMember = constructorOrMethodOrMember;
             FactoryInfo = factoryInfo;
         }
     }
@@ -2321,6 +2322,42 @@ namespace DryIoc
 
         /// <summary>Container will use some sensible defaults for service creation.</summary>
         public static readonly Made Default = new Made();
+
+        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
+        /// <param name="factoryMethod">To use.</param> <returns>New rules.</returns>
+        public static implicit operator Made(FactoryMethodSelector factoryMethod)
+        {
+            return Of(factoryMethod);
+        }
+
+        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
+        /// <param name="factoryMethod">To return from <see cref="FactoryMethod"/>.</param> <returns>New rules.</returns>
+        public static implicit operator Made(FactoryMethod factoryMethod)
+        {
+            return Of(_ => factoryMethod);
+        }
+
+        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
+        /// <param name="factoryMethod">To create <see cref="DryIoc.FactoryMethod"/> and return it from <see cref="FactoryMethod"/>.</param> 
+        /// <returns>New rules.</returns>
+        public static implicit operator Made(MethodInfo factoryMethod)
+        {
+            return Of(_ => DryIoc.FactoryMethod.Of(factoryMethod));
+        }
+
+        /// <summary>Creates rules with only <see cref="Parameters"/> specified.</summary>
+        /// <param name="parameters">To use.</param> <returns>New rules.</returns>
+        public static implicit operator Made(ParameterSelector parameters)
+        {
+            return Of(parameters: parameters);
+        }
+
+        /// <summary>Creates rules with only <see cref="PropertiesAndFields"/> specified.</summary>
+        /// <param name="propertiesAndFields">To use.</param> <returns>New rules.</returns>
+        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields)
+        {
+            return Of(propertiesAndFields: propertiesAndFields);
+        }
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">(optional)</param> <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
@@ -2366,42 +2403,6 @@ namespace DryIoc
             getFactoryInfo.ThrowIfNull();
             return FromExpression(typeof(T), factoryMethodCallExpr,
                 r => getFactoryInfo(r).ThrowIfNull() /* cannot convert to method group because of lack of covariance support in .Net 3.5*/);
-        }
-
-        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
-        /// <param name="factoryMethod">To use.</param> <returns>New rules.</returns>
-        public static implicit operator Made(FactoryMethodSelector factoryMethod)
-        {
-            return Of(factoryMethod);
-        }
-
-        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
-        /// <param name="factoryMethod">To return from <see cref="FactoryMethod"/>.</param> <returns>New rules.</returns>
-        public static implicit operator Made(FactoryMethod factoryMethod)
-        {
-            return Of(_ => factoryMethod);
-        }
-
-        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
-        /// <param name="factoryMethod">To create <see cref="DryIoc.FactoryMethod"/> and return it from <see cref="FactoryMethod"/>.</param> 
-        /// <returns>New rules.</returns>
-        public static implicit operator Made(MethodInfo factoryMethod)
-        {
-            return Of(_ => DryIoc.FactoryMethod.Of(factoryMethod));
-        }
-
-        /// <summary>Creates rules with only <see cref="Parameters"/> specified.</summary>
-        /// <param name="parameters">To use.</param> <returns>New rules.</returns>
-        public static implicit operator Made(ParameterSelector parameters)
-        {
-            return Of(parameters: parameters);
-        }
-
-        /// <summary>Creates rules with only <see cref="PropertiesAndFields"/> specified.</summary>
-        /// <param name="propertiesAndFields">To use.</param> <returns>New rules.</returns>
-        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields)
-        {
-            return Of(propertiesAndFields: propertiesAndFields);
         }
 
         #region Implementation
@@ -4775,76 +4776,90 @@ namespace DryIoc
                     return null;
             }
 
-            var constructorOrMethod = factoryMethod.ConstructorOrMethod;
-            var parameters = constructorOrMethod.GetParameters();
-
             Expression[] paramExprs = null;
-            if (parameters.Length != 0)
+            var constructorOrMethod = factoryMethod.ConstructorOrMethodOrMember as MethodBase;
+            if (constructorOrMethod != null)
             {
-                paramExprs = new Expression[parameters.Length];
-
-                var parameterSelector = request.Container.Rules.Parameters.And(Made.Parameters)(request);
-
-                var funcArgs = request.FuncArgs;
-                var funcArgsUsedMask = 0;
-
-                for (var i = 0; i < parameters.Length; i++)
+                var parameters = constructorOrMethod.GetParameters();
+                if (parameters.Length != 0)
                 {
-                    var param = parameters[i];
-                    Expression paramExpr = null;
+                    paramExprs = new Expression[parameters.Length];
 
-                    if (funcArgs != null)
+                    var parameterSelector = request.Container.Rules.Parameters.And(Made.Parameters)(request);
+
+                    var funcArgs = request.FuncArgs;
+                    var funcArgsUsedMask = 0;
+
+                    for (var i = 0; i < parameters.Length; i++)
                     {
-                        for (var fa = 0; fa < funcArgs.Value.Length && paramExpr == null; ++fa)
+                        var param = parameters[i];
+                        Expression paramExpr = null;
+
+                        if (funcArgs != null)
                         {
-                            var funcArg = funcArgs.Value[fa];
-                            if ((funcArgsUsedMask & 1 << fa) == 0 &&                  // not yet used func argument
-                                funcArg.Type.IsAssignableTo(param.ParameterType)) // and it assignable to parameter
+                            for (var fa = 0; fa < funcArgs.Value.Length && paramExpr == null; ++fa)
                             {
-                                paramExpr = funcArg;
-                                funcArgsUsedMask |= 1 << fa;  // mark that argument was used
-                                funcArgs.Key[fa] = true;      // mark that argument was used globally for Func<..> resolver.
+                                var funcArg = funcArgs.Value[fa];
+                                if ((funcArgsUsedMask & 1 << fa) == 0 &&                  // not yet used func argument
+                                    funcArg.Type.IsAssignableTo(param.ParameterType)) // and it assignable to parameter
+                                {
+                                    paramExpr = funcArg;
+                                    funcArgsUsedMask |= 1 << fa;  // mark that argument was used
+                                    funcArgs.Key[fa] = true;      // mark that argument was used globally for Func<..> resolver.
+                                }
                             }
                         }
-                    }
 
-                    // If parameter expression still null (no Func argument to substitute), try to resolve it
-                    if (paramExpr == null)
-                    {
-
-                        var paramInfo = parameterSelector(param) ?? ParameterServiceInfo.Of(param);
-                        var paramRequest = request.Push(paramInfo);
-
-                        var customValue = paramInfo.Details.CustomValue;
-                        if (customValue != null)
+                        // If parameter expression still null (no Func argument to substitute), try to resolve it
+                        if (paramExpr == null)
                         {
-                            customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.INJECTED_CUSTOM_VALUE_IS_OF_DIFFERENT_TYPE, paramRequest);
-                            paramExpr = paramRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
-                        }
-                        else
-                        {
-                            var paramFactory = paramRequest.Container.ResolveFactory(paramRequest);
-                            paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
-                            if (paramExpr == null)
+
+                            var paramInfo = parameterSelector(param) ?? ParameterServiceInfo.Of(param);
+                            var paramRequest = request.Push(paramInfo);
+
+                            var customValue = paramInfo.Details.CustomValue;
+                            if (customValue != null)
                             {
-                                if (request.IfUnresolved == IfUnresolved.ReturnDefault)
-                                    return null;
+                                customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.INJECTED_CUSTOM_VALUE_IS_OF_DIFFERENT_TYPE, paramRequest);
+                                paramExpr = paramRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
+                            }
+                            else
+                            {
+                                var paramFactory = paramRequest.Container.ResolveFactory(paramRequest);
+                                paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
+                                if (paramExpr == null)
+                                {
+                                    if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+                                        return null;
 
-                                var defaultValue = paramInfo.Details.DefaultValue;
-                                paramExpr = defaultValue != null
-                                    ? paramRequest.Container.GetOrAddStateItemExpression(defaultValue)
-                                    : paramRequest.ServiceType.GetDefaultValueExpression();
+                                    var defaultValue = paramInfo.Details.DefaultValue;
+                                    paramExpr = defaultValue != null
+                                        ? paramRequest.Container.GetOrAddStateItemExpression(defaultValue)
+                                        : paramRequest.ServiceType.GetDefaultValueExpression();
+                                }
                             }
                         }
-                    }
 
-                    paramExprs[i] = paramExpr;
+                        paramExprs[i] = paramExpr;
+                    }
                 }
             }
 
-            return factoryExpr != null ? Expression.Call(factoryExpr, (MethodInfo)constructorOrMethod, paramExprs)
-                : (!constructorOrMethod.IsConstructor ? Expression.Call((MethodInfo)constructorOrMethod, paramExprs)
-                : InitPropertiesAndFields(Expression.New((ConstructorInfo)constructorOrMethod, paramExprs), request));
+            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember, factoryExpr, paramExprs, request);
+        }
+
+        private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember, Expression factoryExpr, Expression[] paramExprs, Request request)
+        {
+            if (ctorOrMethodOrMember is ConstructorInfo)
+                return InitPropertiesAndFields(Expression.New((ConstructorInfo)ctorOrMethodOrMember, paramExprs), request);
+
+            if (ctorOrMethodOrMember is MethodInfo)
+                return Expression.Call(factoryExpr, (MethodInfo)ctorOrMethodOrMember, paramExprs);
+
+            if (ctorOrMethodOrMember is PropertyInfo)
+                return Expression.Property(factoryExpr, (PropertyInfo)ctorOrMethodOrMember);
+
+            return Expression.Field(factoryExpr, (FieldInfo)ctorOrMethodOrMember);
         }
 
         #region Implementation
@@ -4908,19 +4923,27 @@ namespace DryIoc
             if (factoryMethodSelector != null)
             {
                 var factoryMethod = factoryMethodSelector(request);
-                if (factoryMethod != null && factoryMethod.ConstructorOrMethod is MethodInfo)
+                if (factoryMethod != null && !(factoryMethod.ConstructorOrMethodOrMember is ConstructorInfo))
                 {
-                    var method = (MethodInfo)factoryMethod.ConstructorOrMethod;
+                    var member = factoryMethod.ConstructorOrMethodOrMember;
+                    var isStaticMember =
+                        member is MethodInfo ? ((MethodInfo)member).IsStatic : 
+                        member is PropertyInfo ? Portable.GetPropertygGetMethod((PropertyInfo)member).IsStatic :
+                        ((FieldInfo)member).IsStatic;
 
-                    Throw.If(method.IsStatic && factoryMethod.FactoryInfo != null,
-                        Error.FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC, factoryMethod.FactoryInfo, factoryMethod, request);
+                    Throw.If(isStaticMember && factoryMethod.FactoryInfo != null,
+                            Error.FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC, factoryMethod.FactoryInfo, factoryMethod,
+                            request);
 
-                    Throw.If(!method.IsStatic && factoryMethod.FactoryInfo == null,
+                    Throw.If(!isStaticMember && factoryMethod.FactoryInfo == null,
                         Error.FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD, factoryMethod, request);
 
-                    request.ServiceType.ThrowIfNotOf(method.ReturnType,
-                        Error.SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD, factoryMethod, request);
+                    var memberReturnType =
+                        member is MethodInfo ? ((MethodInfo)member).ReturnType :
+                        member.GetPropertyOrFieldType();
 
+                    request.ServiceType.ThrowIfNotOf(memberReturnType,
+                        Error.SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD, factoryMethod, request);
                 }
 
                 return factoryMethod.ThrowIfNull(Error.UNABLE_TO_GET_CONSTRUCTOR_FROM_SELECTOR, implType);
@@ -4963,7 +4986,7 @@ namespace DryIoc
                         bindings.Add(Expression.Bind(member.Member, memberExpr));
                 }
 
-            return bindings.Count == 0 ? (Expression)newServiceExpr : Expression.MemberInit(newServiceExpr, bindings);
+            return bindings.Count == 0 ? (Expression)newServiceExpr : Expression.MemberInit(newServiceExpr, bindings); 
         }
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(Type implType, Request request)
@@ -6920,6 +6943,17 @@ namespace DryIoc
             }
             return types;
         }
+
+        /// <summary>Returns true if member is static, otherwise returns false.</summary>
+        /// <param name="member">Member to check.</param> <returns>True if static.</returns>
+        public static bool IsStatic(this MemberInfo member)
+        {
+            var isStatic =
+                member is MethodInfo ? ((MethodInfo)member).IsStatic : 
+                member is PropertyInfo ? Portable.GetPropertygGetMethod((PropertyInfo)member).IsStatic :
+                ((FieldInfo)member).IsStatic;
+            return isStatic;
+        } 
 
         #region Implementation
 
