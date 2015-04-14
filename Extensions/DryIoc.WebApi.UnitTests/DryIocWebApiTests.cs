@@ -1,6 +1,8 @@
 ﻿using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.Http.Controllers;
 using System.Web.Http.Filters;
@@ -62,6 +64,24 @@ namespace DryIoc.WebApi.UnitTests
                 var foohs = scope.GetServices(typeof(Fooh)).ToArray();
                 Assert.AreEqual(2, foohs.Length);
             }
+        }
+
+        [Test]
+        public void Can_begin_scope_and_resolve_controller()
+        {
+            var config = new HttpConfiguration();
+            var container = new Container().WithWebApi(config, new[] { typeof(MyController).Assembly });
+
+            using (var scope = config.DependencyResolver.BeginScope())
+            {
+                var controller = scope.GetService(typeof(MyController));
+                Assert.NotNull(controller);
+                Assert.AreSame(controller, scope.GetService(typeof(MyController)));
+            }
+        }
+
+        public class MyController : ApiController
+        {
         }
 
         [Test]

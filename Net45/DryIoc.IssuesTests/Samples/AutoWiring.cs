@@ -32,9 +32,11 @@ namespace DryIoc.IssuesTests.Samples
         {
             var container = new Container();
             container.RegisterMany(new[] { Assembly.GetExecutingAssembly() },
-                typeof(IPlugin).Equals,
                 (r, types, type, proceed) =>
                 {
+                    if (!types.Contains(typeof(IPlugin)))
+                        return;
+
                     if (type == typeof(AnotherPlugin)) // custom registration of specific type
                         r.Register<IPlugin, AnotherPlugin>(Reuse.Singleton, serviceKey: "another");
                     else

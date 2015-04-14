@@ -75,7 +75,7 @@ namespace DryIoc.WebApi
         {
             container.ThrowIfNull();
             controllerAssemblies = controllerAssemblies ?? new[] { Assembly.GetExecutingAssembly() };
-            container.RegisterMany(controllerAssemblies, typeof(IHttpController), Reuse.InRequest);
+            container.RegisterMany(controllerAssemblies, type => type.IsAssignableTo(typeof(IHttpController)), Reuse.InRequest);
         }
 
         /// <summary>Replaces all filter providers in services with <see cref="DryIocFilterProvider"/>, and registers it in container.</summary>
@@ -166,7 +166,6 @@ namespace DryIoc.WebApi
         {
             if (Container == null) return;
             Container.Dispose();
-            Container = null;
         }
 
         /// <summary>Retrieves a service from the scope or returns null if not resolved.</summary>

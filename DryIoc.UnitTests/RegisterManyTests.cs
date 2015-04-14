@@ -119,9 +119,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterMany(
-                new[] { GetType().GetAssembly() },
-                with: (r, serviceTypes, implType, register) => // for only A and its implementations
+            container.RegisterMany(new[] { GetType().GetAssembly() },
+                (r, serviceTypes, implType, _) => // for only A and its implementations
                 {
                     if (serviceTypes.IndexOf(typeof(A)) != -1)
                         r.Register(typeof(A), implType, Reuse.Singleton);
@@ -135,7 +134,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterMany(new[] { GetType().GetAssembly() }, with: (r, serviceTypes, implType, register) =>
+            container.RegisterMany(new[] { GetType().GetAssembly() }, (r, serviceTypes, implType, _) =>
             {
                 Assert.False(implType.FullName.Contains("_DisplayClass"));
             });
@@ -165,7 +164,7 @@ namespace DryIoc.UnitTests
         public void Can_get_all_service_registrations()
         {
             var container = new Container();
-            container.RegisterMany(new[] { GetType().GetAssembly() }, with: (r, types, type, register) =>
+            container.RegisterMany(new[] { GetType().GetAssembly() }, (r, types, type, register) =>
             {
                 if (type.GetAllConstructors().Count() == 1)
                     register(types, type);

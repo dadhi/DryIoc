@@ -50,8 +50,8 @@ namespace DryIoc
         /// <returns>Current scope or null.</returns>
         public IScope GetCurrentOrDefault()
         {
-            var scope = (Copyable<IScope>)CallContext.LogicalGetData(_key);
-            return scope == null ? null : scope.Value;
+            var scopeEntry = (ScopeEntry<IScope>)CallContext.LogicalGetData(_scopeEntryKey);
+            return scopeEntry == null ? null : scopeEntry.Value;
         }
 
         /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and  should return new current scope.</summary>
@@ -63,25 +63,18 @@ namespace DryIoc
         {
             var oldScope = GetCurrentOrDefault();
             var newScope = getNewCurrentScope.ThrowIfNull()(oldScope);
-            CallContext.LogicalSetData(_key, new Copyable<IScope>(newScope));
+            var scopeEntry = newScope == null ? null : new ScopeEntry<IScope>(newScope);
+            CallContext.LogicalSetData(_scopeEntryKey, scopeEntry);
             return newScope;
         }
 
-        #region Implementation
+        private static readonly string _scopeEntryKey = typeof(AsyncExecutionFlowScopeContext).Name;
+    }
 
-        private static readonly string _key = typeof(AsyncExecutionFlowScopeContext).Name;
-
-        [Serializable]
-        private sealed class Copyable<T> : MarshalByRefObject
-        {
-            public readonly T Value;
-
-            public Copyable(T value)
-            {
-                Value = value;
-            }
-        }
-
-        #endregion
+    [Serializable]
+    internal sealed class ScopeEntry<T> : MarshalByRefObject
+    {
+        public readonly T Value;
+        public ScopeEntry(T value) { Value = value; }
     }
 }

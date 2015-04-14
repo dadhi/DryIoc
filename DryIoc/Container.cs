@@ -205,9 +205,9 @@ namespace DryIoc
             {
                 if (_scopeContext != null)
                 {
+                    // try to revert context to parent scope, otherwise if context and opened scope not in sync - do nothing
                     var openedScope = _openedScope;
-                    _scopeContext.SetCurrent(scope =>
-                        scope.ThrowIf(scope != openedScope, Error.UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE).Parent);
+                    _scopeContext.SetCurrent(scope => scope == openedScope ? scope.Parent : scope);
                 }
 
                 _openedScope.Dispose();
@@ -2750,23 +2750,23 @@ namespace DryIoc
         /// <param name="r">Registrator provided to do any arbitrary registration User wants.</param>
         /// <param name="serviceTypes">Valid service type that could be used with <paramref name="implType"/>.</param>
         /// <param name="implType">Concrete or open-generic implementation type.</param>
-        /// <param name="registerByDefault">Default registration action to be done on service/implementation types.</param>
-        public delegate void RegisterManyAction(IRegistrator r, Type[] serviceTypes, Type implType, Action<Type[], Type> registerByDefault);
+        /// <param name="defaultAction">Default registration action to be done on service/implementation types.</param>
+        public delegate void RegisterManyAction(IRegistrator r, Type[] serviceTypes, Type implType, Action<Type[], Type> defaultAction);
 
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
         /// <param name="implTypes">Implementation type provider.</param>
-        /// <param name="with">(optional) User specified registration action: 
+        /// <param name="action">(optional) User specified registration action: 
         /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
-        /// <param name="nonPublicServiceTypes">Include non public service types.</param>
+        /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes,
-            RegisterManyAction with = null, bool nonPublicServiceTypes = false)
+            RegisterManyAction action = null, bool nonPublicServiceTypes = false)
         {
-            Action<Type[], Type> register = (st, it) =>
+            Action<Type[], Type> defaultAction = (types, type) =>
             {
-                var factory = new ReflectionFactory(it);
-                for (var i = 0; i < st.Length; i++)
-                    registrator.Register(st[i], factory);
+                var factory = new ReflectionFactory(type);
+                for (var i = 0; i < types.Length; i++)
+                    registrator.Register(types[i], factory);
             };
 
             foreach (var implType in implTypes)
@@ -2791,35 +2791,53 @@ namespace DryIoc
                 if (serviceTypes.IsNullOrEmpty())
                     continue;
 
-                if (with == null)
-                    register(serviceTypes, implType);
+                if (action == null)
+                    defaultAction(serviceTypes, implType);
                 else
-                    with(registrator, serviceTypes, implType, register);
+                    action(registrator, serviceTypes, implType, defaultAction);
             }
         }
 
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
         /// <param name="implTypeAssemblies">Assemblies with implementation/service types to register.</param>
-        /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>
-        /// <param name="with">(optional) User specified registration action: 
+        /// <param name="action">(optional) User specified registration action: 
         /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
-        /// <param name="nonPublicServiceTypes">Include non public service types.</param>
+        /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies,
-            Func<Type, bool> serviceTypeCondition = null, RegisterManyAction with = null, bool nonPublicServiceTypes = false)
+            RegisterManyAction action = null, bool nonPublicServiceTypes = false)
         {
             var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
-            registrator.RegisterMany(implTypes, serviceTypeCondition == null ? with
-                : (r, serviceTypes, implType, register) =>
+            registrator.RegisterMany(implTypes, action, nonPublicServiceTypes);
+        }
+
+        /// <summary>Registers many implementations with their auto-figured service types.</summary>
+        /// <param name="registrator">Registrator/Container to register with.</param>
+        /// <param name="implTypeAssemblies">Assemblies with implementation/service types to register.</param>
+        /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>
+        /// <param name="reuse">(optional) Reuse to apply to all service registrations.</param>
+        /// <param name="made">(optional) Allow to select constructor/method to create service, specify how to inject its parameters and properties/fields.</param>
+        /// <param name="setup">(optional) Factory setup, by default is <see cref="Setup.Default"/>, check <see cref="Setup"/> class for available setups.</param>
+        /// <param name="ifAlreadyRegistered">(optional) Policy to deal with existing service registrations.</param>
+        /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
+        public static void RegisterMany(this IRegistrator registrator, 
+            IEnumerable<Assembly> implTypeAssemblies, Func<Type, bool> serviceTypeCondition,
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            bool nonPublicServiceTypes = false)
+        {
+            registrator.RegisterMany(implTypeAssemblies, (r, serviceTypes, implType, _) =>
+            {
+                serviceTypes = serviceTypes.Where(serviceTypeCondition).ToArrayOrSelf();
+                if (serviceTypes.Length == 1)
+                    r.Register(serviceTypes[0], implType, reuse, made, setup, ifAlreadyRegistered);
+                else if (serviceTypes.Length > 1)
                 {
-                    serviceTypes = serviceTypes.Where(serviceTypeCondition).ToArrayOrSelf();
-                    if (serviceTypes.Length != 0)
-                        if (with != null)
-                            with(r, serviceTypes, implType, register);
-                        else
-                            register(serviceTypes, implType);
-                },
-                nonPublicServiceTypes);
+                    var factory = new ReflectionFactory(implType, reuse, made, setup);
+                    for (var i = 0; i < serviceTypes.Length; i++)
+                        r.Register(serviceTypes[i], factory, ifAlreadyRegistered);
+                }
+            },
+            nonPublicServiceTypes);
         }
 
         /// <summary>Registers single specified <paramref name="serviceType"/> with possibly many implementations provided
@@ -2831,16 +2849,13 @@ namespace DryIoc
         /// <param name="made">(optional) Allow to select constructor/method to create service, specify how to inject its parameters and properties/fields.</param>
         /// <param name="setup">(optional) Factory setup, by default is <see cref="Setup.Default"/>, check <see cref="Setup"/> class for available setups.</param>
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with existing service registrations.</param>
+        /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies, Type serviceType,
-            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            bool nonPublicServiceTypes = false)
         {
-            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
-            registrator.RegisterMany(implTypes, (r, serviceTypes, implType, register) =>
-            {
-                if (serviceTypes.IndexOf(serviceType) != -1)
-                    r.Register(serviceType, implType, reuse, made, setup, ifAlreadyRegistered);
-            },
-            nonPublicServiceTypes: true);
+            registrator.RegisterMany(implTypeAssemblies, type => type == serviceType, 
+                reuse, made, setup, ifAlreadyRegistered, nonPublicServiceTypes);
         }
 
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
@@ -6396,8 +6411,6 @@ namespace DryIoc
                 "No current scope available: probably you are registering to, or resolving from outside of scope."),
             CONTAINER_IS_DISPOSED = Of(
                 "Container is disposed and its operations are no longer available."),
-            UNABLE_TO_DISPOSE_NOT_A_CURRENT_SCOPE = Of(
-                "Unable to dispose not a current opened scope."),
             NOT_DIRECT_SCOPE_PARENT = Of(
                 "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." + Environment.NewLine +
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),

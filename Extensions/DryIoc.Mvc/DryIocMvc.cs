@@ -92,7 +92,8 @@ namespace DryIoc.Mvc
         public static void RegisterMvcControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
-            container.RegisterMany(controllerAssemblies, typeof(IController), Reuse.InRequest, FactoryMethod.ConstructorWithResolvableArguments);
+            container.RegisterMany(controllerAssemblies, type => type.IsAssignableTo(typeof(IController)), Reuse.InRequest, 
+                FactoryMethod.ConstructorWithResolvableArguments);
         }
 
         /// <summary>Replaces default Filter Providers with instance of <see cref="DryIocFilterAttributeFilterProvider"/>,

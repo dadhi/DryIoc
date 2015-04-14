@@ -92,22 +92,18 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Scoped_service_should_Not_propagate_over_async_boundary_with_thread_context()
+        public async void Scoped_service_should_Not_propagate_over_async_boundary_with_thread_context()
         {
-            var c = new Container(scopeContext: new ThreadScopeContext());
-            c.Register<Blah>(Reuse.InCurrentScope);
+            var container = new Container(scopeContext: new ThreadScopeContext());
+            container.Register<Blah>(Reuse.InCurrentScope);
 
-            Assert.That(async () =>
+            using (var scope = container.OpenScope())
             {
-                using (var b = c.OpenScope())
-                {
-                    b.Resolve<Blah>();
-                    await Task.Delay(100).ConfigureAwait(false);
-                    var ex = Assert.Throws<ContainerException>(() => b.Resolve<Blah>());
-                    Assert.That(ex.Error, Is.EqualTo(Error.NO_CURRENT_SCOPE));
-                }
-            }, 
-            Throws.InstanceOf<ContainerException>());
+                scope.Resolve<Blah>();
+                await Task.Delay(100).ConfigureAwait(false);
+                var ex = Assert.Throws<ContainerException>(() => scope.Resolve<Blah>());
+                Assert.AreEqual(Error.NO_CURRENT_SCOPE, ex.Error);
+            }
         }
 
         internal class Blah
