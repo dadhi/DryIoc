@@ -27,7 +27,6 @@ namespace DryIoc.MefAttributedModel
     using System;
     using System.Collections.Generic;
     using System.ComponentModel.Composition;
-    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Reflection;
     using System.Text;
@@ -87,7 +86,7 @@ namespace DryIoc.MefAttributedModel
         /// Then registers found types into registrator/container.</summary>
         /// <param name="registrator">Container to register into</param>
         /// <param name="assemblies">Provides assemblies to scan for exported implementation types.</param>
-        /// <remarks>In case of <see cref="ReflectionTypeLoadException"/> try get type with <see cref="TypeTools.GetLoadedTypes"/>.</remarks>
+        /// <remarks>In case of <see cref="ReflectionTypeLoadException"/> try get type with <see cref="ReflectionTools.GetLoadedTypes"/>.</remarks>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Assembly> assemblies)
         {
             registrator.RegisterExports(Scan(assemblies));
@@ -196,7 +195,7 @@ namespace DryIoc.MefAttributedModel
         {
             var attributes = member.GetAttributes().ToArray();
             var details = attributes.Length == 0 ? null
-                : GetFirstImportDetailsOrNull(member.GetPropertyOrFieldType(), attributes, request);
+                : GetFirstImportDetailsOrNull(member.GetReturnTypeOrDefault(), attributes, request);
             return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details, request);
         }
 
@@ -444,6 +443,7 @@ namespace DryIoc.MefAttributedModel
 
         private static void RegisterFactoryMethods(IRegistrator registrator, RegistrationInfo factoryInfo)
         {
+            // NOTE: Specifying Cast type is required for NET35
             var members = factoryInfo.ImplementationType.GetAll(t => 
                 t.DeclaredMethods.Cast<MemberInfo>().Concat(
                 t.DeclaredProperties.Cast<MemberInfo>().Concat(
@@ -455,9 +455,7 @@ namespace DryIoc.MefAttributedModel
                 if (!IsExportDefined(attributes))
                     continue;
 
-                var memberReturnType = member is MethodInfo
-                    ? ((MethodInfo)member).ReturnType
-                    : member.GetPropertyOrFieldType();
+                var memberReturnType = member.GetReturnTypeOrDefault();
                 var registrationInfo = GetRegistrationInfoOrDefault(memberReturnType, attributes).ThrowIfNull();
 
                 var factoryExport = factoryInfo.Exports[0];

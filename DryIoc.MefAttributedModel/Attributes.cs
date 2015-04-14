@@ -117,9 +117,6 @@ namespace DryIoc.MefAttributedModel
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class ExportManyAttribute : Attribute
     {
-        /// <summary>Default rule to check that type could be exported.</summary>
-        public static Func<Type, bool> ExportedContractTypes = Registrator.RegisterManyPublicServiceTypes;
-
         /// <summary>Specifies service key if <see cref="ContractName"/> is not specified.</summary>
         public object ContractKey { get; set; }
 
@@ -129,12 +126,17 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Excludes specified contract types.</summary>
         public Type[] Except { get; set; }
 
-        /// <summary>Returns all contract types implemented by implementation type,
-        /// that adhere to <see cref="ExportedContractTypes"/> rule, <see cref="Except"/> some specified.</summary>
+        /// <summary>Public types by default.</summary>
+        public bool NonPublic { get; set; }
+
+        /// <summary>Returns all contract types implemented by implementation type <see cref="Except"/> some.</summary>
         /// <param name="implementationType">To get contract types from.</param> <returns>Exported contract types.</returns>
         public IEnumerable<Type> GetContractTypes(Type implementationType)
         {
-            var contractTypes = implementationType.GetImplementedTypes(TypeTools.IncludeInImplementedTypes.SourceType).Where(ExportedContractTypes);
+            var contractTypes = implementationType
+                .GetImplementedTypes(ReflectionTools.IncludeImplementedType.SourceType);
+            if (!NonPublic)
+                contractTypes = contractTypes.Where(ReflectionTools.IsPublicOrNestedPublic).ToArray();
             return Except == null || Except.Length == 0 ? contractTypes : contractTypes.Except(Except);
         }
     }

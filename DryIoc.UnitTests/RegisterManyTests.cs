@@ -97,7 +97,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterMany(new[] { typeof(IBlah<,>).GetAssembly() }, typeof(IBlah<,>));
+            container.RegisterMany(new[] { typeof(IBlah<,>).GetAssembly() }, typeof(IBlah<,>).Equals);
 
             var services = container.Resolve<IBlah<string, bool>[]>();
 
