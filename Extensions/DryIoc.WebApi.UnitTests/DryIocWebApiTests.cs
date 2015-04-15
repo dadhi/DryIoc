@@ -70,7 +70,7 @@ namespace DryIoc.WebApi.UnitTests
         public void Can_begin_scope_and_resolve_controller()
         {
             var config = new HttpConfiguration();
-            var container = new Container().WithWebApi(config, new[] { typeof(MyController).Assembly });
+            new Container().WithWebApi(config, new[] { typeof(MyController).Assembly });
 
             using (var scope = config.DependencyResolver.BeginScope())
             {

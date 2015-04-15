@@ -239,7 +239,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.With(metadata: "blah"));
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.With(metadata: "blah"));
             container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: Setup.Decorator);
-            container.RegisterMany(typeof(OperationUser<>));
+            container.RegisterMany(new[] { typeof(OperationUser<>) });
 
             var user = container.Resolve<OperationUser<object>>();
 

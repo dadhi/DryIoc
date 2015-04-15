@@ -32,7 +32,7 @@ namespace DryIoc.IssuesTests.Samples
         {
             var container = new Container();
             container.RegisterMany(new[] { Assembly.GetExecutingAssembly() },
-                (r, types, type, proceed) =>
+                (r, types, type) =>
                 {
                     if (!types.Contains(typeof(IPlugin)))
                         return;
@@ -40,7 +40,7 @@ namespace DryIoc.IssuesTests.Samples
                     if (type == typeof(AnotherPlugin)) // custom registration of specific type
                         r.Register<IPlugin, AnotherPlugin>(Reuse.Singleton, serviceKey: "another");
                     else
-                        proceed(types, type);
+                        r.RegisterMany(types, type);
                 });
 
             var plugin = container.Resolve<IPlugin>("another");

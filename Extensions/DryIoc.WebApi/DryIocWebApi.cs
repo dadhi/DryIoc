@@ -43,7 +43,7 @@ namespace DryIoc.WebApi
         /// setting container scope context to <see cref="AsyncExecutionFlowScopeContext"/>,
         /// registering HTTP controllers, setting filter provider and dependency resolver.</summary>
         /// <param name="container">Original container.</param> <param name="config">Http configuration.</param>
-        /// <param name="controllerAssemblies">(optional) Assemblies to look for controllers, default is Executing Assembly.</param>
+        /// <param name="controllerAssemblies">(optional) Assemblies to look for controllers, default is ExecutingAssembly.</param>
         /// <param name="scopeContext">(optional) Specific scope context to use, if not specified using
         /// <see cref="AsyncExecutionFlowScopeContext"/> as default in NET 4.5. scope context.</param>
         /// <returns>New container.</returns>
