@@ -278,7 +278,7 @@ namespace DryIoc.UnitTests
         public void Given_Thread_reuse_and_no_open_scope_Exception_should_be_thrown()
         {
             var container = new Container();
-            container.Register<Service>(Reuse.InThreadScope);
+            container.Register<Service>(Reuse.InThread);
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Service>());
 
@@ -290,7 +290,7 @@ namespace DryIoc.UnitTests
         {
             using (var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope())
             {
-                container.Register<Service>(Reuse.InThreadScope);
+                container.Register<Service>(Reuse.InThread);
 
                 var one = container.Resolve<Service>();
                 var another = container.Resolve<Service>();
@@ -304,7 +304,7 @@ namespace DryIoc.UnitTests
         {
             using (var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope())
             {
-                container.Register<Service>(Reuse.InThreadScope);
+                container.Register<Service>(Reuse.InThread);
 
                 var one = container.Resolve<Service>();
 
@@ -324,7 +324,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope();
             container.Register<ServiceWithDependency>();
-            container.Register<IDependency, Dependency>(Reuse.InThreadScope);
+            container.Register<IDependency, Dependency>(Reuse.InThread);
 
             var one = container.Resolve<ServiceWithDependency>();
             var another = container.Resolve<ServiceWithDependency>();
@@ -336,7 +336,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(scopeContext: new ThreadScopeContext());
             var mainThread = container.OpenScope();
-            mainThread.Register<Service>(Reuse.InThreadScope);
+            mainThread.Register<Service>(Reuse.InThread);
 
             Service one = null;
             var threadOne = new Thread(() =>
@@ -359,7 +359,7 @@ namespace DryIoc.UnitTests
             var parent = new Container(scopeContext: new ThreadScopeContext());
             var container = parent.OpenScope();
             container.Register<ServiceWithDependency>();
-            container.Register<IDependency, Dependency>(Reuse.InThreadScope);
+            container.Register<IDependency, Dependency>(Reuse.InThread);
 
             ServiceWithDependency one = null;
             var threadOne = new Thread(() =>

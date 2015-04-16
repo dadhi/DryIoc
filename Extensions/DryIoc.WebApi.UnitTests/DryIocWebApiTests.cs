@@ -1,8 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Reflection;
 using System.Web.Http;
 using System.Web.Http.Controllers;
 using System.Web.Http.Filters;
@@ -82,6 +81,40 @@ namespace DryIoc.WebApi.UnitTests
 
         public class MyController : ApiController
         {
+        }
+
+        [Test]
+        public void Can_begin_scope_and_resolve_any_service_as_fallback_rule()
+        {
+            var config = new HttpConfiguration();
+var container = new Container(rules =>
+    rules.WithUnknownServiceResolver(GetNotRegisteredServices(Assembly.GetExecutingAssembly())));
+
+container.WithWebApi(config);
+
+            using (var scope = config.DependencyResolver.BeginScope())
+            {
+                var controller = scope.GetService(typeof(MyController));
+                Assert.NotNull(controller);
+                Assert.AreSame(controller, scope.GetService(typeof(MyController)));
+            }
+
+            var blah = container.Resolve<Blah>();
+            Assert.AreSame(blah, container.Resolve<Blah>());
+        }
+
+        private static Rules.UnknownServiceResolver GetNotRegisteredServices(params Assembly[] assemblies)
+        {
+            // load types once
+            var implTypes = assemblies.ThrowIfNull().SelectMany(a => a.GetLoadedTypes()).ToArray();
+
+            return request =>
+            {
+                var container = request.Container;
+                var reuse = container.OpenedScope != null ? Reuse.InRequest : DryIoc.Reuse.Singleton;
+                container.RegisterMany(implTypes, type => type.IsAssignableTo(request.ServiceType), reuse);
+                return container.GetServiceFactoryOrDefault(request.ServiceType, serviceKey: null);
+            };
         }
 
         [Test]

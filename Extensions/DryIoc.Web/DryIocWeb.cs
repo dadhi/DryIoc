@@ -97,18 +97,18 @@ namespace DryIoc.Web
         /// Could be overridden with any key-value dictionary where <see cref="HttpContext"/> is not available, e.g. in tests.</summary>
         public static Func<IDictionary> GetContextItems = () => HttpContext.Current.ThrowIfNull().Items;
 
-        /// <summary>Fixed root scope name for the context.</summary>
-        public static readonly object ROOT_SCOPE_NAME = typeof(HttpContextScopeContext);
-
-        /// <summary>Returns fixed <see cref="ROOT_SCOPE_NAME"/>.</summary>
-        public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
-
         /// <summary>Creates the context optionally with arbitrary/test items storage.</summary>
         /// <param name="getContextItems">(optional) Arbitrary/test items storage.</param>
         public HttpContextScopeContext(Func<IDictionary> getContextItems = null)
         {
             _getContextItems = getContextItems ?? GetContextItems;
         }
+
+        /// <summary>Fixed root scope name for the context.</summary>
+        public static readonly object ROOT_SCOPE_NAME = typeof(HttpContextScopeContext);
+
+        /// <summary>Returns fixed <see cref="ROOT_SCOPE_NAME"/>.</summary>
+        public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
 
         /// <summary>Returns current ambient scope stored in item storage.</summary> <returns>Current scope or null if there is no.</returns>
         public IScope GetCurrentOrDefault()

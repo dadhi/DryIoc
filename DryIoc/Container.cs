@@ -5516,7 +5516,13 @@ namespace DryIoc
         }
 
         /// <summary>Ensuring single service instance per Thread.</summary>
-        public static readonly IReuse InThreadScope = InCurrentNamedScope(ThreadScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InThread = InCurrentNamedScope(ThreadScopeContext.ROOT_SCOPE_NAME);
+
+        /// <summary>TODO </summary>
+        public static readonly string WebRequestScopeName = "WebRequestScopeName";
+
+        /// <summary>TODO </summary>
+        public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
     }
 
     /// <summary>Creates <see cref="IReuseWrapper"/> for target and unwraps matching wrapper.</summary>
