@@ -21,14 +21,6 @@ namespace DryIoc.Web
         }
     }
 
-    /// <summary>Defines web reuse as reuse items in <see cref="HttpContextScopeContext"/>.</summary>
-    public static class Reuse
-    {
-        /// <summary>Request reuse corresponds to reusing items in root open scope (physically stored in current <see cref="HttpContext"/>).</summary>
-        public static readonly IReuse InRequest = 
-            DryIoc.Reuse.InCurrentNamedScope(HttpContextScopeContext.ROOT_SCOPE_NAME);
-    }
-
     /// <summary>Registers <see cref="DryIocHttpModule"/>.</summary>
     public static class DryIocHttpModuleInitializer
     {
@@ -49,14 +41,17 @@ namespace DryIoc.Web
         /// <param name="context">An <see cref="T:System.Web.HttpApplication"/> that provides access to the methods, properties, and events common to all application objects within an ASP.NET application </param>
         void IHttpModule.Init(HttpApplication context)
         {
+            var scopeName = Reuse.WebRequestScopeName;
+
             context.BeginRequest += (sender, _) =>
             {
                 var httpContext = (sender as HttpApplication).ThrowIfNull().Context;
                 var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
 
-                scopeContext.SetCurrent(parent => parent != null
-                    ? Throw.For<IScope>(Error.SCOPE_IS_ALREADY_OPENED, parent)
-                    : new Scope(null, scopeContext.RootScopeName));
+                // If current scope does not have WebRequestScopeName then create new scope with this name, 
+                // otherwise - use current.
+                scopeContext.SetCurrent(current => 
+                    current != null && scopeName.Equals(current.Name) ? current : new Scope(current, scopeName));
             };
 
             context.EndRequest += (sender, _) =>
@@ -64,29 +59,14 @@ namespace DryIoc.Web
                 var httpContext = (sender as HttpApplication).ThrowIfNull().Context;
                 var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
                 
-                var currentScope = scopeContext.GetCurrentOrDefault().ThrowIfNull(Error.NO_OPENED_SCOPE_TO_DISPOSE);
-                Throw.If(currentScope.Parent != null, Error.NOT_THE_ROOT_OPENED_SCOPE, currentScope.Parent);
-                
-                currentScope.Dispose();
+                var currentScope = scopeContext.GetCurrentOrDefault();
+                if (currentScope != null && scopeName.Equals(currentScope.Name))
+                    currentScope.Dispose();
             };
         }
 
         /// <summary>Disposes of the resources (other than memory) used by the module  that implements <see cref="IHttpModule"/>.</summary>
         void IHttpModule.Dispose() { }
-    }
-
-    /// <summary>Web-related exceptions.</summary>
-    public static class Error
-    {
-#pragma warning disable 1591 // "Missing XML-comment"
-        public static readonly int
-            SCOPE_IS_ALREADY_OPENED = DryIoc.Error.Of(
-                "Probably problems with Web setup: Someone already opened scope {0} before HttpApplication.BeginRequest."),
-            NO_OPENED_SCOPE_TO_DISPOSE = DryIoc.Error.Of(
-                "Probably problems with Web setup: No opened scope to Dispose."),
-            NOT_THE_ROOT_OPENED_SCOPE = DryIoc.Error.Of(
-                "Probably problems with Web setup: Opened scope is not the root scope.");
-#pragma warning restore 1591
     }
 
     /// <summary>Stores current scope in <see cref="HttpContext.Items"/>.</summary>

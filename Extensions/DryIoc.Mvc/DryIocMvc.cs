@@ -34,12 +34,15 @@ namespace DryIoc.Mvc
     using System.Web.Compilation;
     using Web;
 
-    /// <summary>
+    /// <summary>Set of container extension methods to set HttpContext scope, register Controllers, 
+    /// set DryIoc FilterProvider and set DryIoc container as dependency resolver.</summary>
     /// <example> <code lang="cs"><![CDATA[
     /// protected void Application_Start()
     /// {
     ///     var container = new Container();
-    ///     container.WithMvc();
+    /// 
+    ///     // Enable basic MVC support. 
+    ///     container = container.WithMvc();
     ///     
     ///     // Optionally enable support for MEF Export/ImportAttribute with DryIoc.MefAttributedModel package. 
     ///     // container = container.WithMefAttributedModel();
@@ -48,17 +51,8 @@ namespace DryIoc.Mvc
     ///     // Additional registrations go here ...
     /// }
     /// ]]></code></example>
-    /// </summary>
     public static class DryIocMvc
     {
-        /// <summary>Returns all referenced assemblies except from GAC and dynamic.</summary>
-        /// <returns>Assemblies.</returns>
-        public static IEnumerable<Assembly> GetReferencedAssemblies()
-        {
-            return BuildManager.GetReferencedAssemblies().OfType<Assembly>()
-                .Where(a => !a.IsDynamic && !a.GlobalAssemblyCache);
-        }
-
         /// <summary>Creates new container from original one with <see cref="HttpContextScopeContext"/>.
         /// Then registers MVC controllers in container, 
         /// sets <see cref="DryIocFilterAttributeFilterProvider"/> as filter provider,
@@ -86,14 +80,22 @@ namespace DryIoc.Mvc
             return container;
         }
 
-        /// <summary>Registers controllers types in container with <see cref="Reuse.InRequest"/> reuse.</summary>
+        /// <summary>Returns all app specific referenced assemblies (except from GAC and Dynamic).</summary>
+        /// <returns>Assemblies.</returns>
+        public static IEnumerable<Assembly> GetReferencedAssemblies()
+        {
+            return BuildManager.GetReferencedAssemblies().OfType<Assembly>()
+                .Where(a => !a.IsDynamic && !a.GlobalAssemblyCache); // filter out non-app specific assemblies
+        }
+
+        /// <summary>Registers controllers types in container with InWebRequest reuse.</summary>
         /// <param name="container">Container to register controllers to.</param>
         /// <param name="controllerAssemblies">(optional) Uses <see cref="GetReferencedAssemblies"/> by default.</param>
         public static void RegisterMvcControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
-            container.RegisterMany(controllerAssemblies, type => type.IsAssignableTo(typeof(IController)), Reuse.InRequest, 
-                FactoryMethod.ConstructorWithResolvableArguments);
+            container.RegisterMany(controllerAssemblies, type => type.IsAssignableTo(typeof(IController)), 
+                Reuse.InWebRequest, FactoryMethod.ConstructorWithResolvableArguments);
         }
 
         /// <summary>Replaces default Filter Providers with instance of <see cref="DryIocFilterAttributeFilterProvider"/>,

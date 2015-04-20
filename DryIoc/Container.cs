@@ -1400,6 +1400,56 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Extension methods for automating common use-cases.</summary>
+    public static class ContainerTools
+    {
+        /// <summary>Adds rule to register unknown service when it is resolved.</summary>
+        /// <param name="container">Container to add rule to.</param>
+        /// <param name="implTypes">Provider of implementation types.</param>
+        /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
+        /// <returns>Container with new rule.</returns>
+        /// <remarks>Types provider will be asked on each rule evaluation.</remarks>
+        public static IContainer WithAutoFallbackResolution(this IContainer container, IEnumerable<Type> implTypes,
+            Func<IReuse, Request, IReuse> changeDefaultReuse = null)
+        {
+            return container.ThrowIfNull().With(rules =>
+                rules.WithUnknownServiceResolver(AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse)));
+        }
+
+        /// <summary>Adds rule to register unknown service when it is resolved.</summary>
+        /// <param name="container">Container to add rule to.</param>
+        /// <param name="implTypeAssemblies">Provides assembly with implementation types.</param>
+        /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
+        /// <returns>Container with new rule.</returns>
+        /// <remarks>Implementation types will be requested from assemblies only once, in this method call.</remarks>
+        public static IContainer WithAutoFallbackResolution(this IContainer container, IEnumerable<Assembly> implTypeAssemblies,
+            Func<IReuse, Request, IReuse> changeDefaultReuse = null)
+        {
+            var types = implTypeAssemblies.ThrowIfNull().SelectMany(a => a.GetLoadedTypes()).ToArray();
+            return container.WithAutoFallbackResolution(types);
+        }
+
+        /// <summary>Fallback rule to automatically register requested service with Reuse based on resolution source.</summary>
+        /// <param name="implTypes">Assemblies to look for implementation types.</param>
+        /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
+        /// <returns>Rule.</returns>
+        public static Rules.UnknownServiceResolver AutoRegisterUnknownServiceRule(IEnumerable<Type> implTypes, 
+            Func<IReuse, Request, IReuse> changeDefaultReuse = null)
+        {
+            return request =>
+            {
+                var container = request.Container;
+                var reuse = container.OpenedScope != null
+                    ? Reuse.InCurrentNamedScope(container.OpenedScope.Name)
+                    : Reuse.Singleton;
+                if (changeDefaultReuse != null)
+                    reuse = changeDefaultReuse(reuse, request);
+                container.RegisterMany(implTypes, type => type.IsAssignableTo(request.ServiceType), reuse);
+                return container.GetServiceFactoryOrDefault(request.ServiceType, serviceKey: null);
+            };
+        }
+    }
+
     /// <summary>Used to represent multiple default service keys. 
     /// Exposes <see cref="RegistrationOrder"/> to determine order of service added.</summary>
     public sealed class DefaultKey
@@ -5518,10 +5568,10 @@ namespace DryIoc
         /// <summary>Ensuring single service instance per Thread.</summary>
         public static readonly IReuse InThread = InCurrentNamedScope(ThreadScopeContext.ROOT_SCOPE_NAME);
 
-        /// <summary>TODO </summary>
+        /// <summary>Special name that by convention recognized by <see cref="InWebRequest"/>.</summary>
         public static readonly string WebRequestScopeName = "WebRequestScopeName";
 
-        /// <summary>TODO </summary>
+        /// <summary>Web request is just convention for reuse in <see cref="InCurrentNamedScope"/> with special name <see cref="WebRequestScopeName"/>.</summary>
         public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
     }
 
@@ -6870,24 +6920,6 @@ namespace DryIoc
         /// <summary>Returns type assembly.</summary> <param name="type">Input type</param> <returns>Type assembly.</returns>
         public static Assembly GetAssembly(this Type type) { return type.GetTypeInfo().Assembly; }
 
-        /// <summary>Get types from assembly that are loaded successfully. 
-        /// Hacks to <see cref="ReflectionTypeLoadException"/> for loaded types.</summary>
-        /// <param name="assembly">Assembly to get types from.</param>
-        /// <returns>Array of loaded types.</returns>
-        public static Type[] GetLoadedTypes(this Assembly assembly)
-        {
-            Type[] types;
-            try
-            {
-                types = Portable.GetTypesFromAssembly(assembly).ToArrayOrSelf();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                types = ex.Types.Where(type => type != null).ToArrayOrSelf();
-            }
-            return types;
-        }
-
         /// <summary>Returns true if member is static, otherwise returns false.</summary>
         /// <param name="member">Member to check.</param> <returns>True if static.</returns>
         public static bool IsStatic(this MemberInfo member)
@@ -6947,6 +6979,24 @@ namespace DryIoc
         public static IEnumerable<Attribute> GetAttributes(this ParameterInfo parameter, Type attributeType = null, bool inherit = false)
         {
             return parameter.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).Cast<Attribute>();
+        }
+
+        /// <summary>Get types from assembly that are loaded successfully. 
+        /// Hacks to <see cref="ReflectionTypeLoadException"/> for loaded types.</summary>
+        /// <param name="assembly">Assembly to get types from.</param>
+        /// <returns>Array of loaded types.</returns>
+        public static Type[] GetLoadedTypes(this Assembly assembly)
+        {
+            Type[] types;
+            try
+            {
+                types = Portable.GetTypesFromAssembly(assembly).ToArrayOrSelf();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                types = ex.Types.Where(type => type != null).ToArrayOrSelf();
+            }
+            return types;
         }
 
         #region Implementation

@@ -17,7 +17,7 @@ namespace DryIoc.Mvc.Owin.UnitTests
         {
             IContainer container = new Container();
             container.Register<TestGreetingMiddleware>();
-            container.RegisterDelegate(r => new Greeting { Message = "Hey, DryIoc!" }, Web.Reuse.InRequest);
+            container.RegisterDelegate(r => new Greeting { Message = "Hey, DryIoc!" }, Reuse.InWebRequest);
 
             var contextItems = new Dictionary<object, object>();
             HttpContextScopeContext.GetContextItems = () => contextItems;
@@ -46,7 +46,7 @@ namespace DryIoc.Mvc.Owin.UnitTests
             {
                 app.UseDryIocOwinMiddleware(
                     container.WithMvc(new[] { Assembly.GetExecutingAssembly() }),
-                    scope => scope.RegisterInstance(new Greeting { Message = "Hey, DryIoc!" }, Web.Reuse.InRequest));
+                    scope => scope.RegisterInstance(new Greeting { Message = "Hey, DryIoc!" }, Reuse.InWebRequest));
             }))
             {
                 var response = await server.HttpClient.GetAsync("/");

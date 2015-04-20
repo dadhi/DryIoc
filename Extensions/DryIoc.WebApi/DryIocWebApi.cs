@@ -32,11 +32,12 @@ namespace DryIoc.WebApi
     using System.Threading.Tasks;
     using System.Web.Http;
     using System.Web.Http.Dependencies;
+    using System.Web.Http.Dispatcher;
     using System.Web.Http.Controllers;
     using System.Web.Http.Filters;
     using System.Net.Http;
 
-    /// <summary>WebApi DI bootstrapper with DryIoc. </summary>
+    /// <summary>WebApi DI bootstrapper with DryIoc.</summary>
     public static class DryIocWebApi
     {
         /// <summary>Configures container to work with ASP.NET WepAPI by: 
@@ -47,7 +48,7 @@ namespace DryIoc.WebApi
         /// <param name="scopeContext">(optional) Specific scope context to use, if not specified using
         /// <see cref="AsyncExecutionFlowScopeContext"/> as default in NET 4.5. scope context.</param>
         /// <returns>New container.</returns>
-        public static IContainer WithWebApi(this IContainer container, HttpConfiguration config, 
+        public static IContainer WithWebApi(this IContainer container, HttpConfiguration config,
             IEnumerable<Assembly> controllerAssemblies = null, IScopeContext scopeContext = null)
         {
             container.ThrowIfNull();
@@ -57,7 +58,7 @@ namespace DryIoc.WebApi
             if (scopeContext != null)
                 container = container.With(scopeContext: scopeContext);
 
-            container.RegisterWebApiControllers(controllerAssemblies);
+            container.RegisterWebApiControllers(config, controllerAssemblies);
 
             container.SetFilterProvider(config.Services);
 
@@ -68,14 +69,37 @@ namespace DryIoc.WebApi
             return container;
         }
 
+        /// <summary>Adds rule to register unknown service when it is resolved.</summary>
+        /// <param name="container"></param> <param name="config">Required to get <see cref="IAssembliesResolver"/>.</param>
+        /// <returns>Container with added rule.</returns>
+        public static IContainer WithAutoFallbackResolution(this IContainer container, HttpConfiguration config)
+        {
+            var assembliesResolver = config.Services.GetAssembliesResolver();
+            return container.ThrowIfNull().WithAutoFallbackResolution(assembliesResolver.GetAssemblies());
+        }
+
         /// <summary>Registers controllers found in provided assemblies with per-request reuse.</summary>
         /// <param name="container">Container.</param>
-        /// <param name="controllerAssemblies">Assemblies to look for controllers.</param>
-        public static void RegisterWebApiControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
+        /// <param name="config">Http configuration.</param>
+        /// <param name="assemblies">Assemblies to look for controllers.</param>
+        public static void RegisterWebApiControllers(this IContainer container, HttpConfiguration config, 
+            IEnumerable<Assembly> assemblies = null)
         {
-            container.ThrowIfNull();
-            controllerAssemblies = controllerAssemblies ?? new[] { Assembly.GetExecutingAssembly() };
-            container.RegisterMany(controllerAssemblies, type => type.IsAssignableTo(typeof(IHttpController)), Reuse.InRequest);
+            var assembliesResolver = assemblies == null
+                 ? config.Services.GetAssembliesResolver()
+                 : new GivenAssembliesResolver(assemblies.ToArrayOrSelf());
+
+            var controllerTypeResolver = config.Services.GetHttpControllerTypeResolver();
+            var controllerTypes = controllerTypeResolver.GetControllerTypes(assembliesResolver);
+
+            container.ThrowIfNull().RegisterMany(controllerTypes, reuse: Reuse.InWebRequest);
+        }
+
+        private sealed class GivenAssembliesResolver : IAssembliesResolver
+        {
+            private readonly ICollection<Assembly> _assemblies;
+            public GivenAssembliesResolver(ICollection<Assembly> assemblies) { _assemblies = assemblies; }
+            public ICollection<Assembly> GetAssemblies() { return _assemblies; }
         }
 
         /// <summary>Replaces all filter providers in services with <see cref="DryIocFilterProvider"/>, and registers it in container.</summary>
@@ -99,76 +123,26 @@ namespace DryIoc.WebApi
         }
     }
 
-    /// <summary>Defines per request scope reuse bound to <see cref="AsyncExecutionFlowScopeContext"/>.</summary>
-    public static class Reuse
-    {
-        /// <summary>Reuse object. Actually it is a reuse in top current scope of context.</summary>
-        public static readonly IReuse InRequest =
-            DryIoc.Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
-    }
-
     /// <summary>Resolve based on DryIoc container.</summary>
     public sealed class DryIocDependencyResolver : IDependencyResolver
     {
+        /// <summary>Original DryIoc container.</summary>
+        public readonly IContainer Container;
+
         /// <summary>Creates dependency resolver.</summary> <param name="container">Container.</param>
         internal DryIocDependencyResolver(IContainer container)
         {
-            _container = container;
+            Container = container;
         }
 
         /// <summary>Disposes container.</summary>
         public void Dispose()
         {
-            if (_container == null) return;
-            _container.Dispose();
-            _container = null;
+            if (Container != null)
+                Container.Dispose();
         }
 
         /// <summary>Retrieves a service from the scope or null if unable to resolve service.</summary>
-        /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
-        public object GetService(Type serviceType)
-        {
-            return _container.Resolve(serviceType, IfUnresolved.ReturnDefault);
-        }
-
-        /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>
-        /// <returns>The retrieved collection of services.</returns>
-        /// <param name="serviceType">The collection of services to be retrieved.</param>
-        public IEnumerable<object> GetServices(Type serviceType)
-        {
-            return _container.ResolveMany<object>(serviceType);
-        }
-
-        /// <summary>Opens scope from underlying container.</summary>
-        /// <returns>Opened scope wrapped in dependency scope.</returns>
-        public IDependencyScope BeginScope()
-        {
-            return new DryIocDependencyScope(_container.OpenScope());
-        }
-
-        private IContainer _container;
-    }
-
-    /// <summary>Dependency scope adapter to scoped DryIoc container (created by <see cref="IContainer.OpenScope"/>).</summary>
-    public sealed class DryIocDependencyScope : IDependencyScope
-    {
-        /// <summary>Wrapped DryIoc container.</summary>
-        public IContainer Container { get; private set; }
-
-        /// <summary>Adapts input container.</summary> <param name="scopedContainer">Container returned by OpenScope method.</param>
-        public DryIocDependencyScope(IContainer scopedContainer)
-        {
-            Container = scopedContainer;
-        }
-
-        /// <summary>Disposed underlying scoped container.</summary>
-        public void Dispose()
-        {
-            if (Container == null) return;
-            Container.Dispose();
-        }
-
-        /// <summary>Retrieves a service from the scope or returns null if not resolved.</summary>
         /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
         public object GetService(Type serviceType)
         {
@@ -181,6 +155,50 @@ namespace DryIoc.WebApi
         public IEnumerable<object> GetServices(Type serviceType)
         {
             return Container.ResolveMany<object>(serviceType);
+        }
+
+        /// <summary>Opens scope from underlying container.</summary>
+        /// <returns>Opened scope wrapped in dependency scope.</returns>
+        public IDependencyScope BeginScope()
+        {
+            var scope = Container.OpenScope(Reuse.WebRequestScopeName);
+            return new DryIocDependencyScope(scope);
+        }
+    }
+
+    /// <summary>Dependency scope adapter to scoped DryIoc container (created by <see cref="IContainer.OpenScope"/>).</summary>
+    public sealed class DryIocDependencyScope : IDependencyScope
+    {
+        /// <summary>Wrapped DryIoc container.</summary>
+        public readonly IContainer ScopedContainer;
+
+        /// <summary>Adapts input container.</summary> 
+        /// <param name="scopedContainer">Container returned by OpenScope method.</param>
+        public DryIocDependencyScope(IContainer scopedContainer)
+        {
+            ScopedContainer = scopedContainer;
+        }
+
+        /// <summary>Disposed underlying scoped container.</summary>
+        public void Dispose()
+        {
+            if (ScopedContainer != null)
+                ScopedContainer.Dispose();
+        }
+
+        /// <summary>Retrieves a service from the scope or returns null if not resolved.</summary>
+        /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
+        public object GetService(Type serviceType)
+        {
+            return ScopedContainer.Resolve(serviceType, IfUnresolved.ReturnDefault);
+        }
+
+        /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>
+        /// <returns>The retrieved collection of services.</returns>
+        /// <param name="serviceType">The collection of services to be retrieved.</param>
+        public IEnumerable<object> GetServices(Type serviceType)
+        {
+            return ScopedContainer.ResolveMany<object>(serviceType);
         }
     }
 
@@ -227,13 +245,11 @@ namespace DryIoc.WebApi
         /// <param name="request">Request to register.</param>
         public void RegisterInDependencyScope(HttpRequestMessage request)
         {
-            var dependencyScope = request.ThrowIfNull().GetDependencyScope();
-
-            dependencyScope.ThrowIfNotOf(typeof(DryIocDependencyScope), 
-                Error.REQUEST_MESSAGE_DOESNOT_REFERENCE_DRYIOC_DEPENDENCY_SCOPE);
+            var dependencyScope = request.ThrowIfNull()
+                .GetDependencyScope().ThrowIfNotOf(typeof(DryIocDependencyScope), Error.REQUEST_MESSAGE_DOESNOT_REFERENCE_DRYIOC_DEPENDENCY_SCOPE);
             
-            var container = ((DryIocDependencyScope)dependencyScope).Container;
-            container.RegisterInstance(request, Reuse.InRequest, IfAlreadyRegistered.Replace);
+            var container = ((DryIocDependencyScope)dependencyScope).ScopedContainer;
+            container.RegisterInstance(request, Reuse.InWebRequest, IfAlreadyRegistered.Replace);
         }
     }
 

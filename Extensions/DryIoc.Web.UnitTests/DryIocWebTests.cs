@@ -17,8 +17,8 @@ namespace DryIoc.Web.UnitTests
             var fakeItems = new Dictionary<object, object>();
             var container = original.WithWebReuseInRequest(() => fakeItems);
             
-            container.Register<Me>(Reuse.InRequest);
-            using (var c = container.OpenScope())
+            container.Register<Me>(Reuse.InWebRequest);
+            using (var c = container.OpenScope(Reuse.WebRequestScopeName))
             {
                 var me = container.Resolve<Me>();
                 Assert.AreSame(me, container.Resolve<Me>());

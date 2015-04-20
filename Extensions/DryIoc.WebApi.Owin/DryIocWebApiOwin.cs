@@ -55,10 +55,8 @@ namespace DryIoc.WebApi.Owin
             if (owinContext != null)
             {
                 var scopedContainer = owinContext.GetDryIocScopedContainer();
-                if (scopedContainer != null)
-                {
+                if (scopedContainer != null) // Use existing OWIN ScopeContainer for WebApi dependency resolver
                     request.Properties[HttpPropertyKeys.DependencyScope] = new DryIocDependencyScope(scopedContainer);
-                }
             }
 
             return base.SendAsync(request, cancellationToken);

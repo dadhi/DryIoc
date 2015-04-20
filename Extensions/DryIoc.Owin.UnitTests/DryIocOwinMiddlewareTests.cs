@@ -62,7 +62,7 @@ namespace DryIoc.Owin.UnitTests
             container.Register<TestGreetingMiddleware>();
 
             using (var server = TestServer.Create(app => app.UseDryIocOwinMiddleware(container,
-                r => r.RegisterInstance(new Greeting { Message = "Hey, DryIoc!" }, Reuse.InRequest, IfAlreadyRegistered.Replace))))
+                r => r.RegisterInstance(new Greeting { Message = "Hey, DryIoc!" }, Reuse.InWebRequest, IfAlreadyRegistered.Replace))))
             {
                 var response = await server.HttpClient.GetAsync("/");
                 StringAssert.Contains("Hey, DryIoc!", response.Content.ReadAsStringAsync().Result);

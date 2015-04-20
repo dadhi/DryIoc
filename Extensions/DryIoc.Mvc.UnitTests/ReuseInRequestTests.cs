@@ -13,11 +13,11 @@ namespace DryIoc.Mvc.UnitTests
         {
             var fakeItems = new Dictionary<object, object>();
             var root = new Container(scopeContext: new HttpContextScopeContext(() => fakeItems));
-            root.Register<SomeRoot>(Web.Reuse.InRequest);
-            root.Register<SomeDep>(Web.Reuse.InRequest);
+            root.Register<SomeRoot>(Reuse.InWebRequest);
+            root.Register<SomeDep>(Reuse.InWebRequest);
 
             SomeDep savedOutside;
-            using (var scoped = root.OpenScope())
+            using (var scoped = root.OpenScope(Reuse.WebRequestScopeName))
             {
                 var a = scoped.Resolve<SomeRoot>();
                 var b = scoped.Resolve<SomeRoot>();
@@ -33,7 +33,7 @@ namespace DryIoc.Mvc.UnitTests
                 savedOutside = a.Dep;
             }
 
-            using (var scoped = root.OpenScope())
+            using (var scoped = root.OpenScope(Reuse.WebRequestScopeName))
             {
                 var a = scoped.Resolve<SomeRoot>();
                 var b = scoped.Resolve<SomeRoot>();

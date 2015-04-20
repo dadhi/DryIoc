@@ -52,7 +52,7 @@ namespace DryIoc.Owin
             
             app.Use(async (context, next) =>
             {
-                using (var scopedContainer = container.OpenScope())
+                using (var scopedContainer = container.OpenScope(Reuse.WebRequestScopeName))
                 {
                     scopedContainer.RegisterInstance(context);
                     if (registerInScope != null)
@@ -86,14 +86,6 @@ namespace DryIoc.Owin
         }
     }
 
-    /// <summary>Defines per request reuse.</summary>
-    public static class Reuse
-    {
-        /// <summary>Reuse per request in <see cref="AsyncExecutionFlowScopeContext"/>.</summary>
-        public static readonly IReuse InRequest =
-            DryIoc.Reuse.InCurrentNamedScope(AsyncExecutionFlowScopeContext.ROOT_SCOPE_NAME);
-    }
-
     internal sealed class DryIocWrapperMiddleware<TServiceMiddleware> : OwinMiddleware 
         where TServiceMiddleware : OwinMiddleware
     {
@@ -101,9 +93,9 @@ namespace DryIoc.Owin
 
         public override Task Invoke(IOwinContext context)
         {
-            var container = context.GetDryIocScopedContainer().ThrowIfNull();
+            var scopedContainer = context.GetDryIocScopedContainer().ThrowIfNull();
 
-            var middleware = container.Resolve<Func<OwinMiddleware, TServiceMiddleware>>(IfUnresolved.ReturnDefault);
+            var middleware = scopedContainer.Resolve<Func<OwinMiddleware, TServiceMiddleware>>(IfUnresolved.ReturnDefault);
             if (middleware == null)
                 return Next.Invoke(context);
             

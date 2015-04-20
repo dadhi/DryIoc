@@ -50,9 +50,9 @@ namespace DryIoc.WebApi.UnitTests
             var config = new HttpConfiguration();
             var container = new Container().WithWebApi(config);
             
-            container.Register<Blah>(Reuse.InRequest);
-            container.Register<Fooh>(Reuse.InRequest, serviceKey: 1);
-            container.Register<Fooh>(Reuse.InRequest, serviceKey: 2);
+            container.Register<Blah>(Reuse.InWebRequest);
+            container.Register<Fooh>(Reuse.InWebRequest, serviceKey: 1);
+            container.Register<Fooh>(Reuse.InWebRequest, serviceKey: 2);
 
             using (var scope = config.DependencyResolver.BeginScope())
             {
@@ -66,10 +66,24 @@ namespace DryIoc.WebApi.UnitTests
         }
 
         [Test]
-        public void Can_begin_scope_and_resolve_controller()
+        public void Can_begin_scope_and_resolve_controller_without_specifying_assemblies()
         {
             var config = new HttpConfiguration();
-            new Container().WithWebApi(config, new[] { typeof(MyController).Assembly });
+            new Container().WithWebApi(config);
+
+            using (var scope = config.DependencyResolver.BeginScope())
+            {
+                var controller = scope.GetService(typeof(MyController));
+                Assert.NotNull(controller);
+                Assert.AreSame(controller, scope.GetService(typeof(MyController)));
+            }
+        }
+
+        [Test]
+        public void Can_begin_scope_and_resolve_controller_specifying_assemblies()
+        {
+            var config = new HttpConfiguration();
+            new Container().WithWebApi(config, new[] { Assembly.GetExecutingAssembly() });
 
             using (var scope = config.DependencyResolver.BeginScope())
             {
@@ -87,10 +101,9 @@ namespace DryIoc.WebApi.UnitTests
         public void Can_begin_scope_and_resolve_any_service_as_fallback_rule()
         {
             var config = new HttpConfiguration();
-var container = new Container(rules =>
-    rules.WithUnknownServiceResolver(GetNotRegisteredServices(Assembly.GetExecutingAssembly())));
+            var container = new Container().WithAutoFallbackResolution(config);
 
-container.WithWebApi(config);
+            container.WithWebApi(config);   
 
             using (var scope = config.DependencyResolver.BeginScope())
             {
@@ -101,20 +114,6 @@ container.WithWebApi(config);
 
             var blah = container.Resolve<Blah>();
             Assert.AreSame(blah, container.Resolve<Blah>());
-        }
-
-        private static Rules.UnknownServiceResolver GetNotRegisteredServices(params Assembly[] assemblies)
-        {
-            // load types once
-            var implTypes = assemblies.ThrowIfNull().SelectMany(a => a.GetLoadedTypes()).ToArray();
-
-            return request =>
-            {
-                var container = request.Container;
-                var reuse = container.OpenedScope != null ? Reuse.InRequest : DryIoc.Reuse.Singleton;
-                container.RegisterMany(implTypes, type => type.IsAssignableTo(request.ServiceType), reuse);
-                return container.GetServiceFactoryOrDefault(request.ServiceType, serviceKey: null);
-            };
         }
 
         [Test]
@@ -143,7 +142,7 @@ container.WithWebApi(config);
         [Test]
         public void Can_register_current_request_in_dependency_scope()
         {
-            var scopedContainer = new Container().OpenScope();
+            var scopedContainer = new Container().OpenScope(Reuse.WebRequestScopeName);
             using (var dependencyScope = new DryIocDependencyScope(scopedContainer))
             {
                 var request = new HttpRequestMessage();
