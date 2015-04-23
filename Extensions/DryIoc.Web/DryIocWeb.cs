@@ -97,11 +97,11 @@ namespace DryIoc.Web
         }
 
         /// <summary>Sets the new scope as current using existing current as input.</summary>
-        /// <param name="getNewCurrentScope">Delegate to get new scope.</param>
+        /// <param name="getNewScope">Delegate to get new scope.</param>
         /// <returns>Return new current scope.</returns>
-        public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
+        public IScope SetCurrent(GetNewScopeHandler getNewScope)
         {
-            var newCurrentScope = getNewCurrentScope.ThrowIfNull()(GetCurrentOrDefault());
+            var newCurrentScope = getNewScope.ThrowIfNull()(GetCurrentOrDefault());
             _getContextItems()[ROOT_SCOPE_NAME] = newCurrentScope;
             return newCurrentScope;
         }

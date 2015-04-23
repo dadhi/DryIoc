@@ -5298,6 +5298,11 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Delegate to get new scope from old/existing current scope.</summary>
+    /// <param name="oldScope">Old/existing scope to change.</param>
+    /// <returns>New scope or old if do not want to change current scope.</returns>
+    public delegate IScope GetNewScopeHandler(IScope oldScope);
+
     /// <summary>Provides ambient current scope and optionally scope storage for container, 
     /// examples are HttpContext storage, Execution context, Thread local.</summary>
     public interface IScopeContext
@@ -5311,11 +5316,11 @@ namespace DryIoc
 
         /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and
         /// should return new current scope.</summary>
-        /// <param name="getNewCurrentScope">Delegate to change the scope.</param>
-        /// <remarks>Important: <paramref name="getNewCurrentScope"/> may be called multiple times in concurrent environment.
+        /// <param name="getNewScope">Delegate to change the scope.</param>
+        /// <remarks>Important: <paramref name="getNewScope"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
         /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
-        IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope);
+        IScope SetCurrent(GetNewScopeHandler getNewScope);
     }
 
     /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
@@ -5336,15 +5341,15 @@ namespace DryIoc
         }
 
         /// <summary>Change current scope for the calling Thread.</summary>
-        /// <param name="getNewCurrentScope">Delegate to change the scope given current one (or null).</param>
-        /// <remarks>Important: <paramref name="getNewCurrentScope"/> may be called multiple times in concurrent environment.
+        /// <param name="getNewScope">Delegate to change the scope given current one (or null).</param>
+        /// <remarks>Important: <paramref name="getNewScope"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
-        public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
+        public IScope SetCurrent(GetNewScopeHandler getNewScope)
         {
             var threadId = Portable.GetCurrentManagedThreadID();
             IScope newScope = null;
             Ref.Swap(ref _scopes, scopes =>
-                scopes.AddOrUpdate(threadId, newScope = getNewCurrentScope(scopes.GetValueOrDefault(threadId) as IScope)));
+                scopes.AddOrUpdate(threadId, newScope = getNewScope(scopes.GetValueOrDefault(threadId) as IScope)));
             return newScope;
         }
 

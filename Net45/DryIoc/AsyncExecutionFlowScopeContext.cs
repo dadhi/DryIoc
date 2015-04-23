@@ -55,14 +55,14 @@ namespace DryIoc
         }
 
         /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and  should return new current scope.</summary>
-        /// <param name="getNewCurrentScope">Delegate to change the scope.</param>
-        /// <remarks>Important: <paramref name="getNewCurrentScope"/> may be called multiple times in concurrent environment.
+        /// <param name="getNewScope">Delegate to change the scope.</param>
+        /// <remarks>Important: <paramref name="getNewScope"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
         /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
-        public IScope SetCurrent(Func<IScope, IScope> getNewCurrentScope)
+        public IScope SetCurrent(GetNewScopeHandler getNewScope)
         {
             var oldScope = GetCurrentOrDefault();
-            var newScope = getNewCurrentScope.ThrowIfNull()(oldScope);
+            var newScope = getNewScope.ThrowIfNull()(oldScope);
             var scopeEntry = newScope == null ? null : new ScopeEntry<IScope>(newScope);
             CallContext.LogicalSetData(_scopeEntryKey, scopeEntry);
             return newScope;
