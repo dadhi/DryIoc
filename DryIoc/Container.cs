@@ -576,9 +576,8 @@ namespace DryIoc
             return factory;
         }
 
-        Factory IContainer.GetServiceFactoryOrDefault(Type serviceType, object serviceKey)
+        Factory IContainer.GetServiceFactoryOrDefault(Request request)
         {
-            var request = _emptyRequest.Push(serviceType.ThrowIfNull(), serviceKey);
             return GetServiceFactoryOrDefault(request, Rules.FactorySelector);
         }
 
@@ -955,18 +954,18 @@ namespace DryIoc
                     (x.Value.Setup.Condition == null || x.Value.Setup.Condition(request)))
                     .ToArray();
 
-            if (defaultFactories.Length == 0)
+            if (defaultFactories.Length != 1)
+            {
+                Throw.If(defaultFactories.Length > 1 && request.IfUnresolved == IfUnresolved.Throw, 
+                    Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
                 return null;
-
-            if (defaultFactories.Length > 1)
-                Throw.It(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
+            }
 
             var defaultFactory = defaultFactories[0];
 
             // NOTE: For resolution root sets correct default key to be used in delegate cache.
             if (request.Parent.IsEmpty)
                 request.ChangeServiceKey(defaultFactory.Key);
-
             return defaultFactory.Value;
         }
 
@@ -1445,7 +1444,8 @@ namespace DryIoc
                 if (changeDefaultReuse != null)
                     reuse = changeDefaultReuse(reuse, request);
                 container.RegisterMany(implTypes, type => type.IsAssignableTo(request.ServiceType), reuse);
-                return container.GetServiceFactoryOrDefault(request.ServiceType, serviceKey: null);
+                var factory = container.GetServiceFactoryOrDefault(request);
+                return factory;
             };
         }
     }
@@ -2965,7 +2965,8 @@ namespace DryIoc
             // Try get existing factory.
             if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
             {
-                var registeredFactory = container.GetServiceFactoryOrDefault(serviceType, serviceKey);
+                var request = container.EmptyRequest.Push(serviceType, serviceKey);
+                var registeredFactory = container.GetServiceFactoryOrDefault(request);
 
                 // If existing factory is the same kind: reuse and setup-wise, then we can just replace value in scope.
                 if (registeredFactory != null &&
@@ -6036,9 +6037,14 @@ namespace DryIoc
         IContainer CreateFacade();
 
         /// <summary>Searches for requested factory in registry, and then using <see cref="DryIoc.Rules.UnknownServiceResolvers"/>.</summary>
-        /// <param name="request">Factory lookup info.</param>
+        /// <param name="request">Factory request.</param>
         /// <returns>Found factory, otherwise null if <see cref="Request.IfUnresolved"/> is set to <see cref="IfUnresolved.ReturnDefault"/>.</returns>
         Factory ResolveFactory(Request request);
+
+        /// <summary>Searches for registered service factory and returns it, or null if not found.</summary>
+        /// <param name="request">Factory request.</param>
+        /// <returns>Found registered factory or null.</returns>
+        Factory GetServiceFactoryOrDefault(Request request);
 
         /// <summary>Finds all registered default and keyed service factories and returns them.
         /// It skips decorators and wrappers.</summary>
@@ -6046,12 +6052,6 @@ namespace DryIoc
         /// <returns>Enumerable of found pairs.</returns>
         /// <remarks>Returned Key item should not be null - it should be <see cref="DefaultKey.Value"/>.</remarks>
         IEnumerable<KV<object, Factory>> GetAllServiceFactories(Type serviceType);
-
-        /// <summary>Searches for registered service factory and returns it, or null if not found.</summary>
-        /// <param name="serviceType">Service type to look for.</param>
-        /// <param name="serviceKey">(optional) Service key to lookup in addition to type.</param>
-        /// <returns>Found registered factory or null.</returns>
-        Factory GetServiceFactoryOrDefault(Type serviceType, object serviceKey);
 
         /// <summary>Searches for registered wrapper factory and returns it, or null if not found.</summary>
         /// <param name="serviceType">Service type to look for.</param> <returns>Found wrapper factory or null.</returns>

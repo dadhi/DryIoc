@@ -169,6 +169,22 @@ namespace DryIoc.UnitTests
         internal class YY { }
         internal class ZZ { }
 
+        [Test]
+        public void AutoFallback_resolution_rule_should_respect_IfUnresolved_policy_in_case_of_multiple_registrations()
+        {
+            var container = new Container()
+                .WithAutoFallbackResolution(new[] { typeof(Me), typeof(MiniMe) }, 
+                (reuse, request) => reuse == Reuse.Singleton ? null : reuse);
+
+            var me = container.Resolve<IMe>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNull(me);
+        }
+
+        public interface IMe {}
+        internal class Me : IMe {}
+        internal class MiniMe : IMe {}
+
         #region CUT
 
         public class SomeService { }
