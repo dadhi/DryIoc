@@ -101,7 +101,7 @@ namespace DryIoc.WebApi.UnitTests
         public void Can_begin_scope_and_resolve_any_service_as_fallback_rule()
         {
             var config = new HttpConfiguration();
-            var container = new Container().WithAutoFallbackResolution(config);
+            var container = new Container().WithAutoFallbackResolution(config.Services.GetAssembliesResolver().GetAssemblies());
 
             container.WithWebApi(config);   
 

@@ -87,7 +87,8 @@ namespace DryIoc.CompileTimeGeneration.Tests
         {
             var factory = new ServiceFactory();
 
-            var ex = Assert.Throws<ContainerException>(() => factory.Resolve<NotRegistered>());
+            var ex = Assert.Throws<ServiceFactoryException>(
+                () => factory.Resolve<NotRegistered>());
 
             Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
         }

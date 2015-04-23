@@ -69,15 +69,6 @@ namespace DryIoc.WebApi
             return container;
         }
 
-        /// <summary>Adds rule to register unknown service when it is resolved.</summary>
-        /// <param name="container"></param> <param name="config">Required to get <see cref="IAssembliesResolver"/>.</param>
-        /// <returns>Container with added rule.</returns>
-        public static IContainer WithAutoFallbackResolution(this IContainer container, HttpConfiguration config)
-        {
-            var assembliesResolver = config.Services.GetAssembliesResolver();
-            return container.ThrowIfNull().WithAutoFallbackResolution(assembliesResolver.GetAssemblies());
-        }
-
         /// <summary>Registers controllers found in provided assemblies with per-request reuse.</summary>
         /// <param name="container">Container.</param>
         /// <param name="config">Http configuration.</param>

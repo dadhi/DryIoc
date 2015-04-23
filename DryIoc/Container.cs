@@ -141,9 +141,9 @@ namespace DryIoc
             ThrowIfContainerDisposed();
 
             scopeName = scopeName ?? (_openedScope == null ? NO_CONTEXT_ROOT_SCOPE_NAME : null);
-            var nestedOpenedScope = new Scope(_openedScope, scopeName);
+            var newOpenedScope = new Scope(_openedScope, scopeName);
 
-            return new Container(Rules, _registry, _singletonScope, /*no context*/null, nestedOpenedScope, _disposed);
+            return new Container(Rules, _registry, _singletonScope, /*no context*/null, newOpenedScope, _disposed);
         }
 
         /// <summary>Provide root scope name for <see cref="OpenScopeWithoutContext"/></summary>

@@ -52,7 +52,8 @@ namespace DryIoc.CompileTimeGeneration.Tests
             {
 #>
 
-            Register(<#=serviceTypeName #>, <#=code #>);
+            Register(<#=serviceTypeName #>, 
+                <#=code #>);
 <#
             }
             else
@@ -61,7 +62,8 @@ namespace DryIoc.CompileTimeGeneration.Tests
                 //var serviceKeyString = ObjectStringify.WithFullTypeNames.PlainObjectToCode(r.OptionalServiceKey, null);
 #>
 
-            Register(<#=serviceTypeName #>, <#=serviceKeyString#>, <#=code #>);
+            Register(<#=serviceTypeName #>, <#=serviceKeyString#>, 
+                <#=code #>);
 <#
             }
         }
