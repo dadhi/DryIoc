@@ -11,7 +11,7 @@ set COVERAGE="%REPORTS%\Coverage.xml"
 if not exist %REPORTS% md %REPORTS% 
 
 for %%P in ("."; "Net40"; "Net45"; "PCL-Net45"; "Extensions") do (
-	for %%T in ("%%P\bin\Release\*Tests.dll") do (	
+	for %%T in ("%%P\bin\Release\*Tests.dll") do (
 		set TESTLIBS=!TESTLIBS! %%T
 ))
 
@@ -25,7 +25,7 @@ echo:
  -register:user^
  -target:%NUNIT%^
  -targetargs:"%TESTLIBS% /nologo /noshadow"^
- -filter:"+[*]* -[*Test*]* -[protobuf*]* -[Microsoft*]*"^
+ -filter:"+[*]* -[*Test*]* -[protobuf*]* -[Microsoft*]* -[xunit*]*"^
  -output:%COVERAGE%
 
 echo:

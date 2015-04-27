@@ -455,7 +455,7 @@ namespace DryIoc
 
         #region IResolverContext
 
-        /// <summary>Scope associated with container.</summary>
+        /// <summary>Scope containing container singletons.</summary>
         IScope IResolverContext.SingletonScope
         {
             get { return _singletonScope; }
@@ -5865,7 +5865,7 @@ namespace DryIoc
         /// </remarks>
         object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope);
 
-        /// <summary>Resolve all services registered for specified <paramref name="serviceType"/>, or if not found returns
+        /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
         /// this type. Excludes for result composite parent identified by <paramref name="compositeParentKey"/>.</summary>
         /// <param name="serviceType">Return type of an service item.</param>
@@ -5940,7 +5940,7 @@ namespace DryIoc
     /// <summary>Provides access to both resolver and scopes to <see cref="FactoryDelegate"/>.</summary>
     public interface IResolverContext : IResolver
     {
-        /// <summary>Scope associated with container.</summary>
+        /// <summary>Scope containing container singletons.</summary>
         IScope SingletonScope { get; }
 
         /// <summary>Gets current scope matching the <paramref name="name"/>. 
