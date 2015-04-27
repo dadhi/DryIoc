@@ -11,7 +11,22 @@
         <description>DryIoc is small, fast, capable IoC container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          fixed: #70: .Net 4.0 related: Unable to resolve types from unsigned assembly if compiling to dynamic assembly is turned On (it is by default)
+            - More consistent and complete API.  
+            - Support for ambient current scope and Reuse.InWebRequest for ASP.NET integration.  
+            - Conventional RegisterMany from Assemblies.  
+            - Service key of arbitrary type. Supported resolution as KeyValuePair to get service key with corresponding service.  
+            - Register with condition based on service request.  
+            - Required service type support and ResolveMany support.  
+            - Register once, Update existing registration, Unregister.  
+            - Container snapshots and Cache management.  
+            - Fine-grained control over injection of parameters, properties, and fields.  
+            - Injecting of primitive values.  
+            - Optional parameters support.  
+            - Fine-grained control over reused object behavior via Reuse Wrappers.  
+            - In addition to constructor supported: static and instance factory methods, properties and fields.  
+            - Initializer support.  
+            - Support the rest of collection interfaces implemented by array.  
+            - Compilation to DynamicAssembly is turned Off by default.  
         </releaseNotes>
     </metadata>
     <files>
