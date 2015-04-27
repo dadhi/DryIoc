@@ -1,4 +1,4 @@
-# Sign package using Nivot.StrongNaming <https://www.nuget.org/packages/Nivot.StrongNaming/>
+# Sign package assemblies using Nivot.StrongNaming <https://www.nuget.org/packages/Nivot.StrongNaming/>
 
 $scriptDir=[System.IO.Path]::GetDirectoryName($MyInvocation.MyCommand.Path)
 pushd $scriptDir
@@ -19,7 +19,8 @@ Try
 }
 Catch
 {
-	echo "Failed!"
+    echo "Failed with:"
+	Write-Error $_.Exception
 }
 Finally
 {
