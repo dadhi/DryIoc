@@ -12,10 +12,10 @@ namespace DryIoc.Zero.UnitTests
         [Test]
         public void Can_Register_default_delegate()
         {
-            var factory = new ZeroContainer();
-            factory.Register(typeof(Potato), (r, scope) => new Potato());
+            var container = new ZeroContainer();
+            container.Register(typeof(Potato), (r, scope) => new Potato());
 
-            var potato = factory.Resolve<Potato>();
+            var potato = container.Resolve<Potato>();
             
             Assert.IsNotNull(potato);
         }
@@ -23,15 +23,36 @@ namespace DryIoc.Zero.UnitTests
         [Test]
         public void Can_Register_keyed_delegate()
         {
-            var factory = new ZeroContainer();
-            factory.Register(typeof(Potato), "mashed", (r, scope) => new Potato());
+            var container = new ZeroContainer();
+            container.Register(typeof(Potato), "mashed", (r, scope) => new Potato());
 
-            var potato = factory.Resolve<Potato>("mashed");
+            var potato = container.Resolve<Potato>("mashed");
 
             Assert.IsNotNull(potato);
         }
 
         internal class Potato {}
+
+        [Test]
+        public void Can_open_scope()
+        {
+            var container = new ZeroContainer();
+            container.Register(typeof(Potato), (r, scope) => new Potato());
+            using (var scope = container.OpenScope())
+            {
+                var potato = scope.Resolve<Potato>();
+                Assert.IsNotNull(potato);
+            }
+        }
+
+        [Test]
+        public void Dispose_should_remove_registrations()
+        {
+            var container = new ZeroContainer();
+            container.Register(typeof(Potato), (r, scope) => new Potato());
+            container.Dispose();
+            Assert.Throws<ZeroContainerException>(() => container.Resolve<Potato>());
+        }
 
         [Test]
         public void Can_load_types_from_assembly_and_generate_some_resolutions()

@@ -56,22 +56,34 @@ namespace DryIoc.Zero
     }
 
     /// <summary>Minimal container which allow to register service factory delegates and then resolve service from them.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly",
+        Justification = "Does not container any unmanaged resources.")]
     public class ZeroContainer : IFactoryDelegateRegistrator, IResolverContext, IResolverContextProvider, IDisposable
     {
         /// <summary>Creates container.</summary>
-        /// <param name="singletonScope">(optional) Not null singleton scope. May be used by OpenScope.</param>
-        /// <param name="openedScope">(optional) Not null opened scope. May be used by OpenScope.</param>
-        public ZeroContainer(IScope singletonScope = null, IScope openedScope = null)
+        /// <param name="scopeContext">(optional) Scope context, by default <see cref="ThreadScopeContext"/>.</param>
+        public ZeroContainer(IScopeContext scopeContext = null)
+            : this(Ref.Of(HashTree.Empty), Ref.Of(HashTree.Empty), new Scope(), scopeContext ?? new ThreadScopeContext(), null) { }
+        
+        private ZeroContainer(Ref<HashTree> defaultFactories, Ref<HashTree> keyedFactories, IScope singletonScope,
+            IScopeContext scopeContext, IScope openedScope)
         {
-            SingletonScope = singletonScope ?? new Scope();
+            _defaultFactories = defaultFactories;
+            _keyedFactories = keyedFactories;
+
+            SingletonScope = singletonScope;
+            ScopeContext = scopeContext;
             OpenedScope = openedScope;
-            ScopeContext = new ThreadScopeContext();
         }
 
+        /// <summary>Opened scope or null in root container.</summary>
         public IScope OpenedScope { get; private set; }
 
+        /// <summary>Scope context or null of not necessary.</summary>
         public IScopeContext ScopeContext { get; private set; }
 
+        /// <summary>Creates new container with new current ambient scope.</summary>
+        /// <returns>New container.</returns>
         public ZeroContainer OpenScope()
         {
             var newOpenedScope = new Scope(OpenedScope, null);
@@ -80,33 +92,41 @@ namespace DryIoc.Zero
             ScopeContext.SetCurrent(scope =>
                  newOpenedScope.ThrowIf(scope != OpenedScope, Error.NOT_DIRECT_SCOPE_PARENT, OpenedScope, scope));
 
-            return new ZeroContainer(SingletonScope, newOpenedScope);
+            return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, newOpenedScope);
         }
 
+        /// <summary>Creates new container with new opened scope independent from context.</summary>
+        /// <returns>New container.</returns>
         public ZeroContainer OpenScopeWithoutContext()
         {
             var newOpenedScope = new Scope(OpenedScope, null);
-            return new ZeroContainer(SingletonScope, newOpenedScope);
+            return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, newOpenedScope);
         }
+
+        #region IFactoryDelegateRegistrator
 
         /// <summary>Registers factory delegate with corresponding service type.</summary>
         /// <param name="serviceType">Type</param> <param name="factoryDelegate">Delegate</param>
         public void Register(Type serviceType, StatelessFactoryDelegate factoryDelegate)
         {
-            _defaultFactories = _defaultFactories.AddOrUpdate(serviceType, factoryDelegate);
+            _defaultFactories.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
         }
 
         /// <summary>Registers factory delegate with corresponding service type and service key.</summary>
         /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param> <param name="factoryDelegate">Delegate</param>
         public void Register(Type serviceType, object serviceKey, StatelessFactoryDelegate factoryDelegate)
         {
-            var entry = _keyedFactories.GetValueOrDefault(serviceType) as HashTree ?? HashTree.Empty;
-            _keyedFactories = _keyedFactories.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, factoryDelegate));
+            _keyedFactories.Swap(_ =>
+            {
+                var entry = _.GetValueOrDefault(serviceType) as HashTree ?? HashTree.Empty;
+                return _.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, factoryDelegate));
+            });
         }
 
-        // TODO: Update through refs
-        private HashTree _defaultFactories = HashTree.Empty; //<Type -> FactoryDelegate>
-        private HashTree _keyedFactories = HashTree.Empty; //<Type -> <Key -> FactoryDelegate>>
+        private Ref<HashTree> _defaultFactories; //<Type -> FactoryDelegate>
+        private Ref<HashTree> _keyedFactories; //<Type -> <Key -> FactoryDelegate>>
+
+        #endregion
 
         /// <summary>Provides access to resolver.</summary>
         public IResolverContext Resolver
@@ -115,6 +135,8 @@ namespace DryIoc.Zero
         }
 
         /// <summary>Disposes opened scope or root container including: Singletons, ScopeContext, Make default and keyed factories empty.</summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly",
+            Justification = "Does not container any unmanaged resources.")]
         public void Dispose()
         {
             if (OpenedScope != null)
@@ -125,8 +147,8 @@ namespace DryIoc.Zero
                 var scopeContext = ScopeContext as IDisposable;
                 if (scopeContext != null)
                     scopeContext.Dispose();
-                _defaultFactories = HashTree.Empty;
-                _keyedFactories = HashTree.Empty;
+                _defaultFactories = Ref.Of(HashTree.Empty);
+                _keyedFactories = Ref.Of(HashTree.Empty);
             }
         }
 
@@ -218,7 +240,7 @@ namespace DryIoc.Zero
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
         {
-            var factoryDelegate = _defaultFactories.GetValueOrDefault(serviceType) as StatelessFactoryDelegate;
+            var factoryDelegate = _defaultFactories.Value.GetValueOrDefault(serviceType) as StatelessFactoryDelegate;
             return factoryDelegate != null
                 ? factoryDelegate(this, null)
                 : GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
@@ -243,7 +265,7 @@ namespace DryIoc.Zero
                 return ResolveDefault(serviceType, ifUnresolved, scope);
 
             serviceType = requiredServiceType ?? serviceType;
-            var factories = _keyedFactories.GetValueOrDefault(serviceType) as HashTree;
+            var factories = _keyedFactories.Value.GetValueOrDefault(serviceType) as HashTree;
             if (factories != null)
             {
                 var factoryDelegate = factories.GetValueOrDefault(serviceKey) as StatelessFactoryDelegate;
@@ -268,7 +290,7 @@ namespace DryIoc.Zero
         {
             serviceType = requiredServiceType ?? serviceType;
 
-            var factories = _keyedFactories.GetValueOrDefault(serviceType) as HashTree;
+            var factories = _keyedFactories.Value.GetValueOrDefault(serviceType) as HashTree;
             if (factories != null)
             {
                 if (serviceKey != null)
@@ -288,7 +310,7 @@ namespace DryIoc.Zero
             }
             else
             {
-                var factoryDelegate = _defaultFactories.GetValueOrDefault(serviceType) as StatelessFactoryDelegate;
+                var factoryDelegate = _defaultFactories.Value.GetValueOrDefault(serviceType) as StatelessFactoryDelegate;
                 if (factoryDelegate != null)
                     yield return factoryDelegate(this, scope);
             }
@@ -303,9 +325,16 @@ namespace DryIoc.Zero
         #endregion
     }
 
+    /// <summary>Key Value objects pair.</summary>
     public class KV
     {
-        public readonly object Key, Value;
+        /// <summary>Key object.</summary>
+        public readonly object Key;
+
+        /// <summary>Value object.</summary>
+        public readonly object Value;
+
+        /// <summary>Creates pair.</summary> <param name="key"></param> <param name="value"></param>
         public KV(object key, object value) { Key = key; Value = value; }
 
         /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
@@ -336,9 +365,13 @@ namespace DryIoc.Zero
         }
     }
 
+    /// <summary>Simple immutable AVL tree with integer keys and object values.</summary>
     public sealed class HashTree
     {
+        /// <summary>Represents Empty tree.</summary>
         public static readonly HashTree Empty = new HashTree(IntKeyTree.Empty);
+
+        /// <summary>Returns true if tree is empty.</summary>
         public bool IsEmpty { get { return _tree.IsEmpty; } }
 
         private sealed class KVWithConflicts : KV
@@ -347,6 +380,8 @@ namespace DryIoc.Zero
             public KVWithConflicts(KV kv, KV[] conflicts) : base(kv.Key, kv.Value) { Conflicts = conflicts; }
         }
 
+        /// <summary>Creates new tree with added or updated value for corresponding key.</summary>
+        /// <param name="key">Key.</param> <param name="value">Value.</param> <returns>New tree.</returns>
         public HashTree AddOrUpdate(object key, object value)
         {
             return new HashTree(_tree.AddOrUpdate(key.GetHashCode(), new KV(key, value), UpdateConflictingKeyValue));
@@ -379,6 +414,8 @@ namespace DryIoc.Zero
             return new KVWithConflicts(kvOld, newConflicts);
         }
 
+        /// <summary>Looks for value added with key or will return null if key is not found.</summary>
+        /// <param name="key">Key</param> <returns>Found value or null if not found.</returns>
         public object GetValueOrDefault(object key)
         {
             var kv = _tree.GetValueOrDefault(key.GetHashCode()) as KV;
@@ -396,6 +433,8 @@ namespace DryIoc.Zero
             return null;
         }
 
+        /// <summary>Returns all sub-trees enumerated from left to right.</summary> 
+        /// <returns>Enumerated pairs.</returns>
         public IEnumerable<KV> Enumerate()
         {
             if (!_tree.IsEmpty)
@@ -419,6 +458,7 @@ namespace DryIoc.Zero
         #endregion
     }
 
+    /// <summary>List of error codes and messages.</summary>
     public static class Error
     {
         /// <summary>First error code to identify error range for other possible error code definitions.</summary>
@@ -427,6 +467,7 @@ namespace DryIoc.Zero
         /// <summary>List of error messages indexed with code.</summary>
         public readonly static List<string> Messages = new List<string>(100);
 
+#pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
             UNABLE_TO_RESOLVE_SERVICE = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
@@ -439,7 +480,10 @@ namespace DryIoc.Zero
             NOT_DIRECT_SCOPE_PARENT = Of(
                 "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." + Environment.NewLine +
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!");
+#pragma warning restore 1591 // "Missing XML-comment"
 
+        /// <summary>Generates new code for message.</summary>
+        /// <param name="message">Message.</param> <returns>Code.</returns>
         public static int Of(string message)
         {
             Messages.Add(message);
@@ -447,10 +491,16 @@ namespace DryIoc.Zero
         }
     }
 
+    /// <summary>Zero container exception.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable",
+        Justification = "Not supported for portable targets.")]
     public class ZeroContainerException : InvalidOperationException
     {
+        /// <summary>Error code.</summary>
         public int Error { get; private set; }
 
+        /// <summary>Creates exception.</summary>
+        /// <param name="error">Code.</param> <param name="message">Message.</param>
         public ZeroContainerException(int error, string message)
             : base(message)
         {
@@ -458,7 +508,7 @@ namespace DryIoc.Zero
         }
     }
 
-    public static class Throw
+    internal static class Throw
     {
         public static void It(int error, params object[] args)
         {
