@@ -26,7 +26,6 @@ echo:============================
 %NUGET% pack "NuGet\DryIoc.MefAttributedModel.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 rem -Symbols 
 
-
 echo:
 call :ParseVersion "Extensions\DryIoc.CommonServiceLocator\Properties\AssemblyInfo.cs"
 echo:DryIoc.CommonServiceLocator v%VER%
@@ -73,6 +72,13 @@ echo:DryIoc.WebApi.Owin v%VER%
 echo:============================
 %NUGET% pack "NuGet\DryIoc.WebApi.Owin.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 %NUGET% pack "NuGet\DryIoc.WebApi.Owin.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+rem -Symbols
+
+echo:
+call :ParseVersion "Net45\DryIoc.Zero\Properties\AssemblyInfo.cs"
+echo:DryIoc.Zero v%VER%
+echo:============================
+%NUGET% pack "NuGet\DryIoc.Zero.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 rem -Symbols
 
 echo: 

@@ -21,7 +21,7 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
 * [Wiki documentation][WikiHome] _(being updated for v2.0)_
 * __v1.4.1__ is stable: `PM> Install-Package DryIoc` 
-* __[v2.0]__ is coming: `PM> Install-Package DryIoc -Pre`
+* __v2.0-rc1__ is out: `PM> Install-Package DryIoc -Pre`
 
 #### Benchmarks
 * [Performance](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
