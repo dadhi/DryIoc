@@ -16,7 +16,7 @@ for /f "tokens=2*" %%S in ('reg query HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuil
 		echo:
 		echo:Using MSBuild from "%%T"
 
-		"%%T\MSBuild.exe" %SLN% /t:Rebuild /m /fl /flp:LogFile=MSBuild.log ^
+		"%%T\MSBuild.exe" %SLN% /t:Rebuild /v:minimal /m /fl /flp:LogFile=MSBuild.log ^
    			/p:OutDir=%OUTDIR% ^
    			/p:GenerateProjectSpecificOutputFolder=false ^
    			/p:Configuration=Release ^ 
