@@ -8,7 +8,7 @@
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIoc.Zero is fast and clean Container working on top of compile-time generated service factories, therefore decreasing startup casts.</description>
+        <description>DryIoc.Zero is fast and clean IoC Container working on top of compile-time generated service factories, therefore decreasing startup casts.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
         <releaseNotes>
             - Initial release
@@ -16,7 +16,7 @@
         <dependencies>
             <dependency id="DryIoc.dll" version="(1.5,3.0.0)" />
             <dependency id="DryIoc.MefAttributedModel.dll" version="(1.5,3.0.0)" />
-            <dependency id="ExpressionToCodeLib" version="(1.5.2,2.0.0)" />
+            <dependency id="ExpressionToCodeLib" version="[1.5.2,2.0.0)" />
         </dependencies>
         <frameworkAssemblies>
             <frameworkAssembly assemblyName="System.ComponentModel.Composition" />
