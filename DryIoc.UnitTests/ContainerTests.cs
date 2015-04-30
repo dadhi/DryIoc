@@ -94,15 +94,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Registering_impl_type_with_many_public_constructors_and_without_constructor_selector_should_Throw()
-        {
-            var container = new Container();
-
-            Assert.Throws<ContainerException>(() =>
-                container.Register<ServiceWithMultipleCostructors>());
-        }
-
-        [Test]
         public void Given_registered_service_Injecting_it_as_dependency_should_work()
         {
             var container = new Container();

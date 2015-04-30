@@ -114,8 +114,8 @@ namespace DryIoc.MefAttributedModel
                 for (var i = 0; i < info.Exports.Length; i++)
                 {
                     var export = info.Exports[i];
-                    registrator.Register(factory, export.ServiceType,
-                        export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
+                    registrator.Register(factory, 
+                        export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
                 }
             }
 
@@ -443,7 +443,7 @@ namespace DryIoc.MefAttributedModel
 
         private static void RegisterFactoryMethods(IRegistrator registrator, RegistrationInfo factoryInfo)
         {
-            // NOTE: Specifying Cast type is required for NET35
+            // NOTE: Cast is required for NET35
             var members = factoryInfo.ImplementationType.GetAll(t => 
                 t.DeclaredMethods.Cast<MemberInfo>().Concat(
                 t.DeclaredProperties.Cast<MemberInfo>().Concat(
@@ -469,7 +469,8 @@ namespace DryIoc.MefAttributedModel
                 for (var i = 0; i < serviceExports.Length; i++)
                 {
                     var export = serviceExports[i];
-                    registrator.Register(factory, export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
+                    registrator.Register(factory, 
+                        export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
                 }
             }
         }
@@ -663,7 +664,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Creates factory out of registration info.</summary>
         /// <param name="made">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
         /// <returns>Created factory.</returns>
-        public Factory CreateFactory(Made made = null)
+        public ReflectionFactory CreateFactory(Made made = null)
         {
             var reuse = AttributedModel.GetReuse(ReuseType, ReuseName);
             return new ReflectionFactory(ImplementationType, reuse, made, GetSetup());
