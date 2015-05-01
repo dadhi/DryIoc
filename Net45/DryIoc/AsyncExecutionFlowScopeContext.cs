@@ -30,7 +30,7 @@ namespace DryIoc
 
     partial class Container
     {
-        [SuppressMessage("ReSharper", "RedundantAssignment")]
+        [SuppressMessage("ReSharper", "RedundantAssignment", Justification = "ref is the only way for partial methods.")]
         static partial void GetDefaultScopeContext(ref IScopeContext resultContext)
         {
             resultContext = new AsyncExecutionFlowScopeContext();

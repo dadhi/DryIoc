@@ -79,6 +79,6 @@ Failed with: <#=ObjectStringify.WithFullTypeNames.TypeNameToCode(ex.GetType())#>
         }
     }
 #>
-        } // end of static constructor
+        } // end of registrations
     }
 }

@@ -55,9 +55,20 @@ namespace DryIoc.Zero
         void RegisterGeneratedRoots(IFactoryDelegateRegistrator registrator);
     }
 
+    /// <summary>Tools for more fluent registration.</summary>
+    public static class FactoryDelegateRegistratorTools
+    {
+        /// <summary>Registers root with registrator.</summary>
+        /// <param name="registrator">Registrator</param> <param name="root">Root</param>
+        public static void RegisterRoot(this IFactoryDelegateRegistrator registrator, ICompositionRoot root)
+        {
+            root.RegisterGeneratedRoots(registrator);
+        }
+    }
+
     /// <summary>Minimal container which allow to register service factory delegates and then resolve service from them.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly",
-        Justification = "Does not container any unmanaged resources.")]
+        Justification = "Does not contain any unmanaged resources.")]
     public class ZeroContainer : IFactoryDelegateRegistrator, IResolverContext, IResolverContextProvider, IDisposable
     {
         /// <summary>Creates container.</summary>
@@ -493,7 +504,7 @@ namespace DryIoc.Zero
 
     /// <summary>Zero container exception.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable",
-        Justification = "Not supported for portable targets.")]
+        Justification = "Not available in PCL.")]
     public class ZeroContainerException : InvalidOperationException
     {
         /// <summary>Error code.</summary>
