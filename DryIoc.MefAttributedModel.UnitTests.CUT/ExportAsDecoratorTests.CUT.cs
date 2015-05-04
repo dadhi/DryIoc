@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.Composition;
+﻿using System;
+using System.ComponentModel.Composition;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
@@ -100,6 +101,52 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public FoohDecorator(IHandler handler)
         {
             Handler = handler;
+        }
+    }
+
+    public interface IDecoratedResult
+    {
+        int GetResult();
+    }
+
+    [Export(typeof(IDecoratedResult)), TransientReuse]
+    public class DecoratedResult : IDecoratedResult
+    {
+        public int GetResult()
+        {
+            return 1;
+        }
+    }
+
+    [Export(typeof(IDecoratedResult)), AsDecorator]
+    public class FuncDecorator : IDecoratedResult
+    {
+        private readonly Func<IDecoratedResult> _decorated;
+
+        public FuncDecorator(Func<IDecoratedResult> decorated)
+        {
+            _decorated = decorated;
+        }
+        
+        public int GetResult()
+        {
+            return _decorated().GetResult() + 1;
+        }
+    }
+
+    [Export(typeof(IDecoratedResult)), TransientReuse, AsDecorator]
+    public class LazyDecorator : IDecoratedResult
+    {
+        private readonly Lazy<IDecoratedResult> _decorated;
+
+        public LazyDecorator(Lazy<IDecoratedResult> decorated)
+        {
+            _decorated = decorated;
+        }
+
+        public int GetResult()
+        {
+            return _decorated.Value.GetResult() + 1;
         }
     }
 }

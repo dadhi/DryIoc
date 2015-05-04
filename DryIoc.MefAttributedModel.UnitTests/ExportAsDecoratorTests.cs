@@ -1,4 +1,5 @@
-﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
+﻿using System.Linq;
+using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
@@ -82,6 +83,43 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.That(handler, Is.InstanceOf<FoohDecorator>());
             Assert.That(((FoohDecorator)handler).Handler, Is.InstanceOf<FoohHandler>());
+        }
+
+        [Test]
+        public void Decorator_may_be_applied_to_Func_decorated()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(DecoratedResult), typeof(FuncDecorator));
+
+            var me = container.Resolve<IDecoratedResult>();
+            var result = me.GetResult();
+
+            Assert.AreEqual(2, result);
+        }
+
+        [Test, Ignore]
+        public void Decorator_may_be_applied_to_Lazy_decorated()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(DecoratedResult), typeof(LazyDecorator));
+
+            var me = container.Resolve<IDecoratedResult>();
+            var result = me.GetResult();
+
+            Assert.AreEqual(2, result);
+        }
+
+        [Test]
+        public void Only_single_resolution_should_present_for_decorated_service()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(DecoratedResult), typeof(FuncDecorator));
+
+            var registrations = container.GetServiceRegistrations()
+                .Where(r => r.ServiceType == typeof(IDecoratedResult))
+                .ToArray();
+
+            Assert.AreEqual(1, registrations.Length);
         }
     }
 }

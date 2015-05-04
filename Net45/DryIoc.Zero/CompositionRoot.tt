@@ -1,14 +1,15 @@
 ﻿<#@ template debug="false" hostspecific="true" language="C#" #>
 <#@ output extension=".cs" #>
+<#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 
 <#@ assembly Name="System.Core" #>
 <#@ import Namespace="System.Reflection" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Text" #>
 
-<#@ assembly Name="$(SolutionDir)\packages\DryIoc.dll.2.0.0-rc1build263\lib\net45\DryIoc.dll" #>
-<#@ assembly Name="$(SolutionDir)\packages\DryIoc.MefAttributedModel.dll.2.0.0-rc1build263\lib\net45\DryIoc.MefAttributedModel.dll" #>
-<#@ assembly Name="$(SolutionDir)\packages\ExpressionToCodeLib.1.5.2.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.0.0-rc1build263\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0-rc1build263\lib\net45\DryIoc.MefAttributedModel.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.2.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
@@ -17,8 +18,8 @@ var container = new Container(rules => rules
     .WithoutSingletonOptimization() // Required for stateless factory delegates generation
     .WithMefAttributedModel());
 
-// NOTE: TODO: Specify assemblies with types to Register here:
-//======================================================
+// NOTE: TODO: Specify assemblies with types to Register
+//=======================================================
 //// Specify assembly as file...
 //var assembly = Assembly.LoadFrom(Host.ResolvePath("DryIoc.MefAttributedModel.UnitTests.CUT.dll"));
 //// Or by known type from...
@@ -26,7 +27,7 @@ var container = new Container(rules => rules
 
 var types = assembly.GetLoadedTypes();
 container.RegisterExports(types);
-//======================================================
+//=======================================================
 #>
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 
@@ -81,6 +82,6 @@ Failed with: <#=ObjectStringify.WithFullTypeNames.TypeNameToCode(ex.GetType())#>
         }
     }
 #>
-        } // end of registrationss
+        } // end of registrations
     }
 }

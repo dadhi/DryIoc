@@ -44,6 +44,15 @@ namespace DryIoc.Zero
         /// <summary>Registers factory delegate with corresponding service type and service key.</summary>
         /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param> <param name="factoryDelegate">Delegate</param>
         void Register(Type serviceType, object serviceKey, StatelessFactoryDelegate factoryDelegate);
+
+        /// <summary>Returns if ANY default or keyed factory delegate is registered with Service Type.</summary>
+        /// <param name="serviceType">Service type to find.</param> <returns>True if registered and false otherwise.</returns>
+        bool IsRegistered(Type serviceType);
+
+        /// <summary>Returns true if keyed factory delegate is registered with Service Type and Key.</summary>
+        /// <param name="serviceType">Service type to find.</param> <param name="serviceKey">Service key.</param>
+        /// <returns>True if registered and false otherwise.</returns>
+        bool IsRegistered(Type serviceType, object serviceKey);
     }
 
     /// <summary>Provides action for registering factory delegates in service factory. 
@@ -132,6 +141,18 @@ namespace DryIoc.Zero
                 var entry = _.GetValueOrDefault(serviceType) as HashTree ?? HashTree.Empty;
                 return _.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, factoryDelegate));
             });
+        }
+
+        public bool IsRegistered(Type serviceType)
+        {
+            return _defaultFactories.Value.GetValueOrDefault(serviceType) != null 
+                || _keyedFactories.Value.GetValueOrDefault(serviceType) != null;
+        }
+
+        public bool IsRegistered(Type serviceType, object serviceKey)
+        {
+            var entry = _keyedFactories.Value.GetValueOrDefault(serviceType) as HashTree;
+            return entry != null && entry.GetValueOrDefault(serviceKey) != null;
         }
 
         private Ref<HashTree> _defaultFactories; //<Type -> FactoryDelegate>

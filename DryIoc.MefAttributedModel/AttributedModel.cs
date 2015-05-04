@@ -115,7 +115,7 @@ namespace DryIoc.MefAttributedModel
                 {
                     var export = info.Exports[i];
                     registrator.Register(factory, 
-                        export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
+                        export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
                 }
             }
 
@@ -470,7 +470,7 @@ namespace DryIoc.MefAttributedModel
                 {
                     var export = serviceExports[i];
                     registrator.Register(factory, 
-                        export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed);
+                        export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
                 }
             }
         }

@@ -274,12 +274,13 @@ namespace DryIoc
         /// implemented.</param>
         /// <param name="ifAlreadyRegistered">(optional) Says how to handle existing registration with the same 
         /// <paramref name="serviceType"/> and <paramref name="serviceKey"/>.</param>
+        /// <param name="isStaticallyChecked">Confirms that service and implementation types are statically checked by compiler.</param>
         /// <returns>True if factory was added to registry, false otherwise. 
         /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
-        public bool Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
+        public bool Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered, bool isStaticallyChecked)
         {
             ThrowIfContainerDisposed();
-            factory.ThrowIfNull().ThrowIfRegisteredInvalidServiceOrImplementation(this, serviceType.ThrowIfNull(), serviceKey);
+            factory.ThrowIfNull().ThrowIfInvalidRegistration(this, serviceType.ThrowIfNull(), serviceKey, isStaticallyChecked);
 
             var isRegistered = false;
             _registry.Swap(registry =>
@@ -564,7 +565,7 @@ namespace DryIoc
             var factory = GetServiceFactoryOrDefault(request, Rules.FactorySelector);
             if (factory != null && factory.Provider != null && // handle provider: open-generic, etc.
                 (factory = factory.Provider.ProvideConcreteFactory(request)) != null)
-                Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.Replace);
+                Register(factory, request.ServiceType, request.ServiceKey, IfAlreadyRegistered.Replace, false);
 
             var unknownServiceResolvers = Rules.UnknownServiceResolvers;
             if (factory == null && !unknownServiceResolvers.IsNullOrEmpty())
@@ -641,7 +642,7 @@ namespace DryIoc
                         if (i >= openGenericDecoratorIndex && decorator.Provider != null)
                         {
                             decorator = decorator.Provider.ProvideConcreteFactory(request);
-                            Register(decorator, serviceType, null, IfAlreadyRegistered.AppendNotKeyed);
+                            Register(decorator, serviceType, null, IfAlreadyRegistered.AppendNotKeyed, false);
                         }
 
                         var decoratorExpr = GetCachedFactoryExpressionOrDefault(decorator.FactoryID);
@@ -2671,7 +2672,7 @@ namespace DryIoc
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, 
             object serviceKey = null)
         {
-            registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered);
+            registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
         }
 
         /// <summary>Registers service <paramref name="serviceType"/> with corresponding <paramref name="implementationType"/>.</summary>
@@ -2690,7 +2691,7 @@ namespace DryIoc
             object serviceKey = null)
         {
             var factory = new ReflectionFactory(implementationType, reuse, with, setup);
-            registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered);
+            registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
         }
 
         /// <summary>Registers service of <paramref name="implementationType"/>. ServiceType will be the same as <paramref name="implementationType"/>.</summary>
@@ -2707,7 +2708,7 @@ namespace DryIoc
             object serviceKey = null)
         {
             var factory = new ReflectionFactory(implementationType, reuse, with, setup);
-            registrator.Register(factory, implementationType, serviceKey, ifAlreadyRegistered);
+            registrator.Register(factory, implementationType, serviceKey, ifAlreadyRegistered, false);
         }
 
         /// <summary>Registers service of <typeparamref name="TService"/> type implemented by <typeparamref name="TImplementation"/> type.</summary>
@@ -2725,8 +2726,8 @@ namespace DryIoc
             object serviceKey = null)
             where TImplementation : TService
         {
-            var factory = new ReflectionFactory(typeof(TImplementation), reuse, made, setup, skipServiceRegistrationValidation: true);
-            registrator.Register(factory, typeof(TService), serviceKey, ifAlreadyRegistered);
+            var factory = new ReflectionFactory(typeof(TImplementation), reuse, made, setup);
+            registrator.Register(factory, typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
         
         /// <summary>Registers implementation type <typeparamref name="TImplementation"/> with itself as service type.</summary>
@@ -2742,8 +2743,8 @@ namespace DryIoc
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, 
             object serviceKey = null)
         {
-            var factory = new ReflectionFactory(typeof(TImplementation), reuse, made, setup, skipServiceRegistrationValidation: true);
-            registrator.Register(factory, typeof(TImplementation), serviceKey, ifAlreadyRegistered);
+            var factory = new ReflectionFactory(typeof(TImplementation), reuse, made, setup);
+            registrator.Register(factory, typeof(TImplementation), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
 
         /// <summary>Action that could be used by User to customize register many default behavior.</summary>
@@ -2907,7 +2908,7 @@ namespace DryIoc
             object serviceKey = null)
         {
             var factory = new DelegateFactory(r => factoryDelegate(r), reuse, setup);
-            registrator.Register(factory, typeof(TService), serviceKey, ifAlreadyRegistered);
+            registrator.Register(factory, typeof(TService), serviceKey, ifAlreadyRegistered, false);
         }
 
         /// <summary>Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
@@ -2927,7 +2928,7 @@ namespace DryIoc
             Func<IResolver, object> checkedDelegate = r => factoryDelegate(r)
                 .ThrowIfNotOf(serviceType, Error.REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, r);
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
-            registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered);
+            registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
         }
 
         /// <summary>Registers decorator function that gets decorated value as input and return decorator.</summary>
@@ -2959,7 +2960,7 @@ namespace DryIoc
             {
                 var instanceType = instance == null ? null : instance.GetType();
                 var factory = new DelegateFactory(_ => instance, implementationType: instanceType);
-                container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered);
+                container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
                 return;
             }
 
@@ -2983,7 +2984,7 @@ namespace DryIoc
 
             // Create factory to locate instance in scope.
             var locatorFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse);
-            if (container.Register(locatorFactory, serviceType, serviceKey, ifAlreadyRegistered))
+            if (container.Register(locatorFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
                 reuse.GetScopeOrDefault(container.EmptyRequest)
                     .ThrowIfNull(Error.NO_SCOPE_WHEN_REGISTERING_INSTANCE, instance, reuse)
                     .SetOrAdd(locatorFactory.FactoryID, instance);
@@ -3212,7 +3213,7 @@ namespace DryIoc
         {
             concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UNABLE_TO_NEW_OPEN_GENERIC);
             var factory = new ReflectionFactory(concreteType, null, made, Setup.With(cacheFactoryExpression: false));
-            factory.ThrowIfRegisteredInvalidServiceOrImplementation(container, concreteType, null);
+            factory.ThrowIfInvalidRegistration(container, concreteType, null, isStaticallyChecked: false);
             var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).ResolveWithFactory(factory);
             var factoryDelegate = factory.GetDelegateOrDefault(request);
             var service = factoryDelegate(container.ResolutionStateCache, container.ContainerWeakRef, null);
@@ -3798,7 +3799,7 @@ namespace DryIoc
         public readonly IScope Scope;
 
         /// <summary>Returns true if request originated from first Resolve call.</summary>
-        public bool IsResolutionRoot { get { return Scope == null; }  }
+        public bool IsCompositionRoot { get { return Scope == null; }  }
 
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
         /// <param name="info">Info about service to resolve.</param> <param name="scope">(optional) Resolution scope.</param>
@@ -4236,10 +4237,12 @@ namespace DryIoc
         /// <param name="container">Container to register factory in.</param>
         /// <param name="serviceType">Service type to register factory for.</param>
         /// <param name="serviceKey">Service key to register factory with.</param>
-        public virtual void ThrowIfRegisteredInvalidServiceOrImplementation(IContainer container, Type serviceType, object serviceKey)
+        /// <param name="isStaticallyChecked">Skips service type check. Means that service and implementation are statically checked.</param>
+        public virtual void ThrowIfInvalidRegistration(IContainer container, Type serviceType, object serviceKey, bool isStaticallyChecked)
         {
-            if (serviceType.IsGenericDefinition() && Provider == null)
-                Throw.It(Error.REGISTERING_OPEN_GENERIC_REQUIRES_FACTORY_PROVIDER, serviceType);
+            if (!isStaticallyChecked)
+                if (serviceType.IsGenericDefinition() && Provider == null)
+                    Throw.It(Error.REGISTERING_OPEN_GENERIC_REQUIRES_FACTORY_PROVIDER, serviceType);
         }
 
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
@@ -4675,9 +4678,7 @@ namespace DryIoc
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">Non-abstract close or open generic type.</param>
         /// <param name="reuse">(optional)</param> <param name="made">(optional)</param> <param name="setup">(optional)</param>
-        /// <param name="skipServiceRegistrationValidation">(optional) Skips <see cref="ThrowIfRegisteredInvalidServiceOrImplementation"/>.</param>
-        public ReflectionFactory(Type implementationType, IReuse reuse = null, Made made = null, Setup setup = null,
-            bool skipServiceRegistrationValidation = false)
+        public ReflectionFactory(Type implementationType, IReuse reuse = null, Made made = null, Setup setup = null)
             : base(reuse, setup)
         {
             _implementationType = implementationType;
@@ -4685,8 +4686,6 @@ namespace DryIoc
                 _provider = new CloseGenericFactoryProvider(this);
 
             Made = made ?? Made.Default;
-
-            _skipServiceRegistrationValidation = skipServiceRegistrationValidation;
         }
 
         /// <summary>Before registering factory checks that ImplementationType is assignable, Or
@@ -4695,16 +4694,17 @@ namespace DryIoc
         /// <param name="container">Container to register factory in.</param>
         /// <param name="serviceType">Service type to register factory with.</param>
         /// <param name="serviceKey">(ignored)</param>
-        public override void ThrowIfRegisteredInvalidServiceOrImplementation(IContainer container, Type serviceType, object serviceKey)
+        /// <param name="isStaticallyChecked">Skips service type check. Means that service and implementation are statically checked.</param>
+        public override void ThrowIfInvalidRegistration(IContainer container, Type serviceType, object serviceKey, bool isStaticallyChecked)
         {
+            base.ThrowIfInvalidRegistration(container, serviceType, serviceKey, isStaticallyChecked);
+
             var implType = _implementationType;
-            if (!_skipServiceRegistrationValidation)
+            if (implType == null)
+                return;
+
+            if (!isStaticallyChecked)
             {
-                base.ThrowIfRegisteredInvalidServiceOrImplementation(container, serviceType, serviceKey);
-
-                if (implType == null)
-                    return;
-
                 if (!implType.IsGenericDefinition())
                 {
                     if (implType.IsOpenGeneric())
@@ -4748,10 +4748,11 @@ namespace DryIoc
                 }
             }
 
-            // NOTE: Not so good place to check because it is not related to service - just to implementation type
-            if (implType == null)
-                return;
+            ThrowIfRegisteringInvalidImplementationType(container, implType);
+        }
 
+        private void ThrowIfRegisteringInvalidImplementationType(IContainer container, Type implType)
+        {
             if (Made.FactoryMethod == null)
             {
                 if (container.Rules.FactoryMethod == null)
@@ -4766,7 +4767,7 @@ namespace DryIoc
             }
             else if (Made.ExpressionReturnType != null && !implType.IsGenericDefinition())
             {
-                implType.ThrowIfNotOf(Made.ExpressionReturnType, 
+                implType.ThrowIfNotOf(Made.ExpressionReturnType,
                     Error.MADE_OF_TYPE_NOT_ASSIGNABLE_TO_IMPLEMENTATION_TYPE);
             }
         }
@@ -4879,7 +4880,6 @@ namespace DryIoc
         #region Implementation
 
         private readonly Type _implementationType;
-        private readonly bool _skipServiceRegistrationValidation;
         private readonly CloseGenericFactoryProvider _provider;
 
         private sealed class CloseGenericFactoryProvider : IConcreteFactoryProvider
@@ -5937,9 +5937,10 @@ namespace DryIoc
         /// <param name="serviceType">Service type as unique key in registry for lookup.</param>
         /// <param name="serviceKey">Service key as complementary lookup for the same service type.</param>
         /// <param name="ifAlreadyRegistered">Policy how to deal with already registered factory with same service type and key.</param>
+        /// <param name="isStaticallyChecked">Confirms that service and implementation types are statically checked by compiler.</param>
         /// <returns>True if factory was added to registry, false otherwise. 
         /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
-        bool Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered);
+        bool Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered, bool isStaticallyChecked);
 
         /// <summary>Returns true if expected factory is registered with specified service key and type.</summary>
         /// <param name="serviceType">Type to lookup.</param>

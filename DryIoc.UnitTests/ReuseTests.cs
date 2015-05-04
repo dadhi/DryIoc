@@ -164,7 +164,7 @@ namespace DryIoc.UnitTests
             container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
 
             container.Register<Log>(Reuse.Transient,
-                setup: Setup.With(condition: request => request.IsResolutionRoot));
+                setup: Setup.With(condition: request => request.IsCompositionRoot));
 
             var logReuse = Reuse.InResolutionScopeOf<IViewModel>(outermost: true);
             container.Register<Log>(logReuse,
@@ -199,7 +199,7 @@ namespace DryIoc.UnitTests
 
             container.Register<Log>(Reuse.InResolutionScopeOf<IViewModel>(outermost: true));
 
-            container.Register<Log>(setup: Setup.With(condition: request => request.IsResolutionRoot));
+            container.Register<Log>(setup: Setup.With(condition: request => request.IsCompositionRoot));
 
             var presenter = container.Resolve<ViewModel1Presenter>();
 

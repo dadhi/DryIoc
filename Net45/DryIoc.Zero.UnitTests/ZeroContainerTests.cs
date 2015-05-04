@@ -141,5 +141,15 @@ namespace DryIoc.Zero.UnitTests
         }
 
         internal class NotRegistered {}
+
+        [Test]
+        public void May_check_if_service_is_registered()
+        {
+             var container = new ZeroContainer();
+            container.RegisterRoot(new CompositionRoot());
+
+            Assert.IsFalse(container.IsRegistered(typeof(NotRegistered)));
+            Assert.IsTrue(container.IsRegistered(typeof(IHandler), BlahFooh.Blah));
+        }
     }
 }

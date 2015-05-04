@@ -1,14 +1,16 @@
 ﻿<#@ template debug="false" hostspecific="true" language="C#" #>
 <#@ output extension=".cs" #>
+<#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.dll" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.dll" #>
+<#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\ExpressionToCodeLib.dll" #>
-<#@ import Namespace="System.Reflection" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Text" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
+<#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 <#
 var container = new Container(rules => rules
@@ -17,12 +19,7 @@ var container = new Container(rules => rules
 
 // NOTE: Specify implementation types to Register here:
 //=====================================================
-const string assemblyFile = "DryIoc.MefAttributedModel.UnitTests.CUT.dll";
-
-var assemblyPath = Host.ResolvePath(assemblyFile);
-var assembly = Assembly.LoadFrom(assemblyPath);
-var types = assembly.GetLoadedTypes();
-
+var types = typeof(IDecoratedResult).Assembly.GetLoadedTypes();
 container.RegisterExports(types);
 //=====================================================
 #>
