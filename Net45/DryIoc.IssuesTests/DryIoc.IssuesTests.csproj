@@ -70,6 +70,7 @@
     <Compile Include="Issue110_SupportContravarianceInResolveMany.cs" />
     <Compile Include="Issue110_HidingMultipleContravariantImplementationsBehindComposite.cs" />
     <Compile Include="Issue116_InvokeFactoryConstructorTwoTimes.cs" />
+    <Compile Include="Issue122_DecoratorIsNotHandledAcrossResolutionRoots.cs" />
     <Compile Include="Issue61_PropagateRequestToResolveInRegisteredDelegate.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
@@ -101,6 +102,10 @@
       <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
       <Name>DryIoc</Name>
       <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">
+      <Project>{E210B3D9-29C8-46F5-8968-09A0E5857158}</Project>
+      <Name>DryIoc.MefAttributedModel.UnitTests.CUT</Name>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
       <Project>{bfb1206a-3545-4369-8f23-49fd1bffc362}</Project>

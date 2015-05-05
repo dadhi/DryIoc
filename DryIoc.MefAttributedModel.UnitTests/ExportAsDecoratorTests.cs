@@ -97,18 +97,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(2, result);
         }
 
-        [Test, Ignore]
-        public void Decorator_may_be_applied_to_Lazy_decorated()
-        {
-            var container = new Container().WithMefAttributedModel();
-            container.RegisterExports(typeof(DecoratedResult), typeof(LazyDecorator));
-
-            var me = container.Resolve<IDecoratedResult>();
-            var result = me.GetResult();
-
-            Assert.AreEqual(2, result);
-        }
-
         [Test]
         public void Only_single_resolution_should_present_for_decorated_service()
         {
