@@ -589,7 +589,7 @@ namespace DryIoc
 
             var entry = registry.Services.GetValueOrDefault(serviceType);
             if (entry == null && serviceType.IsClosedGeneric())
-                entry = registry.Services.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
+                entry = registry.Services.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
 
             return entry == null ? Enumerable.Empty<KV<object, Factory>>()
                 : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Value, (Factory)entry) }
@@ -688,19 +688,15 @@ namespace DryIoc
 
         Type IContainer.UnwrapServiceType(Type serviceType)
         {
-            var itemType = serviceType.GetElementTypeOrNull();
-            if (itemType != null)
-                return ((IContainer)this).UnwrapServiceType(itemType);
+            var wrappedType = serviceType.GetElementTypeOrNull();
+            if (wrappedType == null)
+            {
+                var factory = ((IContainer)this).GetWrapperFactoryOrDefault(serviceType);
+                if (factory != null)
+                    wrappedType = ((Setup.WrapperSetup)factory.Setup).UnwrapServiceType(serviceType);
+            }
 
-            var factory = ((IContainer)this).GetWrapperFactoryOrDefault(serviceType);
-            if (factory == null)
-                return serviceType;
-
-            var wrapperSetup = (Setup.WrapperSetup)factory.Setup;
-            var wrappedServiceType = wrapperSetup.UnwrapServiceType(serviceType);
-
-            // Unwrap further recursively.
-            return ((IContainer)this).UnwrapServiceType(wrappedServiceType);
+            return wrappedType == null ? serviceType : ((IContainer)this).UnwrapServiceType(wrappedType);
         }
 
         /// <summary>For given instance resolves and sets properties and fields.</summary>
@@ -907,18 +903,24 @@ namespace DryIoc
             var services = _registry.Value.Services;
 
             var entry = services.GetValueOrDefault(serviceType);
-            if (serviceType.IsGeneric()) // keep entry or find one for open-generic
+            if ((entry == null || serviceKey != null) && serviceType.IsGeneric())
             {
-                var serviceOpenGenericType = serviceType.GetGenericDefinitionOrNull();
-                if (entry == null) // just find new one for open-generic
-                    entry = services.GetValueOrDefault(serviceOpenGenericType);
-                else if (serviceKey != null && (
-                    entry is Factory && !DefaultKey.Value.Equals(serviceKey) ||
-                    entry is FactoriesEntry && ((FactoriesEntry)entry).Factories.GetValueOrDefault(serviceKey) == null))
+                // Use open-generic entry only if:
+                // 1) Entry is not present
+                // 2) Entry does not contain factory for specified key
+                var openGenericServiceType = serviceType.GetGenericTypeDefinition();
+                if (entry == null)
+                    entry = services.GetValueOrDefault(openGenericServiceType);
+                else 
                 {
-                    var genericEntry = services.GetValueOrDefault(serviceOpenGenericType);
-                    if (genericEntry != null)
-                        entry = genericEntry;
+                    var factoriesEntry = entry as FactoriesEntry;
+                    if (factoriesEntry != null && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null ||
+                        entry is Factory && !DefaultKey.Value.Equals(serviceKey))
+                    {
+                        var openGenericEntry = services.GetValueOrDefault(openGenericServiceType);
+                        if (openGenericEntry != null)
+                            entry = openGenericEntry;
+                    }
                 }
             }
 
@@ -946,9 +948,8 @@ namespace DryIoc
             if (serviceKey != null)
             {
                 factory = factories.GetValueOrDefault(serviceKey);
-                return factory != null && 
-                    factory.Setup.Condition != null && !factory.Setup.Condition(request) 
-                    ? null : factory;
+                return factory != null && factory.Setup.Condition != null && !factory.Setup.Condition(request) ? null 
+                    : factory;
             }
 
             var defaultFactories = factories.Enumerate()
@@ -956,19 +957,21 @@ namespace DryIoc
                     (x.Value.Setup.Condition == null || x.Value.Setup.Condition(request)))
                     .ToArray();
 
-            if (defaultFactories.Length != 1)
+            if (defaultFactories.Length == 1)
             {
-                Throw.If(defaultFactories.Length > 1 && request.IfUnresolved == IfUnresolved.Throw, 
-                    Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
-                return null;
+                var defaultFactory = defaultFactories[0];
+
+                // NOTE: For resolution root sets correct default key to be used in delegate cache.
+                if (request.Parent.IsEmpty)
+                    request.ChangeServiceKey(defaultFactory.Key);
+
+                return defaultFactory.Value;
             }
+            
+            if (defaultFactories.Length > 1 && request.IfUnresolved == IfUnresolved.Throw)
+                Throw.It(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
 
-            var defaultFactory = defaultFactories[0];
-
-            // NOTE: For resolution root sets correct default key to be used in delegate cache.
-            if (request.Parent.IsEmpty)
-                request.ChangeServiceKey(defaultFactory.Key);
-            return defaultFactory.Value;
+            return null;
         }
 
         #endregion
@@ -1127,12 +1130,7 @@ namespace DryIoc
 
             public Factory GetWrapperOrDefault(Type serviceType)
             {
-                Factory factory = null;
-                if (serviceType.IsGeneric())
-                    factory = Wrappers.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull());
-                if (factory == null && !serviceType.IsGenericDefinition())
-                    factory = Wrappers.GetValueOrDefault(serviceType);
-                return factory;
+                return Wrappers.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull() ?? serviceType);
             }
 
             private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
@@ -1487,8 +1485,8 @@ namespace DryIoc
         /// <returns>True if keys have the same order.</returns>
         public override bool Equals(object key)
         {
-            return key == null
-                || key is DefaultKey && ((DefaultKey)key).RegistrationOrder == RegistrationOrder;
+            var defaultKey = key as DefaultKey;
+            return key == null || defaultKey != null && defaultKey.RegistrationOrder == RegistrationOrder;
         }
 
         /// <summary>Returns registration order as hash.</summary> <returns>Hash code.</returns>
@@ -1727,7 +1725,7 @@ namespace DryIoc
             // Register array and its collection/list interfaces.
             var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
             var arrayInterfaces = typeof(object[]).GetImplementedInterfaces()
-                .Where(t => t.IsGeneric()).Select(t => t.GetGenericDefinitionOrNull());
+                .Where(t => t.IsGeneric()).Select(t => t.GetGenericTypeDefinition());
             foreach (var arrayInterface in arrayInterfaces)
                 Wrappers = Wrappers.AddOrUpdate(arrayInterface, arrayExpr);
 
@@ -2041,7 +2039,7 @@ namespace DryIoc
         /// <param name="type">Type to check.</param><returns>True for func type, false otherwise.</returns>
         public static bool IsFuncWithArgs(this Type type)
         {
-            return type.IsFunc() && type.GetGenericDefinitionOrNull() != typeof(Func<>);
+            return type.IsFunc() && type.GetGenericTypeDefinition() != typeof(Func<>);
         }
     }
 
@@ -5004,7 +5002,7 @@ namespace DryIoc
         {
             var serviceType = request.ServiceType;
             var serviceTypeArgs = serviceType.GetGenericParamsAndArgs();
-            var serviceOpenGenericType = serviceType.GetGenericDefinitionOrNull().ThrowIfNull();
+            var serviceTypeGenericDef = serviceType.GetGenericTypeDefinition();
 
             var implTypeParams = implType.GetGenericParamsAndArgs();
             var implTypeArgs = new Type[implTypeParams.Length];
@@ -5016,7 +5014,7 @@ namespace DryIoc
             {
                 var implementedType = implementedTypes[i];
                 if (implementedType.IsOpenGeneric() &&
-                    implementedType.GetGenericDefinitionOrNull() == serviceOpenGenericType)
+                    implementedType.GetGenericDefinitionOrNull() == serviceTypeGenericDef)
                 {
                     matchFound = MatchServiceWithImplementedTypeParams(
                         implTypeArgs, implTypeParams, implementedType.GetGenericParamsAndArgs(), serviceTypeArgs);
@@ -5200,7 +5198,7 @@ namespace DryIoc
         void SetOrAdd(int id, object value);
     }
 
-    /// <summary><see cref="IScope"/> implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
+    /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
     /// Locking is used internally to ensure that object factory called only once.</summary>
     public sealed class Scope : IScope
     {
@@ -5216,15 +5214,13 @@ namespace DryIoc
             get { return _disposed == 1; }
         }
 
-        /// <summary>Creates root scope without name.</summary>
-        public Scope() { }
-
         /// <summary>Create scope with optional parent and name.</summary>
         /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
-        public Scope(IScope parent, object name)
+        public Scope(IScope parent = null, object name = null)
         {
             Parent = parent;
             Name = name;
+            _items = IntKeyTree.Empty;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -5235,8 +5231,15 @@ namespace DryIoc
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
-            if (_disposed == 1)
-                Throw.It(Error.SCOPE_IS_DISPOSED);
+            var item = _items.GetValueOrDefault(id);
+            return !(item == null || item is IRecyclable) ? item : TryGetOrAdd(id, createValue, item as IRecyclable);
+        }
+
+        private object TryGetOrAdd(int id, CreateScopedValue createValue, IRecyclable recyclableItem)
+        {
+            Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
+            if (recyclableItem != null && !recyclableItem.IsRecycled)
+                return recyclableItem;
 
             lock (_syncRoot)
             {
@@ -5244,7 +5247,7 @@ namespace DryIoc
                 if (item == null ||
                     item is IRecyclable && ((IRecyclable)item).IsRecycled)
                 {
-                    if (item != null)
+                    if (item != null) // dispose recyclable item
                         DisposeItem(item);
 
                     Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
@@ -5254,6 +5257,25 @@ namespace DryIoc
                 }
                 return item;
             }
+
+
+            //lock (_syncRoot)
+            //{
+            //    object item = null;
+            //    _items = _items.UpdateOrAdd(id, value =>
+            //    {
+            //        var recyclable = value as IRecyclable;
+            //        if (recyclable != null && recyclable.IsRecycled)
+            //        {
+            //            DisposeItem(recyclable);
+            //            value = null;
+            //        }
+
+            //        Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
+            //        return item = value ?? createValue();
+            //    });
+            //    return item;
+            //}
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -5268,8 +5290,7 @@ namespace DryIoc
         /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
-                return;
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
             if (!_items.IsEmpty)
                 foreach (var item in _items.Enumerate().Select(x => x.Value).Where(x => x is IDisposable || x is IReuseWrapper))
                     DisposeItem(item);
@@ -5286,13 +5307,13 @@ namespace DryIoc
 
         #region Implementation
 
-        private IntKeyTree _items = IntKeyTree.Empty;
+        private IntKeyTree _items;
         private int _disposed;
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
         private readonly object _syncRoot = new object();
 
-        private void DisposeItem(object item)
+        private static void DisposeItem(object item)
         {
             try
             {
@@ -7435,9 +7456,9 @@ namespace DryIoc
         }
 
         /// <summary>Delegate to get updated value based on its old and new value.</summary>
-        /// <param name="oldValue">old</param> <param name="newValue">new</param> <returns>result</returns>
+        /// <param name="oldValue">Old</param> <param name="newValue">New</param> <returns>Update result</returns>
         public delegate object UpdateValue(object oldValue, object newValue);
-
+        
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
         /// <param name="key"></param> <param name="value"></param>
         /// <param name="updateValue">Delegate to get updated value based on its old and new value.</param>

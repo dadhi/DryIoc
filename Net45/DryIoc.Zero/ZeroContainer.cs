@@ -106,7 +106,7 @@ namespace DryIoc.Zero
         /// <returns>New container.</returns>
         public ZeroContainer OpenScope()
         {
-            var newOpenedScope = new Scope(OpenedScope, null);
+            var newOpenedScope = new Scope(OpenedScope);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             ScopeContext.SetCurrent(scope =>
@@ -119,7 +119,7 @@ namespace DryIoc.Zero
         /// <returns>New container.</returns>
         public ZeroContainer OpenScopeWithoutContext()
         {
-            var newOpenedScope = new Scope(OpenedScope, null);
+            var newOpenedScope = new Scope(OpenedScope);
             return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, newOpenedScope);
         }
 
