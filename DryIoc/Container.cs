@@ -338,7 +338,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
 
             var request = _emptyRequest.Push(serviceType, ifUnresolved: ifUnresolved, scope: scope);
-            var factory = ((IContainer)this).ResolveFactory(request);
+            var factory = ((IContainer)this).ResolveFactory(request); // NOTE may change request
 
             // The situation is possible for multiple default services registered.
             if (request.ServiceKey != null)
@@ -349,12 +349,12 @@ namespace DryIoc
                 return null;
 
             var registry = _registry.Value;
-            var resultService = factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, scope);
+            var service = factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, scope);
 
             if (factory.Setup.CacheFactoryExpression)
                 registry.DefaultFactoryDelegateCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
 
-            return resultService;
+            return service;
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, 
@@ -5241,41 +5241,23 @@ namespace DryIoc
             if (recyclableItem != null && !recyclableItem.IsRecycled)
                 return recyclableItem;
 
+            object item;
             lock (_syncRoot)
             {
-                var item = _items.GetValueOrDefault(id);
-                if (item == null ||
-                    item is IRecyclable && ((IRecyclable)item).IsRecycled)
-                {
-                    if (item != null) // dispose recyclable item
-                        DisposeItem(item);
+                item = _items.GetValueOrDefault(id);
+                if (item != null && !(item is IRecyclable && ((IRecyclable)item).IsRecycled))
+                    return item;
 
-                    Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
+                if (item != null) // dispose recyclable item
+                    DisposeItem(item);
 
-                    item = createValue();
-                    Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
-                }
-                return item;
+                item = createValue();
             }
 
-
-            //lock (_syncRoot)
-            //{
-            //    object item = null;
-            //    _items = _items.UpdateOrAdd(id, value =>
-            //    {
-            //        var recyclable = value as IRecyclable;
-            //        if (recyclable != null && recyclable.IsRecycled)
-            //        {
-            //            DisposeItem(recyclable);
-            //            value = null;
-            //        }
-
-            //        Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
-            //        return item = value ?? createValue();
-            //    });
-            //    return item;
-            //}
+            Ref.Swap(ref _items, items => items.AddOrUpdate(id, item)
+                .ThrowIf(_disposed == 1, Error.SCOPE_IS_DISPOSED)); // check once more before saving items
+            
+            return item;
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>

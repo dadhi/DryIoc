@@ -116,7 +116,7 @@ namespace DryIoc.Zero.UnitTests
             var ex = Assert.Throws<ZeroContainerException>(
                 () => factory.Resolve<NotRegistered>());
 
-            Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
+            Assert.AreEqual(ex.Error, Error.UnableToResolveService);
         }
 
         [Test]

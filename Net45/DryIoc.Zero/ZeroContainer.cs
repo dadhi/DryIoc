@@ -24,6 +24,7 @@ THE SOFTWARE.
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace DryIoc.Zero
 {
@@ -83,10 +84,10 @@ namespace DryIoc.Zero
         /// <summary>Creates container.</summary>
         /// <param name="scopeContext">(optional) Scope context, by default <see cref="ThreadScopeContext"/>.</param>
         public ZeroContainer(IScopeContext scopeContext = null)
-            : this(Ref.Of(HashTree.Empty), Ref.Of(HashTree.Empty), new Scope(), scopeContext ?? new ThreadScopeContext(), null) { }
+            : this(Ref.Of(HashTree.Empty), Ref.Of(HashTree.Empty), new Scope(), scopeContext ?? new ThreadScopeContext(), null, 0) { }
         
-        private ZeroContainer(Ref<HashTree> defaultFactories, Ref<HashTree> keyedFactories, IScope singletonScope,
-            IScopeContext scopeContext, IScope openedScope)
+        private ZeroContainer(Ref<HashTree> defaultFactories, Ref<HashTree> keyedFactories, IScope singletonScope, 
+            IScopeContext scopeContext, IScope openedScope, int disposed)
         {
             _defaultFactories = defaultFactories;
             _keyedFactories = keyedFactories;
@@ -94,6 +95,8 @@ namespace DryIoc.Zero
             SingletonScope = singletonScope;
             ScopeContext = scopeContext;
             OpenedScope = openedScope;
+
+            _disposed = disposed;
         }
 
         /// <summary>Opened scope or null in root container.</summary>
@@ -106,21 +109,25 @@ namespace DryIoc.Zero
         /// <returns>New container.</returns>
         public ZeroContainer OpenScope()
         {
+            ThrowIfContainerDisposed();
             var newOpenedScope = new Scope(OpenedScope);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             ScopeContext.SetCurrent(scope =>
-                 newOpenedScope.ThrowIf(scope != OpenedScope, Error.NOT_DIRECT_SCOPE_PARENT, OpenedScope, scope));
+                 newOpenedScope.ThrowIf(scope != OpenedScope, Error.NotDirectScopeParent, OpenedScope, scope));
 
-            return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, newOpenedScope);
+            return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, newOpenedScope,
+                _disposed);
         }
 
         /// <summary>Creates new container with new opened scope independent from context.</summary>
         /// <returns>New container.</returns>
         public ZeroContainer OpenScopeWithoutContext()
         {
+            ThrowIfContainerDisposed();
             var newOpenedScope = new Scope(OpenedScope);
-            return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, newOpenedScope);
+            return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, newOpenedScope, 
+                _disposed);
         }
 
         #region IFactoryDelegateRegistrator
@@ -129,6 +136,7 @@ namespace DryIoc.Zero
         /// <param name="serviceType">Type</param> <param name="factoryDelegate">Delegate</param>
         public void Register(Type serviceType, StatelessFactoryDelegate factoryDelegate)
         {
+            ThrowIfContainerDisposed();
             _defaultFactories.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
         }
 
@@ -136,6 +144,7 @@ namespace DryIoc.Zero
         /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param> <param name="factoryDelegate">Delegate</param>
         public void Register(Type serviceType, object serviceKey, StatelessFactoryDelegate factoryDelegate)
         {
+            ThrowIfContainerDisposed();
             _keyedFactories.Swap(_ =>
             {
                 var entry = _.GetValueOrDefault(serviceType) as HashTree ?? HashTree.Empty;
@@ -145,12 +154,14 @@ namespace DryIoc.Zero
 
         public bool IsRegistered(Type serviceType)
         {
+            ThrowIfContainerDisposed();
             return _defaultFactories.Value.GetValueOrDefault(serviceType) != null 
                 || _keyedFactories.Value.GetValueOrDefault(serviceType) != null;
         }
 
         public bool IsRegistered(Type serviceType, object serviceKey)
         {
+            ThrowIfContainerDisposed();
             var entry = _keyedFactories.Value.GetValueOrDefault(serviceType) as HashTree;
             return entry != null && entry.GetValueOrDefault(serviceKey) != null;
         }
@@ -171,6 +182,8 @@ namespace DryIoc.Zero
             Justification = "Does not container any unmanaged resources.")]
         public void Dispose()
         {
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
+
             if (OpenedScope != null)
                 OpenedScope.Dispose();
             else
@@ -184,6 +197,18 @@ namespace DryIoc.Zero
             }
         }
 
+        public bool IsDisposed
+        {
+            get { return _disposed == 1; }
+        }
+
+        private int _disposed;
+        private void ThrowIfContainerDisposed()
+        {
+            if (IsDisposed)
+                Throw.It(Error.ContainerIsDisposed);
+        }
+        
         /// <summary>Scope containing container singletons.</summary>
         public IScope SingletonScope { get; private set; }
 
@@ -191,20 +216,20 @@ namespace DryIoc.Zero
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <returns>Found scope or throws exception.</returns>
         /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
-        /// <exception cref="ZeroContainerException"> with code <see cref="DryIoc.Zero.Error.NO_MATCHED_SCOPE_FOUND"/>.</exception>
+        /// <exception cref="ZeroContainerException"> with code <see cref="Error.NoMatchedScopeFound"/>.</exception>
         public IScope GetCurrentNamedScope(object name, bool throwIfNotFound)
         {
             var currentScope = ScopeContext == null ? OpenedScope : ScopeContext.GetCurrentOrDefault();
             if (currentScope == null)
             {
-                if (throwIfNotFound) Throw.It(Error.NO_CURRENT_SCOPE);
+                if (throwIfNotFound) Throw.It(Error.NoCurrentScope);
                 return null;
             }
 
             var matchingScope = GetMatchingScopeOrDefault(currentScope, name);
             if (matchingScope == null)
             {
-                if (throwIfNotFound) Throw.It(Error.NO_MATCHED_SCOPE_FOUND, name);
+                if (throwIfNotFound) Throw.It(Error.NoMatchedScopeFound, name);
                 return null;
             }
 
@@ -234,7 +259,7 @@ namespace DryIoc.Zero
             var matchingScope = GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost);
             if (matchingScope == null)
             {
-                if (throwIfNotFound) Throw.It(Error.NO_MATCHED_SCOPE_FOUND, new KV(assignableFromServiceType, serviceKey));
+                if (throwIfNotFound) Throw.It(Error.NoMatchedScopeFound, new KV(assignableFromServiceType, serviceKey));
                 return null;
             }
             return matchingScope;
@@ -350,7 +375,7 @@ namespace DryIoc.Zero
 
         private static object GetDefaultOrThrowIfUnresolved(Type serviceType, IfUnresolved ifUnresolved)
         {
-            if (ifUnresolved == IfUnresolved.Throw) Throw.It(Error.UNABLE_TO_RESOLVE_SERVICE, serviceType);
+            if (ifUnresolved == IfUnresolved.Throw) Throw.It(Error.UnableToResolveService, serviceType);
             return null;
         }
 
@@ -494,24 +519,26 @@ namespace DryIoc.Zero
     public static class Error
     {
         /// <summary>First error code to identify error range for other possible error code definitions.</summary>
-        public readonly static int FIRST_ERROR_CODE = 0;
+        public readonly static int FirstErrorCode = 0;
 
         /// <summary>List of error messages indexed with code.</summary>
         public readonly static List<string> Messages = new List<string>(100);
 
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
-            UNABLE_TO_RESOLVE_SERVICE = Of(
+            UnableToResolveService = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
                 "Please ensure you have service registered (with proper key) - 95% of cases." + Environment.NewLine +
                 "Remaining 5%: Service does not match the reuse scope, or service has wrong Setup.With(condition), or no Rules.WithUnknownServiceResolver(ForMyService)."),
-            NO_CURRENT_SCOPE = Of(
+            NoCurrentScope = Of(
                 "No current scope available: probably you are registering to, or resolving from outside of scope."),
-            NO_MATCHED_SCOPE_FOUND = Of(
+            NoMatchedScopeFound = Of(
                 "Unable to find scope with matching name: {0}."),
-            NOT_DIRECT_SCOPE_PARENT = Of(
+            NotDirectScopeParent = Of(
                 "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." + Environment.NewLine +
-                "It is probably other scope was opened in between OR you forgot to Dispose some other scope!");
+                "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
+            ContainerIsDisposed = Of(
+                "Container is disposed and its operations are no longer available.");
 #pragma warning restore 1591 // "Missing XML-comment"
 
         /// <summary>Generates new code for message.</summary>
@@ -519,7 +546,7 @@ namespace DryIoc.Zero
         public static int Of(string message)
         {
             Messages.Add(message);
-            return FIRST_ERROR_CODE + Messages.Count - 1;
+            return FirstErrorCode + Messages.Count - 1;
         }
     }
 
