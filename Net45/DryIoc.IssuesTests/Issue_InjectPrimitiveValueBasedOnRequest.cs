@@ -39,10 +39,8 @@ namespace DryIoc.IssuesTests
             _subject.Register<Target>();
             _subject.Register<ILog, Log>(
                 serviceKey: "normal",
-                made: Parameters.Of.Details((request, parameter) =>
-                    parameter.Name == "input" && parameter.ParameterType == typeof(string)
-                    ? ServiceDetails.Of(request.ParentNonWrapper(p => p.ServiceType != typeof(ILog)).ImplementationType.FullName)
-                    : null));
+                made: Parameters.Of.Type<string>(request =>
+                    request.ParentNonWrapper(p => p.ServiceType != typeof(ILog)).ImplementationType.FullName));
             
             _subject.Register<ILog, LogWrapper>();
 

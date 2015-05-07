@@ -4522,6 +4522,16 @@ namespace DryIoc
             return source.Details((r, p) => !typeof(T).IsAssignableTo(p.ParameterType) ? null
                 : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
         }
+
+        /// <summary>Specify parameter by type and set custom value to it.</summary>
+        /// <typeparam name="T">Parameter type.</typeparam>
+        /// <param name="source">Original parameters rules.</param> 
+        /// <param name="getCustomValue">Custom value provider.</param>
+        /// <returns>New parameters rules.</returns>
+        public static ParameterSelector Type<T>(this ParameterSelector source, Func<Request, object> getCustomValue)
+        {
+            return source.Details((r, p) => p.ParameterType == typeof(T) ? ServiceDetails.Of(getCustomValue(r)) : null);
+        }
     }
 
     /// <summary>DSL for specifying <see cref="PropertiesAndFieldsSelector"/> injection rules.</summary>

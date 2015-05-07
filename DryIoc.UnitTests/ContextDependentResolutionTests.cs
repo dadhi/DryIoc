@@ -1,5 +1,3 @@
-using System;
-using System.Linq.Expressions;
 using NUnit.Framework;
 // ReSharper disable MemberHidesStaticFromOuterClass
 
@@ -120,22 +118,6 @@ namespace DryIoc.UnitTests
             public string Log(string message)
             {
                 return typeof(T) + ": " + message;
-            }
-        }
-
-        public class PlainLogger : ILogger
-        {
-            public string Log(string message)
-            {
-                return message;
-            }
-        }
-
-        public class FastLogger : ILogger
-        {
-            public string Log(string message)
-            {
-                return message;
             }
         }
 
