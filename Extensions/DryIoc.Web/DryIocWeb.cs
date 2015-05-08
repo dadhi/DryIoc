@@ -15,7 +15,7 @@ namespace DryIoc.Web
         /// <param name="container">Original container with some rules and registrations.</param>
         /// <param name="getContextItems">(optional) Arbitrary or test context to use instead of <see cref="HttpContext.Current"/>.</param>
         /// <returns>New container with the same rules and registrations/cache but with new ambient context.</returns>
-        public static IContainer WithWebReuseInRequest(this IContainer container, Func<IDictionary> getContextItems = null)
+        public static IContainer WithHttpContextScopeContext(this IContainer container, Func<IDictionary> getContextItems = null)
         {
             return container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext(getContextItems));
         }
@@ -75,37 +75,40 @@ namespace DryIoc.Web
     {
         /// <summary>Provides default context items dictionary using <see cref="HttpContext.Current"/>.
         /// Could be overridden with any key-value dictionary where <see cref="HttpContext"/> is not available, e.g. in tests.</summary>
-        public static Func<IDictionary> GetContextItems = () => HttpContext.Current.ThrowIfNull().Items;
+        public static Func<IDictionary> GetContextItems = () => 
+            HttpContext.Current.ThrowIfNull(Error.Of("No HttpContext is available.")).Items;
 
         /// <summary>Creates the context optionally with arbitrary/test items storage.</summary>
         /// <param name="getContextItems">(optional) Arbitrary/test items storage.</param>
         public HttpContextScopeContext(Func<IDictionary> getContextItems = null)
         {
+            _currentScopeEntryKey = RootScopeName;
             _getContextItems = getContextItems ?? GetContextItems;
         }
 
         /// <summary>Fixed root scope name for the context.</summary>
-        public static readonly object ROOT_SCOPE_NAME = typeof(HttpContextScopeContext);
+        public static readonly string ScopeContextName = typeof(HttpContextScopeContext).FullName;
 
-        /// <summary>Returns fixed <see cref="ROOT_SCOPE_NAME"/>.</summary>
-        public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
+        /// <summary>Returns fixed name.</summary>
+        public string RootScopeName { get { return ScopeContextName; } }
 
         /// <summary>Returns current ambient scope stored in item storage.</summary> <returns>Current scope or null if there is no.</returns>
         public IScope GetCurrentOrDefault()
         {
-            return _getContextItems()[RootScopeName] as IScope;
+            return _getContextItems()[_currentScopeEntryKey] as IScope;
         }
 
         /// <summary>Sets the new scope as current using existing current as input.</summary>
-        /// <param name="getNewScope">Delegate to get new scope.</param>
+        /// <param name="setCurrentScope">Delegate to get new scope.</param>
         /// <returns>Return new current scope.</returns>
-        public IScope SetCurrent(GetNewScopeHandler getNewScope)
+        public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
         {
-            var newCurrentScope = getNewScope.ThrowIfNull()(GetCurrentOrDefault());
-            _getContextItems()[ROOT_SCOPE_NAME] = newCurrentScope;
+            var newCurrentScope = setCurrentScope.ThrowIfNull()(GetCurrentOrDefault());
+            _getContextItems()[_currentScopeEntryKey] = newCurrentScope;
             return newCurrentScope;
         }
 
+        private readonly string _currentScopeEntryKey;
         private readonly Func<IDictionary> _getContextItems;
     }
 }

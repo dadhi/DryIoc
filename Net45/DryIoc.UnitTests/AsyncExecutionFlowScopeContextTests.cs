@@ -94,16 +94,38 @@ namespace DryIoc.UnitTests
         [Test]
         public async void Scoped_service_should_Not_propagate_over_async_boundary_with_thread_context()
         {
-            var container = new Container(scopeContext: new ThreadScopeContext());
-            container.Register<Blah>(Reuse.InCurrentScope);
-
-            using (var scope = container.OpenScope())
+            using (var container = new Container(scopeContext: new ThreadScopeContext()))
             {
-                scope.Resolve<Blah>();
-                await Task.Delay(100).ConfigureAwait(false);
-                var ex = Assert.Throws<ContainerException>(() => scope.Resolve<Blah>());
-                Assert.AreEqual(Error.NO_CURRENT_SCOPE, ex.Error);
+                container.Register<Blah>(Reuse.InCurrentScope);
+
+                using (var scope = container.OpenScope())
+                {
+                    scope.Resolve<Blah>();
+                    await Task.Delay(100).ConfigureAwait(false);
+                    var ex = Assert.Throws<ContainerException>(() => scope.Resolve<Blah>());
+                    Assert.AreEqual(Error.NO_CURRENT_SCOPE, ex.Error);
+                }
             }
+        }
+
+        [Test]
+        public void Undisposed_scope_from_context_should_be_disposed_by_container_disposal()
+        {
+            using (var container = new Container(scopeContext: new ThreadScopeContext()))
+            {
+                container.OpenScope();
+            }
+        }
+
+        [Test]
+        public void Different_containers_should_not_conflict_with_ambient_scope()
+        {
+            var container1 = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
+            var container2 = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
+
+            using (container1.OpenScope())
+                Assert.DoesNotThrow(() => 
+                   container2.OpenScope());
         }
 
         internal class Blah
