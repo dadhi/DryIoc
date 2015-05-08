@@ -214,14 +214,12 @@ namespace DryIoc
             }
             else // for Container created with constructor.
             {
-                if (_scopeContext is IDisposable)
-                    ((IDisposable)_scopeContext).Dispose();
-
+                Rules = Rules.Empty;
+                _registry.Swap(_ => Registry.Empty);
                 _singletonScope.Dispose();
 
-                _registry.Swap(_ => Registry.Empty);
-
-                Rules = Rules.Empty;
+                if (_scopeContext is IDisposable)
+                    ((IDisposable)_scopeContext).Dispose();
             }
         }
 
@@ -5334,14 +5332,14 @@ namespace DryIoc
     /// <summary>Delegate to get new scope from old/existing current scope.</summary>
     /// <param name="oldScope">Old/existing scope to change.</param>
     /// <returns>New scope or old if do not want to change current scope.</returns>
-    public delegate IScope GetNewScopeHandler(IScope oldScope);
+    public delegate IScope SetCurrentScopeHandler(IScope oldScope);
 
     /// <summary>Provides ambient current scope and optionally scope storage for container, 
     /// examples are HttpContext storage, Execution context, Thread local.</summary>
     public interface IScopeContext
     {
         /// <summary>Name associated with context root scope - so the reuse may find scope context.</summary>
-        object RootScopeName { get; }
+        string RootScopeName { get; }
 
         /// <summary>Returns current scope or null if no ambient scope available at the moment.</summary>
         /// <returns>Current scope or null.</returns>
@@ -5349,11 +5347,11 @@ namespace DryIoc
 
         /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and
         /// should return new current scope.</summary>
-        /// <param name="getNewScope">Delegate to change the scope.</param>
-        /// <remarks>Important: <paramref name="getNewScope"/> may be called multiple times in concurrent environment.
+        /// <param name="setCurrentScope">Delegate to change the scope.</param>
+        /// <remarks>Important: <paramref name="setCurrentScope"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
         /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
-        IScope SetCurrent(GetNewScopeHandler getNewScope);
+        IScope SetCurrent(SetCurrentScopeHandler setCurrentScope);
     }
 
     /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
@@ -5361,11 +5359,11 @@ namespace DryIoc
     public sealed class ThreadScopeContext : IScopeContext, IDisposable
     {
         /// <summary>Provides static access to <see cref="RootScopeName"/>. It is OK because its constant.</summary>
-        public static readonly object ROOT_SCOPE_NAME = typeof(ThreadScopeContext);
+        public static readonly string ScopeContextName = typeof(ThreadScopeContext).FullName;
 
         /// <summary>Key to identify context.</summary>
-        public object RootScopeName { get { return ROOT_SCOPE_NAME; } }
-
+        public string RootScopeName { get { return ScopeContextName; } }
+        
         /// <summary>Returns current scope in calling Thread or null, if no scope tracked.</summary>
         /// <returns>Found scope or null.</returns>
         public IScope GetCurrentOrDefault()
@@ -5374,28 +5372,25 @@ namespace DryIoc
         }
 
         /// <summary>Change current scope for the calling Thread.</summary>
-        /// <param name="getNewScope">Delegate to change the scope given current one (or null).</param>
-        /// <remarks>Important: <paramref name="getNewScope"/> may be called multiple times in concurrent environment.
+        /// <param name="setCurrentScope">Delegate to change the scope given current one (or null).</param>
+        /// <remarks>Important: <paramref name="setCurrentScope"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
-        public IScope SetCurrent(GetNewScopeHandler getNewScope)
+        public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
         {
             var threadId = Portable.GetCurrentManagedThreadID();
             IScope newScope = null;
             Ref.Swap(ref _scopes, scopes =>
-                scopes.AddOrUpdate(threadId, newScope = getNewScope(scopes.GetValueOrDefault(threadId) as IScope)));
+                scopes.AddOrUpdate(threadId, newScope = setCurrentScope(scopes.GetValueOrDefault(threadId) as IScope)));
             return newScope;
         }
 
         /// <summary>Disposed all stored/tracked scopes and empties internal scope storage.</summary>
         public void Dispose()
         {
-            Ref.Swap(ref _scopes, scopes =>
-            {
-                if (!scopes.IsEmpty)
-                    foreach (var scope in scopes.Enumerate().Where(scope => scope.Value is IDisposable))
-                        ((IDisposable)scope.Value).Dispose();
-                return IntKeyTree.Empty;
-            });
+            if (!_scopes.IsEmpty)
+                foreach (var scope in _scopes.Enumerate().Where(scope => scope.Value is IDisposable))
+                    ((IDisposable)scope.Value).Dispose();
+            _scopes = IntKeyTree.Empty;
         }
 
         private IntKeyTree _scopes = IntKeyTree.Empty;
@@ -5605,7 +5600,7 @@ namespace DryIoc
         }
 
         /// <summary>Ensuring single service instance per Thread.</summary>
-        public static readonly IReuse InThread = InCurrentNamedScope(ThreadScopeContext.ROOT_SCOPE_NAME);
+        public static readonly IReuse InThread = InCurrentNamedScope(ThreadScopeContext.ScopeContextName);
 
         /// <summary>Special name that by convention recognized by <see cref="InWebRequest"/>.</summary>
         public static readonly string WebRequestScopeName = "WebRequestScopeName";
