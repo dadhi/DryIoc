@@ -7,8 +7,38 @@ namespace DryIoc.IssuesTests
     /// <summary>
     /// On hold. Here is the workaround with FactoryMethod.
     /// </summary>
-    internal class Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor
+    [TestFixture]
+    public class Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor
     {
+        [Test]
+        public void May_set_propeprties_with_decoragtor()
+        {
+            var container = new Container();
+            container.Register<Hey>();
+            container.Register<Hey>(made: Made.Of(() => Decor(default(Hey), default(string))), setup: Setup.Decorator);
+            container.RegisterInstance("no");
+
+            var hey = container.Resolve<Hey>();
+
+            Assert.AreEqual("yes", hey.Me);
+        }
+
+        public static Hey Decor(Hey hey, string me)
+        {
+            if (hey.Me == null)
+                hey.Me = me;
+            return hey;
+        }
+
+        public class Hey
+        {
+            public string Me { get; set; }
+            public Hey()
+            {
+                Me = "yes";
+            }
+        }
+
         /// <summary>
         /// Posted as answer to: http://stackoverflow.com/questions/321650/how-do-i-set-a-field-value-in-an-c-sharp-expression-tree
         /// </summary>
