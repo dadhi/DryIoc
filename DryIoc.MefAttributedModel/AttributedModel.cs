@@ -159,7 +159,7 @@ namespace DryIoc.MefAttributedModel
         {
             return reuseType == null ? null
                 : SupportedReuseTypes.GetValueOrDefault(reuseType)
-                .ThrowIfNull(Error.UNSUPPORTED_REUSE_TYPE, reuseType)
+                .ThrowIfNull(Error.UnsupportedReuseType, reuseType)
                 .Invoke(reuseName);
         }
 
@@ -173,7 +173,7 @@ namespace DryIoc.MefAttributedModel
             var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
             var constructor = constructors.Length == 1 ? constructors[0]
                 : constructors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
-                    .ThrowIfNull(Error.NO_SINGLE_CTOR_WITH_IMPORTING_ATTR, implementationType);
+                    .ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implementationType);
             return FactoryMethod.Of(constructor);
         }
 
@@ -230,7 +230,7 @@ namespace DryIoc.MefAttributedModel
             var metadata = meta.Metadata;
             var factory = container.GetAllServiceFactories(reflectedType)
                 .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
-                .ThrowIfNull(Error.NOT_FIND_DEPENDENCY_WITH_METADATA, reflectedType, metadata, request);
+                .ThrowIfNull(Error.NotFindDependencyWithMetadata, reflectedType, metadata, request);
 
             return factory.Key;
         }
@@ -332,7 +332,7 @@ namespace DryIoc.MefAttributedModel
 
                 if (attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
-                    Throw.If(info.HasMetadataAttribute, Error.UNSUPPORTED_MULTIPLE_METADATA, implementationType);
+                    Throw.If(info.HasMetadataAttribute, Error.UnsupportedMultipleMetadata, implementationType);
                     info.HasMetadataAttribute = true;
                 }
             }
@@ -340,7 +340,7 @@ namespace DryIoc.MefAttributedModel
             if (info.FactoryType == FactoryType.Decorator)
                 info.ReuseType = null;
 
-            info.Exports.ThrowIfNull(Error.NO_EXPORT, implementationType);
+            info.Exports.ThrowIfNull(Error.NoExport, implementationType);
             return info;
         }
 
@@ -382,7 +382,7 @@ namespace DryIoc.MefAttributedModel
                 .Select(t => new ExportInfo(t, attribute.ContractName ?? attribute.ContractKey))
                 .ToArray();
             
-            Throw.If(exports.Length == 0, Error.NO_TYPES_IN_EXPORT_ALL,
+            Throw.If(exports.Length == 0, Error.NoTypesInExportAll,
                 implementationType, allContractTypes);
 
             var currentExports = currentInfo.Exports;
@@ -397,7 +397,7 @@ namespace DryIoc.MefAttributedModel
         private static void PopulateWrapperInfoFromAttribute(RegistrationInfo resultInfo, AsWrapperAttribute attribute,
             Type implementationType)
         {
-            Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
+            Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
             resultInfo.FactoryType = FactoryType.Wrapper;
             resultInfo.Wrapper = new WrapperInfo { 
                 WrappedServiceType = attribute.WrappedContractType, 
@@ -407,7 +407,7 @@ namespace DryIoc.MefAttributedModel
         private static void PopulateDecoratorInfoFromAttribute(RegistrationInfo resultInfo, AsDecoratorAttribute attribute,
             Type implementationType)
         {
-            Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UNSUPPORTED_MULTIPLE_FACTORY_TYPES, implementationType);
+            Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
             resultInfo.FactoryType = FactoryType.Decorator;
             var decoratedServiceKeyInfo = ServiceKeyInfo.Of(attribute.ContractName ?? attribute.ContractKey);
             resultInfo.Decorator = new DecoratorInfo { DecoratedServiceKeyInfo = decoratedServiceKeyInfo };
@@ -485,29 +485,29 @@ namespace DryIoc.MefAttributedModel
         public readonly static IList<string> Messages = new List<string>(20);
 
         /// <summary>Codes are starting from this value.</summary>
-        public readonly static int FIRST_ERROR_CODE = 100;
+        public readonly static int FirstErrorCode = 100;
 
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
-            NO_SINGLE_CTOR_WITH_IMPORTING_ATTR  = Of("Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}."),
-            NOT_FIND_DEPENDENCY_WITH_METADATA   = Of("Unable to resolve dependency {0} with metadata [{1}] in {2}"),
-            UNSUPPORTED_MULTIPLE_METADATA       = Of("Multiple associated metadata found while exporting {0}." + Environment.NewLine 
+            NoSingleCtorWithImportingAttr  = Of("Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}."),
+            NotFindDependencyWithMetadata   = Of("Unable to resolve dependency {0} with metadata [{1}] in {2}"),
+            UnsupportedMultipleMetadata       = Of("Multiple associated metadata found while exporting {0}." + Environment.NewLine 
                                                     + "Only single metadata is supported per implementation type, please remove the rest."),
-            UNSUPPORTED_MULTIPLE_FACTORY_TYPES  = Of("Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
-            NO_EXPORT                           = Of("At least one Export attributed should be defined for {0}."),
-            NO_TYPES_IN_EXPORT_ALL              = Of("Unable to get contract types for implementation {0} because all of its implemented types where filtered out: {1}"),
-            UNSUPPORTED_REUSE_TYPE              = Of("Attributed model does not support reuse type {0}."),
-            UNSUPPORTED_REUSE_WRAPPER_TYPE      = Of("Attributed model does not support reuse wrapper type {0}."),
-            NO_WRAPPED_TYPE_EXPORTED_WRAPPER    = Of("Exported non-generic wrapper type {0} requires wrapped service type to be specified, but it is null "
+            UnsupportedMultipleFactoryTypes  = Of("Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
+            NoExport                           = Of("At least one Export attributed should be defined for {0}."),
+            NoTypesInExportAll              = Of("Unable to get contract types for implementation {0} because all of its implemented types where filtered out: {1}"),
+            UnsupportedReuseType              = Of("Attributed model does not support reuse type {0}."),
+            UnsupportedReuseWrapperType      = Of("Attributed model does not support reuse wrapper type {0}."),
+            NoWrappedTypeExportedWrapper    = Of("Exported non-generic wrapper type {0} requires wrapped service type to be specified, but it is null "
                                                     + "and instead generic argument index is set to {1}."),
-            WRAPPED_ARG_INDEX_OUT_OF_BOUNDS     = Of("Exported generic wrapper type {0} specifies generic argument index {1} outside of argument list size.");
+            WrappedArgIndexOutOfBounds     = Of("Exported generic wrapper type {0} specifies generic argument index {1} outside of argument list size.");
 #pragma warning restore 1591
 
         /// <summary>Returns message by provided error code.</summary>
-        /// <param name="error">Code starting from <see cref="FIRST_ERROR_CODE"/></param> <returns>String message.</returns>
+        /// <param name="error">Code starting from <see cref="FirstErrorCode"/></param> <returns>String message.</returns>
         public static string GetMessage(int error)
         {
-            return Messages[error - FIRST_ERROR_CODE];
+            return Messages[error - FirstErrorCode];
         }
 
         #region Implementation
@@ -516,7 +516,7 @@ namespace DryIoc.MefAttributedModel
         {
             var original = Throw.GetMatchedException;
             Throw.GetMatchedException = (check, error, arg0, arg1, arg2, arg3, inner) =>
-                0 <= error - FIRST_ERROR_CODE && error - FIRST_ERROR_CODE < Messages.Count
+                0 <= error - FirstErrorCode && error - FirstErrorCode < Messages.Count
                     ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner)
                     : original(check, error, arg0, arg1, arg2, arg3, inner);
         }
@@ -524,7 +524,7 @@ namespace DryIoc.MefAttributedModel
         private static int Of(string message)
         {
             Messages.Add(message);
-            return FIRST_ERROR_CODE + Messages.Count - 1;
+            return FirstErrorCode + Messages.Count - 1;
         }
 
         #endregion
@@ -839,11 +839,11 @@ namespace DryIoc.MefAttributedModel
                 return WrappedServiceType;
 
             wrapperType.ThrowIf(!wrapperType.IsClosedGeneric(),
-                Error.NO_WRAPPED_TYPE_EXPORTED_WRAPPER, WrappedServiceTypeGenericArgIndex);
+                Error.NoWrappedTypeExportedWrapper, WrappedServiceTypeGenericArgIndex);
 
             var typeArgs = wrapperType.GetGenericParamsAndArgs();
             wrapperType.ThrowIf(WrappedServiceTypeGenericArgIndex > typeArgs.Length - 1,
-                Error.WRAPPED_ARG_INDEX_OUT_OF_BOUNDS, WrappedServiceTypeGenericArgIndex);
+                Error.WrappedArgIndexOutOfBounds, WrappedServiceTypeGenericArgIndex);
 
             return typeArgs[WrappedServiceTypeGenericArgIndex];
         }

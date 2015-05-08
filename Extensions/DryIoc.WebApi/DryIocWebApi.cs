@@ -237,7 +237,7 @@ namespace DryIoc.WebApi
         public void RegisterInDependencyScope(HttpRequestMessage request)
         {
             var dependencyScope = request.ThrowIfNull()
-                .GetDependencyScope().ThrowIfNotOf(typeof(DryIocDependencyScope), Error.REQUEST_MESSAGE_DOESNOT_REFERENCE_DRYIOC_DEPENDENCY_SCOPE);
+                .GetDependencyScope().ThrowIfNotOf(typeof(DryIocDependencyScope), Error.RequestMessageDoesnotReferenceDryiocDependencyScope);
             
             var container = ((DryIocDependencyScope)dependencyScope).ScopedContainer;
             container.RegisterInstance(request, Reuse.InWebRequest, IfAlreadyRegistered.Replace);
@@ -249,7 +249,7 @@ namespace DryIoc.WebApi
     {
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
-            REQUEST_MESSAGE_DOESNOT_REFERENCE_DRYIOC_DEPENDENCY_SCOPE = DryIoc.Error.Of(
+            RequestMessageDoesnotReferenceDryiocDependencyScope = DryIoc.Error.Of(
                 "Expecting request message dependency scope to be of type {1} but found: {0}.");
 #pragma warning restore 1591
     }

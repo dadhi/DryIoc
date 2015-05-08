@@ -30,7 +30,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
             container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Throw));
 
-            Assert.AreEqual(ex.Error, Error.UNABLE_TO_REGISTER_DUPLICATE_DEFAULT);
+            Assert.AreEqual(ex.Error, Error.UnableToRegisterDuplicateDefault);
         }
 
         [Test]
@@ -44,7 +44,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
             container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Throw));
 
-            Assert.AreEqual(ex.Error, Error.UNABLE_TO_REGISTER_DUPLICATE_DEFAULT);
+            Assert.AreEqual(ex.Error, Error.UnableToRegisterDuplicateDefault);
         }
 
         [Test]

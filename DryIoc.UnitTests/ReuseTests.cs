@@ -95,7 +95,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<AccountUser>());
 
-            Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
+            Assert.AreEqual(ex.Error, Error.UnableToResolveService);
         }
 
         [Test]
@@ -398,7 +398,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Client>());
 
-            Assert.That(ex.Error, Is.EqualTo(Error.DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN));
+            Assert.That(ex.Error, Is.EqualTo(Error.DependencyHasShorterReuseLifespan));
         }
 
         [Test]

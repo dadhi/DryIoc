@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests
             using (var s1 = container.OpenScope())
             {
                 var ex = Assert.Throws<ContainerException>(() => s1.Resolve<Blah>());
-                Assert.That(ex.Error, Is.EqualTo(Error.UNABLE_TO_RESOLVE_SERVICE));
+                Assert.That(ex.Error, Is.EqualTo(Error.UnableToResolveService));
             }
         }
 
@@ -47,7 +47,7 @@ namespace DryIoc.UnitTests
             container.Register<Blah>(Reuse.InCurrentNamedScope(1));
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Blah>());
-            Assert.That(ex.Error, Is.EqualTo(Error.UNABLE_TO_RESOLVE_SERVICE));
+            Assert.That(ex.Error, Is.EqualTo(Error.UnableToResolveService));
         }
 
         [Test]
@@ -103,7 +103,7 @@ namespace DryIoc.UnitTests
                     scope.Resolve<Blah>();
                     await Task.Delay(100).ConfigureAwait(false);
                     var ex = Assert.Throws<ContainerException>(() => scope.Resolve<Blah>());
-                    Assert.AreEqual(Error.NO_CURRENT_SCOPE, ex.Error);
+                    Assert.AreEqual(Error.NoCurrentScope, ex.Error);
                 }
             }
         }

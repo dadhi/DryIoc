@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.RegisterInstance("a", Reuse.InCurrentNamedScope("b")));
 
-            Assert.AreEqual(ex.Error, Error.NO_SCOPE_WHEN_REGISTERING_INSTANCE);
+            Assert.AreEqual(ex.Error, Error.NoScopeWhenRegisteringInstance);
         }
 
         [Test]
@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
             }
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<string>());
-            Assert.AreEqual(ex.Error, Error.NO_CURRENT_SCOPE);
+            Assert.AreEqual(ex.Error, Error.NoCurrentScope);
         }
 
         [Test]
@@ -61,7 +61,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.RegisterInstance(typeof(int), "ring", serviceKey: "MyPrecious"));
 
-            Assert.AreEqual(ex.Error, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
+            Assert.AreEqual(ex.Error, Error.RegedObjNotAssignableToServiceType);
         }
 
         [Test]
@@ -83,7 +83,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.WithoutSingletonsAndCache().Resolve<string>());
 
-            Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
+            Assert.AreEqual(ex.Error, Error.UnableToResolveService);
         }
 
         [Test]

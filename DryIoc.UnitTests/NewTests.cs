@@ -59,7 +59,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.New(typeof(DoorFor<>)));
 
-            Assert.AreEqual(ex.Error, Error.UNABLE_TO_NEW_OPEN_GENERIC);
+            Assert.AreEqual(ex.Error, Error.UnableToNewOpenGeneric);
         }
 
         internal class Wheels

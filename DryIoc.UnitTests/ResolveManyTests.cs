@@ -137,7 +137,7 @@ namespace DryIoc.UnitTests
                 // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
                 container.ResolveMany<AnotherService>(typeof(Service)).ToArray());
 
-            Assert.AreEqual(ex.Error, Error.WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE);
+            Assert.AreEqual(ex.Error, Error.WrappedNotAssignableFromRequiredType);
         }
 
         [Test]

@@ -79,7 +79,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<InjectionRulesTests.ClientWithServiceAndStringParam>());
 
-            Assert.AreEqual(ex.Error, Error.STATE_IS_REQUIRED_TO_USE_ITEM);
+            Assert.AreEqual(ex.Error, Error.StateIsRequiredToUseItem);
         }
 
         [Test]
@@ -106,7 +106,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<InjectionRulesTests.ClientWithServiceAndStringProperty>());
 
-            Assert.AreEqual(ex.Error, Error.STATE_IS_REQUIRED_TO_USE_ITEM);
+            Assert.AreEqual(ex.Error, Error.StateIsRequiredToUseItem);
         }
 
         [Test]

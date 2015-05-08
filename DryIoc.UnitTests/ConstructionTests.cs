@@ -129,7 +129,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
 
-            Assert.AreEqual(ex.Error, Error.UNABLE_TO_RESOLVE_SERVICE);
+            Assert.AreEqual(ex.Error, Error.UnableToResolveService);
             Assert.That(ex.Message, Is.StringContaining("Unable to resolve"));
         }
 
@@ -142,7 +142,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<IService>());
 
-            Assert.AreEqual(ex.Error, Error.FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD);
+            Assert.AreEqual(ex.Error, Error.FactoryObjIsNullInFactoryMethod);
             Assert.That(ex.Message, Is.StringContaining("Unable to use null factory object with factory method"));
         }
 
@@ -168,7 +168,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<SomeService>());
 
-            Assert.AreEqual(ex.Error, Error.SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD);
+            Assert.AreEqual(ex.Error, Error.ServiceIsNotAssignableFromFactoryMethod);
             Assert.That(ex.Message, Is.StringContaining("SomeService is not assignable from factory method"));
         }
 

@@ -24,7 +24,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
             container.Register<NewBurger>(made: Made.Of(() => new Burger())));
 
-            Assert.AreEqual(ex.Error, Error.MADE_OF_TYPE_NOT_ASSIGNABLE_TO_IMPLEMENTATION_TYPE);
+            Assert.AreEqual(ex.Error, Error.MadeOfTypeNotAssignableToImplementationType);
         }
 
         [Test]

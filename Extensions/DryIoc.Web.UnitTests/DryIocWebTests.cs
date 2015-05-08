@@ -27,7 +27,7 @@ namespace DryIoc.Web.UnitTests
                     Assert.AreSame(me, container.Resolve<Me>());
             }
 
-            Assert.AreEqual(DryIoc.Error.NO_CURRENT_SCOPE,
+            Assert.AreEqual(DryIoc.Error.NoCurrentScope,
                 Assert.Throws<ContainerException>(() => container.Resolve<Me>()).Error);
         }
 

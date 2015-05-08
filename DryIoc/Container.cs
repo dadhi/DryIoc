@@ -126,7 +126,7 @@ namespace DryIoc
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             _scopeContext.SetCurrent(scope =>
-                 newOpenedScope.ThrowIf(scope != _openedScope, Error.NOT_DIRECT_SCOPE_PARENT, _openedScope, scope));
+                 newOpenedScope.ThrowIf(scope != _openedScope, Error.NotDirectScopeParent, _openedScope, scope));
 
             var rules = configure == null ? Rules : configure(Rules);
             return new Container(rules, _registry, _singletonScope, _scopeContext, newOpenedScope, _disposed);
@@ -140,14 +140,14 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
 
-            scopeName = scopeName ?? (_openedScope == null ? NO_CONTEXT_ROOT_SCOPE_NAME : null);
+            scopeName = scopeName ?? (_openedScope == null ? NoContextRootScopeName : null);
             var newOpenedScope = new Scope(_openedScope, scopeName);
 
             return new Container(Rules, _registry, _singletonScope, /*no context*/null, newOpenedScope, _disposed);
         }
 
         /// <summary>Provide root scope name for <see cref="OpenScopeWithoutContext"/></summary>
-        public static readonly object NO_CONTEXT_ROOT_SCOPE_NAME = typeof(IContainer);
+        public static readonly object NoContextRootScopeName = typeof(IContainer);
 
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
         /// Facade is the new empty container, with the same rules and scope context as current container. 
@@ -363,7 +363,7 @@ namespace DryIoc
                 requiredServiceType != serviceType)
             {
                 var wrappedServiceType = ((IContainer)this).UnwrapServiceType(serviceType)
-                    .ThrowIfNotOf(requiredServiceType, Error.WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE, serviceType);
+                    .ThrowIfNotOf(requiredServiceType, Error.WrappedNotAssignableFromRequiredType, serviceType);
 
                 if (serviceType == wrappedServiceType)
                     serviceType = requiredServiceType;
@@ -448,7 +448,7 @@ namespace DryIoc
         private void ThrowIfContainerDisposed()
         {
             if (IsDisposed) 
-                Throw.It(Error.CONTAINER_IS_DISPOSED);
+                Throw.It(Error.ContainerIsDisposed);
         }
 
         #endregion
@@ -465,14 +465,14 @@ namespace DryIoc
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <param name="throwIfNotFound">Says to throw if no scope found.</param>
         /// <returns>Found scope or throws exception.</returns>
-        /// <exception cref="ContainerException"> with code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/>.</exception>
+        /// <exception cref="ContainerException"> with code <see cref="Error.NoMatchedScopeFound"/>.</exception>
         IScope IResolverContext.GetCurrentNamedScope(object name, bool throwIfNotFound)
         {
             var currentScope = _scopeContext == null ? _openedScope : _scopeContext.GetCurrentOrDefault();
             return currentScope == null 
-                ? (throwIfNotFound ? Throw.For<IScope>(Error.NO_CURRENT_SCOPE) : null)
+                ? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope) : null)
                 : GetMatchingScopeOrDefault(currentScope, name)
-                ?? (throwIfNotFound ? Throw.For<IScope>(Error.NO_MATCHED_SCOPE_FOUND, name) : null);
+                ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoMatchedScopeFound, name) : null);
         }
 
         private static IScope GetMatchingScopeOrDefault(IScope scope, object name)
@@ -506,7 +506,7 @@ namespace DryIoc
             bool outermost, bool throwIfNotFound)
         {
             return GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost)
-                ?? (!throwIfNotFound ? null : Throw.For<IScope>(Error.NO_MATCHED_SCOPE_FOUND,
+                ?? (!throwIfNotFound ? null : Throw.For<IScope>(Error.NoMatchedScopeFound,
                 new KV<Type, object>(assignableFromServiceType, serviceKey)));
         }
 
@@ -571,7 +571,7 @@ namespace DryIoc
                     factory = unknownServiceResolvers[i](request);
 
             if (factory == null)
-                Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
+                Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UnableToResolveService, request);
 
             return factory;
         }
@@ -650,7 +650,7 @@ namespace DryIoc
                                 funcArgPrefix: i.ToString()); // use prefix to generate non-conflicting Func argument names
 
                             decoratorExpr = decorator.GetExpressionOrDefault(decoratorRequest)
-                                .ThrowIfNull(Error.CANT_CREATE_DECORATOR_EXPR, decoratorRequest);
+                                .ThrowIfNull(Error.CantCreateDecoratorExpr, decoratorRequest);
 
                             var decoratedArgWasUsed = decoratorRequest.FuncArgs.Key[0];
                             decoratorExpr = !decoratedArgWasUsed ? decoratorExpr // case of replacing decorator.
@@ -782,7 +782,7 @@ namespace DryIoc
             }
 
             if (throwIfStateRequired)
-                Throw.It(Error.STATE_IS_REQUIRED_TO_USE_ITEM, item);
+                Throw.It(Error.StateIsRequiredToUseItem, item);
 
             var itemIndex = GetOrAddStateItem(item);
             var indexExpr = Expression.Constant(itemIndex, typeof(int));
@@ -967,7 +967,7 @@ namespace DryIoc
             }
             
             if (defaultFactories.Length > 1 && request.IfUnresolved == IfUnresolved.Throw)
-                Throw.It(Error.EXPECTED_SINGLE_DEFAULT_FACTORY, serviceType, defaultFactories);
+                Throw.It(Error.ExpectedSingleDefaultFactory, serviceType, defaultFactories);
 
             return null;
         }
@@ -1152,7 +1152,7 @@ namespace DryIoc
                         {
                             case IfAlreadyRegistered.Throw:
                                 oldFactory = oldFactory ?? oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
-                                return Throw.For<object>(Error.UNABLE_TO_REGISTER_DUPLICATE_DEFAULT, serviceType, oldFactory);
+                                return Throw.For<object>(Error.UnableToRegisterDuplicateDefault, serviceType, oldFactory);
 
                             case IfAlreadyRegistered.Keep:
                                 return oldEntry;
@@ -1211,7 +1211,7 @@ namespace DryIoc
                                     //case IfAlreadyRegistered.Throw:
                                     //case IfAlreadyRegistered.AppendDefault:
                                     default:
-                                        return Throw.For<Factory>(Error.UNABLE_TO_REGISTER_DUPLICATE_KEY,
+                                        return Throw.For<Factory>(Error.UnableToRegisterDuplicateKey,
                                             serviceType, serviceKey, oldFactory);
                                 }
                             }));
@@ -1638,9 +1638,9 @@ namespace DryIoc
         {
             var container = _weakref.Target as IContainer;
             return container
-                .ThrowIfNull(Error.CONTAINER_IS_GARBAGE_COLLECTED)
+                .ThrowIfNull(Error.ContainerIsGarbageCollected)
                 // ReSharper disable once PossibleNullReferenceException
-                .ThrowIf(container.IsDisposed, Error.CONTAINER_IS_DISPOSED);
+                .ThrowIf(container.IsDisposed, Error.ContainerIsDisposed);
         }
 
         /// <summary>Creates weak reference wrapper over passed container object.</summary> <param name="container">Object to wrap.</param>
@@ -2021,7 +2021,7 @@ namespace DryIoc
             if (reuse != null && serviceFactory.Setup.ReuseWrappers.IndexOf(wrapperType) != -1)
                 return serviceFactory.GetExpressionOrDefault(serviceRequest, wrapperType);
             Throw.If(request.IfUnresolved == IfUnresolved.Throw,
-                Error.UNABLE_TO_RESOLVE_REUSE_WRAPPER, wrapperType, serviceRequest);
+                Error.UnableToResolveReuseWrapper, wrapperType, serviceRequest);
             return null;
         }
 
@@ -2323,14 +2323,14 @@ namespace DryIoc
                             })).All(p => ResolveParameter(p, parameterSelector, request) != null);
                     });
 
-                var ctor = matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS, funcType, request).Ctor;
+                var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindMatchingCtorForFuncWithArgs, funcType, request).Ctor;
                 return Of(ctor);
             }
             else
             {
                 var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(x =>
                     x.Params.All(p => ResolveParameter(p, parameterSelector, request) != null));
-                var ctor = matchedCtor.ThrowIfNull(Error.UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS, request).Ctor;
+                var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request).Ctor;
                 return Of(ctor);
             }
         };
@@ -2497,10 +2497,10 @@ namespace DryIoc
             {
                 var member = ((MemberExpression)callExpr).Member;
                 Throw.If(!(member is PropertyInfo) && !(member is FieldInfo),
-                    Error.UNEXPECTED_FACTORY_MEMBER_EXPRESSION, member);
+                    Error.UnexpectedFactoryMemberExpression, member);
                 ctorOrMethodOrMember = member;
             }
-            else return Throw.For<Made>(Error.UNEXPECTED_EXPRESSION_TO_MAKE_SERVICE, callExpr);
+            else return Throw.For<Made>(Error.UnexpectedExpressionToMakeService, callExpr);
 
             FactoryMethodSelector factoryMethod = request =>
                 DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, getFactoryInfo == null ? null : getFactoryInfo(request));
@@ -2523,7 +2523,7 @@ namespace DryIoc
                 if (methodCallExpr != null)
                 {
                     Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg),
-                        Error.UNEXPECTED_EXPRESSION_INSTEAD_OF_ARG_METHOD, methodCallExpr);
+                        Error.UnexpectedExpressionInsteadOfArgMethod, methodCallExpr);
 
                     var requiredServiceType = methodCallExpr.Method.GetGenericArguments()[0];
                     if (requiredServiceType == parameter.ParameterType)
@@ -2552,7 +2552,7 @@ namespace DryIoc
                 else
                 {
                     GetArgConstantExpressionOrDefault(argExprs[i])
-                        .ThrowIfNull(Error.UNEXPECTED_EXPRESSION_INSTEAD_OF_CONSTANT, argExprs[i]);
+                        .ThrowIfNull(Error.UnexpectedExpressionInsteadOfConstant, argExprs[i]);
                 }
             }
             return parameters;
@@ -2570,7 +2570,7 @@ namespace DryIoc
                 if (methodCallExpr != null)
                 {
                     Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg),
-                        Error.UNEXPECTED_EXPRESSION_INSTEAD_OF_ARG_METHOD, methodCallExpr);
+                        Error.UnexpectedExpressionInsteadOfArgMethod, methodCallExpr);
 
                     var requiredServiceType = methodCallExpr.Method.GetGenericArguments()[0];
                     if (requiredServiceType == member.GetReturnTypeOrDefault())
@@ -2601,7 +2601,7 @@ namespace DryIoc
                 else
                 {
                     GetArgConstantExpressionOrDefault(memberAssignment.Expression)
-                        .ThrowIfNull(Error.UNEXPECTED_EXPRESSION_INSTEAD_OF_CONSTANT, memberAssignment.Expression);
+                        .ThrowIfNull(Error.UnexpectedExpressionInsteadOfConstant, memberAssignment.Expression);
                     propertiesAndFields = propertiesAndFields.And(r => new[]
                     {
                         PropertyOrFieldServiceInfo.Of(member)
@@ -2922,7 +2922,7 @@ namespace DryIoc
             object serviceKey = null)
         {
             Func<IResolver, object> checkedDelegate = r => factoryDelegate(r)
-                .ThrowIfNotOf(serviceType, Error.REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE, r);
+                .ThrowIfNotOf(serviceType, Error.RegedFactoryDlgResultNotOfServiceType, r);
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
         }
@@ -2950,7 +2950,7 @@ namespace DryIoc
             object serviceKey = null)
         {
             if (instance != null)
-                instance.ThrowIfNotOf(serviceType, Error.REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
+                instance.ThrowIfNotOf(serviceType, Error.RegedObjNotAssignableToServiceType);
 
             if (reuse == null || reuse is ResolutionScopeReuse)
             {
@@ -2972,7 +2972,7 @@ namespace DryIoc
                     registeredFactory.Setup == Setup.Default)
                 {
                     reuse.GetScopeOrDefault(container.EmptyRequest)
-                        .ThrowIfNull(Error.NO_SCOPE_WHEN_REGISTERING_INSTANCE, instance, reuse)
+                        .ThrowIfNull(Error.NoScopeWhenRegisteringInstance, instance, reuse)
                         .SetOrAdd(registeredFactory.FactoryID, instance);
                     return;
                 }
@@ -2982,14 +2982,14 @@ namespace DryIoc
             var locatorFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse);
             if (container.Register(locatorFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
                 reuse.GetScopeOrDefault(container.EmptyRequest)
-                    .ThrowIfNull(Error.NO_SCOPE_WHEN_REGISTERING_INSTANCE, instance, reuse)
+                    .ThrowIfNull(Error.NoScopeWhenRegisteringInstance, instance, reuse)
                     .SetOrAdd(locatorFactory.FactoryID, instance);
         }
 
         private static Expression GetThrowInstanceNoLongerAvailable(Request r)
         {
             return Expression.Call(typeof(Throw), "For", new[] { r.ServiceType },
-                Expression.Constant(Error.UNABLE_TO_RESOLVE_SERVICE), Expression.Constant(r.ServiceType),
+                Expression.Constant(Error.UnableToResolveService), Expression.Constant(r.ServiceType),
                 Expression.Constant(null), Expression.Constant(null), Expression.Constant(null));
         }
 
@@ -3207,7 +3207,7 @@ namespace DryIoc
         /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
         public static object New(this IContainer container, Type concreteType, Made made = null)
         {
-            concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UNABLE_TO_NEW_OPEN_GENERIC);
+            concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UnableToNewOpenGeneric);
             var factory = new ReflectionFactory(concreteType, null, made, Setup.With(cacheFactoryExpression: false));
             factory.ThrowIfInvalidRegistration(container, concreteType, null, isStaticallyChecked: false);
             var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).ResolveWithFactory(factory);
@@ -3402,7 +3402,7 @@ namespace DryIoc
             if (requiredServiceType != null)
             {
                 var wrappedRequiredServiceType = request.Container.UnwrapServiceType(requiredServiceType);
-                wrappedServiceType.ThrowIfNotOf(wrappedRequiredServiceType, Error.WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE, request);
+                wrappedServiceType.ThrowIfNotOf(wrappedRequiredServiceType, Error.WrappedNotAssignableFromRequiredType, request);
 
                 // Replace serviceType with Required if they are assignable
                 if (requiredServiceType.IsAssignableTo(serviceType))
@@ -3480,7 +3480,7 @@ namespace DryIoc
         /// <returns>Created info.</returns>
         public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null)
         {
-            serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.EXPECTED_CLOSED_GENERIC_SERVICE_TYPE);
+            serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.ExpectedClosedGenericServiceType);
             return serviceKey == null && ifUnresolved == IfUnresolved.Throw
                 ? new ServiceInfo(serviceType)
                 : new WithDetails(serviceType, ServiceDetails.Of(null, serviceKey, ifUnresolved));
@@ -3807,7 +3807,7 @@ namespace DryIoc
                 return new Request(this, ContainerWeakRef, info.ThrowIfNull(), null, null, 
                     scope /* input scope provided only for first request when Resolve called */);
 
-            ResolvedFactory.ThrowIfNull(Error.PUSHING_TO_REQUEST_WITHOUT_FACTORY, info.ThrowIfNull(), this);
+            ResolvedFactory.ThrowIfNull(Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
             var inheritedInfo = info.InheritInfo(ServiceInfo, ResolvedFactory.Setup.FactoryType != FactoryType.Service);
             return new Request(this, ContainerWeakRef, inheritedInfo, null, FuncArgs, 
                 Scope /* then scope is copied into dependency requests */);
@@ -3890,7 +3890,7 @@ namespace DryIoc
             if (factory.FactoryType == FactoryType.Service)
                 for (var p = Parent; !p.IsEmpty; p = p.Parent)
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID,
-                        Error.RECURSIVE_DEPENDENCY_DETECTED, Print(factory.FactoryID));
+                        Error.RecursiveDependencyDetected, Print(factory.FactoryID));
 
             return new Request(Parent, ContainerWeakRef, ServiceInfo, factory, FuncArgs, Scope);
         }
@@ -4048,7 +4048,7 @@ namespace DryIoc
 
             if (reuseWrappers != null && reuseWrappers.Length != 0)
                 for (var i = 0; i < reuseWrappers.Length; ++i)
-                    typeof(IReuseWrapper).ThrowIfNotOf(reuseWrappers[i], Error.REG_REUSED_OBJ_WRAPPER_IS_NOT_IREUSED, i, reuseWrappers);
+                    typeof(IReuseWrapper).ThrowIfNotOf(reuseWrappers[i], Error.RegReusedObjWrapperIsNotIreused, i, reuseWrappers);
 
             return new ServiceSetup(cacheFactoryExpression, lazyMetadata, metadata, condition, openResolutionScope, reuseWrappers);
         }
@@ -4130,9 +4130,9 @@ namespace DryIoc
 
             private static Type GetSingleGenericArgByDefault(Type wrapperType)
             {
-                wrapperType.ThrowIf(!wrapperType.IsClosedGeneric(), Error.NO_WRAPPED_TYPE_FOR_NON_GENERIC_WRAPPER);
+                wrapperType.ThrowIf(!wrapperType.IsClosedGeneric(), Error.NoWrappedTypeForNonGenericWrapper);
                 var typeArgs = wrapperType.GetGenericParamsAndArgs();
-                Throw.If(typeArgs.Length != 1, Error.WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY, wrapperType);
+                Throw.If(typeArgs.Length != 1, Error.WrapperCanWrapSingleServiceOnly, wrapperType);
                 return typeArgs[0];
             }
         }
@@ -4238,7 +4238,7 @@ namespace DryIoc
         {
             if (!isStaticallyChecked)
                 if (serviceType.IsGenericDefinition() && Provider == null)
-                    Throw.It(Error.REGISTERING_OPEN_GENERIC_REQUIRES_FACTORY_PROVIDER, serviceType);
+                    Throw.It(Error.RegisteringOpenGenericRequiresFactoryProvider, serviceType);
         }
 
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
@@ -4301,7 +4301,7 @@ namespace DryIoc
             }
 
             if (serviceExpr == null)
-                Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UNABLE_TO_RESOLVE_SERVICE, request);
+                Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UnableToResolveService, request);
 
             return serviceExpr;
         }
@@ -4315,7 +4315,7 @@ namespace DryIoc
                 var parentReuse = request.Parent.ResolvedFactory.Reuse;
                 if (parentReuse != null)
                     Throw.If(reuse.Lifespan < parentReuse.Lifespan,
-                        Error.DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN, request.PrintCurrent(), request.Parent, reuse, parentReuse);
+                        Error.DependencyHasShorterReuseLifespan, request.PrintCurrent(), request.Parent, reuse, parentReuse);
             }
         }
 
@@ -4618,7 +4618,7 @@ namespace DryIoc
                         : new[] { PropertyOrFieldServiceInfo.Of(field).WithDetails(details, request) };
                 }
                     
-                return Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(Error.NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD, name, request);
+                return Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(Error.NotFoundSpecifiedWriteablePropertyOrField, name, request);
             });
         }
 
@@ -4714,12 +4714,12 @@ namespace DryIoc
                 if (!implType.IsGenericDefinition())
                 {
                     if (implType.IsOpenGeneric())
-                        Throw.It(Error.REGISTERING_NOT_A_GENERIC_TYPEDEF_IMPL_TYPE,
+                        Throw.It(Error.RegisteringNotAGenericTypedefImplType,
                             implType, implType.GetGenericDefinitionOrNull());
 
                     if (implType != serviceType && serviceType != typeof(object) &&
                         Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1)
-                        Throw.It(Error.IMPLEMENTATION_NOT_ASSIGNABLE_TO_SERVICE_TYPE, implType, serviceType);
+                        Throw.It(Error.ImplementationNotAssignableToServiceType, implType, serviceType);
                 }
                 else if (implType != serviceType)
                 {
@@ -4739,18 +4739,18 @@ namespace DryIoc
                         }
 
                         if (!implementedTypeFound)
-                            Throw.It(Error.IMPLEMENTATION_NOT_ASSIGNABLE_TO_SERVICE_TYPE, implType, serviceType);
+                            Throw.It(Error.ImplementationNotAssignableToServiceType, implType, serviceType);
 
                         if (!containsAllTypeParams)
-                            Throw.It(Error.REGISTERING_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS,
+                            Throw.It(Error.RegisteringOpenGenericServiceWithMissingTypeArgs,
                                 implType, serviceType,
                                 implementedTypes.Where(t => t.GetGenericDefinitionOrNull() == serviceType));
                     }
                     else if (implType.IsGeneric() && serviceType.IsOpenGeneric())
-                        Throw.It(Error.REGISTERING_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE,
+                        Throw.It(Error.RegisteringNotAGenericTypedefServiceType,
                             serviceType, serviceType.GetGenericDefinitionOrNull());
                     else
-                        Throw.It(Error.REGISTERING_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE, implType, serviceType);
+                        Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
                 }
             }
 
@@ -4764,17 +4764,17 @@ namespace DryIoc
                 if (container.Rules.FactoryMethod == null)
                 {
                     if (implType.IsAbstract())
-                        Throw.It(Error.EXPECTED_NON_ABSTRACT_IMPL_TYPE, implType);
+                        Throw.It(Error.ExpectedNonAbstractImplType, implType);
 
                     var publicCounstructorCount = implType.GetAllConstructors().Count();
                     if (publicCounstructorCount != 1)
-                        Throw.It(Error.NO_DEFINED_METHOD_TO_SELECT_FROM_MULTIPLE_CONSTRUCTORS, implType, publicCounstructorCount);
+                        Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, implType, publicCounstructorCount);
                 }
             }
             else if (Made.ExpressionReturnType != null && !implType.IsGenericDefinition())
             {
                 implType.ThrowIfNotOf(Made.ExpressionReturnType,
-                    Error.MADE_OF_TYPE_NOT_ASSIGNABLE_TO_IMPLEMENTATION_TYPE);
+                    Error.MadeOfTypeNotAssignableToImplementationType);
             }
         }
 
@@ -4841,7 +4841,7 @@ namespace DryIoc
                             var customValue = paramInfo.Details.CustomValue;
                             if (customValue != null)
                             {
-                                customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.INJECTED_CUSTOM_VALUE_IS_OF_DIFFERENT_TYPE, paramRequest);
+                                customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
                                 paramExpr = paramRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
                             }
                             else
@@ -4922,7 +4922,7 @@ namespace DryIoc
                 {
                     closedImplType = Throw.IfThrows<ArgumentException, Type>(
                        () => implType.MakeGenericType(closedTypeArgs),
-                       Error.NO_MATCHED_GENERIC_PARAM_CONSTRAINTS, implType, request);
+                       Error.NoMatchedGenericParamConstraints, implType, request);
                 }
 
                 var factory = new ReflectionFactory(closedImplType, _factory.Reuse, _factory.Made, _factory.Setup);
@@ -4953,22 +4953,22 @@ namespace DryIoc
                         ((FieldInfo)member).IsStatic;
 
                     Throw.If(isStaticMember && factoryMethod.FactoryInfo != null,
-                            Error.FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC, factoryMethod.FactoryInfo, factoryMethod,
+                            Error.FactoryObjProvidedButMethodIsStatic, factoryMethod.FactoryInfo, factoryMethod,
                             request);
 
                     Throw.If(!isStaticMember && factoryMethod.FactoryInfo == null,
-                        Error.FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD, factoryMethod, request);
+                        Error.FactoryObjIsNullInFactoryMethod, factoryMethod, request);
 
                     request.ServiceType.ThrowIfNotOf(member.GetReturnTypeOrDefault(),
-                        Error.SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD, factoryMethod, request);
+                        Error.ServiceIsNotAssignableFromFactoryMethod, factoryMethod, request);
                 }
 
-                return factoryMethod.ThrowIfNull(Error.UNABLE_TO_GET_CONSTRUCTOR_FROM_SELECTOR, implType);
+                return factoryMethod.ThrowIfNull(Error.UnableToGetConstructorFromSelector, implType);
             }
 
             var ctors = implType.GetAllConstructors().ToArrayOrSelf();
-            Throw.If(ctors.Length == 0, Error.NO_PUBLIC_CONSTRUCTOR_DEFINED, implType);
-            Throw.If(ctors.Length > 1, Error.UNABLE_TO_SELECT_CONSTRUCTOR, ctors.Length, implType);
+            Throw.If(ctors.Length == 0, Error.NoPublicConstructorDefined, implType);
+            Throw.If(ctors.Length > 1, Error.UnableToSelectConstructor, ctors.Length, implType);
             return FactoryMethod.Of(ctors[0]);
         }
 
@@ -4988,7 +4988,7 @@ namespace DryIoc
                     var customValue = member.Details.CustomValue;
                     if (customValue != null)
                     {
-                        customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.INJECTED_CUSTOM_VALUE_IS_OF_DIFFERENT_TYPE, memberRequest);
+                        customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
                         memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
                     }
                     else
@@ -5031,7 +5031,7 @@ namespace DryIoc
 
             if (!matchFound)
                 return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
-                    : Throw.For<Type[]>(Error.NO_MATCHED_IMPLEMENTED_TYPES_WITH_SERVICE_TYPE,
+                    : Throw.For<Type[]>(Error.NoMatchedImplementedTypesWithServiceType,
                         implType, implementedTypes, request);
 
             // check constraints
@@ -5062,7 +5062,7 @@ namespace DryIoc
             var notMatchedIndex = Array.IndexOf(implTypeArgs, null);
             if (notMatchedIndex != -1)
                 return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
-                    : Throw.For<Type[]>(Error.NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE,
+                    : Throw.For<Type[]>(Error.NotFoundOpenGenericImplTypeArgInService,
                         implType, implTypeParams[notMatchedIndex], request);
 
             return implTypeArgs;
@@ -5245,7 +5245,7 @@ namespace DryIoc
 
         private object TryGetOrAdd(int id, CreateScopedValue createValue, IRecyclable recyclableItem)
         {
-            Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
+            Throw.If(_disposed == 1, Error.ScopeIsDisposed);
             if (recyclableItem != null && !recyclableItem.IsRecycled)
                 return recyclableItem;
 
@@ -5263,7 +5263,7 @@ namespace DryIoc
             }
 
             Ref.Swap(ref _items, items => items.AddOrUpdate(id, item)
-                .ThrowIf(_disposed == 1, Error.SCOPE_IS_DISPOSED)); // check once more before saving items
+                .ThrowIf(_disposed == 1, Error.ScopeIsDisposed)); // check once more before saving items
             
             return item;
         }
@@ -5272,7 +5272,7 @@ namespace DryIoc
         /// <param name="id">To set value at.</param> <param name="value">Value to set.</param>
         public void SetOrAdd(int id, object value)
         {
-            Throw.If(_disposed == 1, Error.SCOPE_IS_DISPOSED);
+            Throw.If(_disposed == 1, Error.ScopeIsDisposed);
             Ref.Swap(ref _items, items => items.AddOrUpdate(id, value));
         }
 
@@ -5469,7 +5469,7 @@ namespace DryIoc
         /// <summary>Returns container current scope or if <see cref="Name"/> specified: current scope or its parent with corresponding name.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Found current scope or its parent.</returns>
-        /// <exception cref="ContainerException">with the code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/> if <see cref="Name"/> specified but
+        /// <exception cref="ContainerException">with the code <see cref="Error.NoMatchedScopeFound"/> if <see cref="Name"/> specified but
         /// no matching scope or its parent found.</exception>
         public IScope GetScopeOrDefault(Request request)
         {
@@ -5660,7 +5660,7 @@ namespace DryIoc
 
             public object Unwrap(object wrapper)
             {
-                return (wrapper as ReuseWeakReference).ThrowIfNull().Target.ThrowIfNull(Error.WEAKREF_REUSE_WRAPPER_GCED);
+                return (wrapper as ReuseWeakReference).ThrowIfNull().Target.ThrowIfNull(Error.WeakrefReuseWrapperGced);
             }
         }
 
@@ -5687,7 +5687,7 @@ namespace DryIoc
             public object Unwrap(object wrapper)
             {
                 var recyclable = (wrapper as ReuseRecyclable).ThrowIfNull();
-                Throw.If(recyclable.IsRecycled, Error.RECYCLABLE_REUSE_WRAPPER_IS_RECYCLED);
+                Throw.If(recyclable.IsRecycled, Error.RecyclableReuseWrapperIsRecycled);
                 return recyclable.Target;
             }
         }
@@ -5745,7 +5745,7 @@ namespace DryIoc
         {
             get
             {
-                Throw.If(IsDisposed, Error.TARGET_WAS_ALREADY_DISPOSED, _targetType, typeof(ReuseHiddenDisposable));
+                Throw.If(IsDisposed, Error.TargetWasAlreadyDisposed, _targetType, typeof(ReuseHiddenDisposable));
                 return _target;
             }
         }
@@ -5976,7 +5976,7 @@ namespace DryIoc
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <returns>Found scope or throws exception.</returns>
         /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
-        /// <exception cref="ContainerException"> with code <see cref="Error.NO_MATCHED_SCOPE_FOUND"/>.</exception>
+        /// <exception cref="ContainerException"> with code <see cref="Error.NoMatchedScopeFound"/>.</exception>
         IScope GetCurrentNamedScope(object name, bool throwIfNotFound);
 
         /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
@@ -6256,19 +6256,19 @@ namespace DryIoc
                 switch (errorCheck) // handle error check when error code is unspecified.
                 {
                     case ErrorCheck.InvalidCondition:
-                        errorCode = DryIoc.Error.INVALID_CONDITION;
+                        errorCode = DryIoc.Error.InvalidCondition;
                         message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg0.GetType()));
                         break;
                     case ErrorCheck.IsNull:
-                        errorCode = DryIoc.Error.IS_NULL;
+                        errorCode = DryIoc.Error.IsNull;
                         message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0));
                         break;
                     case ErrorCheck.IsNotOfType:
-                        errorCode = DryIoc.Error.IS_NOT_OF_TYPE;
+                        errorCode = DryIoc.Error.IsNotOfType;
                         message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1));
                         break;
                     case ErrorCheck.TypeIsNotOfType:
-                        errorCode = DryIoc.Error.TYPE_IS_NOT_OF_TYPE;
+                        errorCode = DryIoc.Error.TypeIsNotOfType;
                         message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1));
                         break;
                 }
@@ -6310,142 +6310,142 @@ namespace DryIoc
     public static class Error
     {
         /// <summary>First error code to identify error range for other possible error code definitions.</summary>
-        public readonly static int FIRST_ERROR_CODE = 0;
+        public readonly static int FirstErrorCode = 0;
 
         /// <summary>List of error messages indexed with code.</summary>
         public readonly static List<string> Messages = new List<string>(100);
 
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
-            INVALID_CONDITION = Of("Argument {0} of type {1} has invalid condition."),
-            IS_NULL = Of("Argument of type {0} is null."),
-            IS_NOT_OF_TYPE = Of("Argument {0} is not of type {1}."),
-            TYPE_IS_NOT_OF_TYPE = Of("Type argument {0} is not assignable from type {1}."),
+            InvalidCondition = Of("Argument {0} of type {1} has invalid condition."),
+            IsNull = Of("Argument of type {0} is null."),
+            IsNotOfType = Of("Argument {0} is not of type {1}."),
+            TypeIsNotOfType = Of("Type argument {0} is not assignable from type {1}."),
 
-            UNABLE_TO_RESOLVE_SERVICE = Of(
+            UnableToResolveService = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
                 "Please ensure you have service registered (with proper key) - 95% of cases." + Environment.NewLine +
                 "Remaining 5%: Service does not match the reuse scope, or service has wrong Setup.With(condition), or no Rules.WithUnknownServiceResolver(ForMyService)."),
-            EXPECTED_SINGLE_DEFAULT_FACTORY = Of(
+            ExpectedSingleDefaultFactory = Of(
                 "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
-            IMPLEMENTATION_NOT_ASSIGNABLE_TO_SERVICE_TYPE = Of(
+            ImplementationNotAssignableToServiceType = Of(
                 "Implementation type {0} should be assignable to service type {1} but it is not."),
-            MADE_OF_TYPE_NOT_ASSIGNABLE_TO_IMPLEMENTATION_TYPE = Of(
+            MadeOfTypeNotAssignableToImplementationType = Of(
                 "Factory method made-of-type {1} should be assignable to implementation type {0} but it is not."),
-            REGISTERING_OPEN_GENERIC_REQUIRES_FACTORY_PROVIDER = Of(
+            RegisteringOpenGenericRequiresFactoryProvider = Of(
                 "Unable to register not a factory provider for open-generic service {0}."),
-            REGISTERING_OPEN_GENERIC_IMPL_WITH_NON_GENERIC_SERVICE = Of(
+            RegisteringOpenGenericImplWithNonGenericService = Of(
                 "Unable to register open-generic implementation {0} with non-generic service {1}."),
-            REGISTERING_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS = Of(
+            RegisteringOpenGenericServiceWithMissingTypeArgs = Of(
                 "Unable to register open-generic implementation {0} because service {1} should specify all type arguments, but specifies only {2}."),
-            REGISTERING_NOT_A_GENERIC_TYPEDEF_IMPL_TYPE = Of(
+            RegisteringNotAGenericTypedefImplType = Of(
                 "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
                 "Consider to register generic type definition {1} instead."),
-            REGISTERING_NOT_A_GENERIC_TYPEDEF_SERVICE_TYPE = Of(
+            RegisteringNotAGenericTypedefServiceType = Of(
                 "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine + 
                 "Consider to register generic type definition {1} instead."),
-            EXPECTED_NON_ABSTRACT_IMPL_TYPE = Of(
+            ExpectedNonAbstractImplType = Of(
                 "Expecting not abstract and not interface implementation type, but found {0}."),
-            NO_PUBLIC_CONSTRUCTOR_DEFINED = Of(
+            NoPublicConstructorDefined = Of(
                 "There is no public constructor defined for {0}."),
-            NO_DEFINED_METHOD_TO_SELECT_FROM_MULTIPLE_CONSTRUCTORS = Of(
+            NoDefinedMethodToSelectFromMultipleConstructors = Of(
                 "Unspecified how to select single constructor for implementation type {0} with {1} public constructors."),
-            NO_MATCHED_IMPLEMENTED_TYPES_WITH_SERVICE_TYPE = Of(
+            NoMatchedImplementedTypesWithServiceType = Of(
                 "Unable to match service with open-generic {0} implementing {1} when resolving {2}."),
-            CTOR_IS_MISSING_SOME_PARAMETERS = Of(
+            CtorIsMissingSomeParameters = Of(
                 "Constructor [{0}] of {1} misses some arguments required for {2} dependency."),
-            UNABLE_TO_SELECT_CONSTRUCTOR = Of(
+            UnableToSelectConstructor = Of(
                 "Unable to select single constructor from {0} available in {1}." + Environment.NewLine
                 + "Please provide constructor selector when registering service."),
-            EXPECTED_FUNC_WITH_MULTIPLE_ARGS = Of(
+            ExpectedFuncWithMultipleArgs = Of(
                 "Expecting Func with one or more arguments but found {0}."),
-            EXPECTED_CLOSED_GENERIC_SERVICE_TYPE = Of(
+            ExpectedClosedGenericServiceType = Of(
                 "Expecting closed-generic service type but found {0}."),
-            RECURSIVE_DEPENDENCY_DETECTED = Of(
+            RecursiveDependencyDetected = Of(
                 "Recursive dependency is detected when resolving" + Environment.NewLine + "{0}."),
-            SCOPE_IS_DISPOSED = Of(
+            ScopeIsDisposed = Of(
                 "Scope is disposed and scoped instances are no longer available."),
-            WRAPPER_CAN_WRAP_SINGLE_SERVICE_ONLY = Of(
+            WrapperCanWrapSingleServiceOnly = Of(
                 "Wrapper {0} can wrap single service type only, but found many. You should specify service type selector in wrapper setup."),
-            NOT_FOUND_OPEN_GENERIC_IMPL_TYPE_ARG_IN_SERVICE = Of(
+            NotFoundOpenGenericImplTypeArgInService = Of(
                 "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}."),
-            UNABLE_TO_GET_CONSTRUCTOR_FROM_SELECTOR = Of(
+            UnableToGetConstructorFromSelector = Of(
                 "Unable to get constructor of {0} using provided constructor selector."),
-            UNABLE_TO_FIND_CTOR_WITH_ALL_RESOLVABLE_ARGS = Of(
+            UnableToFindCtorWithAllResolvableArgs = Of(
                 "Unable to find constructor with all resolvable parameters when resolving {0}."),
-            UNABLE_TO_FIND_MATCHING_CTOR_FOR_FUNC_WITH_ARGS = Of(
+            UnableToFindMatchingCtorForFuncWithArgs = Of(
                 "Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine
                 + "and the rest of parameters resolvable from Container when resolving: {1}."),
-            REGED_FACTORY_DLG_RESULT_NOT_OF_SERVICE_TYPE = Of(
+            RegedFactoryDlgResultNotOfServiceType = Of(
                 "Registered factory delegate returns service {0} is not assignable to {2}."),
-            REGED_OBJ_NOT_ASSIGNABLE_TO_SERVICE_TYPE = Of(
+            RegedObjNotAssignableToServiceType = Of(
                 "Registered instance {0} is not assignable to serviceType {1}."),
-            NOT_FOUND_SPECIFIED_WRITEABLE_PROPERTY_OR_FIELD = Of(
+            NotFoundSpecifiedWriteablePropertyOrField = Of(
                 "Unable to find writable property or field \"{0}\" when resolving: {1}."),
-            PUSHING_TO_REQUEST_WITHOUT_FACTORY = Of(
+            PushingToRequestWithoutFactory = Of(
                 "Pushing next info {0} to request not yet resolved to factory: {1}"),
-            TARGET_WAS_ALREADY_DISPOSED = Of(
+            TargetWasAlreadyDisposed = Of(
                 "Target {0} was already disposed in {1} wrapper."),
-            NO_MATCHED_GENERIC_PARAM_CONSTRAINTS = Of(
+            NoMatchedGenericParamConstraints = Of(
                 "Service type does not match registered open-generic implementation constraints {0} when resolving {1}."),
-            NO_WRAPPED_TYPE_FOR_NON_GENERIC_WRAPPER = Of(
+            NoWrappedTypeForNonGenericWrapper = Of(
                 "Non-generic wrapper {0} should specify wrapped service selector when registered."),
-            DEPENDENCY_HAS_SHORTER_REUSE_LIFESPAN = Of(
+            DependencyHasShorterReuseLifespan = Of(
                 "Dependency {0} has shorter Reuse lifespan than its parent: {1}." + Environment.NewLine +
                 "{2} lifetime is shorter than {3}." + Environment.NewLine +
                 "You may turn Off this error with new Container(rules=>rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false))."),
-            WEAKREF_REUSE_WRAPPER_GCED = Of(
+            WeakrefReuseWrapperGced = Of(
                 "Service with WeakReference reuse wrapper is garbage collected now, and no longer available."),
-            SERVICE_IS_NOT_ASSIGNABLE_FROM_FACTORY_METHOD = Of(
+            ServiceIsNotAssignableFromFactoryMethod = Of(
                 "Service of {0} is not assignable from factory method {2} when resolving: {3}."),
-            FACTORY_OBJ_IS_NULL_IN_FACTORY_METHOD = Of(
+            FactoryObjIsNullInFactoryMethod = Of(
                 "Unable to use null factory object with factory method {0} when resolving: {1}."),
-            FACTORY_OBJ_PROVIDED_BUT_METHOD_IS_STATIC = Of(
+            FactoryObjProvidedButMethodIsStatic = Of(
                 "Factory instance provided {0} But factory method is static {1} when resolving: {2}."),
-            NO_OPEN_THREAD_SCOPE = Of(
+            NoOpenThreadScope = Of(
                 "Unable to find open thread scope in {0}. Please OpenScope with {0} to make sure thread reuse work."),
-            CONTAINER_IS_GARBAGE_COLLECTED = Of(
+            ContainerIsGarbageCollected = Of(
                 "Container is no longer available (has been garbage-collected)."),
-            CANT_CREATE_DECORATOR_EXPR = Of(
+            CantCreateDecoratorExpr = Of(
                 "Unable to create decorator expression for: {0}."),
-            UNABLE_TO_REGISTER_DUPLICATE_DEFAULT = Of(
+            UnableToRegisterDuplicateDefault = Of(
                 "Service {0} without key is already registered as {2}."),
-            UNABLE_TO_REGISTER_DUPLICATE_KEY = Of(
+            UnableToRegisterDuplicateKey = Of(
                 "Service {0} with the same key \"{1}\" is already registered as {2}."),
-            NO_CURRENT_SCOPE = Of(
+            NoCurrentScope = Of(
                 "No current scope available: probably you are registering to, or resolving from outside of scope."),
-            CONTAINER_IS_DISPOSED = Of(
+            ContainerIsDisposed = Of(
                 "Container is disposed and its operations are no longer available."),
-            NOT_DIRECT_SCOPE_PARENT = Of(
+            NotDirectScopeParent = Of(
                 "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." + Environment.NewLine +
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
-            UNABLE_TO_RESOLVE_REUSE_WRAPPER = Of(
+            UnableToResolveReuseWrapper = Of(
                 "Unable to resolve reuse wrapper {0} for: {1}"),
-            WRAPPED_NOT_ASSIGNABLE_FROM_REQUIRED_TYPE = Of(
+            WrappedNotAssignableFromRequiredType = Of(
                 "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}."),
-            NO_MATCHED_SCOPE_FOUND = Of(
+            NoMatchedScopeFound = Of(
                 "Unable to find scope with matching name: {0}."),
-            UNABLE_TO_NEW_OPEN_GENERIC = Of(
+            UnableToNewOpenGeneric = Of(
                 "Unable to New not concrete/open-generic type {0}."),
-            REG_REUSED_OBJ_WRAPPER_IS_NOT_IREUSED = Of(
+            RegReusedObjWrapperIsNotIreused = Of(
                 "Registered reuse wrapper {1} at index {2} of {3} does not implement expected {0} interface."),
-            RECYCLABLE_REUSE_WRAPPER_IS_RECYCLED = Of(
+            RecyclableReuseWrapperIsRecycled = Of(
                 "Recyclable wrapper is recycled."),
-            NO_SCOPE_WHEN_REGISTERING_INSTANCE = Of(
+            NoScopeWhenRegisteringInstance = Of(
                 "No scope is available when registering instance [{0}] with [{1}]." + Environment.NewLine + 
                 "You can register delegate returning instance instead, if scope will be available at resolution."),
-            UNEXPECTED_EXPRESSION_TO_MAKE_SERVICE = Of(
+            UnexpectedExpressionToMakeService = Of(
                 "Only expression of method call, property getter, or new statement (with optional property initializer) is supported, but found: {0}."),
-            UNEXPECTED_FACTORY_MEMBER_EXPRESSION = Of(
+            UnexpectedFactoryMemberExpression = Of(
                 "Expected property getter, but found {0}."),
-            UNEXPECTED_EXPRESSION_INSTEAD_OF_ARG_METHOD = Of(
+            UnexpectedExpressionInsteadOfArgMethod = Of(
                 "Expected DryIoc.Arg method call to specify parameter/property/field, but found: {0}."),
-            UNEXPECTED_EXPRESSION_INSTEAD_OF_CONSTANT = Of(
+            UnexpectedExpressionInsteadOfConstant = Of(
                 "Expected constant expression to specify parameter/property/field, but found something else: {0}."),
-            INJECTED_CUSTOM_VALUE_IS_OF_DIFFERENT_TYPE = Of(
+            InjectedCustomValueIsOfDifferentType = Of(
                 "Injected value {0} is not assignable to {2}."),
-            STATE_IS_REQUIRED_TO_USE_ITEM = Of(
+            StateIsRequiredToUseItem = Of(
                 "State is required to use (probably to inject) item {0}.");
 #pragma warning restore 1591 // "Missing XML-comment"
 
@@ -6454,7 +6454,7 @@ namespace DryIoc
         public static int Of(string message)
         {
             Messages.Add(message);
-            return FIRST_ERROR_CODE + Messages.Count - 1;
+            return FirstErrorCode + Messages.Count - 1;
         }
     }
 
@@ -7177,7 +7177,7 @@ namespace DryIoc
     public static class PrintTools
     {
         /// <summary>Default separator used for printing enumerable.</summary>
-        public readonly static string DEFAULT_ITEM_SEPARATOR = ";" + Environment.NewLine;
+        public readonly static string DefaultItemSeparator = ";" + Environment.NewLine;
 
         /// <summary>Prints input object by using corresponding Print methods for know types.</summary>
         /// <param name="s">Builder to append output to.</param>
@@ -7193,7 +7193,7 @@ namespace DryIoc
                 : x is string ? s.Print((string)x, quote)
                 : x is Type ? s.Print((Type)x, getTypeName)
                 : x is IEnumerable<Type> || x is IEnumerable
-                    ? s.Print((IEnumerable)x, itemSeparator ?? DEFAULT_ITEM_SEPARATOR, (_, o) => _.Print(o, quote, null, getTypeName))
+                    ? s.Print((IEnumerable)x, itemSeparator ?? DefaultItemSeparator, (_, o) => _.Print(o, quote, null, getTypeName))
                 : s.Append(x);
         }
 
@@ -7773,12 +7773,12 @@ namespace DryIoc
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > RETRY_COUNT_UNTIL_THROW)
-                    throw new InvalidOperationException(ERROR_RETRY_COUNT_EXCEEDED);
+                    throw new InvalidOperationException(_errorRetryCountExceeded);
             }
         }
 
         private const int RETRY_COUNT_UNTIL_THROW = 50;
-        private static readonly string ERROR_RETRY_COUNT_EXCEEDED =
+        private static readonly string _errorRetryCountExceeded =
             "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
     }
 

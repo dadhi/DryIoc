@@ -50,7 +50,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var ex = Assert.Throws<AttributedModelException>(() => 
                 container.Resolve<MyDisposableWronglyExported>(typeof(Service)));
 
-            Assert.AreEqual(ex.Error, Error.NO_WRAPPED_TYPE_EXPORTED_WRAPPER);
+            Assert.AreEqual(ex.Error, Error.NoWrappedTypeExportedWrapper);
             Assert.That(ex.Message, Is.StringContaining(
                 "Exported non-generic wrapper type DryIoc.MefAttributedModel.UnitTests.ExportAsWrapperTests.MyDisposableWronglyExported"));
         }
@@ -64,7 +64,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var ex = Assert.Throws<AttributedModelException>(() => 
                 container.Resolve<MyFactoryWrapperExportedWithWrongIndex<IService>>());
 
-            Assert.AreEqual(ex.Error, Error.WRAPPED_ARG_INDEX_OUT_OF_BOUNDS);
+            Assert.AreEqual(ex.Error, Error.WrappedArgIndexOutOfBounds);
             Assert.That(ex.Message, Is.StringContaining(
                 "Exported generic wrapper type DryIoc.MefAttributedModel.UnitTests.ExportAsWrapperTests.MyFactoryWrapperExportedWithWrongIndex<DryIoc.MefAttributedModel.UnitTests.CUT.IService> " 
                 + "specifies generic argument index 1 outside of argument list size"));

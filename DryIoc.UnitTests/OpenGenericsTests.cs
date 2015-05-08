@@ -341,7 +341,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
             container.Register(typeof(X<>), typeof(Y<>)));
 
-            Assert.AreEqual(ex.Error, Error.IMPLEMENTATION_NOT_ASSIGNABLE_TO_SERVICE_TYPE);
+            Assert.AreEqual(ex.Error, Error.ImplementationNotAssignableToServiceType);
         }
 
         [Test]
@@ -368,7 +368,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
             container.Register(typeof(ICommandHandler<>), typeof(ReplayCommandHandler<,>)));
 
-            Assert.AreEqual(ex.Error, Error.REGISTERING_OPEN_GENERIC_SERVICE_WITH_MISSING_TYPE_ARGS);
+            Assert.AreEqual(ex.Error, Error.RegisteringOpenGenericServiceWithMissingTypeArgs);
         }
 
         internal class ReplayCommand<T> { }

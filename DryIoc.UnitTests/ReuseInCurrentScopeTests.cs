@@ -85,7 +85,7 @@ namespace DryIoc.UnitTests
             using (container.OpenScope())
             {
                 var ex = Assert.Throws<ContainerException>(() => container.OpenScope());
-                Assert.That(ex.Error, Is.EqualTo(Error.NOT_DIRECT_SCOPE_PARENT));
+                Assert.That(ex.Error, Is.EqualTo(Error.NotDirectScopeParent));
             }
         }
 
@@ -99,8 +99,8 @@ namespace DryIoc.UnitTests
             using (var containerWithNewScope = container.OpenScope())
                 getLog = containerWithNewScope.Resolve<Func<Log>>();
 
-            Assert.AreEqual(Error.CONTAINER_IS_DISPOSED, Assert.Throws<ContainerException>(() => getLog()).Error);
-            Assert.AreEqual(Error.CONTAINER_IS_DISPOSED, Assert.Throws<ContainerException>(() => getLog()).Error);
+            Assert.AreEqual(Error.ContainerIsDisposed, Assert.Throws<ContainerException>(() => getLog()).Error);
+            Assert.AreEqual(Error.ContainerIsDisposed, Assert.Throws<ContainerException>(() => getLog()).Error);
         }
 
         [Test]
@@ -128,7 +128,7 @@ namespace DryIoc.UnitTests
                 Assert.That(getLog(), Is.InstanceOf<Log>());
 
             var ex = Assert.Throws<ContainerException>(() => getLog());
-            Assert.That(ex.Error, Is.EqualTo(Error.NO_CURRENT_SCOPE));
+            Assert.That(ex.Error, Is.EqualTo(Error.NoCurrentScope));
         }
 
         [Test]
@@ -244,7 +244,7 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<IDep>());
-            Assert.AreEqual(Error.NO_CURRENT_SCOPE, ex.Error);
+            Assert.AreEqual(Error.NoCurrentScope, ex.Error);
         }
 
         [Test]

@@ -25,7 +25,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var ex = Assert.Throws<AttributedModelException>(() => 
                 container.Resolve<FooConsumerNotFound>());
-            Assert.AreEqual(ex.Error, Error.NOT_FIND_DEPENDENCY_WITH_METADATA);
+            Assert.AreEqual(ex.Error, Error.NotFindDependencyWithMetadata);
         }
     }
 }

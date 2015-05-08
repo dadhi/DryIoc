@@ -87,7 +87,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 var ex = Assert.Throws<ContainerException>(() => 
                     scoped.Resolve<WithNamedCurrentScope>());
 
-                Assert.AreEqual(DryIoc.Error.UNABLE_TO_RESOLVE_SERVICE, ex.Error);
+                Assert.AreEqual(DryIoc.Error.UnableToResolveService, ex.Error);
             }
         }
 
