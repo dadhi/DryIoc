@@ -38,8 +38,21 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ZeroContainer.cs" />
+    <Compile Include="ZeroContainer.Generated.cs">
+      <DependentUpon>ZeroContainer.Generated.tt</DependentUpon>
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">
+      <Project>{e210b3d9-29c8-46f5-8968-09a0e5857158}</Project>
+      <Name>DryIoc.MefAttributedModel.UnitTests.CUT</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
+      <Project>{bfb1206a-3545-4369-8f23-49fd1bffc362}</Project>
+      <Name>DryIoc.MefAttributedModel</Name>
+    </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
       <Name>DryIoc</Name>
@@ -47,7 +60,13 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="CompositionRoot.tt" />
+    <None Include="ZeroContainer.Generated.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>ZeroContainer.Generated.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

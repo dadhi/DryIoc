@@ -88,33 +88,30 @@ namespace DryIoc.Zero.UnitTests
         [Test]
         public void Can_resolve_singleton()
         {
-            var factory = new ZeroContainer();
-            CompositionRoot.Default.RegisterGeneratedRoots(factory);
+            var container = new ZeroContainer();
 
-            var service = factory.Resolve<ISomeDb>();
+            var service = container.Resolve<ISomeDb>();
             Assert.NotNull(service);
-            Assert.AreSame(service, factory.Resolve<ISomeDb>());
+            Assert.AreSame(service, container.Resolve<ISomeDb>());
         }
 
         [Test]
         public void Can_resolve_singleton_with_key()
         {
-            var factory = new ZeroContainer();
-            CompositionRoot.Default.RegisterGeneratedRoots(factory);
+            var container = new ZeroContainer();
 
-            var service = factory.Resolve<IMultiExported>("j");
+            var service = container.Resolve<IMultiExported>("j");
             Assert.NotNull(service);
-            Assert.AreSame(service, factory.Resolve<IMultiExported>("c"));
+            Assert.AreSame(service, container.Resolve<IMultiExported>("c"));
         }
 
         [Test]
         public void Will_throw_for_not_registered_service_type()
         {
-            var factory = new ZeroContainer();
-            CompositionRoot.Default.RegisterGeneratedRoots(factory);
+            var container = new ZeroContainer();
 
             var ex = Assert.Throws<ZeroContainerException>(
-                () => factory.Resolve<NotRegistered>());
+                () => container.Resolve<NotRegistered>());
 
             Assert.AreEqual(ex.Error, Error.UnableToResolveService);
         }
@@ -122,9 +119,9 @@ namespace DryIoc.Zero.UnitTests
         [Test]
         public void Will_return_null_for_not_registered_service_type_with_IfUnresolved_option()
         {
-            var factory = new ZeroContainer();
+            var container = new ZeroContainer();
 
-            var nullService = factory.Resolve<NotRegistered>(IfUnresolved.ReturnDefault);
+            var nullService = container.Resolve<NotRegistered>(IfUnresolved.ReturnDefault);
 
             Assert.IsNull(nullService);
         }
@@ -132,24 +129,13 @@ namespace DryIoc.Zero.UnitTests
         [Test]
         public void Can_resolve_many()
         {
-            var factory = new ZeroContainer();
-            CompositionRoot.Default.RegisterGeneratedRoots(factory);
+            var container = new ZeroContainer();
 
-            var handlers = factory.ResolveMany<IHandler>().ToArray();
+            var handlers = container.ResolveMany<IHandler>().ToArray();
 
             Assert.AreEqual(5, handlers.Length);
         }
 
         internal class NotRegistered {}
-
-        [Test]
-        public void May_check_if_service_is_registered()
-        {
-             var container = new ZeroContainer();
-            container.RegisterRoot(new CompositionRoot());
-
-            Assert.IsFalse(container.IsRegistered(typeof(NotRegistered)));
-            Assert.IsTrue(container.IsRegistered(typeof(IHandler), BlahFooh.Blah));
-        }
     }
 }

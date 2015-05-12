@@ -24,6 +24,7 @@ THE SOFTWARE.
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace DryIoc.Zero
@@ -45,15 +46,6 @@ namespace DryIoc.Zero
         /// <summary>Registers factory delegate with corresponding service type and service key.</summary>
         /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param> <param name="factoryDelegate">Delegate</param>
         void Register(Type serviceType, object serviceKey, StatelessFactoryDelegate factoryDelegate);
-
-        /// <summary>Returns if ANY default or keyed factory delegate is registered with Service Type.</summary>
-        /// <param name="serviceType">Service type to find.</param> <returns>True if registered and false otherwise.</returns>
-        bool IsRegistered(Type serviceType);
-
-        /// <summary>Returns true if keyed factory delegate is registered with Service Type and Key.</summary>
-        /// <param name="serviceType">Service type to find.</param> <param name="serviceKey">Service key.</param>
-        /// <returns>True if registered and false otherwise.</returns>
-        bool IsRegistered(Type serviceType, object serviceKey);
     }
 
     /// <summary>Provides action for registering factory delegates in service factory. 
@@ -76,10 +68,24 @@ namespace DryIoc.Zero
         }
     }
 
+    public class ZeroContainerGeneratedBase
+    {
+        public virtual object ResolveGenerated(Type serviceType, IScope scope)
+        {
+            return null;
+        }
+
+        public virtual object ResolveGenerated(Type serviceType, object serviceKey, IScope scope)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Minimal container which allow to register service factory delegates and then resolve service from them.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly",
         Justification = "Does not contain any unmanaged resources.")]
-    public class ZeroContainer : IFactoryDelegateRegistrator, IResolverContext, IResolverContextProvider, IDisposable
+    public partial class ZeroContainer : ZeroContainerGeneratedBase, 
+        IFactoryDelegateRegistrator, IResolverContext, IResolverContextProvider, IDisposable
     {
         /// <summary>Creates container.</summary>
         /// <param name="scopeContext">(optional) Scope context, by default <see cref="ThreadScopeContext"/>.</param>
@@ -150,20 +156,6 @@ namespace DryIoc.Zero
                 var entry = _.GetValueOrDefault(serviceType) as HashTree ?? HashTree.Empty;
                 return _.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, factoryDelegate));
             });
-        }
-
-        public bool IsRegistered(Type serviceType)
-        {
-            ThrowIfContainerDisposed();
-            return _defaultFactories.Value.GetValueOrDefault(serviceType) != null 
-                || _keyedFactories.Value.GetValueOrDefault(serviceType) != null;
-        }
-
-        public bool IsRegistered(Type serviceType, object serviceKey)
-        {
-            ThrowIfContainerDisposed();
-            var entry = _keyedFactories.Value.GetValueOrDefault(serviceType) as HashTree;
-            return entry != null && entry.GetValueOrDefault(serviceKey) != null;
         }
 
         private Ref<HashTree> _defaultFactories; //<Type -> FactoryDelegate>
@@ -254,6 +246,15 @@ namespace DryIoc.Zero
             return scope ?? (scope = new Scope(null, new KV(serviceType, serviceKey)));
         }
 
+        /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
+        /// then returns input <paramref name="scope"/>.
+        /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and 
+        /// Key equal to <paramref name="serviceKey"/>.</summary>
+        /// <param name="scope">Scope to start matching with Type and Key specified.</param>
+        /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
+        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
+        /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
+        /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
         public IScope GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost, bool throwIfNotFound)
         {
             var matchingScope = GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost);
@@ -297,10 +298,16 @@ namespace DryIoc.Zero
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
         public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
         {
+            var result = _defaultFactories.Value.IsEmpty 
+                ? ResolveGenerated(serviceType, scope) 
+                : ResolveRegisteredFirst(serviceType, scope);
+            return result ?? GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
+        }
+
+        private object ResolveRegisteredFirst(Type serviceType, IScope scope)
+        {
             var factoryDelegate = _defaultFactories.Value.GetValueOrDefault(serviceType) as StatelessFactoryDelegate;
-            return factoryDelegate != null
-                ? factoryDelegate(this, null)
-                : GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
+            return factoryDelegate != null ? factoryDelegate(this, scope) : ResolveGenerated(serviceType, scope);
         }
 
         /// <summary>Resolves keyed service from container and returns created service object.</summary>
@@ -315,22 +322,25 @@ namespace DryIoc.Zero
         /// This method covers all possible resolution input parameters comparing to <see cref="IResolver.ResolveDefault"/>, and
         /// by specifying the same parameters as for <see cref="IResolver.ResolveDefault"/> should return the same result.
         /// </remarks>
-        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
-            Type requiredServiceType, IScope scope)
+        public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
         {
             if (serviceKey == null && requiredServiceType == null)
                 return ResolveDefault(serviceType, ifUnresolved, scope);
 
             serviceType = requiredServiceType ?? serviceType;
-            var factories = _keyedFactories.Value.GetValueOrDefault(serviceType) as HashTree;
-            if (factories != null)
+
+            var keyedFactories = _keyedFactories.Value;
+            if (!keyedFactories.IsEmpty)
             {
-                var factoryDelegate = factories.GetValueOrDefault(serviceKey) as StatelessFactoryDelegate;
-                if (factoryDelegate != null)
-                    return factoryDelegate(this, null);
+                var factories = keyedFactories.GetValueOrDefault(serviceType) as HashTree;
+                var factoryDelegate = factories == null ? null
+                    : factories.GetValueOrDefault(serviceKey) as StatelessFactoryDelegate;
+                if (factoryDelegate != null) 
+                    return factoryDelegate(this, scope);                
             }
 
-            return GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
+            return ResolveGenerated(serviceType, serviceKey, scope)
+                   ?? GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
         }
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
@@ -342,10 +352,16 @@ namespace DryIoc.Zero
         /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType,
-            object compositeParentKey, IScope scope)
+        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, IScope scope)
         {
             serviceType = requiredServiceType ?? serviceType;
+            
+            var manyGenerated = ResolveManyGenerated(serviceType);
+            if (compositeParentKey != null)
+                manyGenerated = manyGenerated.Where(kv => !compositeParentKey.Equals(kv.Key));
+
+            foreach (var generated in manyGenerated)
+                yield return ((StatelessFactoryDelegate)generated.Value)(this, scope);
 
             var factories = _keyedFactories.Value.GetValueOrDefault(serviceType) as HashTree;
             if (factories != null)
@@ -359,10 +375,8 @@ namespace DryIoc.Zero
                 else
                 {
                     foreach (var resolution in factories.Enumerate())
-                    {
-                        var factoryDelegate = (StatelessFactoryDelegate)resolution.Value;
-                        yield return factoryDelegate(this, scope);
-                    }
+                        if (compositeParentKey == null || !compositeParentKey.Equals(resolution.Key))
+                            yield return ((StatelessFactoryDelegate)resolution.Value)(this, scope);
                 }
             }
             else
@@ -475,7 +489,7 @@ namespace DryIoc.Zero
         /// <param name="key">Key</param> <returns>Found value or null if not found.</returns>
         public object GetValueOrDefault(object key)
         {
-            var kv = _tree.GetValueOrDefault(key.GetHashCode()) as KV;
+            var kv = _tree.Height == 0 ? null : _tree.GetValueOrDefault(key.GetHashCode()) as KV;
             return kv != null && (ReferenceEquals(key, kv.Key) || key.Equals(kv.Key))
                 ? kv.Value : GetConflictedValueOrDefault(kv, key);
         }

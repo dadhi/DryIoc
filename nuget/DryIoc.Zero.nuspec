@@ -32,7 +32,7 @@
 
         <!--net45-->
         <file src="..\Net45\DryIoc.Zero\ZeroContainer.cs" target="content\net45\DryIoc\Zero" />
-        <file src="..\Net45\DryIoc.Zero\CompositionRoot.tt" target="content\net45\DryIoc\Zero" />
+        <file src="..\Net45\DryIoc.Zero\ZeroContainer.Generated.tt" target="content\net45\DryIoc\Zero" />
 
     </files>
 </package>

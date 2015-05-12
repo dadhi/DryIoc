@@ -4,16 +4,24 @@
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.dll" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.dll" #>
-<#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\ExpressionToCodeLib.dll" #>
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Text" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
-<#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
+
+<#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
+<#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
+
 <#
+/*
+$(SolutionDir)packages\DryIoc.dll.2.0.0-rc1build268\lib\net45\DryIoc.dll
+$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0-rc1build268\lib\net45\DryIoc.MefAttributedModel.dll
+$(SolutionDir)packages\ExpressionToCodeLib.1.5.2.0\lib\net40-Client\ExpressionToCodeLib.dll
+*/
+
 var container = new Container(rules => rules
     .WithoutSingletonOptimization()
     .WithMefAttributedModel());
@@ -58,23 +66,90 @@ var factories = container.GetServiceRegistrations()
 #>
 using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
+using System.Collections.Generic;
 
-namespace DryIoc.Zero.UnitTests
+namespace DryIoc.Zero
 {
-    public static class ServiceFactory
+    partial class ZeroContainer
     {
-        public static object Resolve(this IResolverContextProvider r, Type type)
+/* 
+Exceptions happened during resolution:
+======================================
+
+<#
+    foreach (var ex in exceptions)
+    {
+#>
+<#=objectToCode.TypeNameToCode(ex.GetType())#>:
+<#=ex.Message#>
+
+<#
+    }
+#>
+======================================
+end of exception list
+*/
+
+        public override object ResolveGenerated(Type serviceType, IScope scope)
         {
 <#
         foreach (var factory in factories.Where(f => f.Key == "null"))
         {
 #>
-            if (type == <#= factory.Type #>)
-                return Create_<#= factory.Id #>(r, null);
+            if (serviceType == <#= factory.Type #>)
+                return Create_<#= factory.Id #>(this, scope);
 <#
         }
 #>
             return null;
+        }
+
+        public override object ResolveGenerated(Type serviceType, object serviceKey, IScope scope)
+        {
+<#
+        foreach (var factoryGroup in factories.Where(f => f.Key != "null").GroupBy(f => f.Type))
+        {
+#>
+            if (serviceType == <#= factoryGroup.Key #>) 
+            {
+<#
+            foreach (var factory in factoryGroup)
+            {
+#>
+                if (<#= factory.Key #>.Equals(serviceKey))
+                    return Create_<#= factory.Id #>(this, scope);
+<#
+            }
+
+#>
+            }
+<#
+        }
+#>
+            return null;
+        }
+
+        public IEnumerable<KV> ResolveManyGenerated(Type serviceType)
+        {
+<#
+        foreach (var factoryGroup in factories.GroupBy(f => f.Type))
+        {
+#>
+            if (serviceType == <#= factoryGroup.Key #>)
+            {
+<#
+            foreach (var factory in factoryGroup)
+            {
+#>
+                yield return new KV(<#= factory.Key #>, (StatelessFactoryDelegate)Create_<#= factory.Id #>);
+<#
+            }
+#>
+            }
+
+<#
+        }
+#>
         }
 
 <#
