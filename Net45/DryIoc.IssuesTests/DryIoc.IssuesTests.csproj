@@ -71,6 +71,7 @@
     <Compile Include="Issue110_HidingMultipleContravariantImplementationsBehindComposite.cs" />
     <Compile Include="Issue116_InvokeFactoryConstructorTwoTimes.cs" />
     <Compile Include="Issue122_DecoratorIsNotHandledAcrossResolutionRoots.cs" />
+    <Compile Include="Issue123_TipsForMigrationFromAutofac.cs" />
     <Compile Include="Issue61_PropagateRequestToResolveInRegisteredDelegate.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />

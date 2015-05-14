@@ -1441,7 +1441,7 @@ namespace DryIoc
                     : Reuse.Singleton;
                 if (changeDefaultReuse != null)
                     reuse = changeDefaultReuse(reuse, request);
-                container.RegisterMany(implTypes, type => type.IsAssignableTo(request.ServiceType), reuse);
+                container.RegisterMany(implTypes, reuse, serviceTypeCondition: type => type.IsAssignableTo(request.ServiceType));
                 var factory = container.GetServiceFactoryOrDefault(request);
                 return factory;
             };
@@ -1454,6 +1454,9 @@ namespace DryIoc
     {
         /// <summary>Default value.</summary>
         public static readonly DefaultKey Value = new DefaultKey(0);
+
+        /// <summary>Allows to determine service registration order.</summary>
+        public readonly int RegistrationOrder;
 
         /// <summary>Create new default key with specified registration order.</summary>
         /// <param name="registrationOrder"></param> <returns>New default key.</returns>
@@ -1474,9 +1477,6 @@ namespace DryIoc
         {
             return Of(RegistrationOrder + 1);
         }
-
-        /// <summary>Allows to determine service registration order.</summary>
-        public readonly int RegistrationOrder;
 
         /// <summary>Compares keys based on registration order.</summary>
         /// <param name="key">Key to compare with.</param>
@@ -2752,16 +2752,17 @@ namespace DryIoc
         /// <summary>Registers many service types with the same implementation.</summary>
         /// <param name="registrator">Registrator/Container</param>
         /// <param name="serviceTypes">1 or more service types.</param> 
-        /// <param name="implType">Should implement service types. Will throw if not.</param>
+        /// <param name="implementationType">Should implement service types. Will throw if not.</param>
         /// <param name="reuse">(optional)</param> <param name="made">(optional) How to create implementation instance.</param>
         /// <param name="setup">(optional)</param> <param name="ifAlreadyRegistered">(optional) By default <see cref="IfAlreadyRegistered.AppendNotKeyed"/></param>
         /// <param name="serviceKey">(optional)</param>
-        public static void RegisterMany(this IRegistrator registrator, Type[] serviceTypes, Type implType,
+        public static void RegisterMany(this IRegistrator registrator, 
+            Type[] serviceTypes, Type implementationType,
             IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null)
         {
-            var factory = new ReflectionFactory(implType, reuse, made, setup);
+            var factory = new ReflectionFactory(implementationType, reuse, made, setup);
             if (serviceTypes.Length == 1)
                 registrator.Register(serviceTypes[0], factory, ifAlreadyRegistered, serviceKey);
             else for (var i = 0; i < serviceTypes.Length; i++)
@@ -2780,23 +2781,7 @@ namespace DryIoc
         {
             foreach (var implType in implTypes)
             {
-                if (implType.IsAbstract() || implType.IsCompilerGenerated())
-                    continue;
-
-                var serviceTypes = implType.GetImplementedTypes(ReflectionTools.IncludeImplementedType.SourceType);
-                var selectedServiceTypes = nonPublicServiceTypes
-                    ? serviceTypes
-                    : serviceTypes.Where(ReflectionTools.IsPublicOrNestedPublic);
-
-                if (implType.IsGenericDefinition())
-                {
-                    var implTypeArgs = implType.GetGenericParamsAndArgs();
-                    selectedServiceTypes = selectedServiceTypes
-                        .Where(t => t.ContainsAllGenericTypeParameters(implTypeArgs))
-                        .Select(t => t.GetGenericDefinitionOrNull());
-                }
-
-                serviceTypes = selectedServiceTypes.ToArrayOrSelf();
+                var serviceTypes = GetImplementedServiceTypes(implType, nonPublicServiceTypes);
                 if (serviceTypes.IsNullOrEmpty())
                     continue;
 
@@ -2807,21 +2792,45 @@ namespace DryIoc
             }
         }
 
+
+        /// <summary>Returns many service types implemented by source type. Used by RegisterMany method.</summary>
+        /// <param name="type">Source type: may be concrete, abstract or generic definition.</param> 
+        /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
+        /// <returns>Array of types or empty.</returns>
+        public static Type[] GetImplementedServiceTypes(Type type, bool nonPublicServiceTypes = false)
+        {
+            var serviceTypes = type.GetImplementedTypes(ReflectionTools.IncludeImplementedType.SourceType);
+            var selectedServiceTypes = nonPublicServiceTypes
+                ? serviceTypes
+                : serviceTypes.Where(ReflectionTools.IsPublicOrNestedPublic);
+
+            if (type.IsGenericDefinition())
+            {
+                var implTypeArgs = type.GetGenericParamsAndArgs();
+                selectedServiceTypes = selectedServiceTypes
+                    .Where(t => t.ContainsAllGenericTypeParameters(implTypeArgs))
+                    .Select(t => t.GetGenericDefinitionOrNull());
+            }
+
+            serviceTypes = selectedServiceTypes.ToArrayOrSelf();
+            return serviceTypes;
+        }
+
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
         /// <param name="implTypes">Implementation type provider.</param>
-        /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>
         /// <param name="reuse">(optional) Reuse to apply to all service registrations.</param>
         /// <param name="made">(optional) Allow to select constructor/method to create service, specify how to inject its parameters and properties/fields.</param>
         /// <param name="setup">(optional) Factory setup, by default is <see cref="Setup.Default"/>, check <see cref="Setup"/> class for available setups.</param>
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with existing service registrations.</param>
+        /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void RegisterMany(this IRegistrator registrator, 
-            IEnumerable<Type> implTypes, Func<Type, bool> serviceTypeCondition = null,
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes,
             IReuse reuse = null, Made made = null, Setup setup = null, 
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            bool nonPublicServiceTypes = false, object serviceKey = null)
+            Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false, 
+            object serviceKey = null)
         {
             registrator.RegisterMany(implTypes, (r, serviceTypes, implType) =>
             {
@@ -2834,22 +2843,29 @@ namespace DryIoc
         }
 
         /// <summary>Registers single registration for all implemented public interfaces and base classes.</summary>
-        /// <typeparam name="TImplementation">The type of service.</typeparam>
+        /// <typeparam name="T">The type to get service types from.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="made">(optional) Allow to select constructor/method to create service, specify how to inject its parameters and properties/fields.</param>
         /// <param name="setup">(optional) Factory setup, by default is <see cref="Setup.Default"/>, check <see cref="Setup"/> class for available setups.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
+        /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>        
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void RegisterMany<TImplementation>(this IRegistrator registrator,
+        public static void RegisterMany<T>(this IRegistrator registrator,
             IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            bool nonPublicServiceTypes = false, object serviceKey = null)
+            Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false, 
+            object serviceKey = null)
         {
-            registrator.RegisterMany(new[] { typeof(TImplementation) }, (r, serviceTypes, implType) => 
-                r.RegisterMany(serviceTypes, implType, reuse, made, setup, ifAlreadyRegistered, serviceKey),
-                nonPublicServiceTypes);
+            registrator.RegisterMany(new[] { typeof(T) }, (r, serviceTypes, implType) =>
+            {
+                if (serviceTypeCondition != null) 
+                    serviceTypes = serviceTypes.Where(serviceTypeCondition).ToArrayOrSelf();
+                if (serviceTypes.Length != 0)
+                    r.RegisterMany(serviceTypes, implType, reuse, made, setup, ifAlreadyRegistered, serviceKey);
+            },
+            nonPublicServiceTypes);
         }
 
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
@@ -2861,7 +2877,8 @@ namespace DryIoc
         public static void RegisterMany(this IRegistrator registrator,
             IEnumerable<Assembly> implTypeAssemblies, RegisterManyAction action = null, bool nonPublicServiceTypes = false)
         {
-            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly);
+            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly)
+                .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated());
             registrator.RegisterMany(implTypes, action, nonPublicServiceTypes);
         }
 
@@ -2881,8 +2898,10 @@ namespace DryIoc
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool nonPublicServiceTypes = false, object serviceKey = null)
         {
-            registrator.RegisterMany(implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly), 
-                serviceTypeCondition, reuse, made, setup, ifAlreadyRegistered, nonPublicServiceTypes, serviceKey);
+            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly)
+                .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated());
+            registrator.RegisterMany(implTypes,
+                reuse, made, setup, ifAlreadyRegistered, serviceTypeCondition, nonPublicServiceTypes, serviceKey);
         }
 
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
@@ -4682,7 +4701,7 @@ namespace DryIoc
         public readonly Made Made;
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
-        /// <param name="implementationType">Non-abstract close or open generic type.</param>
+        /// <param name="implementationType">(optional) Optional if Made.FactoryMethod is present Non-abstract close or open generic type.</param>
         /// <param name="reuse">(optional)</param> <param name="made">(optional)</param> <param name="setup">(optional)</param>
         public ReflectionFactory(Type implementationType, IReuse reuse = null, Made made = null, Setup setup = null)
             : base(reuse, setup)
@@ -6629,7 +6648,7 @@ namespace DryIoc
         /// <see cref="object"/> type as the last item.</summary>
         /// <param name="sourceType">Source type for discovery.</param>
         /// <param name="includeImplementedType">Additional types to include into result collection.</param>
-        /// <returns>Collection of found types.</returns>
+        /// <returns>Array of found types, empty if nothing found.</returns>
         public static Type[] GetImplementedTypes(this Type sourceType, IncludeImplementedType includeImplementedType = IncludeImplementedType.None)
         {
             Type[] results;

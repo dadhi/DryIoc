@@ -83,7 +83,7 @@ namespace DryIoc.WebApi
             var controllerTypeResolver = config.Services.GetHttpControllerTypeResolver();
             var controllerTypes = controllerTypeResolver.GetControllerTypes(assembliesResolver);
 
-            container.ThrowIfNull().RegisterMany(controllerTypes, reuse: Reuse.InWebRequest);
+            container.ThrowIfNull().RegisterMany(controllerTypes, Reuse.InWebRequest);
         }
 
         private sealed class GivenAssembliesResolver : IAssembliesResolver
