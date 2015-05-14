@@ -90,7 +90,7 @@ Exceptions happened during resolution:
 end of exception list
 */
 
-        public override object ResolveGenerated(Type serviceType, IScope scope)
+        public object ResolveGenerated(Type serviceType, IScope scope)
         {
 <#
         foreach (var factory in factories.Where(f => f.Key == "null"))
@@ -104,7 +104,7 @@ end of exception list
             return null;
         }
 
-        public override object ResolveGenerated(Type serviceType, object serviceKey, IScope scope)
+        public object ResolveGenerated(Type serviceType, object serviceKey, IScope scope)
         {
 <#
         foreach (var factoryGroup in factories.Where(f => f.Key != "null").GroupBy(f => f.Type))

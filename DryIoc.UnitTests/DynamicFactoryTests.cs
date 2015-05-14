@@ -28,7 +28,6 @@ namespace DryIoc.UnitTests
 	    public void Can_resolve_Func_of_Lazy()
 	    {
             var container = new Container();
-            container.RegisterInstance<IResolver>(container);
             container.Register<IServiceWithDependency, ServiceWithDependency>();
             container.Register(typeof(Service));
             container.Register(typeof(LazyDynamic<>), setup: Setup.Wrapper);

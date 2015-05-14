@@ -422,5 +422,21 @@ namespace DryIoc.UnitTests
             c.Register<UseLogger2>(Reuse.Singleton); // uses ILogger
             c.Resolve<UseLogger2>();
         }
+
+        [Test]
+        public void IResolver_will_be_injected_as_property_even_if_not_registered()
+        {
+            var container = new Container();
+            container.Register<Beh>(made: PropertiesAndFields.Auto);
+
+            var resolver = container.Resolve<Beh>().R;
+
+            Assert.NotNull(resolver);
+        }
+
+        public class Beh
+        {
+            public IResolver R { get; set; }
+        }
     }
 }

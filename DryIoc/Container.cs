@@ -995,7 +995,7 @@ namespace DryIoc
             // Factories:
             public readonly HashTree<Type, object> Services;
             public readonly HashTree<Type, Factory[]> Decorators;
-            public readonly HashTree<Type, Factory> Wrappers;
+            private readonly HashTree<Type, Factory> _wrappers;
 
             // Cache:
             public readonly Ref<HashTree<Type, FactoryDelegate>> DefaultFactoryDelegateCache;
@@ -1005,7 +1005,7 @@ namespace DryIoc
 
             public Registry WithoutCache()
             {
-                return new Registry(Services, Decorators, Wrappers,
+                return new Registry(Services, Decorators, _wrappers,
                     Ref.Of(HashTree<Type, FactoryDelegate>.Empty), Ref.Of(HashTree<KV<Type, object>, FactoryDelegate>.Empty),
                     Ref.Of(IntKeyTree.Empty), Ref.Of(AppendableArray.Empty));
             }
@@ -1030,7 +1030,7 @@ namespace DryIoc
             {
                 Services = services;
                 Decorators = decorators;
-                Wrappers = wrappers;
+                _wrappers = wrappers;
                 DefaultFactoryDelegateCache = defaultFactoryDelegateCache;
                 KeyedFactoryDelegateCache = keyedFactoryDelegateCache;
                 FactoryExpressionCache = factoryExpressionCache;
@@ -1040,7 +1040,7 @@ namespace DryIoc
             private Registry WithServices(HashTree<Type, object> services)
             {
                 return services == Services ? this :
-                    new Registry(services, Decorators, Wrappers,
+                    new Registry(services, Decorators, _wrappers,
                         DefaultFactoryDelegateCache.Copy(), KeyedFactoryDelegateCache.Copy(),
                         FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
             }
@@ -1048,14 +1048,14 @@ namespace DryIoc
             private Registry WithDecorators(HashTree<Type, Factory[]> decorators)
             {
                 return decorators == Decorators ? this :
-                    new Registry(Services, decorators, Wrappers,
+                    new Registry(Services, decorators, _wrappers,
                         DefaultFactoryDelegateCache.Copy(), KeyedFactoryDelegateCache.Copy(),
                         FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
             }
 
             private Registry WithWrappers(HashTree<Type, Factory> wrappers)
             {
-                return wrappers == Wrappers ? this :
+                return wrappers == _wrappers ? this :
                     new Registry(Services, Decorators, wrappers,
                         DefaultFactoryDelegateCache.Copy(), KeyedFactoryDelegateCache.Copy(),
                         FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
@@ -1086,7 +1086,7 @@ namespace DryIoc
                         return WithDecorators(Decorators.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append));
 
                     case FactoryType.Wrapper:
-                        return WithWrappers(Wrappers.AddOrUpdate(serviceType, factory));
+                        return WithWrappers(_wrappers.AddOrUpdate(serviceType, factory));
 
                     default:
                         return WithService(factory, serviceType, serviceKey, ifAlreadyRegistered);
@@ -1128,7 +1128,7 @@ namespace DryIoc
 
             public Factory GetWrapperOrDefault(Type serviceType)
             {
-                return Wrappers.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull() ?? serviceType);
+                return _wrappers.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull() ?? serviceType);
             }
 
             private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
@@ -1231,7 +1231,7 @@ namespace DryIoc
                 {
                     case FactoryType.Wrapper:
                         Factory removedWrapper = null;
-                        var registry = WithWrappers(Wrappers.Update(serviceType, null, (factory, _null) =>
+                        var registry = WithWrappers(_wrappers.Update(serviceType, null, (factory, _null) =>
                         {
                             if (factory != null && condition != null && !condition(factory))
                                 return factory;
@@ -4834,8 +4834,16 @@ namespace DryIoc
                         // If parameter expression still null (no Func argument to substitute), try to resolve it
                         if (paramExpr == null)
                         {
-
                             var paramInfo = parameterSelector(param) ?? ParameterServiceInfo.Of(param);
+                            
+                            // NOTE Special case to inject Resolver from FactoryDelegate resolver context provider.
+                            if (paramInfo.ServiceType == typeof(IResolver) && 
+                                paramInfo.Details.ServiceKey == null && paramInfo.Details.RequiredServiceType == null)
+                            {
+                                paramExprs[i] = Container.ResolverContextExpr;
+                                continue;
+                            }
+
                             var paramRequest = request.Push(paramInfo);
 
                             var customValue = paramInfo.Details.CustomValue;
@@ -4982,6 +4990,14 @@ namespace DryIoc
             foreach (var member in members)
                 if (member != null)
                 {
+                    // NOTE Special case to inject Resolver from FactoryDelegate resolver context provider.
+                    if (member.ServiceType == typeof(IResolver) &&
+                        member.Details.ServiceKey == null && member.Details.RequiredServiceType == null)
+                    {
+                        bindings.Add(Expression.Bind(member.Member, Container.ResolverContextExpr));
+                        continue;
+                    }
+
                     var memberRequest = request.Push(member);
                     Expression memberExpr;
 

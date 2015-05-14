@@ -68,23 +68,10 @@ namespace DryIoc.Zero
         }
     }
 
-    public class ZeroContainerGeneratedBase
-    {
-        public virtual object ResolveGenerated(Type serviceType, IScope scope)
-        {
-            return null;
-        }
-
-        public virtual object ResolveGenerated(Type serviceType, object serviceKey, IScope scope)
-        {
-            return null;
-        }
-    }
-
     /// <summary>Minimal container which allow to register service factory delegates and then resolve service from them.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly",
         Justification = "Does not contain any unmanaged resources.")]
-    public partial class ZeroContainer : ZeroContainerGeneratedBase, 
+    public partial class ZeroContainer :
         IFactoryDelegateRegistrator, IResolverContext, IResolverContextProvider, IDisposable
     {
         /// <summary>Creates container.</summary>

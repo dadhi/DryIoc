@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -7,6 +8,50 @@ namespace DryIoc.UnitTests
     [TestFixture]
     public class DelegateFactoryTests
     {
+        [Test]
+        public void Can_register_custom_delegates_without_ReflectionFactory()
+        {
+            var container = new Container();
+
+            container.Register<ServiceLocator>();
+
+            container.Register<SingleInstanceFactory>(
+                made: Made.Of(r => ServiceInfo.Of<ServiceLocator>(), l => l.X));
+            container.Register<MultiInstanceFactory>(
+                made: Made.Of(r => ServiceInfo.Of<ServiceLocator>(), l => l.Y));
+
+            container.Resolve<SingleInstanceFactory>();
+            container.Resolve<MultiInstanceFactory>();
+        }
+
+        public delegate object SingleInstanceFactory(Type serviceType);
+        public delegate IEnumerable<object> MultiInstanceFactory(Type serviceType);
+
+        public class ServiceLocator
+        {
+            private readonly IResolver _r;
+
+            public readonly SingleInstanceFactory X;
+            public readonly MultiInstanceFactory Y;
+
+            public ServiceLocator(IResolver r)
+            {
+                _r = r;
+                X = GetInstance;
+                Y = GetAllInstances;
+            }
+
+            public object GetInstance(Type serviceType)
+            {
+                return _r.Resolve(serviceType);
+            }
+
+            public IEnumerable<object> GetAllInstances(Type serviceType)
+            {
+                return _r.ResolveMany<object>(serviceType);
+            }
+        }
+
         [Test]
         public void Given_Lambda_registration_Resolving_service_should_be_of_Lambda_provided_implementation()
         {
