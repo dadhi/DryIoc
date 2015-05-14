@@ -7335,8 +7335,11 @@ namespace DryIoc
         private static readonly MethodInfo _getEnvCurrentManagedThreadIdMethod =
             typeof(Environment).GetDeclaredMethodOrNull("get_CurrentManagedThreadId");
 
-        private static readonly Func<int> _getEnvCurrentManagedThreadId = _getEnvCurrentManagedThreadIdMethod == null ? null
-            : Expression.Lambda<Func<int>>(Expression.Call(_getEnvCurrentManagedThreadIdMethod), null).Compile();
+        private static readonly Func<int> _getEnvCurrentManagedThreadId = 
+            _getEnvCurrentManagedThreadIdMethod == null ? null : 
+            Expression.Lambda<Func<int>>(
+                Expression.Call(_getEnvCurrentManagedThreadIdMethod, (Expression[])null), 
+                null).Compile();
     }
 
     /// <summary>Tools for expressions, that are not supported out-of-box.</summary>
@@ -7374,7 +7377,8 @@ namespace DryIoc
             var methodInfo = typeof(TOwner).GetDeclaredMethodOrNull(methodName);
             if (methodInfo == null) return null;
             var thisExpr = Expression.Parameter(typeof(TOwner), "_");
-            var methodExpr = Expression.Lambda<Func<TOwner, TReturn>>(Expression.Call(thisExpr, methodInfo), thisExpr);
+            var methodCallExpr = Expression.Call(thisExpr, methodInfo, null);
+            var methodExpr = Expression.Lambda<Func<TOwner, TReturn>>(methodCallExpr, thisExpr);
             return methodExpr.Compile();
         }
 
