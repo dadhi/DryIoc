@@ -6,14 +6,8 @@ environment:
   CODECOV_TOKEN:
     secure: UvfSSzh4rCvMM3jNNhSFO/EbZF2JBTkSOYrZQQ8rM2zncScz9R8JUuslzTK7u29c
 
-install:
- - pip install codecov
- 
 build_script:
  - .\BuildScripts\_main.bat -nopause
-
-after_build:
- - codecov --token=$env:CODECOV_TOKEN 
 
 assembly_info:
   patch: true
