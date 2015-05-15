@@ -24,7 +24,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable).One()));
 
             var service = container.Resolve<DisposableService>();
 
@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable)));
+                    setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable).One()));
 
                 var service = container.Resolve<IService>();
 
@@ -55,7 +55,7 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable)));
+                    setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable).One()));
 
                 var disposable = container.Resolve<ReuseHiddenDisposable>(typeof(IService));
                 disposable.Dispose();
@@ -79,7 +79,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable).One()));
 
             var disposable = container.Resolve<ReuseHiddenDisposable>(typeof(IService));
             disposable.Dispose();
@@ -101,7 +101,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference).One()));
 
             var serviceWeakRef = container.Resolve<ReuseWeakReference>(typeof(IService));
             Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
@@ -119,7 +119,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference).One()));
 
             var serviceWeakRef = container.Resolve<ReuseWeakReference>(typeof(IService));
             Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
@@ -132,11 +132,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable).One()));
             container.Register<Dependency>(Reuse.InResolutionScope,
-                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable).One()));
             container.Register<ServiceClient>(Reuse.InCurrentScope,
-                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable).One()));
 
             using (var scoped = container.OpenScope())
             {
@@ -215,7 +215,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(
-                setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference).One()));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<ReuseWeakReference>(typeof(IService)));
@@ -242,7 +242,7 @@ namespace DryIoc.UnitTests
             {
                 container.Register<Service>();
                 container.Register<ServiceWithParameterAndDependency>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference)));
+                    setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference).One()));
 
                 var func = container.Resolve<Func<bool, ReuseWeakReference>>(typeof(ServiceWithParameterAndDependency));
                 var service = func(true).Target;
@@ -257,7 +257,7 @@ namespace DryIoc.UnitTests
 
             container.Register<Service>();
             container.Register<ServiceWithParameterAndDependency>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable).One()));
 
             var func = container.Resolve<Func<bool, ReuseSwapable>>(typeof(ServiceWithParameterAndDependency));
             var service = func(true);
@@ -273,7 +273,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable).One()));
 
             IService service;
             using (container.OpenScope())
@@ -289,7 +289,7 @@ namespace DryIoc.UnitTests
 
             container.Register<Service>();
             container.Register<ServiceWithParameterAndDependency>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseSwapable).One()));
 
             var func = container.Resolve<Func<bool, ReuseSwapable>>(typeof(ServiceWithParameterAndDependency));
             var service = func(true);
@@ -308,7 +308,7 @@ namespace DryIoc.UnitTests
         public void Can_resolve_as_swapable_and_swap_based_on_current_value()
         {
             var container = new Container();
-            container.Register<Service>(Reuse.Singleton, setup: Setup.With(reuseWrappers: typeof(ReuseSwapable)));
+            container.Register<Service>(Reuse.Singleton, setup: Setup.With(reuseWrappers: typeof(ReuseSwapable).One()));
 
             var service = container.Resolve<ReuseSwapable>(typeof(Service));
 
@@ -339,7 +339,7 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<Service>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: typeof(ReuseRecyclable)));
+                    setup: Setup.With(reuseWrappers: typeof(ReuseRecyclable).One()));
 
                 var recyclable = container.Resolve<ReuseRecyclable>(typeof(Service));
                 var oldService = recyclable.TargetOrDefault<Service>();
@@ -357,7 +357,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseRecyclable)));
+                setup: Setup.With(reuseWrappers: typeof(ReuseRecyclable).One()));
 
             var recyclable = container.Resolve<ReuseRecyclable>(typeof(IService));
             var oldService = recyclable.TargetOrDefault<DisposableService>();

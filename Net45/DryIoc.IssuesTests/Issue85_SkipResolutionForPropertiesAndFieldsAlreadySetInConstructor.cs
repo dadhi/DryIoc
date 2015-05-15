@@ -53,6 +53,7 @@ namespace DryIoc.IssuesTests
 
             public static class FieldAndPropSetter
             {
+                // ReSharper disable once RedundantAssignment
                 public static T SetField<T, TField>(T holder, ref TField field, TField value)
                 {
                     field = value;

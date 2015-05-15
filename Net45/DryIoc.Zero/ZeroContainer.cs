@@ -539,7 +539,9 @@ namespace DryIoc.Zero
                 "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." + Environment.NewLine +
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
             ContainerIsDisposed = Of(
-                "Container is disposed and its operations are no longer available.");
+                "Container is disposed and its operations are no longer available."),
+            ScopeIsDisposed = Of(
+                "Scope is disposed and scoped instances are no longer available.");
 #pragma warning restore 1591 // "Missing XML-comment"
 
         /// <summary>Generates new code for message.</summary>
@@ -577,4 +579,151 @@ namespace DryIoc.Zero
             throw new ZeroContainerException(error, message);
         }
     }
+
+    /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
+    /// Locking is used internally to ensure that object factory called only once.</summary>
+    public sealed class Scope2 : IScope
+    {
+        /// <summary>Parent scope in scope stack. Null for root scope.</summary>
+        public IScope Parent { get; private set; }
+
+        /// <summary>Optional name object associated with scope.</summary>
+        public object Name { get; private set; }
+
+        /// <summary>Returns true if scope disposed.</summary>
+        public bool IsDisposed
+        {
+            get { return _disposed == 1; }
+        }
+
+        private int _lastItemIndex = -1;
+        public int GetLastItemIndex()
+        {
+            var lastItemIndex = Interlocked.Increment(ref _lastItemIndex);
+            if (lastItemIndex >= _items.Length)
+                EnsureItemsInclude(lastItemIndex);
+            return lastItemIndex;
+        }
+
+        /// <summary>Create scope with optional parent and name.</summary>
+        /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
+        public Scope2(IScope parent = null, object name = null)
+        {
+            Parent = parent;
+            Name = name;
+            _items = new object[] { };
+        }
+
+        /// <summary><see cref="IScope.GetOrAdd"/> for description.
+        /// Will throw <see cref="ContainerException"/> if scope is disposed.</summary>
+        /// <param name="id">Unique ID to find created object in subsequent calls.</param>
+        /// <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
+        /// <returns>Created and stored object.</returns>
+        /// <exception cref="ContainerException">if scope is disposed.</exception>
+        public object GetOrAdd(int id, CreateScopedValue createValue)
+        {
+            var item = EnsureItemsInclude(id)[id];
+            return !(item == null || item is IRecyclable) ? item : TryGetOrAdd(id, createValue, item as IRecyclable);
+        }
+
+        private object TryGetOrAdd(int id, CreateScopedValue createValue, IRecyclable recyclableItem)
+        {
+            if (_disposed == 1) Throw.It(Error.ScopeIsDisposed);
+            if (recyclableItem != null && !recyclableItem.IsRecycled)
+                return recyclableItem;
+
+            object item;
+            lock (_syncRoot)
+            {
+                item = _items[id];
+                if (item != null && !(item is IRecyclable && ((IRecyclable)item).IsRecycled))
+                    return item;
+
+                if (item != null) // dispose recyclable item
+                    DisposeItem(item);
+
+                item = createValue();
+            }
+
+            _items[id] = item;
+            return item;
+        }
+
+        /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
+        /// <param name="id">To set value at.</param> <param name="value">Value to set.</param>
+        public void SetOrAdd(int id, object value)
+        {
+            if (_disposed == 1) Throw.It(Error.ScopeIsDisposed);
+            EnsureItemsInclude(id)[id] = value;
+        }
+
+        private object[] EnsureItemsInclude(int id)
+        {
+            if (id >= _items.Length)
+            {
+                var newItems = new object[id + 4];
+                Array.Copy(_items, 0, newItems, 0, _items.Length);
+                _items = newItems;
+            }
+
+            return _items;
+        }
+
+        /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
+        /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
+        public void Dispose()
+        {
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
+            for (var i = 0; i < _items.Length; i++)
+            {
+                var item = _items[i];
+                if (item is IDisposable || item is IReuseWrapper)
+                    DisposeItem(item);
+            }
+
+            _items = new object[0];
+        }
+
+        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
+        public override string ToString()
+        {
+            return "named: " +
+                (Name == null ? "no" : Name.ToString()) +
+                (Parent == null ? "" : " (parent " + Parent + ")");
+        }
+
+        #region Implementation
+
+        private object[] _items;
+        private int _disposed;
+
+        // Sync root is required to create object only once. The same reason as for Lazy<T>.
+        private readonly object _syncRoot = new object();
+
+        private static void DisposeItem(object item)
+        {
+            try
+            {
+                var disposable = item as IDisposable;
+                if (disposable != null)
+                    disposable.Dispose();
+                else
+                {
+                    var reused = item as IReuseWrapper;
+                    while (reused != null && !(reused is IHideDisposableFromContainer)
+                           && reused.Target != null && (disposable = reused.Target as IDisposable) == null)
+                        reused = reused.Target as IReuseWrapper;
+                    if (disposable != null)
+                        disposable.Dispose();
+                }
+            }
+            catch (Exception)
+            {
+                // NOTE Ignoring disposing exception, they not so important for program to proceed.
+            }
+        }
+
+        #endregion
+    }
+
 }

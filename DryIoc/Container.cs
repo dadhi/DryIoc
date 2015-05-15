@@ -249,7 +249,8 @@ namespace DryIoc
             var registeredServiceType = request.Container.UnwrapServiceType(parent.RequiredServiceType ?? parent.ServiceType);
             var parentServiceTypeExpr = request.Container.GetOrAddStateItemExpression(registeredServiceType, typeof(Type));
             var parentServiceKeyExpr = Expression.Convert(request.Container.GetOrAddStateItemExpression(parent.ServiceKey), typeof(object));
-            return Expression.Call(ResolverContextExpr, "GetOrCreateResolutionScope", null, ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
+            return Expression.Call(ResolverContextExpr, "GetOrCreateResolutionScope", ArrayTools.No<Type>(), 
+                ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
 
         #endregion
@@ -2238,7 +2239,7 @@ namespace DryIoc
         private static Expression PrimitivesToExpressionConverter(object item, Type itemType)
         {
             return itemType == typeof(DefaultKey)
-                    ? (Expression)Expression.Call(itemType, "Of", null,
+                    ? (Expression)Expression.Call(itemType, "Of", ArrayTools.No<Type>(),
                         Expression.Constant(((DefaultKey)item).RegistrationOrder))
                 : (itemType.IsPrimitive() || itemType == typeof(Type)
                     ? Expression.Constant(item, itemType)
@@ -3255,7 +3256,7 @@ namespace DryIoc
 
             var getOrNewCallExpr = Container.GetResolutionScopeExpression(request);
 
-            var resolveExpr = Expression.Call(Container.ResolverExpr, "ResolveKeyed", null,
+            var resolveExpr = Expression.Call(Container.ResolverExpr, "ResolveKeyed", ArrayTools.No<Type>(),
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr,
                 getOrNewCallExpr);
 
@@ -4059,7 +4060,7 @@ namespace DryIoc
         public static Setup With(bool cacheFactoryExpression = true,
             Func<object> lazyMetadata = null, object metadata = null,
             Func<Request, bool> condition = null, bool openResolutionScope = false,
-            params Type[] reuseWrappers)
+            Type[] reuseWrappers = null)
         {
             if (cacheFactoryExpression && lazyMetadata == null && metadata == null &&
                 condition == null && openResolutionScope == false && reuseWrappers == null)
@@ -4274,7 +4275,7 @@ namespace DryIoc
         /// <returns>Service expression.</returns>
         public virtual Expression GetExpressionOrDefault(Request request, Type reuseWrapperType = null)
         {
-            // return r.Resolver.Resolve<DependencyServiceType>(...) instead of actual new or method call expression.
+            // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
             if (Setup.OpenResolutionScope && !request.ParentNonWrapper().IsEmpty)
                 return Resolver.CreateResolutionExpression(request);
 
@@ -4373,13 +4374,15 @@ namespace DryIoc
             var getScopeExpr = reuse.GetScopeExpression(request);
 
             var serviceType = serviceExpr.Type;
-            var factoryIDExpr = Expression.Constant(FactoryID);
+            var factoryIdExpr = Expression.Constant(FactoryID);
 
             var wrapperTypes = Setup.ReuseWrappers;
 
             if (wrapperTypes.IsNullOrEmpty())
-                return Expression.Convert(Expression.Call(getScopeExpr, "GetOrAdd", null,
-                    factoryIDExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, null)), serviceType);
+                return Expression.Convert(
+                    Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.No<Type>(),
+                        factoryIdExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.No<ParameterExpression>())), 
+                    serviceType);
 
             // First wrap serviceExpr with wrapper Wrap method.
             var wrappers = new IReuseWrapperFactory[wrapperTypes.Length];
@@ -4391,14 +4394,14 @@ namespace DryIoc
 
                 serviceExpr = Expression.Call(
                     request.Container.GetOrAddStateItemExpression(wrapper, typeof(IReuseWrapperFactory)),
-                    "Wrap", null, serviceExpr);
+                    "Wrap", ArrayTools.No<Type>(), serviceExpr);
 
                 wrappers[i] = wrapper; // save wrapper for later unwrap
             }
 
             // Makes call like this: scope.GetOrAdd(id, () => wrapper1.Wrap(wrapper0.Wrap(new Service)))
-            var getScopedServiceExpr = Expression.Call(getScopeExpr, "GetOrAdd", null, 
-                factoryIDExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, null));
+            var getScopedServiceExpr = Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.No<Type>(),
+                factoryIdExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.No<ParameterExpression>()));
 
             // Unwrap wrapped service in backward order like this: wrapper0.Unwrap(wrapper1.Unwrap(scope.GetOrAdd(...)))
             for (var i = wrapperTypes.Length - 1; i >= 0; --i)
@@ -4410,7 +4413,7 @@ namespace DryIoc
                     return Expression.Convert(getScopedServiceExpr, requiredWrapperType);
 
                 var wrapperExpr = request.Container.GetOrAddStateItemExpression(wrappers[i], typeof(IReuseWrapperFactory));
-                getScopedServiceExpr = Expression.Call(wrapperExpr, "Unwrap", null, getScopedServiceExpr);
+                getScopedServiceExpr = Expression.Call(wrapperExpr, "Unwrap", ArrayTools.No<Type>(), getScopedServiceExpr);
             }
 
             return requiredWrapperType != null ? null
@@ -5517,7 +5520,7 @@ namespace DryIoc
         public Expression GetScopeExpression(Request request)
         {
             var nameExpr = request.Container.GetOrAddStateItemExpression(Name, typeof(object));
-            return Expression.Call(Container.ResolverContextExpr, "GetCurrentNamedScope", null, 
+            return Expression.Call(Container.ResolverContextExpr, "GetCurrentNamedScope", ArrayTools.No<Type>(), 
                 nameExpr, Expression.Constant(true));
         }
 
@@ -5570,7 +5573,7 @@ namespace DryIoc
         /// <returns>Method call expression returning existing or newly created resolution scope.</returns>
         public Expression GetScopeExpression(Request request)
         {
-            return Expression.Call(Container.ResolverContextExpr, "GetMatchingResolutionScope", null,
+            return Expression.Call(Container.ResolverContextExpr, "GetMatchingResolutionScope", ArrayTools.No<Type>(),
                 Container.GetResolutionScopeExpression(request),
                 Expression.Constant(_assignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(_serviceKey, typeof(object)),
@@ -7206,6 +7209,26 @@ namespace DryIoc
         {
             return source.RemoveAt(source.IndexOf(value));
         }
+
+        /// <summary>Creates array consisting of single item.</summary>
+        /// <param name="item">item</param> <typeparam name="T">item type.</typeparam>
+        /// <returns>Array of one item.</returns>
+        public static T[] One<T>(this T item)
+        {
+            return new[] { item };
+        }
+
+        /// <summary>Returns singleton empty array of provided type.</summary> 
+        /// <typeparam name="T">Array item type.</typeparam> <returns>Empty array.</returns>
+        public static T[] No<T>()
+        {
+            return EmptyArray<T>.Value;
+        }
+
+        private static class EmptyArray<T>
+        {
+            public static readonly T[] Value = new T[0];
+        }
     }
 
     /// <summary>Provides pretty printing/debug view for number of types.</summary>
@@ -7333,13 +7356,13 @@ namespace DryIoc
         static partial void GetCurrentManagedThreadID(ref int threadID);
 
         private static readonly MethodInfo _getEnvCurrentManagedThreadIdMethod =
-            typeof(Environment).GetDeclaredMethodOrNull("get_CurrentManagedThreadId");
+            typeof(Environment).GetDeclaredMethodOrNull("get_CurrentManagedThreadId", ArrayTools.No<Type>());
 
         private static readonly Func<int> _getEnvCurrentManagedThreadId = 
             _getEnvCurrentManagedThreadIdMethod == null ? null : 
             Expression.Lambda<Func<int>>(
-                Expression.Call(_getEnvCurrentManagedThreadIdMethod, (Expression[])null), 
-                null).Compile();
+                Expression.Call(_getEnvCurrentManagedThreadIdMethod, ArrayTools.No<Expression>()),
+                ArrayTools.No<ParameterExpression>()).Compile();
     }
 
     /// <summary>Tools for expressions, that are not supported out-of-box.</summary>
@@ -7377,7 +7400,7 @@ namespace DryIoc
             var methodInfo = typeof(TOwner).GetDeclaredMethodOrNull(methodName);
             if (methodInfo == null) return null;
             var thisExpr = Expression.Parameter(typeof(TOwner), "_");
-            var methodCallExpr = Expression.Call(thisExpr, methodInfo, null);
+            var methodCallExpr = Expression.Call(thisExpr, methodInfo, ArrayTools.No<Expression>());
             var methodExpr = Expression.Lambda<Func<TOwner, TReturn>>(methodCallExpr, thisExpr);
             return methodExpr.Compile();
         }
@@ -7387,10 +7410,11 @@ namespace DryIoc
         /// <returns>Default value expression.</returns>
         public static Expression GetDefaultValueExpression(this Type type)
         {
-            return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), (Expression[])null);
+            return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), ArrayTools.No<Expression>());
         }
 
-        private static readonly MethodInfo _getDefaultMethod = typeof(ExpressionTools).GetDeclaredMethodOrNull("GetDefault");
+        private static readonly MethodInfo _getDefaultMethod = typeof(ExpressionTools)
+            .GetDeclaredMethodOrNull("GetDefault", ArrayTools.No<Type>());
         internal static T GetDefault<T>() { return default(T); }
     }
 

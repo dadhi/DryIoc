@@ -325,7 +325,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<IContext, Context1>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: ReuseWrapper.Swapable));
+                setup: Setup.With(reuseWrappers: ReuseWrapper.Swapable.One()));
 
             var context = container.Resolve<IContext>();
             Assert.NotNull(context);
@@ -348,14 +348,14 @@ namespace DryIoc.UnitTests
             IContainer c = new Container();
             // before request
             c.Register<IContext, Context1>(Reuse.Singleton, 
-                setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable));
+                setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable.One()));
 
             var r1 = c.Resolve<IContext>();
             r1.Data = "before";
 
             c.Register<IContext, Context2>(Reuse.Singleton, 
                 ifAlreadyRegistered: IfAlreadyRegistered.Replace,
-                setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable));
+                setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable.One()));
 
             c.Resolve<ReuseRecyclable>(typeof(IContext)).Recycle();
 
@@ -402,7 +402,7 @@ namespace DryIoc.UnitTests
             // If we know that Logger could be changed/re-registered, then register it as dynamic dependency
             c.Register<ILogger, Logger1>(setup: Setup.With(openResolutionScope: true));
 
-            c.Register<UseLogger1>(Reuse.Singleton, setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable));
+            c.Register<UseLogger1>(Reuse.Singleton, setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable.One()));
             var user1 = c.Resolve<UseLogger1>();
 
             c.Register<ILogger, Logger2>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
