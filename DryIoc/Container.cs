@@ -7397,7 +7397,7 @@ namespace DryIoc
         /// <returns>Created delegate or null, if no method with such name is found.</returns>
         public static Func<TOwner, TReturn> GetMethodDelegateOrNull<TOwner, TReturn>(string methodName)
         {
-            var methodInfo = typeof(TOwner).GetDeclaredMethodOrNull(methodName);
+            var methodInfo = typeof(TOwner).GetDeclaredMethodOrNull(methodName, ArrayTools.No<Type>());
             if (methodInfo == null) return null;
             var thisExpr = Expression.Parameter(typeof(TOwner), "_");
             var methodCallExpr = Expression.Call(thisExpr, methodInfo, ArrayTools.No<Expression>());
