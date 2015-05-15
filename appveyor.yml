@@ -1,11 +1,15 @@
 version: 2.0.0.{build}
-
 os: Windows Server 2012
-
 test: off
+
+install:
+ - pip install codecov
  
 build_script:
  - .\BuildScripts\_main.bat -nopause
+
+after_build:
+ - codecov --token=010207f8-6304-48b3-a71d-e9437ca26b76 
 
 assembly_info:
   patch: true
