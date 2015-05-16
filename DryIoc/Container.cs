@@ -4329,7 +4329,7 @@ namespace DryIoc
         /// <summary>Check method name for explanation XD.</summary> <param name="reuse">Reuse to check.</param> <param name="request">Request to resolve.</param>
         protected static void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse, Request request)
         {
-            if (reuse != null && !request.Parent.IsEmpty &&
+            if (reuse != null && reuse.Lifespan > 0 && !request.Parent.IsEmpty &&
                 request.Container.Rules.ThrowIfDependencyHasShorterReuseLifespan)
             {
                 var parentReuse = request.Parent.ResolvedFactory.Reuse;
@@ -4429,7 +4429,7 @@ namespace DryIoc
             var serviceType = serviceExpr.Type;
             if (wrapperTypes == null || wrapperTypes.Length == 0)
                 return request.Container.GetOrAddStateItemExpression(
-                    scope.GetOrAdd(FactoryID, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, null)),
+                    scope.GetOrAdd(FactoryID, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope)),
                     serviceType);
 
             var wrappers = new IReuseWrapperFactory[wrapperTypes.Length];
@@ -5458,11 +5458,8 @@ namespace DryIoc
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
     public sealed class SingletonReuse : IReuse
     {
-        /// <summary>Related lifespan value associated with reuse.</summary>
-        public static readonly int LIFESPAN = 1000;
-
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get { return LIFESPAN; } }
+        public int Lifespan { get { return 1000; } }
 
         /// <summary>Returns container bound Singleton scope.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
@@ -5488,14 +5485,11 @@ namespace DryIoc
     /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
     public sealed class CurrentScopeReuse : IReuse
     {
-        /// <summary>Related lifespan value associated with reuse.</summary>
-        public static readonly int LIFESPAN = 100;
-
         /// <summary>Name to find current scope or parent with equal name.</summary>
         public readonly object Name;
 
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get { return LIFESPAN; } }
+        public int Lifespan { get { return 100; } }
 
         /// <summary>Creates reuse optionally specifying its name.</summary> 
         /// <param name="name">(optional) Used to find matching current scope or parent.</param>
@@ -5537,11 +5531,8 @@ namespace DryIoc
     /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
     public sealed class ResolutionScopeReuse : IReuse
     {
-        /// <summary>Related lifespan value associated with reuse.</summary>
-        public static readonly int LIFESPAN = 10;
-
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get { return LIFESPAN; } }
+        public int Lifespan { get { return 0; } }
 
         /// <summary>Creates new resolution scope reuse with specified type and key.</summary>
         /// <param name="assignableFromServiceType">(optional)</param> <param name="serviceKey">(optional)</param>

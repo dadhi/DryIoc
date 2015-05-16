@@ -393,12 +393,15 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Client>(Reuse.Singleton);
-            container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
+            container.Register<ILogger, FastLogger>(Reuse.InCurrentScope);
 
-            var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<Client>());
+            using (var scope = container.OpenScope())
+            {
+                var ex = Assert.Throws<ContainerException>(() =>
+                    container.Resolve<Client>());
 
-            Assert.That(ex.Error, Is.EqualTo(Error.DependencyHasShorterReuseLifespan));
+                Assert.That(ex.Error, Is.EqualTo(Error.DependencyHasShorterReuseLifespan));
+            }
         }
 
         [Test]
