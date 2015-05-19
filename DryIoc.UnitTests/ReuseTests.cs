@@ -395,7 +395,7 @@ namespace DryIoc.UnitTests
             container.Register<Client>(Reuse.Singleton);
             container.Register<ILogger, FastLogger>(Reuse.InCurrentScope);
 
-            using (var scope = container.OpenScope())
+            using (container.OpenScope())
             {
                 var ex = Assert.Throws<ContainerException>(() =>
                     container.Resolve<Client>());
@@ -495,6 +495,44 @@ namespace DryIoc.UnitTests
 
             container.Dispose();
             Assert.IsTrue(service.IsDisposed);
+        }
+
+        [Test]
+        public void Dispose_should_happen_in_reverse_order_to_registration()
+        {
+            var container = new Container();
+            container.Register<Fst>(Reuse.Singleton);
+            container.Register<Snd>(Reuse.Singleton);
+            
+            var fst = container.Resolve<Fst>();
+            container.Dispose();
+
+            Assert.AreEqual(2, fst.Snd.Order);
+        }
+
+        class Fst : IDisposable
+        {
+            public readonly Snd Snd;
+
+            public Fst(Snd snd)
+            {
+                Snd = snd;
+            }
+
+            public void Dispose()
+            {
+                Snd.Order = 2;
+            }
+        }
+
+        class Snd : IDisposable
+        {
+            public int Order;
+
+            public void Dispose()
+            {
+                Order = 1;
+            }
         }
 
         internal class SomethingDisposable : IDisposable

@@ -5319,8 +5319,10 @@ namespace DryIoc
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
             if (!_items.IsEmpty)
-                foreach (var item in _items.Enumerate().Select(x => x.Value).Where(x => x is IDisposable || x is IReuseWrapper))
-                    DisposeItem(item);
+                foreach (var item in _items.Enumerate()
+                    .Where(it => it.Value is IDisposable || it.Value is IReuseWrapper)
+                    .OrderByDescending(it => it.Key))
+                    DisposeItem(item.Value);
             _items = IntKeyTree.Empty;
         }
 
