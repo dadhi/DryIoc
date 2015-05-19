@@ -96,7 +96,7 @@ namespace DryIoc.MefAttributedModel
         /// is serializable DTO for registration.</summary>
         /// <param name="registrator">Container to register into.</param>
         /// <param name="infos">Registrations to register.</param>
-        public static void RegisterExports(this IRegistrator registrator, IEnumerable<RegistrationInfo> infos)
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<ExportedRegistrationInfo> infos)
         {
             foreach (var info in infos)
                 RegisterInfo(registrator, info);
@@ -106,7 +106,7 @@ namespace DryIoc.MefAttributedModel
         /// contain multiple exported services with single implementation.</summary>
         /// <param name="registrator">Container to register into.</param>
         /// <param name="info">Registration information provided.</param>
-        public static void RegisterInfo(this IRegistrator registrator, RegistrationInfo info)
+        public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info)
         {
             if (!info.ImplementationType.IsStatic())
             {
@@ -127,7 +127,7 @@ namespace DryIoc.MefAttributedModel
         /// attributes, and create serializable DTO with all information required for registering of exported types.</summary>
         /// <param name="assemblies">Assemblies to scan.</param>
         /// <returns>Lazy collection of registration info DTOs.</returns>
-        public static IEnumerable<RegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
+        public static IEnumerable<ExportedRegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
             return assemblies.SelectMany(Portable.GetTypesFromAssembly)
                 .Select(GetRegistrationInfoOrDefault).Where(info => info != null);
@@ -138,7 +138,7 @@ namespace DryIoc.MefAttributedModel
         /// If type is not concrete or is value type, then return null.</summary>
         /// <param name="implementationType">Type to convert into registration info.</param>
         /// <returns>Created DTO.</returns>
-        public static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType)
+        public static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type implementationType)
         {
             if (implementationType.IsValueType() || 
                 implementationType.IsAbstract() && !implementationType.IsStatic() ||
@@ -276,12 +276,12 @@ namespace DryIoc.MefAttributedModel
 
         #region Implementation
 
-        private static RegistrationInfo GetRegistrationInfoOrDefault(Type implementationType, Attribute[] attributes)
+        private static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type implementationType, Attribute[] attributes)
         {
             if (implementationType.IsOpenGeneric())
                 implementationType = implementationType.GetGenericTypeDefinition();
 
-            var info = new RegistrationInfo { ImplementationType = implementationType, ReuseType = DefaultReuseType };
+            var info = new ExportedRegistrationInfo { ImplementationType = implementationType, ReuseType = DefaultReuseType };
 
             for (var attrIndex = 0; attrIndex < attributes.Length; attrIndex++)
             {
@@ -352,7 +352,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static ExportInfo[] GetExportsFromExportAttribute(ExportAttribute attribute,
-            RegistrationInfo currentInfo, Type implementationType)
+            ExportedRegistrationInfo currentInfo, Type implementationType)
         {
             var export = new ExportInfo(attribute.ContractType ?? implementationType,
                 attribute.ContractName ??
@@ -366,7 +366,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static ExportInfo[] GetExportsFromExportManyAttribute(ExportManyAttribute attribute,
-            RegistrationInfo currentInfo, Type implementationType)
+            ExportedRegistrationInfo currentInfo, Type implementationType)
         {
             var allContractTypes = attribute.GetContractTypes(implementationType);
 
@@ -394,7 +394,7 @@ namespace DryIoc.MefAttributedModel
             return exports;
         }
 
-        private static void PopulateWrapperInfoFromAttribute(RegistrationInfo resultInfo, AsWrapperAttribute attribute,
+        private static void PopulateWrapperInfoFromAttribute(ExportedRegistrationInfo resultInfo, AsWrapperAttribute attribute,
             Type implementationType)
         {
             Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
@@ -404,7 +404,7 @@ namespace DryIoc.MefAttributedModel
                 WrappedServiceTypeGenericArgIndex = attribute.ContractTypeGenericArgIndex };
         }
 
-        private static void PopulateDecoratorInfoFromAttribute(RegistrationInfo resultInfo, AsDecoratorAttribute attribute,
+        private static void PopulateDecoratorInfoFromAttribute(ExportedRegistrationInfo resultInfo, AsDecoratorAttribute attribute,
             Type implementationType)
         {
             Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
@@ -441,7 +441,7 @@ namespace DryIoc.MefAttributedModel
             return exports;
         }
 
-        private static void RegisterFactoryMethods(IRegistrator registrator, RegistrationInfo factoryInfo)
+        private static void RegisterFactoryMethods(IRegistrator registrator, ExportedRegistrationInfo factoryInfo)
         {
             // NOTE: Cast is required for NET35
             var members = factoryInfo.ImplementationType.GetAll(t => 
@@ -554,7 +554,7 @@ namespace DryIoc.MefAttributedModel
     }
 
     /// <summary>Converts provided literal into valid C# code. Used for generating registration code 
-    /// from <see cref="RegistrationInfo"/> DTOs.</summary>
+    /// from <see cref="ExportedRegistrationInfo"/> DTOs.</summary>
     public static class PrintCode
     {
         /// <summary>Prints valid c# Boolean literal: true/false.</summary>
@@ -619,7 +619,7 @@ namespace DryIoc.MefAttributedModel
 #pragma warning disable 659
 
     /// <summary>Serializable DTO of all registration information.</summary>
-    public sealed class RegistrationInfo
+    public sealed class ExportedRegistrationInfo
     {
         /// <summary>All exports defined for implementation type (registration).</summary>
         public ExportInfo[] Exports;
@@ -697,7 +697,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="obj">Other info to compare.</param> <returns>True if equal.</returns>
         public override bool Equals(object obj)
         {
-            var other = obj as RegistrationInfo;
+            var other = obj as ExportedRegistrationInfo;
             return other != null
                 && other.ImplementationType == ImplementationType
                 && other.ReuseType == ReuseType

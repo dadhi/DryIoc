@@ -260,7 +260,7 @@ namespace DryIoc
         /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
         /// <returns>Existing registrations.</returns>
         /// <remarks>Decorator and Wrapper types are not included.</remarks>
-        public IEnumerable<ServiceTypeKeyFactory> GetServiceRegistrations()
+        public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
         {
             return _registry.Value.GetServiceRegistrations();
         }
@@ -1062,19 +1062,19 @@ namespace DryIoc
                         FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
             }
 
-            public IEnumerable<ServiceTypeKeyFactory> GetServiceRegistrations()
+            public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
             {
-                foreach (var factoryEntry in Services.Enumerate())
+                foreach (var entry in Services.Enumerate())
                 {
-                    var serviceType = factoryEntry.Key;
-                    var factory = factoryEntry.Value as Factory;
+                    var serviceType = entry.Key;
+                    var factory = entry.Value as Factory;
                     if (factory != null)
-                        yield return new ServiceTypeKeyFactory { ServiceType = serviceType, Factory = factory };
+                        yield return new ServiceRegistrationInfo(factory, serviceType, null);
                     else
                     {
-                        var factories = ((FactoriesEntry)factoryEntry.Value).Factories;
+                        var factories = ((FactoriesEntry)entry.Value).Factories;
                         foreach (var f in factories.Enumerate())
-                            yield return new ServiceTypeKeyFactory { ServiceType = serviceType, OptionalServiceKey = f.Key, Factory = f.Value };
+                            yield return new ServiceRegistrationInfo(f.Value, serviceType, f.Key);
                     }
                 }
             }
@@ -1836,8 +1836,7 @@ namespace DryIoc
                     itemsWithVariance = itemsWithVariance.Where(x => request.ServiceKey.Equals(x.OptionalServiceKey));
             }
 
-            var allItems = items.Select(kv => new ServiceTypeKeyFactory { 
-                ServiceType = requiredItemType, OptionalServiceKey = kv.Key, Factory = kv.Value });
+            var allItems = items.Select(kv => new ServiceRegistrationInfo(kv.Value, requiredItemType, kv.Key));
             if (itemsWithVariance != null)
                 allItems = allItems.Concat(itemsWithVariance);
 
@@ -5948,17 +5947,30 @@ namespace DryIoc
     }
 
     /// <summary>Define registered service structure.</summary>
-    [DebuggerDisplay("{ServiceType}; {OptionalServiceKey}; {Factory}")]
-    public struct ServiceTypeKeyFactory
+    [DebuggerDisplay("#{RegistrationOrder}, {ServiceType}, {OptionalServiceKey}, {Factory}")]
+    public struct ServiceRegistrationInfo
     {
         /// <summary>Required service type.</summary>
         public Type ServiceType;
 
-        /// <summary>Optional service key, may be an instance of <see cref="DefaultKey"/> for multiple default registrations.</summary>
+        /// <summary>Is null single default service, or actual service key, or <see cref="DefaultKey"/> for multiple default services.</summary>
         public object OptionalServiceKey;
 
         /// <summary>Registered factory.</summary>
         public Factory Factory;
+
+        /// <summary>Provides registration order across all registrations in container.</summary>
+        public int RegistrationOrder;
+
+        /// <summary>Creates info. Registration order is figured out automatically based on Factory.</summary>
+        /// <param name="factory"></param> <param name="serviceType"></param> <param name="optionalServiceKey"></param>
+        public ServiceRegistrationInfo(Factory factory, Type serviceType, object optionalServiceKey)
+        {
+            ServiceType = serviceType;
+            OptionalServiceKey = optionalServiceKey;
+            Factory = factory;
+            RegistrationOrder = factory.FactoryID;
+        }
     }
 
     /// <summary>Defines operations that for changing registry, and checking if something exist in registry.</summary>
@@ -5967,7 +5979,7 @@ namespace DryIoc
         /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
         /// <returns>Existing registrations.</returns>
         /// <remarks>Decorator and Wrapper types are not included.</remarks>
-        IEnumerable<ServiceTypeKeyFactory> GetServiceRegistrations();
+        IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations();
 
         /// <summary>Registers factory in registry with specified service type and key for lookup.</summary>
         /// <param name="factory">To register.</param>

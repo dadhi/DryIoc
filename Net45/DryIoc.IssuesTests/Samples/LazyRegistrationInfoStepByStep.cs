@@ -71,7 +71,7 @@ namespace DryIoc.IssuesTests.Samples
             var lazyLoadedAssembly = new Lazy<Assembly>(() => Assembly.LoadFrom(assemblyFile));
 
             // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var regInfoByServiceTypeNameIndex = new Dictionary<string, List<KeyValuePair<object, RegistrationInfo>>>();
+            var regInfoByServiceTypeNameIndex = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
             foreach (var lazyRegistration in lazyRegistrations)
             {
                 var exports = lazyRegistration.Exports;
@@ -80,18 +80,18 @@ namespace DryIoc.IssuesTests.Samples
                     var export = exports[i];
                     var serviceTypeFullName = export.ServiceTypeFullName;
 
-                    List<KeyValuePair<object, RegistrationInfo>> regs;
+                    List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
                     if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
                         regInfoByServiceTypeNameIndex.Add(serviceTypeFullName, 
-                            regs = new List<KeyValuePair<object, RegistrationInfo>>());
-                    regs.Add(new KeyValuePair<object, RegistrationInfo>(export.ServiceKeyInfo.Key, lazyRegistration));
+                            regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
+                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(export.ServiceKeyInfo.Key, lazyRegistration));
                 }
             }
 
             // Step 2 - Add resolution rule for creating factory on resolve.
             Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
             {
-                List<KeyValuePair<object, RegistrationInfo>> regs;
+                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
                 if (!regInfoByServiceTypeNameIndex.TryGetValue(request.ServiceType.FullName, out regs))
                     return null;
 

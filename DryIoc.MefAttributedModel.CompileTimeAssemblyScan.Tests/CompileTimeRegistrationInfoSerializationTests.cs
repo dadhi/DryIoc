@@ -52,9 +52,9 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 
             // Then
             var loadedModel = CreateModel();
-            RegistrationInfo[] infos;
+            ExportedRegistrationInfo[] infos;
             using (var file = File.OpenRead(DATA_FILE))
-                infos = (RegistrationInfo[])loadedModel.Deserialize(file, null, typeof(RegistrationInfo[]));
+                infos = (ExportedRegistrationInfo[])loadedModel.Deserialize(file, null, typeof(ExportedRegistrationInfo[]));
 
             Assert.That(services, Is.EqualTo(infos));
         }
@@ -74,9 +74,9 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 model.Serialize(file, services);
 
             var loadedModel = CreateModel();
-            RegistrationInfo[] infos;
+            ExportedRegistrationInfo[] infos;
             using (var file = File.OpenRead(DATA_FILE))
-                infos = (RegistrationInfo[])loadedModel.Deserialize(file, null, typeof(RegistrationInfo[]));
+                infos = (ExportedRegistrationInfo[])loadedModel.Deserialize(file, null, typeof(ExportedRegistrationInfo[]));
 
             // When
             var container = new Container().WithMefAttributedModel();
@@ -91,7 +91,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         {
             var model = TypeModel.Create();
             model.Add(typeof(ServiceKeyInfo), false).SetSurrogate(typeof(ServiceKeyInfoSurrogate));
-            model.Add<RegistrationInfo>();
+            model.Add<ExportedRegistrationInfo>();
             model.Add<ExportInfo>();
             model.Add<WrapperInfo>();
             model.Add<DecoratorInfo>();
