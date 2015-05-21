@@ -180,7 +180,7 @@ namespace DryIoc.UnitTests
 	    }
         
         [Test]
-        public void Can_resolve_Func_with_args_of_LazyEnumerable()
+        public void CanNOT_resolve_Func_with_args_of_LazyEnumerable()
         {
             var container = new Container();
             container.Register<IServiceWithParameterAndDependency, ServiceWithParameterAndDependency>();

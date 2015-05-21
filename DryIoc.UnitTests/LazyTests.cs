@@ -142,7 +142,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<Func<bool, Lazy<IServiceWithParameterAndDependency>>>());
 
-            Assert.That(ex.Error, Is.EqualTo(Error.UnableToResolveService));
+            Assert.That(ex.Error, Is.EqualTo(Error.UnableToResolveUnknownService));
         }
 
         [Test]

@@ -42,7 +42,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_two_named_registerations_Resolving_without_name_should_throw()
+        public void Given_two_named_registrations_Resolving_without_name_should_throw()
         {
             var container = new Container();
             container.Register<IService, Service>(serviceKey: "some");
@@ -51,7 +51,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
 
-            Assert.AreEqual(ex.Error, Error.UnableToResolveService);
+            Assert.AreEqual(ex.Error, Error.UnableToResolveFromRegisteredServices);
         }
 
         [Test]
@@ -338,7 +338,7 @@ namespace DryIoc.UnitTests
             container.Unregister<IContext>();
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<IContext>());
-            Assert.AreEqual(Error.UnableToResolveService, ex.Error);
+            Assert.AreEqual(Error.UnableToResolveUnknownService, ex.Error);
         }
 
         [Test]

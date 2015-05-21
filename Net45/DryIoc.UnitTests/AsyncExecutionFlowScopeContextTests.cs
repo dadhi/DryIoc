@@ -36,18 +36,18 @@ namespace DryIoc.UnitTests
             using (var s1 = container.OpenScope())
             {
                 var ex = Assert.Throws<ContainerException>(() => s1.Resolve<Blah>());
-                Assert.That(ex.Error, Is.EqualTo(Error.UnableToResolveService));
+                Assert.That(ex.Error, Is.EqualTo(Error.UnableToResolveFromRegisteredServices));
             }
         }
 
         [Test]
-        public void If_no_scope_opened_And_not_matched_name_found_then_resolving_should_Throw()
+        public void If_no_scope_opened_and_no_matched_name_found_then_resolving_should_Throw()
         {
             var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
             container.Register<Blah>(Reuse.InCurrentNamedScope(1));
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Blah>());
-            Assert.That(ex.Error, Is.EqualTo(Error.UnableToResolveService));
+            Assert.That(ex.Error, Is.EqualTo(Error.UnableToResolveFromRegisteredServices));
         }
 
         [Test]

@@ -571,8 +571,22 @@ namespace DryIoc
                 for (var i = 0; factory == null && i < unknownServiceResolvers.Length; i++)
                     factory = unknownServiceResolvers[i](request);
 
-            if (factory == null)
-                Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UnableToResolveService, request);
+            if (factory == null && request.IfUnresolved == IfUnresolved.Throw)
+            {
+                var registrations = ((IContainer)this).GetAllServiceFactories(request.ServiceType)
+                    .Aggregate(new StringBuilder(), (s, f) => 
+                        (f.Value.HasMatchingReuseScopeInRequest(request) 
+                            ? s.Append("  ") 
+                            : s.Append("  without matching scope "))
+                            .AppendLine(f.ToString()));
+                
+                if (registrations.Length != 0)
+                    Throw.It(Error.UnableToResolveFromRegisteredServices, 
+                        request, ScopeContext != null ? ScopeContext.GetCurrentOrDefault() : OpenedScope,
+                        request.Scope, registrations);
+                
+                Throw.It(Error.UnableToResolveUnknownService, request);
+            }
 
             return factory;
         }
@@ -947,14 +961,15 @@ namespace DryIoc
             if (serviceKey != null)
             {
                 factory = factories.GetValueOrDefault(serviceKey);
-                return factory != null && factory.Setup.Condition != null && !factory.Setup.Condition(request) ? null 
-                    : factory;
+                return factory != null 
+                    && factory.Setup.Condition != null 
+                    && !factory.Setup.Condition(request) 
+                    ? null : factory;
             }
 
-            var defaultFactories = factories.Enumerate()
-                .Where(x => x.Key is DefaultKey &&
-                    (x.Value.Setup.Condition == null || x.Value.Setup.Condition(request)))
-                    .ToArray();
+            var defaultFactories = factories.Enumerate().Where(f => f.Key is DefaultKey 
+                && (f.Value.Setup.Condition == null || f.Value.Setup.Condition(request)))
+                .ToArray();
 
             if (defaultFactories.Length == 1)
             {
@@ -2991,7 +3006,7 @@ namespace DryIoc
                     registeredFactory.Setup == Setup.Default)
                 {
                     reuse.GetScopeOrDefault(container.EmptyRequest)
-                        .ThrowIfNull(Error.NoScopeWhenRegisteringInstance, instance, reuse)
+                        .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
                         .SetOrAdd(registeredFactory.FactoryID, instance);
                     return;
                 }
@@ -3001,14 +3016,14 @@ namespace DryIoc
             var locatorFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse);
             if (container.Register(locatorFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
                 reuse.GetScopeOrDefault(container.EmptyRequest)
-                    .ThrowIfNull(Error.NoScopeWhenRegisteringInstance, instance, reuse)
+                    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
                     .SetOrAdd(locatorFactory.FactoryID, instance);
         }
 
         private static Expression GetThrowInstanceNoLongerAvailable(Request r)
         {
             return Expression.Call(typeof(Throw), "For", new[] { r.ServiceType },
-                Expression.Constant(Error.UnableToResolveService), Expression.Constant(r.ServiceType),
+                Expression.Constant(Error.UnableToResolveUnknownService), Expression.Constant(r.ServiceType),
                 Expression.Constant(null), Expression.Constant(null), Expression.Constant(null));
         }
 
@@ -3342,16 +3357,17 @@ namespace DryIoc
         /// <summary>Pretty prints service details to string for debugging and errors.</summary> <returns>Details string.</returns>
         public override string ToString()
         {
-            if (CustomValue != null)
-                return "{with custom value: " + CustomValue + "}";
-
             var s = new StringBuilder();
+            
+            if (CustomValue != null)
+                return s.Append("{CustomValue=").Print(CustomValue, "\"").Append("}").ToString();
+
             if (RequiredServiceType != null)
-                s.Append("{required: ").Print(RequiredServiceType);
+                s.Append("{RequiredServiceType=").Print(RequiredServiceType);
             if (ServiceKey != null)
-                (s.Length == 0 ? s.Append('{') : s.Append(", ")).Print(ServiceKey, "\"");
+                (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("ServiceKey=").Print(ServiceKey, "\"");
             if (IfUnresolved != IfUnresolved.Throw)
-                (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("allow default");
+                (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("AllowsDefault");
             return (s.Length == 0 ? s : s.Append('}')).ToString();
         }
 
@@ -3950,7 +3966,7 @@ namespace DryIoc
         public StringBuilder PrintCurrent(StringBuilder s = null)
         {
             s = s ?? new StringBuilder();
-            if (IsEmpty) return s.Append("<empty>");
+            if (IsEmpty) return s.Append("{IsEmpty}");
             if (ResolvedFactory != null && ResolvedFactory.FactoryType != FactoryType.Service)
                 s.Append(ResolvedFactory.FactoryType.ToString().ToLower()).Append(' ');
             if (ImplementationType != null && ImplementationType != ServiceType)
@@ -3971,7 +3987,7 @@ namespace DryIoc
             s = recursiveFactoryID == -1 ? s : s.Append(" <--recursive");
             return Parent.Enumerate().Aggregate(s, (a, r) =>
             {
-                a = r.PrintCurrent(a.AppendLine().Append(" in "));
+                a = r.PrintCurrent(a.AppendLine().Append("  in "));
                 return r.ResolvedFactory.FactoryID == recursiveFactoryID ? a.Append(" <--recursive") : a;
             });
         }
@@ -4027,8 +4043,8 @@ namespace DryIoc
         public virtual object Metadata { get { return null; } }
         
         /// <summary>Indicates that injected expression should be: 
-        /// <code lang="cs"><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></code>
-        /// instead of: <code lang="cs"><![CDATA[new Dependency(...)]]></code>.</summary>
+        /// <c><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></c>
+        /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
         public virtual bool OpenResolutionScope { get { return false; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
@@ -4226,10 +4242,12 @@ namespace DryIoc
             Setup = setup ?? Setup.Default;
 
             if (reuse != null)
-                Setup = Setup.WithCondition(HasMatchingReuseScope);
+                Setup = Setup.WithCondition(HasMatchingReuseScopeInRequest);
         }
 
-        private bool HasMatchingReuseScope(Request request)
+        /// <summary>Returns true if for factory Reuse exists matching resolution or current Scope.</summary>
+        /// <param name="request"></param> <returns>True if matching Scope exists.</returns>
+        public bool HasMatchingReuseScopeInRequest(Request request)
         {
             var rules = request.Container.Rules;
             if (!rules.ImplicitSetupConditionToCheckReuseMatchingScope)
@@ -4319,8 +4337,8 @@ namespace DryIoc
                     serviceExpr = Expression.Invoke(decorator, serviceExpr);
             }
 
-            if (serviceExpr == null)
-                Throw.If(request.IfUnresolved == IfUnresolved.Throw, Error.UnableToResolveService, request);
+            if (serviceExpr == null && request.IfUnresolved == IfUnresolved.Throw)
+                Throw.It(Error.UnableToResolveUnknownService, request);
 
             return serviceExpr;
         }
@@ -4352,14 +4370,19 @@ namespace DryIoc
         /// <returns>String representation.</returns>
         public override string ToString()
         {
-            var s = new StringBuilder();
-            s.Append("{FactoryID=").Append(FactoryID);
+            var s = new StringBuilder().Append("{ID=").Append(FactoryID);
             if (ImplementationType != null)
                 s.Append(", ImplType=").Print(ImplementationType);
             if (Reuse != null)
-                s.Append(", ReuseType=").Print(Reuse.GetType());
+                s.Append(", Reuse=").Print(Reuse);
             if (Setup.FactoryType != Setup.Default.FactoryType)
                 s.Append(", FactoryType=").Append(Setup.FactoryType);
+            if (Setup.Metadata != null)
+                s.Append(", Metadata=").Append(Setup.Metadata);
+            if (Setup.Condition != null && Setup.Condition != HasMatchingReuseScopeInRequest)
+                s.Append(", HasCondition");
+            if (Setup.OpenResolutionScope)
+                s.Append(", OpensResolutionScope");
             return s.Append("}").ToString();
         }
 
@@ -5329,9 +5352,10 @@ namespace DryIoc
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
         public override string ToString()
         {
-            return "named: " +
-                (Name == null ? "no" : Name.ToString()) +
-                (Parent == null ? "" : " (parent " + Parent + ")");
+            return "{" + 
+                (Name != null ? "Name=" + Name + ", " : string.Empty) +
+                (Parent == null ? "Parent=null" : "Parent=" + Parent) + 
+                "}";
         }
 
         #region Implementation
@@ -5479,7 +5503,7 @@ namespace DryIoc
         }
 
         /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
-        public override string ToString() { return GetType().Name + ":" + Lifespan; }
+        public override string ToString() { return GetType().Name + " {Lifespan=" + Lifespan + "}"; }
     }
 
     /// <summary>Returns container bound current scope created by <see cref="Container.OpenScope"/> method.</summary>
@@ -5522,9 +5546,10 @@ namespace DryIoc
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
         {
-            var s = GetType().Name + ":" + Lifespan;
-            if (Name != null) s += new StringBuilder(", Name:").Print(Name);
-            return s;
+            var s = new StringBuilder(GetType().Name + " {");
+            if (Name != null) 
+                s.Append("Name=").Print(Name, "\"").Append(", ");
+            return s.Append("Lifespan=").Append(Lifespan).Append("}").ToString();
         }
     }
 
@@ -5574,7 +5599,14 @@ namespace DryIoc
         }
 
         /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
-        public override string ToString() { return GetType().Name + ":" + Lifespan; }
+        public override string ToString()
+        {
+            var s = new StringBuilder().Append(GetType().Name)
+                .Append(" {Name={").Print(_assignableFromServiceType)
+                .Append(", ").Print(_serviceKey, "\"")
+                .Append("}}");
+            return s.ToString();
+        }
 
         private readonly Type _assignableFromServiceType;
         private readonly object _serviceKey;
@@ -6365,10 +6397,14 @@ namespace DryIoc
             IsNotOfType = Of("Argument {0} is not of type {1}."),
             TypeIsNotOfType = Of("Type argument {0} is not assignable from type {1}."),
 
-            UnableToResolveService = Of(
+            UnableToResolveUnknownService = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
-                "Please ensure you have service registered (with proper key) - 95% of cases." + Environment.NewLine +
-                "Remaining 5%: Service does not match the reuse scope, or service has wrong Setup.With(condition), or no Rules.WithUnknownServiceResolver(ForMyService)."),
+                "Please register service or add Rules.WithUnknownServiceResolver(...)."),
+            UnableToResolveFromRegisteredServices = Of(
+                "Unable to resolve {0}" + Environment.NewLine +
+                "Where CurrentScope={1}" + Environment.NewLine +
+                "  and ResolutionScope={2}" + Environment.NewLine +
+                "Found registrations:" + Environment.NewLine + "{3}"),
             ExpectedSingleDefaultFactory = Of(
                 "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
@@ -6475,8 +6511,8 @@ namespace DryIoc
                 "Registered reuse wrapper {1} at index {2} of {3} does not implement expected {0} interface."),
             RecyclableReuseWrapperIsRecycled = Of(
                 "Recyclable wrapper is recycled."),
-            NoScopeWhenRegisteringInstance = Of(
-                "No scope is available when registering instance [{0}] with [{1}]." + Environment.NewLine + 
+            NoMatchingScopeWhenRegisteringInstance = Of(
+                "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine + 
                 "You can register delegate returning instance instead, if scope will be available at resolution."),
             UnexpectedExpressionToMakeService = Of(
                 "Only expression of method call, property getter, or new statement (with optional property initializer) is supported, but found: {0}."),
@@ -7446,7 +7482,9 @@ namespace DryIoc
         /// <summary>Creates nice string view.</summary><returns>String representation.</returns>
         public override string ToString()
         {
-            return new StringBuilder("[").Print(Key).Append(", ").Print(Value).Append("]").ToString();
+            return new StringBuilder("{")
+                .Print(Key, "\"").Append(", ")
+                .Print(Value, "\"").Append("}").ToString();
         }
 
         /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>

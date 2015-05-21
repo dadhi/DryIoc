@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.RegisterInstance("a", Reuse.InCurrentNamedScope("b")));
 
-            Assert.AreEqual(ex.Error, Error.NoScopeWhenRegisteringInstance);
+            Assert.AreEqual(ex.Error, Error.NoMatchingScopeWhenRegisteringInstance);
         }
 
         [Test]
@@ -83,7 +83,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.WithoutSingletonsAndCache().Resolve<string>());
 
-            Assert.AreEqual(ex.Error, Error.UnableToResolveService);
+            Assert.AreEqual(ex.Error, Error.UnableToResolveUnknownService);
         }
 
         [Test]

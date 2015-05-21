@@ -129,7 +129,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
 
-            Assert.AreEqual(ex.Error, Error.UnableToResolveService);
+            Assert.AreEqual(ex.Error, Error.UnableToResolveUnknownService);
             Assert.That(ex.Message, Is.StringContaining("Unable to resolve"));
         }
 

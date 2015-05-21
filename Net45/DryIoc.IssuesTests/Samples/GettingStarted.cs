@@ -64,14 +64,13 @@ namespace DryIoc.IssuesTests.Samples
             container.Register<IClient, SomeClient>();
             // forgot to container.Register<IService, SomeService>(Reuse.Singleton);
 
-            var exception = Assert.Throws<ContainerException>(() =>
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IClient>());
 
-            Assert.That(exception.Message, Is.EqualTo(
+            Assert.That(ex.Message, Is.EqualTo(
 @"Unable to resolve DryIoc.IssuesTests.Samples.IService as parameter ""service""
- in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient.
-Please ensure you have service registered (with proper key) - 95% of cases.
-Remaining 5%: Service does not match the reuse scope, or service has wrong Setup.With(condition), or no Rules.WithUnknownServiceResolver(ForMyService)."));
+  in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient.
+Please register service or add Rules.WithUnknownServiceResolver(...)."));
         }
     }
 

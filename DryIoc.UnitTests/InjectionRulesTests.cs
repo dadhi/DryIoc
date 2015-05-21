@@ -76,7 +76,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<ClientWithPropsAndFields>());
 
-            Assert.AreEqual(ex.Error, Error.UnableToResolveService);
+            Assert.AreEqual(ex.Error, Error.UnableToResolveUnknownService);
         }
 
         [Test]

@@ -95,7 +95,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<AccountUser>());
 
-            Assert.AreEqual(ex.Error, Error.UnableToResolveService);
+            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
         }
 
         [Test]
