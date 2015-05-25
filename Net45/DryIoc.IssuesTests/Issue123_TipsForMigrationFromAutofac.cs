@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Linq;
+using Autofac;
+using Autofac.Features.OwnedInstances;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -104,6 +106,82 @@ namespace DryIoc.IssuesTests
                 return null;
             }
         }
-    }
 
+        [Test]
+        public void How_Autofac_Owned_works()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<AClient>();
+            builder.RegisterType<AService>();
+            builder.RegisterType<ADependency>();
+            builder.RegisterType<ANestedDep>().InstancePerOwned<AService>();
+            var container = builder.Build();
+
+            var c1 = container.Resolve<AClient>();
+            var c2 = container.Resolve<AClient>();
+            Assert.AreNotSame(c2, c1);
+            Assert.AreNotSame(c2.Service, c1.Service);
+
+            var dep = c1.Service.Value.Dep;
+            Assert.AreNotSame(c2.Service.Value.Dep, dep);
+            Assert.AreSame(c1.Service.Value.NestedDep, dep.NestedDep);
+
+            c1.Dispose();
+            Assert.IsTrue(dep.IsDisposed);
+            Assert.IsTrue(dep.NestedDep.IsDisposed);
+        }
+
+        public class ANestedDep : IDisposable 
+        {
+            public bool IsDisposed { get; private set; }
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+
+        public class ADependency : IDisposable 
+        {
+            public ANestedDep NestedDep { get; private set; }
+
+            public bool IsDisposed { get; private set; }
+
+            public ADependency(ANestedDep nestedDep)
+            {
+                NestedDep = nestedDep;
+            }
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+
+        public class AService
+        {
+            public ADependency Dep { get; private set; }
+            public ANestedDep NestedDep { get; private set; }
+
+            public AService(ADependency dep, ANestedDep nestedDep)
+            {
+                Dep = dep;
+                NestedDep = nestedDep;
+            }
+        }
+
+        public class AClient : IDisposable
+        {
+            public Owned<AService> Service { get; private set; }
+            public AClient(Owned<AService> service)
+            {
+                Service = service;
+            }
+
+            public void Dispose()
+            {
+                Service.Dispose();
+            }
+        }
+    }
 }

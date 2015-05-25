@@ -584,8 +584,7 @@ namespace DryIoc
                     Throw.It(Error.UnableToResolveFromRegisteredServices, 
                         request, ScopeContext != null ? ScopeContext.GetCurrentOrDefault() : OpenedScope,
                         request.Scope, registrations);
-                
-                Throw.It(Error.UnableToResolveUnknownService, request);
+                else Throw.It(Error.UnableToResolveUnknownService, request);
             }
 
             return factory;
@@ -665,7 +664,7 @@ namespace DryIoc
                                 funcArgPrefix: i.ToString()); // use prefix to generate non-conflicting Func argument names
 
                             decoratorExpr = decorator.GetExpressionOrDefault(decoratorRequest)
-                                .ThrowIfNull(Error.CantCreateDecoratorExpr, decoratorRequest);
+                                .ThrowIfNull(Error.UnableToResolveDecorator, decoratorRequest);
 
                             var decoratedArgWasUsed = decoratorRequest.FuncArgs.Key[0];
                             decoratorExpr = !decoratedArgWasUsed ? decoratorExpr // case of replacing decorator.
@@ -6486,8 +6485,8 @@ namespace DryIoc
                 "Unable to find open thread scope in {0}. Please OpenScope with {0} to make sure thread reuse work."),
             ContainerIsGarbageCollected = Of(
                 "Container is no longer available (has been garbage-collected)."),
-            CantCreateDecoratorExpr = Of(
-                "Unable to create decorator expression for: {0}."),
+            UnableToResolveDecorator = Of(
+                "Unable to resolve decorator {0}."),
             UnableToRegisterDuplicateDefault = Of(
                 "Service {0} without key is already registered as {2}."),
             UnableToRegisterDuplicateKey = Of(
@@ -6513,7 +6512,7 @@ namespace DryIoc
                 "Recyclable wrapper is recycled."),
             NoMatchingScopeWhenRegisteringInstance = Of(
                 "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine + 
-                "You can register delegate returning instance instead, if scope will be available at resolution."),
+                "You could register delegate returning instance instead. That will succeed as long as scope is available at resolution."),
             UnexpectedExpressionToMakeService = Of(
                 "Only expression of method call, property getter, or new statement (with optional property initializer) is supported, but found: {0}."),
             UnexpectedFactoryMemberExpression = Of(

@@ -72,6 +72,42 @@ namespace DryIoc.IssuesTests.Samples
   in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient.
 Please register service or add Rules.WithUnknownServiceResolver(...)."));
         }
+
+        [Test]
+        public void Unable_to_resolve_in_case_of_wrong_key()
+        {
+            var container = new Container();
+            container.Register<X>();
+            container.Register<Y>(serviceKey: "special");
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<X>());
+
+            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
+        }
+
+        [Test]
+        public void Unable_to_resolve_in_case_of_no_scope()
+        {
+            var container = new Container();
+            container.Register<X>();
+            container.Register<Y>(Reuse.InCurrentNamedScope("specialScope"));
+
+            using (container.OpenScope("luckyScope"))
+            {
+                var ex = Assert.Throws<ContainerException>(() =>
+                    container.Resolve<X>());
+
+                Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
+            }
+        }
+
+        class X
+        {
+            public X(Y y) { }
+        }
+        
+        class Y {}
     }
 
     public interface IService { }

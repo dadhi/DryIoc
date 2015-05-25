@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.RegisterInstance("a", Reuse.InCurrentNamedScope("b")));
 
-            Assert.AreEqual(ex.Error, Error.NoMatchingScopeWhenRegisteringInstance);
+            Assert.AreEqual(Error.NoMatchingScopeWhenRegisteringInstance, ex.Error);
         }
 
         [Test]

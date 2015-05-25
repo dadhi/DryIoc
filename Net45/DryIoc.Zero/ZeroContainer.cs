@@ -582,7 +582,7 @@ namespace DryIoc.Zero
 
     /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
     /// Locking is used internally to ensure that object factory called only once.</summary>
-    public sealed class Scope2 : IScope
+    public sealed class FastScope : IScope
     {
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
         public IScope Parent { get; private set; }
@@ -607,7 +607,7 @@ namespace DryIoc.Zero
 
         /// <summary>Create scope with optional parent and name.</summary>
         /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
-        public Scope2(IScope parent = null, object name = null)
+        public FastScope(IScope parent = null, object name = null)
         {
             Parent = parent;
             Name = name;
@@ -660,23 +660,26 @@ namespace DryIoc.Zero
         private object[] EnsureItemsInclude(int id)
         {
             if (id >= _items.Length)
-            {
-                var newItems = new object[id + 4];
-                Array.Copy(_items, 0, newItems, 0, _items.Length);
-                _items = newItems;
-            }
-
+                Ref.Swap(ref _items, items =>
+                {
+                    if (id < items.Length) return items;
+                    var newItems = new object[id + 4];
+                    Array.Copy(items, 0, newItems, 0, items.Length);
+                    return newItems;
+                });
             return _items;
         }
 
-        /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
+        /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.
+        /// Dispose happens in reverse order of registrations.</summary>
         /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
-            for (var i = 0; i < _items.Length; i++)
+            var items = _items;
+            for (var i = items.Length - 1; i >= 0; --i)
             {
-                var item = _items[i];
+                var item = items[i];
                 if (item is IDisposable || item is IReuseWrapper)
                     DisposeItem(item);
             }
@@ -687,9 +690,10 @@ namespace DryIoc.Zero
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
         public override string ToString()
         {
-            return "named: " +
-                (Name == null ? "no" : Name.ToString()) +
-                (Parent == null ? "" : " (parent " + Parent + ")");
+            return "{" +
+                (Name != null ? "Name=" + Name + ", " : string.Empty) +
+                (Parent == null ? "Parent=null" : "Parent=" + Parent) +
+                "}";
         }
 
         #region Implementation
