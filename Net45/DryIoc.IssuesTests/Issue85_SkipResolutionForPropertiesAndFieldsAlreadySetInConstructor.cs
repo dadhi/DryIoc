@@ -11,26 +11,30 @@ namespace DryIoc.IssuesTests
     public class Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor
     {
         [Test]
-        public void May_set_propeprties_with_decoragtor()
+        public void May_set_properties_with_decorator()
         {
             var container = new Container();
-            container.Register<Hey>();
-            container.Register<Hey>(made: Made.Of(() => Decor(default(Hey), default(string))), setup: Setup.Decorator);
+            container.Register<IHey, Hey>();
+            container.Register(Made.Of(() => Decor(default(IHey), default(string))), setup: Setup.Decorator);
             container.RegisterInstance("no");
 
-            var hey = container.Resolve<Hey>();
+            var hey = container.Resolve<IHey>();
 
             Assert.AreEqual("yes", hey.Me);
         }
 
-        public static Hey Decor(Hey hey, string me)
+        public static IHey Decor(IHey hey, string me)
         {
             if (hey.Me == null)
                 hey.Me = me;
             return hey;
         }
 
-        public class Hey
+        public interface IHey {
+            string Me { get; set;  }
+        }
+
+        public class Hey : IHey
         {
             public string Me { get; set; }
             public Hey()

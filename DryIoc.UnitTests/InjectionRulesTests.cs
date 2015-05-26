@@ -58,8 +58,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(serviceKey: "key");
-            container.RegisterMany<ClientWithPropsAndFields>(
-                made: Made.Of(() => new ClientWithPropsAndFields { PWithInternalSetter = Arg.Of<IService>(IfUnresolved.Throw, "key") }));
+            container.RegisterMany(Made.Of(() => new ClientWithPropsAndFields { PWithInternalSetter = Arg.Of<IService>(IfUnresolved.Throw, "key") }));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -70,8 +69,7 @@ namespace DryIoc.UnitTests
         public void I_can_specify_to_throw_if_property_is_unresolved()
         {
             var container = new Container();
-            container.RegisterMany<ClientWithPropsAndFields>(
-                made: Made.Of(() => new ClientWithPropsAndFields { PWithInternalSetter = Arg.Of<IService>(IfUnresolved.Throw, "key") }));
+            container.RegisterMany(Made.Of(() => new ClientWithPropsAndFields { PWithInternalSetter = Arg.Of<IService>(IfUnresolved.Throw, "key") }));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<ClientWithPropsAndFields>());
@@ -84,8 +82,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterMany<ClientWithPropsAndFields>(
-                made: Made.Of(() => new ClientWithPropsAndFields { PInternal = default(IService) }));
+            container.RegisterMany(Made.Of(() => new ClientWithPropsAndFields { PInternal = default(IService) }));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -227,7 +224,7 @@ namespace DryIoc.UnitTests
             container.Register<MyService>();
             container.Register<ConnectionStringProvider>(Reuse.Singleton);
             container.Register<IConnectionStringProvider, ConnectionNamingConnectionStringProvider>(
-                setup: Setup.With(cacheFactoryExpression: false),
+                setup: Setup.With(false),
                 made: Made.Of(parameters: request => parameter =>
                 {
                     if (parameter.ParameterType != typeof(string))
@@ -254,10 +251,10 @@ namespace DryIoc.UnitTests
             container.Register<MyService>();
             container.Register<ConnectionStringProvider>(Reuse.Singleton);
             container.Register<IConnectionStringProvider, ConnectionNamingConnectionStringProvider>(
-                made: Made.Of(() => new ConnectionNamingConnectionStringProvider(default(ConnectionStringProvider), Arg.Of<string>("targetName"))));
+                Made.Of(() => new ConnectionNamingConnectionStringProvider(default(ConnectionStringProvider), Arg.Of<string>("targetName"))));
 
             container.Register<string>(serviceKey: "targetName",
-                setup: Setup.With(cacheFactoryExpression: false),
+                setup: Setup.With(false),
                 made: Made.Of(r =>
                 {
                     var method = GetType().GetDeclaredMethodOrNull("GetTargetName");

@@ -32,11 +32,33 @@ namespace DryIoc.UnitTests
         public void Can_use_any_type_static_method_for_service_creation_Refactoring_friendly()
         {
             var container = new Container();
-            container.Register<IService>(made: Made.Of(() => ServiceFactory.CreateService()));
+            container.Register(Made.Of(() => ServiceFactory.CreateService()));
 
             var service = container.Resolve<IService>();
 
             Assert.That(service.Message, Is.EqualTo("static"));
+        }
+
+        [Test]
+        public void Can_register_service_with_static_method_creating_implementation()
+        {
+            var container = new Container();
+            container.Register<IA, A>(Made.Of(() => F.CreateA()));
+
+            var a = container.Resolve<IA>();
+
+            Assert.NotNull(a);
+        }
+
+        interface IA { }
+        class A : IA {}
+
+        static class F
+        {
+            public static A CreateA()
+            {
+                return new A();
+            }  
         }
 
         [Test]
@@ -74,9 +96,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ServiceFactory>();
             container.RegisterInstance("parameter");
-            container.Register<IService>(made: Made.Of(
-                r => ServiceInfo.Of<ServiceFactory>(), 
-                f => f.Create(default(string))));
+            container.Register(Made.Of(r => ServiceInfo.Of<ServiceFactory>(), f => f.Create(default(string))));
 
             var service = container.Resolve<IService>();
 
@@ -91,7 +111,7 @@ namespace DryIoc.UnitTests
             container.Register<ServiceFactory>(serviceKey: "factory");
             container.RegisterInstance("parameter");
 
-            container.Register<IService>(made: Made.Of(
+            container.Register(Made.Of(
                 r => ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"),
                 f => f.Create(default(string))));
 
@@ -108,7 +128,7 @@ namespace DryIoc.UnitTests
             container.Register<ServiceFactory>(serviceKey: "factory");
             container.RegisterInstance("XXX", serviceKey: "myKey");
 
-            container.Register<IService>(made: Made.Of(
+            container.Register(Made.Of(
                 r => ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"),
                 f => f.Create(Arg.Of<string>("myKey"))));
 

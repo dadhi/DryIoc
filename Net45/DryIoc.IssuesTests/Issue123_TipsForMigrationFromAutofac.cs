@@ -75,14 +75,17 @@ namespace DryIoc.IssuesTests
 
             builder.Register<HubConnectionFactory>();
 
-            builder.RegisterMany<IAssetHub>(Reuse.Singleton,
-                Made.Of(r => ServiceInfo.Of<HubConnectionFactory>(), f => f.CreateHubConnection<IAssetHub>()));
+            builder.RegisterMany(
+                Made.Of(r => ServiceInfo.Of<HubConnectionFactory>(), f => f.CreateHubConnection<IAssetHub>()),
+                Reuse.Singleton);
 
-            builder.RegisterMany<INotificationHub>(Reuse.Singleton,
-                Made.Of(r => ServiceInfo.Of<HubConnectionFactory>(), f => f.CreateHubConnection<INotificationHub>()));
+            builder.RegisterMany(
+                Made.Of(r => ServiceInfo.Of<HubConnectionFactory>(), f => f.CreateHubConnection<INotificationHub>()),
+                Reuse.Singleton);
 
             builder.Resolve<IAssetHub>();
             builder.Resolve<INotificationHub>();
+
             var hubs = builder.Resolve<IStatefulHub[]>();
             Assert.AreEqual(hubs.Length, 2);
         }

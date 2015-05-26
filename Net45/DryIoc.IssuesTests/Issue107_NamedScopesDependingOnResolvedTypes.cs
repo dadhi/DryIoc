@@ -513,7 +513,7 @@ namespace DryIoc.IssuesTests
 
             container.Register<IBigInterfaceWhichProvidesSmallerInterfaces, BigInterfaceWhichProvidesSmallerInterfaces>(Reuse.Singleton);
 
-            container.Register<ISmallInterface>(made: Made.Of(
+            container.Register(Made.Of(
                 r => ServiceInfo.Of<IBigInterfaceWhichProvidesSmallerInterfaces>(),
                 b => b.Small));
 

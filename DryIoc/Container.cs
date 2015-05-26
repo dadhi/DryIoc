@@ -2376,7 +2376,7 @@ namespace DryIoc
         public FactoryMethodSelector FactoryMethod { get; private set; }
 
         /// <summary>Return type of strongly-typed expression.</summary>
-        public Type ExpressionReturnType { get; private set; }
+        public Type ExpressionResultType { get; private set; }
 
         /// <summary>Specifies how constructor parameters should be resolved: 
         /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
@@ -2430,8 +2430,8 @@ namespace DryIoc
         public static Made Of(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, 
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            return factoryMethod == null && parameters == null && propertiesAndFields == null ? Default
-                : new Made(null/*ExpressionReturnType*/, factoryMethod, parameters, propertiesAndFields);
+            return factoryMethod == null && parameters == null && propertiesAndFields == null 
+                ? Default : new Made(factoryMethod, parameters, propertiesAndFields);
         }
 
         /// <summary>Defines how to select constructor from implementation type.</summary>
@@ -2445,47 +2445,35 @@ namespace DryIoc
         }
 
         /// <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
-        /// <typeparam name="T">Type with constructor or static method.</typeparam>
-        /// <param name="ctorOrMethodOrMethodExpr">Expression tree with call to constructor with properties: 
+        /// <typeparam name="TService">Type with constructor or static method.</typeparam>
+        /// <param name="serviceReturningExpr">Expression tree with call to constructor with properties: 
         /// <code lang="cs"><![CDATA[() => new Car(Arg.Of<IEngine>()) { Color = Arg.Of<Color>("CarColor") }]]></code>
         /// or static method call <code lang="cs"><![CDATA[() => Car.Create(Arg.Of<IEngine>())]]></code></param>
         /// <returns>New Made specification.</returns>
-        public static Made Of<T>(Expression<Func<T>> ctorOrMethodOrMethodExpr)
+        public static Expr<TService> Of<TService>(Expression<Func<TService>> serviceReturningExpr)
         {
-            return FromExpression(typeof(T), ctorOrMethodOrMethodExpr);
+            return FromExpression<TService>(serviceReturningExpr);
         }
 
-        /// <summary>Defines creation info from factory method call expression (without using strings).
+        /// <summary>Defines creation info from factory method call Expression without using strings.
         /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
-        /// <typeparam name="TFactory">Factory type.</typeparam> <typeparam name="T">Factory product type.</typeparam>
-        /// <param name="getFactoryInfo">Returns or resolves factory instance.</param> <param name="factoryMethodCallExpr">Get a method call expression.</param>
+        /// <typeparam name="TFactory">Factory type.</typeparam> <typeparam name="TService">Factory product type.</typeparam>
+        /// <param name="getFactoryInfo">Returns or resolves factory instance.</param> <param name="factoryReturningServiceExpr">Get a method call expression.</param>
         /// <returns>New Made specification.</returns>
-        public static Made Of<TFactory, T>(
-            Func<Request, ServiceInfo.Typed<TFactory>> getFactoryInfo, 
-            Expression<Func<TFactory, T>> factoryMethodCallExpr)
+        public static Expr<TService> Of<TFactory, TService>(
+            Func<Request, ServiceInfo.Typed<TFactory>> getFactoryInfo,
+            Expression<Func<TFactory, TService>> factoryReturningServiceExpr)
             where TFactory : class
         {
             getFactoryInfo.ThrowIfNull();
-            return FromExpression(typeof(T), factoryMethodCallExpr,
+            return FromExpression<TService>(factoryReturningServiceExpr,
                 r => getFactoryInfo(r).ThrowIfNull() /* cannot convert to method group because of lack of covariance support in .Net 3.5*/);
         }
 
-        #region Implementation
-
-        private Made(Type expressionReturnType = null,
-            FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null)
+        private static Expr<TService> FromExpression<TService>(
+            LambdaExpression serviceReturningExpr, Func<Request, ServiceInfo> getFactoryInfo = null)
         {
-            ExpressionReturnType = expressionReturnType;
-            FactoryMethod = factoryMethod;
-            Parameters = parameters;
-            PropertiesAndFields = propertiesAndFields;
-        }
-
-        private static Made FromExpression(Type madeOfType,
-            LambdaExpression constructorOrMethodCallExpr, Func<Request, ServiceInfo> getFactoryInfo = null)
-        {
-            var callExpr = constructorOrMethodCallExpr.ThrowIfNull().Body;
+            var callExpr = serviceReturningExpr.ThrowIfNull().Body;
 
             MemberInfo ctorOrMethodOrMember;
             IList<Expression> argumentExprs = null;
@@ -2514,7 +2502,7 @@ namespace DryIoc
                     Error.UnexpectedFactoryMemberExpression, member);
                 ctorOrMethodOrMember = member;
             }
-            else return Throw.For<Made>(Error.UnexpectedExpressionToMakeService, callExpr);
+            else return Throw.For<Expr<TService>>(Error.NotSupportedMadeExpression, callExpr);
 
             FactoryMethodSelector factoryMethod = request =>
                 DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, getFactoryInfo == null ? null : getFactoryInfo(request));
@@ -2524,7 +2512,29 @@ namespace DryIoc
             var propertiesAndFieldsSelector = memberBindingExprs == null || memberBindingExprs.Count == 0 ? null
                 : GetPropertiesAndFields(memberBindingExprs);
 
-            return new Made(madeOfType, factoryMethod, parameterSelector, propertiesAndFieldsSelector);
+            return new Expr<TService>(factoryMethod, parameterSelector, propertiesAndFieldsSelector);
+        }
+
+        /// <summary>Typed version of <see cref="Made"/> specified with statically typed expression tree.</summary>
+        /// <typeparam name="TService">Type that expression returns.</typeparam>
+        public sealed class Expr<TService> : Made
+        {
+            /// <summary>Creates typed version.</summary>
+            /// <param name="factoryMethod"></param> <param name="parameters"></param> <param name="propertiesAndFields"></param>
+            internal Expr(FactoryMethodSelector factoryMethod = null, 
+                ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) 
+                : base(factoryMethod, parameters, propertiesAndFields, typeof(TService)) {}
+        }
+
+        #region Implementation
+
+        private Made(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null, 
+            Type expressionResultType = null)
+        {
+            ExpressionResultType = expressionResultType;
+            FactoryMethod = factoryMethod;
+            Parameters = parameters;
+            PropertiesAndFields = propertiesAndFields;
         }
 
         private static ParameterSelector GetParameters(IList<Expression> argExprs, ParameterInfo[] parameterInfos)
@@ -2638,7 +2648,7 @@ namespace DryIoc
 
         #endregion
     }
-
+    
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
     /// Its methods are NOT actually called, they just used to reflect service info from call expression.</summary>
     public static class Arg
@@ -2757,6 +2767,40 @@ namespace DryIoc
             registrator.Register(factory, typeof(TImplementation), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
 
+        /// <summary>Registers service type returned by Made expression.</summary>
+        /// <typeparam name="TService">The type of service.</typeparam>
+        /// <typeparam name="TMadeResult">The type returned by Made expression.</typeparam>
+        /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
+        /// <param name="made">Made specified with strongly-typed service creation expression.</param>
+        /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
+        /// <param name="setup">(optional) Factory setup, by default is (<see cref="Setup.Default"/>)</param>
+        /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
+        /// <param name="serviceKey">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        public static void Register<TService, TMadeResult>(this IRegistrator registrator,
+            Made.Expr<TMadeResult> made, IReuse reuse = null, Setup setup = null,
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            object serviceKey = null) where TMadeResult : TService
+        {
+            var factory = new ReflectionFactory(null, reuse, made, setup);
+            registrator.Register(factory, typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+        }
+
+        /// <summary>Registers service type returned by Made expression.</summary>
+        /// <typeparam name="TService">The type of service.</typeparam>
+        /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
+        /// <param name="made">Made specified with strongly-typed service creation expression.</param>
+        /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
+        /// <param name="setup">(optional) Factory setup, by default is (<see cref="Setup.Default"/>)</param>
+        /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
+        /// <param name="serviceKey">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        public static void Register<TService>(this IRegistrator registrator,
+            Made.Expr<TService> made, IReuse reuse = null, Setup setup = null,
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            object serviceKey = null)
+        {
+            registrator.Register<TService, TService>(made, reuse, setup, ifAlreadyRegistered, serviceKey);
+        }
+
         /// <summary>Action that could be used by User to customize register many default behavior.</summary>
         /// <param name="r">Registrator provided to do any arbitrary registration User wants.</param>
         /// <param name="serviceTypes">Valid service type that could be used with <paramref name="implType"/>.</param>
@@ -2869,17 +2913,37 @@ namespace DryIoc
         public static void RegisterMany<T>(this IRegistrator registrator,
             IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false, 
+            Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false,
             object serviceKey = null)
         {
             registrator.RegisterMany(new[] { typeof(T) }, (r, serviceTypes, implType) =>
             {
-                if (serviceTypeCondition != null) 
+                if (serviceTypeCondition != null)
                     serviceTypes = serviceTypes.Where(serviceTypeCondition).ToArrayOrSelf();
                 if (serviceTypes.Length != 0)
                     r.RegisterMany(serviceTypes, implType, reuse, made, setup, ifAlreadyRegistered, serviceKey);
             },
             nonPublicServiceTypes);
+        }
+
+        /// <summary>Registers single registration for all implemented public interfaces and base classes.</summary>
+        /// <typeparam name="TMadeResult">The type returned by Made factory expression.</typeparam>
+        /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
+        /// <param name="made">Made specified with strongly-typed factory expression.</param>
+        /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
+        /// <param name="setup">(optional) Factory setup, by default is <see cref="Setup.Default"/>, check <see cref="Setup"/> class for available setups.</param>
+        /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
+        /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>        
+        /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
+        /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        public static void RegisterMany<TMadeResult>(this IRegistrator registrator,
+            Made.Expr<TMadeResult> made, IReuse reuse = null, Setup setup = null,
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false,
+            object serviceKey = null)
+        {
+            registrator.RegisterMany<TMadeResult>(reuse, made.ThrowIfNull(), setup, 
+                ifAlreadyRegistered, serviceTypeCondition, nonPublicServiceTypes, serviceKey);
         }
 
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
@@ -4814,9 +4878,9 @@ namespace DryIoc
                         Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, implType, publicCounstructorCount);
                 }
             }
-            else if (Made.ExpressionReturnType != null && !implType.IsGenericDefinition())
+            else if (Made.ExpressionResultType != null && !implType.IsGenericDefinition())
             {
-                implType.ThrowIfNotOf(Made.ExpressionReturnType,
+                implType.ThrowIfNotOf(Made.ExpressionResultType,
                     Error.MadeOfTypeNotAssignableToImplementationType);
             }
         }
@@ -6513,7 +6577,7 @@ namespace DryIoc
             NoMatchingScopeWhenRegisteringInstance = Of(
                 "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine + 
                 "You could register delegate returning instance instead. That will succeed as long as scope is available at resolution."),
-            UnexpectedExpressionToMakeService = Of(
+            NotSupportedMadeExpression = Of(
                 "Only expression of method call, property getter, or new statement (with optional property initializer) is supported, but found: {0}."),
             UnexpectedFactoryMemberExpression = Of(
                 "Expected property getter, but found {0}."),

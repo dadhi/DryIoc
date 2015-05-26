@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -14,14 +16,16 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<ServiceLocator>();
+            container.Register<A>();
 
-            container.Register<SingleInstanceFactory>(
-                made: Made.Of(r => ServiceInfo.Of<ServiceLocator>(), l => l.X));
-            container.Register<MultiInstanceFactory>(
-                made: Made.Of(r => ServiceInfo.Of<ServiceLocator>(), l => l.Y));
+            container.Register(Made.Of(r => ServiceInfo.Of<ServiceLocator>(), l => l.SingleInstanceFactory));
+            container.Register(Made.Of(r => ServiceInfo.Of<ServiceLocator>(), l => l.MultiInstanceFactory));
 
-            container.Resolve<SingleInstanceFactory>();
-            container.Resolve<MultiInstanceFactory>();
+            var getInstance = container.Resolve<SingleInstanceFactory>();
+            Assert.IsNotNull(getInstance(typeof(A)));
+
+            var getAllInstances = container.Resolve<MultiInstanceFactory>();
+            Assert.AreEqual(1, getAllInstances(typeof(A)).Count());
         }
 
         public delegate object SingleInstanceFactory(Type serviceType);
@@ -29,27 +33,41 @@ namespace DryIoc.UnitTests
 
         public class ServiceLocator
         {
-            private readonly IResolver _r;
+            public readonly SingleInstanceFactory SingleInstanceFactory;
+            public readonly MultiInstanceFactory MultiInstanceFactory;
 
-            public readonly SingleInstanceFactory X;
-            public readonly MultiInstanceFactory Y;
+            private readonly IResolver _resolver;
 
-            public ServiceLocator(IResolver r)
+            public ServiceLocator(IResolver resolver)
             {
-                _r = r;
-                X = GetInstance;
-                Y = GetAllInstances;
+                _resolver = resolver;
+                SingleInstanceFactory = GetInstance;
+                MultiInstanceFactory = GetAllInstances;
             }
 
             public object GetInstance(Type serviceType)
             {
-                return _r.Resolve(serviceType);
+                return _resolver.Resolve(serviceType);
             }
 
             public IEnumerable<object> GetAllInstances(Type serviceType)
             {
-                return _r.ResolveMany<object>(serviceType);
+                return _resolver.ResolveMany<object>(serviceType);
             }
+        }
+
+        public class A { }
+
+        [Test]
+        public void Can_register_custom_delegates_as_method_groups()
+        {
+            var container = new Container();
+            container.Register<ServiceLocator>();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.Register(Made.Of(r => ServiceInfo.Of<ServiceLocator>(), f => (SingleInstanceFactory)f.GetInstance)));
+
+            Assert.AreEqual(Error.NotSupportedMadeExpression, ex.Error);
         }
 
         [Test]
