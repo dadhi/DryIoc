@@ -10,7 +10,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<Burger>(made: Made.Of(() => new Burger()));
+            container.Register(Made.Of(() => new Burger()));
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Null);
@@ -32,7 +32,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<Burger>(made: Made.Of(() => new Burger(default(ICheese))));
+            container.Register(Made.Of(() => new Burger(default(ICheese))));
             container.Register<ICheese, BlueCheese>();
 
             var burger = container.Resolve<Burger>();
@@ -44,8 +44,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<Burger>(
-                made: Made.Of(() => new Burger(Arg.Of<ICheese>(IfUnresolved.ReturnDefault))));
+            container.Register(Made.Of(() => new Burger(Arg.Of<ICheese>(IfUnresolved.ReturnDefault))));
 
             var burger = container.Resolve<Burger>();
             Assert.That(burger.Cheese, Is.Null);
@@ -59,8 +58,7 @@ namespace DryIoc.UnitTests
             container.Register<BlueCheese>(serviceKey: "a");
             container.RegisterInstance("King");
 
-            container.Register<Burger>(
-                made: Made.Of(() => new Burger("King", Arg.Of<BlueCheese>("a"))));
+            container.Register(Made.Of(() => new Burger("King", Arg.Of<BlueCheese>("a"))));
 
             var burger = container.Resolve<Burger>();
             Assert.AreEqual("King", burger.Name);
@@ -71,7 +69,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<Burger>(made: Made.Of(() => Burger.Create()));
+            container.Register(Made.Of(() => Burger.Create()));
 
             Assert.NotNull(container.Resolve<Burger>());
         }
@@ -84,8 +82,7 @@ namespace DryIoc.UnitTests
             container.Register<BlueCheese>(serviceKey: "a");
             container.RegisterInstance("King");
 
-            container.Register<Burger>(
-                made: Made.Of(() => Burger.Create("King", Arg.Of<BlueCheese>("a"))));
+            container.Register(Made.Of(() => Burger.Create("King", Arg.Of<BlueCheese>("a"))));
 
             var burger = container.Resolve<Burger>();
             Assert.AreEqual("King", burger.Name);
@@ -95,8 +92,7 @@ namespace DryIoc.UnitTests
         public void Can_specify_properties_and_fields_together_with_constructor()
         {
             var container = new Container();
-            container.Register<Burger>(
-                made: Made.Of(() => new Burger { Name = "", Cheese = Arg.Of<BlueCheese>() }));
+            container.Register(Made.Of(() => new Burger { Name = "", Cheese = Arg.Of<BlueCheese>() }));
 
             container.RegisterInstance("King");
             container.Register<BlueCheese>();
@@ -111,7 +107,7 @@ namespace DryIoc.UnitTests
         public void Can_handle_default_parameters()
         {
             var container = new Container();
-            container.Register<IBurger, Burger>(made: Made.Of(() => new Burger(Arg.Of<string>("key"), default(int))));
+            container.Register<IBurger, Burger>(Made.Of(() => new Burger(Arg.Of<string>("key"), default(int))));
             container.RegisterInstance("King", serviceKey: "key");
 
             var burger = container.Resolve<IBurger>();
@@ -123,7 +119,7 @@ namespace DryIoc.UnitTests
         public void Can_handle_default_parameters_with_explicit_specification()
         {
             var container = new Container();
-            container.Register<IBurger, Burger>(made: Made.Of(() => new Burger(Arg.Of<string>("key"), Arg.Of<int>(IfUnresolved.ReturnDefault))));
+            container.Register<IBurger, Burger>(Made.Of(() => new Burger(Arg.Of<string>("key"), Arg.Of<int>(IfUnresolved.ReturnDefault))));
             container.RegisterInstance("King", serviceKey: "key");
 
             var burger = container.Resolve<IBurger>();
@@ -135,7 +131,7 @@ namespace DryIoc.UnitTests
         public void Can_use_enum_service_key()
         {
             var container = new Container();
-            container.Register<IBurger, Burger>(made: Made.Of(() => new Burger(Arg.Of<ICheese>(BurgerCheese.Blue))));
+            container.Register<IBurger, Burger>(Made.Of(() => new Burger(Arg.Of<ICheese>(BurgerCheese.Blue))));
             container.Register<ICheese, BlueCheese>(serviceKey: BurgerCheese.Blue);
 
             var burger = container.Resolve<IBurger>();
@@ -217,7 +213,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<FooFactory>(Reuse.Singleton);
-            container.Register<IFoo>(made: Made.Of(r => ServiceInfo.Of<FooFactory>(), factory => factory.Foo));
+            container.Register(Made.Of(r => ServiceInfo.Of<FooFactory>(), factory => factory.Foo));
 
             var foo = container.Resolve<IFoo>();
 
@@ -229,8 +225,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<FooFactory>(Reuse.Singleton);
-            container.Register<Blah>(
-                made: Made.Of(
+            container.Register(Made.Of(
                     r => ServiceInfo.Of<FooFactory>(IfUnresolved.ReturnDefault), 
                     factory => factory.Blah));
 
