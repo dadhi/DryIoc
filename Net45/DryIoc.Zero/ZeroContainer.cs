@@ -626,60 +626,48 @@ namespace DryIoc.Zero
             return item != null && !(item is IRecyclable) ? item : TryGetOrSet(id, createValue, item as IRecyclable);
         }
 
-        //private object TryGetOrSet(int id, CreateScopedValue createValue, IRecyclable recyclableItem)
-        //{
-        //    if (_disposed == 1) Throw.It(Error.ScopeIsDisposed);
-        //    if (recyclableItem != null && !recyclableItem.IsRecycled)
-        //        return recyclableItem;
-
-        //    Ref.Swap(ref _items, items =>
-        //    {
-        //        var locker = new ItemLocker();
-        //        var item = Interlocked.CompareExchange(ref _items[id], null, locker);
-        //        if (item != null && !(item is ItemLocker))
-        //            return items;
-
-        //        locker = item as ItemLocker ?? locker;
-        //        lock (locker)
-        //        {
-        //            Interlocked.CompareExchange(ref _items[id], locker, item = createValue());
-        //        }
-
-        //        return items;
-        //    });
-        //}
-
-        private sealed class ItemLocker {}
-
         private object TryGetOrSet(int id, CreateScopedValue createValue, IRecyclable recyclableItem)
         {
-            if (_disposed == 1) Throw.It(Error.ScopeIsDisposed);
+            if (_disposed == 1) 
+                Throw.It(Error.ScopeIsDisposed);
+            
             if (recyclableItem != null && !recyclableItem.IsRecycled)
                 return recyclableItem;
 
-            object item;
-            lock (_syncRoot)
+            object item = null;
+
+            Ref.Swap(ref _items, items =>
             {
-                item = _items[id];
-                if (item != null && !(item is IRecyclable && ((IRecyclable)item).IsRecycled))
-                    return item;
+                object itemLocker = new ItemLocker();
+                item = Interlocked.CompareExchange(ref items[id], null, itemLocker);
+                lock (item ?? itemLocker)
+                {
+                    if (item != null && !(item is ItemLocker))
+                    {
+                        recyclableItem = item as IRecyclable;
+                        if (recyclableItem == null || !recyclableItem.IsRecycled) 
+                            return items;
+                        DisposeItem(item);
+                    }
 
-                if (item != null) // dispose recyclable item
-                    DisposeItem(item);
+                    item = createValue();
+                }
+                
+                return items;
+            });
 
-                item = createValue();
-            }
-
-            _items[id] = item;
             return item;
         }
+
+        private sealed class ItemLocker {}
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
         /// <param name="id">To set value at.</param> <param name="value">Value to set.</param>
         public void SetOrAdd(int id, object value)
         {
-            if (_disposed == 1) Throw.It(Error.ScopeIsDisposed);
-            EnsureItemsInclude(id)[id] = value;
+            if (_disposed == 1) 
+                Throw.It(Error.ScopeIsDisposed);
+            EnsureItemsInclude(id)[id] = value; // use locking
         }
 
         private object[] EnsureItemsInclude(int id)

@@ -18,7 +18,7 @@ namespace DryIoc.IssuesTests
             container.Register<IBar, FooBar>();
 
             var regsInOrder = container.GetServiceRegistrations()
-                .OrderBy(factory => factory.RegistrationOrder)
+                .OrderBy(factory => factory.FactoryRegistrationOrder)
                 .ToArray();
 
             Assert.AreEqual(null, regsInOrder[0].OptionalServiceKey);
@@ -62,10 +62,24 @@ namespace DryIoc.IssuesTests
             Assert.Null(container.Resolve<FooBar>(IfUnresolved.ReturnDefault));
         }
 
+        [Test]
+        public void IDisposable_should_be_excluded_from_register_many()
+        {
+            var container = new Container();
+            container.RegisterMany<FooBar>(serviceTypeCondition: type => type.IsInterface);
+
+            var fooBar = container.Resolve<IDisposable>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNull(fooBar);
+        }
+
         public interface IFoo { }
         public interface IBar { }
-        public class FooBar : IFoo, IBar
+        public class FooBar : IFoo, IBar, IDisposable
         {
+            public void Dispose()
+            {
+            }
         }
 
         [Test]

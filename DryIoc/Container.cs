@@ -2850,6 +2850,14 @@ namespace DryIoc
             }
         }
 
+        /// <summary>List of types excluded by default from RegisterMany convention.</summary>
+        public static readonly Type[] ExcludedGeneralPurposeServiceTypes = 
+        {
+            typeof(IDisposable),
+            typeof(IList),
+            typeof(ICollection),
+            typeof(IEnumerable)
+        };
 
         /// <summary>Returns many service types implemented by source type. Used by RegisterMany method.</summary>
         /// <param name="type">Source type: may be concrete, abstract or generic definition.</param> 
@@ -2861,6 +2869,8 @@ namespace DryIoc
             var selectedServiceTypes = nonPublicServiceTypes
                 ? serviceTypes
                 : serviceTypes.Where(ReflectionTools.IsPublicOrNestedPublic);
+
+            selectedServiceTypes = selectedServiceTypes.Except(ExcludedGeneralPurposeServiceTypes);
 
             if (type.IsGenericDefinition())
             {
@@ -6046,7 +6056,7 @@ namespace DryIoc
     }
 
     /// <summary>Define registered service structure.</summary>
-    [DebuggerDisplay("#{RegistrationOrder}, {ServiceType}, {OptionalServiceKey}, {Factory}")]
+    [DebuggerDisplay("#{FactoryRegistrationOrder}, {ServiceType}, {OptionalServiceKey}, {Factory}")]
     public struct ServiceRegistrationInfo
     {
         /// <summary>Required service type.</summary>
@@ -6058,8 +6068,9 @@ namespace DryIoc
         /// <summary>Registered factory.</summary>
         public Factory Factory;
 
-        /// <summary>Provides registration order across all registrations in container.</summary>
-        public int RegistrationOrder;
+        /// <summary>Provides registration order across all factory registrations in container.</summary>
+        /// <remarks>May be repeated for factory registered with multiple services.</remarks>
+        public int FactoryRegistrationOrder;
 
         /// <summary>Creates info. Registration order is figured out automatically based on Factory.</summary>
         /// <param name="factory"></param> <param name="serviceType"></param> <param name="optionalServiceKey"></param>
@@ -6068,7 +6079,7 @@ namespace DryIoc
             ServiceType = serviceType;
             OptionalServiceKey = optionalServiceKey;
             Factory = factory;
-            RegistrationOrder = factory.FactoryID;
+            FactoryRegistrationOrder = factory.FactoryID;
         }
     }
 
