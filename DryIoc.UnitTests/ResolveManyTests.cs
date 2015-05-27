@@ -152,5 +152,22 @@ namespace DryIoc.UnitTests
             Assert.That(items[0]().Key, Is.EqualTo("first"));
             Assert.That(items[0]().Value, Is.InstanceOf<Service>());
         }
+
+        [Test]
+        public void Can_specify_service_key_to_resolve_many()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(serviceKey: "first");
+            container.Register<IService, AnotherService>();
+
+            var service = container.ResolveMany<IService>(serviceKey: "first").First();
+            Assert.IsNotNull(service);
+
+            var services = container.ResolveMany<IService>();
+            Assert.AreEqual(2, services.Count());
+
+            var noServices = container.ResolveMany<IService>(serviceKey: "wrong");
+            Assert.AreEqual(0, noServices.Count());
+        }
     }
 }

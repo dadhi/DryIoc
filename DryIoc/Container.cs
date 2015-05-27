@@ -3265,6 +3265,7 @@ namespace DryIoc
         /// <param name="resolver">Usually <see cref="Container"/> object.</param>
         /// <param name="requiredServiceType">(optional) Denotes registered service type. Should be assignable to <typeparamref name="TService"/>.</param>
         /// <param name="behavior">(optional) Specifies new registered services awareness. Aware by default.</param>
+        /// <param name="serviceKey">(optional) Service key.</param>
         /// <returns>Result collection of services.</returns>
         /// <remarks>The same result could be achieved by directly calling:
         /// <code lang="cs"><![CDATA[
@@ -3274,11 +3275,12 @@ namespace DryIoc
         /// ]]></code>
         /// </remarks>
         public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver,
-            Type requiredServiceType = null, ResolveManyBehavior behavior = ResolveManyBehavior.AsLazyEnumerable)
+            Type requiredServiceType = null, ResolveManyBehavior behavior = ResolveManyBehavior.AsLazyEnumerable,
+            object serviceKey = null)
         {
             return behavior == ResolveManyBehavior.AsLazyEnumerable
-                ? resolver.ResolveMany(typeof(TService), null, requiredServiceType, null, null).Cast<TService>()
-                : resolver.Resolve<IEnumerable<TService>>(requiredServiceType);
+                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, null, null).Cast<TService>()
+                : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
         }
 
         /// <summary>For given instance resolves and sets properties and fields.

@@ -622,11 +622,36 @@ namespace DryIoc.Zero
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
-            var item = EnsureItemsInclude(id)[id];
-            return !(item == null || item is IRecyclable) ? item : TryGetOrAdd(id, createValue, item as IRecyclable);
+            var item = id < _items.Length ? _items[id] : EnsureItemsInclude(id)[id];
+            return item != null && !(item is IRecyclable) ? item : TryGetOrSet(id, createValue, item as IRecyclable);
         }
 
-        private object TryGetOrAdd(int id, CreateScopedValue createValue, IRecyclable recyclableItem)
+        //private object TryGetOrSet(int id, CreateScopedValue createValue, IRecyclable recyclableItem)
+        //{
+        //    if (_disposed == 1) Throw.It(Error.ScopeIsDisposed);
+        //    if (recyclableItem != null && !recyclableItem.IsRecycled)
+        //        return recyclableItem;
+
+        //    Ref.Swap(ref _items, items =>
+        //    {
+        //        var locker = new ItemLocker();
+        //        var item = Interlocked.CompareExchange(ref _items[id], null, locker);
+        //        if (item != null && !(item is ItemLocker))
+        //            return items;
+
+        //        locker = item as ItemLocker ?? locker;
+        //        lock (locker)
+        //        {
+        //            Interlocked.CompareExchange(ref _items[id], locker, item = createValue());
+        //        }
+
+        //        return items;
+        //    });
+        //}
+
+        private sealed class ItemLocker {}
+
+        private object TryGetOrSet(int id, CreateScopedValue createValue, IRecyclable recyclableItem)
         {
             if (_disposed == 1) Throw.It(Error.ScopeIsDisposed);
             if (recyclableItem != null && !recyclableItem.IsRecycled)
