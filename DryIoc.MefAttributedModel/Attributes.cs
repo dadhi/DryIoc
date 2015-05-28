@@ -74,6 +74,22 @@ namespace DryIoc.MefAttributedModel
         public CurrentScopeReuseAttribute(string reuseName = null) : base(typeof(CurrentScopeReuse), reuseName) { }
     }
 
+    /// <summary>Marks exported type with Reuse.InWebRequest. 
+    /// Basically it is CurrentScopeReuse with predefined name <see cref="Reuse.WebRequestScopeName"/>.</summary>
+    public class WebRequestReuseAttribute : CurrentScopeReuseAttribute
+    {
+        /// <summary>Creates attribute.</summary>
+        public WebRequestReuseAttribute() : base(Reuse.WebRequestScopeName) { }
+    }
+
+    /// <summary>Marks exported type with Reuse.InThread. 
+    /// Basically it is CurrentScopeReuse with predefined name <see cref="ThreadScopeContext.ScopeContextName"/>.</summary>
+    public class ThreadReuseAttribute : CurrentScopeReuseAttribute
+    {
+        /// <summary>Creates attribute.</summary>
+        public ThreadReuseAttribute() : base(ThreadScopeContext.ScopeContextName) { }
+    }
+
     /// <summary>Denotes exported type with Resolution Scope Reuse.</summary>
     public class ResolutionScopeReuseAttribute : ReuseAttribute
     {

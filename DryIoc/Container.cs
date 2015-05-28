@@ -1759,6 +1759,10 @@ namespace DryIoc
             Wrappers = Wrappers.AddOrUpdate(typeof(CaptureResolutionScope<>),
                 new ExpressionFactory(GetCaptureResolutionScopeExpressionOrDefault, setup: Setup.Wrapper));
 
+            Wrappers = Wrappers.AddOrUpdate(typeof(IDisposable),
+                new ExpressionFactory(GetResolutionScopedDisposablesExpressionOrDefault, 
+                    setup: Setup.WrapperWith(_ => typeof(object))));
+
             Wrappers = Wrappers.AddOrUpdate(typeof(FactoryExpression<>),
                 new ExpressionFactory(GetFactoryExpression, setup: Setup.Wrapper));
 
@@ -2004,6 +2008,12 @@ namespace DryIoc
             var metadataExpr = request.Container.GetOrAddStateItemExpression(result.Value.Setup.Metadata, metadataType);
             var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
             return metaExpr;
+        }
+
+        private static Expression GetResolutionScopedDisposablesExpressionOrDefault(Request request)
+        {
+            var resolutionScopeExpr = Container.GetResolutionScopeExpression(request);
+            return Expression.Convert(resolutionScopeExpr, typeof(IDisposable));
         }
 
         private static Expression GetCaptureResolutionScopeExpressionOrDefault(Request request)
@@ -3057,7 +3067,7 @@ namespace DryIoc
             object serviceKey = null)
         {
             if (instance != null)
-                instance.ThrowIfNotOf(serviceType, Error.RegedObjNotAssignableToServiceType);
+                instance.ThrowIfNotOf(serviceType, Error.RegisteredInstanceIsNotAssignableToServiceType);
 
             if (reuse == null || reuse is ResolutionScopeReuse)
             {
@@ -4287,6 +4297,9 @@ namespace DryIoc
         /// <summary>Reuse policy for factory created services.</summary>
         public readonly IReuse Reuse;
 
+        /// <summary>Index of service stored in reuse scope. 0 if no reuse.</summary>
+        public int ReusedItemIndex { get; private set; }
+
         /// <summary>Setup may contain different/non-default factory settings.</summary>
         public Setup Setup
         {
@@ -4317,7 +4330,10 @@ namespace DryIoc
             Setup = setup ?? Setup.Default;
 
             if (reuse != null)
+            {
                 Setup = Setup.WithCondition(HasMatchingReuseScopeInRequest);
+                //ReusedItemIndex = reuse.NextItemIndex();
+            }
         }
 
         /// <summary>Returns true if for factory Reuse exists matching resolution or current Scope.</summary>
@@ -5337,8 +5353,8 @@ namespace DryIoc
         object GetOrAdd(int id, CreateScopedValue createValue);
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
-        /// <param name="id">To set value at.</param> <param name="value">Value to set.</param>
-        void SetOrAdd(int id, object value);
+        /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
+        void SetOrAdd(int id, object item);
     }
 
     /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
@@ -5404,11 +5420,11 @@ namespace DryIoc
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
-        /// <param name="id">To set value at.</param> <param name="value">Value to set.</param>
-        public void SetOrAdd(int id, object value)
+        /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
+        public void SetOrAdd(int id, object item)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            Ref.Swap(ref _items, items => items.AddOrUpdate(id, value));
+            Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
@@ -5429,8 +5445,7 @@ namespace DryIoc
         {
             return "{" + 
                 (Name != null ? "Name=" + Name + ", " : string.Empty) +
-                (Parent == null ? "Parent=null" : "Parent=" + Parent) + 
-                "}";
+                (Parent == null ? "Parent=null" : "Parent=" + Parent) + "}";
         }
 
         #region Implementation
@@ -6344,7 +6359,7 @@ namespace DryIoc
         public CaptureResolutionScope(T value, IScope scope)
         {
             Value = value;
-            Scope = scope as IDisposable;
+            Scope = scope;
         }
 
         /// <summary>Disposes both resolved service (if disposable) and then disposes resolution scope.</summary>
@@ -6534,7 +6549,7 @@ namespace DryIoc
                 + "and the rest of parameters resolvable from Container when resolving: {1}."),
             RegedFactoryDlgResultNotOfServiceType = Of(
                 "Registered factory delegate returns service {0} is not assignable to {2}."),
-            RegedObjNotAssignableToServiceType = Of(
+            RegisteredInstanceIsNotAssignableToServiceType = Of(
                 "Registered instance {0} is not assignable to serviceType {1}."),
             NotFoundSpecifiedWriteablePropertyOrField = Of(
                 "Unable to find writable property or field \"{0}\" when resolving: {1}."),

@@ -68,7 +68,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.RegisterMany<FooBar>(serviceTypeCondition: type => type.IsInterface);
 
-            var fooBar = container.Resolve<IDisposable>(IfUnresolved.ReturnDefault);
+            var fooBar = container.Resolve<IDisposable>() as FooBar;
 
             Assert.IsNull(fooBar);
         }

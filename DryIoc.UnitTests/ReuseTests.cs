@@ -34,7 +34,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_registring_external_instance_and_disposing_container_Then_instance_should_not_be_disposed()
+        public void When_registring_external_instance_and_disposing_container_Then_instance_should_Not_be_disposed()
         {
             var container = new Container();
             var service = new DisposableService();
@@ -179,7 +179,7 @@ namespace DryIoc.UnitTests
         public void Can_correctly_handle_resolution_scope_condition()
         {
             var container = new Container();
-            container.Register<ViewModel2>(made: Made.Of(() => new ViewModel2(Arg.Of<Log>(IfUnresolved.ReturnDefault))));
+            container.Register(Made.Of(() => new ViewModel2(Arg.Of<Log>(IfUnresolved.ReturnDefault))));
 
             var logReuse = Reuse.InResolutionScopeOf<ViewModel1>();
             container.Register<Log>(logReuse, setup: Setup.With(condition: request => logReuse.GetScopeOrDefault(request) != null));
@@ -442,6 +442,18 @@ namespace DryIoc.UnitTests
                 Assert.That(service.Scope, Is.Not.Null);
 
             Assert.That(service.Value.Dep.IsDisposed, Is.True);
+        }
+
+        [Test]
+        public void Can_disposed_resolution_reused_services2()
+        {
+            var container = new Container();
+            container.Register<SomeDep>(Reuse.InResolutionScope);
+            container.Register<SomeRoot>();
+
+            var scope = container.Resolve<IDisposable>();
+
+            Assert.IsInstanceOf<IScope>(scope);
         }
 
         [Test]

@@ -263,8 +263,10 @@ namespace DryIoc.UnitTests
             container.Resolve<IceCreamSource<bool>>();
             container.Resolve<IceCream<bool>>();
 
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<IDisposable>());
+            var ex = Assert.Throws<ContainerException>(() =>
+            container.Resolve<ISomeIface>());
+
+            Assert.AreEqual(Error.UnableToResolveUnknownService, ex.Error);
         }
 
         [Test]
@@ -438,7 +440,9 @@ namespace DryIoc.UnitTests
 
         public interface IceCream<T> { }
 
-        public class IceCreamSource<T> : IceCream<T>, IDisposable
+        public interface ISomeIface { }
+
+        public class IceCreamSource<T> : IceCream<T>, ISomeIface
         {
             public void Dispose()
             {
@@ -459,4 +463,5 @@ namespace DryIoc.UnitTests
 
         #endregion
     }
+
 }

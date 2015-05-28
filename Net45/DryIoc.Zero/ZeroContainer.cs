@@ -634,40 +634,41 @@ namespace DryIoc.Zero
             if (recyclableItem != null && !recyclableItem.IsRecycled)
                 return recyclableItem;
 
-            object item = null;
-
-            Ref.Swap(ref _items, items =>
+            lock (_itemsLocker)
             {
-                object itemLocker = new ItemLocker();
-                item = Interlocked.CompareExchange(ref items[id], null, itemLocker);
-                lock (item ?? itemLocker)
+                var item = _items[id];
+                if (item != null)
                 {
-                    if (item != null && !(item is ItemLocker))
-                    {
-                        recyclableItem = item as IRecyclable;
-                        if (recyclableItem == null || !recyclableItem.IsRecycled) 
-                            return items;
-                        DisposeItem(item);
-                    }
-
-                    item = createValue();
+                    recyclableItem = item as IRecyclable;
+                    if (recyclableItem == null || !recyclableItem.IsRecycled)
+                        return item;
+                    DisposeItem(recyclableItem);
                 }
-                
-                return items;
-            });
 
-            return item;
+                item = createValue();
+                Ref.Swap(ref _items, items =>
+                {
+                    items[id] = item;
+                    return items;
+                });
+
+                return item;
+            }
         }
 
-        private sealed class ItemLocker {}
-
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
-        /// <param name="id">To set value at.</param> <param name="value">Value to set.</param>
-        public void SetOrAdd(int id, object value)
+        /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
+        public void SetOrAdd(int id, object item)
         {
             if (_disposed == 1) 
                 Throw.It(Error.ScopeIsDisposed);
-            EnsureItemsInclude(id)[id] = value; // use locking
+            EnsureItemsInclude(id);
+            lock (_itemsLocker)
+                Ref.Swap(ref _items, items =>
+                {
+                    items[id] = item;
+                    return items;
+                });
         }
 
         private object[] EnsureItemsInclude(int id)
@@ -715,7 +716,7 @@ namespace DryIoc.Zero
         private int _disposed;
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
-        private readonly object _syncRoot = new object();
+        private readonly object _itemsLocker = new object();
 
         private static void DisposeItem(object item)
         {

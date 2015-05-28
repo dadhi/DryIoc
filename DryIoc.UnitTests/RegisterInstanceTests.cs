@@ -61,7 +61,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.RegisterInstance(typeof(int), "ring", serviceKey: "MyPrecious"));
 
-            Assert.AreEqual(ex.Error, Error.RegedObjNotAssignableToServiceType);
+            Assert.AreEqual(ex.Error, Error.RegisteredInstanceIsNotAssignableToServiceType);
         }
 
         [Test]
