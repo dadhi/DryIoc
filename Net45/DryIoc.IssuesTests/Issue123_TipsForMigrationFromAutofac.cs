@@ -26,18 +26,25 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(DefaultKey.Value, regsInOrder[2].OptionalServiceKey);
         }
 
-        [Flags]
-        public enum Metadata { AutoActivated }
+        public abstract class Metadata
+        {
+            public class AutoActivated : Metadata
+            {
+                public static readonly AutoActivated It = new AutoActivated();
+            }
+        }
 
         [Test]
         public void Auto_activated_with_metadata()
         {
             var container = new Container();
-            container.Register<ISpecific, Foo>(setup: Setup.With(metadata: Metadata.AutoActivated));
+            container.Register<ISpecific, Foo>(setup: Setup.With(metadata: Metadata.AutoActivated.It));
             container.Register<INormal, Bar>();
 
             var registrations = container.GetServiceRegistrations()
-                .Where(r => r.Factory.Setup.Metadata as Metadata? == Metadata.AutoActivated)
+                .Where(r => r.Factory.Setup.Metadata is Metadata.AutoActivated)
+                .OrderBy(r => r.FactoryRegistrationOrder)
+                .GroupBy(r => r.FactoryRegistrationOrder, (f, r) => r.First())
                 .Select(r => container.Resolve(r.ServiceType, r.OptionalServiceKey));
             
             Assert.IsInstanceOf<ISpecific>(registrations.First());
@@ -68,7 +75,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.RegisterMany<FooBar>(serviceTypeCondition: type => type.IsInterface);
 
-            var fooBar = container.Resolve<IDisposable>() as FooBar;
+            var fooBar = container.Resolve<IDisposable>(IfUnresolved.ReturnDefault);
 
             Assert.IsNull(fooBar);
         }
@@ -198,6 +205,104 @@ namespace DryIoc.IssuesTests
             public void Dispose()
             {
                 Service.Dispose();
+            }
+        }
+
+        [Test]
+        public void Implement_Owned_in_DryIoc()
+        {
+            var container = new Container();
+            container.Register(typeof(DryIocOwned<>), setup: Setup.Wrapper);
+            container.Register<My>();
+            container.Register<Cake>(Reuse.InResolutionScopeOf<My>());
+
+            var my = container.Resolve<My>();
+            my.Dispose();
+
+            Assert.IsTrue(my.OwnedCake.Value.IsDisposed);
+        }
+
+        public class Cake : IDisposable 
+        {
+            public bool IsDisposed { get; private set; }
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+
+        public class My : IDisposable
+        {
+            public DryIocOwned<Cake> OwnedCake { get; private set; }
+
+            public My(DryIocOwned<Cake> ownedCake)
+            {
+                OwnedCake = ownedCake;
+            }
+
+            public void Dispose()
+            {
+                OwnedCake.Dispose();
+            }
+        }
+
+        public class DryIocOwned<TService> : IDisposable
+        {
+            public TService Value { get; private set; }
+            private readonly IDisposable _scope;
+
+            public DryIocOwned(TService value, IDisposable scope)
+            {
+                Value = value;
+                _scope = scope;
+            }
+
+            public void Dispose()
+            {
+                _scope.Dispose();
+            }
+        }
+
+        [Test]
+        public void Autofac_default_constructor_selection_policy()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<A>();
+            builder.RegisterType<B>();
+            var container = builder.Build();
+
+            container.Resolve<A>();
+        }
+
+        [Test]
+        public void DryIoc_constructor_selection_plus_specs()
+        {
+            var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments));
+
+            container.Register(Made.Of(() => new A(Arg.Of<C>(IfUnresolved.ReturnDefault))));
+            container.Register<B>();
+
+            var a = container.Resolve<A>();
+            Assert.IsTrue(a.IsCreatedWithC);
+        }
+
+        public class B {}
+        public class C {}
+
+        public class A
+        {
+            public bool IsCreateWithB { get; private set; }
+            public bool IsCreatedWithC { get; private set; }
+
+            public A(B b)
+            {
+                IsCreateWithB = true;
+            }
+
+            public A(C c)
+            {
+                IsCreatedWithC = true;
             }
         }
     }

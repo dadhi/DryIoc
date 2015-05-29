@@ -2,7 +2,7 @@
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
-    [ExportMany, Export]
+    [Export, ExportMany, Export]
     public class WithBothTheSameExports { }
 
     public interface IOne { }
@@ -12,6 +12,6 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [ExportMany(ContractName = "blah")]
     public class NamedOne : INamed, IOne { }
 
-    [Export("named", typeof(INamed)), ExportMany]
+    [Export("named", typeof(INamed)), ExportMany, Export("named", typeof(INamed))]
     public class BothExportManyAndExport : INamed, IOne {}
 }

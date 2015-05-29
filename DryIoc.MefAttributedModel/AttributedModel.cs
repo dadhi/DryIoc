@@ -292,7 +292,7 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is ExportManyAttribute)
                 {
-                    info.Exports = GetExportsFromExportManyAttribute((ExportManyAttribute)attribute, info, implementationType);
+                    info.Exports = GetExportsFromExportManyAttribute(info, implementationType, (ExportManyAttribute)attribute);
                 }
                 else if (attribute is PartCreationPolicyAttribute)
                 {
@@ -365,33 +365,26 @@ namespace DryIoc.MefAttributedModel
             return exports;
         }
 
-        private static ExportInfo[] GetExportsFromExportManyAttribute(ExportManyAttribute attribute,
-            ExportedRegistrationInfo currentInfo, Type implementationType)
+        private static ExportInfo[] GetExportsFromExportManyAttribute(ExportedRegistrationInfo currentInfo, 
+            Type implementationType, ExportManyAttribute exportManyAttribute)
         {
-            var allContractTypes = attribute.GetContractTypes(implementationType);
+            var contractTypes = Registrator.GetImplementedServiceTypes(implementationType, exportManyAttribute.NonPublic);
+            if (!exportManyAttribute.Except.IsNullOrEmpty())
+                contractTypes = contractTypes.Except(exportManyAttribute.Except).ToArrayOrSelf();
 
-            if (implementationType.IsGenericDefinition())
-            {
-                var implTypeArgs = implementationType.GetGenericParamsAndArgs();
-                allContractTypes = allContractTypes
-                    .Where(t => t.ContainsAllGenericTypeParameters(implTypeArgs))
-                    .Select(t => t.GetGenericDefinitionOrNull());
-            }
-
-            var exports = allContractTypes
-                .Select(t => new ExportInfo(t, attribute.ContractName ?? attribute.ContractKey))
+            var manyExports = contractTypes
+                .Select(t => new ExportInfo(t, exportManyAttribute.ContractName ?? exportManyAttribute.ContractKey))
                 .ToArray();
             
-            Throw.If(exports.Length == 0, Error.NoTypesInExportAll,
-                implementationType, allContractTypes);
+            Throw.If(manyExports.Length == 0, Error.ExportManyDoesNotExportAnyType, implementationType, contractTypes);
 
             var currentExports = currentInfo.Exports;
-            if (currentExports != null)
-                for (var index = 0; index < currentExports.Length; index++)
-                    if (!exports.Contains(currentExports[index])) // filtering out identical exports
-                        exports = exports.AppendOrUpdate(currentExports[index]);
+            if (!currentExports.IsNullOrEmpty())
+                for (var i = 0; i < currentExports.Length; i++)
+                    if (!manyExports.Contains(currentExports[i]))
+                        manyExports = manyExports.AppendOrUpdate(currentExports[i]);
 
-            return exports;
+            return manyExports;
         }
 
         private static void PopulateWrapperInfoFromAttribute(ExportedRegistrationInfo resultInfo, AsWrapperAttribute attribute,
@@ -495,7 +488,7 @@ namespace DryIoc.MefAttributedModel
                                                     + "Only single metadata is supported per implementation type, please remove the rest."),
             UnsupportedMultipleFactoryTypes  = Of("Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
             NoExport                           = Of("At least one Export attributed should be defined for {0}."),
-            NoTypesInExportAll              = Of("Unable to get contract types for implementation {0} because all of its implemented types where filtered out: {1}"),
+            ExportManyDoesNotExportAnyType              = Of("Unable to get contract types for implementation {0} because all of its implemented types where filtered out: {1}"),
             UnsupportedReuseType              = Of("Attributed model does not support reuse type {0}."),
             UnsupportedReuseWrapperType      = Of("Attributed model does not support reuse wrapper type {0}."),
             NoWrappedTypeExportedWrapper    = Of("Exported non-generic wrapper type {0} requires wrapped service type to be specified, but it is null "

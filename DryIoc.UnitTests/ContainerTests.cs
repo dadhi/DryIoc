@@ -434,6 +434,17 @@ namespace DryIoc.UnitTests
             Assert.NotNull(resolver);
         }
 
+        [Test]
+        public void Should_Throw_if_implementation_is_not_assignable_to_service_type()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.Register(typeof(IService), typeof(Beh)));
+
+            Assert.AreEqual(Error.ImplementationIsNotAssignableToServiceType, ex.Error);
+        }
+
         public class Beh
         {
             public IResolver R { get; set; }

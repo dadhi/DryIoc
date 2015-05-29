@@ -150,17 +150,6 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Public types by default.</summary>
         public bool NonPublic { get; set; }
-
-        /// <summary>Returns all contract types implemented by implementation type <see cref="Except"/> some.</summary>
-        /// <param name="implementationType">To get contract types from.</param> <returns>Exported contract types.</returns>
-        public IEnumerable<Type> GetContractTypes(Type implementationType)
-        {
-            var contractTypes = implementationType
-                .GetImplementedTypes(ReflectionTools.IncludeImplementedType.SourceType);
-            if (!NonPublic)
-                contractTypes = contractTypes.Where(ReflectionTools.IsPublicOrNestedPublic).ToArray();
-            return Except == null || Except.Length == 0 ? contractTypes : contractTypes.Except(Except);
-        }
     }
 
     /// <summary>Specifies that class exporting static or instance method factories</summary>

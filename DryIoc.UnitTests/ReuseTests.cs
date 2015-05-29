@@ -261,16 +261,16 @@ namespace DryIoc.UnitTests
 
         internal class CarefulAccount : Account, IDisposable
         {
-            private readonly CaptureResolutionScope<Log> _disposableLogAndEverything;
+            private readonly IDisposable _scope;
 
-            public CarefulAccount(CaptureResolutionScope<Log> log) : base(log.Value)
+            public CarefulAccount(Log log, IDisposable scope) : base(log)
             {
-                _disposableLogAndEverything = log;
+                _scope = scope;
             }
 
             public void Dispose()
             {
-                _disposableLogAndEverything.Dispose();
+                _scope.Dispose();
             }
         }
 
@@ -437,23 +437,10 @@ namespace DryIoc.UnitTests
             container.Register<SomeDep>(Reuse.InResolutionScope);
             container.Register<SomeRoot>();
 
-            var service = container.Resolve<CaptureResolutionScope<SomeRoot>>();
-            using (service)
-                Assert.That(service.Scope, Is.Not.Null);
+            var root = container.Resolve<SomeRoot>();
+            root.Dispose();
 
-            Assert.That(service.Value.Dep.IsDisposed, Is.True);
-        }
-
-        [Test]
-        public void Can_disposed_resolution_reused_services2()
-        {
-            var container = new Container();
-            container.Register<SomeDep>(Reuse.InResolutionScope);
-            container.Register<SomeRoot>();
-
-            var scope = container.Resolve<IDisposable>();
-
-            Assert.IsInstanceOf<IScope>(scope);
+            Assert.That(root.Dep.IsDisposed, Is.True);
         }
 
         [Test]
@@ -577,13 +564,22 @@ namespace DryIoc.UnitTests
             }
         }
 
-        internal class SomeRoot
+        internal class SomeRoot : IDisposable
         {
             public SomeDep Dep { get; private set; }
-            public SomeRoot(SomeDep dep)
+
+            public SomeRoot(SomeDep dep, IDisposable scope)
             {
+                _scope = scope;
                 Dep = dep;
             }
+
+            public void Dispose()
+            {
+                _scope.Dispose();
+            }
+
+            private readonly IDisposable _scope;
         }
 
         #region CUT

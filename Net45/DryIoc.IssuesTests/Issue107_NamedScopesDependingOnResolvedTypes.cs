@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 // ReSharper disable MemberHidesStaticFromOuterClass
@@ -364,16 +363,24 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        internal class AreaWithOneCar
+        internal class AreaWithOneCar : IDisposable
         {
             public ICar Car { get; private set; }
             public SomeTool Tool { get; private set; }
 
-            public AreaWithOneCar(ICar car, SomeTool tool)
+            public AreaWithOneCar(ICar car, SomeTool tool, IDisposable scope)
             {
+                _scope = scope;
                 Car = car;
                 Tool = tool;
             }
+
+            public void Dispose()
+            {
+                _scope.Dispose();
+            }
+
+            private readonly IDisposable _scope;
         }
 
         internal class AreaManager
@@ -423,40 +430,21 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        /// <summary>Mediator to use as resolution root instead of Area, and resolve Area wrapped in DryIoc.CaptureResolutionScope disposable wrapper.
-        /// The wrapper is taking care to dispose corresponding ResolutionScope.</summary>
-        internal class DisposableArea<TArea> : IDisposable
-        {
-            public TArea Area { get { return _area.Value; } }
-
-            private readonly CaptureResolutionScope<TArea> _area;
-            public DisposableArea(CaptureResolutionScope<TArea> area)
-            {
-                _area = area;
-            }
-
-            public void Dispose()
-            {
-                _area.Dispose();
-            }
-        }
-
         internal class CarefulAreaManager : IDisposable
         {
-            public IEnumerable<AreaWithOneCar> OneCarAreas { get { return _disposableAreas.Select(x => x.Area); } }
+            public AreaWithOneCar[] Areas { get; private set; }
             public ICar ReferenceCar { get; private set; }
 
-            private readonly DisposableArea<AreaWithOneCar>[] _disposableAreas;
-            public CarefulAreaManager(DisposableArea<AreaWithOneCar>[] disposableAreas, ICar referenceCar)
+            public CarefulAreaManager(AreaWithOneCar[] areas, ICar referenceCar)
             {
-                _disposableAreas = disposableAreas;
+                Areas = areas;
                 ReferenceCar = referenceCar;
             }
 
             public void Dispose()
             {
-                foreach (var disposableArea in _disposableAreas)
-                    disposableArea.Dispose();
+                foreach (var area in Areas)
+                    area.Dispose();
             }
         }
 
@@ -466,15 +454,12 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register<ICar, SmallCar>(Reuse.InResolutionScope);
-
-            container.Register(typeof(DisposableArea<>), setup: Setup.With(openResolutionScope: true));
-            container.Register<AreaWithOneCar>();
+            container.Register<AreaWithOneCar>(setup: Setup.With(openResolutionScope: true));
             container.Register<SomeTool>();
-
             container.Register<CarefulAreaManager>();
 
             var manager = container.Resolve<CarefulAreaManager>();
-            var area = manager.OneCarAreas.First();
+            var area = manager.Areas.First();
 
             Assert.AreSame(area.Car, area.Tool.Car);
             Assert.AreNotSame(manager.ReferenceCar, area.Car);
