@@ -89,7 +89,7 @@ Exceptions happened during resolution:
 ======================================
 end of exception list
 */
-
+        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
         public object ResolveGenerated(Type serviceType, IScope scope)
         {
 <#

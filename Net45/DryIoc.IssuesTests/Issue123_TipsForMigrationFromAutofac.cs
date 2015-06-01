@@ -292,12 +292,12 @@ namespace DryIoc.IssuesTests
 
         public class A
         {
-            public bool IsCreateWithB { get; private set; }
+            public bool IsCreatedWithB { get; private set; }
             public bool IsCreatedWithC { get; private set; }
 
             public A(B b)
             {
-                IsCreateWithB = true;
+                IsCreatedWithB = true;
             }
 
             public A(C c)
