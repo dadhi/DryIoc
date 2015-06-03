@@ -77,6 +77,7 @@
     <Compile Include="Issue122_DecoratorIsNotHandledAcrossResolutionRoots.cs" />
     <Compile Include="Issue123_TipsForMigrationFromAutofac.cs" />
     <Compile Include="Issue128_ResolveFailsWithSingletonsInOuterScope.cs" />
+    <Compile Include="Issue135_DecoratorsIgnoredInChildScope.cs" />
     <Compile Include="Issue61_PropagateRequestToResolveInRegisteredDelegate.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />

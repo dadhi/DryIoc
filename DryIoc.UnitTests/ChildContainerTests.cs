@@ -112,9 +112,9 @@ namespace DryIoc.UnitTests
 
             var container = new Container();
 
-            var attachParents = Container.FallbackToContainers(parent, anotherParent);
-            var childContainer = container.With(rules => 
-                rules.WithUnknownServiceResolver(attachParents));
+            var childContainer = container.With(rules => rules
+                .WithFallbackContainer(parent)
+                .WithFallbackContainer(anotherParent));
 
             Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
         }
@@ -129,8 +129,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IFruit, Orange>();
 
-            var childContainer = container.With(rules => 
-                rules.WithUnknownServiceResolver(Container.FallbackToContainers(parent)));
+            var childContainer = container.With(rules => rules.WithFallbackContainer(parent));
 
             Assert.That(parent.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
             Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Orange>());
@@ -149,13 +148,12 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IFruit, Orange>();
 
-            var resolveFromParents = Container.FallbackToContainers(parent) ;
-            var childContainer = container.With(rules => rules.WithUnknownServiceResolver(resolveFromParents));
+            var childContainer = container.With(rules => rules.WithFallbackContainer(parent));
 
             Assert.That(parent.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
             Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Orange>());
 
-            var detachedChild = childContainer.With(rules => rules.WithoutUnknownServiceResolver(resolveFromParents));
+            var detachedChild = childContainer.With(rules => rules.WithoutFallbackContainer(parent));
 
             Assert.Throws<ContainerException>(() =>
                 detachedChild.Resolve<FruitJuice>());

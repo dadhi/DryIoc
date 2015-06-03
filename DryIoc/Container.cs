@@ -158,41 +158,7 @@ namespace DryIoc
         public IContainer CreateFacade()
         {
             ThrowIfContainerDisposed();
-            return new Container(Rules.WithUnknownServiceResolver(FallbackToContainers(this)), _scopeContext);
-        }
-
-        /// <summary>The rule to fallback to multiple containers in order to resolve service unresolved in rule owner.</summary>
-        /// <param name="containers">One or many container to resolve from if service is not resolved from original container.</param>
-        /// <returns>New rule with fallback to resolve service from specified containers.</returns>
-        /// <remarks>There are two options to detach containers link: 1st - save original container before linking to containers and use it; 
-        /// 2nd - save rule returned by this method and then remove saved rule from container using <see cref="DryIoc.Rules.WithoutUnknownServiceResolver"/>.</remarks>
-        public static Rules.UnknownServiceResolver FallbackToContainers(params IContainer[] containers)
-        {
-            var containerWeakRefs = containers
-                .ThrowIf(ArrayTools.IsNullOrEmpty)
-                .Select(p => p.ContainerWeakRef).ToArray();
-
-            return request =>
-            {
-                Factory factory = null;
-                for (var i = 0; i < containerWeakRefs.Length && factory == null; i++)
-                {
-                    var containerWeakRef = containerWeakRefs[i];
-                    var containerRequest = request.SwitchContainer(containerWeakRef);
-
-                    // Enable continue to next parent if factory is not found in first parent by
-                    // updating IfUnresolved policy to ReturnDefault.
-                    if (containerRequest.IfUnresolved != IfUnresolved.ReturnDefault)
-                        containerRequest = containerRequest.UpdateServiceInfo(info => // NOTE Smells.
-                            ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfo(info));
-
-                    var container = containerWeakRef.GetTarget();
-                    factory = container.ResolveFactory(containerRequest);
-                }
-
-                return factory == null ? null : 
-                    new ExpressionFactory(r => factory.GetExpressionOrDefault(r));
-            };
+            return new Container(Rules.WithFallbackContainer(this), _scopeContext);
         }
 
         /// <summary>Disposes container current scope and that means container itself.</summary>
@@ -610,11 +576,8 @@ namespace DryIoc
 
         Expression IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
-            var registry = _registry.Value;
-
-            // Stop if no decorators registered.
-            var decorators = registry.Decorators;
-            if (decorators.IsEmpty)
+            if (_registry.Value.Decorators.IsEmpty &&
+                request.Container.Rules.FallbackContainers.IsNullOrEmpty())
                 return null;
 
             // Decorators for non service types are not supported.
@@ -627,18 +590,20 @@ namespace DryIoc
             if (!parent.IsEmpty && parent.ResolvedFactory.FactoryType == FactoryType.Decorator)
                 return null;
 
+            var container = request.Container;
+
             var serviceType = request.ServiceType;
             var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
 
             // First look for Func decorators Func<TService,TService> and initializers Action<TService>.
-            var funcDecoratorExpr = GetFuncDecoratorExpressionOrDefault(decoratorFuncType, decorators, request);
+            var funcDecoratorExpr = GetFuncDecoratorExpressionOrDefault(decoratorFuncType, request);
 
             // Next look for normal decorators.
-            var serviceDecorators = decorators.GetValueOrDefault(serviceType);
+            var serviceDecorators = container.GetDecoratorFactoriesOrDefault(serviceType);
             var openGenericDecoratorIndex = serviceDecorators == null ? 0 : serviceDecorators.Length;
             var openGenericServiceType = request.ServiceType.GetGenericDefinitionOrNull();
             if (openGenericServiceType != null)
-                serviceDecorators = serviceDecorators.Append(decorators.GetValueOrDefault(openGenericServiceType));
+                serviceDecorators = serviceDecorators.Append(container.GetDecoratorFactoriesOrDefault(openGenericServiceType));
 
             Expression resultDecorator = funcDecoratorExpr;
             if (serviceDecorators != null)
@@ -696,6 +661,28 @@ namespace DryIoc
         Factory IContainer.GetWrapperFactoryOrDefault(Type serviceType)
         {
             return _registry.Value.GetWrapperOrDefault(serviceType);
+        }
+
+        Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
+        {
+            Factory[] decorators = null;
+
+            var allDecorators = _registry.Value.Decorators;
+            if (!allDecorators.IsEmpty)
+                decorators = allDecorators.GetValueOrDefault(serviceType);
+
+            if (!Rules.FallbackContainers.IsNullOrEmpty())
+            {
+                var fallbackDecorators = Rules.FallbackContainers.SelectMany(r => 
+                    r.GetTarget().GetDecoratorFactoriesOrDefault(serviceType) ?? ArrayTools.No<Factory>())
+                    .ToArrayOrSelf();
+                if (!fallbackDecorators.IsNullOrEmpty())
+                    decorators = decorators == null
+                        ? fallbackDecorators
+                        : decorators.Append(fallbackDecorators);
+            }
+
+            return decorators;
         }
 
         Type IContainer.UnwrapServiceType(Type serviceType)
@@ -810,12 +797,12 @@ namespace DryIoc
 
         #region Decorators support
 
-        private static LambdaExpression GetFuncDecoratorExpressionOrDefault(Type decoratorFuncType,
-            HashTree<Type, Factory[]> decorators, Request request)
+        private static LambdaExpression GetFuncDecoratorExpressionOrDefault(Type decoratorFuncType, Request request)
         {
             LambdaExpression funcDecoratorExpr = null;
 
             var serviceType = request.ServiceType;
+            var container = request.Container;
 
             // Look first for Action<ImplementedType> initializer-decorator
             var implementationType = request.ImplementationType ?? serviceType;
@@ -826,7 +813,7 @@ namespace DryIoc
             {
                 var implementedType = implementedTypes[i];
                 var initializerActionType = typeof(Action<>).MakeGenericType(implementedType);
-                var initializerFactories = decorators.GetValueOrDefault(initializerActionType);
+                var initializerFactories = container.GetDecoratorFactoriesOrDefault(initializerActionType);
                 if (initializerFactories != null)
                 {
                     var doAction = _doMethod.MakeGenericMethod(implementedType, implementationType);
@@ -849,7 +836,7 @@ namespace DryIoc
             }
 
             // Then look for decorators registered as Func of decorated service returning decorator - Func<TService, TService>.
-            var funcDecoratorFactories = decorators.GetValueOrDefault(decoratorFuncType);
+            var funcDecoratorFactories = container.GetDecoratorFactoriesOrDefault(decoratorFuncType);
             if (funcDecoratorFactories != null)
             {
                 for (var i = 0; i < funcDecoratorFactories.Length; i++)
@@ -2049,6 +2036,7 @@ namespace DryIoc
         /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.</summary>
         public static readonly Rules Default = Empty
             .WithUnknownServiceResolver(WrappersSupport.ResolveWrappers)
+            .WithUnknownServiceResolver(FallbackFactoryResolutionToContainers)
             .WithItemToExpressionConverter(PrimitivesToExpressionConverter);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
@@ -2125,6 +2113,53 @@ namespace DryIoc
             var newRules = (Rules)MemberwiseClone();
             newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.AppendOrUpdate(rule);
             return newRules;
+        }
+
+        /// <summary>List of containers to fallback resolution to.</summary>
+        public ContainerWeakRef[] FallbackContainers { get; private set; }
+
+        /// <summary>Appends WeakReference fallback container to end of the list.</summary>
+        /// <param name="container">To append.</param> <returns>New rules.</returns>
+        public Rules WithFallbackContainer(IContainer container)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.FallbackContainers = newRules.FallbackContainers.AppendOrUpdate(container.ContainerWeakRef);
+            return newRules;
+        }
+
+        /// <summary>Removes WeakReference to fallback container from the list.</summary>
+        /// <param name="container">To remove.</param> <returns>New rules.</returns>
+        public Rules WithoutFallbackContainer(IContainer container)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.FallbackContainers = newRules.FallbackContainers.Remove(container.ContainerWeakRef);
+            return newRules;
+        }
+
+        private static Factory FallbackFactoryResolutionToContainers(Request request)
+        {
+            var fallbackContainers = request.Container.Rules.FallbackContainers;
+            if (fallbackContainers.IsNullOrEmpty())
+                return null;
+
+            for (var i = 0; i < fallbackContainers.Length; i++)
+            {
+                var containerWeakRef = fallbackContainers[i];
+                var containerRequest = request.SwitchContainer(containerWeakRef);
+
+                // Continue to next parent if factory is not found in first parent by
+                // updating IfUnresolved policy to ReturnDefault.
+                if (containerRequest.IfUnresolved != IfUnresolved.ReturnDefault)
+                    containerRequest = containerRequest.UpdateServiceInfo(info => // NOTE Smells.
+                        ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfo(info));
+
+                var container = containerWeakRef.GetTarget();
+                var factory = container.ResolveFactory(containerRequest);
+                if (factory != null)
+                    return factory;
+            }
+
+            return null;
         }
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
@@ -6232,6 +6267,9 @@ namespace DryIoc
         /// <summary>Searches for registered wrapper factory and returns it, or null if not found.</summary>
         /// <param name="serviceType">Service type to look for.</param> <returns>Found wrapper factory or null.</returns>
         Factory GetWrapperFactoryOrDefault(Type serviceType);
+
+        /// <summary>Returns all decorators registered for the service type.</summary> <returns>Decorator factories.</returns>
+        Factory[] GetDecoratorFactoriesOrDefault(Type serviceType);
 
         /// <summary>Creates decorator expression: it could be either Func{TService,TService}, 
         /// or service expression for replacing decorators.</summary>
