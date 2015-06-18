@@ -1,4 +1,5 @@
-﻿using NSubstitute;
+﻿using System;
+using NSubstitute;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests.Samples
@@ -29,6 +30,15 @@ namespace DryIoc.IssuesTests.Samples
                 if (!request.ServiceType.IsAbstract)
                     return null; // Mock interface or abstract class only.
                 return new DelegateFactory(_ => Substitute.For(new[] { request.ServiceType }, null));
+            }));
+
+            var container2 = new Container(rules => rules.WithUnknownServiceResolver(request =>
+            {
+                if (!request.ServiceType.IsAbstract)
+                    return null; // Mock interface or abstract class only.
+                return new ReflectionFactory(made: Made.Of(
+                    FactoryMethod.Of(typeof(Substitute).GetDeclaredMethodOrNull("For", typeof(Type[]), typeof(object[]))),
+                    Parameters.Of.Type<Type[]>(req => new[] { req.ServiceType }).Type<object[]>(null)));
             }));
 
             container.Register<TestClient>();

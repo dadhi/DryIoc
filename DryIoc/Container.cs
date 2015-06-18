@@ -192,7 +192,7 @@ namespace DryIoc
         #region Static state
 
         internal static readonly ParameterExpression StateParamExpr = 
-            Expression.Parameter(typeof(AppendableArray), "state");
+            Expression.Parameter(typeof(ImTreeArray), "state");
 
         internal static readonly ParameterExpression ResolverContextProviderParamExpr = 
             Expression.Parameter(typeof(IResolverContextProvider), "r");
@@ -741,7 +741,7 @@ namespace DryIoc
         }
 
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
-        public AppendableArray ResolutionStateCache
+        public ImTreeArray ResolutionStateCache
         {
             get { return _registry.Value.ResolutionStateCache.Value; }
         }
@@ -791,7 +791,7 @@ namespace DryIoc
             return Expression.Convert(getItemByIndexExpr, itemType);
         }
 
-        private static readonly MethodInfo _getItemMethod = typeof(AppendableArray).GetSingleDeclaredMethodOrNull("Get");
+        private static readonly MethodInfo _getItemMethod = typeof(ImTreeArray).GetSingleDeclaredMethodOrNull("Get");
 
         #endregion
 
@@ -886,9 +886,9 @@ namespace DryIoc
         private sealed class FactoriesEntry
         {
             public readonly DefaultKey LastDefaultKey;
-            public readonly HashTree<object, Factory> Factories;
+            public readonly ImTreeMap<object, Factory> Factories;
 
-            public FactoriesEntry(DefaultKey lastDefaultKey, HashTree<object, Factory> factories)
+            public FactoriesEntry(DefaultKey lastDefaultKey, ImTreeMap<object, Factory> factories)
             {
                 LastDefaultKey = lastDefaultKey;
                 Factories = factories;
@@ -995,40 +995,40 @@ namespace DryIoc
             public static readonly Registry Default = new Registry(WrappersSupport.Wrappers);
 
             // Factories:
-            public readonly HashTree<Type, object> Services;
-            public readonly HashTree<Type, Factory[]> Decorators;
-            private readonly HashTree<Type, Factory> _wrappers;
+            public readonly ImTreeMap<Type, object> Services;
+            public readonly ImTreeMap<Type, Factory[]> Decorators;
+            private readonly ImTreeMap<Type, Factory> _wrappers;
 
             // Cache:
-            public readonly Ref<HashTree<Type, FactoryDelegate>> DefaultFactoryDelegateCache;
-            public readonly Ref<HashTree<KV<Type, object>, FactoryDelegate>> KeyedFactoryDelegateCache;
-            public readonly Ref<IntKeyTree> FactoryExpressionCache;
-            public readonly Ref<AppendableArray> ResolutionStateCache;
+            public readonly Ref<ImTreeMap<Type, FactoryDelegate>> DefaultFactoryDelegateCache;
+            public readonly Ref<ImTreeMap<KV<Type, object>, FactoryDelegate>> KeyedFactoryDelegateCache;
+            public readonly Ref<ImTreeMapIntToObj> FactoryExpressionCache;
+            public readonly Ref<ImTreeArray> ResolutionStateCache;
 
             public Registry WithoutCache()
             {
                 return new Registry(Services, Decorators, _wrappers,
-                    Ref.Of(HashTree<Type, FactoryDelegate>.Empty), Ref.Of(HashTree<KV<Type, object>, FactoryDelegate>.Empty),
-                    Ref.Of(IntKeyTree.Empty), Ref.Of(AppendableArray.Empty));
+                    Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty), Ref.Of(ImTreeMap<KV<Type, object>, FactoryDelegate>.Empty),
+                    Ref.Of(ImTreeMapIntToObj.Empty), Ref.Of(ImTreeArray.Empty));
             }
 
-            private Registry(HashTree<Type, Factory> wrapperFactories = null)
-                : this(HashTree<Type, object>.Empty, 
-                    HashTree<Type, Factory[]>.Empty,
-                    wrapperFactories ?? HashTree<Type, Factory>.Empty,
-                    Ref.Of(HashTree<Type, FactoryDelegate>.Empty),
-                    Ref.Of(HashTree<KV<Type, object>, FactoryDelegate>.Empty),
-                    Ref.Of(IntKeyTree.Empty),
-                    Ref.Of(AppendableArray.Empty)) { }
+            private Registry(ImTreeMap<Type, Factory> wrapperFactories = null)
+                : this(ImTreeMap<Type, object>.Empty, 
+                    ImTreeMap<Type, Factory[]>.Empty,
+                    wrapperFactories ?? ImTreeMap<Type, Factory>.Empty,
+                    Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
+                    Ref.Of(ImTreeMap<KV<Type, object>, FactoryDelegate>.Empty),
+                    Ref.Of(ImTreeMapIntToObj.Empty),
+                    Ref.Of(ImTreeArray.Empty)) { }
 
             private Registry(
-                HashTree<Type, object> services,
-                HashTree<Type, Factory[]> decorators,
-                HashTree<Type, Factory> wrappers,
-                Ref<HashTree<Type, FactoryDelegate>> defaultFactoryDelegateCache,
-                Ref<HashTree<KV<Type, object>, FactoryDelegate>> keyedFactoryDelegateCache,
-                Ref<IntKeyTree> factoryExpressionCache,
-                Ref<AppendableArray> resolutionStateCache)
+                ImTreeMap<Type, object> services,
+                ImTreeMap<Type, Factory[]> decorators,
+                ImTreeMap<Type, Factory> wrappers,
+                Ref<ImTreeMap<Type, FactoryDelegate>> defaultFactoryDelegateCache,
+                Ref<ImTreeMap<KV<Type, object>, FactoryDelegate>> keyedFactoryDelegateCache,
+                Ref<ImTreeMapIntToObj> factoryExpressionCache,
+                Ref<ImTreeArray> resolutionStateCache)
             {
                 Services = services;
                 Decorators = decorators;
@@ -1039,7 +1039,7 @@ namespace DryIoc
                 ResolutionStateCache = resolutionStateCache;
             }
 
-            private Registry WithServices(HashTree<Type, object> services)
+            private Registry WithServices(ImTreeMap<Type, object> services)
             {
                 return services == Services ? this :
                     new Registry(services, Decorators, _wrappers,
@@ -1047,7 +1047,7 @@ namespace DryIoc
                         FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
             }
 
-            private Registry WithDecorators(HashTree<Type, Factory[]> decorators)
+            private Registry WithDecorators(ImTreeMap<Type, Factory[]> decorators)
             {
                 return decorators == Decorators ? this :
                     new Registry(Services, decorators, _wrappers,
@@ -1055,7 +1055,7 @@ namespace DryIoc
                         FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
             }
 
-            private Registry WithWrappers(HashTree<Type, Factory> wrappers)
+            private Registry WithWrappers(ImTreeMap<Type, Factory> wrappers)
             {
                 return wrappers == _wrappers ? this :
                     new Registry(Services, Decorators, wrappers,
@@ -1130,7 +1130,7 @@ namespace DryIoc
             private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
             {
                 Factory replacedFactory = null;
-                HashTree<Type, object> services;
+                ImTreeMap<Type, object> services;
                 if (serviceKey == null)
                 {
                     services = Services.AddOrUpdate(serviceType, factory, (oldEntry, newFactory) =>
@@ -1165,7 +1165,7 @@ namespace DryIoc
                             default:
                                 if (oldFactories == null)
                                     return new FactoriesEntry(DefaultKey.Value.Next(),
-                                        HashTree<object, Factory>.Empty
+                                        ImTreeMap<object, Factory>.Empty
                                             .AddOrUpdate(DefaultKey.Value, (Factory)oldEntry)
                                             .AddOrUpdate(DefaultKey.Value.Next(), (Factory)newFactory));
 
@@ -1177,7 +1177,7 @@ namespace DryIoc
                 }
                 else // serviceKey != null
                 {
-                    var factories = new FactoriesEntry(null, HashTree<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
+                    var factories = new FactoriesEntry(null, ImTreeMap<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
                     services = Services.AddOrUpdate(serviceType, factories, (oldEntry, newEntry) =>
                     {
                         if (oldEntry == null)
@@ -1268,7 +1268,7 @@ namespace DryIoc
             private Registry UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
             {
                 object removed = null; // Factory or FactoriesEntry or Factory[]
-                HashTree<Type, object> services;
+                ImTreeMap<Type, object> services;
 
                 if (serviceKey == null && condition == null) // simplest case with simplest handling
                     services = Services.Update(serviceType, null, (entry, _null) =>
@@ -1293,7 +1293,7 @@ namespace DryIoc
 
                         var factoriesEntry = (FactoriesEntry)entry;
                         var oldFactories = factoriesEntry.Factories;
-                        var remainingFactories = HashTree<object, Factory>.Empty;
+                        var remainingFactories = ImTreeMap<object, Factory>.Empty;
                         if (serviceKey == null) // automatically means condition != null
                         {
                             // keep factories for which condition is true
@@ -1309,7 +1309,7 @@ namespace DryIoc
                             if (factory != null)
                                 remainingFactories = oldFactories.Height > 1
                                     ? oldFactories.Update(serviceKey, null)
-                                    : HashTree<object, Factory>.Empty;
+                                    : ImTreeMap<object, Factory>.Empty;
                         }
 
                         if (remainingFactories.IsEmpty)
@@ -1514,25 +1514,25 @@ namespace DryIoc
 
     /// <summary>Immutable array based on wide hash tree, where each node is sub-array with predefined size: 32 is by default.
     /// Array supports only append, no remove.</summary>
-    public class AppendableArray
+    public class ImTreeArray
     {
         /// <summary>Node array size. When the item added to same node, array will be copied. 
         /// So if array is too big performance will degrade. Should be power of two: e.g. 2, 4, 8, 16, 32...</summary>
         public const int NODE_ARRAY_SIZE = 32;
 
         /// <summary>Empty/default value to start from.</summary>
-        public static readonly AppendableArray Empty = new AppendableArray(0);
+        public static readonly ImTreeArray Empty = new ImTreeArray(0);
 
         /// <summary>Number of items in array.</summary>
         public readonly int Length;
 
         /// <summary>Appends value and returns new array.</summary>
         /// <param name="value">Value to append.</param> <returns>New array.</returns>
-        public virtual AppendableArray Append(object value)
+        public virtual ImTreeArray Append(object value)
         {
             return Length < NODE_ARRAY_SIZE
-                ? new AppendableArray(Length + 1, _items.AppendOrUpdate(value))
-                : new AppendableArrayTree(Length, IntKeyTree.Empty.AddOrUpdate(0, _items)).Append(value);
+                ? new ImTreeArray(Length + 1, _items.AppendOrUpdate(value))
+                : new Tree(Length, ImTreeMapIntToObj.Empty.AddOrUpdate(0, _items)).Append(value);
         }
 
         /// <summary>Returns item stored at specified index. Method relies on underlying array for index range checking.</summary>
@@ -1563,22 +1563,22 @@ namespace DryIoc
 
         private readonly object[] _items;
 
-        private AppendableArray(int length, object[] items = null)
+        private ImTreeArray(int length, object[] items = null)
         {
             Length = length;
             _items = items;
         }
 
-        private sealed class AppendableArrayTree : AppendableArray
+        private sealed class Tree : ImTreeArray
         {
             private const int NODE_ARRAY_BIT_MASK = NODE_ARRAY_SIZE - 1; // for length 32 will be 11111 binary.
             private const int NODE_ARRAY_BIT_COUNT = 5;                  // number of set bits in NODE_ARRAY_BIT_MASK.
 
-            public override AppendableArray Append(object value)
+            public override ImTreeArray Append(object value)
             {
                 var key = Length >> NODE_ARRAY_BIT_COUNT;
                 var nodeItems = _tree.GetValueOrDefault(key) as object[];
-                return new AppendableArrayTree(Length + 1, _tree.AddOrUpdate(key, nodeItems.AppendOrUpdate(value)));
+                return new Tree(Length + 1, _tree.AddOrUpdate(key, nodeItems.AppendOrUpdate(value)));
             }
 
             public override object Get(int index)
@@ -1605,13 +1605,13 @@ namespace DryIoc
                 return -1;
             }
 
-            public AppendableArrayTree(int length, IntKeyTree tree)
+            public Tree(int length, ImTreeMapIntToObj tree)
                 : base(length)
             {
                 _tree = tree;
             }
 
-            private readonly IntKeyTree _tree;
+            private readonly ImTreeMapIntToObj _tree;
         }
 
         #endregion
@@ -1658,7 +1658,7 @@ namespace DryIoc
     /// registered delegate factory, <see cref="Lazy{T}"/>, and <see cref="LazyEnumerable{TService}"/>.</param>
     /// <param name="scope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
     /// <returns>Created service object.</returns>
-    public delegate object FactoryDelegate(AppendableArray state, IResolverContextProvider r, IScope scope);
+    public delegate object FactoryDelegate(ImTreeArray state, IResolverContextProvider r, IScope scope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
     public static partial class FactoryCompiler
@@ -1715,11 +1715,11 @@ namespace DryIoc
         public static readonly Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
 
         /// <summary>Registered wrappers by their concrete or generic definition service type.</summary>
-        public static readonly HashTree<Type, Factory> Wrappers;
+        public static readonly ImTreeMap<Type, Factory> Wrappers;
 
         static WrappersSupport()
         {
-            Wrappers = HashTree<Type, Factory>.Empty;
+            Wrappers = ImTreeMap<Type, Factory>.Empty;
 
             // Register array and its collection/list interfaces.
             var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
@@ -5042,8 +5042,8 @@ namespace DryIoc
 
             private readonly ReflectionFactory _factory;
 
-            private readonly Ref<HashTree<int, KV<Type, object>>>
-                _providedFactories = Ref.Of(HashTree<int, KV<Type, object>>.Empty);
+            private readonly Ref<ImTreeMap<int, KV<Type, object>>>
+                _providedFactories = Ref.Of(ImTreeMap<int, KV<Type, object>>.Empty);
         }
 
         private void ThrowIfRegisteringInvalidImplementationType(IContainer container, Type implType)
@@ -5390,7 +5390,7 @@ namespace DryIoc
         {
             Parent = parent;
             Name = name;
-            _items = IntKeyTree.Empty;
+            _items = ImTreeMapIntToObj.Empty;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -5448,7 +5448,7 @@ namespace DryIoc
                     .Where(it => it.Value is IDisposable || it.Value is IReuseWrapper)
                     .OrderByDescending(it => it.Key))
                     DisposeItem(item.Value);
-            _items = IntKeyTree.Empty;
+            _items = ImTreeMapIntToObj.Empty;
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
@@ -5461,7 +5461,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private IntKeyTree _items;
+        private ImTreeMapIntToObj _items;
         private int _disposed;
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
@@ -5554,10 +5554,10 @@ namespace DryIoc
             if (!_scopes.IsEmpty)
                 foreach (var scope in _scopes.Enumerate().Where(scope => scope.Value is IDisposable))
                     ((IDisposable)scope.Value).Dispose();
-            _scopes = IntKeyTree.Empty;
+            _scopes = ImTreeMapIntToObj.Empty;
         }
 
-        private IntKeyTree _scopes = IntKeyTree.Empty;
+        private ImTreeMapIntToObj _scopes = ImTreeMapIntToObj.Empty;
     }
 
     /// <summary>Reuse goal is to locate or create scope where reused objects will be stored.</summary>
@@ -6192,7 +6192,7 @@ namespace DryIoc
         Request EmptyRequest { get; }
 
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
-        AppendableArray ResolutionStateCache { get; }
+        ImTreeArray ResolutionStateCache { get; }
 
         /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
@@ -7584,10 +7584,10 @@ namespace DryIoc
     public delegate V Update<V>(V oldValue, V newValue);
 
     /// <summary>Simple immutable AVL tree with integer keys and object values.</summary>
-    public sealed class IntKeyTree
+    public sealed class ImTreeMapIntToObj
     {
         /// <summary>Empty tree to start with. The <see cref="Height"/> of the empty tree is 0.</summary>
-        public static readonly IntKeyTree Empty = new IntKeyTree();
+        public static readonly ImTreeMapIntToObj Empty = new ImTreeMapIntToObj();
 
         /// <summary>Key.</summary>
         public readonly int Key;
@@ -7596,10 +7596,10 @@ namespace DryIoc
         public readonly object Value;
 
         /// <summary>Left subtree/branch, or empty.</summary>
-        public readonly IntKeyTree Left;
+        public readonly ImTreeMapIntToObj Left;
 
         /// <summary>Right subtree/branch, or empty.</summary>
-        public readonly IntKeyTree Right;
+        public readonly ImTreeMapIntToObj Right;
 
         /// <summary>Height of longest subtree/branch. It is 0 for empty tree, and 1 for single node tree.</summary>
         public readonly int Height;
@@ -7610,7 +7610,7 @@ namespace DryIoc
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
         /// <param name="key"></param> <param name="value"></param>
         /// <returns>New tree.</returns>
-        public IntKeyTree AddOrUpdate(int key, object value)
+        public ImTreeMapIntToObj AddOrUpdate(int key, object value)
         {
             return AddOrUpdate(key, value, false, null);
         }
@@ -7623,7 +7623,7 @@ namespace DryIoc
         /// <param name="key"></param> <param name="value"></param>
         /// <param name="updateValue">Delegate to get updated value based on its old and new value.</param>
         /// <returns>New tree.</returns>
-        public IntKeyTree AddOrUpdate(int key, object value, UpdateValue updateValue)
+        public ImTreeMapIntToObj AddOrUpdate(int key, object value, UpdateValue updateValue)
         {
             return AddOrUpdate(key, value, false, updateValue);
         }
@@ -7631,7 +7631,7 @@ namespace DryIoc
         /// <summary>Returns new tree with updated value for the key, Or the same tree if key was not found.</summary>
         /// <param name="key"></param> <param name="value"></param>
         /// <returns>New tree if key is found, or the same tree otherwise.</returns>
-        public IntKeyTree Update(int key, object value)
+        public ImTreeMapIntToObj Update(int key, object value)
         {
             return AddOrUpdate(key, value, true, null);
         }
@@ -7648,12 +7648,12 @@ namespace DryIoc
 
         /// <summary>Returns all sub-trees enumerated from left to right.</summary> 
         /// <returns>Enumerated sub-trees or empty if tree is empty.</returns>
-        public IEnumerable<IntKeyTree> Enumerate()
+        public IEnumerable<ImTreeMapIntToObj> Enumerate()
         {
             if (Height == 0)
                 yield break;
 
-            var parents = new IntKeyTree[Height];
+            var parents = new ImTreeMapIntToObj[Height];
 
             var tree = this;
             var parentCount = -1;
@@ -7675,9 +7675,9 @@ namespace DryIoc
 
         #region Implementation
 
-        private IntKeyTree() { }
+        private ImTreeMapIntToObj() { }
 
-        private IntKeyTree(int key, object value, IntKeyTree left, IntKeyTree right)
+        private ImTreeMapIntToObj(int key, object value, ImTreeMapIntToObj left, ImTreeMapIntToObj right)
         {
             Key = key;
             Value = value;
@@ -7687,18 +7687,18 @@ namespace DryIoc
         }
 
         // If keys is not found and updateOnly is true, it should return current tree without changes.
-        private IntKeyTree AddOrUpdate(int key, object value, bool updateOnly, UpdateValue update)
+        private ImTreeMapIntToObj AddOrUpdate(int key, object value, bool updateOnly, UpdateValue update)
         {
             return Height == 0 ? // tree is empty
-                    (updateOnly ? this : new IntKeyTree(key, value, Empty, Empty))
+                    (updateOnly ? this : new ImTreeMapIntToObj(key, value, Empty, Empty))
                 : (key == Key ? // actual update
-                    new IntKeyTree(key, update == null ? value : update(Value, value), Left, Right)
+                    new ImTreeMapIntToObj(key, update == null ? value : update(Value, value), Left, Right)
                 : (key < Key    // try update on left or right sub-tree
                     ? With(Left.AddOrUpdate(key, value, updateOnly, update), Right)
                     : With(Left, Right.AddOrUpdate(key, value, updateOnly, update))).KeepBalanced());
         }
 
-        private IntKeyTree KeepBalanced()
+        private ImTreeMapIntToObj KeepBalanced()
         {
             var delta = Left.Height - Right.Height;
             return delta >= 2 ? With(Left.Right.Height - Left.Left.Height == 1 ? Left.RotateLeft() : Left, Right).RotateRight()
@@ -7706,29 +7706,29 @@ namespace DryIoc
                 : this);
         }
 
-        private IntKeyTree RotateRight()
+        private ImTreeMapIntToObj RotateRight()
         {
             return Left.With(Left.Left, With(Left.Right, Right));
         }
 
-        private IntKeyTree RotateLeft()
+        private ImTreeMapIntToObj RotateLeft()
         {
             return Right.With(With(Left, Right.Left), Right.Right);
         }
 
-        private IntKeyTree With(IntKeyTree left, IntKeyTree right)
+        private ImTreeMapIntToObj With(ImTreeMapIntToObj left, ImTreeMapIntToObj right)
         {
-            return left == Left && right == Right ? this : new IntKeyTree(Key, Value, left, right);
+            return left == Left && right == Right ? this : new ImTreeMapIntToObj(Key, Value, left, right);
         }
 
         #endregion
     }
 
     /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.</summary>
-    public sealed class HashTree<K, V>
+    public sealed class ImTreeMap<K, V>
     {
         /// <summary>Empty tree to start with. The <see cref="Height"/> of the empty tree is 0.</summary>
-        public static readonly HashTree<K, V> Empty = new HashTree<K, V>();
+        public static readonly ImTreeMap<K, V> Empty = new ImTreeMap<K, V>();
 
         /// <summary>Key of type K that should support <see cref="object.Equals(object)"/> and <see cref="object.GetHashCode"/>.</summary>
         public readonly K Key;
@@ -7743,10 +7743,10 @@ namespace DryIoc
         public readonly KV<K, V>[] Conflicts;
 
         /// <summary>Left subtree/branch, or empty.</summary>
-        public readonly HashTree<K, V> Left;
+        public readonly ImTreeMap<K, V> Left;
 
         /// <summary>Right subtree/branch, or empty.</summary>
-        public readonly HashTree<K, V> Right;
+        public readonly ImTreeMap<K, V> Right;
 
         /// <summary>Height of longest subtree/branch. It is 0 for empty tree, and 1 for single node tree.</summary>
         public readonly int Height;
@@ -7760,7 +7760,7 @@ namespace DryIoc
         /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
         /// <param name="update">(optional) Delegate to decide what value to keep: old or new one.</param>
         /// <returns>New tree with added or updated key-value.</returns>
-        public HashTree<K, V> AddOrUpdate(K key, V value, Update<V> update = null)
+        public ImTreeMap<K, V> AddOrUpdate(K key, V value, Update<V> update = null)
         {
             return AddOrUpdate(key.GetHashCode(), key, value, update, updateOnly: false);
         }
@@ -7773,7 +7773,7 @@ namespace DryIoc
         /// <param name="update">(optional) Delegate for custom update logic, it gets old and new <paramref name="value"/>
         /// as inputs and should return updated value as output.</param>
         /// <returns>New tree with updated value or the SAME tree if no key found.</returns>
-        public HashTree<K, V> Update(K key, V value, Update<V> update = null)
+        public ImTreeMap<K, V> Update(K key, V value, Update<V> update = null)
         {
             return AddOrUpdate(key.GetHashCode(), key, value, update, updateOnly: true);
         }
@@ -7799,7 +7799,7 @@ namespace DryIoc
             if (Height == 0)
                 yield break;
 
-            var parents = new HashTree<K, V>[Height];
+            var parents = new ImTreeMap<K, V>[Height];
 
             var tree = this;
             var parentCount = -1;
@@ -7826,9 +7826,9 @@ namespace DryIoc
 
         #region Implementation
 
-        private HashTree() { }
+        private ImTreeMap() { }
 
-        private HashTree(int hash, K key, V value, KV<K, V>[] conficts, HashTree<K, V> left, HashTree<K, V> right)
+        private ImTreeMap(int hash, K key, V value, KV<K, V>[] conficts, ImTreeMap<K, V> left, ImTreeMap<K, V> right)
         {
             Hash = hash;
             Key = key;
@@ -7839,23 +7839,23 @@ namespace DryIoc
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private HashTree<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update, bool updateOnly)
+        private ImTreeMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update, bool updateOnly)
         {
-            return Height == 0 ? (updateOnly ? this : new HashTree<K, V>(hash, key, value, null, Empty, Empty))
+            return Height == 0 ? (updateOnly ? this : new ImTreeMap<K, V>(hash, key, value, null, Empty, Empty))
                 : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, update, updateOnly)
                 : (hash < Hash
                     ? With(Left.AddOrUpdate(hash, key, value, update, updateOnly), Right)
                     : With(Left, Right.AddOrUpdate(hash, key, value, update, updateOnly))).KeepBalanced());
         }
 
-        private HashTree<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update, bool updateOnly)
+        private ImTreeMap<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update, bool updateOnly)
         {
             if (ReferenceEquals(Key, key) || Key.Equals(key))
-                return new HashTree<K, V>(Hash, key, update == null ? value : update(Value, value), Conflicts, Left, Right);
+                return new ImTreeMap<K, V>(Hash, key, update == null ? value : update(Value, value), Conflicts, Left, Right);
 
             if (Conflicts == null) // add only if updateOnly is false.
                 return updateOnly ? this
-                    : new HashTree<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
+                    : new ImTreeMap<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
 
             var found = Conflicts.Length - 1;
             while (found >= 0 && !Equals(Conflicts[found].Key, Key)) --found;
@@ -7865,13 +7865,13 @@ namespace DryIoc
                 var newConflicts = new KV<K, V>[Conflicts.Length + 1];
                 Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
                 newConflicts[Conflicts.Length] = new KV<K, V>(key, value);
-                return new HashTree<K, V>(Hash, Key, Value, newConflicts, Left, Right);
+                return new ImTreeMap<K, V>(Hash, Key, Value, newConflicts, Left, Right);
             }
 
             var conflicts = new KV<K, V>[Conflicts.Length];
             Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
             conflicts[found] = new KV<K, V>(key, update == null ? value : update(Conflicts[found].Value, value));
-            return new HashTree<K, V>(Hash, Key, Value, conflicts, Left, Right);
+            return new ImTreeMap<K, V>(Hash, Key, Value, conflicts, Left, Right);
         }
 
         private V GetConflictedValueOrDefault(K key, V defaultValue)
@@ -7883,7 +7883,7 @@ namespace DryIoc
             return defaultValue;
         }
 
-        private HashTree<K, V> KeepBalanced()
+        private ImTreeMap<K, V> KeepBalanced()
         {
             var delta = Left.Height - Right.Height;
             return delta >= 2 ? With(Left.Right.Height - Left.Left.Height == 1 ? Left.RotateLeft() : Left, Right).RotateRight()
@@ -7891,19 +7891,19 @@ namespace DryIoc
                 : this);
         }
 
-        private HashTree<K, V> RotateRight()
+        private ImTreeMap<K, V> RotateRight()
         {
             return Left.With(Left.Left, With(Left.Right, Right));
         }
 
-        private HashTree<K, V> RotateLeft()
+        private ImTreeMap<K, V> RotateLeft()
         {
             return Right.With(With(Left, Right.Left), Right.Right);
         }
 
-        private HashTree<K, V> With(HashTree<K, V> left, HashTree<K, V> right)
+        private ImTreeMap<K, V> With(ImTreeMap<K, V> left, ImTreeMap<K, V> right)
         {
-            return left == Left && right == Right ? this : new HashTree<K, V>(Hash, Key, Value, Conflicts, left, right);
+            return left == Left && right == Right ? this : new ImTreeMap<K, V>(Hash, Key, Value, Conflicts, left, right);
         }
 
         #endregion

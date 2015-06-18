@@ -9,7 +9,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Append_to_end()
         {
-            var store = AppendableArray.Empty;
+            var store = ImTreeArray.Empty;
             store = store
                 .Append("a")
                 .Append("b")
@@ -25,7 +25,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Indexed_store_get_or_add()
         {
-            var store = AppendableArray.Empty;
+            var store = ImTreeArray.Empty;
 
             store = store
                 .Append("a")
@@ -41,7 +41,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void IndexOf_with_empty_store()
         {
-            var store = AppendableArray.Empty;
+            var store = ImTreeArray.Empty;
 
             Assert.AreEqual(-1, store.IndexOf("a"));
         }
@@ -49,7 +49,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void IndexOf_non_existing_item()
         {
-            var store = AppendableArray.Empty;
+            var store = ImTreeArray.Empty;
 
             store = store.Append("a");
 
@@ -59,7 +59,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void IndexOf_existing_item()
         {
-            var store = AppendableArray.Empty;
+            var store = ImTreeArray.Empty;
 
             store = store
                 .Append("a")
@@ -72,8 +72,8 @@ namespace DryIoc.UnitTests
         [Test]
         public void Append_for_full_node_and_get_node_last_item()
         {
-            var nodeArrayLength = AppendableArray.NODE_ARRAY_SIZE;
-            var array = AppendableArray.Empty;
+            var nodeArrayLength = ImTreeArray.NODE_ARRAY_SIZE;
+            var array = ImTreeArray.Empty;
             for (var i = 0; i <= nodeArrayLength; i++)
                 array = array.Append(i);
 
@@ -87,7 +87,7 @@ namespace DryIoc.UnitTests
         public void Append_and_get_items_in_multiple_node_array()
         {
             var list = new List<Foo>();
-            var array = AppendableArray.Empty;
+            var array = ImTreeArray.Empty;
 
             for (var index = 0; index < 129; ++index)
             {

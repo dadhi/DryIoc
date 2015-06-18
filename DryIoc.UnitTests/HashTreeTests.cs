@@ -11,7 +11,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Tree_should_support_arbitrary_keys_by_using_their_hash_code()
         {
-            var tree = HashTree<Type, string>.Empty;
+            var tree = ImTreeMap<Type, string>.Empty;
 
             var key = typeof(HashTreeTests);
             var value = "test";
@@ -28,7 +28,7 @@ namespace DryIoc.UnitTests
             var key1 = new HashConflictingKey<string>("a", 1);
             var key2 = new HashConflictingKey<string>("b", 1);
             var key3 = new HashConflictingKey<string>("c", 1);
-            var tree = HashTree<HashConflictingKey<string>, int>.Empty
+            var tree = ImTreeMap<HashConflictingKey<string>, int>.Empty
                 .AddOrUpdate(key1, 1)
                 .AddOrUpdate(key2, 2)
                 .AddOrUpdate(key3, 3);
@@ -44,7 +44,7 @@ namespace DryIoc.UnitTests
             var key1 = new HashConflictingKey<string>("a", 1);
             var key2 = new HashConflictingKey<string>("b", 1);
             var key3 = new HashConflictingKey<string>("c", 1);
-            var tree = HashTree<HashConflictingKey<string>, int>.Empty
+            var tree = ImTreeMap<HashConflictingKey<string>, int>.Empty
                 .AddOrUpdate(key1, 1)
                 .AddOrUpdate(key2, 2)
                 .AddOrUpdate(key3, 3);
@@ -62,7 +62,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_that_all_added_values_are_accessible()
         {
-            var t = HashTree<int, int>.Empty
+            var t = ImTreeMap<int, int>.Empty
                 .AddOrUpdate(1, 11)
                 .AddOrUpdate(2, 22)
                 .AddOrUpdate(3, 33);
@@ -75,7 +75,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_left_left_tree()
         {
-            var t = HashTree<int, int>.Empty
+            var t = ImTreeMap<int, int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(3, 3);
@@ -91,7 +91,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_preserved_when_add_to_balanced_tree()
         {
-            var t = HashTree<int, int>.Empty
+            var t = ImTreeMap<int, int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(3, 3)
@@ -113,7 +113,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_left_right_tree()
         {
-            var t = HashTree<int, int>.Empty
+            var t = ImTreeMap<int, int>.Empty
                 .AddOrUpdate(5, 1)
                 .AddOrUpdate(3, 2)
                 .AddOrUpdate(4, 3);
@@ -129,7 +129,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_right_right_tree()
         {
-            var t = HashTree<int, int>.Empty
+            var t = ImTreeMap<int, int>.Empty
                 .AddOrUpdate(3, 1)
                 .AddOrUpdate(4, 2)
                 .AddOrUpdate(5, 3);
@@ -145,7 +145,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Test_balance_ensured_for_right_left_tree()
         {
-            var t = HashTree<int, int>.Empty
+            var t = ImTreeMap<int, int>.Empty
                 .AddOrUpdate(3, 1)
                 .AddOrUpdate(5, 2)
                 .AddOrUpdate(4, 3);
@@ -161,7 +161,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Search_in_empty_tree_should_NOT_throw()
         {
-            var tree = HashTree<int, int>.Empty;
+            var tree = ImTreeMap<int, int>.Empty;
 
             Assert.DoesNotThrow(
                 () => tree.GetValueOrDefault(0));
@@ -170,7 +170,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Search_for_non_existent_key_should_NOT_throw()
         {
-            var tree = HashTree<int, int>.Empty
+            var tree = ImTreeMap<int, int>.Empty
                 .AddOrUpdate(1, 1)
                 .AddOrUpdate(3, 2);
 
@@ -181,7 +181,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void For_two_same_added_items_height_should_be_one()
         {
-            var tree = HashTree<int, string>.Empty
+            var tree = ImTreeMap<int, string>.Empty
                 .AddOrUpdate(1, "x")
                 .AddOrUpdate(1, "y");
 
@@ -192,7 +192,7 @@ namespace DryIoc.UnitTests
         public void Enumerated_values_should_be_returned_in_sorted_order()
         {
             var items = Enumerable.Range(0, 10).ToArray();
-            var tree = items.Aggregate(HashTree<int, int>.Empty, (t, i) => t.AddOrUpdate(i, i));
+            var tree = items.Aggregate(ImTreeMap<int, int>.Empty, (t, i) => t.AddOrUpdate(i, i));
 
             var enumerated = tree.Enumerate().Select(t => t.Value).ToArray();
 
@@ -202,7 +202,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Update_to_null_and_then_to_value_should_remove_null()
         {
-            var tree = HashTree<int, string>.Empty
+            var tree = ImTreeMap<int, string>.Empty
                 .AddOrUpdate(1, "a").AddOrUpdate(2, "b").AddOrUpdate(3, "c").AddOrUpdate(4, "d");
             Assert.That(tree.GetValueOrDefault(4), Is.EqualTo("d"));
 
@@ -217,7 +217,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Update_of_not_found_key_should_return_the_same_tree()
         {
-            var tree = HashTree<int, string>.Empty
+            var tree = ImTreeMap<int, string>.Empty
                 .AddOrUpdate(1, "a").AddOrUpdate(2, "b").AddOrUpdate(3, "c").AddOrUpdate(4, "d");
 
             var updatedTree = tree.Update(5, "e");
@@ -228,7 +228,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_use_int_key_tree_to_represent_general_HashTree_with_possible_hash_conflicts()
         {
-            var tree = HashTree<int, KeyValuePair<Type, string>[]>.Empty;
+            var tree = ImTreeMap<int, KeyValuePair<Type, string>[]>.Empty;
 
             var key = typeof(HashTreeTests);
             var keyHash = key.GetHashCode();

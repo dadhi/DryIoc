@@ -57,9 +57,9 @@ namespace DryIoc.Zero
         /// <summary>Creates container.</summary>
         /// <param name="scopeContext">(optional) Scope context, by default <see cref="ThreadScopeContext"/>.</param>
         public ZeroContainer(IScopeContext scopeContext = null)
-            : this(Ref.Of(HashTree.Empty), Ref.Of(HashTree.Empty), new Scope(), scopeContext ?? new ThreadScopeContext(), null, 0) { }
+            : this(Ref.Of(ImTreeMap.Empty), Ref.Of(ImTreeMap.Empty), new Scope(), scopeContext ?? new ThreadScopeContext(), null, 0) { }
         
-        private ZeroContainer(Ref<HashTree> defaultFactories, Ref<HashTree> keyedFactories, IScope singletonScope, 
+        private ZeroContainer(Ref<ImTreeMap> defaultFactories, Ref<ImTreeMap> keyedFactories, IScope singletonScope, 
             IScopeContext scopeContext, IScope openedScope, int disposed)
         {
             _defaultFactories = defaultFactories;
@@ -120,13 +120,13 @@ namespace DryIoc.Zero
             ThrowIfContainerDisposed();
             _keyedFactories.Swap(_ =>
             {
-                var entry = _.GetValueOrDefault(serviceType) as HashTree ?? HashTree.Empty;
+                var entry = _.GetValueOrDefault(serviceType) as ImTreeMap ?? ImTreeMap.Empty;
                 return _.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, factoryDelegate));
             });
         }
 
-        private Ref<HashTree> _defaultFactories; //<Type -> FactoryDelegate>
-        private Ref<HashTree> _keyedFactories; //<Type -> <Key -> FactoryDelegate>>
+        private Ref<ImTreeMap> _defaultFactories; //<Type -> FactoryDelegate>
+        private Ref<ImTreeMap> _keyedFactories; //<Type -> <Key -> FactoryDelegate>>
 
         #endregion
 
@@ -151,8 +151,8 @@ namespace DryIoc.Zero
                 var scopeContext = ScopeContext as IDisposable;
                 if (scopeContext != null)
                     scopeContext.Dispose();
-                _defaultFactories = Ref.Of(HashTree.Empty);
-                _keyedFactories = Ref.Of(HashTree.Empty);
+                _defaultFactories = Ref.Of(ImTreeMap.Empty);
+                _keyedFactories = Ref.Of(ImTreeMap.Empty);
             }
         }
 
@@ -164,8 +164,7 @@ namespace DryIoc.Zero
         private int _disposed;
         private void ThrowIfContainerDisposed()
         {
-            if (IsDisposed)
-                Throw.It(Error.ContainerIsDisposed);
+            Throw.If(_disposed == 1, Error.ContainerIsDisposed);
         }
         
         /// <summary>Scope containing container singletons.</summary>
@@ -179,18 +178,13 @@ namespace DryIoc.Zero
         public IScope GetCurrentNamedScope(object name, bool throwIfNotFound)
         {
             var currentScope = ScopeContext == null ? OpenedScope : ScopeContext.GetCurrentOrDefault();
+            
             if (currentScope == null)
-            {
-                if (throwIfNotFound) Throw.It(Error.NoCurrentScope);
-                return null;
-            }
+                return (IScope)Throw.If(throwIfNotFound, Error.NoCurrentScope);
 
             var matchingScope = GetMatchingScopeOrDefault(currentScope, name);
             if (matchingScope == null)
-            {
-                if (throwIfNotFound) Throw.It(Error.NoMatchedScopeFound, name);
-                return null;
-            }
+                return (IScope)Throw.If(throwIfNotFound, Error.NoMatchedScopeFound, name);
 
             return matchingScope;
         }
@@ -225,12 +219,8 @@ namespace DryIoc.Zero
         public IScope GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost, bool throwIfNotFound)
         {
             var matchingScope = GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost);
-            if (matchingScope == null)
-            {
-                if (throwIfNotFound) Throw.It(Error.NoMatchedScopeFound, new KV(assignableFromServiceType, serviceKey));
-                return null;
-            }
-            return matchingScope;
+            return matchingScope
+                ?? (IScope)Throw.If(throwIfNotFound, Error.NoMatchedScopeFound, new KV(assignableFromServiceType, serviceKey));
         }
 
         private static IScope GetMatchingScopeOrDefault(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost)
@@ -299,7 +289,7 @@ namespace DryIoc.Zero
             var keyedFactories = _keyedFactories.Value;
             if (!keyedFactories.IsEmpty)
             {
-                var factories = keyedFactories.GetValueOrDefault(serviceType) as HashTree;
+                var factories = keyedFactories.GetValueOrDefault(serviceType) as ImTreeMap;
                 var factoryDelegate = factories == null ? null
                     : factories.GetValueOrDefault(serviceKey) as StatelessFactoryDelegate;
                 if (factoryDelegate != null) 
@@ -330,7 +320,7 @@ namespace DryIoc.Zero
             foreach (var generated in manyGenerated)
                 yield return ((StatelessFactoryDelegate)generated.Value)(this, scope);
 
-            var factories = _keyedFactories.Value.GetValueOrDefault(serviceType) as HashTree;
+            var factories = _keyedFactories.Value.GetValueOrDefault(serviceType) as ImTreeMap;
             if (factories != null)
             {
                 if (serviceKey != null)
@@ -356,8 +346,7 @@ namespace DryIoc.Zero
 
         private static object GetDefaultOrThrowIfUnresolved(Type serviceType, IfUnresolved ifUnresolved)
         {
-            if (ifUnresolved == IfUnresolved.Throw) Throw.It(Error.UnableToResolveService, serviceType);
-            return null;
+            return Throw.If(ifUnresolved == IfUnresolved.Throw, Error.UnableToResolveService, serviceType);
         }
 
         #endregion
@@ -404,10 +393,10 @@ namespace DryIoc.Zero
     }
 
     /// <summary>Simple immutable AVL tree with integer keys and object values.</summary>
-    public sealed class HashTree
+    public sealed class ImTreeMap
     {
         /// <summary>Represents Empty tree.</summary>
-        public static readonly HashTree Empty = new HashTree(IntKeyTree.Empty);
+        public static readonly ImTreeMap Empty = new ImTreeMap(ImTreeMapIntToObj.Empty);
 
         /// <summary>Returns true if tree is empty.</summary>
         public bool IsEmpty { get { return _tree.IsEmpty; } }
@@ -420,9 +409,9 @@ namespace DryIoc.Zero
 
         /// <summary>Creates new tree with added or updated value for corresponding key.</summary>
         /// <param name="key">Key.</param> <param name="value">Value.</param> <returns>New tree.</returns>
-        public HashTree AddOrUpdate(object key, object value)
+        public ImTreeMap AddOrUpdate(object key, object value)
         {
-            return new HashTree(_tree.AddOrUpdate(key.GetHashCode(), new KV(key, value), UpdateConflictingKeyValue));
+            return new ImTreeMap(_tree.AddOrUpdate(key.GetHashCode(), new KV(key, value), UpdateConflictingKeyValue));
         }
 
         private static object UpdateConflictingKeyValue(object entryOld, object entryNew)
@@ -490,8 +479,8 @@ namespace DryIoc.Zero
 
         #region Implementation
 
-        private readonly IntKeyTree _tree;
-        private HashTree(IntKeyTree tree) { _tree = tree; }
+        private readonly ImTreeMapIntToObj _tree;
+        private ImTreeMap(ImTreeMapIntToObj tree) { _tree = tree; }
 
         #endregion
     }
@@ -557,6 +546,12 @@ namespace DryIoc.Zero
             var messageFormat = Error.Messages[error];
             var message = string.Format(messageFormat, args);
             throw new ZeroContainerException(error, message);
+        }
+
+        public static object If(bool condition, int error, params object[] args)
+        {
+            if (condition) It(error, args);
+            return null;
         }
     }
 }

@@ -40,8 +40,8 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/> 
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
-        public static readonly HashTree<Type, Func<string, IReuse>> SupportedReuseTypes = 
-            HashTree<Type, Func<string, IReuse>>.Empty
+        public static readonly ImTreeMap<Type, Func<string, IReuse>> SupportedReuseTypes = 
+            ImTreeMap<Type, Func<string, IReuse>>.Empty
             .AddOrUpdate(typeof(SingletonReuse), _ => Reuse.Singleton)
             .AddOrUpdate(typeof(CurrentScopeReuse), Reuse.InCurrentNamedScope)
             .AddOrUpdate(typeof(ResolutionScopeReuse), _ => Reuse.InResolutionScope);
