@@ -194,14 +194,14 @@ namespace DryIoc
         internal static readonly ParameterExpression StateParamExpr = 
             Expression.Parameter(typeof(ImTreeArray), "state");
 
-        internal static readonly ParameterExpression ResolverContextProviderParamExpr = 
-            Expression.Parameter(typeof(IResolverContextProvider), "r");
+        internal static readonly ParameterExpression ResolverContextParamExpr = 
+            Expression.Parameter(typeof(IResolverContext), "r");
         
-        internal static readonly Expression ResolverContextExpr = 
-            Expression.Property(ResolverContextProviderParamExpr, "Resolver");
+        internal static readonly Expression ResolverExpr = 
+            Expression.Property(ResolverContextParamExpr, "Resolver");
 
-        internal static readonly Expression ResolverExpr =
-            Expression.Convert(ResolverContextExpr, typeof(IResolver));
+        internal static readonly Expression ScopesExpr = 
+            Expression.Property(ResolverContextParamExpr, "Scopes");
 
         internal static readonly ParameterExpression ResolutionScopeParamExpr = 
             Expression.Parameter(typeof(IScope), "scope");
@@ -215,7 +215,7 @@ namespace DryIoc
             var registeredServiceType = request.Container.UnwrapServiceType(parent.RequiredServiceType ?? parent.ServiceType);
             var parentServiceTypeExpr = request.Container.GetOrAddStateItemExpression(registeredServiceType, typeof(Type));
             var parentServiceKeyExpr = Expression.Convert(request.Container.GetOrAddStateItemExpression(parent.ServiceKey), typeof(object));
-            return Expression.Call(ResolverContextExpr, "GetOrCreateResolutionScope", ArrayTools.No<Type>(), 
+            return Expression.Call(ScopesExpr, "GetOrCreateResolutionScope", ArrayTools.No<Type>(), 
                 ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
 
@@ -423,7 +423,7 @@ namespace DryIoc
         #region IResolverContext
 
         /// <summary>Scope containing container singletons.</summary>
-        IScope IResolverContext.SingletonScope
+        IScope IScopeAccess.SingletonScope
         {
             get { return _singletonScope; }
         }
@@ -433,7 +433,7 @@ namespace DryIoc
         /// <param name="name">May be null</param> <param name="throwIfNotFound">Says to throw if no scope found.</param>
         /// <returns>Found scope or throws exception.</returns>
         /// <exception cref="ContainerException"> with code <see cref="Error.NoMatchedScopeFound"/>.</exception>
-        IScope IResolverContext.GetCurrentNamedScope(object name, bool throwIfNotFound)
+        IScope IScopeAccess.GetCurrentNamedScope(object name, bool throwIfNotFound)
         {
             var currentScope = _scopeContext == null ? _openedScope : _scopeContext.GetCurrentOrDefault();
             return currentScope == null 
@@ -455,7 +455,7 @@ namespace DryIoc
         /// <param name="serviceType">Marking scope with resolved service type.</param> 
         /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
-        IScope IResolverContext.GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
+        IScope IScopeAccess.GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
         {
             return scope ?? (scope = new Scope(null, new KV<Type, object>(serviceType, serviceKey)));
         }
@@ -469,7 +469,7 @@ namespace DryIoc
         /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
         /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
         /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
-        IScope IResolverContext.GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey,
+        IScope IScopeAccess.GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey,
             bool outermost, bool throwIfNotFound)
         {
             return GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost)
@@ -1619,20 +1619,23 @@ namespace DryIoc
 
     /// <summary>Returns reference to actual resolver implementation. 
     /// Minimizes <see cref="FactoryDelegate"/> dependency on container.</summary>
-    public interface IResolverContextProvider
+    public interface IResolverContext
     {
         /// <summary>Provides access to resolver implementation.</summary>
-        IResolverContext Resolver { get; }
+        IResolver Resolver { get; }
+
+        /// <summary>Scopes access</summary>
+        IScopeAccess Scopes { get; }
     }
 
     /// <summary>Wraps <see cref="IContainer"/> WeakReference with more specialized exceptions on access to GCed or disposed container.</summary>
-    public sealed class ContainerWeakRef : IResolverContextProvider
+    public sealed class ContainerWeakRef : IResolverContext
     {
         /// <summary>Provides access to resolver implementation.</summary>
-        public IResolverContext Resolver
-        {
-            get { return GetTarget(); }
-        }
+        public IResolver Resolver { get { return GetTarget(); } }
+
+        /// <summary>Scope access.</summary>
+        public IScopeAccess Scopes { get { return GetTarget(); } }
 
         /// <summary>Retrieves container instance if it is not GCed or disposed</summary>
         public IContainer GetTarget()
@@ -1658,7 +1661,7 @@ namespace DryIoc
     /// registered delegate factory, <see cref="Lazy{T}"/>, and <see cref="LazyEnumerable{TService}"/>.</param>
     /// <param name="scope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
     /// <returns>Created service object.</returns>
-    public delegate object FactoryDelegate(ImTreeArray state, IResolverContextProvider r, IScope scope);
+    public delegate object FactoryDelegate(ImTreeArray state, IResolverContext r, IScope scope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
     public static partial class FactoryCompiler
@@ -1673,7 +1676,7 @@ namespace DryIoc
             if (expression.Type.IsValueType())
                 expression = Expression.Convert(expression, typeof(object));
             return Expression.Lambda<FactoryDelegate>(expression,
-                Container.StateParamExpr, Container.ResolverContextProviderParamExpr, Container.ResolutionScopeParamExpr);
+                Container.StateParamExpr, Container.ResolverContextParamExpr, Container.ResolutionScopeParamExpr);
         }
 
         /// <summary>First wraps the input service creation expression into lambda expression and
@@ -1878,7 +1881,7 @@ namespace DryIoc
             if (!parent.IsEmpty && parent.ServiceType == itemRequiredServiceType)
                 compositeParentKey = parent.ServiceKey;
 
-            var callResolveManyExpr = Expression.Call(Container.ResolverContextExpr, _resolveManyMethod,
+            var callResolveManyExpr = Expression.Call(Container.ResolverExpr, _resolveManyMethod,
                 Expression.Constant(itemServiceType),
                 request.Container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(itemRequiredServiceType),
@@ -5085,7 +5088,7 @@ namespace DryIoc
         {
             return serviceInfo.ServiceType == typeof(IResolver) &&
                    serviceInfo.Details.ServiceKey == null && serviceInfo.Details.RequiredServiceType == null
-                ? Container.ResolverContextExpr
+                ? Container.ResolverExpr
                 : null;
         }
 
@@ -5314,7 +5317,7 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var factoryDelegateExpr = request.Container.GetOrAddStateItemExpression(_factoryDelegate);
-            return Expression.Convert(Expression.Invoke(factoryDelegateExpr, Container.ResolverContextExpr), request.ServiceType);
+            return Expression.Convert(Expression.Invoke(factoryDelegateExpr, Container.ResolverExpr), request.ServiceType);
         }
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
@@ -5595,12 +5598,12 @@ namespace DryIoc
             return request.Container.SingletonScope;
         }
 
-        /// <summary>Returns expression directly accessing <see cref="IResolverContext.SingletonScope"/>.</summary>
+        /// <summary>Returns expression directly accessing <see cref="IScopeAccess.SingletonScope"/>.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Singleton scope property expression.</returns>
         public Expression GetScopeExpression(Request request)
         {
-            return Expression.Property(Container.ResolverContextExpr, "SingletonScope");
+            return Expression.Property(Container.ScopesExpr, "SingletonScope");
         }
 
         /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
@@ -5634,13 +5637,13 @@ namespace DryIoc
             return request.Container.GetCurrentNamedScope(Name, false);
         }
 
-        /// <summary>Returns <see cref="IResolverContext.GetCurrentNamedScope"/> method call expression.</summary>
+        /// <summary>Returns <see cref="IScopeAccess.GetCurrentNamedScope"/> method call expression.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Method call expression returning matched current scope.</returns>
         public Expression GetScopeExpression(Request request)
         {
             var nameExpr = request.Container.GetOrAddStateItemExpression(Name, typeof(object));
-            return Expression.Call(Container.ResolverContextExpr, "GetCurrentNamedScope", ArrayTools.No<Type>(), 
+            return Expression.Call(Container.ScopesExpr, "GetCurrentNamedScope", ArrayTools.No<Type>(), 
                 nameExpr, Expression.Constant(true));
         }
 
@@ -5686,12 +5689,12 @@ namespace DryIoc
             return request.Container.GetMatchingResolutionScope(scope, _assignableFromServiceType, _serviceKey, _outermost, false);
         }
 
-        /// <summary>Returns <see cref="IResolverContext.GetMatchingResolutionScope"/> method call expression.</summary>
+        /// <summary>Returns <see cref="IScopeAccess.GetMatchingResolutionScope"/> method call expression.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Method call expression returning existing or newly created resolution scope.</returns>
         public Expression GetScopeExpression(Request request)
         {
-            return Expression.Call(Container.ResolverContextExpr, "GetMatchingResolutionScope", ArrayTools.No<Type>(),
+            return Expression.Call(Container.ScopesExpr, "GetMatchingResolutionScope", ArrayTools.No<Type>(),
                 Container.GetResolutionScopeExpression(request),
                 Expression.Constant(_assignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(_serviceKey, typeof(object)),
@@ -6143,8 +6146,8 @@ namespace DryIoc
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
     }
 
-    /// <summary>Provides access to both resolver and scopes to <see cref="FactoryDelegate"/>.</summary>
-    public interface IResolverContext : IResolver
+    /// <summary>Provides access to scopes.</summary>
+    public interface IScopeAccess
     {
         /// <summary>Scope containing container singletons.</summary>
         IScope SingletonScope { get; }
@@ -6177,7 +6180,7 @@ namespace DryIoc
 
     /// <summary>Exposes operations required for internal registry access. 
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
-    public interface IContainer : IRegistrator, IResolver, IResolverContext, IDisposable
+    public interface IContainer : IRegistrator, IResolver, IScopeAccess, IDisposable
     {
         /// <summary>Returns true if container is disposed.</summary>
         bool IsDisposed { get; }

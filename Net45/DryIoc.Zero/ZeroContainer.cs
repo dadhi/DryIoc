@@ -34,7 +34,7 @@ namespace DryIoc.Zero
     /// <param name="r">Provides access to <see cref="IResolver"/> to enable dynamic dependency resolution inside factory delegate.</param>
     /// <param name="scope">Resolution scope parameter. May be null to enable on demand scope creation inside factory delegate.</param>
     /// <returns>Created service object.</returns>
-    public delegate object StatelessFactoryDelegate(IResolverContextProvider r, IScope scope);
+    public delegate object StatelessFactoryDelegate(IResolverContext r, IScope scope);
 
     /// <summary>Provides methods to register default or keyed factory delegates.</summary>
     public interface IFactoryDelegateRegistrator
@@ -51,8 +51,7 @@ namespace DryIoc.Zero
     /// <summary>Minimal container which allow to register service factory delegates and then resolve service from them.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly",
         Justification = "Does not contain any unmanaged resources.")]
-    public partial class ZeroContainer :
-        IFactoryDelegateRegistrator, IResolverContext, IResolverContextProvider, IDisposable
+    public partial class ZeroContainer : IFactoryDelegateRegistrator, IResolverContext, IResolver, IScopeAccess, IDisposable
     {
         /// <summary>Creates container.</summary>
         /// <param name="scopeContext">(optional) Scope context, by default <see cref="ThreadScopeContext"/>.</param>
@@ -131,7 +130,13 @@ namespace DryIoc.Zero
         #endregion
 
         /// <summary>Provides access to resolver.</summary>
-        public IResolverContext Resolver
+        public IResolver Resolver
+        {
+            get { return this; }
+        }
+
+        /// <summary>Scopes access</summary>
+        public IScopeAccess Scopes
         {
             get { return this; }
         }

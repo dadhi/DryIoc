@@ -91,7 +91,7 @@ namespace DryIoc
                 "GetService", 
                 MethodAttributes.Public | MethodAttributes.Static,
                 typeof(object),
-                new[] { typeof(ImTreeArray), typeof(IResolverContextProvider), typeof(IScope) });
+                new[] { typeof(ImTreeArray), typeof(IResolverContext), typeof(IScope) });
 
             factoryExpression.CompileToMethod(methodBuilder);
 

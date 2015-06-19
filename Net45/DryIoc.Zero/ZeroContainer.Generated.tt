@@ -156,7 +156,7 @@ end of exception list
     foreach (var factory in factories)
     {
 #>
-        internal static object Create_<#=factory.Id#>(IResolverContextProvider r, IScope scope)
+        internal static object Create_<#=factory.Id#>(IResolverContext r, IScope scope)
         {
             return <#= factory.Expression #>;
         }
