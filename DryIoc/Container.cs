@@ -541,7 +541,7 @@ namespace DryIoc
             {
                 var registrations = ((IContainer)this).GetAllServiceFactories(request.ServiceType)
                     .Aggregate(new StringBuilder(), (s, f) =>
-                        (f.Value.HasMatchingReuseScopeInRequest(request)
+                        (f.Value.IsMatchingReuseScope(request)
                             ? s.Append("  ")
                             : s.Append("  without matching scope "))
                             .AppendLine(f.ToString()));
@@ -905,8 +905,8 @@ namespace DryIoc
             if ((entry == null || serviceKey != null) && serviceType.IsGeneric())
             {
                 // Use open-generic entry only if:
-                // 1) Entry is not present
-                // 2) Entry does not contain factory for specified key
+                // 1) Concrete Entry is not present
+                // 2) Concrete Entry does not contain factory for specified key
                 var openGenericServiceType = serviceType.GetGenericTypeDefinition();
                 if (entry == null)
                     entry = services.GetValueOrDefault(openGenericServiceType);
@@ -931,7 +931,7 @@ namespace DryIoc
                 var allFactories = entry is Factory
                     ? new[] { new KeyValuePair<object, Factory>(DefaultKey.Value, (Factory)entry) }
                     : ((FactoriesEntry)entry).Factories.Enumerate()
-                        .Where(f => f.Value.Setup.Condition == null || f.Value.Setup.Condition(request))
+                        .Where(f => f.Value.CheckCondition(request))
                         .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
                         .ToArray();
                 return factorySelector(request, allFactories);
@@ -939,22 +939,18 @@ namespace DryIoc
 
             var factory = entry as Factory;
             if (factory != null)
-                return serviceKey != null && !DefaultKey.Value.Equals(serviceKey) ? null
-                    : factory.Setup.Condition != null && !factory.Setup.Condition(request) ? null
-                    : factory;
+                return (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
+                    && factory.CheckCondition(request) ? factory : null;
 
             var factories = ((FactoriesEntry)entry).Factories;
             if (serviceKey != null)
             {
                 factory = factories.GetValueOrDefault(serviceKey);
-                return factory != null
-                    && factory.Setup.Condition != null
-                    && !factory.Setup.Condition(request)
-                    ? null : factory;
+                return factory != null && factory.CheckCondition(request) ? factory : null;
             }
 
-            var defaultFactories = factories.Enumerate().Where(f => f.Key is DefaultKey
-                && (f.Value.Setup.Condition == null || f.Value.Setup.Condition(request)))
+            var defaultFactories = factories.Enumerate()
+                .Where(f => f.Key is DefaultKey && f.Value.CheckCondition(request))
                 .ToArray();
 
             if (defaultFactories.Length == 1)
@@ -2251,14 +2247,14 @@ namespace DryIoc
 
         /// <summary>Flag acting in implicit <see cref="Setup.Condition"/> for service registered with not null <see cref="IReuse"/>.
         /// Condition skips resolution if no matching scope found.</summary>
-        public bool ImplicitSetupConditionToCheckReuseMatchingScope { get; private set; }
+        public bool ImplicitCheckForReuseMatchingScope { get; private set; }
 
-        /// <summary>Removes <see cref="ImplicitSetupConditionToCheckReuseMatchingScope"/></summary>
+        /// <summary>Removes <see cref="ImplicitCheckForReuseMatchingScope"/></summary>
         /// <returns>New rules.</returns>
         public Rules WithoutImplicitSetupConditionToCheckReuseMatchingScope()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.ImplicitSetupConditionToCheckReuseMatchingScope = false;
+            newRules.ImplicitCheckForReuseMatchingScope = false;
             return newRules;
         }
 
@@ -2273,7 +2269,7 @@ namespace DryIoc
         {
             _made = Made.Default;
             ThrowIfDependencyHasShorterReuseLifespan = true;
-            ImplicitSetupConditionToCheckReuseMatchingScope = true;
+            ImplicitCheckForReuseMatchingScope = true;
             SingletonOptimization = true;
         }
 
@@ -2501,12 +2497,12 @@ namespace DryIoc
         {
             getFactoryInfo.ThrowIfNull();
             // NOTE: cannot convert to method group because of lack of covariance support in .Net 3.5
-            return FromExpression<TService>(r => getFactoryInfo(r).ThrowIfNull(), serviceReturningExpr, argValues); 
+            return FromExpression<TService>(r => getFactoryInfo(r).ThrowIfNull(), serviceReturningExpr, argValues);
         }
 
         private static Expr<TService> FromExpression<TService>(
-            Func<Request, ServiceInfo> getFactoryInfo, 
-            LambdaExpression serviceReturningExpr, 
+            Func<Request, ServiceInfo> getFactoryInfo,
+            LambdaExpression serviceReturningExpr,
             params Func<Request, object>[] argValues)
         {
             var callExpr = serviceReturningExpr.ThrowIfNull().Body;
@@ -2546,7 +2542,7 @@ namespace DryIoc
             var parameterSelector = parameters.IsNullOrEmpty() ? null
                 : ComposeParameterSelectorFromArgs(parameters, argExprs, argValues);
 
-            var propertiesAndFieldsSelector = 
+            var propertiesAndFieldsSelector =
                 memberBindingExprs == null || memberBindingExprs.Count == 0 ? null
                 : ComposePropertiesAndFieldsSelector(memberBindingExprs, argValues);
 
@@ -2672,7 +2668,7 @@ namespace DryIoc
             return getArgValue;
         }
 
-        private static ServiceDetails GetArgServiceDetails(MethodCallExpression methodCallExpr, 
+        private static ServiceDetails GetArgServiceDetails(MethodCallExpression methodCallExpr,
             Type dependencyType, IfUnresolved defaultIfUnresolved, object defaultValue)
         {
             var requiredServiceType = methodCallExpr.Method.GetGenericArguments()[0];
@@ -3118,35 +3114,27 @@ namespace DryIoc
             registrator.RegisterDelegate(getDecorator, setup: Setup.DecoratorWith(condition));
         }
 
-        /// <summary>Registers a pre-created object assignable to <paramref name="serviceType"/>. </summary>
+        /// <summary>Registers an externally created object of <paramref name="serviceType"/>. 
+        /// If no reuse specified instance will be stored in Singleton Scope, and disposed when container is disposed.</summary>
         /// <param name="container">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceType">Service type to register.</param>
         /// <param name="instance">The pre-created instance of <paramref name="serviceType"/>.</param>
-        /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
+        /// <param name="reuse">(optional) By default means <see cref="Reuse.Singleton"/> as the longest available.</param>
+        /// <param name="ifAlreadyRegistered">(optional) If Replace specified then existing instance may be replaced in scope without introducing new factory.</param>
+        /// <param name="preventDisposal">(optional) Prevents disposal of stored instance by wrapping it into <see cref="ReuseWrapper.HiddenDisposable"/>.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterInstance(this IContainer container, Type serviceType, object instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            object serviceKey = null)
+            bool preventDisposal = false, object serviceKey = null)
         {
             if (instance != null)
                 instance.ThrowIfNotOf(serviceType, Error.RegisteredInstanceIsNotAssignableToServiceType);
 
-            if (reuse == null || reuse is ResolutionScopeReuse)
-            {
-                reuse = reuse ?? Reuse.Singleton;
-                var factory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse);
-                var request = container.EmptyRequest.Push(serviceType, serviceKey);
-                reuse.GetScopeOrDefault(request)
-                    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
-                    .SetOrAdd(factory.FactoryID, instance);
+            Throw.If(reuse is ResolutionScopeReuse, Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
 
-                container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
-                return;
-            }
+            reuse = reuse ?? Reuse.Singleton;
 
-            // Try get existing factory.
-            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
+            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace) // Try get existing factory.
             {
                 var request = container.EmptyRequest.Push(serviceType, serviceKey);
                 var registeredFactory = container.GetServiceFactoryOrDefault(request);
@@ -3163,12 +3151,19 @@ namespace DryIoc
                 }
             }
 
+            var setup = Setup.Default;
+            if (preventDisposal)
+            {
+                setup = Setup.With(reuseWrappers: new[] { ReuseWrapper.HiddenDisposable });
+                instance = ReuseWrapperFactory.HiddenDisposable.Wrap(instance);
+            }
+
             // Create factory to locate instance in scope.
-            var locatorFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse);
-            if (container.Register(locatorFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
+            var instanceFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse, setup);
+            if (container.Register(instanceFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
                 reuse.GetScopeOrDefault(container.EmptyRequest)
                     .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
-                    .SetOrAdd(locatorFactory.FactoryID, instance);
+                    .SetOrAdd(instanceFactory.FactoryID, instance);
         }
 
         private static Expression GetThrowInstanceNoLongerAvailable(Request r)
@@ -3178,19 +3173,20 @@ namespace DryIoc
                 Expression.Constant(null), Expression.Constant(null), Expression.Constant(null));
         }
 
-        /// <summary>Registers a pre-created object of <typeparamref name="TService"/>.
-        /// It is just a sugar on top of <see cref="RegisterDelegate{TService}"/> method.</summary>
+        /// <summary>Registers an externally created object of <typeparamref name="TService"/>. 
+        /// If no reuse specified instance will be stored in Singleton Scope, and disposed when container is disposed.</summary>
         /// <typeparam name="TService">The type of service.</typeparam>
         /// <param name="container">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="instance">The pre-created instance of <typeparamref name="TService"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
+        /// <param name="preventDisposal">(optional) Prevents disposal of stored instance by wrapping it into <see cref="ReuseWrapper.HiddenDisposable"/>.</param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterInstance<TService>(this IContainer container, TService instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            object serviceKey = null)
+            bool preventDisposal = false, object serviceKey = null)
         {
-            container.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered, serviceKey);
+            container.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered, preventDisposal, serviceKey);
         }
 
         /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
@@ -4204,18 +4200,6 @@ namespace DryIoc
         /// or disable disposing with <see cref="ReuseHiddenDisposable"/>, etc.</summary>
         public virtual Type[] ReuseWrappers { get { return null; } }
 
-        /// <summary>Adds new condition to setup using logical AND with old condition.</summary>
-        /// <param name="condition">Condition based on service request.</param> <returns>Setup with condition.</returns>
-        public Setup WithCondition(Func<Request, bool> condition)
-        {
-            condition.ThrowIfNull();
-            var oldCondition = Condition;
-            var setup = (Setup)MemberwiseClone();
-            setup.Condition = oldCondition == null ? condition
-                : (request => condition(request) && oldCondition(request));
-            return setup;
-        }
-
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
 
@@ -4372,6 +4356,15 @@ namespace DryIoc
             protected internal set { _setup = value ?? Setup.Default; }
         }
 
+        /// <summary>Checks that condition is met for request or there is no condition setup. 
+        /// Additionally check for reuse scope availability.</summary>
+        /// <param name="request">Request to check against.</param>
+        /// <returns>True if condition met or no condition setup.</returns>
+        public bool CheckCondition(Request request)
+        {
+            return (Setup.Condition == null || Setup.Condition(request)) && IsMatchingReuseScope(request);
+        }
+
         /// <summary>Shortcut for <see cref="DryIoc.Setup.FactoryType"/>.</summary>
         public FactoryType FactoryType
         {
@@ -4393,17 +4386,14 @@ namespace DryIoc
             FactoryID = Interlocked.Increment(ref _lastFactoryID);
             Reuse = reuse;
             Setup = setup ?? Setup.Default;
-
-            if (reuse != null)
-                Setup = Setup.WithCondition(HasMatchingReuseScopeInRequest);
         }
 
         /// <summary>Returns true if for factory Reuse exists matching resolution or current Scope.</summary>
         /// <param name="request"></param> <returns>True if matching Scope exists.</returns>
-        public bool HasMatchingReuseScopeInRequest(Request request)
+        public bool IsMatchingReuseScope(Request request)
         {
             var rules = request.Container.Rules;
-            if (!rules.ImplicitSetupConditionToCheckReuseMatchingScope)
+            if (!rules.ImplicitCheckForReuseMatchingScope)
                 return true;
 
             var reuseMapping = rules.ReuseMapping;
@@ -4532,7 +4522,7 @@ namespace DryIoc
                 s.Append(", FactoryType=").Append(Setup.FactoryType);
             if (Setup.Metadata != null)
                 s.Append(", Metadata=").Append(Setup.Metadata);
-            if (Setup.Condition != null && Setup.Condition != HasMatchingReuseScopeInRequest)
+            if (Setup.Condition != null && Setup.Condition != IsMatchingReuseScope)
                 s.Append(", HasCondition");
             if (Setup.OpenResolutionScope)
                 s.Append(", OpensResolutionScope");
@@ -5343,35 +5333,6 @@ namespace DryIoc
         }
 
         private readonly Func<Request, Expression> _getServiceExpression;
-    }
-
-    /// <summary>
-    /// todo
-    /// </summary>
-    public sealed class InstanceFactory : Factory
-    {
-        public override Type ImplementationType
-        {
-            get { return _instance == null ? null : _instance.GetType(); }
-        }
-
-        /// <summary>Wraps provided delegate into factory.</summary>
-        /// <param name="instance">todo </param>
-        /// <param name="reuse">(optional) Reuse.</param> <param name="setup">(optional) Setup.</param>
-        public InstanceFactory(object instance, IReuse reuse, Setup setup = null)
-            : base(reuse, setup)
-        {
-            _instance = instance;
-        }
-
-        /// <summary>Creates service expression using wrapped delegate.</summary>
-        /// <param name="request">Request to resolve.</param> <returns>Expression returned by stored delegate.</returns>
-        public override Expression CreateExpressionOrDefault(Request request)
-        {
-            return Reuse.GetScopeExpression(request);
-        }
-
-        private readonly object _instance;
     }
 
     /// <summary>This factory is the thin wrapper for user provided delegate 
@@ -6669,6 +6630,8 @@ namespace DryIoc
             NoMatchingScopeWhenRegisteringInstance = Of(
                 "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine +
                 "You could register delegate returning instance instead. That will succeed as long as scope is available at resolution."),
+            ResolutionScopeIsNotSupportedForRegisterInstance = Of(
+                "ResolutionScope reuse is not supported for registering instance: {0}"),
             NotSupportedMadeExpression = Of(
                 "Only expression of method call, property getter, or new statement (with optional property initializer) is supported, but found: {0}."),
             UnexpectedFactoryMemberExpression = Of(

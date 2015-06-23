@@ -34,11 +34,23 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_registring_external_instance_and_disposing_container_Then_instance_should_Not_be_disposed()
+        public void When_registring_external_instance_and_disposing_container_Then_instance_should_be_disposed()
         {
             var container = new Container();
             var service = new DisposableService();
             container.RegisterInstance<IService>(service);
+
+            container.Dispose();
+
+            Assert.That(service.IsDisposed, Is.True);
+        }
+
+        [Test]
+        public void When_registring_external_instance_with_prevent_disposal_parameter_Then_instance_should_Not_be_disposed()
+        {
+            var container = new Container();
+            var service = new DisposableService();
+            container.RegisterInstance<IService>(service, preventDisposal: true);
 
             container.Dispose();
 

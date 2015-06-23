@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System.Linq;
+using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
@@ -100,12 +101,28 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Register_instance_in_resolution_scope_is_the_same_as_delegate()
+        public void Register_instance_in_resolution_scope_does_not_make_sense_and_should_throw()
         {
             var container = new Container();
-            container.RegisterInstance("xxx", Reuse.InResolutionScope);
 
-            Assert.NotNull(container.Resolve<string>());
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.RegisterInstance("xxx", Reuse.InResolutionScope));
+        
+            Assert.AreEqual(Error.ResolutionScopeIsNotSupportedForRegisterInstance, ex.Error);
+        }
+
+        [Test]
+        public void Register_instance_with_replace_option_will_replace_registered_instance_in_place()
+        {
+            var container = new Container();
+
+            container.RegisterInstance("hey");
+            var regBefore = container.GetServiceRegistrations().Single();
+
+            container.RegisterInstance("nah", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            var regAfter = container.GetServiceRegistrations().Single();
+
+            Assert.AreEqual(regBefore.Factory.FactoryID, regAfter.Factory.FactoryID);
         }
     }
 }
