@@ -170,7 +170,7 @@ namespace DryIoc.UnitTests
             Assert.That(client.Serv, Is.InstanceOf<Serv>());
 
             using (var scoped = container.OpenScope(scopeName,
-                rules => rules.WithFactorySelector(Rules.PreferKeyOverDefault(scopeName))))
+                rules => rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(scopeName))))
             {
                 var scopedClient = scoped.Resolve<IClient>(scopeName);
 

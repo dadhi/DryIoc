@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System;
+using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
@@ -248,6 +249,38 @@ namespace DryIoc.UnitTests
                 Foo = new Foo();
                 Blah = new Blah();
             }
+        }
+
+        [Test]
+        public void Can_specify_property_custom_value_with_factory_spec()
+        {
+            var container = new Container();
+            container.Register<IA, A>(Made.Of(() => new A { ImplType = Arg.OfValue<Type>(0) }, r => r.ServiceType));
+
+            var a = container.Resolve<IA>();
+
+            Assert.AreEqual(typeof(IA), a.ImplType);
+        }
+
+        [Test]
+        public void Will_throw_for_custom_value_with_factory_spec_But_without_value_provider()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Register<IA, A>(Made.Of(() => new A { ImplType = Arg.OfValue<Type>(0) })));
+
+            Assert.AreEqual(Error.ArgOfValueIsProvidedButNoArgValues, ex.Error);
+        }
+
+        public interface IA 
+        {
+            Type ImplType { get; }
+        }
+
+        public class A : IA
+        {
+            public Type ImplType { get; set; }
         }
     }
 }

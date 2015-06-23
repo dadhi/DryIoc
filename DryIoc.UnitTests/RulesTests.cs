@@ -81,8 +81,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void You_can_specify_rules_to_resolve_last_registration_from_multiple_available()
         {
-            var container = new Container(Rules.Default.WithFactorySelector(
-                (request, factories) => factories.LastOrDefault(f => f.Key.Equals(request.ServiceKey)).Value));
+            var container = new Container(Rules.Default.WithFactorySelector(Rules.SelectLastRegisteredFactory()));
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));
