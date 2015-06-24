@@ -239,7 +239,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_switch_off_filtering_out_not_scoped_services()
         {
-            var container = new Container(r => r.WithoutImplicitSetupConditionToCheckReuseMatchingScope());
+            var container = new Container(r => r.WithoutImplicitCheckForReuseMatchingScope());
             container.Register<IDep, DepScoped>(Reuse.InCurrentScope);
 
             var ex = Assert.Throws<ContainerException>(

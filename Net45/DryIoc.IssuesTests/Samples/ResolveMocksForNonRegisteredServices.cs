@@ -12,9 +12,13 @@ namespace DryIoc.IssuesTests.Samples
         {
             var container = new Container(rules => rules.WithUnknownServiceResolver(request =>
             {
-                if (!request.ServiceType.IsAbstract)
+                var serviceType = request.ServiceType;
+                if (!serviceType.IsAbstract)
                     return null; // Mock interface or abstract class only.
-                return new DelegateFactory(_ => Substitute.For(new[] { request.ServiceType }, null));
+
+                return new ReflectionFactory(made: Made.Of(
+                    () => Substitute.For(Arg.OfValue<Type[]>(0), Arg.OfValue<object[]>(1)),
+                    _ => new[] { serviceType }, _ => (object[])null));
             }));
 
             var sub = container.Resolve<INotImplementedService>();
@@ -27,18 +31,13 @@ namespace DryIoc.IssuesTests.Samples
         {
             var container = new Container(rules => rules.WithUnknownServiceResolver(request =>
             {
-                if (!request.ServiceType.IsAbstract)
+                var serviceType = request.ServiceType;
+                if (!serviceType.IsAbstract)
                     return null; // Mock interface or abstract class only.
-                return new DelegateFactory(_ => Substitute.For(new[] { request.ServiceType }, null));
-            }));
-
-            var container2 = new Container(rules => rules.WithUnknownServiceResolver(request =>
-            {
-                if (!request.ServiceType.IsAbstract)
-                    return null; // Mock interface or abstract class only.
+                
                 return new ReflectionFactory(made: Made.Of(
-                    FactoryMethod.Of(typeof(Substitute).GetDeclaredMethodOrNull("For", typeof(Type[]), typeof(object[]))),
-                    Parameters.Of.Type<Type[]>(req => new[] { req.ServiceType }).Type<object[]>(null)));
+                    () => Substitute.For(Arg.OfValue<Type[]>(0), Arg.OfValue<object[]>(1)),
+                    _ => new[] { serviceType }, _ => (object[])null));
             }));
 
             container.Register<TestClient>();

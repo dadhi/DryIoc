@@ -769,11 +769,10 @@ namespace DryIoc
         /// <returns>Returns constant or state access expression for added items.</returns>
         public Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
-            if (item == null)
-                return itemType == null ? (Expression)Expression.Constant(null)
-                    : Expression.Convert(Expression.Constant(null), itemType);
-
-            itemType = itemType ?? item.GetType();
+            itemType = itemType ?? (item == null ? typeof(object) : item.GetType());    
+            var result = GetPrimitiveOrArrayExprOrDefault(item, itemType);
+            if (result != null)
+                return result;
 
             if (Rules.ItemToExpressionConverter != null)
             {
@@ -782,13 +781,35 @@ namespace DryIoc
                     return expression;
             }
 
-            if (throwIfStateRequired)
-                Throw.It(Error.StateIsRequiredToUseItem, item);
-
+            Throw.If(throwIfStateRequired, Error.StateIsRequiredToUseItem, item);
             var itemIndex = GetOrAddStateItem(item);
             var indexExpr = Expression.Constant(itemIndex, typeof(int));
             var getItemByIndexExpr = Expression.Call(StateParamExpr, _getItemMethod, indexExpr);
             return Expression.Convert(getItemByIndexExpr, itemType);
+        }
+
+        private static Expression GetPrimitiveOrArrayExprOrDefault(object item, Type itemType)
+        {
+            if (item == null)
+                return Expression.Constant(null, itemType);
+
+            itemType = itemType ?? item.GetType();
+            
+            if (itemType == typeof(DefaultKey))
+                return Expression.Call(typeof(DefaultKey), "Of", ArrayTools.Empty<Type>(),
+                    Expression.Constant(((DefaultKey)item).RegistrationOrder));
+
+            if (itemType.IsArray)
+            {
+                var itType = itemType.GetElementType();
+                var items = ((IEnumerable)item).Cast<object>().Select(it => GetPrimitiveOrArrayExprOrDefault(it, itType));
+                var itExprs = Expression.NewArrayInit(itType, items);
+                return itExprs;
+            }
+
+            return itemType.IsPrimitive() || itemType.IsAssignableTo(typeof(Type))
+                ? Expression.Constant(item, itemType)
+                : null;
         }
 
         private static readonly MethodInfo _getItemMethod = typeof(ImTreeArray).GetSingleDeclaredMethodOrNull("Get");
@@ -2033,10 +2054,9 @@ namespace DryIoc
 
         /// <summary>Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
         /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.</summary>
-        public static readonly Rules Default = Empty
-            .WithUnknownServiceResolver(WrappersSupport.ResolveWrappers)
-            .WithUnknownServiceResolver(FallbackFactoryResolutionToContainers)
-            .WithItemToExpressionConverter(PrimitivesToExpressionConverter);
+        public static readonly Rules Default = Empty.WithUnknownServiceResolver(
+            WrappersSupport.ResolveWrappers, 
+            ResolveFromFallbackContainers);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
@@ -2113,11 +2133,11 @@ namespace DryIoc
         public UnknownServiceResolver[] UnknownServiceResolvers { get; private set; }
 
         /// <summary>Appends resolver to current unknown service resolvers.</summary>
-        /// <param name="rule">Rule to append.</param> <returns>New Rules.</returns>
-        public Rules WithUnknownServiceResolver(UnknownServiceResolver rule)
+        /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
+        public Rules WithUnknownServiceResolver(params UnknownServiceResolver[] rules)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.AppendOrUpdate(rule);
+            newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.Append(rules);
             return newRules;
         }
 
@@ -2142,7 +2162,7 @@ namespace DryIoc
             return newRules;
         }
 
-        private static Factory FallbackFactoryResolutionToContainers(Request request)
+        private static Factory ResolveFromFallbackContainers(Request request)
         {
             var fallbackContainers = request.Container.Rules.FallbackContainers;
             if (fallbackContainers.IsNullOrEmpty())
@@ -2251,7 +2271,7 @@ namespace DryIoc
 
         /// <summary>Removes <see cref="ImplicitCheckForReuseMatchingScope"/></summary>
         /// <returns>New rules.</returns>
-        public Rules WithoutImplicitSetupConditionToCheckReuseMatchingScope()
+        public Rules WithoutImplicitCheckForReuseMatchingScope()
         {
             var newRules = (Rules)MemberwiseClone();
             newRules.ImplicitCheckForReuseMatchingScope = false;
@@ -2271,16 +2291,6 @@ namespace DryIoc
             ThrowIfDependencyHasShorterReuseLifespan = true;
             ImplicitCheckForReuseMatchingScope = true;
             SingletonOptimization = true;
-        }
-
-        private static Expression PrimitivesToExpressionConverter(object item, Type itemType)
-        {
-            return itemType == typeof(DefaultKey)
-                    ? (Expression)Expression.Call(itemType, "Of", ArrayTools.Empty<Type>(),
-                        Expression.Constant(((DefaultKey)item).RegistrationOrder))
-                : (itemType.IsPrimitive() || itemType.IsAssignableTo(typeof(Type))
-                    ? Expression.Constant(item, itemType)
-                    : null);
         }
 
         #endregion
@@ -5119,13 +5129,19 @@ namespace DryIoc
             if (ctorOrMethodOrMember is ConstructorInfo)
                 return InitPropertiesAndFields(Expression.New((ConstructorInfo)ctorOrMethodOrMember, paramExprs), request);
 
-            if (ctorOrMethodOrMember is MethodInfo)
-                return Expression.Call(factoryExpr, (MethodInfo)ctorOrMethodOrMember, paramExprs);
+            var serviceExpr = ctorOrMethodOrMember is MethodInfo
+                ? (Expression)Expression.Call(factoryExpr, (MethodInfo)ctorOrMethodOrMember, paramExprs)
+                : (ctorOrMethodOrMember is PropertyInfo
+                    ? Expression.Property(factoryExpr, (PropertyInfo)ctorOrMethodOrMember)
+                    : Expression.Field(factoryExpr, (FieldInfo)ctorOrMethodOrMember));
 
-            if (ctorOrMethodOrMember is PropertyInfo)
-                return Expression.Property(factoryExpr, (PropertyInfo)ctorOrMethodOrMember);
+            var returnType = ctorOrMethodOrMember.GetReturnTypeOrDefault().ThrowIfNull();
+            if (!returnType.IsAssignableTo(request.ServiceType))
+                return Throw.IfThrows<InvalidOperationException, Expression>(
+                    () => Expression.Convert(serviceExpr, request.ServiceType),
+                    Error.ServiceIsNotAssignableFromFactoryMethod, request.ServiceType, ctorOrMethodOrMember, request);
 
-            return Expression.Field(factoryExpr, (FieldInfo)ctorOrMethodOrMember);
+            return serviceExpr;
         }
 
         private static Expression TryInjectResolver(IServiceInfo serviceInfo)
@@ -5160,14 +5176,10 @@ namespace DryIoc
                         ((FieldInfo)member).IsStatic;
 
                     Throw.If(isStaticMember && factoryMethod.FactoryInfo != null,
-                            Error.FactoryObjProvidedButMethodIsStatic, factoryMethod.FactoryInfo, factoryMethod,
-                            request);
+                        Error.FactoryObjProvidedButMethodIsStatic, factoryMethod.FactoryInfo, factoryMethod, request);
 
                     Throw.If(!isStaticMember && factoryMethod.FactoryInfo == null,
                         Error.FactoryObjIsNullInFactoryMethod, factoryMethod, request);
-
-                    request.ServiceType.ThrowIfNotOf(member.GetReturnTypeOrDefault(),
-                        Error.ServiceIsNotAssignableFromFactoryMethod, factoryMethod, request);
                 }
 
                 return factoryMethod.ThrowIfNull(Error.UnableToGetConstructorFromSelector, implType);
@@ -6593,7 +6605,7 @@ namespace DryIoc
             WeakrefReuseWrapperGced = Of(
                 "Service with WeakReference reuse wrapper is garbage collected now, and no longer available."),
             ServiceIsNotAssignableFromFactoryMethod = Of(
-                "Service of {0} is not assignable from factory method {2} when resolving: {3}."),
+                "Service of {0} is not assignable from factory method {1} when resolving: {2}."),
             FactoryObjIsNullInFactoryMethod = Of(
                 "Unable to use null factory object with factory method {0} when resolving: {1}."),
             FactoryObjProvidedButMethodIsStatic = Of(
