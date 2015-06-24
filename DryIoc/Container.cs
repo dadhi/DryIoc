@@ -5452,6 +5452,77 @@ namespace DryIoc
             _items = ImTreeMapIntToObj.Empty;
         }
 
+        /// <summary>
+        /// todo:
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        public int GetIndex(int id)
+        {
+            var index = _idToIndexMap.GetValueOrDefault(id);
+            if (index != null) 
+                return (int)index;
+            var itemIndex = Interlocked.Increment(ref _lastItemIndex);
+            Ref.Swap(ref _itemArray, items => itemIndex < items.Length ? items : IncreaseItems(items));
+            _idToIndexMap = _idToIndexMap.AddOrUpdate(id, itemIndex);
+            return itemIndex;
+        }
+
+        private static object[] IncreaseItems(object[] items)
+        {
+            return items.Append(null, null, null, null);
+        }
+
+        /// <summary>
+        /// todo:
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="createValue"></param>
+        /// <returns></returns>
+        public object GetOrAddFromIndex(int index, CreateScopedValue createValue)
+        {
+            var item = _itemArray[index];
+            return item != null && !(item is IRecyclable) ? item 
+                : TryGetOrAddToArray(index, createValue, item as IRecyclable);
+        }
+
+        private object TryGetOrAddToArray(int itemIndex, CreateScopedValue createValue, IRecyclable recyclableItem)
+        {
+            Throw.If(_disposed == 1, Error.ScopeIsDisposed);
+            if (recyclableItem != null && !recyclableItem.IsRecycled)
+                return recyclableItem;
+
+            object item;
+            lock (_lockers[itemIndex % _lockers.Length])
+            {
+                item = _itemArray[itemIndex];
+                if (item != null && !(item is IRecyclable && ((IRecyclable)item).IsRecycled))
+                    return item;
+
+                if (item != null) // dispose recyclable item
+                    DisposeItem(item);
+
+                item = createValue();
+            }
+
+            Ref.Swap(ref _itemArray, items => items.AppendOrUpdate(item, itemIndex)
+                .ThrowIf(_disposed == 1, Error.ScopeIsDisposed)); // check once more before saving items
+
+            return item;
+        }
+
+        private ImTreeMapIntToObj _idToIndexMap = ImTreeMapIntToObj.Empty;
+        private object[] _itemArray = {};
+        private int _lastItemIndex = -1;
+
+        private static object[] _lockers =
+        {
+            new object(), new object(), new object(), new object(),
+            new object(), new object(), new object(), new object(),
+            new object(), new object(), new object(), new object(),
+            new object(), new object(), new object(), new object(),
+        };
+
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
         /// Will throw <see cref="ContainerException"/> if scope is disposed.</summary>
         /// <param name="id">Unique ID to find created object in subsequent calls.</param>
