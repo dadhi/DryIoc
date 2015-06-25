@@ -7,12 +7,12 @@ namespace DryIoc.IssuesTests
     public class InjectLog4netLog
     {
         [Test]
-        public void Can_register_ILog_with_factory_in_generic_way()
+        public void Can_register_ILog_with_factory()
         {
             var container = new Container();
             container.Register<A>();
 
-            container.Register(Made.Of(
+            container.Register<log4net.ILog>(Made.Of(
                 () => log4net.LogManager.GetLogger(Arg.OfValue<Type>(0)), 
                 request => request.ParentNonWrapper().ImplementationType));
 

@@ -322,6 +322,51 @@ namespace DryIoc
             return service;
         }
 
+        object ResolveKeyed2(Type serviceType, object serviceKey,
+            IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
+        {
+            if (requiredServiceType != null)
+            {
+                if (requiredServiceType.IsAssignableTo(serviceType))
+                {
+                    serviceType = requiredServiceType;
+                    requiredServiceType = null;
+                }
+            }
+
+            if (scope != null)
+                scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
+
+            // If service key is null, then use resolve default instead of keyed.
+            if (serviceKey == null && requiredServiceType == null)
+                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, scope);
+
+            var registry = _registry.Value;
+            var keyedCacheKey = new KV<Type, object>(serviceType, serviceKey);
+            if (requiredServiceType == null)
+            {
+                var cachedFactoryDelegate = registry.KeyedFactoryDelegateCache.Value.GetValueOrDefault(keyedCacheKey);
+                if (cachedFactoryDelegate != null)
+                    return cachedFactoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, scope);
+            }
+
+            ThrowIfContainerDisposed();
+
+            var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType, scope);
+            var factory = ((IContainer)this).ResolveFactory(request);
+            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
+            if (factoryDelegate == null)
+                return null;
+
+            var resultService = factoryDelegate(request.Container.ResolutionStateCache, _containerWeakRef, scope);
+
+            // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
+            if (factory.Setup.CacheFactoryExpression && requiredServiceType == null)
+                registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(keyedCacheKey, factoryDelegate));
+
+            return resultService;
+        }
+
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
         {
@@ -5452,25 +5497,37 @@ namespace DryIoc
             _items = ImTreeMapIntToObj.Empty;
         }
 
-        /// <summary>
-        /// todo:
-        /// </summary>
+        /// <summary>Adds mapping between id and index on resolution.</summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        public int GetIndex(int id)
+        public int ReserveItemIndex(int id)
         {
             var index = _idToIndexMap.GetValueOrDefault(id);
-            if (index != null) 
+            if (index != null)
                 return (int)index;
-            var itemIndex = Interlocked.Increment(ref _lastItemIndex);
-            Ref.Swap(ref _itemArray, items => itemIndex < items.Length ? items : IncreaseItems(items));
-            _idToIndexMap = _idToIndexMap.AddOrUpdate(id, itemIndex);
-            return itemIndex;
+
+            var newIndex = Interlocked.Increment(ref _lastItemIndex);
+            if (newIndex >= _itemArray.Length)
+                EnsureIndexExist(newIndex);
+
+            Ref.Swap(ref _idToIndexMap, idToIndex => idToIndex.AddOrUpdate(id, newIndex));
+            return newIndex;
         }
 
-        private static object[] IncreaseItems(object[] items)
+        private static readonly int MaxItemArrayIncreaseStep = 32;
+
+        private void EnsureIndexExist(int index)
         {
-            return items.Append(null, null, null, null);
+            Ref.Swap(ref _itemArray, items =>
+            {
+                var size = items.Length;
+                if (index < size)
+                    return items;
+                var newSize = Math.Max(index, Math.Min(size + size, size + MaxItemArrayIncreaseStep));
+                var newItems = new object[newSize];
+                Array.Copy(items, 0, newItems, 0, size);
+                return newItems;
+            });
         }
 
         /// <summary>
@@ -5481,8 +5538,8 @@ namespace DryIoc
         /// <returns></returns>
         public object GetOrAddFromIndex(int index, CreateScopedValue createValue)
         {
-            var item = _itemArray[index];
-            return item != null && !(item is IRecyclable) ? item 
+            var item = index < _itemArray.Length ? _itemArray[index] : null;
+            return item != null && !(item is IRecyclable) ? item
                 : TryGetOrAddToArray(index, createValue, item as IRecyclable);
         }
 
@@ -5493,7 +5550,7 @@ namespace DryIoc
                 return recyclableItem;
 
             object item;
-            lock (_lockers[itemIndex % _lockers.Length])
+            lock (_itemCreationLocker)
             {
                 item = _itemArray[itemIndex];
                 if (item != null && !(item is IRecyclable && ((IRecyclable)item).IsRecycled))
@@ -5505,23 +5562,13 @@ namespace DryIoc
                 item = createValue();
             }
 
-            Ref.Swap(ref _itemArray, items => items.AppendOrUpdate(item, itemIndex)
-                .ThrowIf(_disposed == 1, Error.ScopeIsDisposed)); // check once more before saving items
-
+            Ref.Swap(ref _itemArray, items => { items[itemIndex] = item; return items; }); 
             return item;
         }
 
         private ImTreeMapIntToObj _idToIndexMap = ImTreeMapIntToObj.Empty;
         private object[] _itemArray = {};
         private int _lastItemIndex = -1;
-
-        private static object[] _lockers =
-        {
-            new object(), new object(), new object(), new object(),
-            new object(), new object(), new object(), new object(),
-            new object(), new object(), new object(), new object(),
-            new object(), new object(), new object(), new object(),
-        };
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
         /// Will throw <see cref="ContainerException"/> if scope is disposed.</summary>
@@ -5542,7 +5589,7 @@ namespace DryIoc
                 return recyclableItem;
 
             object item;
-            lock (_syncRoot)
+            lock (_itemCreationLocker)
             {
                 item = _items.GetValueOrDefault(id);
                 if (item != null && !(item is IRecyclable && ((IRecyclable)item).IsRecycled))
@@ -5568,6 +5615,17 @@ namespace DryIoc
             Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
         }
 
+        /// <summary>
+        /// todo:
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="item"></param>
+        public void SetOrAddByIndex(int index, object item)
+        {
+            Throw.If(_disposed == 1, Error.ScopeIsDisposed);
+            Ref.Swap(ref _itemArray, items => { items[index] = item; return items; });
+        }
+
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
         /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
         public void Dispose()
@@ -5581,12 +5639,23 @@ namespace DryIoc
             _items = ImTreeMapIntToObj.Empty;
         }
 
+        private void Dispose(bool x)
+        {
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
+            if (!_idToIndexMap.IsEmpty)
+                foreach (var idToIndex in _idToIndexMap.Enumerate().OrderByDescending(it => it.Key))
+                    DisposeItem(_itemArray[(int)idToIndex.Value]);
+            _idToIndexMap = ImTreeMapIntToObj.Empty;
+            _itemArray = ArrayTools.Empty<object>();
+        }
+
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
         public override string ToString()
         {
             return "{" +
                 (Name != null ? "Name=" + Name + ", " : string.Empty) +
-                (Parent == null ? "Parent=null" : "Parent=" + Parent) + "}";
+                (Parent == null ? "Parent=null" : "Parent=" + Parent) 
+                + "}";
         }
 
         #region Implementation
@@ -5595,7 +5664,7 @@ namespace DryIoc
         private int _disposed;
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
-        private readonly object _syncRoot = new object();
+        private readonly object _itemCreationLocker = new object();
 
         private static void DisposeItem(object item)
         {
