@@ -322,17 +322,15 @@ namespace DryIoc
             return service;
         }
 
-        object ResolveKeyed2(Type serviceType, object serviceKey,
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
         {
             if (requiredServiceType != null)
-            {
                 if (requiredServiceType.IsAssignableTo(serviceType))
                 {
                     serviceType = requiredServiceType;
                     requiredServiceType = null;
                 }
-            }
 
             if (scope != null)
                 scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
@@ -363,55 +361,6 @@ namespace DryIoc
             // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
             if (factory.Setup.CacheFactoryExpression && requiredServiceType == null)
                 registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(keyedCacheKey, factoryDelegate));
-
-            return resultService;
-        }
-
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey,
-            IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
-        {
-            var cacheServiceKey = serviceKey;
-            if (requiredServiceType != null &&
-                requiredServiceType != serviceType)
-            {
-                var wrappedServiceType = ((IContainer)this).UnwrapServiceType(serviceType)
-                    .ThrowIfNotOf(requiredServiceType, Error.WrappedNotAssignableFromRequiredType, serviceType);
-
-                if (serviceType == wrappedServiceType)
-                    serviceType = requiredServiceType;
-                else
-                    cacheServiceKey = serviceKey == null ? requiredServiceType
-                        : (object)new KV<Type, object>(requiredServiceType, serviceKey);
-            }
-
-            if (scope != null)
-                scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
-
-            // If service key is null, then use resolve default instead of keyed.
-            if (cacheServiceKey == null)
-                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, scope);
-
-            var registry = _registry.Value;
-
-            var cacheKey = new KV<Type, object>(serviceType, cacheServiceKey);
-            var factoryDelegate = registry.KeyedFactoryDelegateCache.Value.GetValueOrDefault(cacheKey);
-            if (factoryDelegate != null)
-                return factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, scope);
-
-            ThrowIfContainerDisposed();
-
-            var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType, scope);
-
-            var factory = ((IContainer)this).ResolveFactory(request);
-            factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
-            if (factoryDelegate == null)
-                return null;
-
-            var resultService = factoryDelegate(request.Container.ResolutionStateCache, _containerWeakRef, scope);
-
-            // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
-            if (factory.Setup.CacheFactoryExpression)
-                registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(cacheKey, factoryDelegate));
 
             return resultService;
         }
@@ -2639,7 +2588,7 @@ namespace DryIoc
                     Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg),
                         Error.UnexpectedExpressionInsteadOfArgMethod, methodCallExpr);
 
-                    if (methodCallExpr.Method.Name == "OfValue") // handle custom value
+                    if (methodCallExpr.Method.Name == Arg.RefMethodName) 
                     {
                         var getArgValue = GetArgCustomValueProvider(methodCallExpr, argValues);
                         parameters = parameters.Details((r, p) => p.Equals(parameter)
@@ -2686,7 +2635,7 @@ namespace DryIoc
                     Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg),
                         Error.UnexpectedExpressionInsteadOfArgMethod, methodCallExpr);
 
-                    if (methodCallExpr.Method.Name == "OfValue") // handle custom value
+                    if (methodCallExpr.Method.Name == Arg.RefMethodName) // handle custom value
                     {
                         var getArgValue = GetArgCustomValueProvider(methodCallExpr, argValues);
                         propertiesAndFields = propertiesAndFields.And(r => new[]
@@ -2797,7 +2746,10 @@ namespace DryIoc
         /// similar to String.Format <c>"{0}, {1}, etc"</c>.</summary>
         /// <typeparam name="T">Type of dependency. Difference from actual parameter type is ignored.</typeparam>
         /// <param name="argIndex">Argument index starting from 0</param> <returns>Ignored.</returns>
-        public static T OfValue<T>(int argIndex) { return default(T); }
+        public static T Ref<T>(int argIndex) { return default(T); }
+
+        /// <summary>Name is close to method itself to not forget when renaming the method.</summary>
+        public static string RefMethodName = "Ref";
     }
 
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
@@ -3641,7 +3593,7 @@ namespace DryIoc
             if (requiredServiceType != null)
             {
                 var wrappedRequiredServiceType = request.Container.UnwrapServiceType(requiredServiceType);
-                wrappedServiceType.ThrowIfNotOf(wrappedRequiredServiceType, Error.WrappedNotAssignableFromRequiredType, request);
+                wrappedServiceType.ThrowIfNotImplementedBy(wrappedRequiredServiceType, Error.WrappedNotAssignableFromRequiredType, request);
 
                 // Replace serviceType with Required if they are assignable
                 if (requiredServiceType.IsAssignableTo(serviceType))
@@ -4275,7 +4227,7 @@ namespace DryIoc
 
             if (reuseWrappers != null && reuseWrappers.Length != 0)
                 for (var i = 0; i < reuseWrappers.Length; ++i)
-                    typeof(IReuseWrapper).ThrowIfNotOf(reuseWrappers[i], Error.RegReusedObjWrapperIsNotIreused, i, reuseWrappers);
+                    typeof(IReuseWrapper).ThrowIfNotImplementedBy(reuseWrappers[i], Error.RegReusedObjWrapperIsNotIreused, i, reuseWrappers);
 
             return new ServiceSetup(cacheFactoryExpression, lazyMetadata, metadata, condition, openResolutionScope, reuseWrappers);
         }
@@ -5164,7 +5116,7 @@ namespace DryIoc
             }
             else if (Made.ExpressionResultType != null && !implType.IsGenericDefinition())
             {
-                implType.ThrowIfNotOf(Made.ExpressionResultType,
+                implType.ThrowIfNotImplementedBy(Made.ExpressionResultType,
                     Error.MadeOfTypeNotAssignableToImplementationType);
             }
         }
@@ -6908,7 +6860,7 @@ namespace DryIoc
         /// <param name="error">Error code</param>
         ///  <param name="arg2"></param> <param name="arg3"></param>
         /// <returns><paramref name="arg0"/> if no exception.</returns>
-        public static Type ThrowIfNotOf(this Type arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
+        public static Type ThrowIfNotImplementedBy(this Type arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
         {
             if (arg1.IsAssignableTo(arg0)) return arg0;
             throw GetMatchedException(ErrorCheck.TypeIsNotOfType, error, arg0, arg1, arg2, arg3, null);

@@ -47,7 +47,8 @@ namespace DryIoc.MefAttributedModel
         /// <param name="reuseName">(optional) Name is valid only for Current Scope Reuse and will be ignored by the rest of reuse types.</param>
         public ReuseAttribute(Type reuseType, string reuseName = null)
         {
-            if (reuseType != null) (typeof(IReuse)).ThrowIfNotOf(reuseType);
+            if (reuseType != null) 
+                (typeof(IReuse)).ThrowIfNotImplementedBy(reuseType);
             ReuseType = reuseType;
             ReuseName = reuseName;
         }

@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
             container.Register<A>();
 
             container.Register<log4net.ILog>(Made.Of(
-                () => log4net.LogManager.GetLogger(Arg.OfValue<Type>(0)), 
+                () => log4net.LogManager.GetLogger(Arg.Ref<Type>(0)), 
                 request => request.ParentNonWrapper().ImplementationType));
 
             var a = container.Resolve<A>();
