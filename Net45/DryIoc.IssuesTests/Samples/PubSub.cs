@@ -47,6 +47,30 @@ namespace DryIoc.IssuesTests.Samples
 
             Assert.That(subscriber.LastMessage, Is.EqualTo("ping"));
         }
+
+        [Test, Ignore]
+        public void Can_subscribe_attributed_subscriber2()
+        {
+            var container = new Container();
+            container.Register<PubSubHub>(Reuse.Singleton);
+            container.Register(Made.Of<object>(() => Subscribe(default(ISubsriber), default(PubSubHub))),
+                setup: Setup.DecoratorWith(r => r.ImplementationType != null
+                  && r.ImplementationType.GetAttributes(typeof(SubscriberAttribute)).Count() == 1));
+
+            container.Register<AttributedSubscriber>();
+
+            var subscriber = container.Resolve<AttributedSubscriber>();
+            var hub = container.Resolve<PubSubHub>();
+            hub.PingSubscribers();
+
+            Assert.That(subscriber.LastMessage, Is.EqualTo("ping"));
+        }
+
+        public static ISubsriber Subscribe(ISubsriber s, PubSubHub hub)
+        {
+            hub.Subscribe(s.Receive);
+            return s;
+        }
     }
 
     public class PubSubHub

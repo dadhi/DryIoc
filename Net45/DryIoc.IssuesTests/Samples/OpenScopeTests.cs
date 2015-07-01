@@ -10,7 +10,7 @@ namespace DryIoc.IssuesTests.Samples
         {
             var container = new Container(scopeContext: new ThreadScopeContext());
             container.Register<ISessionFactory, TestSessionFactory>();
-            container.RegisterDelegate(r => r.Resolve<ISessionFactory>().OpenSession(), Reuse.InCurrentScope);
+            container.Register(Made.Of(r => ServiceInfo.Of<ISessionFactory>(), f => f.OpenSession()), Reuse.InCurrentScope);
 
             ISession scopeOneSession;
             using (var scoped = container.OpenScope())
@@ -33,7 +33,7 @@ namespace DryIoc.IssuesTests.Samples
             var container = new Container(scopeContext: new ThreadScopeContext());
             container.Register<SessionClient>();
             container.Register<ISessionFactory, TestSessionFactory>();
-            container.RegisterDelegate(r => r.Resolve<ISessionFactory>().OpenSession(), Reuse.InCurrentScope);
+            container.Register(Made.Of(r => ServiceInfo.Of<ISessionFactory>(), f => f.OpenSession()), Reuse.InCurrentScope);
 
             SessionClient client;
             using (var scoped = container.OpenScope())

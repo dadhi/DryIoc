@@ -24,18 +24,6 @@ namespace DryIoc.IssuesTests.Samples
         }
 
         [Test]
-        public void Register_some_client_as_delegate_Then_resolve_client_with_injected_service()
-        {
-            var container = new Container();
-            container.RegisterDelegate<IClient>(r => new SomeClient(r.Resolve<IService>()));
-            container.RegisterDelegate<IService>(r => new SomeService(), Reuse.Singleton);
-
-            var client = container.Resolve<IClient>();
-
-            Assert.That(client, Is.InstanceOf<SomeClient>());
-        }
-
-        [Test]
         public void Specify_reuse_type_for_resolved_injected_objects()
         {
             var container = new Container();

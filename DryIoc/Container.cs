@@ -3129,10 +3129,11 @@ namespace DryIoc
         /// <param name="reuse">(optional) By default means <see cref="Reuse.Singleton"/> as the longest available.</param>
         /// <param name="ifAlreadyRegistered">(optional) If Replace specified then existing instance may be replaced in scope without introducing new factory.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of stored instance by wrapping it into <see cref="ReuseWrapper.HiddenDisposable"/>.</param>
+        /// <param name="weaklyReferenced">(optional) Store as WeakReference. </param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterInstance(this IContainer container, Type serviceType, object instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            bool preventDisposal = false, object serviceKey = null)
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
             if (instance != null)
                 instance.ThrowIfNotOf(serviceType, Error.RegisteredInstanceIsNotAssignableToServiceType);
@@ -3159,10 +3160,21 @@ namespace DryIoc
             }
 
             var setup = Setup.Default;
-            if (preventDisposal)
+            if (preventDisposal || weaklyReferenced)
             {
-                setup = Setup.With(reuseWrappers: new[] { ReuseWrapper.HiddenDisposable });
-                instance = ReuseWrapperFactory.HiddenDisposable.Wrap(instance);
+                var reuseWrappers = weaklyReferenced ? (preventDisposal 
+                    ? new[] { ReuseWrapper.WeakReference, ReuseWrapper.HiddenDisposable }
+                    : new[] { ReuseWrapper.WeakReference })
+                    : new[] { ReuseWrapper.HiddenDisposable};
+
+                for (var i = 0; i < reuseWrappers.Length; i++)
+                {
+                    var wrapperFactory = container.GetWrapperFactoryOrDefault(reuseWrappers[i]).ThrowIfNull();
+                    var wrapper = ((Setup.WrapperSetup)wrapperFactory.Setup).ReuseWrapperFactory;
+                    instance = wrapper.Wrap(instance);                    
+                }
+
+                setup = Setup.With(reuseWrappers: reuseWrappers);
             }
 
             // Create factory to locate instance in scope.
@@ -3188,12 +3200,14 @@ namespace DryIoc
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of stored instance by wrapping it into <see cref="ReuseWrapper.HiddenDisposable"/>.</param>
+        /// <param name="weaklyReferenced">(optional) Store as WeakReference. </param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterInstance<TService>(this IContainer container, TService instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            bool preventDisposal = false, object serviceKey = null)
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
-            container.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered, preventDisposal, serviceKey);
+            container.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered, 
+                preventDisposal, weaklyReferenced, serviceKey);
         }
 
         /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
