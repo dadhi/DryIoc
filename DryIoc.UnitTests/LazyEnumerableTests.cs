@@ -197,7 +197,7 @@ namespace DryIoc.UnitTests
 	    {
 	        var container = new Container();
 	        container.Register<Child>();
-	        container.Register<Man>(made: Parameters.Of.Name("children", typeof(LazyEnumerable<Child>)));
+            container.Register(Made.Of(() => new Man(Arg.Of<LazyEnumerable<Child>>())));
 
 	        var man = container.Resolve<Man>();
             Assert.IsInstanceOf<Child>(man.Children.FirstOrDefault());

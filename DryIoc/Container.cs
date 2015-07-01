@@ -94,7 +94,7 @@ namespace DryIoc
         public IContainer WithRegistrationsCopy(bool preserveCache = false)
         {
             ThrowIfContainerDisposed();
-            var newRegistry = preserveCache ? _registry.Copy() : Ref.Of(_registry.Value.WithoutCache());
+            var newRegistry = preserveCache ? _registry.NewRef() : Ref.Of(_registry.Value.WithoutCache());
             return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
         }
 
@@ -1054,24 +1054,24 @@ namespace DryIoc
             {
                 return services == Services ? this :
                     new Registry(services, Decorators, _wrappers,
-                        DefaultFactoryDelegateCache.Copy(), KeyedFactoryDelegateCache.Copy(),
-                        FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
+                        DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
+                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef());
             }
 
             private Registry WithDecorators(ImTreeMap<Type, Factory[]> decorators)
             {
                 return decorators == Decorators ? this :
                     new Registry(Services, decorators, _wrappers,
-                        DefaultFactoryDelegateCache.Copy(), KeyedFactoryDelegateCache.Copy(),
-                        FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
+                        DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
+                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef());
             }
 
             private Registry WithWrappers(ImTreeMap<Type, Factory> wrappers)
             {
                 return wrappers == _wrappers ? this :
                     new Registry(Services, Decorators, wrappers,
-                        DefaultFactoryDelegateCache.Copy(), KeyedFactoryDelegateCache.Copy(),
-                        FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
+                        DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
+                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef());
             }
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
@@ -1228,8 +1228,8 @@ namespace DryIoc
                 if (registry.Services != services)
                 {
                     registry = new Registry(services, Decorators, _wrappers,
-                        DefaultFactoryDelegateCache.Copy(), KeyedFactoryDelegateCache.Copy(),
-                        FactoryExpressionCache.Copy(), ResolutionStateCache.Copy());
+                        DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
+                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef());
 
                     if (replacedFactory != null)
                         registry = WithoutFactoryCache(registry, replacedFactory, serviceType, serviceKey);
@@ -2887,8 +2887,7 @@ namespace DryIoc
         /// <param name="reuse">(optional)</param> <param name="made">(optional) How to create implementation instance.</param>
         /// <param name="setup">(optional)</param> <param name="ifAlreadyRegistered">(optional) By default <see cref="IfAlreadyRegistered.AppendNotKeyed"/></param>
         /// <param name="serviceKey">(optional)</param>
-        public static void RegisterMany(this IRegistrator registrator,
-            Type[] serviceTypes, Type implementationType,
+        public static void RegisterMany(this IRegistrator registrator, Type[] serviceTypes, Type implementationType,
             IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null)
@@ -2898,29 +2897,6 @@ namespace DryIoc
                 registrator.Register(serviceTypes[0], factory, ifAlreadyRegistered, serviceKey);
             else for (var i = 0; i < serviceTypes.Length; i++)
                     registrator.Register(serviceTypes[i], factory, ifAlreadyRegistered, serviceKey);
-        }
-
-        /// <summary>Registers many implementations with their auto-figured service types.</summary>
-        /// <param name="registrator">Registrator/Container to register with.</param>
-        /// <param name="implTypes">Implementation type provider.</param>
-        /// <param name="action">(optional) User specified registration action: 
-        /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
-        /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
-        public static void RegisterMany(this IRegistrator registrator,
-            IEnumerable<Type> implTypes, RegisterManyAction action,
-            bool nonPublicServiceTypes = false)
-        {
-            foreach (var implType in implTypes)
-            {
-                var serviceTypes = GetImplementedServiceTypes(implType, nonPublicServiceTypes);
-                if (serviceTypes.IsNullOrEmpty())
-                    continue;
-
-                if (action == null)
-                    registrator.RegisterMany(serviceTypes, implType);
-                else
-                    action(registrator, serviceTypes, implType);
-            }
         }
 
         /// <summary>List of types excluded by default from RegisterMany convention.</summary>
@@ -2963,6 +2939,28 @@ namespace DryIoc
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
         /// <param name="implTypes">Implementation type provider.</param>
+        /// <param name="action">(optional) User specified registration action: 
+        /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
+        /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes, RegisterManyAction action,
+            bool nonPublicServiceTypes = false)
+        {
+            foreach (var implType in implTypes)
+            {
+                var serviceTypes = GetImplementedServiceTypes(implType, nonPublicServiceTypes);
+                if (serviceTypes.IsNullOrEmpty())
+                    continue;
+
+                if (action == null)
+                    registrator.RegisterMany(serviceTypes, implType);
+                else
+                    action(registrator, serviceTypes, implType);
+            }
+        }
+
+        /// <summary>Registers many implementations with their auto-figured service types.</summary>
+        /// <param name="registrator">Registrator/Container to register with.</param>
+        /// <param name="implTypes">Implementation type provider.</param>
         /// <param name="reuse">(optional) Reuse to apply to all service registrations.</param>
         /// <param name="made">(optional) Allow to select constructor/method to create service, specify how to inject its parameters and properties/fields.</param>
         /// <param name="setup">(optional) Factory setup, by default is <see cref="Setup.Default"/>, check <see cref="Setup"/> class for available setups.</param>
@@ -2987,7 +2985,7 @@ namespace DryIoc
         }
 
         /// <summary>Registers single registration for all implemented public interfaces and base classes.</summary>
-        /// <typeparam name="T">The type to get service types from.</typeparam>
+        /// <typeparam name="TImplementation">The type to get service types from.</typeparam>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="made">(optional) Allow to select constructor/method to create service, specify how to inject its parameters and properties/fields.</param>
@@ -2996,13 +2994,13 @@ namespace DryIoc
         /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>        
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void RegisterMany<T>(this IRegistrator registrator,
+        public static void RegisterMany<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false,
             object serviceKey = null)
         {
-            registrator.RegisterMany(new[] { typeof(T) }, (r, serviceTypes, implType) =>
+            registrator.RegisterMany(new[] { typeof(TImplementation) }, (r, serviceTypes, implType) =>
             {
                 if (serviceTypeCondition != null)
                     serviceTypes = serviceTypes.Where(serviceTypeCondition).ToArrayOrSelf();
@@ -3022,8 +3020,8 @@ namespace DryIoc
         /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>        
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void RegisterMany<TMadeResult>(this IRegistrator registrator,
-            Made.Expr<TMadeResult> made, IReuse reuse = null, Setup setup = null,
+        public static void RegisterMany<TMadeResult>(this IRegistrator registrator, Made.Expr<TMadeResult> made, 
+            IReuse reuse = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false,
             object serviceKey = null)
@@ -3038,8 +3036,8 @@ namespace DryIoc
         /// <param name="action">(optional) User specified registration action: 
         /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
-        public static void RegisterMany(this IRegistrator registrator,
-            IEnumerable<Assembly> implTypeAssemblies, RegisterManyAction action = null, bool nonPublicServiceTypes = false)
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies, 
+            RegisterManyAction action = null, bool nonPublicServiceTypes = false)
         {
             var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly)
                 .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated());
@@ -3056,13 +3054,14 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with existing service registrations.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void RegisterMany(this IRegistrator registrator,
+        public static void RegisterMany(this IRegistrator registrator, 
             IEnumerable<Assembly> implTypeAssemblies, Func<Type, bool> serviceTypeCondition,
             IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool nonPublicServiceTypes = false, object serviceKey = null)
         {
-            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly)
+            var implTypes = implTypeAssemblies.ThrowIfNull()
+                .SelectMany(Portable.GetTypesFromAssembly)
                 .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated());
             registrator.RegisterMany(implTypes,
                 reuse, made, setup, ifAlreadyRegistered, serviceTypeCondition, nonPublicServiceTypes, serviceKey);
@@ -8096,7 +8095,7 @@ namespace DryIoc
 
         /// <summary>Creates new ref to original ref value.</summary> <typeparam name="T">Type of ref value.</typeparam>
         /// <param name="original">Original ref.</param> <returns>New ref to original value.</returns>
-        public static Ref<T> Copy<T>(this Ref<T> original) where T : class
+        public static Ref<T> NewRef<T>(this Ref<T> original) where T : class
         {
             return Of(original.Value);
         }
