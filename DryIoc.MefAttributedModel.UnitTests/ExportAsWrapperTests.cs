@@ -45,32 +45,24 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Exporting_non_generic_wrapper_with_generic_index_should_Throw()
         {
             var container = new Container();
-            container.RegisterExports(typeof(Service), typeof(MyDisposableWronglyExported));
 
-            var ex = Assert.Throws<AttributedModelException>(() => 
-                container.Resolve<MyDisposableWronglyExported>(typeof(Service)));
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.RegisterExports(typeof(Service), typeof(MyDisposableWronglyExported)));
 
-            Assert.AreEqual(ex.Error, Error.NoWrappedTypeExportedWrapper);
-            Assert.That(ex.Message, Is.StringContaining(
-                "Exported non-generic wrapper type DryIoc.MefAttributedModel.UnitTests.ExportAsWrapperTests.MyDisposableWronglyExported"));
+            Assert.AreEqual(DryIoc.Error.NonGenericWrapperMayWrapOnlyRequiredServiceType, ex.Error);
         }
 
         [Test]
         public void Exporting_generic_wrapper_with_wrong_generic_arg_index_should_throw_meaningful_exception()
         {
             var container = new Container().WithMefAttributedModel();
-            container.RegisterExports(typeof(MyFactoryWrapperExportedWithWrongIndex<>), typeof(Service));
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.RegisterExports(typeof(MyFactoryWrapperExportedWithWrongIndex<>), typeof(Service)));
 
-            var ex = Assert.Throws<AttributedModelException>(() => 
-                container.Resolve<MyFactoryWrapperExportedWithWrongIndex<IService>>());
-
-            Assert.AreEqual(ex.Error, Error.WrappedArgIndexOutOfBounds);
-            Assert.That(ex.Message, Is.StringContaining(
-                "Exported generic wrapper type DryIoc.MefAttributedModel.UnitTests.ExportAsWrapperTests.MyFactoryWrapperExportedWithWrongIndex<DryIoc.MefAttributedModel.UnitTests.CUT.IService> " 
-                + "specifies generic argument index 1 outside of argument list size"));
+            Assert.AreEqual(DryIoc.Error.GenericWrapperTypeArgIndexOutOfBounds, ex.Error);
         }
 
-        [Export, AsWrapper(typeof(IService))]
+        [Export, AsWrapper(WrapsRequiredServiceType = true)]
         public class MyDisposable
         {
             public IService Service { get; set; }
@@ -81,7 +73,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             }
         }
 
-        [Export, AsWrapper(0)]
+        [Export, AsWrapper]
         public class MyDisposableWronglyExported
         {
             public IService Service { get; set; }

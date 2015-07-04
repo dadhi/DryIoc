@@ -119,8 +119,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(serviceKey: 1);
             container.Register<IService, AnotherService>(serviceKey: '1');
 
-            IEnumerable<object> result = container.ResolveMany<object>(typeof(IService), ResolveManyBehavior.AsFixedArray);
-            var items = result.ToArray();
+            var items = container.ResolveMany<object>(typeof(IService), ResolveManyBehavior.AsFixedArray).ToArray();
 
             Assert.That(items.Length, Is.EqualTo(2));
             Assert.That(items[0], Is.InstanceOf<Service>());

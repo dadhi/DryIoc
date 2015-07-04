@@ -226,7 +226,7 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var container = request.Container;
-            reflectedType = container.UnwrapServiceType(reflectedType);
+            reflectedType = container.UnwrapServiceType(request.RequiredServiceType ?? reflectedType);
             var metadata = meta.Metadata;
             var factory = container.GetAllServiceFactories(reflectedType)
                 .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
@@ -242,7 +242,8 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var container = request.Container;
-            serviceType = import.ContractType ?? container.UnwrapServiceType(serviceType);
+            serviceType = import.ContractType 
+                ?? container.UnwrapServiceType(request.RequiredServiceType ?? serviceType);
             var serviceKey = import.ContractKey;
 
             if (!container.IsRegistered(serviceType, serviceKey))
@@ -392,9 +393,11 @@ namespace DryIoc.MefAttributedModel
         {
             Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
             resultInfo.FactoryType = FactoryType.Wrapper;
-            resultInfo.Wrapper = new WrapperInfo { 
-                WrappedServiceType = attribute.WrappedContractType, 
-                WrappedServiceTypeGenericArgIndex = attribute.ContractTypeGenericArgIndex };
+            resultInfo.Wrapper = new WrapperInfo
+            {
+                WrappedServiceTypeArgIndex = attribute.WrappedServiceTypeArgIndex,
+                WrapsRequiredServiceType = attribute.WrapsRequiredServiceType
+            };
         }
 
         private static void PopulateDecoratorInfoFromAttribute(ExportedRegistrationInfo resultInfo, AsDecoratorAttribute attribute,
@@ -482,18 +485,23 @@ namespace DryIoc.MefAttributedModel
 
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
-            NoSingleCtorWithImportingAttr  = Of("Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}."),
-            NotFindDependencyWithMetadata   = Of("Unable to resolve dependency {0} with metadata [{1}] in {2}"),
-            UnsupportedMultipleMetadata       = Of("Multiple associated metadata found while exporting {0}." + Environment.NewLine 
-                                                    + "Only single metadata is supported per implementation type, please remove the rest."),
-            UnsupportedMultipleFactoryTypes  = Of("Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
-            NoExport                           = Of("At least one Export attributed should be defined for {0}."),
-            ExportManyDoesNotExportAnyType              = Of("Unable to get contract types for implementation {0} because all of its implemented types where filtered out: {1}"),
-            UnsupportedReuseType              = Of("Attributed model does not support reuse type {0}."),
-            UnsupportedReuseWrapperType      = Of("Attributed model does not support reuse wrapper type {0}."),
-            NoWrappedTypeExportedWrapper    = Of("Exported non-generic wrapper type {0} requires wrapped service type to be specified, but it is null "
-                                                    + "and instead generic argument index is set to {1}."),
-            WrappedArgIndexOutOfBounds     = Of("Exported generic wrapper type {0} specifies generic argument index {1} outside of argument list size.");
+            NoSingleCtorWithImportingAttr = Of(
+                "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}."),
+            NotFindDependencyWithMetadata = Of(
+                "Unable to resolve dependency {0} with metadata [{1}] in {2}"),
+            UnsupportedMultipleMetadata = Of(
+                "Multiple associated metadata found while exporting {0}." + Environment.NewLine +
+                "Only single metadata is supported per implementation type, please remove the rest."),
+            UnsupportedMultipleFactoryTypes = Of(
+                "Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
+            NoExport = Of(
+                "At least one Export attributed should be defined for {0}."),
+            ExportManyDoesNotExportAnyType = Of(
+                "Unable to get contract types for implementation {0} because all of its implemented types where filtered out: {1}"),
+            UnsupportedReuseType = Of(
+                "Attributed model does not support reuse type {0}."),
+            UnsupportedReuseWrapperType = Of(
+                "Attributed model does not support reuse wrapper type {0}.");
 #pragma warning restore 1591
 
         /// <summary>Returns message by provided error code.</summary>
@@ -718,9 +726,7 @@ namespace DryIoc.MefAttributedModel
     FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
             if (Wrapper != null) code.Append(@",
     Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ")
-                .Append(Wrapper.WrappedServiceTypeGenericArgIndex)
-                .Append(", WrappedServiceType = ")
-                .AppendType(Wrapper.WrappedServiceType).Append(@" }");
+                .Append(Wrapper.WrappedServiceTypeArgIndex).Append(@" }");
             if (Decorator != null)
             {
                 code.Append(@",
@@ -792,16 +798,18 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Defines wrapper setup in serializable way.</summary>
     public sealed class WrapperInfo
     {
-        /// <summary>Concrete wrapped type for non generic wrapper</summary>
-        public Type WrappedServiceType;
-
         /// <summary>Index of wrapped type argument in open-generic wrapper.</summary>
-        public int WrappedServiceTypeGenericArgIndex;
+        public int WrappedServiceTypeArgIndex;
+        
+        /// <summary>Per name.</summary>
+        public bool WrapsRequiredServiceType;
 
         /// <summary>Creates Wrapper setup from this info.</summary> <returns>Setup.</returns>
         public Setup GetSetup()
         {
-            return Setup.WrapperWith(UnwrapServiceType);
+            return WrapsRequiredServiceType
+                ? Setup.WrapperOfRequiredServiceType
+                : Setup.WrapperOfTypeArg(WrappedServiceTypeArgIndex);
         }
 
         /// <summary>Used to compare wrappers info for equality.</summary> <param name="obj">Other info to compare.</param>
@@ -810,8 +818,7 @@ namespace DryIoc.MefAttributedModel
         {
             var other = obj as WrapperInfo;
             return other != null 
-                && other.WrappedServiceType == WrappedServiceType
-                && other.WrappedServiceTypeGenericArgIndex == WrappedServiceTypeGenericArgIndex;
+                && other.WrappedServiceTypeArgIndex == WrappedServiceTypeArgIndex;
         }
 
         /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
@@ -820,25 +827,7 @@ namespace DryIoc.MefAttributedModel
         {
             return (code ?? new StringBuilder())
                 .Append(@"Wrapper = new WrapperInfo(")
-                .AppendType(WrappedServiceType).Append(", ")
-                .AppendCode(WrappedServiceTypeGenericArgIndex).Append(")");
-        }
-
-        /// <summary>Function to be used as delegate for unwrapping service type from wrapper using this info.</summary>
-        /// <param name="wrapperType">Source Wrapper to to unwrap.</param> <returns>Unwrapped service type.</returns>
-        private Type UnwrapServiceType(Type wrapperType)
-        {
-            if (WrappedServiceType != null)
-                return WrappedServiceType;
-
-            wrapperType.ThrowIf(!wrapperType.IsClosedGeneric(),
-                Error.NoWrappedTypeExportedWrapper, WrappedServiceTypeGenericArgIndex);
-
-            var typeArgs = wrapperType.GetGenericParamsAndArgs();
-            wrapperType.ThrowIf(WrappedServiceTypeGenericArgIndex > typeArgs.Length - 1,
-                Error.WrappedArgIndexOutOfBounds, WrappedServiceTypeGenericArgIndex);
-
-            return typeArgs[WrappedServiceTypeGenericArgIndex];
+                .AppendCode(WrappedServiceTypeArgIndex).Append(")");
         }
     }
 

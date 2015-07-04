@@ -58,27 +58,14 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Wrapper_may_work_with_single_service_type_only_and_should_throw_otherwise()
-        {
-            var container = new Container();
-            container.Register(typeof(WrapperWithTwoArgs<,>), setup: Setup.Wrapper);
-            container.Register<Service>();
-            container.Register<AnotherService>();
-
-            Assert.Throws<ContainerException>(() => 
-                container.Resolve<WrapperWithTwoArgs<Service, AnotherService>>());
-        }
-
-        [Test]
         public void Wrapper_is_only_working_if_used_in_enumerable_or_other_wrapper_It_means_that_resolving_array_of_multiple_wrapper_should_throw()
         {
             var container = new Container();
-            container.Register(typeof(WrapperWithTwoArgs<,>), setup: Setup.Wrapper);
-            container.Register<Service>();
-            container.Register<AnotherService>();
+            
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Register(typeof(WrapperWithTwoArgs<,>), setup: Setup.Wrapper));
 
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<WrapperWithTwoArgs<Service, AnotherService>[]>());
+            Assert.AreEqual(Error.GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex, ex.Error);
         }
 
         [Test]
@@ -88,7 +75,7 @@ namespace DryIoc.UnitTests
 
             container.Register(typeof(WeakReference), 
                 with: Made.Of(t => t.GetConstructorOrNull(args: typeof(object))),
-                setup: Setup.WrapperWith(_ => typeof(object)));
+                setup: Setup.WrapperOfRequiredServiceType);
 
             container.Register<Service>();
 

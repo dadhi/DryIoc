@@ -25,13 +25,14 @@ THE SOFTWARE.
 namespace DryIoc.MefAttributedModel
 {
     using System;
-    using System.Collections.Generic;
     using System.ComponentModel.Composition;
     using System.Diagnostics.CodeAnalysis;
-    using System.Linq;
     
     /// <summary>Base attribute to specify type of reuse (implementing <see cref="IReuse"/>) for annotated class.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Field | AttributeTargets.Property
+    [AttributeUsage(AttributeTargets.Class 
+        | AttributeTargets.Method 
+        | AttributeTargets.Field 
+        | AttributeTargets.Property 
         | AttributeTargets.Parameter, 
         Inherited = false)]
     public class ReuseAttribute : Attribute
@@ -114,7 +115,10 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Defines export with arbitrary object key.</summary>
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
         Justification = "Not available in PCL.")]
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class 
+        | AttributeTargets.Method 
+        | AttributeTargets.Property 
+        | AttributeTargets.Field, 
         AllowMultiple = true, Inherited = false)]
     public class ExportWithKeyAttribute : ExportAttribute
     {
@@ -136,7 +140,10 @@ namespace DryIoc.MefAttributedModel
     }
 
     /// <summary>Specifies to export all implemented contract types automatically.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class 
+        | AttributeTargets.Method 
+        | AttributeTargets.Property 
+        | AttributeTargets.Field, 
         Inherited = false)]
     public class ExportManyAttribute : Attribute
     {
@@ -154,38 +161,40 @@ namespace DryIoc.MefAttributedModel
     }
 
     /// <summary>Specifies that class exporting static or instance method factories</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class 
+        | AttributeTargets.Method 
+        | AttributeTargets.Property 
+        | AttributeTargets.Field, 
         Inherited = false)]
     public class AsFactoryAttribute : Attribute { }
 
     /// <summary>Exports service as custom wrapper.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class 
+        | AttributeTargets.Method 
+        | AttributeTargets.Property 
+        | AttributeTargets.Field, 
         Inherited = false)]
     public class AsWrapperAttribute : Attribute
     {
         /// <summary>For open-generic wrapper indicates wrapped argument type index.</summary>
-        public int ContractTypeGenericArgIndex { get; set; }
+        public int WrappedServiceTypeArgIndex { get; set; }
 
-        /// <summary>Explicitly defines wrapped type. If defined overrides <see cref="ContractTypeGenericArgIndex"/>.</summary>
-        public Type WrappedContractType { get; set; }
+        /// <summary>Per name.</summary>
+        public bool WrapsRequiredServiceType { get; set; }
 
-        /// <summary>Creates attribute with <see cref="ContractTypeGenericArgIndex"/>.</summary>
-        /// <param name="contractTypeGenericArgInsdex"></param>
-        public AsWrapperAttribute(int contractTypeGenericArgInsdex = 0)
+        /// <summary>Creates attribute with <see cref="WrappedServiceTypeArgIndex"/>.</summary>
+        /// <param name="wrappedServiceTypeArgIndex">(optional) To use single generic type arg.</param>
+        public AsWrapperAttribute(int wrappedServiceTypeArgIndex = -1)
         {
-            ContractTypeGenericArgIndex = contractTypeGenericArgInsdex.ThrowIf(contractTypeGenericArgInsdex < 0);
-        }
-
-        /// <summary>Creates attribute with <see cref="WrappedContractType"/>.</summary>
-        /// <param name="wrappedContractType"></param>
-        public AsWrapperAttribute(Type wrappedContractType)
-        {
-            WrappedContractType = wrappedContractType.ThrowIfNull();
+            WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
         }
     }
 
     /// <summary>Specifies that exported service is decorator of services of <see cref="ExportAttribute.ContractType"/>.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class 
+        | AttributeTargets.Method 
+        | AttributeTargets.Property 
+        | AttributeTargets.Field, 
         Inherited = false)]
     public class AsDecoratorAttribute : Attribute
     {
@@ -209,7 +218,9 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Imports service Only with equal <see cref="ContractKey"/>.</summary>
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible", 
         Justification = "Not available in PCL.")] 
-    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Parameter 
+        | AttributeTargets.Field 
+        | AttributeTargets.Property)]
     public class ImportWithKeyAttribute : ImportAttribute
     {
         /// <summary>Arbitrary object to match with service key.</summary>
@@ -234,8 +245,12 @@ namespace DryIoc.MefAttributedModel
 
     /// <summary>Exports service with associated metadata object.</summary>
     [MetadataAttribute]
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | 
-        AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Class 
+        | AttributeTargets.Method
+        | AttributeTargets.Parameter 
+        | AttributeTargets.Field 
+        | AttributeTargets.Property, 
+        Inherited = false)]
     public class WithMetadataAttribute : Attribute
     {
         /// <summary>Metadata object</summary>
@@ -250,7 +265,9 @@ namespace DryIoc.MefAttributedModel
 
     /// <summary>Indicate to import service and in case it is not registered, register it using provided
     /// implementation info. Useful for ad-hoc/quick-prototyping registration of types from not controlled libraries.</summary>
-    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Parameter 
+        | AttributeTargets.Field 
+        | AttributeTargets.Property)]
     public class ImportExternalAttribute : Attribute
     {
         /// <summary>Implementation type of registered service.</summary>
@@ -286,7 +303,10 @@ namespace DryIoc.MefAttributedModel
     }
 
     /// <summary>Specifies that exported service setup to <see cref="Setup.OpenResolutionScope"/>.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
+    [AttributeUsage(AttributeTargets.Class 
+        | AttributeTargets.Method 
+        | AttributeTargets.Property 
+        | AttributeTargets.Field,
         Inherited = false)]
     public class OpenResolutionScopeAttribute : Attribute { }
 }
