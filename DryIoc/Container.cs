@@ -1422,46 +1422,64 @@ namespace DryIoc
         /// <param name="container">Container to add rule to.</param>
         /// <param name="implTypes">Provider of implementation types.</param>
         /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
+        /// <param name="condition">(optional) condition.</param>
         /// <returns>Container with new rule.</returns>
         /// <remarks>Types provider will be asked on each rule evaluation.</remarks>
-        public static IContainer WithAutoFallbackResolution(this IContainer container, IEnumerable<Type> implTypes,
-            Func<IReuse, Request, IReuse> changeDefaultReuse = null)
+        public static IContainer WithAutoFallbackResolution(this IContainer container, 
+            IEnumerable<Type> implTypes,
+            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
+            Func<Request, bool> condition = null)
         {
             return container.ThrowIfNull().With(rules =>
-                rules.WithUnknownServiceResolver(AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse)));
+                rules.WithUnknownServiceResolver(
+                    AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
         }
 
         /// <summary>Adds rule to register unknown service when it is resolved.</summary>
         /// <param name="container">Container to add rule to.</param>
         /// <param name="implTypeAssemblies">Provides assembly with implementation types.</param>
         /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
+        /// <param name="condition">(optional) condition.</param>
         /// <returns>Container with new rule.</returns>
         /// <remarks>Implementation types will be requested from assemblies only once, in this method call.</remarks>
-        public static IContainer WithAutoFallbackResolution(this IContainer container, IEnumerable<Assembly> implTypeAssemblies,
-            Func<IReuse, Request, IReuse> changeDefaultReuse = null)
+        public static IContainer WithAutoFallbackResolution(this IContainer container, 
+            IEnumerable<Assembly> implTypeAssemblies,
+            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
+            Func<Request, bool> condition = null)
         {
-            var types = implTypeAssemblies.ThrowIfNull().SelectMany(a => a.GetLoadedTypes()).ToArray();
-            return container.WithAutoFallbackResolution(types);
+            var types = implTypeAssemblies.ThrowIfNull()
+                .SelectMany(a => a.GetLoadedTypes())
+                .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated())
+                .ToArray();
+            return container.WithAutoFallbackResolution(types, changeDefaultReuse, condition);
         }
 
         /// <summary>Fallback rule to automatically register requested service with Reuse based on resolution source.</summary>
         /// <param name="implTypes">Assemblies to look for implementation types.</param>
         /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
+        /// <param name="condition">(optional) condition.</param>
         /// <returns>Rule.</returns>
         public static Rules.UnknownServiceResolver AutoRegisterUnknownServiceRule(IEnumerable<Type> implTypes,
-            Func<IReuse, Request, IReuse> changeDefaultReuse = null)
+            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
+            Func<Request, bool> condition = null)
         {
             return request =>
             {
+                if (condition != null && !condition(request))
+                    return null;
+
                 var container = request.Container;
                 var reuse = container.OpenedScope != null
                     ? Reuse.InCurrentNamedScope(container.OpenedScope.Name)
                     : Reuse.Singleton;
+                
                 if (changeDefaultReuse != null)
                     reuse = changeDefaultReuse(reuse, request);
-                container.RegisterMany(implTypes, reuse, serviceTypeCondition: type => type.IsAssignableTo(request.ServiceType));
-                var factory = container.GetServiceFactoryOrDefault(request);
-                return factory;
+                
+                container.RegisterMany(implTypes, reuse, 
+                    serviceTypeCondition: type => type.IsAssignableTo(request.ServiceType));
+
+                return container.GetServiceFactoryOrDefault(request);
             };
         }
     }
