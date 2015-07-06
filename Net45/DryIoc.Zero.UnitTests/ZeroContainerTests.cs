@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using System.Linq.Expressions;
 using NUnit.Framework;
 using DryIoc.MefAttributedModel;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
@@ -65,9 +66,9 @@ namespace DryIoc.Zero.UnitTests
             container.RegisterExports(types);
 
             var r = container.GetServiceRegistrations().FirstOrDefault(x => x.ServiceType == typeof(Chicken));
-            var factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalServiceKey, IfUnresolved.Throw, r.ServiceType);
+            var factoryExpr = container.Resolve<LambdaExpression>(r.OptionalServiceKey, IfUnresolved.Throw, r.ServiceType);
 
-            Assert.DoesNotThrow(() => ExpressionStringify.With(true, true).ToCode(factoryExpr.Value));
+            Assert.DoesNotThrow(() => ExpressionStringify.With(true, true).ToCode(factoryExpr));
         }
 
         [Test]
@@ -80,9 +81,9 @@ namespace DryIoc.Zero.UnitTests
             container.RegisterExports(typeof(BirdFactory));
 
             var r = container.GetServiceRegistrations().FirstOrDefault(x => x.ServiceType == typeof(Chicken));
-            var factoryExpr = container.Resolve<FactoryExpression<object>>(r.OptionalServiceKey, IfUnresolved.Throw, r.ServiceType);
+            var factoryExpr = container.Resolve<LambdaExpression>(r.OptionalServiceKey, IfUnresolved.Throw, r.ServiceType);
 
-            Assert.DoesNotThrow(() => ExpressionStringify.With(true, true).ToCode(factoryExpr.Value));
+            Assert.DoesNotThrow(() => ExpressionStringify.With(true, true).ToCode(factoryExpr));
         }
 
         [Test]
