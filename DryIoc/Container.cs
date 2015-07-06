@@ -2554,6 +2554,16 @@ namespace DryIoc
                 parameters = methodCallExpr.Method.GetParameters();
                 argExprs = methodCallExpr.Arguments;
             }
+            else if (callExpr.NodeType == ExpressionType.Invoke)
+            {
+                var invokeExpr = ((InvocationExpression)callExpr);
+                var invokedDelegateExpr = invokeExpr.Expression;
+                var invokeMethod = invokedDelegateExpr.Type.GetSingleDeclaredMethodOrNull("Invoke");
+                ctorOrMethodOrMember = invokeMethod;
+                parameters = invokeMethod.GetParameters();
+                argExprs = invokeExpr.Arguments;
+            }
+
             else if (callExpr.NodeType == ExpressionType.MemberAccess)
             {
                 var member = ((MemberExpression)callExpr).Member;

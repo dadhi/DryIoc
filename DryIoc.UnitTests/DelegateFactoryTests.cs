@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -59,22 +58,22 @@ namespace DryIoc.UnitTests
         public class A { }
 
         [Test]
-        public void Can_register_custom_delegates_as_method_groups()
-        {
-            var container = new Container();
-            container.Register<ServiceLocator>();
-
-            var ex = Assert.Throws<ContainerException>(() => 
-            container.Register(Made.Of(r => ServiceInfo.Of<ServiceLocator>(), f => (SingleInstanceFactory)f.GetInstance)));
-
-            Assert.AreEqual(Error.NotSupportedMadeExpression, ex.Error);
-        }
-
-        [Test]
         public void Given_Lambda_registration_Resolving_service_should_be_of_Lambda_provided_implementation()
         {
             var container = new Container();
             container.RegisterDelegate<IService>(_ => new Service());
+
+            var service = container.Resolve<IService>();
+
+            Assert.That(service, Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void Can_use_factory_method_instead_register_delegate()
+        {
+            var container = new Container();
+            container.RegisterInstance<Func<IService>>(() => new Service());
+            container.Register(Made.Of(r => ServiceInfo.Of<Func<IService>>(), func => func()));
 
             var service = container.Resolve<IService>();
 
@@ -135,6 +134,31 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IDependency, Dependency>();
             container.RegisterDelegate(r => new ServiceWithDependency(r.Resolve<IDependency>()));
+
+            var service = container.Resolve<ServiceWithDependency>();
+
+            Assert.That(service.Dependency, Is.InstanceOf<Dependency>());
+        }
+
+        [Test]
+        public void Can_use_factory_method_instead_register_delegate_with_dependency_resolve()
+        {
+            var container = new Container();
+            container.Register<IDependency, Dependency>();
+            container.RegisterInstance<Func<IResolver, ServiceWithDependency>>(r => new ServiceWithDependency(r.Resolve<IDependency>()));
+            container.Register(Made.Of(r => ServiceInfo.Of<Func<IResolver, ServiceWithDependency>>(), f => f(Arg.Of<IResolver>())));
+
+            var service = container.Resolve<ServiceWithDependency>();
+
+            Assert.That(service.Dependency, Is.InstanceOf<Dependency>());
+        }
+
+        [Test]
+        public void Can_use_factory_method_instead_register_delegate_with_dependency_resolve_Better_approach()
+        {
+            var container = new Container();
+            container.Register<IDependency, Dependency>();
+            container.Register(Made.Of(() => new ServiceWithDependency(Arg.Of<IDependency>())));
 
             var service = container.Resolve<ServiceWithDependency>();
 
