@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq.Expressions;
 using NUnit.Framework;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 
@@ -109,7 +110,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.RegisterExports(typeof(BirdFactory));
 
             var chicken = container.Resolve<Chicken>();
-            container.Resolve<FactoryExpression<object>>(requiredServiceType: typeof(Chicken));
+            container.Resolve<LambdaExpression>(typeof(Chicken));
 
             Assert.IsInstanceOf<Chicken>(chicken);
         }

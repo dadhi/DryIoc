@@ -7,6 +7,7 @@
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\ExpressionToCodeLib.dll" #>
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import Namespace="System.Linq" #>
+<#@ import namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Text" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
@@ -43,14 +44,13 @@ var factories = container.GetServiceRegistrations()
     {
         try
         {
-            var factoryExpr = container.Resolve<FactoryExpression<object>>(
-                r.OptionalServiceKey, IfUnresolved.Throw, r.ServiceType);
+            var factoryExpr = container.Resolve<LambdaExpression>(r.OptionalServiceKey, IfUnresolved.Throw, r.ServiceType);
             
             var serviceTypeCode = objectToCode.PlainObjectToCode(r.ServiceType, typeof(Type));
             var serviceKeyCode = r.OptionalServiceKey == null ? "null"
                 : new StringBuilder().AppendCode(r.OptionalServiceKey).ToString();
                 
-            var expressionCode = exprToCode.ToCode(factoryExpr.Value.Body);
+            var expressionCode = exprToCode.ToCode(factoryExpr.Body);
 
             return new { Id = ++idSeed, Type = serviceTypeCode, Key = serviceKeyCode, Expression = expressionCode };
 

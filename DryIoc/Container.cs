@@ -1780,8 +1780,8 @@ namespace DryIoc
             Wrappers = Wrappers.AddOrUpdate(typeof(Meta<,>),
                 new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperOfTypeArg(0)));
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(FactoryExpression<>),
-                new ExpressionFactory(GetFactoryExpression, setup: Setup.Wrapper));
+            Wrappers = Wrappers.AddOrUpdate(typeof(LambdaExpression),
+                new ExpressionFactory(GetFactoryExpression, setup: Setup.WrapperOfRequiredServiceType));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(Func<>),
                 new ExpressionFactory(GetFuncExpression, setup: Setup.Wrapper));
@@ -1963,12 +1963,12 @@ namespace DryIoc
 
         private static Expression GetFactoryExpression(Request request)
         {
-            var ctor = request.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
-            var serviceType = request.ServiceType.GetGenericParamsAndArgs()[0];
+            var serviceType = request.RequiredServiceType
+                .ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request);
             var serviceRequest = request.Push(serviceType);
             var factory = request.Container.ResolveFactory(serviceRequest);
             var expr = factory == null ? null : factory.GetExpressionOrDefault(serviceRequest);
-            return expr == null ? null : Expression.New(ctor, request.Container.GetOrAddStateItemExpression(expr.WrapInFactoryExpression()));
+            return expr == null ? null : Expression.Constant(expr.WrapInFactoryExpression(), typeof(LambdaExpression));
         }
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request)
@@ -6677,21 +6677,6 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Wraps factory expression created by container internally. May be used for debugging.</summary>
-    /// <typeparam name="TService">Service type to resolve.</typeparam>
-    [DebuggerDisplay("{Value}")]
-    public sealed class FactoryExpression<TService>
-    {
-        /// <summary>Factory expression that Container compiles to delegate.</summary>
-        public readonly Expression<FactoryDelegate> Value;
-
-        /// <summary>Creates wrapper.</summary> <param name="value">Wrapped expression.</param>
-        public FactoryExpression(Expression<FactoryDelegate> value)
-        {
-            Value = value;
-        }
-    }
-
     /// <summary>Exception that container throws in case of error. Dedicated exception type simplifies
     /// filtering or catching container relevant exceptions from client code.</summary>
     [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable", Justification = "Not available in PCL.")]
@@ -6921,7 +6906,9 @@ namespace DryIoc
             ArgOfValueIsProvidedButNoArgValues = Of(
                 "Arg.OfValue index is provided but no arg values specified."),
             ArgOfValueIndesIsOutOfProvidedArgValues = Of(
-                "Arg.OfValue index {0} is outside of provided value factories: {1}");
+                "Arg.OfValue index {0} is outside of provided value factories: {1}"),
+            ResolutionNeedsRequiredServiceType = Of(
+                "Expecting required service type but it is not specified when resolving: {0}");
 #pragma warning restore 1591 // "Missing XML-comment"
 
         /// <summary>Stores new error message and returns error code for it.</summary>

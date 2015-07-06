@@ -1,4 +1,5 @@
-﻿using DryIoc.UnitTests.CUT;
+﻿using System.Linq.Expressions;
+using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -12,9 +13,9 @@ namespace DryIoc.UnitTests
 			container.Register<ServiceWithDependency>();
 			container.Register<IDependency, Dependency>(Reuse.Singleton);
 
-			var service = container.Resolve<FactoryExpression<ServiceWithDependency>>();
+			var service = container.Resolve<LambdaExpression>(typeof(ServiceWithDependency));
 
-			Assert.That(service.Value.ToString(), Is.StringContaining("=> new ServiceWithDependency("));
+			Assert.That(service.ToString(), Is.StringContaining("=> new ServiceWithDependency("));
 		}
 	}
 }

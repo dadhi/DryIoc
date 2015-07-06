@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq.Expressions;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 // ReSharper disable RedundantAssignment
@@ -152,9 +153,9 @@ namespace DryIoc.UnitTests
             container.Register<Foo>();            
             container.Register<IDependency, BarDependency>();
 
-            var fooExpr = container.Resolve<FactoryExpression<Foo>>();
+            var fooExpr = container.Resolve<LambdaExpression>(typeof(Foo));
 
-            Assert.That(fooExpr.Value.ToString(), Is.StringContaining(".Resolve"));
+            Assert.That(fooExpr.ToString(), Is.StringContaining(".Resolve"));
         }
 
         internal class BarDependency : IDependency {}
@@ -186,8 +187,8 @@ namespace DryIoc.UnitTests
             var food = dog.Feed();
             Assert.IsInstanceOf<Food>(food);
 
-            var dogExpr = container.Resolve<FactoryExpression<Dog>>();
-            StringAssert.Contains(".Resolve", dogExpr.Value.ToString());
+            var dogExpr = container.Resolve<LambdaExpression>(typeof(Dog));
+            StringAssert.Contains(".Resolve", dogExpr.ToString());
         }
 
         internal class Dog

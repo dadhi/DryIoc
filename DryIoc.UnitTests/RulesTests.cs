@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -141,9 +142,9 @@ namespace DryIoc.UnitTests
             var container = new Container(r => r.WithoutSingletonOptimization());
             container.Register<FooHey>(Reuse.Singleton);
 
-            var singleton = container.Resolve<FactoryExpression<FooHey>>();
+            var singleton = container.Resolve<LambdaExpression>(typeof(FooHey));
 
-            Assert.That(singleton.Value.ToString(), Is.StringContaining("SingletonScope"));
+            Assert.That(singleton.ToString(), Is.StringContaining("SingletonScope"));
         }
 
         [Test]
@@ -160,8 +161,8 @@ namespace DryIoc.UnitTests
             container.Register(typeof(YY), factory);
             factoryIDs[typeof(YY)] = factory.FactoryID.ToString();
 
-            StringAssert.Contains(factoryIDs[typeof(YY)], container.Resolve<FactoryExpression<YY>>().Value.ToString());
-            StringAssert.Contains(factoryIDs[typeof(XX)], container.Resolve<FactoryExpression<XX>>().Value.ToString());
+            StringAssert.Contains(factoryIDs[typeof(YY)], container.Resolve<LambdaExpression>(typeof(YY)).ToString());
+            StringAssert.Contains(factoryIDs[typeof(XX)], container.Resolve<LambdaExpression>(typeof(XX)).ToString());
         }
 
         internal class XX { }

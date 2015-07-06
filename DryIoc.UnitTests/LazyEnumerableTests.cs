@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -202,8 +203,8 @@ namespace DryIoc.UnitTests
 	        var man = container.Resolve<Man>();
             Assert.IsInstanceOf<Child>(man.Children.FirstOrDefault());
 
-	        var expr = container.Resolve<FactoryExpression<Man>>();
-	        StringAssert.Contains("r.Resolver.ResolveMany(", expr.Value.ToString());
+	        var expr = container.Resolve<LambdaExpression>(typeof(Man));
+	        StringAssert.Contains("r.Resolver.ResolveMany(", expr.ToString());
 	    }
 
         public class Man

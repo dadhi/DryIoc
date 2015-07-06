@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
@@ -187,9 +188,9 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var container = new Container(r => r.WithMefAttributedModel());
             container.RegisterExports(typeof(LazyDepClient), typeof(LazyDep));
 
-            var clientExpr = container.Resolve<FactoryExpression<LazyDepClient>>();
+            var clientExpr = container.Resolve<LambdaExpression>(typeof(LazyDepClient));
 
-            StringAssert.Contains(".Resolve", clientExpr.Value.ToString());
+            StringAssert.Contains(".Resolve", clientExpr.ToString());
         }
 
         [Test]
