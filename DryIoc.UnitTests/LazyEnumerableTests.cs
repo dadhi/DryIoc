@@ -235,5 +235,29 @@ namespace DryIoc.UnitTests
 	        // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
             Assert.Throws<ContainerException>(() => { services.FirstOrDefault(); });
 	    }
+
+	    [Test]
+	    public void I_can_resolve_IEnumerable_as_LazyEnumerable_with_container_rule()
+	    {
+	        var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+
+	        var aas = container.Resolve<IEnumerable<A>>();
+            container.Register<A>();
+
+            Assert.IsInstanceOf<A>(aas.SingleOrDefault());
+	    }
+
+        [Test]
+        public void I_can_resolve_IEnumerable_as_LazyEnumerable_with_container_rule_and_required_service_type()
+        {
+            var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+
+            var aas = container.Resolve<IEnumerable<object>>(typeof(A));
+            container.Register<A>();
+
+            Assert.IsInstanceOf<A>(aas.SingleOrDefault());
+        }
+
+        class A { }
 	}
 }

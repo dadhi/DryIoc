@@ -108,7 +108,7 @@ namespace DryIoc.IssuesTests.Samples
 
             // Test that resolve works
             //========================
-            var container = new Container(rules => rules.WithUnknownServiceResolver(createFactoryFromAssembly));
+            var container = new Container(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly));
             var thing = container.Resolve<IThing>();
             Assert.NotNull(thing);
         }

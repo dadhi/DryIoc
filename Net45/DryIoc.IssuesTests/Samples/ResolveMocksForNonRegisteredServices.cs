@@ -10,7 +10,7 @@ namespace DryIoc.IssuesTests.Samples
         [Test]
         public void Resolve_mock_for_non_registered_service()
         {
-            var container = new Container(rules => rules.WithUnknownServiceResolver(request =>
+            var container = new Container(rules => rules.WithUnknownServiceResolvers(request =>
             {
                 var serviceType = request.ServiceType;
                 if (!serviceType.IsAbstract)
@@ -29,7 +29,7 @@ namespace DryIoc.IssuesTests.Samples
         [Test]
         public void Inject_mock_for_non_registered_service()
         {
-            var container = new Container(rules => rules.WithUnknownServiceResolver(request =>
+            var container = new Container(rules => rules.WithUnknownServiceResolvers(request =>
             {
                 var serviceType = request.ServiceType;
                 if (!serviceType.IsAbstract)

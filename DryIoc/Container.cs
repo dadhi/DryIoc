@@ -845,7 +845,7 @@ namespace DryIoc
                         if (condition == null || condition(request))
                         {
                             var decoratorRequest =
-                                request.UpdateServiceInfo(_ => ServiceInfo.Of(initializerActionType))
+                                request.WithChangedServiceInfo(_ => ServiceInfo.Of(initializerActionType))
                                     .ResolveWithFactory(initializerFactory);
                             var actionExpr = initializerFactory.GetExpressionOrDefault(decoratorRequest);
                             if (actionExpr != null)
@@ -864,7 +864,7 @@ namespace DryIoc
                 {
                     var decoratorFactory = funcDecoratorFactories[i];
                     var decoratorRequest = request
-                        .UpdateServiceInfo(_ => ServiceInfo.Of(decoratorFuncType))
+                        .WithChangedServiceInfo(_ => ServiceInfo.Of(decoratorFuncType))
                         .ResolveWithFactory(decoratorFactory);
 
                     var condition = decoratorFactory.Setup.Condition;
@@ -1431,7 +1431,7 @@ namespace DryIoc
             Func<Request, bool> condition = null)
         {
             return container.ThrowIfNull().With(rules =>
-                rules.WithUnknownServiceResolver(
+                rules.WithUnknownServiceResolvers(
                     AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
         }
 
@@ -1838,6 +1838,12 @@ namespace DryIoc
         private static Expression GetArrayExpression(Request request)
         {
             var collectionType = request.ServiceType;
+            if (request.Container.Rules.ResolveIEnumerableAsLazyEnumerable &&
+                collectionType.GetGenericDefinitionOrNull() == typeof(IEnumerable<>))
+            {
+                return GetLazyEnumerableExpressionOrDefault(request);
+            }
+
             var itemType = collectionType.GetElementTypeOrNull() ?? collectionType.GetGenericParamsAndArgs()[0];
 
             var container = request.Container;
@@ -1925,7 +1931,8 @@ namespace DryIoc
             if (itemServiceType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
                 callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemServiceType }, callResolveManyExpr);
 
-            return Expression.New(wrapperType.GetSingleConstructorOrNull().ThrowIfNull(), callResolveManyExpr);
+            var lazyEnumerableCtor = typeof(LazyEnumerable<>).MakeGenericType(itemServiceType).GetSingleConstructorOrNull();
+            return Expression.New(lazyEnumerableCtor, callResolveManyExpr);
         }
 
         // Result: r => new Lazy<TService>(() => r.Resolver.Resolve<TService>(key, ifUnresolved, requiredType));
@@ -2071,7 +2078,7 @@ namespace DryIoc
 
         /// <summary>Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
         /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.</summary>
-        public static readonly Rules Default = Empty.WithUnknownServiceResolver(
+        public static readonly Rules Default = Empty.WithUnknownServiceResolvers(
             WrappersSupport.ResolveWrappers, 
             ResolveFromFallbackContainers);
 
@@ -2151,7 +2158,7 @@ namespace DryIoc
 
         /// <summary>Appends resolver to current unknown service resolvers.</summary>
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
-        public Rules WithUnknownServiceResolver(params UnknownServiceResolver[] rules)
+        public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules)
         {
             var newRules = (Rules)MemberwiseClone();
             newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.Append(rules);
@@ -2193,7 +2200,7 @@ namespace DryIoc
                 // Continue to next parent if factory is not found in first parent by
                 // updating IfUnresolved policy to ReturnDefault.
                 if (containerRequest.IfUnresolved != IfUnresolved.ReturnDefault)
-                    containerRequest = containerRequest.UpdateServiceInfo(info => // NOTE Smells.
+                    containerRequest = containerRequest.WithChangedServiceInfo(info => // NOTE Code Smell
                         ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfo(info));
 
                 var container = containerWeakRef.GetTarget();
@@ -2292,6 +2299,30 @@ namespace DryIoc
         {
             var newRules = (Rules)MemberwiseClone();
             newRules.ImplicitCheckForReuseMatchingScope = false;
+            return newRules;
+        }
+
+        /// <summary>Specifies to resolve IEnumerable as LazyEnumerable.</summary>
+        public bool ResolveIEnumerableAsLazyEnumerable { get; private set; }
+
+        /// <summary>Sets flag <see cref="ResolveIEnumerableAsLazyEnumerable"/>.</summary>
+        /// <returns>Returns new rules with flag set.</returns>
+        public Rules WithResolveIEnumerableAsLazyEnumerable()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.ResolveIEnumerableAsLazyEnumerable = true;
+            return newRules;
+        }
+
+        /// <summary>Flag instructs to include covariant compatible types in resolved collection, array and many.</summary>
+        public bool IncludeCovariantTypesToResolvedCollection { get; private set; }
+
+        /// <summary>Sets flag <see cref="IncludeCovariantTypesToResolvedCollection"/>.</summary>
+        /// <returns>Returns new rules with flag set.</returns>
+        public Rules WithIncludeCovariantTypesToResolvedCollection()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.IncludeCovariantTypesToResolvedCollection = true;
             return newRules;
         }
 
@@ -4073,7 +4104,7 @@ namespace DryIoc
         /// <summary>Allow to switch current service info to new one: for instance it is used be decorators.</summary>
         /// <param name="getInfo">Gets new info to switch to.</param>
         /// <returns>New request with new info but the rest intact: e.g. <see cref="ResolvedFactory"/>.</returns>
-        public Request UpdateServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
+        public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
             return new Request(Parent, ContainerWeakRef, getInfo(ServiceInfo), ResolvedFactory, FuncArgs, Scope);
         }
@@ -5528,6 +5559,10 @@ namespace DryIoc
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
         /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
         void SetOrAdd(int id, object item);
+
+        /// <summary>Adds mapping between id and index on resolution.</summary>
+        /// <param name="id"></param> <returns></returns>
+        int ReserveItemIndex(int id);
     }
 
     /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
@@ -5553,6 +5588,13 @@ namespace DryIoc
             Parent = parent;
             Name = name;
             _items = ImTreeMapIntToObj.Empty;
+        }
+
+        /// <summary>Returns the passed id without providing separate index.</summary>
+        /// <param name="id"></param> <returns></returns>
+        public int ReserveItemIndex(int id)
+        {
+            return id;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
