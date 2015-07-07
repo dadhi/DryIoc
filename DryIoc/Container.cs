@@ -370,7 +370,9 @@ namespace DryIoc
             var container = ((IContainer)this);
             var itemServiceType = requiredServiceType ?? serviceType;
             var items = container.GetAllServiceFactories(itemServiceType);
-            var itemsWithVariance = !itemServiceType.IsGeneric() ? null :
+
+            var includeVariantItems = container.Rules.CovariantTypesInResolvedCollection;
+            var itemsWithVariance = !includeVariantItems || !itemServiceType.IsGeneric() ? null :
                 container.GetServiceRegistrations().Where(x =>
                     itemServiceType != x.ServiceType && x.ServiceType.IsClosedGeneric() &&
                     itemServiceType.GetGenericTypeDefinition() == x.ServiceType.GetGenericTypeDefinition() &&
@@ -1838,7 +1840,9 @@ namespace DryIoc
         private static Expression GetArrayExpression(Request request)
         {
             var collectionType = request.ServiceType;
-            if (request.Container.Rules.ResolveIEnumerableAsLazyEnumerable &&
+
+            var rules = request.Container.Rules;
+            if (rules.ResolveIEnumerableAsLazyEnumerable &&
                 collectionType.GetGenericDefinitionOrNull() == typeof(IEnumerable<>))
                 return GetLazyEnumerableExpressionOrDefault(request);
 
@@ -1848,7 +1852,9 @@ namespace DryIoc
             var requiredItemType = container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? itemType);
 
             var items = container.GetAllServiceFactories(requiredItemType);
-            var itemsWithVariance = !requiredItemType.IsGeneric() ? null :
+            var includeVariantItems = rules.CovariantTypesInResolvedCollection;
+
+            var itemsWithVariance = !includeVariantItems || !requiredItemType.IsGeneric() ? null :
                 // Check generic type with compatible variance, 
                 // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
                 container.GetServiceRegistrations().Where(x =>
@@ -2313,14 +2319,14 @@ namespace DryIoc
         }
 
         /// <summary>Flag instructs to include covariant compatible types in resolved collection, array and many.</summary>
-        public bool IncludeCovariantTypesToResolvedCollection { get; private set; }
+        public bool CovariantTypesInResolvedCollection { get; private set; }
 
-        /// <summary>Sets flag <see cref="IncludeCovariantTypesToResolvedCollection"/>.</summary>
+        /// <summary>Unsets flag <see cref="CovariantTypesInResolvedCollection"/>.</summary>
         /// <returns>Returns new rules with flag set.</returns>
-        public Rules WithIncludeCovariantTypesToResolvedCollection()
+        public Rules WithoutCovariantTypesInResolvedCollection()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.IncludeCovariantTypesToResolvedCollection = true;
+            newRules.CovariantTypesInResolvedCollection = false;
             return newRules;
         }
 
@@ -2337,6 +2343,7 @@ namespace DryIoc
             ThrowIfDependencyHasShorterReuseLifespan = true;
             ImplicitCheckForReuseMatchingScope = true;
             SingletonOptimization = true;
+            CovariantTypesInResolvedCollection = true;
         }
 
         #endregion
