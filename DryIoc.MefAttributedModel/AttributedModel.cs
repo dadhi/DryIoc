@@ -226,7 +226,7 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var container = request.Container;
-            reflectedType = container.UnwrapServiceType(request.RequiredServiceType ?? reflectedType);
+            reflectedType = container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? reflectedType);
             var metadata = meta.Metadata;
             var factory = container.GetAllServiceFactories(reflectedType)
                 .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
@@ -243,7 +243,7 @@ namespace DryIoc.MefAttributedModel
 
             var container = request.Container;
             serviceType = import.ContractType 
-                ?? container.UnwrapServiceType(request.RequiredServiceType ?? serviceType);
+                ?? container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? serviceType);
             var serviceKey = import.ContractKey;
 
             if (!container.IsRegistered(serviceType, serviceKey))

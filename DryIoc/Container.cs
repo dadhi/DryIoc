@@ -212,7 +212,7 @@ namespace DryIoc
                 return ResolutionScopeParamExpr;
 
             var parent = request.Enumerate().Last();
-            var registeredServiceType = request.Container.UnwrapServiceType(parent.RequiredServiceType ?? parent.ServiceType);
+            var registeredServiceType = request.Container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(parent.RequiredServiceType ?? parent.ServiceType);
             var parentServiceTypeExpr = request.Container.GetOrAddStateItemExpression(registeredServiceType, typeof(Type));
             var parentServiceKeyExpr = Expression.Convert(request.Container.GetOrAddStateItemExpression(parent.ServiceKey), typeof(object));
             return Expression.Call(ScopesExpr, "GetOrCreateResolutionScope", ArrayTools.Empty<Type>(),
@@ -679,7 +679,7 @@ namespace DryIoc
             return decorators;
         }
 
-        Type IContainer.UnwrapServiceType(Type serviceType)
+        Type IContainer.GetWrappedTypeOrNullIfWrapsRequiredServiceType(Type serviceType)
         {
             var wrappedType = serviceType.GetElementTypeOrNull();
             if (wrappedType == null)
@@ -695,7 +695,7 @@ namespace DryIoc
             }
 
             return wrappedType == null ? serviceType 
-                : ((IContainer)this).UnwrapServiceType(wrappedType);
+                : ((IContainer)this).GetWrappedTypeOrNullIfWrapsRequiredServiceType(wrappedType);
         }
 
         /// <summary>For given instance resolves and sets properties and fields.</summary>
@@ -1840,14 +1840,12 @@ namespace DryIoc
             var collectionType = request.ServiceType;
             if (request.Container.Rules.ResolveIEnumerableAsLazyEnumerable &&
                 collectionType.GetGenericDefinitionOrNull() == typeof(IEnumerable<>))
-            {
                 return GetLazyEnumerableExpressionOrDefault(request);
-            }
 
             var itemType = collectionType.GetElementTypeOrNull() ?? collectionType.GetGenericParamsAndArgs()[0];
 
             var container = request.Container;
-            var requiredItemType = container.UnwrapServiceType(request.RequiredServiceType ?? itemType);
+            var requiredItemType = container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? itemType);
 
             var items = container.GetAllServiceFactories(requiredItemType);
             var itemsWithVariance = !requiredItemType.IsGeneric() ? null :
@@ -1911,9 +1909,9 @@ namespace DryIoc
             if (IsNestedInFuncWithArgs(request))
                 return null;
 
-            var wrapperType = request.ServiceType;
-            var itemServiceType = wrapperType.GetGenericParamsAndArgs()[0];
-            var itemRequiredServiceType = request.Container.UnwrapServiceType(request.RequiredServiceType ?? itemServiceType);
+            var itemServiceType = request.ServiceType.GetGenericParamsAndArgs()[0];
+            var itemRequiredServiceType = request.Container
+                .GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? itemServiceType);
 
             // Composite pattern support: find composite parent key to exclude from result.
             object compositeParentKey = null;
@@ -2009,7 +2007,7 @@ namespace DryIoc
             var serviceType = typeArgs[0];
 
             var container = request.Container;
-            var requiredServiceType = container.UnwrapServiceType(request.RequiredServiceType ?? serviceType);
+            var requiredServiceType = container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? serviceType);
             var serviceKey = request.ServiceKey;
 
             var result = container.GetAllServiceFactories(requiredServiceType)
@@ -2036,7 +2034,7 @@ namespace DryIoc
         private static Expression GetReusedObjectWrapperExpressionOrDefault(Request request)
         {
             var wrapperType = request.ServiceType;
-            var serviceType = request.Container.UnwrapServiceType(request.RequiredServiceType ?? wrapperType);
+            var serviceType = request.Container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? wrapperType);
             var serviceRequest = request.Push(serviceType);
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
             if (serviceFactory == null)
@@ -3676,10 +3674,10 @@ namespace DryIoc
                 }
                 else
                 {
-                    var wrappedType = request.Container.UnwrapServiceType(serviceType);
+                    var wrappedType = request.Container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(serviceType);
                     if (wrappedType != null)
                     {
-                        var wrappedRequiredType = request.Container.UnwrapServiceType(requiredServiceType);
+                        var wrappedRequiredType = request.Container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(requiredServiceType);
                         wrappedType.ThrowIfNotImplementedBy(wrappedRequiredType, Error.WrappedNotAssignableFromRequiredType, request);                           
                     }
                 }
@@ -6652,7 +6650,7 @@ namespace DryIoc
         /// Otherwise, method returns the input <paramref name="serviceType"/>.</summary>
         /// <param name="serviceType">Type to unwrap. Method will return early if type is not generic.</param>
         /// <returns>Unwrapped service type in case it corresponds to registered generic wrapper, or input type in all other cases.</returns>
-        Type UnwrapServiceType(Type serviceType);
+        Type GetWrappedTypeOrNullIfWrapsRequiredServiceType(Type serviceType);
 
         /// <summary>Adds factory expression to cache identified by factory ID (<see cref="Factory.FactoryID"/>).</summary>
         /// <param name="factoryID">Key in cache.</param>
