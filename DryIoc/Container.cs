@@ -43,7 +43,7 @@ namespace DryIoc
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
         /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadScopeContext"/>.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
-            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), new Scope(), scopeContext ?? GetDefaultScopeContext()) { }
+            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), new SingletonScope(), scopeContext ?? GetDefaultScopeContext()) { }
 
         /// <summary>Creates new container with configured rules.</summary>
         /// <param name="configure">Delegate gets <see cref="DryIoc.Rules.Default"/> as input and may return configured rules.</param>
@@ -3209,10 +3209,10 @@ namespace DryIoc
             Throw.If(reuse is ResolutionScopeReuse, Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
 
             reuse = reuse ?? Reuse.Singleton;
+            var request = container.EmptyRequest.Push(serviceType, serviceKey);
 
             if (ifAlreadyRegistered == IfAlreadyRegistered.Replace) // Try get existing factory.
             {
-                var request = container.EmptyRequest.Push(serviceType, serviceKey);
                 var registeredFactory = container.GetServiceFactoryOrDefault(request);
 
                 // If existing factory is the same kind: reuse and setup-wise, then we can just replace value in scope.
@@ -3220,9 +3220,10 @@ namespace DryIoc
                     registeredFactory.Reuse == reuse &&
                     registeredFactory.Setup == Setup.Default)
                 {
-                    reuse.GetScopeOrDefault(request)
-                        .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
-                        .SetOrAdd(registeredFactory.FactoryID, instance);
+                    var scope = reuse.GetScopeOrDefault(request)
+                        .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse);
+                    var scopedInstanceId = reuse.GetScopedItemIdOrSelf(registeredFactory.FactoryID, request);
+                    scope.SetOrAdd(scopedInstanceId, instance);
                     return;
                 }
             }
@@ -3248,9 +3249,12 @@ namespace DryIoc
             // Create factory to locate instance in scope.
             var instanceFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse, setup);
             if (container.Register(instanceFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
-                reuse.GetScopeOrDefault(container.EmptyRequest)
-                    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
-                    .SetOrAdd(instanceFactory.FactoryID, instance);
+            {
+                var scope = reuse.GetScopeOrDefault(container.EmptyRequest)
+                    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse);
+                var scopedInstanceId = reuse.GetScopedItemIdOrSelf(instanceFactory.FactoryID, request);
+                scope.SetOrAdd(scopedInstanceId, instance);
+            }
         }
 
         private static Expression GetThrowInstanceNoLongerAvailable(Request r)
@@ -4688,14 +4692,14 @@ namespace DryIoc
         private Expression GetScopedExpressionOrDefault(Expression serviceExpr, IReuse reuse, Request request, Type requiredWrapperType)
         {
             var getScopeExpr = reuse.GetScopeExpression(request);
-
             var serviceType = serviceExpr.Type;
-            var factoryIdExpr = Expression.Constant(FactoryID);
+            var scopedInstanceId = reuse.GetScopedItemIdOrSelf(FactoryID, request);
+            var scopedInstanceIdExpr = Expression.Constant(scopedInstanceId);
 
             var wrapperTypes = Setup.ReuseWrappers;
             if (wrapperTypes.IsNullOrEmpty())
                 return Expression.Convert(
-                    Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(), factoryIdExpr, 
+                    Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(), scopedInstanceIdExpr, 
                         Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>())), serviceType);
 
             // First wrap serviceExpr with wrapper Wrap method.
@@ -4715,7 +4719,7 @@ namespace DryIoc
 
             // Makes call like this: scope.GetOrAdd(id, () => wrapper1.Wrap(wrapper0.Wrap(new Service)))
             var getScopedServiceExpr = Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
-                factoryIdExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
+                scopedInstanceIdExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
 
             // Unwrap wrapped service in backward order like this: wrapper0.Unwrap(wrapper1.Unwrap(scope.GetOrAdd(...)))
             for (var i = wrapperTypes.Length - 1; i >= 0; --i)
@@ -4738,12 +4742,13 @@ namespace DryIoc
         {
             var factoryDelegate = serviceExpr.CompileToDelegate(request.Container.Rules);
             var scope = request.Container.SingletonScope;
+            var scopedInstanceId = scope.GetScopedItemIdOrSelf(FactoryID);
 
             var wrapperTypes = Setup.ReuseWrappers;
             var serviceType = serviceExpr.Type;
             if (wrapperTypes == null || wrapperTypes.Length == 0)
                 return request.Container.GetOrAddStateItemExpression(
-                    scope.GetOrAdd(FactoryID, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope)),
+                    scope.GetOrAdd(scopedInstanceId, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope)),
                     serviceType);
 
             var wrappers = new IReuseWrapperFactory[wrapperTypes.Length];
@@ -4757,7 +4762,7 @@ namespace DryIoc
                 wrappers[i] = wrapper;
             }
 
-            var wrappedService = scope.GetOrAdd(FactoryID,
+            var wrappedService = scope.GetOrAdd(scopedInstanceId,
                 () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, null));
 
             for (var i = wrapperTypes.Length - 1; i >= 0; --i)
@@ -5565,9 +5570,11 @@ namespace DryIoc
         /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
         void SetOrAdd(int id, object item);
 
-        /// <summary>Adds mapping between id and index on resolution.</summary>
-        /// <param name="id"></param> <returns></returns>
-        int ReserveItemIndex(int id);
+        /// <summary>Creates id/index for new item to be stored in scope. 
+        /// If separate index is not supported then just returns back passed <paramref name="externalId"/>.</summary>
+        /// <param name="externalId">Id to be mapped to new item id/index</param> 
+        /// <returns>New it/index or just passed <paramref name="externalId"/></returns>
+        int GetScopedItemIdOrSelf(int externalId);
     }
 
     /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
@@ -5595,11 +5602,11 @@ namespace DryIoc
             _items = ImTreeMapIntToObj.Empty;
         }
 
-        /// <summary>Returns the passed id without providing separate index.</summary>
-        /// <param name="id"></param> <returns></returns>
-        public int ReserveItemIndex(int id)
+        /// <summary>Just returns back <paramref name="externalId"/> without any changes.</summary>
+        /// <param name="externalId">Id will be returned back.</param> <returns><paramref name="externalId"/>.</returns>
+        public int GetScopedItemIdOrSelf(int externalId)
         {
-            return id;
+            return externalId;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -5730,12 +5737,12 @@ namespace DryIoc
             _itemCreationLocker = new object();
         }
 
-        /// <summary>Adds mapping between id and index on resolution.</summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        public int ReserveItemIndex(int id)
+        /// <summary>Adds mapping between provide id and index for new stored item. Returns index.</summary>
+        /// <param name="externalId">External id mapped to internal index.</param>
+        /// <returns>Already mapped index, or newly created.</returns>
+        public int GetScopedItemIdOrSelf(int externalId)
         {
-            var index = _factoryIdToIndexMap.GetValueOrDefault(id);
+            var index = _factoryIdToIndexMap.GetValueOrDefault(externalId);
             if (index != null)
                 return (int)index;
 
@@ -5743,7 +5750,7 @@ namespace DryIoc
             if (newIndex >= _items.Length)
                 EnsureIndexExist(newIndex);
 
-            Ref.Swap(ref _factoryIdToIndexMap, idToIndex => idToIndex.AddOrUpdate(id, newIndex));
+            Ref.Swap(ref _factoryIdToIndexMap, idToIndex => idToIndex.AddOrUpdate(externalId, newIndex));
             return newIndex;
         }
 
@@ -5803,7 +5810,8 @@ namespace DryIoc
                 var size = items.Length;
                 if (index < size)
                     return items;
-                var newSize = Math.Max(index, Math.Min(size + size, size + MaxItemArrayIncreaseStep));
+
+                var newSize = Math.Max(index + 1, size + MaxItemArrayIncreaseStep);
                 var newItems = new object[newSize];
                 Array.Copy(items, 0, newItems, 0, size);
                 return newItems;
@@ -5945,6 +5953,11 @@ namespace DryIoc
         /// <remarks>Result expression should be static: should Not create closure on any objects. 
         /// If you require to reference some item from outside, put it into <see cref="IContainer.ResolutionStateCache"/>.</remarks>
         Expression GetScopeExpression(Request request);
+
+        /// <summary>Returns special id/index to lookup scoped item, or original passed factory id otherwise.</summary>
+        /// <param name="factoryID">Id to map to item id/index.</param> <param name="request">Context to get access to scope.</param>
+        /// <returns>id/index or source factory id.</returns>
+        int GetScopedItemIdOrSelf(int factoryID, Request request);
     }
 
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
@@ -5967,6 +5980,15 @@ namespace DryIoc
         public Expression GetScopeExpression(Request request)
         {
             return Expression.Property(Container.ScopesExpr, "SingletonScope");
+        }
+
+        /// <summary>Returns index of new item in singleton scope.</summary>
+        /// <param name="factoryID">Factory id to map to new item index.</param>
+        /// <param name="request">Context to get singleton scope from.</param>
+        /// <returns>Index in scope.</returns>
+        public int GetScopedItemIdOrSelf(int factoryID, Request request)
+        {
+            return request.Container.SingletonScope.GetScopedItemIdOrSelf(factoryID);
         }
 
         /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
@@ -6008,6 +6030,14 @@ namespace DryIoc
             var nameExpr = request.Container.GetOrAddStateItemExpression(Name, typeof(object));
             return Expression.Call(Container.ScopesExpr, "GetCurrentNamedScope", ArrayTools.Empty<Type>(),
                 nameExpr, Expression.Constant(true));
+        }
+
+        /// <summary>Just returns back passed id without changes.</summary>
+        /// <param name="factoryID">Id to return back.</param> <param name="request">Ignored.</param>
+        /// <returns><paramref name="factoryID"/></returns>
+        public int GetScopedItemIdOrSelf(int factoryID, Request request)
+        {
+            return factoryID;
         }
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
@@ -6063,6 +6093,14 @@ namespace DryIoc
                 request.Container.GetOrAddStateItemExpression(_serviceKey, typeof(object)),
                 Expression.Constant(_outermost, typeof(bool)),
                 Expression.Constant(true, typeof(bool)));
+        }
+
+        /// <summary>Just returns back passed id without changes.</summary>
+        /// <param name="factoryID">Id to return back.</param> <param name="request">Ignored.</param>
+        /// <returns><paramref name="factoryID"/></returns>
+        public int GetScopedItemIdOrSelf(int factoryID, Request request)
+        {
+            return factoryID;
         }
 
         /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
