@@ -5824,6 +5824,9 @@ namespace DryIoc
             if (recyclableItem != null && !recyclableItem.IsRecycled)
                 return recyclableItem;
 
+            if (itemIndex >= _items.Length)
+                EnsureIndexExist(itemIndex);
+
             object item;
             lock (_itemCreationLocker)
             {

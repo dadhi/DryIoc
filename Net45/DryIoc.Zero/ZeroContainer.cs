@@ -56,7 +56,7 @@ namespace DryIoc.Zero
         /// <summary>Creates container.</summary>
         /// <param name="scopeContext">(optional) Scope context, by default <see cref="ThreadScopeContext"/>.</param>
         public ZeroContainer(IScopeContext scopeContext = null)
-            : this(Ref.Of(ImTreeMap.Empty), Ref.Of(ImTreeMap.Empty), new Scope(), scopeContext ?? new ThreadScopeContext(), null, 0) { }
+            : this(Ref.Of(ImTreeMap.Empty), Ref.Of(ImTreeMap.Empty), new SingletonScope(), scopeContext ?? new ThreadScopeContext(), null, 0) { }
         
         private ZeroContainer(Ref<ImTreeMap> defaultFactories, Ref<ImTreeMap> keyedFactories, IScope singletonScope, 
             IScopeContext scopeContext, IScope openedScope, int disposed)
