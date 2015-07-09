@@ -6,7 +6,7 @@ using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
-    [TestFixture]
+    [TestFixture]as
     public class ReuseInCurrentScopeTests
     {
         [Test]
@@ -79,13 +79,12 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void CanNot_open_deeply_nested_scope_from_root_container()
+        public void Can_open_many_parallel_scopes()
         {
             var container = new Container();
-            using (container.OpenScope())
+            using (var scope = container.OpenScope())
             {
-                var ex = Assert.Throws<ContainerException>(() => container.OpenScope());
-                Assert.That(ex.Error, Is.EqualTo(Error.NotDirectScopeParent));
+                Assert.DoesNotThrow(() => scope.OpenScope().Dispose());
             }
         }
 
@@ -120,7 +119,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Calling_Func_of_scoped_service_outside_of_scope_should_Throw()
         {
-            var container = new Container();
+            var container = new Container(scopeContext: new ThreadScopeContext());
             container.Register<Log>(Reuse.InCurrentScope);
 
             var getLog = container.Resolve<Func<Log>>();
@@ -267,7 +266,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Factory_should_return_different_service_when_called_in_different_scopes()
         {
-            var container = new Container();
+            var container = new Container(scopeContext: new ThreadScopeContext());
 
             container.Register<IService, IndependentService>(Reuse.InCurrentScope);
             container.Register<ServiceWithFuncConstructorDependency>(Reuse.Singleton);
@@ -283,6 +282,7 @@ namespace DryIoc.UnitTests
             scope.Dispose();
 
             Assert.That(second, Is.Not.SameAs(first));
+            container.Dispose();
         }
 
         [Test]

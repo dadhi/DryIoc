@@ -407,10 +407,10 @@ namespace DryIoc.UnitTests
             container.Register<Client>(Reuse.Singleton);
             container.Register<ILogger, FastLogger>(Reuse.InCurrentScope);
 
-            using (container.OpenScope())
+            using (var scope = container.OpenScope())
             {
                 var ex = Assert.Throws<ContainerException>(() =>
-                    container.Resolve<Client>());
+                    scope.Resolve<Client>());
 
                 Assert.That(ex.Error, Is.EqualTo(Error.DependencyHasShorterReuseLifespan));
             }

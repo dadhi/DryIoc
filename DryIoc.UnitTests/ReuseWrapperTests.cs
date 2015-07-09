@@ -276,8 +276,8 @@ namespace DryIoc.UnitTests
                 setup: Setup.With(reuseWrappers: typeof(ReuseSwapable).One()));
 
             IService service;
-            using (container.OpenScope())
-                service = container.Resolve<IService>();
+            using (var scope = container.OpenScope())
+                service = scope.Resolve<IService>();
 
             Assert.IsTrue(((DisposableService)service).IsDisposed);
         }
