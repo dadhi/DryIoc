@@ -6,7 +6,7 @@ using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
-    [TestFixture]as
+    [TestFixture]
     public class ReuseInCurrentScopeTests
     {
         [Test]
@@ -266,7 +266,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Factory_should_return_different_service_when_called_in_different_scopes()
         {
-            var container = new Container(scopeContext: new ThreadScopeContext());
+            var container = new Container(scopeContext: ScopeContext.Default);
 
             container.Register<IService, IndependentService>(Reuse.InCurrentScope);
             container.Register<ServiceWithFuncConstructorDependency>(Reuse.Singleton);
@@ -291,12 +291,12 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Blah>(Reuse.InCurrentScope);
 
-            using (var scope = container.OpenScopeWithoutContext())
+            using (var scope = container.OpenScope())
             {
                 var blah = scope.Resolve<Blah>();
                 Assert.AreSame(blah, scope.Resolve<Blah>());
 
-                using (var scope2 = ((Container)scope).OpenScopeWithoutContext())
+                using (var scope2 = ((Container)scope).OpenScope())
                     Assert.AreNotSame(blah, scope2.Resolve<Blah>());
             }
         }
@@ -307,12 +307,12 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Blah>(Reuse.InCurrentNamedScope("hey"));
 
-            using (var scope = container.OpenScopeWithoutContext("hey"))
+            using (var scope = container.OpenScope("hey"))
             {
                 var blah = scope.Resolve<Blah>();
                 Assert.AreSame(blah, scope.Resolve<Blah>());
 
-                using (var scope2 = ((Container)scope).OpenScopeWithoutContext())
+                using (var scope2 = ((Container)scope).OpenScope())
                     Assert.AreSame(blah, scope2.Resolve<Blah>());
             }
 
@@ -325,8 +325,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Blah>(Reuse.InCurrentScope);
 
-            var scope1 = container.OpenScopeWithoutContext();
-            var scope2 = container.OpenScopeWithoutContext();
+            var scope1 = container.OpenScope();
+            var scope2 = container.OpenScope();
 
             var blah1 = scope1.Resolve<Blah>();
             var blah2 = scope2.Resolve<Blah>();

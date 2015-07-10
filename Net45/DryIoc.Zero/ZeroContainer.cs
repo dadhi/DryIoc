@@ -56,7 +56,7 @@ namespace DryIoc.Zero
         /// <summary>Creates container.</summary>
         /// <param name="scopeContext">(optional) Scope context, by default <see cref="ThreadScopeContext"/>.</param>
         public ZeroContainer(IScopeContext scopeContext = null)
-            : this(Ref.Of(ImTreeMap.Empty), Ref.Of(ImTreeMap.Empty), new SingletonScope(), scopeContext ?? new ThreadScopeContext(), null, 0) { }
+            : this(Ref.Of(ImTreeMap.Empty), Ref.Of(ImTreeMap.Empty), new SingletonScope(), scopeContext, null, 0) { }
         
         private ZeroContainer(Ref<ImTreeMap> defaultFactories, Ref<ImTreeMap> keyedFactories, IScope singletonScope, 
             IScopeContext scopeContext, IScope openedScope, int disposed)
@@ -82,14 +82,16 @@ namespace DryIoc.Zero
         public ZeroContainer OpenScope()
         {
             ThrowIfContainerDisposed();
-            var newOpenedScope = new Scope(OpenedScope);
+
+            var nestedOpenedScope = new Scope(OpenedScope);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
-            ScopeContext.SetCurrent(scope =>
-                 newOpenedScope.ThrowIf(scope != OpenedScope, Error.NotDirectScopeParent, OpenedScope, scope));
+            if (ScopeContext != null)
+                ScopeContext.SetCurrent(scope =>
+                     nestedOpenedScope.ThrowIf(scope != OpenedScope, Error.NotDirectScopeParent, OpenedScope, scope));
 
-            return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, newOpenedScope,
-                _disposed);
+            return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, 
+                nestedOpenedScope, _disposed);
         }
 
         /// <summary>Creates new container with new opened scope independent from context.</summary>

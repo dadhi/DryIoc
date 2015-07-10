@@ -43,7 +43,7 @@ namespace DryIoc
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
         /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadScopeContext"/>.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
-            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), new SingletonScope(), scopeContext ?? GetDefaultScopeContext()) { }
+            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), new SingletonScope(), scopeContext) { }
 
         /// <summary>Creates new container with configured rules.</summary>
         /// <param name="configure">Delegate gets <see cref="DryIoc.Rules.Default"/> as input and may return configured rules.</param>
@@ -59,7 +59,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var rules = configure == null ? Rules : configure(Rules);
-            scopeContext = scopeContext ?? _scopeContext ?? GetDefaultScopeContext();
+            scopeContext = scopeContext ?? _scopeContext;
             if (rules == Rules && scopeContext == _scopeContext)
                 return this;
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
@@ -121,33 +121,24 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
 
-            scopeName = scopeName ?? (_openedScope == null ? _scopeContext.RootScopeName : null);
-            var newOpenedScope = new Scope(_openedScope, scopeName);
+            if (scopeName == null)
+                scopeName = _openedScope != null ? null
+                    : _scopeContext != null ? _scopeContext.RootScopeName
+                    : NoContextRootScopeName;
+
+            var nestedOpenedScope = new Scope(_openedScope, scopeName);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
-            _scopeContext.SetCurrent(scope =>
-                 newOpenedScope.ThrowIf(scope != _openedScope, Error.NotDirectScopeParent, _openedScope, scope));
+            if (_scopeContext != null)
+                _scopeContext.SetCurrent(scope =>
+                     nestedOpenedScope.ThrowIf(scope != _openedScope, Error.NotDirectScopeParent, _openedScope, scope));
 
             var rules = configure == null ? Rules : configure(Rules);
-            return new Container(rules, _registry, _singletonScope, _scopeContext, newOpenedScope, _disposed);
+            return new Container(rules, _registry, _singletonScope, _scopeContext, nestedOpenedScope, _disposed);
         }
 
-        /// <summary>Creates scoped container with scope bound to container itself, and not some ambient context.
-        /// Current container scope will become parent for new scope.</summary>
-        /// <param name="scopeName">(optional) Scope name.</param>
-        /// <returns>New container with all state shared except new created scope and context.</returns>
-        public IContainer OpenScopeWithoutContext(object scopeName = null)
-        {
-            ThrowIfContainerDisposed();
-
-            scopeName = scopeName ?? (_openedScope == null ? NoContextRootScopeName : null);
-            var newOpenedScope = new Scope(_openedScope, scopeName);
-
-            return new Container(Rules, _registry, _singletonScope, /*no context*/null, newOpenedScope, _disposed);
-        }
-
-        /// <summary>Provide root scope name for <see cref="OpenScopeWithoutContext"/></summary>
-        public static readonly object NoContextRootScopeName = typeof(IContainer);
+        /// <summary>Provides root scope name when context is absent.</summary>
+        public static readonly object NoContextRootScopeName = typeof(IContainer).FullName;
 
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
         /// Facade is the new empty container, with the same rules and scope context as current container. 
@@ -534,22 +525,35 @@ namespace DryIoc
                     factory = unknownServiceResolvers[i](request);
 
             if (factory == null && request.IfUnresolved == IfUnresolved.Throw)
-            {
-                var registrations = ((IContainer)this).GetAllServiceFactories(request.ServiceType)
-                    .Aggregate(new StringBuilder(), (s, f) =>
-                        (f.Value.IsMatchingReuseScope(request)
-                            ? s.Append("  ")
-                            : s.Append("  without matching scope "))
-                            .AppendLine(f.ToString()));
-
-                if (registrations.Length != 0)
-                    Throw.It(Error.UnableToResolveFromRegisteredServices,
-                        request, ScopeContext != null ? ScopeContext.GetCurrentOrDefault() : OpenedScope,
-                        request.Scope, registrations);
-                else Throw.It(Error.UnableToResolveUnknownService, request);
-            }
+                ThrowUnableToResolve(request);
 
             return factory;
+        }
+
+        private void ThrowUnableToResolve(Request request)
+        {
+            var registrations = ((IContainer)this).GetAllServiceFactories(request.ServiceType)
+                .Aggregate(new StringBuilder(), (s, f) =>
+                    (f.Value.IsMatchingReuseScope(request)
+                        ? s.Append("  ")
+                        : s.Append("  without matching scope "))
+                        .AppendLine(f.ToString()));
+
+            if (registrations.Length != 0)
+            {
+                Throw.It(Error.UnableToResolveFromRegisteredServices,
+                    request, ScopeContext != null ? ScopeContext.GetCurrentOrDefault() : OpenedScope,
+                    request.Scope, registrations);
+            }
+            else
+            {
+                if (!Rules.FallbackContainers.IsNullOrEmpty())
+                {
+                    ; // TODO: Integrate into error message or even change Fallback container resolvers to throw.
+                }
+
+                Throw.It(Error.UnableToResolveUnknownService, request);
+            }
         }
 
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
@@ -1403,16 +1407,6 @@ namespace DryIoc
             _containerWeakRef = new ContainerWeakRef(this);
             _emptyRequest = Request.CreateEmpty(_containerWeakRef);
         }
-
-        static IScopeContext GetDefaultScopeContext()
-        {
-            IScopeContext context = null;
-            GetDefaultScopeContext(ref context);
-            // ReSharper disable once ConstantNullCoalescingCondition
-            return context ?? new ThreadScopeContext();
-        }
-
-        static partial void GetDefaultScopeContext(ref IScopeContext resultContext);
 
         #endregion
     }
@@ -5903,17 +5897,25 @@ namespace DryIoc
     }
 
     /// <summary>Provides scope context by convention.</summary>
-    public static class ScopeContext
+    public static partial class ScopeContext
     {
-        //public static IScopeContext Default { get { return GetDefaultScopeContext(); } }
+        /// <summary>Default scope context.</summary>
+        public static IScopeContext Default
+        {
+            get { return _default ?? (_default = GetDefaultScopeContext()); }
+        }
 
-        //static IScopeContext GetDefaultScopeContext()
-        //{
-        //    IScopeContext context = null;
-        //    GetDefaultScopeContext(ref context);
-        //    // ReSharper disable once ConstantNullCoalescingCondition
-        //    return context ?? new ThreadScopeContext();
-        //}
+        static partial void GetDefaultScopeContext(ref IScopeContext resultContext);
+
+        private static IScopeContext GetDefaultScopeContext()
+        {
+            IScopeContext context = null;
+            GetDefaultScopeContext(ref context);
+            // ReSharper disable once ConstantNullCoalescingCondition
+            return context ?? new ThreadScopeContext();
+        }
+
+        private static IScopeContext _default;
     }
 
     /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
@@ -6664,12 +6666,6 @@ namespace DryIoc
         /// ]]></code></example>
         IContainer OpenScope(object name = null, Func<Rules, Rules> configure = null);
 
-        /// <summary>Creates scoped container with scope bound to container itself, and not some ambient context.
-        /// Current container scope will become parent for new scope.</summary>
-        /// <param name="scopeName">(optional) Scope name.</param>
-        /// <returns>New container with all state shared except new created scope and context.</returns>
-        IContainer OpenScopeWithoutContext(object scopeName = null);
-
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
         /// Facade shares rules with this container, everything else is its own. 
         /// It could be used for instance to create Test facade over original container with replacing some services with test ones.</summary>
@@ -6881,7 +6877,7 @@ namespace DryIoc
 
             UnableToResolveUnknownService = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
-                "Please register service or add Rules.WithUnknownServiceResolver(...)."),
+                "Please register service or specify Rules.WithUnknownServiceResolver."),
             UnableToResolveFromRegisteredServices = Of(
                 "Unable to resolve {0}" + Environment.NewLine +
                 "Where CurrentScope={1}" + Environment.NewLine +

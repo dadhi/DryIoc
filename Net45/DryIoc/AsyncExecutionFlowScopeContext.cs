@@ -30,7 +30,7 @@ namespace DryIoc
     using System.Runtime.Remoting.Messaging;
     using System.Diagnostics.CodeAnalysis;
 
-    partial class Container
+    static partial class ScopeContext
     {
         [SuppressMessage("ReSharper", "RedundantAssignment", Justification = "ref is the only way for partial methods.")]
         static partial void GetDefaultScopeContext(ref IScopeContext resultContext)

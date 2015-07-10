@@ -50,7 +50,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_inject_current_scope_service_from_parent_container_After_it_was_resolved_from_parent2()
+        public void Can_inject_current_scope_service_from_fallback_container()
         {
             var parent = new Container();
             parent.Register<IFruit, Mango>(Reuse.InCurrentScope);
@@ -60,10 +60,8 @@ namespace DryIoc.UnitTests
 
             using (var childScope = child.OpenScope())
             {
-                var parentFruit = childScope.Resolve<IFruit>();
-                var childJuice = child.Resolve<IJuice>();
-
-                Assert.That(parentFruit, Is.SameAs(childJuice.Fruit));
+                var juice = childScope.Resolve<IJuice>();
+                Assert.IsInstanceOf<Mango>(juice.Fruit);
             }
 
             Assert.That(() => child.Resolve<IJuice>(), Throws.InstanceOf<ContainerException>());
@@ -191,10 +189,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var parent = container.OpenScopeWithoutContext("parent");
+            var parent = container.OpenScope("parent");
             parent.Register<Foo>(Reuse.InCurrentNamedScope("parent"));
 
-            var firstChild = parent.OpenScopeWithoutContext();
+            var firstChild = parent.OpenScope();
             var firstFoo = firstChild.Resolve<Foo>();
 
             firstChild.Register<Blah>(Reuse.InCurrentScope);
@@ -205,7 +203,7 @@ namespace DryIoc.UnitTests
             Assert.IsFalse(firstFoo.Disposed); // firstFoo shouldn't be disposed
             Assert.IsTrue(firstBlah.Disposed); // firstBlah should be disposed
 
-            var secondChild = parent.OpenScopeWithoutContext();
+            var secondChild = parent.OpenScope();
             secondChild.Resolve<Foo>(); // Resolve<Foo>() shouldn't throw
 
             parent.Dispose();   // Parent scope is disposed.
