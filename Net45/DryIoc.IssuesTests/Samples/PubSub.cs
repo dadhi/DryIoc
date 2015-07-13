@@ -49,7 +49,7 @@ namespace DryIoc.IssuesTests.Samples
         }
 
         [Test, Ignore]
-        public void Can_subscribe_attributed_subscriber2()
+        public void Can_subscribe_attributed_subscriber_with_decorator()
         {
             var container = new Container();
             container.Register<PubSubHub>(Reuse.Singleton);

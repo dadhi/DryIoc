@@ -343,24 +343,20 @@ namespace DryIoc.UnitTests
 
         [Test]
         [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
-        public void ReRegister_singleton()
+        public void ReRegister_singleton_without_recycleable()
         {
-            IContainer c = new Container();
+            var container = new Container();
             // before request
-            c.Register<IContext, Context1>(Reuse.Singleton, 
-                setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable.One()));
+            container.Register<IContext, Context1>(Reuse.Singleton);
 
-            var r1 = c.Resolve<IContext>();
+            var r1 = container.Resolve<IContext>();
             r1.Data = "before";
 
-            c.Register<IContext, Context2>(Reuse.Singleton, 
-                ifAlreadyRegistered: IfAlreadyRegistered.Replace,
-                setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable.One()));
+            container.Register<IContext, Context2>(Reuse.Singleton,
+                ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
-            c.Resolve<ReuseRecyclable>(typeof(IContext)).Recycle();
-
-            var r2 = c.Resolve<IContext>();
-            var r3 = c.Resolve<IContext>();
+            var r2 = container.Resolve<IContext>();
+            var r3 = container.Resolve<IContext>();
             Assert.AreNotEqual(r1, r2);
             Assert.AreEqual(r2, r3);
             Assert.AreEqual(null, r2.Data);
@@ -395,26 +391,26 @@ namespace DryIoc.UnitTests
 
         [Test]
         [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
-        public void ReRegister_dependency_of_singleton()
+        public void ReRegister_dependency_of_singleton_without_recyclable()
         {
             var c = new Container();
-            
+
             // If we know that Logger could be changed/re-registered, then register it as dynamic dependency
             c.Register<ILogger, Logger1>(setup: Setup.With(openResolutionScope: true));
-
-            c.Register<UseLogger1>(Reuse.Singleton, setup: Setup.With(reuseWrappers: ReuseWrapper.Recyclable.One()));
+            c.Register<UseLogger1>(Reuse.Singleton);
             var user1 = c.Resolve<UseLogger1>();
 
             c.Register<ILogger, Logger2>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             // It is a already resolved singleton,
             // so it should not be affected by new ILogger registration.
-            // To change that, you may recycle singleton to re-create it with new ILogger.
-            var user12 = c.Resolve<UseLogger1>();      
+            
+            var user12 = c.Resolve<UseLogger1>();
             Assert.AreSame(user1, user12);
             Assert.IsInstanceOf<Logger1>(user12.Logger);
 
-            c.Resolve<ReuseRecyclable>(typeof(UseLogger1)).Recycle();
+            // To change that, you you need reregister the singleton to re-create it with new ILogger.
+            c.Register<UseLogger1>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             var u13 = c.Resolve<UseLogger1>();
             Assert.AreNotSame(user12, u13);
             Assert.IsInstanceOf<Logger2>(u13.Logger);

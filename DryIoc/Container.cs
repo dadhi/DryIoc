@@ -98,9 +98,6 @@ namespace DryIoc
             return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
         }
 
-        /// <summary>Container opened scope. May or may not be equal to Current Scope.</summary>
-        public IScope OpenedScope { get { return _openedScope; } }
-
         /// <summary>Returns scope context associated with container.</summary>
         public IScopeContext ScopeContext { get { return _scopeContext; } }
 
@@ -415,6 +412,11 @@ namespace DryIoc
             get { return _singletonScope; }
         }
 
+        IScope IScopeAccess.GetCurrentScope()
+        {
+            return ((IScopeAccess)this).GetCurrentNamedScope(null, false);
+        }
+
         /// <summary>Gets current scope matching the <paramref name="name"/>. 
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <param name="throwIfNotFound">Says to throw if no scope found.</param>
@@ -541,17 +543,11 @@ namespace DryIoc
 
             if (registrations.Length != 0)
             {
-                Throw.It(Error.UnableToResolveFromRegisteredServices,
-                    request, ScopeContext != null ? ScopeContext.GetCurrentOrDefault() : OpenedScope,
-                    request.Scope, registrations);
+                var currentScope = ((IScopeAccess)this).GetCurrentScope();
+                Throw.It(Error.UnableToResolveFromRegisteredServices, request, currentScope, request.Scope, registrations);
             }
             else
             {
-                if (!Rules.FallbackContainers.IsNullOrEmpty())
-                {
-                    ; // TODO: Integrate into error message or even change Fallback container resolvers to throw.
-                }
-
                 Throw.It(Error.UnableToResolveUnknownService, request);
             }
         }
@@ -1178,10 +1174,11 @@ namespace DryIoc
 
                             case IfAlreadyRegistered.Replace:
                                 replacedFactory = oldFactory ?? oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
-                                if (replacedFactory != null)
-                                    ((Factory)newFactory).FactoryID = replacedFactory.FactoryID;
-                                return oldFactories == null
-                                    ? newFactory
+
+                                if (((Factory)newFactory).FactoryID == -1)
+                                    ((Factory)newFactory).FactoryID = replacedFactory != null ? replacedFactory.FactoryID : Factory.GetNextID();
+
+                                return oldFactories == null ? newFactory
                                     : new FactoriesEntry(oldFactories.LastDefaultKey,
                                         oldFactories.Factories.AddOrUpdate(oldFactories.LastDefaultKey, (Factory)newFactory));
 
@@ -1464,18 +1461,18 @@ namespace DryIoc
                 if (condition != null && !condition(request))
                     return null;
 
-                var container = request.Container;
-                var reuse = container.OpenedScope != null
-                    ? Reuse.InCurrentNamedScope(container.OpenedScope.Name)
+                var currentScope = request.Scopes.GetCurrentScope();
+                var reuse = currentScope != null
+                    ? Reuse.InCurrentNamedScope(currentScope.Name)
                     : Reuse.Singleton;
                 
                 if (changeDefaultReuse != null)
                     reuse = changeDefaultReuse(reuse, request);
                 
-                container.RegisterMany(implTypes, reuse, 
+                request.Container.RegisterMany(implTypes, reuse, 
                     serviceTypeCondition: type => type.IsAssignableTo(request.ServiceType));
 
-                return container.GetServiceFactoryOrDefault(request);
+                return request.Container.GetServiceFactoryOrDefault(request);
             };
         }
     }
@@ -1799,11 +1796,7 @@ namespace DryIoc
 
                 .AddOrUpdate(typeof(ReuseSwapable),
                     new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
-                        setup: Setup.ReuseWrapper(ReuseWrapperFactory.Swapable)))
-
-                .AddOrUpdate(typeof(ReuseRecyclable),
-                    new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
-                        setup: Setup.ReuseWrapper(ReuseWrapperFactory.Recyclable)));
+                        setup: Setup.ReuseWrapper(ReuseWrapperFactory.Swapable)));
         }
 
         /// <summary>Unregistered/fallback wrapper resolution rule.</summary>
@@ -3205,6 +3198,24 @@ namespace DryIoc
             reuse = reuse ?? Reuse.Singleton;
             var request = container.EmptyRequest.Push(serviceType, serviceKey);
 
+            var setup = weaklyReferenced && preventDisposal
+                ? WeaklyReferencedHiddenDisposableInstanceSetup
+                : weaklyReferenced ? WeaklyReferencedInstanceSetup
+                : preventDisposal ? HiddenDisposableInstanceSetup
+                : Setup.Default;
+
+            // Wrap instance if re
+            if (setup != Setup.Default)
+            {
+                var reuseWrappers = setup.ReuseWrappers;
+                for (var i = 0; i < reuseWrappers.Length; i++)
+                {
+                    var wrapperFactory = container.GetWrapperFactoryOrDefault(reuseWrappers[i]).ThrowIfNull();
+                    var wrapper = ((Setup.WrapperSetup)wrapperFactory.Setup).ReuseWrapperFactory;
+                    instance = wrapper.Wrap(instance);
+                }
+            }
+
             if (ifAlreadyRegistered == IfAlreadyRegistered.Replace) // Try get existing factory.
             {
                 var registeredFactory = container.GetServiceFactoryOrDefault(request);
@@ -3212,7 +3223,7 @@ namespace DryIoc
                 // If existing factory is the same kind: reuse and setup-wise, then we can just replace value in scope.
                 if (registeredFactory != null &&
                     registeredFactory.Reuse == reuse &&
-                    registeredFactory.Setup == Setup.Default)
+                    registeredFactory.Setup == setup)
                 {
                     var scope = reuse.GetScopeOrDefault(request)
                         .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse);
@@ -3222,26 +3233,10 @@ namespace DryIoc
                 }
             }
 
-            var setup = Setup.Default;
-            if (preventDisposal || weaklyReferenced)
-            {
-                var reuseWrappers = weaklyReferenced ? (preventDisposal 
-                    ? new[] { ReuseWrapper.WeakReference, ReuseWrapper.HiddenDisposable }
-                    : new[] { ReuseWrapper.WeakReference })
-                    : new[] { ReuseWrapper.HiddenDisposable};
-
-                for (var i = 0; i < reuseWrappers.Length; i++)
-                {
-                    var wrapperFactory = container.GetWrapperFactoryOrDefault(reuseWrappers[i]).ThrowIfNull();
-                    var wrapper = ((Setup.WrapperSetup)wrapperFactory.Setup).ReuseWrapperFactory;
-                    instance = wrapper.Wrap(instance);                    
-                }
-
-                setup = Setup.With(reuseWrappers: reuseWrappers);
-            }
-
             // Create factory to locate instance in scope.
             var instanceFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse, setup);
+            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
+                instanceFactory.FactoryID = -1; // NOTE Nasty hack to distinguish instance factories when replaced.
             if (container.Register(instanceFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
             {
                 var scope = reuse.GetScopeOrDefault(container.EmptyRequest)
@@ -3250,6 +3245,13 @@ namespace DryIoc
                 scope.SetOrAdd(scopedInstanceId, instance);
             }
         }
+
+        private static readonly Setup WeaklyReferencedInstanceSetup = 
+            Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference });
+        private static readonly Setup HiddenDisposableInstanceSetup = 
+            Setup.With(reuseWrappers: new[] { ReuseWrapper.HiddenDisposable });
+        private static readonly Setup WeaklyReferencedHiddenDisposableInstanceSetup = 
+            Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference, ReuseWrapper.HiddenDisposable });
 
         private static Expression GetThrowInstanceNoLongerAvailable(Request r)
         {
@@ -4512,12 +4514,18 @@ namespace DryIoc
         /// consumer should call <see cref="IConcreteFactoryProvider.ProvideConcreteFactory"/>  to get concrete factory.</summary>
         public virtual IConcreteFactoryProvider Provider { get { return null; } }
 
+        /// <summary>Get next factory ID in a atomic way.</summary><returns>The ID.</returns>
+        public static int GetNextID()
+        {
+            return Interlocked.Increment(ref _lastFactoryID);
+        }
+
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
         /// <param name="reuse">(optional)</param>
         /// <param name="setup">(optional)</param>
         protected Factory(IReuse reuse = null, Setup setup = null)
         {
-            FactoryID = Interlocked.Increment(ref _lastFactoryID);
+            FactoryID = GetNextID();
             Reuse = reuse;
             Setup = setup ?? Setup.Default;
         }
@@ -4619,8 +4627,7 @@ namespace DryIoc
                 // When singleton scope, and no Func in request chain, and no renewable wrapper used,
                 // then reused instance could be directly inserted into delegate instead of lazy requested from Scope.
                 var canBeInstantiated = reuse is SingletonReuse && request.Container.Rules.SingletonOptimization
-                    && (request.Parent.IsEmpty || !request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc()))
-                    && Setup.ReuseWrappers.IndexOf(t => t.IsAssignableTo(typeof(IRecyclable))) == -1;
+                    && (request.Parent.IsEmpty || !request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc()));
 
                 serviceExpr = canBeInstantiated
                     ? GetInstantiatedSingletonExpressionOrDefault(serviceExpr, request, reuseWrapperType)
@@ -5618,26 +5625,19 @@ namespace DryIoc
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
-            var item = _items.GetValueOrDefault(id);
-            return !(item == null || item is IRecyclable) ? item : TryGetOrAdd(id, createValue, item as IRecyclable);
+            return _items.GetValueOrDefault(id) ?? TryGetOrAdd(id, createValue);
         }
 
-        private object TryGetOrAdd(int id, CreateScopedValue createValue, IRecyclable recyclableItem)
+        private object TryGetOrAdd(int id, CreateScopedValue createValue)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            if (recyclableItem != null && !recyclableItem.IsRecycled)
-                return recyclableItem;
 
             object item;
             lock (_itemCreationLocker)
             {
                 item = _items.GetValueOrDefault(id);
-                if (item != null && !(item is IRecyclable && ((IRecyclable)item).IsRecycled))
+                if (item != null)
                     return item;
-
-                if (item != null) // dispose recyclable item
-                    DisposeItem(item);
-
                 item = createValue();
             }
 
@@ -5763,9 +5763,7 @@ namespace DryIoc
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
-            var item = id < _items.Length ? _items[id] : null;
-            return item != null && !(item is IRecyclable) ? item
-                : TryGetOrAddToArray(id, createValue, item as IRecyclable);
+            return (id < _items.Length ? _items[id] : null) ?? TryGetOrAddToArray(id, createValue);
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -5819,11 +5817,9 @@ namespace DryIoc
             });
         }
 
-        private object TryGetOrAddToArray(int itemIndex, CreateScopedValue createValue, IRecyclable recyclableItem)
+        private object TryGetOrAddToArray(int itemIndex, CreateScopedValue createValue)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            if (recyclableItem != null && !recyclableItem.IsRecycled)
-                return recyclableItem;
 
             if (itemIndex >= _items.Length)
                 EnsureIndexExist(itemIndex);
@@ -5832,12 +5828,8 @@ namespace DryIoc
             lock (_itemCreationLocker)
             {
                 item = _items[itemIndex];
-                if (item != null && !(item is IRecyclable && ((IRecyclable)item).IsRecycled))
+                if (item != null)
                     return item;
-
-                if (item != null) // dispose recyclable item
-                    DisposeItem(item);
-
                 item = createValue();
             }
 
@@ -6226,9 +6218,6 @@ namespace DryIoc
         /// <summary>Factory for <see cref="ReuseSwapable"/>.</summary>
         public static readonly IReuseWrapperFactory Swapable = new SwapableFactory();
 
-        /// <summary>Factory for <see cref="ReuseRecyclable"/>.</summary>
-        public static readonly IReuseWrapperFactory Recyclable = new RecyclableFactory();
-
         #region Implementation
 
         private sealed class HiddenDisposableFactory : IReuseWrapperFactory
@@ -6270,21 +6259,6 @@ namespace DryIoc
             }
         }
 
-        private sealed class RecyclableFactory : IReuseWrapperFactory
-        {
-            public object Wrap(object target)
-            {
-                return new ReuseRecyclable(target);
-            }
-
-            public object Unwrap(object wrapper)
-            {
-                var recyclable = (wrapper as ReuseRecyclable).ThrowIfNull();
-                Throw.If(recyclable.IsRecycled, Error.RecyclableReuseWrapperIsRecycled);
-                return recyclable.Target;
-            }
-        }
-
         #endregion
     }
 
@@ -6302,8 +6276,6 @@ namespace DryIoc
         public static readonly Type HiddenDisposable = typeof(ReuseHiddenDisposable);
         /// <summary>Type of <see cref="ReuseWeakReference"/> added for intellisense discoverability.</summary>
         public static readonly Type WeakReference = typeof(ReuseWeakReference);
-        /// <summary>Type of <see cref="ReuseRecyclable"/> added for intellisense discoverability.</summary>
-        public static readonly Type Recyclable = typeof(ReuseRecyclable);
         /// <summary>Type of <see cref="ReuseSwapable"/> added for intellisense discoverability.</summary>
         public static readonly Type Swapable = typeof(ReuseSwapable);
 
@@ -6412,43 +6384,6 @@ namespace DryIoc
         }
 
         private object _value;
-    }
-
-    /// <summary>If recycled set to True, that command Scope to create and return new value on next access.</summary>
-    public interface IRecyclable
-    {
-        /// <summary>Indicates that value should be recycled.</summary>
-        bool IsRecycled { get; }
-
-        /// <summary>Commands to recycle value.</summary>
-        void Recycle();
-    }
-
-    /// <summary>Wraps value with ability to be recycled, so next access to recycle value with create new value from Container.</summary>
-    public class ReuseRecyclable : IReuseWrapper, IRecyclable
-    {
-        /// <summary>Wraps input value</summary> <param name="value"></param>
-        public ReuseRecyclable(object value)
-        {
-            _value = value;
-        }
-
-        /// <summary>Returns wrapped value.</summary>
-        public object Target
-        {
-            get { return _value; }
-        }
-
-        /// <summary>Indicates that value should be recycled.</summary>
-        public bool IsRecycled { get; private set; }
-
-        /// <summary>Commands to recycle value.</summary>
-        public void Recycle()
-        {
-            IsRecycled = true;
-        }
-
-        private readonly object _value;
     }
 
     /// <summary>Specifies what to return when <see cref="IResolver"/> unable to resolve service.</summary>
@@ -6581,6 +6516,9 @@ namespace DryIoc
         /// <summary>Scope containing container singletons.</summary>
         IScope SingletonScope { get; }
 
+        /// <summary>Current scope.</summary>
+        IScope GetCurrentScope();
+
         /// <summary>Gets current scope matching the <paramref name="name"/>. 
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <returns>Found scope or throws exception.</returns>
@@ -6646,9 +6584,6 @@ namespace DryIoc
         /// <param name="preserveCache">(optional) If set preserves cache if you know what to do.</param>
         /// <returns>New container with copy of all registrations.</returns>
         IContainer WithRegistrationsCopy(bool preserveCache = false);
-
-        /// <summary>Container opened scope. May or may not be equal to Current Scope.</summary>
-        IScope OpenedScope { get; }
 
         /// <summary>Returns scope context associated with container.</summary>
         IScopeContext ScopeContext { get; }

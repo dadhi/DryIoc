@@ -188,14 +188,14 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             // two client versions: root and scoped
-            container.Register<IClient, Client>(setup: Setup.With(condition: r => r.Container.OpenedScope == null));
+            container.Register<IClient, Client>(setup: Setup.With(condition: r => r.Scopes.GetCurrentScope() == null));
             container.Register<IClient, ClientScoped>(Reuse.InCurrentScope);
 
             // uses
             container.Register<IServ, Serv>(Reuse.Singleton);
 
             // two dependency versions:
-            container.Register<IDep, Dep>(setup: Setup.With(condition: r => r.Container.OpenedScope == null));
+            container.Register<IDep, Dep>(setup: Setup.With(condition: r => r.Scopes.GetCurrentScope() == null));
             container.Register<IDep, DepScoped>(Reuse.InCurrentScope);
 
             var client = container.Resolve<IClient>();

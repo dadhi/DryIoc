@@ -177,6 +177,12 @@ namespace DryIoc.Zero
         /// <summary>Scope containing container singletons.</summary>
         public IScope SingletonScope { get; private set; }
 
+        /// <summary>Current scope.</summary>
+        public IScope GetCurrentScope()
+        {
+            return GetCurrentNamedScope(null, false);
+        }
+
         /// <summary>Returns current scope matching the <paramref name="name"/>. 
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <returns>Found scope or throws exception.</returns>
