@@ -1769,20 +1769,20 @@ namespace DryIoc
                 new ExpressionFactory(GetLazyExpressionOrDefault, setup: Setup.Wrapper));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
-                new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperOfTypeArg(1)));
+                new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(Meta<,>),
-                new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperOfTypeArg(0)));
+                new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(LambdaExpression),
-                new ExpressionFactory(GetFactoryExpression, setup: Setup.WrapperOfRequiredServiceType));
+                new ExpressionFactory(GetFactoryExpression, setup: Setup.Wrapper));
 
             Wrappers = Wrappers.AddOrUpdate(typeof(Func<>),
                 new ExpressionFactory(GetFuncExpression, setup: Setup.Wrapper));
 
             for (var i = 0; i < FuncTypes.Length; i++)
                 Wrappers = Wrappers.AddOrUpdate(FuncTypes[i],
-                    new ExpressionFactory(GetFuncExpression, setup: Setup.WrapperOfTypeArg(i)));
+                    new ExpressionFactory(GetFuncExpression, setup: Setup.WrapperWith(i)));
 
             // Reuse wrappers
             Wrappers = Wrappers
@@ -4327,25 +4327,24 @@ namespace DryIoc
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
-        public static readonly Setup Wrapper = new WrapperSetup(-1);
+        public static readonly Setup Wrapper = new WrapperSetup();
 
         /// <summary>Returns generic wrapper setup.</summary>
-        /// <param name="index">(optional) Generic type arg index - default -1 is for single type arg.</param>
-        /// <returns>New setup with specified index or <see cref="Setup.Wrapper"/> otherwise.</returns>
-        public static Setup WrapperOfTypeArg(int index = -1)
+        /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param> 
+        /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
+        /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
+        public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false)
         {
-            return index == -1 ? Wrapper : new WrapperSetup(index);
+            return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType ? Wrapper 
+                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType);
         }
-
-        /// <summary>Required service type setup.</summary>
-        public static Setup WrapperOfRequiredServiceType = new WrapperSetup();
 
         /// <summary>Reuse wrapper setup.</summary>
         /// <param name="reuseWrapperFactory"></param>
         /// <returns>New reuse wrapper setup.</returns>
         public static Setup ReuseWrapper(IReuseWrapperFactory reuseWrapperFactory)
         {
-            return new WrapperSetup(reuseWrapperFactory.ThrowIfNull());
+            return new WrapperSetup(reuseWrapperFactory: reuseWrapperFactory.ThrowIfNull());
         }
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
@@ -4401,23 +4400,19 @@ namespace DryIoc
             public readonly int WrappedServiceTypeArgIndex;
 
             /// <summary>Per name.</summary>
-            public readonly bool WrapsRequiredServiceType;
+            public readonly bool AlwaysWrapsRequiredServiceType;
 
             /// <summary>(optional) Tool for wrapping and unwrapping reused object.</summary>
             public readonly IReuseWrapperFactory ReuseWrapperFactory;
 
             /// <summary>Constructs wrapper setup from optional wrapped type selector and reuse wrapper factory.</summary>
-            /// <param name="wrappedServiceTypeArgIndex"></param> 
-            public WrapperSetup(int wrappedServiceTypeArgIndex)
+            /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param> 
+            /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
+            /// <param name="reuseWrapperFactory">Need to be set for reuse wrapper.</param>
+            public WrapperSetup(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false, IReuseWrapperFactory reuseWrapperFactory = null)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
-            }
-
-            /// <summary>Constructs wrapper setup from optional wrapped type selector and reuse wrapper factory.</summary>
-            /// <param name="reuseWrapperFactory">(optional)</param>
-            public WrapperSetup(IReuseWrapperFactory reuseWrapperFactory = null)
-            {
-                WrapsRequiredServiceType = true;
+                AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
                 ReuseWrapperFactory = reuseWrapperFactory;
             }
 
@@ -4426,22 +4421,19 @@ namespace DryIoc
             /// <returns>Wrapped type or self.</returns>
             public Type GetWrappedTypeOrNullIfWrapsRequired(Type serviceType)
             {
-                if (WrapsRequiredServiceType)
+                if (AlwaysWrapsRequiredServiceType || !serviceType.IsGeneric())
                     return null;
 
-                serviceType.ThrowIf(!serviceType.IsClosedGeneric(), 
-                    Error.GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex);
-                
                 var typeArgs = serviceType.GetGenericParamsAndArgs();
-                var index = WrappedServiceTypeArgIndex;
-                serviceType.ThrowIf(typeArgs.Length > 1 && index == -1, 
+                var typeArgIndex = WrappedServiceTypeArgIndex;
+                serviceType.ThrowIf(typeArgs.Length > 1 && typeArgIndex == -1, 
                     Error.GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex);
 
-                index = index != -1 ? index : 0;
-                serviceType.ThrowIf(index > typeArgs.Length - 1, 
-                    Error.GenericWrapperTypeArgIndexOutOfBounds, index);
+                typeArgIndex = typeArgIndex != -1 ? typeArgIndex : 0;
+                serviceType.ThrowIf(typeArgIndex > typeArgs.Length - 1, 
+                    Error.GenericWrapperTypeArgIndexOutOfBounds, typeArgIndex);
                 
-                return typeArgs[index];
+                return typeArgs[typeArgIndex];
             }
         }
 
@@ -4564,14 +4556,9 @@ namespace DryIoc
 
             if (Setup.FactoryType == FactoryType.Wrapper)
             {
-                if (!serviceType.IsGeneric())
+                if (serviceType.IsGeneric())
                 {
-                    Throw.If(!((Setup.WrapperSetup)Setup).WrapsRequiredServiceType,
-                        Error.NonGenericWrapperMayWrapOnlyRequiredServiceType, serviceType);
-                }
-                else
-                {
-                    if (((Setup.WrapperSetup)Setup).WrapsRequiredServiceType == false)
+                    if (((Setup.WrapperSetup)Setup).AlwaysWrapsRequiredServiceType == false)
                     {
                         var typeArgIndex = ((Setup.WrapperSetup)Setup).WrappedServiceTypeArgIndex;
                         var typeArgCount = serviceType.GetGenericParamsAndArgs().Length;
@@ -6883,8 +6870,6 @@ namespace DryIoc
                 "Generic wrapper type {0} should specify what type arg is wrapped, but it does not."),
             GenericWrapperTypeArgIndexOutOfBounds = Of(
                 "Registered generic wrapper {0} specified type argument index {1} is out of type argument list."),
-            NonGenericWrapperMayWrapOnlyRequiredServiceType = Of(
-                "Registered non-generic wrapper {0} should specify to wrap required service type, but it does not."),
             DependencyHasShorterReuseLifespan = Of(
                 "Dependency {0} has shorter Reuse lifespan than its parent: {1}." + Environment.NewLine +
                 "{2} lifetime is shorter than {3}." + Environment.NewLine +

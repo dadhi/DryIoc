@@ -180,13 +180,15 @@ namespace DryIoc.MefAttributedModel
         public int WrappedServiceTypeArgIndex { get; set; }
 
         /// <summary>Per name.</summary>
-        public bool WrapsRequiredServiceType { get; set; }
+        public bool AlwaysWrapsRequiredServiceType { get; set; }
 
         /// <summary>Creates attribute with <see cref="WrappedServiceTypeArgIndex"/>.</summary>
         /// <param name="wrappedServiceTypeArgIndex">(optional) To use single generic type arg.</param>
-        public AsWrapperAttribute(int wrappedServiceTypeArgIndex = -1)
+        /// <param name="alwaysWrapsRequiredServiceType">(optional) Required for generic wrapper to ignore its type arguments.</param>
+        public AsWrapperAttribute(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false)
         {
             WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
+            AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
         }
     }
 

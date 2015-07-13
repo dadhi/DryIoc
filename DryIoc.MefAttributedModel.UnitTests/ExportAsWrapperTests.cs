@@ -42,14 +42,14 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Exporting_non_generic_wrapper_with_generic_index_should_Throw()
+        public void Exporting_non_generic_wrapper_with_generic_index_should_just_ignore_the_index()
         {
             var container = new Container();
+            container.RegisterExports(typeof(Service), typeof(MyDisposableWronglyExported));
 
-            var ex = Assert.Throws<ContainerException>(() =>
-                container.RegisterExports(typeof(Service), typeof(MyDisposableWronglyExported)));
+            var wrapper = container.Resolve<MyDisposableWronglyExported>();
 
-            Assert.AreEqual(DryIoc.Error.NonGenericWrapperMayWrapOnlyRequiredServiceType, ex.Error);
+            Assert.IsInstanceOf<Service>(wrapper.Service);
         }
 
         [Test]
@@ -62,7 +62,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(DryIoc.Error.GenericWrapperTypeArgIndexOutOfBounds, ex.Error);
         }
 
-        [Export, AsWrapper(WrapsRequiredServiceType = true)]
+        [Export, AsWrapper(AlwaysWrapsRequiredServiceType = true)]
         public class MyDisposable
         {
             public IService Service { get; set; }

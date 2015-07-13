@@ -396,7 +396,7 @@ namespace DryIoc.MefAttributedModel
             resultInfo.Wrapper = new WrapperInfo
             {
                 WrappedServiceTypeArgIndex = attribute.WrappedServiceTypeArgIndex,
-                WrapsRequiredServiceType = attribute.WrapsRequiredServiceType
+                AlwaysWrapsRequiredServiceType = attribute.AlwaysWrapsRequiredServiceType
             };
         }
 
@@ -802,14 +802,12 @@ namespace DryIoc.MefAttributedModel
         public int WrappedServiceTypeArgIndex;
         
         /// <summary>Per name.</summary>
-        public bool WrapsRequiredServiceType;
+        public bool AlwaysWrapsRequiredServiceType;
 
         /// <summary>Creates Wrapper setup from this info.</summary> <returns>Setup.</returns>
         public Setup GetSetup()
         {
-            return WrapsRequiredServiceType
-                ? Setup.WrapperOfRequiredServiceType
-                : Setup.WrapperOfTypeArg(WrappedServiceTypeArgIndex);
+            return Setup.WrapperWith(WrappedServiceTypeArgIndex, AlwaysWrapsRequiredServiceType);
         }
 
         /// <summary>Used to compare wrappers info for equality.</summary> <param name="obj">Other info to compare.</param>
@@ -818,7 +816,8 @@ namespace DryIoc.MefAttributedModel
         {
             var other = obj as WrapperInfo;
             return other != null 
-                && other.WrappedServiceTypeArgIndex == WrappedServiceTypeArgIndex;
+                && other.WrappedServiceTypeArgIndex == WrappedServiceTypeArgIndex
+                && other.AlwaysWrapsRequiredServiceType == AlwaysWrapsRequiredServiceType;
         }
 
         /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
@@ -827,7 +826,8 @@ namespace DryIoc.MefAttributedModel
         {
             return (code ?? new StringBuilder())
                 .Append(@"Wrapper = new WrapperInfo(")
-                .AppendCode(WrappedServiceTypeArgIndex).Append(")");
+                .AppendCode(WrappedServiceTypeArgIndex).Append(", ")
+                .AppendCode(AlwaysWrapsRequiredServiceType).Append(")");
         }
     }
 

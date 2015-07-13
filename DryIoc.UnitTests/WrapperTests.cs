@@ -75,7 +75,7 @@ namespace DryIoc.UnitTests
 
             container.Register(typeof(WeakReference), 
                 with: Made.Of(t => t.GetConstructorOrNull(args: typeof(object))),
-                setup: Setup.WrapperOfRequiredServiceType);
+                setup: Setup.Wrapper);
 
             container.Register<Service>();
 
