@@ -67,9 +67,9 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
         public sealed class ForSlowHandler : ExportConditionAttribute
         {
-            public override bool Evaluate(Request request)
+            public override bool Evaluate(RequestInfo request)
             {
-                return request.ImplementationType == typeof(SlowHandler);
+                return request.ImplementationTypeIfAvailable == typeof(SlowHandler);
             }
         }
     }

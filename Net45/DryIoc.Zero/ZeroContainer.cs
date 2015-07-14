@@ -54,7 +54,7 @@ namespace DryIoc.Zero
     public partial class ZeroContainer : IFactoryDelegateRegistrator, IResolverContext, IResolver, IScopeAccess, IDisposable
     {
         /// <summary>Creates container.</summary>
-        /// <param name="scopeContext">(optional) Scope context, by default <see cref="ThreadScopeContext"/>.</param>
+        /// <param name="scopeContext">(optional) Ambient scope context.</param>
         public ZeroContainer(IScopeContext scopeContext = null)
             : this(Ref.Of(ImTreeMap.Empty), Ref.Of(ImTreeMap.Empty), new SingletonScope(), scopeContext, null, 0) { }
         
@@ -92,16 +92,6 @@ namespace DryIoc.Zero
 
             return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, 
                 nestedOpenedScope, _disposed);
-        }
-
-        /// <summary>Creates new container with new opened scope independent from context.</summary>
-        /// <returns>New container.</returns>
-        public ZeroContainer OpenScopeWithoutContext()
-        {
-            ThrowIfContainerDisposed();
-            var newOpenedScope = new Scope(OpenedScope);
-            return new ZeroContainer(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext, newOpenedScope, 
-                _disposed);
         }
 
         #region IFactoryDelegateRegistrator
@@ -191,7 +181,6 @@ namespace DryIoc.Zero
         public IScope GetCurrentNamedScope(object name, bool throwIfNotFound)
         {
             var currentScope = ScopeContext == null ? OpenedScope : ScopeContext.GetCurrentOrDefault();
-            
             if (currentScope == null)
                 return (IScope)Throw.If(throwIfNotFound, Error.NoCurrentScope);
 

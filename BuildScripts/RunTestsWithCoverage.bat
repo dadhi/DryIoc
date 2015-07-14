@@ -30,13 +30,13 @@ echo:
 
 echo:
 echo:Generating HTML coverage report in "%REPORTS%" . . .
-echo:
+echo: Skip!
 
-%REPORTGEN%^
- -reports:%COVERAGE%^
- -targetdir:%REPORTS%^
- -reporttypes:Html;HtmlSummary^
- -filters:-*Test*
+rem %REPORTGEN%^
+rem -reports:%COVERAGE%^
+rem -targetdir:%REPORTS%^
+rem -reporttypes:Html;HtmlSummary^
+rem -filters:-*Test*
 
 rem start %REPORTS%\index.htm
 

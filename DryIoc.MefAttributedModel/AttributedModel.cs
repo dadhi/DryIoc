@@ -35,16 +35,16 @@ namespace DryIoc.MefAttributedModel
     /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
     public static class AttributedModel
     {
-        ///<summary>Default reuse policy is Singleton, the same as in MEF.</summary>
-        public static Type DefaultReuseType = typeof(SingletonReuse);
+        ///<summary>Default reuse policy is Singleton, as in MEF.</summary>
+        public static SupportedReuse DefaultReuse = SupportedReuse.Singleton;
 
         /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/> 
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
-        public static readonly ImTreeMap<Type, Func<string, IReuse>> SupportedReuseTypes = 
-            ImTreeMap<Type, Func<string, IReuse>>.Empty
-            .AddOrUpdate(typeof(SingletonReuse), _ => Reuse.Singleton)
-            .AddOrUpdate(typeof(CurrentScopeReuse), Reuse.InCurrentNamedScope)
-            .AddOrUpdate(typeof(ResolutionScopeReuse), _ => Reuse.InResolutionScope);
+        public static readonly ImTreeMap<SupportedReuse, Func<string, IReuse>> SupportedReuseTypes =
+            ImTreeMap<SupportedReuse, Func<string, IReuse>>.Empty
+            .AddOrUpdate(SupportedReuse.Singleton, _ => Reuse.Singleton)
+            .AddOrUpdate(SupportedReuse.CurrentScope, Reuse.InCurrentNamedScope)
+            .AddOrUpdate(SupportedReuse.ResolutionScope, _ => Reuse.InResolutionScope);
 
         /// <summary>Returns new rules with attributed model importing rules appended.</summary>
         /// <param name="rules">Source rules to append importing rules to.</param>
@@ -155,12 +155,13 @@ namespace DryIoc.MefAttributedModel
         /// <param name="reuseType">Reuse type to find in supported.</param>
         /// <param name="reuseName">(optional) Reuse name to match with scope name.</param>
         /// <returns>Supported reuse object.</returns>
-        public static IReuse GetReuse(Type reuseType, string reuseName = null)
+        public static IReuse GetReuse(SupportedReuse reuseType, string reuseName = null)
         {
-            return reuseType == null ? null
+            return reuseType == SupportedReuse.Transient 
+                ? null
                 : SupportedReuseTypes.GetValueOrDefault(reuseType)
-                .ThrowIfNull(Error.UnsupportedReuseType, reuseType)
-                .Invoke(reuseName);
+                    .ThrowIfNull(Error.UnsupportedReuseType, reuseType)
+                    .Invoke(reuseName);
         }
 
         #endregion
@@ -251,8 +252,8 @@ namespace DryIoc.MefAttributedModel
                 var implementationType = import.ImplementationType ?? serviceType;
 
                 var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
-                var reuseType = reuseAttr == null ? DefaultReuseType : reuseAttr.ReuseType;
-                var reuseName = reuseAttr == null ? null : reuseAttr.ReuseName;
+                var reuseType = reuseAttr == null ? DefaultReuse : reuseAttr.SupportedReuse;
+                var reuseName = reuseAttr == null ? null : reuseAttr.ScopeName;
                 var reuse = GetReuse(reuseType, reuseName);
 
                 var impl = import.ConstructorSignature == null ? null
@@ -282,7 +283,7 @@ namespace DryIoc.MefAttributedModel
             if (implementationType.IsOpenGeneric())
                 implementationType = implementationType.GetGenericTypeDefinition();
 
-            var info = new ExportedRegistrationInfo { ImplementationType = implementationType, ReuseType = DefaultReuseType };
+            var info = new ExportedRegistrationInfo { ImplementationType = implementationType, Reuse = DefaultReuse };
 
             for (var attrIndex = 0; attrIndex < attributes.Length; attrIndex++)
             {
@@ -298,13 +299,15 @@ namespace DryIoc.MefAttributedModel
                 else if (attribute is PartCreationPolicyAttribute)
                 {
                     var creationPolicy = ((PartCreationPolicyAttribute)attribute).CreationPolicy;
-                    info.ReuseType = creationPolicy == CreationPolicy.NonShared ? null : typeof(SingletonReuse);
+                    info.Reuse = creationPolicy == CreationPolicy.NonShared 
+                        ? SupportedReuse.Transient 
+                        : SupportedReuse.Singleton;
                 }
                 else if (attribute is ReuseAttribute)
                 {
                     var reuseAttribute = ((ReuseAttribute)attribute);
-                    info.ReuseType = reuseAttribute.ReuseType;
-                    info.ReuseName = reuseAttribute.ReuseName;
+                    info.Reuse = reuseAttribute.SupportedReuse;
+                    info.ReuseName = reuseAttribute.ScopeName;
                 }
                 else if (attribute is OpenResolutionScopeAttribute)
                 {
@@ -339,7 +342,7 @@ namespace DryIoc.MefAttributedModel
             }
 
             if (info.FactoryType == FactoryType.Decorator)
-                info.ReuseType = null;
+                info.Reuse = SupportedReuse.Transient;
 
             info.Exports.ThrowIfNull(Error.NoExport, implementationType);
             return info;
@@ -633,7 +636,7 @@ namespace DryIoc.MefAttributedModel
         public string ImplementationTypeFullName;
 
         /// <summary>One of <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
-        public Type ReuseType;
+        public SupportedReuse Reuse;
 
         /// <summary>Name to pass to reuse factory from <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
         public string ReuseName;
@@ -667,7 +670,7 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Created factory.</returns>
         public ReflectionFactory CreateFactory(Made made = null)
         {
-            var reuse = AttributedModel.GetReuse(ReuseType, ReuseName);
+            var reuse = AttributedModel.GetReuse(Reuse, ReuseName);
             return new ReflectionFactory(ImplementationType, reuse, made, GetSetup());
         }
 
@@ -680,7 +683,8 @@ namespace DryIoc.MefAttributedModel
                 return Wrapper == null ? Setup.Wrapper : Wrapper.GetSetup();
 
             var condition = ConditionType == null ? (Func<Request, bool>)null
-                : ((ExportConditionAttribute)Activator.CreateInstance(ConditionType)).Evaluate;
+                : (request => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
+                    .Evaluate(ConvertRequestToInfo(request)));
 
             var lazyMetadata = HasMetadataAttribute ? (Func<object>)(() => GetMetadata(attributes)) : null;
 
@@ -694,6 +698,13 @@ namespace DryIoc.MefAttributedModel
                 openResolutionScope: OpenResolutionScope, reuseWrappers: ReusedWrappers);
         }
 
+        private static RequestInfo ConvertRequestToInfo(Request request)
+        {
+            return request.Enumerate().Aggregate<Request, RequestInfo>(null, (parent, r) =>
+                new RequestInfo(parent, r.ResolvedFactoryType != FactoryType.Service, 
+                    r.ServiceType, r.ServiceKey, r.ImplementationType));
+        }
+
         /// <summary>Compares with another info for equality.</summary>
         /// <param name="obj">Other info to compare.</param> <returns>True if equal.</returns>
         public override bool Equals(object obj)
@@ -701,7 +712,7 @@ namespace DryIoc.MefAttributedModel
             var other = obj as ExportedRegistrationInfo;
             return other != null
                 && other.ImplementationType == ImplementationType
-                && other.ReuseType == ReuseType
+                && other.Reuse == Reuse
                 && other.FactoryType == FactoryType
                 && Equals(other.Wrapper, Wrapper)
                 && Equals(other.Decorator, Decorator)
@@ -721,7 +732,7 @@ namespace DryIoc.MefAttributedModel
         "); for (var i = 0; i < Exports.Length; i++)
                 code = Exports[i].ToCode(code).Append(@",
         "); code.Append(@"},
-    ReuseType = ").AppendType(ReuseType).Append(@",
+    Reuse = ").AppendEnum(typeof(SupportedReuse), Reuse).Append(@",
     HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
     FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
             if (Wrapper != null) code.Append(@",

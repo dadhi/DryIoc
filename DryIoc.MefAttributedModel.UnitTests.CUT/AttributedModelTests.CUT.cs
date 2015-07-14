@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel.Composition;
+using System.Linq;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
@@ -286,9 +287,9 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     public abstract class ForParentImplementationAttribute : ExportConditionAttribute
     {
-        public override bool Evaluate(Request request)
+        public override bool Evaluate(RequestInfo request)
         {
-            return request.ParentNonWrapper().ImplementationType == _parentImplementationType;
+            return request.Any(r => r.ImplementationTypeIfAvailable == _parentImplementationType);
         }
 
         private readonly Type _parentImplementationType;

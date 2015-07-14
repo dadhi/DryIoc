@@ -22,13 +22,29 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+using System.Collections;
+using System.Collections.Generic;
+
 namespace DryIoc.MefAttributedModel
 {
     using System;
     using System.ComponentModel.Composition;
     using System.Diagnostics.CodeAnalysis;
-    
-    /// <summary>Base attribute to specify type of reuse (implementing <see cref="IReuse"/>) for annotated class.</summary>
+
+    /// <summary>List of supported DryIoc reuse types.</summary>
+    public enum SupportedReuse
+    {
+        /// <summary>Means no reuse.</summary>
+        Transient, 
+        /// <summary>subj.</summary>
+        Singleton,
+        /// <summary>subj.</summary>
+        CurrentScope,
+        /// <summary>subj.</summary>
+        ResolutionScope
+    }
+
+    /// <summary>Base attribute to specify type of reuse for annotated class.</summary>
     [AttributeUsage(AttributeTargets.Class 
         | AttributeTargets.Method 
         | AttributeTargets.Field 
@@ -38,65 +54,69 @@ namespace DryIoc.MefAttributedModel
     public class ReuseAttribute : Attribute
     {
         /// <summary>Implementation of reuse. Could be null to specify transient or no reuse.</summary>
-        public readonly Type ReuseType;
+        public readonly SupportedReuse SupportedReuse;
 
         /// <summary>Optional name, valid only for Current Scope Reuse.</summary>
-        public readonly string ReuseName;
+        public readonly string ScopeName;
 
         /// <summary>Create attribute with specified type implementing reuse.</summary>
-        /// <param name="reuseType">Could be null to specify transient or no reuse.</param>
-        /// <param name="reuseName">(optional) Name is valid only for Current Scope Reuse and will be ignored by the rest of reuse types.</param>
-        public ReuseAttribute(Type reuseType, string reuseName = null)
+        /// <param name="supportedReuse">Supported reuse type.</param>
+        /// <param name="scopeName">(optional) Name is valid only for Current Scope Reuse and will be ignored by the rest of reuse types.</param>
+        public ReuseAttribute(SupportedReuse supportedReuse, string scopeName = null)
         {
-            if (reuseType != null) 
-                (typeof(IReuse)).ThrowIfNotImplementedBy(reuseType);
-            ReuseType = reuseType;
-            ReuseName = reuseName;
+            SupportedReuse = supportedReuse;
+            ScopeName = scopeName;
         }
     }
 
     /// <summary>Defines the Transient reuse for exported service.</summary>
     public class TransientReuseAttribute : ReuseAttribute
     {
-        /// <summary>Creates attribute by specifying null as <see cref="ReuseAttribute.ReuseType"/>.</summary>
-        public TransientReuseAttribute() : base(null) { }
+        /// <summary>Creates attribute by specifying null as <see cref="ReuseAttribute.SupportedReuse"/>.</summary>
+        public TransientReuseAttribute() : base(SupportedReuse.Transient) { }
     }
 
     /// <summary>Denotes exported type with Singleton reuse.</summary>
     public class SingletonReuseAttribute : ReuseAttribute
     {
         /// <summary>Creates attribute.</summary>
-        public SingletonReuseAttribute() : base(typeof(SingletonReuse)) { }
+        public SingletonReuseAttribute() : base(SupportedReuse.Singleton) { }
     }
 
     /// <summary>Denotes exported type with Current Scope Reuse.</summary>
     public class CurrentScopeReuseAttribute : ReuseAttribute
     {
-        /// <summary>Creates attribute.</summary> <param name="reuseName">(optional)</param>
-        public CurrentScopeReuseAttribute(string reuseName = null) : base(typeof(CurrentScopeReuse), reuseName) { }
+        /// <summary>Creates attribute.</summary> <param name="scopeName">(optional)</param>
+        public CurrentScopeReuseAttribute(string scopeName = null) : base(SupportedReuse.CurrentScope, scopeName) { }
     }
 
     /// <summary>Marks exported type with Reuse.InWebRequest. 
-    /// Basically it is CurrentScopeReuse with predefined name <see cref="Reuse.WebRequestScopeName"/>.</summary>
+    /// Basically it is CurrentScopeReuse with predefined name Reuse.WebRequestScopeName.</summary>
     public class WebRequestReuseAttribute : CurrentScopeReuseAttribute
     {
+        /// <summary>Default web reuse scope name. Just a convention supported by DryIoc.</summary>
+        public static readonly string WebRequestScopeName = "WebRequestScopeName";
+
         /// <summary>Creates attribute.</summary>
-        public WebRequestReuseAttribute() : base(Reuse.WebRequestScopeName) { }
+        public WebRequestReuseAttribute() : base(WebRequestScopeName) { }
     }
 
     /// <summary>Marks exported type with Reuse.InThread. 
-    /// Basically it is CurrentScopeReuse with predefined name <see cref="ThreadScopeContext.ScopeContextName"/>.</summary>
+    /// Basically it is CurrentScopeReuse with predefined name ThreadScopeContext.ScopeContextName.</summary>
     public class ThreadReuseAttribute : CurrentScopeReuseAttribute
     {
+        /// <summary>Name for root scope in thread context. Just a convention supported by DryIoc.</summary>
+        public static readonly string ScopeContextName = "ThreadScopeContext";
+
         /// <summary>Creates attribute.</summary>
-        public ThreadReuseAttribute() : base(ThreadScopeContext.ScopeContextName) { }
+        public ThreadReuseAttribute() : base(ScopeContextName) { }
     }
 
     /// <summary>Denotes exported type with Resolution Scope Reuse.</summary>
     public class ResolutionScopeReuseAttribute : ReuseAttribute
     {
         /// <summary>Creates attribute.</summary>
-        public ResolutionScopeReuseAttribute() : base(typeof(ResolutionScopeReuse)) { }
+        public ResolutionScopeReuseAttribute() : base(SupportedReuse.ResolutionScope) { }
     }
 
     /// <summary>Represents Reuse Wrappers defined for exported type.</summary>
@@ -207,14 +227,62 @@ namespace DryIoc.MefAttributedModel
         public object ContractKey { get; set; }
     }
 
+    /// <summary></summary>
+    public sealed class RequestInfo : IEnumerable<RequestInfo>
+    {
+        /// <summary>Parent request or null for root resolution request.</summary>
+        public readonly RequestInfo Parent;
+
+        /// <summary>False for Decorators and Wrappers.</summary>
+        public readonly bool IsDecoratorOrWrapper; 
+
+        /// <summary>Asked service type.</summary>
+        public readonly Type ServiceType;
+        
+        /// <summary>Optional service key.</summary>
+        public readonly object ServiceKey;
+
+        /// <summary>Implementation type.</summary>
+        public readonly Type ImplementationTypeIfAvailable;
+
+        /// <summary>Creates info.</summary>
+        /// <param name="parent"></param> <param name="isDecoratorOrWrapper"></param> <param name="serviceType"></param>
+        /// <param name="serviceKey"></param> <param name="implementationTypeIfAvailable"></param>
+        public RequestInfo(RequestInfo parent, 
+            bool isDecoratorOrWrapper, Type serviceType, object serviceKey, Type implementationTypeIfAvailable)
+        {
+            Parent = parent;
+            IsDecoratorOrWrapper = isDecoratorOrWrapper;
+            ServiceType = serviceType;
+            ServiceKey = serviceKey;
+            ImplementationTypeIfAvailable = implementationTypeIfAvailable;
+        }
+
+        /// <summary>Returns all request until the root - parent is null.</summary>
+        /// <returns>Requests from the last to first.</returns>
+        public IEnumerator<RequestInfo> GetEnumerator()
+        {
+            for (var i = this; i != null; i = i.Parent)
+                yield return i;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+    }
+
     /// <summary>Base type for exported type Setup Condition.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class 
+        | AttributeTargets.Method 
+        | AttributeTargets.Property 
+        | AttributeTargets.Field, 
         Inherited = false)]
     public abstract class ExportConditionAttribute : Attribute
     {
         /// <summary>Returns true to use exported service for request.</summary>
         /// <param name="request"></param> <returns>True to use exported service for request.</returns>
-        public abstract bool Evaluate(Request request);
+        public abstract bool Evaluate(RequestInfo request);
     }
 
     /// <summary>Imports service Only with equal <see cref="ContractKey"/>.</summary>
@@ -261,7 +329,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Creates attribute</summary> <param name="metadata"></param>
         public WithMetadataAttribute(object metadata)
         {
-            Metadata = metadata.ThrowIfNull();
+            Metadata = metadata;
         }
     }
 
@@ -304,11 +372,19 @@ namespace DryIoc.MefAttributedModel
         }
     }
 
-    /// <summary>Specifies that exported service setup to <see cref="Setup.OpenResolutionScope"/>.</summary>
+    /// <summary>Exported type should open resolution scope when injected.</summary>
     [AttributeUsage(AttributeTargets.Class 
         | AttributeTargets.Method 
         | AttributeTargets.Property 
         | AttributeTargets.Field,
         Inherited = false)]
     public class OpenResolutionScopeAttribute : Attribute { }
+
+    /// <summary>Marker for resolution root exports.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field,
+        Inherited = false)]
+    public class ResolutionRoot : Attribute { }
 }

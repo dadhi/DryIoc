@@ -20,7 +20,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeExample), 1),
         new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IPrintToCode), 1),
         },
-    ReuseType = typeof(DryIoc.SingletonReuse),
+    Reuse = DryIoc.MefAttributedModel.SupportedReuse.Singleton,
     HasMetadataAttribute = false,
     FactoryType = DryIoc.FactoryType.Service
 }"));

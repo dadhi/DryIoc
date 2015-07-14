@@ -3239,7 +3239,7 @@ namespace DryIoc
                 instanceFactory.FactoryID = -1; // NOTE Nasty hack to distinguish instance factories when replaced.
             if (container.Register(instanceFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
             {
-                var scope = reuse.GetScopeOrDefault(container.EmptyRequest)
+                var scope = reuse.GetScopeOrDefault(request)
                     .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse);
                 var scopedInstanceId = reuse.GetScopedItemIdOrSelf(instanceFactory.FactoryID, request);
                 scope.SetOrAdd(scopedInstanceId, instance);
@@ -4072,6 +4072,9 @@ namespace DryIoc
 
         /// <summary>Implementation type of factory, if request was <see cref="WithResolvedFactory"/> factory, or null otherwise.</summary>
         public Type ImplementationType { get { return ResolvedFactory == null ? null : ResolvedFactory.ImplementationType; } }
+        
+        /// <summary>Shortcut to FactoryType.</summary>
+        public FactoryType ResolvedFactoryType { get { return ResolvedFactory == null ? FactoryType.Service : ResolvedFactory.FactoryType; } }
 
         /// <summary>Resolution scope.</summary>
         public readonly IScope Scope;
@@ -4295,6 +4298,9 @@ namespace DryIoc
         /// <summary>Indicates that injected expression should be: 
         /// <c><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></c>
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
+        public virtual bool IsResolutionRoot { get { return false; } }
+
+        /// <summary>In addition to <see cref="IsResolutionRoot"/> opens scope.</summary>
         public virtual bool OpenResolutionScope { get { return false; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
@@ -4308,22 +4314,27 @@ namespace DryIoc
         /// <param name="cacheFactoryExpression">(optional)</param> <param name="lazyMetadata">(optional)</param> 
         /// <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param> <param name="condition">(optional)</param>
         /// <param name="openResolutionScope">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
+        /// <param name="isResolutionRoot">(optional)</param>
         /// <param name="reuseWrappers">(optional) Multiple reuse wrappers.</param>       
         /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
         public static Setup With(bool cacheFactoryExpression = true,
             Func<object> lazyMetadata = null, object metadata = null,
-            Func<Request, bool> condition = null, bool openResolutionScope = false,
+            Func<Request, bool> condition = null, 
+            bool openResolutionScope = false, bool isResolutionRoot = false,
             Type[] reuseWrappers = null)
         {
             if (cacheFactoryExpression && lazyMetadata == null && metadata == null &&
-                condition == null && openResolutionScope == false && reuseWrappers == null)
+                condition == null && openResolutionScope == false && isResolutionRoot == false &&
+                reuseWrappers == null)
                 return Default;
 
             if (reuseWrappers != null && reuseWrappers.Length != 0)
                 for (var i = 0; i < reuseWrappers.Length; ++i)
-                    typeof(IReuseWrapper).ThrowIfNotImplementedBy(reuseWrappers[i], Error.RegReusedObjWrapperIsNotIreused, i, reuseWrappers);
+                    typeof(IReuseWrapper).ThrowIfNotImplementedBy(reuseWrappers[i], 
+                        Error.RegisteredReuseWrapperTypeIsNotReuseWrapper, i, reuseWrappers);
 
-            return new ServiceSetup(cacheFactoryExpression, lazyMetadata, metadata, condition, openResolutionScope, reuseWrappers);
+            return new ServiceSetup(cacheFactoryExpression, lazyMetadata, metadata,
+                condition, openResolutionScope, isResolutionRoot, reuseWrappers);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -4365,13 +4376,16 @@ namespace DryIoc
 
             public override object Metadata { get { return _metadata ?? (_metadata = _lazyMetadata == null ? null : _lazyMetadata()); } }
 
+            public override bool IsResolutionRoot { get { return _isResolutionRoot || _openResolutionScope; } }
+
             public override bool OpenResolutionScope { get { return _openResolutionScope; } }
 
             public override Type[] ReuseWrappers { get { return _reuseWrappers; } }
 
             public ServiceSetup(bool cacheFactoryExpression = true,
                 Func<object> lazyMetadata = null, object metadata = null,
-                Func<Request, bool> condition = null, bool openResolutionScope = false,
+                Func<Request, bool> condition = null, 
+                bool openResolutionScope = false, bool isResolutionRoot = false,
                 Type[] reuseWrappers = null)
             {
                 _cacheFactoryExpression = cacheFactoryExpression;
@@ -4379,6 +4393,7 @@ namespace DryIoc
                 _metadata = metadata;
                 Condition = condition;
                 _openResolutionScope = openResolutionScope;
+                _isResolutionRoot = isResolutionRoot;
                 _reuseWrappers = reuseWrappers;
             }
 
@@ -4386,6 +4401,7 @@ namespace DryIoc
             private readonly Func<object> _lazyMetadata;
             private object _metadata;
             private readonly bool _openResolutionScope;
+            private readonly bool _isResolutionRoot;
             private readonly Type[] _reuseWrappers;
         }
 
@@ -5901,8 +5917,8 @@ namespace DryIoc
     /// if not yet tracked. Context actually stores scope references internally, so it should be disposed to free them.</summary>
     public sealed class ThreadScopeContext : IScopeContext, IDisposable
     {
-        /// <summary>Provides static access to <see cref="RootScopeName"/>. It is OK because its constant.</summary>
-        public static readonly string ScopeContextName = typeof(ThreadScopeContext).FullName;
+        /// <summary>Provides static name for context. It is OK because its constant.</summary>
+        public static readonly string ScopeContextName = "ThreadScopeContext";
 
         /// <summary>Key to identify context.</summary>
         public string RootScopeName { get { return ScopeContextName; } }
@@ -6907,7 +6923,7 @@ namespace DryIoc
                 "Unable to find scope with matching name: {0}."),
             UnableToNewOpenGeneric = Of(
                 "Unable to New not concrete/open-generic type {0}."),
-            RegReusedObjWrapperIsNotIreused = Of(
+            RegisteredReuseWrapperTypeIsNotReuseWrapper = Of(
                 "Registered reuse wrapper {1} at index {2} of {3} does not implement expected {0} interface."),
             RecyclableReuseWrapperIsRecycled = Of(
                 "Recyclable wrapper is recycled."),
