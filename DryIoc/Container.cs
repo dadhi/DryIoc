@@ -180,7 +180,7 @@ namespace DryIoc
         #region Static state
 
         internal static readonly ParameterExpression StateParamExpr =
-            Expression.Parameter(typeof(ImTreeArray), "state");
+            Expression.Parameter(typeof(object[]), "state");
 
         internal static readonly ParameterExpression ResolverContextParamExpr =
             Expression.Parameter(typeof(IResolverContext), "r");
@@ -743,7 +743,7 @@ namespace DryIoc
         }
 
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
-        public ImTreeArray ResolutionStateCache
+        public object[] ResolutionStateCache
         {
             get { return _registry.Value.ResolutionStateCache.Value; }
         }
@@ -756,10 +756,25 @@ namespace DryIoc
             var index = -1;
             _registry.Value.ResolutionStateCache.Swap(state =>
             {
-                index = state.IndexOf(item);
-                if (index == -1)
-                    index = (state = state.Append(item)).Length - 1;
-                return state;
+                for (var i = 0; i < state.Length; ++i)
+                {
+                    var it = state[i];
+                    if (it == null || ReferenceEquals(it, item) || Equals(it, item))
+                    {
+                        if (it == null)
+                            state[i] = item;
+                        index = i;
+                        return state;
+                    }
+                }
+
+                var size = state.Length;
+                var newState = new object[size + 32];
+                Array.Copy(state, 0, newState, 0, size);
+
+                index = size;
+                newState[index] = item;
+                return newState;
             });
             return index;
         }
@@ -786,7 +801,7 @@ namespace DryIoc
             Throw.If(throwIfStateRequired, Error.StateIsRequiredToUseItem, item);
             var itemIndex = GetOrAddStateItem(item);
             var indexExpr = Expression.Constant(itemIndex, typeof(int));
-            var getItemByIndexExpr = Expression.Call(StateParamExpr, _getItemMethod, indexExpr);
+            var getItemByIndexExpr = Expression.ArrayIndex(StateParamExpr, indexExpr);
             return Expression.Convert(getItemByIndexExpr, itemType);
         }
 
@@ -814,8 +829,6 @@ namespace DryIoc
                 : null;
         }
 
-        private static readonly MethodInfo _getItemMethod = typeof(ImTreeArray).GetSingleDeclaredMethodOrNull("Get");
-
         #endregion
 
         #region Decorators support
@@ -830,7 +843,7 @@ namespace DryIoc
             // Look first for Action<ImplementedType> initializer-decorator
             var implementationType = request.ImplementationType ?? serviceType;
             var implementedTypes = implementationType.GetImplementedTypes(
-                ReflectionTools.IncludeImplementedType.SourceType | ReflectionTools.IncludeImplementedType.ObjectType);
+                ReflectionTools.AsImplementedType.SourceType | ReflectionTools.AsImplementedType.ObjectType);
 
             for (var i = 0; i < implementedTypes.Length; i++)
             {
@@ -1022,13 +1035,13 @@ namespace DryIoc
             public readonly Ref<ImTreeMap<Type, FactoryDelegate>> DefaultFactoryDelegateCache;
             public readonly Ref<ImTreeMap<KV<Type, object>, FactoryDelegate>> KeyedFactoryDelegateCache;
             public readonly Ref<ImTreeMapIntToObj> FactoryExpressionCache;
-            public readonly Ref<ImTreeArray> ResolutionStateCache;
+            public readonly Ref<object[]> ResolutionStateCache;
 
             public Registry WithoutCache()
             {
                 return new Registry(Services, Decorators, _wrappers,
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty), Ref.Of(ImTreeMap<KV<Type, object>, FactoryDelegate>.Empty),
-                    Ref.Of(ImTreeMapIntToObj.Empty), Ref.Of(ImTreeArray.Empty));
+                    Ref.Of(ImTreeMapIntToObj.Empty), Ref.Of(ArrayTools.Empty<object>()));
             }
 
             private Registry(ImTreeMap<Type, Factory> wrapperFactories = null)
@@ -1038,7 +1051,7 @@ namespace DryIoc
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMap<KV<Type, object>, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMapIntToObj.Empty),
-                    Ref.Of(ImTreeArray.Empty)) { }
+                    Ref.Of(ArrayTools.Empty<object>())) { }
 
             private Registry(
                 ImTreeMap<Type, object> services,
@@ -1047,7 +1060,7 @@ namespace DryIoc
                 Ref<ImTreeMap<Type, FactoryDelegate>> defaultFactoryDelegateCache,
                 Ref<ImTreeMap<KV<Type, object>, FactoryDelegate>> keyedFactoryDelegateCache,
                 Ref<ImTreeMapIntToObj> factoryExpressionCache,
-                Ref<ImTreeArray> resolutionStateCache)
+                Ref<object[]> resolutionStateCache)
             {
                 Services = services;
                 Decorators = decorators;
@@ -1690,7 +1703,7 @@ namespace DryIoc
     /// registered delegate factory, <see cref="Lazy{T}"/>, and <see cref="LazyEnumerable{TService}"/>.</param>
     /// <param name="scope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
     /// <returns>Created service object.</returns>
-    public delegate object FactoryDelegate(ImTreeArray state, IResolverContext r, IScope scope);
+    public delegate object FactoryDelegate(object[] state, IResolverContext r, IScope scope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
     public static partial class FactoryCompiler
@@ -2556,11 +2569,17 @@ namespace DryIoc
             params Func<Request, object>[] argValues)
         {
             var callExpr = serviceReturningExpr.ThrowIfNull().Body;
+            if (callExpr.NodeType == ExpressionType.Convert) // proceed without Cast expression.
+                return FromExpression<TService>(getFactoryInfo,
+                    Expression.Lambda(((UnaryExpression)callExpr).Operand, ArrayTools.Empty<ParameterExpression>()),
+                    argValues);
 
             MemberInfo ctorOrMethodOrMember;
             IList<Expression> argExprs = null;
             IList<MemberBinding> memberBindingExprs = null;
             ParameterInfo[] parameters = null;
+
+            
             if (callExpr.NodeType == ExpressionType.New || callExpr.NodeType == ExpressionType.MemberInit)
             {
                 var newExpr = callExpr as NewExpression ?? ((MemberInitExpression)callExpr).NewExpression;
@@ -2644,7 +2663,7 @@ namespace DryIoc
                     Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg),
                         Error.UnexpectedExpressionInsteadOfArgMethod, methodCallExpr);
 
-                    if (methodCallExpr.Method.Name == Arg.RefMethodName) 
+                    if (methodCallExpr.Method.Name == Arg.ArgIndexMethodName) 
                     {
                         var getArgValue = GetArgCustomValueProvider(methodCallExpr, argValues);
                         parameters = parameters.Details((r, p) => p.Equals(parameter)
@@ -2691,7 +2710,7 @@ namespace DryIoc
                     Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg),
                         Error.UnexpectedExpressionInsteadOfArgMethod, methodCallExpr);
 
-                    if (methodCallExpr.Method.Name == Arg.RefMethodName) // handle custom value
+                    if (methodCallExpr.Method.Name == Arg.ArgIndexMethodName) // handle custom value
                     {
                         var getArgValue = GetArgCustomValueProvider(methodCallExpr, argValues);
                         propertiesAndFields = propertiesAndFields.And(r => new[]
@@ -2802,10 +2821,10 @@ namespace DryIoc
         /// similar to String.Format <c>"{0}, {1}, etc"</c>.</summary>
         /// <typeparam name="T">Type of dependency. Difference from actual parameter type is ignored.</typeparam>
         /// <param name="argIndex">Argument index starting from 0</param> <returns>Ignored.</returns>
-        public static T Ref<T>(int argIndex) { return default(T); }
+        public static T Index<T>(int argIndex) { return default(T); }
 
         /// <summary>Name is close to method itself to not forget when renaming the method.</summary>
-        public static string RefMethodName = "Ref";
+        public static string ArgIndexMethodName = "Index";
     }
 
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
@@ -2973,7 +2992,7 @@ namespace DryIoc
         /// <returns>Array of types or empty.</returns>
         public static Type[] GetImplementedServiceTypes(Type type, bool nonPublicServiceTypes = false)
         {
-            var serviceTypes = type.GetImplementedTypes(ReflectionTools.IncludeImplementedType.SourceType);
+            var serviceTypes = type.GetImplementedTypes(ReflectionTools.AsImplementedType.SourceType);
             var selectedServiceTypes = nonPublicServiceTypes
                 ? serviceTypes
                 : serviceTypes.Where(ReflectionTools.IsPublicOrNestedPublic);
@@ -6570,7 +6589,7 @@ namespace DryIoc
         Request EmptyRequest { get; }
 
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
-        ImTreeArray ResolutionStateCache { get; }
+        object[] ResolutionStateCache { get; }
 
         /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
@@ -7106,7 +7125,7 @@ namespace DryIoc
     {
         /// <summary>Flags for <see cref="GetImplementedTypes"/> method.</summary>
         [Flags]
-        public enum IncludeImplementedType
+        public enum AsImplementedType
         {
             /// <summary>Include nor object not source type.</summary>
             None = 0,
@@ -7117,18 +7136,18 @@ namespace DryIoc
         }
 
         /// <summary>Returns all interfaces and all base types (in that order) implemented by <paramref name="sourceType"/>.
-        /// Specify <paramref name="includeImplementedType"/> to include <paramref name="sourceType"/> itself as first item and 
+        /// Specify <paramref name="asImplementedType"/> to include <paramref name="sourceType"/> itself as first item and 
         /// <see cref="object"/> type as the last item.</summary>
         /// <param name="sourceType">Source type for discovery.</param>
-        /// <param name="includeImplementedType">Additional types to include into result collection.</param>
+        /// <param name="asImplementedType">Additional types to include into result collection.</param>
         /// <returns>Array of found types, empty if nothing found.</returns>
-        public static Type[] GetImplementedTypes(this Type sourceType, IncludeImplementedType includeImplementedType = IncludeImplementedType.None)
+        public static Type[] GetImplementedTypes(this Type sourceType, AsImplementedType asImplementedType = AsImplementedType.None)
         {
             Type[] results;
 
             var interfaces = sourceType.GetImplementedInterfaces();
-            var interfaceStartIndex = (includeImplementedType & IncludeImplementedType.SourceType) == 0 ? 0 : 1;
-            var includingObjectType = (includeImplementedType & IncludeImplementedType.ObjectType) == 0 ? 0 : 1;
+            var interfaceStartIndex = (asImplementedType & AsImplementedType.SourceType) == 0 ? 0 : 1;
+            var includingObjectType = (asImplementedType & AsImplementedType.ObjectType) == 0 ? 0 : 1;
             var sourcePlusInterfaceCount = interfaceStartIndex + interfaces.Length;
 
             var baseType = sourceType.GetTypeInfo().BaseType;
@@ -7647,8 +7666,11 @@ namespace DryIoc
         {
             if (source != null && source.Length != 0)
                 for (var i = 0; i < source.Length; ++i)
-                    if (Equals(source[i], value))
+                {
+                    var item = source[i];
+                    if (ReferenceEquals(item, value) || Equals(item, value))
                         return i;
+                }
             return -1;
         }
 

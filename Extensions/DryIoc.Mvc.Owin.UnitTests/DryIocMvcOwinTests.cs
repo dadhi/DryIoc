@@ -17,7 +17,7 @@ namespace DryIoc.Mvc.Owin.UnitTests
         {
             IContainer container = new Container();
             container.Register<TestGreetingMiddleware>();
-            container.Register(Made.Of(() => new Greeting { Message = Arg.Ref<string>(0) }, _ => "Hey, DryIoc!"), Reuse.InWebRequest);
+            container.Register(Made.Of(() => new Greeting { Message = Arg.Index<string>(0) }, _ => "Hey, DryIoc!"), Reuse.InWebRequest);
 
             var contextItems = new Dictionary<object, object>();
             HttpContextScopeContext.GetContextItems = () => contextItems;

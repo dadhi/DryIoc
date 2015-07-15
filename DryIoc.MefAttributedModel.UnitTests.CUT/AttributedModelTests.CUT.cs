@@ -233,7 +233,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportMany]
+    [ExportMany, AsResolutionRoot]
     public class DbMan : ISomeDb, IAnotherDb
     {
     }

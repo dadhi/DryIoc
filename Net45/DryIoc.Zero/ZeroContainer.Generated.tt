@@ -17,9 +17,10 @@
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
 
 <#
-/*
-$(SolutionDir)packages\DryIoc.dll.2.0.0-rc1build268\lib\net45\DryIoc.dll
-$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0-rc1build268\lib\net45\DryIoc.MefAttributedModel.dll
+/* 
+requires assemblies:
+$(SolutionDir)packages\DryIoc.dll.2.0.0\lib\net45\DryIoc.dll
+$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0\lib\net45\DryIoc.MefAttributedModel.dll
 $(SolutionDir)packages\ExpressionToCodeLib.1.5.2.0\lib\net40-Client\ExpressionToCodeLib.dll
 */
 
@@ -40,7 +41,7 @@ var idSeed = 0;
 var exceptions = new List<Exception>();
 var factories = container.GetServiceRegistrations()
     .Where(r => !r.ServiceType.IsGenericDefinition())
-//   .Where(r => r.Factory.Setup.AsResolutionRoot)
+    .Where(r => r.Factory.Setup.AsResolutionRoot)
     .Select(r =>
     {
         try
@@ -105,6 +106,7 @@ end of exception list
             return null;
         }
 
+        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
         public object ResolveGenerated(Type serviceType, object serviceKey, IScope scope)
         {
 <#
@@ -130,6 +132,7 @@ end of exception list
             return null;
         }
 
+        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
         public IEnumerable<KV> ResolveManyGenerated(Type serviceType)
         {
 <#

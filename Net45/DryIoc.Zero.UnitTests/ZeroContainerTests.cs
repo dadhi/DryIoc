@@ -101,7 +101,7 @@ namespace DryIoc.Zero.UnitTests
         {
             var container = new ZeroContainer();
 
-            var service = container.Resolve<IMultiExported>("j");
+            var service = container.Resolve<IMultiExported>("c");
             Assert.NotNull(service);
             Assert.AreSame(service, container.Resolve<IMultiExported>("c"));
         }
@@ -132,9 +132,9 @@ namespace DryIoc.Zero.UnitTests
         {
             var container = new ZeroContainer();
 
-            var handlers = container.ResolveMany<IHandler>().ToArray();
+            var handlers = container.ResolveMany<ISomeDb>().ToArray();
 
-            Assert.AreEqual(5, handlers.Length);
+            Assert.AreEqual(1, handlers.Length);
         }
 
         internal class NotRegistered {}

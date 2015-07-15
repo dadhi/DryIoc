@@ -17,7 +17,7 @@ namespace DryIoc.IssuesTests.Samples
                     return null; // Mock interface or abstract class only.
 
                 return new ReflectionFactory(made: Made.Of(
-                    () => Substitute.For(Arg.Ref<Type[]>(0), Arg.Ref<object[]>(1)),
+                    () => Substitute.For(Arg.Index<Type[]>(0), Arg.Index<object[]>(1)),
                     _ => new[] { serviceType }, _ => (object[])null));
             }));
 
@@ -36,7 +36,7 @@ namespace DryIoc.IssuesTests.Samples
                     return null; // Mock interface or abstract class only.
                 
                 return new ReflectionFactory(made: Made.Of(
-                    () => Substitute.For(Arg.Ref<Type[]>(0), Arg.Ref<object[]>(1)),
+                    () => Substitute.For(Arg.Index<Type[]>(0), Arg.Index<object[]>(1)),
                     _ => new[] { serviceType }, _ => (object[])null));
             }));
 

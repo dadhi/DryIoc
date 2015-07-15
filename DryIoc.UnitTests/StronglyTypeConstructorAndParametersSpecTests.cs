@@ -255,7 +255,7 @@ namespace DryIoc.UnitTests
         public void Can_specify_property_custom_value_with_factory_spec()
         {
             var container = new Container();
-            container.Register<IA, A>(Made.Of(() => new A { ImplType = Arg.Ref<Type>(0) }, r => r.ServiceType));
+            container.Register<IA, A>(Made.Of(() => new A { ImplType = Arg.Index<Type>(0) }, r => r.ServiceType));
 
             var a = container.Resolve<IA>();
 
@@ -268,9 +268,24 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<ContainerException>(() => 
-                container.Register<IA, A>(Made.Of(() => new A { ImplType = Arg.Ref<Type>(0) })));
+                container.Register<IA, A>(Made.Of(() => new A { ImplType = Arg.Index<Type>(0) })));
 
             Assert.AreEqual(Error.ArgOfValueIsProvidedButNoArgValues, ex.Error);
+        }
+
+        [Test]
+        public void Can_use_cast_to_specific_return_type_in_factory_expression()
+        {
+            var container = new Container();
+
+            container.Register(Made.Of(() => (IA)GetAObject()));
+
+            Assert.IsInstanceOf<A>(container.Resolve<IA>());
+        }
+
+        public static object GetAObject()
+        {
+            return new A();
         }
 
         public interface IA 
