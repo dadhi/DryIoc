@@ -204,6 +204,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsInstanceOf<ExportConditionalObject3>(_container.Resolve<ImportConditionObject3>().ExportConditionInterface);
         }
 
+        [Test]
+        public void I_can_mark_exports_to_be_injected_as_resolution_roots()
+        {
+            var container = new Container(r => r.WithMefAttributedModel());
+            container.RegisterExports(typeof(A), typeof(B));
+
+            var b = container.Resolve<LambdaExpression>(typeof(B));
+
+            Assert.That(b.ToString(), Is.StringContaining("ResolveKeyed(DryIoc.MefAttributedModel.UnitTests.CUT.A"));
+        }
+
         #region Implementation
 
         private void WhenIRegisterAllExportedTypes()

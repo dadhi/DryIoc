@@ -307,13 +307,13 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_as_swapable_and_swap_based_on_current_value()
         {
-            var container = new Container();
-            container.Register<Service>(Reuse.Singleton, setup: Setup.With(reuseWrappers: typeof(ReuseSwapable).One()));
-
-            var service = container.Resolve<ReuseSwapable>(typeof(Service));
+            var container = new Container(rules => 
+                rules.WithoutSingletonOptimization()); // NOTE: Test fails without it.
+            container.Register<Service>(Reuse.Singleton);
+            container.Resolve<Service>();
 
             var another = new Service();
-            service.Swap(current => another);
+            container.RegisterInstance(another, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             Assert.AreSame(another, container.Resolve<Service>());
         }

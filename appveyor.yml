@@ -3,21 +3,21 @@ os: Windows Server 2012
 test: off
 
 environment:
-  CODECOV_TOKEN:
-    secure: UvfSSzh4rCvMM3jNNhSFO/EbZF2JBTkSOYrZQQ8rM2zncScz9R8JUuslzTK7u29c
+  COVERALLS_REPO_TOKEN:
+    secure: wbdO3ggQGIggpCZU0oZiL2C6rQKf+ksiGllDbLD46fpC2eLyqnsmv4+LnG0bWVYA
 
 build_script:
   - .\BuildScripts\_main.bat -nopause
 
 after_build:
-  - bash <(curl -s https://codecov.io/bash)
+  - ps: .\packages\coveralls.net.0.5.0\csmacnz.Coveralls.exe --opencover -i ".\bin\Reports\Coverage.xml" --repoToken $env:COVERALLS_REPO_TOKEN --commitId $env:APPVEYOR_REPO_COMMIT --commitBranch $env:APPVEYOR_REPO_BRANCH --commitAuthor $env:APPVEYOR_REPO_COMMIT_AUTHOR --commitEmail $env:APPVEYOR_REPO_COMMIT_AUTHOR_EMAIL --commitMessage $env:APPVEYOR_REPO_COMMIT_MESSAGE --jobId $env:APPVEYOR_JOB_ID
 
 assembly_info:
   patch: true
   file: AssemblyInfo.*
   assembly_version: "{version}"
   assembly_file_version: "{version}"
-  assembly_informational_version: "2.0.0-rc1build{build}"
+  assembly_informational_version: "2.0.0-rc2build{build}"
 
 artifacts:
   - path: bin\NuGetPackages\*.nupkg

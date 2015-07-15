@@ -313,6 +313,10 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.OpenResolutionScope = true;
                 }
+                else if (attribute is AsResolutionRoot)
+                {
+                    info.AsResolutionRoot = true;
+                }
                 else if (attribute is ReuseWrappersAttribute)
                 {
                     info.ReusedWrappers = ((ReuseWrappersAttribute)attribute).WrapperTypes;
@@ -643,6 +647,9 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Corresponds to <see cref="Setup.OpenResolutionScope"/>.</summary>
         public bool OpenResolutionScope;
+        
+        /// <summary>Corresponds to <see cref="Setup.AsResolutionRoot"/>.</summary>
+        public bool AsResolutionRoot;
 
         /// <summary>Reuse wrappers defined for exported type.</summary>
         public Type[] ReusedWrappers;
@@ -691,11 +698,7 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(lazyMetadata, condition);
 
-            if (lazyMetadata == null && condition == null && !OpenResolutionScope && ReusedWrappers.IsNullOrEmpty())
-                return Setup.Default;
-
-            return Setup.With(lazyMetadata: lazyMetadata, condition: condition, 
-                openResolutionScope: OpenResolutionScope, reuseWrappers: ReusedWrappers);
+            return Setup.With(true, lazyMetadata, null, condition, OpenResolutionScope, AsResolutionRoot, ReusedWrappers);
         }
 
         private static RequestInfo ConvertRequestToInfo(Request request)

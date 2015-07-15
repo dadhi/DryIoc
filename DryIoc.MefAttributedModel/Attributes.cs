@@ -386,5 +386,5 @@ namespace DryIoc.MefAttributedModel
         | AttributeTargets.Property
         | AttributeTargets.Field,
         Inherited = false)]
-    public class ResolutionRoot : Attribute { }
+    public class AsResolutionRoot : Attribute { }
 }

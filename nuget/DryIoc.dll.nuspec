@@ -11,22 +11,10 @@
         <description>DryIoc is small, fast, capable IoC container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-            - More consistent and complete API.  
-            - Support for ambient current scope and Reuse.InWebRequest for ASP.NET integration.  
-            - Conventional RegisterMany from Assemblies.  
-            - Service key of arbitrary type. Supported resolution as KeyValuePair to get service key with corresponding service.  
-            - Register with condition based on service request.  
-            - Required service type support and ResolveMany support.  
-            - Register once, Update existing registration, Unregister.  
-            - Container snapshots and Cache management.  
-            - Fine-grained control over injection of parameters, properties, and fields.  
-            - Injecting of primitive values.  
-            - Optional parameters support.  
-            - Fine-grained control over reused object behavior via Reuse Wrappers.  
-            - In addition to constructor supported: static and instance factory methods, properties and fields.  
-            - Initializer support.  
-            - Support the rest of collection interfaces implemented by array.  
-            - Compilation to DynamicAssembly is turned Off by default.  
+            - rc1 breaking: No scope context by default! - ambient scope context should be explicitly specified for Container.
+            - rc1 breaking: No more OpenScopeWithoutContext - use OpenScope without specifying scope context, which is default.
+            - rc1 breaking: No more ReuseRecyclable wrapper - use IfAlreadyRegistered.Replace instead.
+            - rc1 breaking: LambdaExpression instead of FactoryExpression{T}.
         </releaseNotes>
     </metadata>
     <files>

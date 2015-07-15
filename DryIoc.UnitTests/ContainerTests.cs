@@ -320,19 +320,18 @@ namespace DryIoc.UnitTests
 
         [Test]
         [Description("https://bitbucket.org/dadhi/dryioc/issue/73/remove-reused-instance-when-unregister")]
-        public void Unregister_singleton()
+        public void Unregister_singleton_without_swappable()
         {
             var container = new Container();
 
-            container.Register<IContext, Context1>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: ReuseWrapper.Swapable.One()));
+            container.Register<IContext, Context1>(Reuse.Singleton);
 
             var context = container.Resolve<IContext>();
             Assert.NotNull(context);
             Assert.AreSame(context, container.Resolve<IContext>());
 
             // Removes service instance from Singleton scope by setting it to null.
-            container.Resolve<ReuseSwapable>(typeof(IContext)).Swap(old => null);
+            container.RegisterInstance<IContext>(null, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             // Removes service registration.
             container.Unregister<IContext>();

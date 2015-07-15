@@ -803,7 +803,7 @@ namespace DryIoc
 
             if (itemType.IsArray)
             {
-                var itType = itemType.GetElementType();
+                var itType = itemType.GetElementType().ThrowIfNull();
                 var items = ((IEnumerable)item).Cast<object>().Select(it => GetPrimitiveOrArrayExprOrDefault(it, itType));
                 var itExprs = Expression.NewArrayInit(itType, items);
                 return itExprs;
@@ -1935,7 +1935,7 @@ namespace DryIoc
 
             var wrapperType = request.ServiceType;
             var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
-            var serviceExpr = Resolver.CreateResolutionExpression(request, serviceType);
+            var serviceExpr = Resolver.CreateResolutionExpression(request, serviceType: serviceType);
             var factoryExpr = Expression.Lambda(serviceExpr, null);
             var wrapperCtor = wrapperType.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(serviceType));
             return Expression.New(wrapperCtor, factoryExpr);
@@ -3498,7 +3498,8 @@ namespace DryIoc
             return (T)container.New(typeof(T), made);
         }
 
-        internal static Expression CreateResolutionExpression(Request request, Type serviceType = null)
+        internal static Expression CreateResolutionExpression(Request request, 
+            bool openResolutionScope = false, Type serviceType = null)
         {
             serviceType = serviceType ?? request.ServiceType;
             var serviceTypeExpr = request.Container.GetOrAddStateItemExpression(serviceType, typeof(Type));
@@ -3506,7 +3507,9 @@ namespace DryIoc
             var requiredServiceTypeExpr = request.Container.GetOrAddStateItemExpression(request.RequiredServiceType, typeof(Type));
             var serviceKeyExpr = Expression.Convert(request.Container.GetOrAddStateItemExpression(request.ServiceKey), typeof(object));
 
-            var getOrNewCallExpr = Container.GetResolutionScopeExpression(request);
+            var getOrNewCallExpr = openResolutionScope
+                ? Container.GetResolutionScopeExpression(request)
+                : Container.ResolutionScopeParamExpr;
 
             var resolveExpr = Expression.Call(Container.ResolverExpr, "ResolveKeyed", ArrayTools.Empty<Type>(),
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr,
@@ -4298,9 +4301,9 @@ namespace DryIoc
         /// <summary>Indicates that injected expression should be: 
         /// <c><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></c>
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
-        public virtual bool IsResolutionRoot { get { return false; } }
+        public virtual bool AsResolutionRoot { get { return false; } }
 
-        /// <summary>In addition to <see cref="IsResolutionRoot"/> opens scope.</summary>
+        /// <summary>In addition to <see cref="AsResolutionRoot"/> opens scope.</summary>
         public virtual bool OpenResolutionScope { get { return false; } }
 
         /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
@@ -4314,18 +4317,20 @@ namespace DryIoc
         /// <param name="cacheFactoryExpression">(optional)</param> <param name="lazyMetadata">(optional)</param> 
         /// <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param> <param name="condition">(optional)</param>
         /// <param name="openResolutionScope">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
-        /// <param name="isResolutionRoot">(optional)</param>
+        /// <param name="asResolutionRoot">(optional)</param>
         /// <param name="reuseWrappers">(optional) Multiple reuse wrappers.</param>       
         /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
         public static Setup With(bool cacheFactoryExpression = true,
             Func<object> lazyMetadata = null, object metadata = null,
             Func<Request, bool> condition = null, 
-            bool openResolutionScope = false, bool isResolutionRoot = false,
+            bool openResolutionScope = false, bool asResolutionRoot = false,
             Type[] reuseWrappers = null)
         {
-            if (cacheFactoryExpression && lazyMetadata == null && metadata == null &&
-                condition == null && openResolutionScope == false && isResolutionRoot == false &&
-                reuseWrappers == null)
+            if (cacheFactoryExpression && 
+                lazyMetadata == null && metadata == null &&
+                condition == null && 
+                openResolutionScope == false && asResolutionRoot == false &&
+                reuseWrappers.IsNullOrEmpty())
                 return Default;
 
             if (reuseWrappers != null && reuseWrappers.Length != 0)
@@ -4334,7 +4339,7 @@ namespace DryIoc
                         Error.RegisteredReuseWrapperTypeIsNotReuseWrapper, i, reuseWrappers);
 
             return new ServiceSetup(cacheFactoryExpression, lazyMetadata, metadata,
-                condition, openResolutionScope, isResolutionRoot, reuseWrappers);
+                condition, openResolutionScope, asResolutionRoot, reuseWrappers);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -4376,7 +4381,7 @@ namespace DryIoc
 
             public override object Metadata { get { return _metadata ?? (_metadata = _lazyMetadata == null ? null : _lazyMetadata()); } }
 
-            public override bool IsResolutionRoot { get { return _isResolutionRoot || _openResolutionScope; } }
+            public override bool AsResolutionRoot { get { return _isResolutionRoot || _openResolutionScope; } }
 
             public override bool OpenResolutionScope { get { return _openResolutionScope; } }
 
@@ -4603,8 +4608,8 @@ namespace DryIoc
         public virtual Expression GetExpressionOrDefault(Request request, Type reuseWrapperType = null)
         {
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
-            if (Setup.OpenResolutionScope && !request.ParentNonWrapper().IsEmpty)
-                return Resolver.CreateResolutionExpression(request);
+            if (Setup.AsResolutionRoot && !request.ParentNonWrapper().IsEmpty)
+                return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             request = request.WithResolvedFactory(this);
 

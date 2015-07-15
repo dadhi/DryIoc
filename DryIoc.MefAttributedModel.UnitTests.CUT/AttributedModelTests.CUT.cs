@@ -349,4 +349,18 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             ExportConditionInterface = exportConditionInterface;
         }
     }
+
+    [Export, AsResolutionRoot, TransientReuse]
+    public class A {}
+
+    [Export, AsResolutionRoot, TransientReuse]
+    public class B
+    {
+        public readonly A A;
+        
+        public B(A a)
+        {
+            A = a;
+        }
+    }
 }
