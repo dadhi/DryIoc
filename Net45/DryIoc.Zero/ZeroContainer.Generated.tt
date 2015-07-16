@@ -72,8 +72,6 @@ using System.Collections.Generic;
 
 namespace DryIoc.Zero
 {
-    partial class ZeroContainer
-    {
 /* 
 Exceptions happened during resolution:
 ======================================
@@ -91,36 +89,47 @@ Exceptions happened during resolution:
 ======================================
 end of exception list
 */
+
+    partial class ZeroContainer
+    {
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-        public object ResolveGenerated(Type serviceType, IScope scope)
+        partial void ResolveGenerated(ref object service, Type serviceType, IScope scope)
         {
 <#
+        var count = 0;
         foreach (var factory in factories.Where(f => f.Key == "null"))
         {
+            if (count++ > 0) WriteLine(@"
+            else");
 #>
             if (serviceType == <#= factory.Type #>)
-                return Create_<#= factory.Id #>(this, scope);
+                service = Create_<#= factory.Id #>(this, scope);
 <#
         }
 #>
-            return null;
         }
 
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-        public object ResolveGenerated(Type serviceType, object serviceKey, IScope scope)
+        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, IScope scope)
         {
 <#
+        var groupCount = 0;
         foreach (var factoryGroup in factories.Where(f => f.Key != "null").GroupBy(f => f.Type))
         {
+            if (groupCount++ > 0) WriteLine(@"
+            else");
 #>
             if (serviceType == <#= factoryGroup.Key #>) 
             {
 <#
+            var inGroupCount = 0;
             foreach (var factory in factoryGroup)
             {
+                if (inGroupCount++ > 0) WriteLine(@"
+                else");
 #>
                 if (<#= factory.Key #>.Equals(serviceKey))
-                    return Create_<#= factory.Id #>(this, scope);
+                    service = Create_<#= factory.Id #>(this, scope);
 <#
             }
 
@@ -129,11 +138,16 @@ end of exception list
 <#
         }
 #>
-            return null;
         }
 
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-        public IEnumerable<KV> ResolveManyGenerated(Type serviceType)
+        partial void ResolveManyGenerated(ref IEnumerable<KV> services, Type serviceType) 
+        {
+            services = ResolveManyGenerated(serviceType);
+        }
+
+        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+        private IEnumerable<KV> ResolveManyGenerated(Type serviceType)
         {
 <#
         foreach (var factoryGroup in factories.GroupBy(f => f.Type))

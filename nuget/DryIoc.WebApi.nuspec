@@ -10,7 +10,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for ASP.NET WebAPI</description>
         <tags>Web ASP API Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
-        <releaseNotes>Initial release.</releaseNotes>
+        <releaseNotes></releaseNotes>
         <dependencies>
           <group>
               <dependency id="DryIoc" version="(1.5,3.0.0)" />

@@ -51,7 +51,7 @@ namespace DryIoc.Zero
     /// <summary>Minimal container which allow to register service factory delegates and then resolve service from them.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly",
         Justification = "Does not contain any unmanaged resources.")]
-    public partial class ZeroContainer : IFactoryDelegateRegistrator, IResolverContext, IResolver, IScopeAccess, IDisposable
+    public sealed partial class ZeroContainer : IFactoryDelegateRegistrator, IResolverContext, IResolver, IScopeAccess, IDisposable
     {
         /// <summary>Creates container.</summary>
         /// <param name="scopeContext">(optional) Ambient scope context.</param>
@@ -250,24 +250,28 @@ namespace DryIoc.Zero
 
         #region IResolver
 
+        partial void ResolveGenerated(ref object service, Type serviceType, IScope scope);
+
+        public object ResolveRuntimeDefault(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
+        {
+            var factoryDelegate = _defaultFactories.Value.GetValueOrDefault(serviceType) as StatelessFactoryDelegate;
+            return factoryDelegate == null ? null : factoryDelegate(this, scope);
+        }
+
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
-        /// <param name="scope">Propagated resolution scope.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
-        public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
+        public object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var result = _defaultFactories.Value.IsEmpty 
-                ? ResolveGenerated(serviceType, scope) 
-                : ResolveRegisteredFirst(serviceType, scope);
-            return result ?? GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
+            object service = null;
+            ResolveGenerated(ref service, serviceType, null);
+            return service 
+                ?? ResolveRuntimeDefault(serviceType, ifUnresolved, null)
+                ?? GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
         }
 
-        private object ResolveRegisteredFirst(Type serviceType, IScope scope)
-        {
-            var factoryDelegate = _defaultFactories.Value.GetValueOrDefault(serviceType) as StatelessFactoryDelegate;
-            return factoryDelegate != null ? factoryDelegate(this, scope) : ResolveGenerated(serviceType, scope);
-        }
+        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, IScope scope);
 
         /// <summary>Resolves keyed service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
@@ -283,10 +287,18 @@ namespace DryIoc.Zero
         /// </remarks>
         public object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
         {
+            object service = null;
             if (serviceKey == null && requiredServiceType == null)
-                return ResolveDefault(serviceType, ifUnresolved, scope);
+            {
+                ResolveGenerated(ref service, serviceType, scope);
+                return service ?? ResolveRuntimeDefault(serviceType, ifUnresolved, scope);
+            }
 
             serviceType = requiredServiceType ?? serviceType;
+
+            ResolveGenerated(ref service, serviceType, serviceKey, scope);
+            if (service != null)
+                return service;
 
             var keyedFactories = _keyedFactories.Value;
             if (!keyedFactories.IsEmpty)
@@ -298,9 +310,10 @@ namespace DryIoc.Zero
                     return factoryDelegate(this, scope);                
             }
 
-            return ResolveGenerated(serviceType, serviceKey, scope)
-                   ?? GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
+            return GetDefaultOrThrowIfUnresolved(serviceType, ifUnresolved);
         }
+
+        partial void ResolveManyGenerated(ref IEnumerable<KV> services, Type serviceType);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
@@ -315,7 +328,8 @@ namespace DryIoc.Zero
         {
             serviceType = requiredServiceType ?? serviceType;
             
-            var manyGenerated = ResolveManyGenerated(serviceType);
+            var manyGenerated = Enumerable.Empty<KV>();
+            ResolveManyGenerated(ref manyGenerated, serviceType);
             if (compositeParentKey != null)
                 manyGenerated = manyGenerated.Where(kv => !compositeParentKey.Equals(kv.Key));
 

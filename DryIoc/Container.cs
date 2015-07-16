@@ -194,6 +194,9 @@ namespace DryIoc
         internal static readonly ParameterExpression ResolutionScopeParamExpr =
             Expression.Parameter(typeof(IScope), "scope");
 
+        internal static readonly ParameterExpression[] FactoryDelegateParamsExpr = 
+            { StateParamExpr, ResolverContextParamExpr, ResolutionScopeParamExpr };
+
         internal static Expression GetResolutionScopeExpression(Request request)
         {
             if (request.Scope != null)
@@ -277,13 +280,62 @@ namespace DryIoc
 
         #region IResolver
 
-        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
+        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
             var registry = _registry.Value;
             var factoryDelegate = registry.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
-                ? factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, scope)
-                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, scope);
+                ? factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, null)
+                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, null);
+        }
+
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey,
+            IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
+        {
+            if (requiredServiceType != null)
+                if (requiredServiceType.IsAssignableTo(serviceType))
+                {
+                    serviceType = requiredServiceType;
+                    requiredServiceType = null;
+                }
+
+            if (scope != null)
+                scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
+
+            var registry = _registry.Value;
+
+            // If service key is null, then use resolve default instead of keyed.
+            if (serviceKey == null && requiredServiceType == null)
+            {
+                var defaultFactory = registry.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+                return defaultFactory != null
+                    ? defaultFactory(registry.ResolutionStateCache.Value, _containerWeakRef, scope)
+                    : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, scope);
+            }
+
+            var keyedCacheKey = new KV<Type, object>(serviceType, serviceKey);
+            if (requiredServiceType == null)
+            {
+                var cachedKeyedFactory = registry.KeyedFactoryDelegateCache.Value.GetValueOrDefault(keyedCacheKey);
+                if (cachedKeyedFactory != null)
+                    return cachedKeyedFactory(registry.ResolutionStateCache.Value, _containerWeakRef, scope);
+            }
+
+            ThrowIfContainerDisposed();
+
+            var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType, scope);
+            var factory = ((IContainer)this).ResolveFactory(request);
+            var keyedFactory = factory == null ? null : factory.GetDelegateOrDefault(request);
+            if (keyedFactory == null)
+                return null;
+
+            var resultService = keyedFactory(request.Container.ResolutionStateCache, _containerWeakRef, scope);
+
+            // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
+            if (factory.Setup.CacheFactoryExpression && requiredServiceType == null)
+                registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(keyedCacheKey, keyedFactory));
+
+            return resultService;
         }
 
         private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
@@ -308,49 +360,6 @@ namespace DryIoc
                 registry.DefaultFactoryDelegateCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
 
             return service;
-        }
-
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey,
-            IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
-        {
-            if (requiredServiceType != null)
-                if (requiredServiceType.IsAssignableTo(serviceType))
-                {
-                    serviceType = requiredServiceType;
-                    requiredServiceType = null;
-                }
-
-            if (scope != null)
-                scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
-
-            // If service key is null, then use resolve default instead of keyed.
-            if (serviceKey == null && requiredServiceType == null)
-                return ((IResolver)this).ResolveDefault(serviceType, ifUnresolved, scope);
-
-            var registry = _registry.Value;
-            var keyedCacheKey = new KV<Type, object>(serviceType, serviceKey);
-            if (requiredServiceType == null)
-            {
-                var cachedFactoryDelegate = registry.KeyedFactoryDelegateCache.Value.GetValueOrDefault(keyedCacheKey);
-                if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, scope);
-            }
-
-            ThrowIfContainerDisposed();
-
-            var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType, scope);
-            var factory = ((IContainer)this).ResolveFactory(request);
-            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
-            if (factoryDelegate == null)
-                return null;
-
-            var resultService = factoryDelegate(request.Container.ResolutionStateCache, _containerWeakRef, scope);
-
-            // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
-            if (factory.Setup.CacheFactoryExpression && requiredServiceType == null)
-                registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(keyedCacheKey, factoryDelegate));
-
-            return resultService;
         }
 
         IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, IScope scope)
@@ -1717,8 +1726,7 @@ namespace DryIoc
                 expression = ((UnaryExpression)expression).Operand;
             if (expression.Type.IsValueType())
                 expression = Expression.Convert(expression, typeof(object));
-            return Expression.Lambda<FactoryDelegate>(expression,
-                Container.StateParamExpr, Container.ResolverContextParamExpr, Container.ResolutionScopeParamExpr);
+            return Expression.Lambda<FactoryDelegate>(expression, Container.FactoryDelegateParamsExpr);
         }
 
         /// <summary>First wraps the input service creation expression into lambda expression and
@@ -1736,7 +1744,6 @@ namespace DryIoc
             // ReSharper disable ConstantNullCoalescingCondition
             factoryDelegate = factoryDelegate ?? factoryExpression.Compile();
             // ReSharper restore ConstantNullCoalescingCondition
-
             //System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(factoryDelegate.Method.MethodHandle);
             return factoryDelegate;
         }
@@ -3383,7 +3390,7 @@ namespace DryIoc
         /// <returns>The requested service instance.</returns>
         public static object Resolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return resolver.ResolveDefault(serviceType, ifUnresolved, null);
+            return resolver.ResolveDefault(serviceType, ifUnresolved);
         }
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
@@ -3393,7 +3400,7 @@ namespace DryIoc
         /// <returns>The requested service instance.</returns>
         public static TService Resolve<TService>(this IResolver resolver, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveDefault(typeof(TService), ifUnresolved, null);
+            return (TService)resolver.ResolveDefault(typeof(TService), ifUnresolved);
         }
 
         /// <summary>Returns instance of <typeparamref name="TService"/> searching for <paramref name="requiredServiceType"/>.
@@ -3432,7 +3439,7 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
             return serviceKey == null && requiredServiceType == null
-                ? resolver.ResolveDefault(serviceType, ifUnresolved, null)
+                ? resolver.ResolveDefault(serviceType, ifUnresolved)
                 : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, null);
         }
 
@@ -6430,9 +6437,8 @@ namespace DryIoc
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
-        /// <param name="scope">Propagated resolution scope.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
-        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved, IScope scope);
+        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved);
 
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>

@@ -10,9 +10,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc.MefAttributedModel is extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
-        <releaseNotes>
-          fixed: #70: .Net 4.0 related: Unable to resolve types from unsigned assembly if compiling to dynamic assembly is turned On (it is by default)
-        </releaseNotes>
+        <releaseNotes>Supports all DryIoc V2 features.</releaseNotes>
         <dependencies>
             <group>
                 <dependency id="DryIoc" version="(1.5,3.0.0)" />

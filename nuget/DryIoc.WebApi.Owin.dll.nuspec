@@ -10,7 +10,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for ASP.NET WebAPI and OWIN</description>
         <tags>Web ASP WebApi OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
-        <releaseNotes>Initial release.</releaseNotes>
+        <releaseNotes></releaseNotes>
         <dependencies>
           <group>
 

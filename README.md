@@ -21,7 +21,7 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
 * [Wiki documentation][WikiHome] _(being updated for v2.0)_
 * __v1.4.1__ is stable: `PM> Install-Package DryIoc` 
-* __v2.0-rc1__ is out: `PM> Install-Package DryIoc -Pre`
+* __v2.0-rc2__ is out: `PM> Install-Package DryIoc -Pre`
 
 #### Benchmarks
 * [Performance](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
@@ -42,7 +42,7 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Thread-safe and lock-free: registrations and resolutions could be made in parallel without corrupting container state. 
 * Detects recursive dependencies - cycles in object graph.
 * Throws exceptions as early as possible. Exception provides meaningful information about problem and context.
-* Resolve as `FactoryExpression<T>` to look into underlying service creation expression.
+* Resolve as `LanbdaExpression` to be clear about service creation expression.
 
 #### Features
 
@@ -55,13 +55,13 @@ DryIoc is small, fast, capable IoC Container for .NET
     * Nested disposable scopes, ambient scope context.
     * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`, or define your own.
     * Changing default reuse type per container via  `Rules.WithReuseMapping()`.
-    * Control over reused objects behavior via ReuseWrappers: `HiddenDisposable`, `WeakReference`, `Swapable`, `Recyclable`, and user-defined.
+    * Control over reused objects behavior via ReuseWrappers: `HiddenDisposable`, `WeakReference`, `Swapable`, and user-defined.
 * Open-generics without special syntax.
 * Constructor, property and field injection.
-* Static or instance Factory Methods in addition to constructor. Parameter injection is supported the same way as for constructor.
+* Static or instance factory methods in addition to constructor. Factory methods support parameter injection same as constructors.
 * Injecting properties/fields into existing object.
 * Creating concrete object without registering it in Container but with injecting its parameters, properties, and fields.
-* Metadata associating with registration.
+* Metadata object associating with registration.
 * Generic wrappers:
     * Service collections: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and as `I(ReadOnly)Collection|List`.
     * Other: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>`, `KeyValuePair<TKey, T>`, and user-defined wrappers.
@@ -69,7 +69,7 @@ DryIoc is small, fast, capable IoC Container for .NET
     * Nested wrappers: e.g. `Meta<SomeMetadata, Func<ISomeService>>[]`.
 * [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern): Composite itself is excluded from result collection.
 * [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern). 
-* Context-based service selection.
+* Context-based service selection on resolution.
 
 #### Extensions
 * [MefAttributedModel] for [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx). Enables automatic types discovery and wiring.

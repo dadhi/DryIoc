@@ -84,7 +84,7 @@ namespace DryIoc
 
             result.ThrowIf(result != null);
 
-            var typeName = "Factory" + Interlocked.Increment(ref _typeId);
+            var typeName = "Factory" + Interlocked.Increment(ref _lastTypeId);
             var typeBuilder = GetDynamicAssemblyModuleBuilder().DefineType(typeName, TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
 
             var methodBuilder = typeBuilder.DefineMethod(
@@ -96,12 +96,12 @@ namespace DryIoc
             factoryExpression.CompileToMethod(methodBuilder);
 
             var dynamicType = typeBuilder.CreateType();
-            result = (FactoryDelegate)Delegate.CreateDelegate(typeof(FactoryDelegate), dynamicType.GetMethod("GetService"));
+            result = (FactoryDelegate)Delegate.CreateDelegate(factoryExpression.Type, dynamicType.GetMethod("GetService"), true);
         }
 
         #region Implementation
 
-        private static int _typeId;
+        private static int _lastTypeId;
         private static ModuleBuilder _moduleBuilder;
 
         private static ModuleBuilder GetDynamicAssemblyModuleBuilder()
@@ -118,7 +118,7 @@ namespace DryIoc
             if (IsDryIocSigned())
                 assemblyName.KeyPair = new StrongNameKeyPair(StrongNameKeyPairBytes);
 
-            var assemblyBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+            var assemblyBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
             var moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name);
             return moduleBuilder;
         }

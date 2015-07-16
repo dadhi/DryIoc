@@ -10,7 +10,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Implementation of CommonServiceLocator for DryIoc container, see rationale at https://commonservicelocator.codeplex.com/</description>
         <tags>Service-Locator CommonServiceLocator IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
-        <releaseNotes>First release.</releaseNotes>
+        <releaseNotes></releaseNotes>
         <dependencies>
           <group>
             <dependency id="DryIoc.dll" version="(1.5,3.0.0)" />
