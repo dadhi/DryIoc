@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Linq;
+using System.Text;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -216,16 +218,6 @@ namespace DryIoc.UnitTests
 
             Assert.That(services.Length, Is.EqualTo(1));
             Assert.That(services.Single().Metadata, Is.EqualTo("m"));
-        }
-
-        [Test]
-        public void Can_resolve_as_Tuple_instead_of_Meta()
-        {
-            var container = new Container();
-
-            container.Register<IService, Service>(setup: Setup.With(metadata: "m"));
-
-            //container.Resolve<Tuple<IService, string>>();
         }
     }
 

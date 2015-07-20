@@ -43,12 +43,6 @@
     <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="..\..\Net40\DryIoc\FactoryCompiler.cs">
-      <Link>FactoryCompiler.cs</Link>
-    </Compile>
-    <Compile Include="..\..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs">
-      <Link>InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs</Link>
-    </Compile>
     <Compile Include="AsyncExecutionFlowScopeContext.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

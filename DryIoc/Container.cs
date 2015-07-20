@@ -282,11 +282,8 @@ namespace DryIoc
 
         object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var registry = _registry.Value;
-            var factoryDelegate = registry.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-            return factoryDelegate != null
-                ? factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, null)
-                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, null);
+            return _registry.Value.ResolveServiceFromCache(serviceType, _containerWeakRef)
+                ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, null); 
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey,
@@ -1409,6 +1406,12 @@ namespace DryIoc
 
                 return registry;
             }
+
+            public object ResolveServiceFromCache(Type serviceType, IResolverContext resolverContext)
+            {
+                var factoryDelegate = DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+                return factoryDelegate == null ? null : factoryDelegate(ResolutionStateCache.Value, resolverContext, null);
+            }
         }
 
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope, IScopeContext scopeContext,
@@ -1721,7 +1724,8 @@ namespace DryIoc
         /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
         public static Expression<FactoryDelegate> WrapInFactoryExpression(this Expression expression)
         {
-            // Removing not required Convert from expression root, because CompiledFactory result still be converted at the end.
+            // Optimize expression by:
+            // - removing not required Convert from expression root, because CompiledFactory result still be converted at the end.
             if (expression.NodeType == ExpressionType.Convert)
                 expression = ((UnaryExpression)expression).Operand;
             if (expression.Type.IsValueType())
@@ -1739,18 +1743,10 @@ namespace DryIoc
         public static FactoryDelegate CompileToDelegate(this Expression expression, Rules rules)
         {
             var factoryExpression = expression.WrapInFactoryExpression();
-            FactoryDelegate factoryDelegate = null;
-            CompileToMethod(factoryExpression, rules, ref factoryDelegate);
-            // ReSharper disable ConstantNullCoalescingCondition
-            factoryDelegate = factoryDelegate ?? factoryExpression.Compile();
-            // ReSharper restore ConstantNullCoalescingCondition
+            var factoryDelegate = factoryExpression.Compile();
             //System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(factoryDelegate.Method.MethodHandle);
             return factoryDelegate;
         }
-
-        // Partial method definition to be implemented in .NET40 version of Container.
-        // It is optional and fine to be not implemented.
-        static partial void CompileToMethod(Expression<FactoryDelegate> factoryExpression, Rules rules, ref FactoryDelegate result);
     }
 
     /// <summary>Adds to Container support for:
@@ -4696,7 +4692,7 @@ namespace DryIoc
             }
         }
 
-        /// <summary>Creates factory delegate from service expression and returns it. By default uses <see cref="FactoryCompiler"/>
+        /// <summary>Creates factory delegate from service expression and returns it.
         /// to compile delegate from expression but could be overridden by concrete factory type: e.g. <see cref="DelegateFactory"/></summary>
         /// <param name="request">Service request.</param>
         /// <returns>Factory delegate created from service expression.</returns>

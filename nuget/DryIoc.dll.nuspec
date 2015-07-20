@@ -15,6 +15,7 @@
             - rc1 breaking: No more OpenScopeWithoutContext - use OpenScope without specifying scope context, which is default.
             - rc1 breaking: No more ReuseRecyclable wrapper - use IfAlreadyRegistered.Replace instead.
             - rc1 breaking: LambdaExpression instead of FactoryExpression{T}.
+            - rc1 breaking: Removed compiling factory delegates to Dynamic Assembly and whole complexity - DryIoc perf is fine without it.
         </releaseNotes>
     </metadata>
     <files>
@@ -29,7 +30,6 @@
         <file src="..\Net40\bin\Release\DryIoc.dll" target="lib\net40" />
         <file src="..\Net40\bin\Release\DryIoc.pdb" target="lib\net40" />
         <file src="..\Net40\bin\Release\DryIoc.xml" target="lib\net40" />
-        <file src="..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs" target="content\net40\Properties" />
 
         <!-- net45 -->
         <file src="..\Net45\bin\Release\DryIoc.dll" target="lib\net45" />
