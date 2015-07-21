@@ -31,8 +31,8 @@ echo:
  -output:%COVERAGE%
 
 echo:
-echo:Generating HTML coverage report in "%REPORTS%" . . .
-echo: Skip!
+echo:SKIP Generating HTML coverage report in "%REPORTS%" . . .
+echo: 
 
 rem %REPORTGEN%^
 rem -reports:%COVERAGE%^

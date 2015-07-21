@@ -1,16 +1,9 @@
 version: 2.0.0.{build}
 os: Windows Server 2012
-test: off
 
 environment:
   COVERALLS_REPO_TOKEN:
     secure: wbdO3ggQGIggpCZU0oZiL2C6rQKf+ksiGllDbLD46fpC2eLyqnsmv4+LnG0bWVYA
-
-build_script:
-  - .\BuildScripts\_main.bat -nopause
-
-after_build:
-  - ps: .\packages\coveralls.net.0.5.0\csmacnz.Coveralls.exe --opencover -i ".\bin\Reports\Coverage.xml" --repoToken $env:COVERALLS_REPO_TOKEN --commitId $env:APPVEYOR_REPO_COMMIT --commitBranch $env:APPVEYOR_REPO_BRANCH --commitAuthor $env:APPVEYOR_REPO_COMMIT_AUTHOR --commitEmail $env:APPVEYOR_REPO_COMMIT_AUTHOR_EMAIL --commitMessage $env:APPVEYOR_REPO_COMMIT_MESSAGE --jobId $env:APPVEYOR_JOB_ID
 
 assembly_info:
   patch: true
@@ -21,6 +14,12 @@ assembly_info:
 
 artifacts:
   - path: bin\NuGetPackages\*.nupkg
+
+build_script:
+  - .\BuildScripts\_main.bat -nopause
+
+test_script:
+  - ps: .\packages\coveralls.net.0.5.0\csmacnz.Coveralls.exe --opencover -i ".\bin\Reports\Coverage.xml" --repoToken $env:COVERALLS_REPO_TOKEN --commitId $env:APPVEYOR_REPO_COMMIT --commitBranch $env:APPVEYOR_REPO_BRANCH --commitAuthor $env:APPVEYOR_REPO_COMMIT_AUTHOR --commitEmail $env:APPVEYOR_REPO_COMMIT_AUTHOR_EMAIL --commitMessage $env:APPVEYOR_REPO_COMMIT_MESSAGE --jobId $env:APPVEYOR_JOB_ID
 
 nuget:
   account_feed: true
