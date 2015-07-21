@@ -3,6 +3,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
+using DryIocAttributes;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests

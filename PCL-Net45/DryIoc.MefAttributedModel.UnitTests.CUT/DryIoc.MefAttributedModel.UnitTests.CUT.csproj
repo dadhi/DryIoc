@@ -75,9 +75,9 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
-      <Project>{5f929104-328d-45ec-b766-7408d1548e40}</Project>
-      <Name>DryIoc.MefAttributedModel</Name>
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
+      <Project>{741c3558-4a90-41d2-a45f-48cb27c15347}</Project>
+      <Name>DryIocAttributes</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">

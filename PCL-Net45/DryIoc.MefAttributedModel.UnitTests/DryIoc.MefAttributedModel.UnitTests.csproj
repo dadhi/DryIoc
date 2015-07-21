@@ -90,6 +90,11 @@
       <Name>DryIoc.MefAttributedModel</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
+      <Project>{741c3558-4a90-41d2-a45f-48cb27c15347}</Project>
+      <Name>DryIocAttributes</Name>
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{b9fcd777-84b2-4318-8059-250805825b48}</Project>
       <Name>DryIoc</Name>

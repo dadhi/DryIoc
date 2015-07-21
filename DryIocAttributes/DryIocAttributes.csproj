@@ -1,15 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>8.0.30703</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{9E67B15C-D721-4525-9DD7-6A6ED6137748}</ProjectGuid>
+    <ProjectGuid>{3BBD5CCF-D87C-4650-B039-334767A7CEDD}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.MefAttributedModel.UnitTests.CUT</RootNamespace>
-    <AssemblyName>DryIoc.MefAttributedModel.UnitTests.CUT</AssemblyName>
+    <RootNamespace>DryIocAttributes</RootNamespace>
+    <AssemblyName>DryIocAttributes</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -21,6 +20,8 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>..\bin\Debug\DryIocAttributes.XML</DocumentationFile>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -29,36 +30,15 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>..\bin\Release\DryIocAttributes.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AttributedModelTests.CUT.cs" />
-    <Compile Include="CodeGenerationTests.CUT.cs" />
-    <Compile Include="CustomInjectionRulesTests.CUT.cs" />
-    <Compile Include="ExportAsDecoratorTests.CUT.cs" />
-    <Compile Include="ExportAsGenericWrapperTests.CUT.cs" />
-    <Compile Include="ExportFactoryTests.CUT.cs" />
-    <Compile Include="ExportImportWithKeyTests.CUT.cs" />
-    <Compile Include="ExportManyTests.CUT.cs" />
-    <Compile Include="ImportExternalTests.CUT.cs" />
-    <Compile Include="ImportWithMetadataTests.CUT.cs" />
-    <Compile Include="InheritedExportTests.CUT.cs" />
+    <Compile Include="Attributes.cs" />
+    <Compile Include="Ported-net40.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
-      <Project>{3bbd5ccf-d87c-4650-b039-334767a7cedd}</Project>
-      <Name>DryIocAttributes</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
-      <Name>DryIoc</Name>
-      <Private>False</Private>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

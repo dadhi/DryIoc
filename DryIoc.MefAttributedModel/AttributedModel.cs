@@ -30,21 +30,22 @@ namespace DryIoc.MefAttributedModel
     using System.Linq;
     using System.Reflection;
     using System.Text;
+    using DryIocAttributes;
     
     /// <summary>Implements MEF Attributed Programming Model. 
     /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
     public static class AttributedModel
     {
         ///<summary>Default reuse policy is Singleton, as in MEF.</summary>
-        public static SupportedReuse DefaultReuse = SupportedReuse.Singleton;
+        public static ReuseType DefaultReuse = ReuseType.Singleton;
 
         /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/> 
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
-        public static readonly ImTreeMap<SupportedReuse, Func<string, IReuse>> SupportedReuseTypes =
-            ImTreeMap<SupportedReuse, Func<string, IReuse>>.Empty
-            .AddOrUpdate(SupportedReuse.Singleton, _ => Reuse.Singleton)
-            .AddOrUpdate(SupportedReuse.CurrentScope, Reuse.InCurrentNamedScope)
-            .AddOrUpdate(SupportedReuse.ResolutionScope, _ => Reuse.InResolutionScope);
+        public static readonly ImTreeMap<ReuseType, Func<string, IReuse>> SupportedReuseTypes =
+            ImTreeMap<ReuseType, Func<string, IReuse>>.Empty
+            .AddOrUpdate(ReuseType.Singleton, _ => Reuse.Singleton)
+            .AddOrUpdate(ReuseType.CurrentScope, Reuse.InCurrentNamedScope)
+            .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope);
 
         /// <summary>Returns new rules with attributed model importing rules appended.</summary>
         /// <param name="rules">Source rules to append importing rules to.</param>
@@ -155,9 +156,9 @@ namespace DryIoc.MefAttributedModel
         /// <param name="reuseType">Reuse type to find in supported.</param>
         /// <param name="reuseName">(optional) Reuse name to match with scope name.</param>
         /// <returns>Supported reuse object.</returns>
-        public static IReuse GetReuse(SupportedReuse reuseType, string reuseName = null)
+        public static IReuse GetReuse(ReuseType reuseType, string reuseName = null)
         {
-            return reuseType == SupportedReuse.Transient 
+            return reuseType == ReuseType.Transient 
                 ? null
                 : SupportedReuseTypes.GetValueOrDefault(reuseType)
                     .ThrowIfNull(Error.UnsupportedReuseType, reuseType)
@@ -252,7 +253,7 @@ namespace DryIoc.MefAttributedModel
                 var implementationType = import.ImplementationType ?? serviceType;
 
                 var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
-                var reuseType = reuseAttr == null ? DefaultReuse : reuseAttr.SupportedReuse;
+                var reuseType = reuseAttr == null ? DefaultReuse : reuseAttr.ReuseType;
                 var reuseName = reuseAttr == null ? null : reuseAttr.ScopeName;
                 var reuse = GetReuse(reuseType, reuseName);
 
@@ -300,13 +301,13 @@ namespace DryIoc.MefAttributedModel
                 {
                     var creationPolicy = ((PartCreationPolicyAttribute)attribute).CreationPolicy;
                     info.Reuse = creationPolicy == CreationPolicy.NonShared 
-                        ? SupportedReuse.Transient 
-                        : SupportedReuse.Singleton;
+                        ? ReuseType.Transient 
+                        : ReuseType.Singleton;
                 }
                 else if (attribute is ReuseAttribute)
                 {
                     var reuseAttribute = ((ReuseAttribute)attribute);
-                    info.Reuse = reuseAttribute.SupportedReuse;
+                    info.Reuse = reuseAttribute.ReuseType;
                     info.ReuseName = reuseAttribute.ScopeName;
                 }
                 else if (attribute is OpenResolutionScopeAttribute)
@@ -346,7 +347,7 @@ namespace DryIoc.MefAttributedModel
             }
 
             if (info.FactoryType == FactoryType.Decorator)
-                info.Reuse = SupportedReuse.Transient;
+                info.Reuse = ReuseType.Transient;
 
             info.Exports.ThrowIfNull(Error.NoExport, implementationType);
             return info;
@@ -640,7 +641,7 @@ namespace DryIoc.MefAttributedModel
         public string ImplementationTypeFullName;
 
         /// <summary>One of <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
-        public SupportedReuse Reuse;
+        public ReuseType Reuse;
 
         /// <summary>Name to pass to reuse factory from <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
         public string ReuseName;
@@ -735,7 +736,7 @@ namespace DryIoc.MefAttributedModel
         "); for (var i = 0; i < Exports.Length; i++)
                 code = Exports[i].ToCode(code).Append(@",
         "); code.Append(@"},
-    Reuse = ").AppendEnum(typeof(SupportedReuse), Reuse).Append(@",
+    Reuse = ").AppendEnum(typeof(ReuseType), Reuse).Append(@",
     HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
     FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
             if (Wrapper != null) code.Append(@",

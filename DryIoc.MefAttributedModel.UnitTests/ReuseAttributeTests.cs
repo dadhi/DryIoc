@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel.Composition;
+using DryIocAttributes;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests

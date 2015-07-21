@@ -39,11 +39,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AttributedModel.cs" />
-    <Compile Include="Attributes.cs" />
-    <Compile Include="Ported-net40.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
+      <Project>{3bbd5ccf-d87c-4650-b039-334767a7cedd}</Project>
+      <Name>DryIocAttributes</Name>
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
       <Name>DryIoc</Name>

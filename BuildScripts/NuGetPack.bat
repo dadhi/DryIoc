@@ -19,6 +19,14 @@ echo:================
 rem -Symbols
 
 echo:
+call :ParseVersion "DryIocAttributes\Properties\AssemblyInfo.cs"
+echo:DryIocAttributes v%VER%
+echo:============================
+%NUGET% pack "NuGet\DryIocAttributes.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack "NuGet\DryIocAttributes.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+rem -Symbols 
+
+echo:
 call :ParseVersion "DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs"
 echo:MefAttributedModel v%VER%
 echo:============================

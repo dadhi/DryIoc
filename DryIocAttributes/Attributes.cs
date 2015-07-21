@@ -22,17 +22,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel.Composition;
+using System.Diagnostics.CodeAnalysis;
 
-namespace DryIoc.MefAttributedModel
+namespace DryIocAttributes
 {
-    using System;
-    using System.ComponentModel.Composition;
-    using System.Diagnostics.CodeAnalysis;
-
     /// <summary>List of supported DryIoc reuse types.</summary>
-    public enum SupportedReuse
+    public enum ReuseType
     {
         /// <summary>Means no reuse.</summary>
         Transient, 
@@ -54,17 +53,17 @@ namespace DryIoc.MefAttributedModel
     public class ReuseAttribute : Attribute
     {
         /// <summary>Implementation of reuse. Could be null to specify transient or no reuse.</summary>
-        public readonly SupportedReuse SupportedReuse;
+        public readonly ReuseType ReuseType;
 
         /// <summary>Optional name, valid only for Current Scope Reuse.</summary>
         public readonly string ScopeName;
 
         /// <summary>Create attribute with specified type implementing reuse.</summary>
-        /// <param name="supportedReuse">Supported reuse type.</param>
+        /// <param name="reuseType">Supported reuse type.</param>
         /// <param name="scopeName">(optional) Name is valid only for Current Scope Reuse and will be ignored by the rest of reuse types.</param>
-        public ReuseAttribute(SupportedReuse supportedReuse, string scopeName = null)
+        public ReuseAttribute(ReuseType reuseType, string scopeName = null)
         {
-            SupportedReuse = supportedReuse;
+            ReuseType = reuseType;
             ScopeName = scopeName;
         }
     }
@@ -72,22 +71,22 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Defines the Transient reuse for exported service.</summary>
     public class TransientReuseAttribute : ReuseAttribute
     {
-        /// <summary>Creates attribute by specifying null as <see cref="ReuseAttribute.SupportedReuse"/>.</summary>
-        public TransientReuseAttribute() : base(SupportedReuse.Transient) { }
+        /// <summary>Creates attribute by specifying null as <see cref="ReuseAttribute.ReuseType"/>.</summary>
+        public TransientReuseAttribute() : base(ReuseType.Transient) { }
     }
 
     /// <summary>Denotes exported type with Singleton reuse.</summary>
     public class SingletonReuseAttribute : ReuseAttribute
     {
         /// <summary>Creates attribute.</summary>
-        public SingletonReuseAttribute() : base(SupportedReuse.Singleton) { }
+        public SingletonReuseAttribute() : base(ReuseType.Singleton) { }
     }
 
     /// <summary>Denotes exported type with Current Scope Reuse.</summary>
     public class CurrentScopeReuseAttribute : ReuseAttribute
     {
         /// <summary>Creates attribute.</summary> <param name="scopeName">(optional)</param>
-        public CurrentScopeReuseAttribute(string scopeName = null) : base(SupportedReuse.CurrentScope, scopeName) { }
+        public CurrentScopeReuseAttribute(string scopeName = null) : base(ReuseType.CurrentScope, scopeName) { }
     }
 
     /// <summary>Marks exported type with Reuse.InWebRequest. 
@@ -116,7 +115,7 @@ namespace DryIoc.MefAttributedModel
     public class ResolutionScopeReuseAttribute : ReuseAttribute
     {
         /// <summary>Creates attribute.</summary>
-        public ResolutionScopeReuseAttribute() : base(SupportedReuse.ResolutionScope) { }
+        public ResolutionScopeReuseAttribute() : base(ReuseType.ResolutionScope) { }
     }
 
     /// <summary>Represents Reuse Wrappers defined for exported type.</summary>

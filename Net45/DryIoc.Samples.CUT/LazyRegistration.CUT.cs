@@ -1,5 +1,5 @@
 ﻿using DryIoc.IssuesTests.Samples;
-using DryIoc.MefAttributedModel;
+using DryIocAttributes;
 
 namespace DryIoc.Samples.CUT
 {

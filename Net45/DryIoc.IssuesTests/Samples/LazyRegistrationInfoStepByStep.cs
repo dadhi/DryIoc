@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using DryIoc.MefAttributedModel;
+using DryIocAttributes;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests.Samples

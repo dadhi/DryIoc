@@ -42,6 +42,11 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- A reference to the entire .NET Framework is automatically included -->
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
+      <Project>{a62ffeeb-4dfe-4fa3-a418-029d49c62963}</Project>
+      <Name>DryIocAttributes</Name>
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{878e401e-474b-4aab-ae20-122051755c81}</Project>
       <Name>DryIoc</Name>
@@ -51,12 +56,6 @@
   <ItemGroup>
     <Compile Include="..\..\DryIoc.MefAttributedModel\AttributedModel.cs">
       <Link>AttributedModel.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel\Attributes.cs">
-      <Link>Attributes.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel\Ported-net40.cs">
-      <Link>Ported-net40.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>

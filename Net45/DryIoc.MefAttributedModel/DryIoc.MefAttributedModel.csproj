@@ -41,14 +41,16 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel\AttributedModel.cs">
       <Link>AttributedModel.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel\Attributes.cs">
-      <Link>Attributes.cs</Link>
-    </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
+      <Project>{9fb3bbb2-30a6-4b67-9af7-ffc152920e49}</Project>
+      <Name>DryIocAttributes</Name>
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
       <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
       <Name>DryIoc</Name>

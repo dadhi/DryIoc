@@ -1,4 +1,5 @@
 ﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
+using DryIocAttributes;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
@@ -16,7 +17,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(AnotherService),
                     Exports = new[] { new ExportInfo(typeof(IService), "another") },
-                    Reuse = SupportedReuse.Singleton,
+                    Reuse = ReuseType.Singleton,
                     HasMetadataAttribute = false,
                 }
             });
@@ -36,7 +37,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(Service),
                     Exports = new[] { new ExportInfo(typeof(IService), "some") },
-                    Reuse = SupportedReuse.Singleton,
+                    Reuse = ReuseType.Singleton,
                     HasMetadataAttribute = false
                 },
 
@@ -44,7 +45,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(AnotherService),
                     Exports = new[] { new ExportInfo(typeof(IService), null) },
-                    Reuse = SupportedReuse.Transient,
+                    Reuse = ReuseType.Transient,
                     HasMetadataAttribute = false,
                     FactoryType = FactoryType.Decorator,
                 },
@@ -53,7 +54,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(Wrap<>),
                     Exports = new[] { new ExportInfo(typeof(Wrap<>), null) }, 
-                    Reuse = SupportedReuse.Transient,
+                    Reuse = ReuseType.Transient,
                     HasMetadataAttribute = false,
                     FactoryType = FactoryType.Wrapper
                 },

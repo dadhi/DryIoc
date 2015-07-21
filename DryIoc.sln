@@ -46,6 +46,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51
 		NuGet\DryIoc.WebApi.Owin.dll.nuspec = NuGet\DryIoc.WebApi.Owin.dll.nuspec
 		NuGet\DryIoc.WebApi.Owin.nuspec = NuGet\DryIoc.WebApi.Owin.nuspec
 		NuGet\DryIoc.Zero.nuspec = NuGet\DryIoc.Zero.nuspec
+		NuGet\DryIocAttributes.dll.nuspec = NuGet\DryIocAttributes.dll.nuspec
+		NuGet\DryIocAttributes.nuspec = NuGet\DryIocAttributes.nuspec
 		NuGet\SignPackageAssemblies.ps1 = NuGet\SignPackageAssemblies.ps1
 	EndProjectSection
 EndProject
@@ -142,6 +144,16 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{71C3BA
 	ProjectSection(SolutionItems) = preProject
 		.nuget\packages.config = .nuget\packages.config
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocAttributes", "Net45\DryIocAttributes\DryIocAttributes.csproj", "{9FB3BBB2-30A6-4B67-9AF7-FFC152920E49}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocAttributes", "DryIocAttributes\DryIocAttributes.csproj", "{3BBD5CCF-D87C-4650-B039-334767A7CEDD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocAttributes", "PCL\DryIocAttributes\DryIocAttributes.csproj", "{A62FFEEB-4DFE-4FA3-A418-029D49C62963}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocAttributes", "PCL-Net45\DryIocAttributes\DryIocAttributes.csproj", "{741C3558-4A90-41D2-A45F-48CB27C15347}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocAttributes", "Net40\DryIocAttributes\DryIocAttributes.csproj", "{6DCB5CCD-ADA2-4C6A-A864-CC396BF718AD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -321,6 +333,26 @@ Global
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FB3BBB2-30A6-4B67-9AF7-FFC152920E49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FB3BBB2-30A6-4B67-9AF7-FFC152920E49}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FB3BBB2-30A6-4B67-9AF7-FFC152920E49}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FB3BBB2-30A6-4B67-9AF7-FFC152920E49}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3BBD5CCF-D87C-4650-B039-334767A7CEDD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3BBD5CCF-D87C-4650-B039-334767A7CEDD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3BBD5CCF-D87C-4650-B039-334767A7CEDD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3BBD5CCF-D87C-4650-B039-334767A7CEDD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A62FFEEB-4DFE-4FA3-A418-029D49C62963}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A62FFEEB-4DFE-4FA3-A418-029D49C62963}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A62FFEEB-4DFE-4FA3-A418-029D49C62963}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A62FFEEB-4DFE-4FA3-A418-029D49C62963}.Release|Any CPU.Build.0 = Release|Any CPU
+		{741C3558-4A90-41D2-A45F-48CB27C15347}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{741C3558-4A90-41D2-A45F-48CB27C15347}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{741C3558-4A90-41D2-A45F-48CB27C15347}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{741C3558-4A90-41D2-A45F-48CB27C15347}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6DCB5CCD-ADA2-4C6A-A864-CC396BF718AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6DCB5CCD-ADA2-4C6A-A864-CC396BF718AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6DCB5CCD-ADA2-4C6A-A864-CC396BF718AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6DCB5CCD-ADA2-4C6A-A864-CC396BF718AD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -361,5 +393,9 @@ Global
 		{642F214F-8956-43CF-9011-2C2A9ADB6426} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{181FC23C-08F1-4385-8549-B13781D82F23} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
+		{9FB3BBB2-30A6-4B67-9AF7-FFC152920E49} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
+		{A62FFEEB-4DFE-4FA3-A418-029D49C62963} = {CE5E598E-5A34-40EA-9110-AD2663BAD177}
+		{741C3558-4A90-41D2-A45F-48CB27C15347} = {C8C71EEF-0C64-4A33-96F8-D22C6E429741}
+		{6DCB5CCD-ADA2-4C6A-A864-CC396BF718AD} = {84205448-1773-45D6-8D42-548A7997A7E1}
 	EndGlobalSection
 EndGlobal
