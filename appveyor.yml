@@ -1,5 +1,6 @@
 version: 2.0.0.{build}
 os: Windows Server 2012
+tests: off
 
 environment:
   COVERALLS_REPO_TOKEN:
@@ -18,8 +19,12 @@ artifacts:
 build_script:
   - .\BuildScripts\_main.bat -nopause
 
-test_script:
-  - ps: .\packages\coveralls.net.0.5.0\csmacnz.Coveralls.exe --opencover -i ".\bin\Reports\Coverage.xml" --repoToken $env:COVERALLS_REPO_TOKEN --commitId $env:APPVEYOR_REPO_COMMIT --commitBranch $env:APPVEYOR_REPO_BRANCH --commitAuthor $env:APPVEYOR_REPO_COMMIT_AUTHOR --commitEmail $env:APPVEYOR_REPO_COMMIT_AUTHOR_EMAIL --commitMessage $env:APPVEYOR_REPO_COMMIT_MESSAGE --jobId $env:APPVEYOR_JOB_ID
+on_success:
+  - ps: >-
+        Write-Host $env:COVERALLS_REPO_TOKEN
+        Write-Host $env:APPVEYOR_REPO_COMMIT_MESSAGE
+        if (Test-Path "./bin/Reports/Coverage.xml") { Write-Host "coverage exists" } else { Write-Host "no coverage!" }
+        .\packages\coveralls.net.0.5.0\csmacnz.Coveralls.exe --opencover -i ./bin/Reports/Coverage.xml --repoToken $env:COVERALLS_REPO_TOKEN --commitId $env:APPVEYOR_REPO_COMMIT --commitBranch $env:APPVEYOR_REPO_BRANCH --commitAuthor $env:APPVEYOR_REPO_COMMIT_AUTHOR --commitEmail $env:APPVEYOR_REPO_COMMIT_AUTHOR_EMAIL --commitMessage $env:APPVEYOR_REPO_COMMIT_MESSAGE --jobId $env:APPVEYOR_JOB_ID
 
 nuget:
   account_feed: true
