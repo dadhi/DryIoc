@@ -280,14 +280,13 @@ namespace DryIoc
 
         #region IResolver
 
-        object IResolver.ResolveDefault(Type serviceType, IfUnresolved ifUnresolved)
+        object IResolver.ResolveDefault(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             return _registry.Value.ResolveServiceFromCache(serviceType, _containerWeakRef)
-                ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, null); 
+                ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null); 
         }
 
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey,
-            IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
         {
             if (requiredServiceType != null)
                 if (requiredServiceType.IsAssignableTo(serviceType))
@@ -307,7 +306,7 @@ namespace DryIoc
                 var defaultFactory = registry.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
                 return defaultFactory != null
                     ? defaultFactory(registry.ResolutionStateCache.Value, _containerWeakRef, scope)
-                    : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved, scope);
+                    : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, scope);
             }
 
             var keyedCacheKey = new KV<Type, object>(serviceType, serviceKey);
@@ -320,6 +319,7 @@ namespace DryIoc
 
             ThrowIfContainerDisposed();
 
+            var ifUnresolved = ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
             var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType, scope);
             var factory = ((IContainer)this).ResolveFactory(request);
             var keyedFactory = factory == null ? null : factory.GetDelegateOrDefault(request);
@@ -335,16 +335,17 @@ namespace DryIoc
             return resultService;
         }
 
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved, IScope scope)
+        private object ResolveAndCacheDefaultDelegate(Type serviceType, bool ifUnresolvedReturnDefault, IScope scope)
         {
             ThrowIfContainerDisposed();
 
+            var ifUnresolved = ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
             var request = _emptyRequest.Push(serviceType, ifUnresolved: ifUnresolved, scope: scope);
             var factory = ((IContainer)this).ResolveFactory(request); // NOTE may change request
 
             // The situation is possible for multiple default services registered.
             if (request.ServiceKey != null)
-                return ((IResolver)this).ResolveKeyed(serviceType, request.ServiceKey, ifUnresolved, null, scope);
+                return ((IResolver)this).ResolveKeyed(serviceType, request.ServiceKey, ifUnresolvedReturnDefault, null, scope);
 
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
@@ -388,7 +389,7 @@ namespace DryIoc
 
             foreach (var item in items)
             {
-                var service = ((IResolver)this).ResolveKeyed(serviceType, item.Key, IfUnresolved.ReturnDefault, requiredServiceType, scope);
+                var service = ((IResolver)this).ResolveKeyed(serviceType, item.Key, true, requiredServiceType, scope);
                 if (service != null) // skip unresolved items
                     yield return service;
             }
@@ -396,7 +397,7 @@ namespace DryIoc
             if (itemsWithVariance != null)
                 foreach (var item in itemsWithVariance)
                 {
-                    var service = ((IResolver)this).ResolveKeyed(serviceType, item.OptionalServiceKey, IfUnresolved.ReturnDefault, item.ServiceType, scope);
+                    var service = ((IResolver)this).ResolveKeyed(serviceType, item.OptionalServiceKey, true, item.ServiceType, scope);
                     if (service != null) // skip unresolved items
                         yield return service;
                 }
@@ -1671,7 +1672,7 @@ namespace DryIoc
     }
 
     /// <summary>Returns reference to actual resolver implementation. 
-    /// Minimizes <see cref="FactoryDelegate"/> dependency on container.</summary>
+    /// Minimizes dependency to Factory Delegate on container.</summary>
     public interface IResolverContext
     {
         /// <summary>Provides access to resolver implementation.</summary>
@@ -1808,11 +1809,7 @@ namespace DryIoc
 
                 .AddOrUpdate(typeof(ReuseWeakReference),
                     new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
-                        setup: Setup.ReuseWrapper(ReuseWrapperFactory.WeakReference)))
-
-                .AddOrUpdate(typeof(ReuseSwapable),
-                    new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
-                        setup: Setup.ReuseWrapper(ReuseWrapperFactory.Swapable)));
+                        setup: Setup.ReuseWrapper(ReuseWrapperFactory.WeakReference)));
         }
 
         /// <summary>Unregistered/fallback wrapper resolution rule.</summary>
@@ -3382,11 +3379,20 @@ namespace DryIoc
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
         /// <returns>The requested service instance.</returns>
-        public static object Resolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        public static object Resolve(this IResolver resolver, Type serviceType)
         {
-            return resolver.ResolveDefault(serviceType, ifUnresolved);
+            return resolver.ResolveDefault(serviceType, false);
+        }
+
+        /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
+        /// <param name="serviceType">The type of the requested service.</param>
+        /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
+        /// <param name="ifUnresolved">Says how to handle unresolved service.</param>
+        /// <returns>The requested service instance.</returns>
+        public static object Resolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved)
+        {
+            return resolver.ResolveDefault(serviceType, ifUnresolved == IfUnresolved.ReturnDefault);
         }
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
@@ -3396,7 +3402,7 @@ namespace DryIoc
         /// <returns>The requested service instance.</returns>
         public static TService Resolve<TService>(this IResolver resolver, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveDefault(typeof(TService), ifUnresolved);
+            return (TService)resolver.ResolveDefault(typeof(TService), ifUnresolved == IfUnresolved.ReturnDefault);
         }
 
         /// <summary>Returns instance of <typeparamref name="TService"/> searching for <paramref name="requiredServiceType"/>.
@@ -3414,7 +3420,7 @@ namespace DryIoc
         /// ]]></code></example>
         public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved, requiredServiceType, null);
+            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved == IfUnresolved.ReturnDefault, requiredServiceType, null);
         }
 
         /// <summary>Returns instance of <paramref name="serviceType"/> searching for <paramref name="requiredServiceType"/>.
@@ -3434,9 +3440,10 @@ namespace DryIoc
         public static object Resolve(this IResolver resolver, Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null)
         {
+            var ifUnresolvedReturnDefault = ifUnresolved == IfUnresolved.ReturnDefault;
             return serviceKey == null && requiredServiceType == null
-                ? resolver.ResolveDefault(serviceType, ifUnresolved)
-                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, null);
+                ? resolver.ResolveDefault(serviceType, ifUnresolvedReturnDefault)
+                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, null);
         }
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
@@ -3525,7 +3532,7 @@ namespace DryIoc
         {
             serviceType = serviceType ?? request.ServiceType;
             var serviceTypeExpr = request.Container.GetOrAddStateItemExpression(serviceType, typeof(Type));
-            var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved);
+            var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.ReturnDefault, typeof(bool));
             var requiredServiceTypeExpr = request.Container.GetOrAddStateItemExpression(request.RequiredServiceType, typeof(Type));
             var serviceKeyExpr = Expression.Convert(request.Container.GetOrAddStateItemExpression(request.ServiceKey), typeof(object));
 
@@ -5715,7 +5722,7 @@ namespace DryIoc
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
         private readonly object _itemCreationLocker = new object();
 
-        private static void DisposeItem(object item)
+        internal static void DisposeItem(object item)
         {
             try
             {
@@ -5725,7 +5732,7 @@ namespace DryIoc
                 else
                 {
                     var reused = item as IReuseWrapper;
-                    while (reused != null && !(reused is IHideDisposableFromContainer)
+                    while (reused != null && !(reused is ReuseHiddenDisposable)
                            && reused.Target != null && (disposable = reused.Target as IDisposable) == null)
                         reused = reused.Target as IReuseWrapper;
                     if (disposable != null)
@@ -5811,7 +5818,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
             if (!_factoryIdToIndexMap.IsEmpty)
                 foreach (var idToIndex in _factoryIdToIndexMap.Enumerate().OrderByDescending(it => it.Key))
-                    DisposeItem(_items[(int)idToIndex.Value]);
+                    Scope.DisposeItem(_items[(int)idToIndex.Value]);
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
             _items = ArrayTools.Empty<object>();
         }
@@ -5865,29 +5872,6 @@ namespace DryIoc
 
             Ref.Swap(ref _items, items => { items[itemIndex] = item; return items; });
             return item;
-        }
-
-        private static void DisposeItem(object item)
-        {
-            try
-            {
-                var disposable = item as IDisposable;
-                if (disposable != null)
-                    disposable.Dispose();
-                else
-                {
-                    var reused = item as IReuseWrapper;
-                    while (reused != null && !(reused is IHideDisposableFromContainer)
-                           && reused.Target != null && (disposable = reused.Target as IDisposable) == null)
-                        reused = reused.Target as IReuseWrapper;
-                    if (disposable != null)
-                        disposable.Dispose();
-                }
-            }
-            catch (Exception)
-            {
-                // NOTE Ignoring disposing exception, they not so important for program to proceed.
-            }
         }
 
         #endregion
@@ -6245,9 +6229,6 @@ namespace DryIoc
         /// <summary>Factory for <see cref="ReuseWeakReference"/>.</summary>
         public static readonly IReuseWrapperFactory WeakReference = new WeakReferenceFactory();
 
-        /// <summary>Factory for <see cref="ReuseSwapable"/>.</summary>
-        public static readonly IReuseWrapperFactory Swapable = new SwapableFactory();
-
         #region Implementation
 
         private sealed class HiddenDisposableFactory : IReuseWrapperFactory
@@ -6276,19 +6257,6 @@ namespace DryIoc
             }
         }
 
-        private sealed class SwapableFactory : IReuseWrapperFactory
-        {
-            public object Wrap(object target)
-            {
-                return new ReuseSwapable(target);
-            }
-
-            public object Unwrap(object wrapper)
-            {
-                return (wrapper as ReuseSwapable).ThrowIfNull().Target;
-            }
-        }
-
         #endregion
     }
 
@@ -6306,8 +6274,6 @@ namespace DryIoc
         public static readonly Type HiddenDisposable = typeof(ReuseHiddenDisposable);
         /// <summary>Type of <see cref="ReuseWeakReference"/> added for intellisense discoverability.</summary>
         public static readonly Type WeakReference = typeof(ReuseWeakReference);
-        /// <summary>Type of <see cref="ReuseSwapable"/> added for intellisense discoverability.</summary>
-        public static readonly Type Swapable = typeof(ReuseSwapable);
 
         /// <summary>Unwraps input until target of <typeparamref name="T"/> is found. Returns found target, otherwise returns null.</summary>
         /// <typeparam name="T">Target to stop search on.</typeparam>
@@ -6321,11 +6287,8 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Marker interface used by Scope to skip dispose for reused disposable object.</summary>
-    public interface IHideDisposableFromContainer { }
-
     /// <summary>Wraps reused service object to prevent container to dispose service object. Intended to work only with <see cref="IDisposable"/> target.</summary>
-    public class ReuseHiddenDisposable : IReuseWrapper, IHideDisposableFromContainer
+    public sealed class ReuseHiddenDisposable : IReuseWrapper
     {
         /// <summary>Constructs wrapper by wrapping input target.</summary>
         /// <param name="target">Disposable target.</param>
@@ -6370,7 +6333,7 @@ namespace DryIoc
     }
 
     /// <summary>Wraps reused object as <see cref="WeakReference"/>. Allow wrapped object to be garbage collected.</summary>
-    public class ReuseWeakReference : IReuseWrapper
+    public sealed class ReuseWeakReference : IReuseWrapper
     {
         /// <summary>Provides access to <see cref="WeakReference"/> members.</summary>
         public readonly WeakReference Ref;
@@ -6385,41 +6348,10 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Wraps reused value ref box with ability to Swap it new value. Similar to <see cref="Ref{T}"/>.</summary>
-    public sealed class ReuseSwapable : IReuseWrapper
-    {
-        /// <summary>Wrapped value.</summary>
-        public object Target { get { return _value; } }
-
-        /// <summary>Constructs ref wrapper.</summary> <param name="value">Wrapped value.</param>
-        public ReuseSwapable(object value)
-        {
-            _value = value;
-        }
-
-        /// <summary>Exchanges currently hold object with <paramref name="getValue"/> result.</summary>
-        /// <param name="getValue">Delegate to produce new object value from current one passed as parameter.</param>
-        /// <returns>Returns old object value the same way as <see cref="Interlocked.Exchange(ref int,int)"/></returns>
-        /// <remarks>Important: <paramref name="getValue"/> delegate may be called multiple times with new value each time, 
-        /// if it was changed in meantime by other concurrently running code.</remarks>
-        public object Swap(Func<object, object> getValue)
-        {
-            return Ref.Swap(ref _value, getValue);
-        }
-
-        /// <summary>Simplified version of Swap ignoring old value.</summary> <param name="newValue">New value.</param> <returns>Old value.</returns>
-        public object Swap(object newValue)
-        {
-            return Interlocked.Exchange(ref _value, newValue);
-        }
-
-        private object _value;
-    }
-
     /// <summary>Specifies what to return when <see cref="IResolver"/> unable to resolve service.</summary>
     public enum IfUnresolved
     {
-        /// <summary>Specifies to throw <see cref="ContainerException"/> if no service found.</summary>
+        /// <summary>Specifies to throw exception if no service found.</summary>
         Throw,
         /// <summary>Specifies to return default value instead of throwing error.</summary>
         ReturnDefault
@@ -6432,23 +6364,23 @@ namespace DryIoc
     {
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
-        /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
-        /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
-        object ResolveDefault(Type serviceType, IfUnresolved ifUnresolved);
+        /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
+        /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
+        object ResolveDefault(Type serviceType, bool ifUnresolvedReturnDefault);
 
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="serviceKey">Optional service key used for registering service.</param>
-        /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
+        /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
         /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
         ///     or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
         /// <param name="scope">Propagated resolution scope.</param>
-        /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
+        /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         /// <remarks>
         /// This method covers all possible resolution input parameters comparing to <see cref="ResolveDefault"/>, and
         /// by specifying the same parameters as for <see cref="ResolveDefault"/> should return the same result.
         /// </remarks>
-        object ResolveKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, IScope scope);
+        object ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
@@ -6552,7 +6484,6 @@ namespace DryIoc
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <returns>Found scope or throws exception.</returns>
         /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
-        /// <exception cref="ContainerException"> with code <see cref="Error.NoMatchedScopeFound"/>.</exception>
         IScope GetCurrentNamedScope(object name, bool throwIfNotFound);
 
         /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
@@ -6570,7 +6501,6 @@ namespace DryIoc
         /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
         /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
         /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
-        /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
         IScope GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost, bool throwIfNotFound);
     }
 

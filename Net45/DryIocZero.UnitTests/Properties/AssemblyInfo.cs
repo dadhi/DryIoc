@@ -1,11 +1,11 @@
 ﻿using System.Reflection;
 
-[assembly: AssemblyTitle("DryIoc.Zero.UnitTests")]
-[assembly: AssemblyDescription("Tests for DryIoc.Zero.")]
+[assembly: AssemblyTitle("DryIocZero.UnitTests")]
+[assembly: AssemblyDescription("Unit Tests of DryIocZero")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc")]
-[assembly: AssemblyCopyright("Copyright © 2014 Maksim Volkau")]
+[assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

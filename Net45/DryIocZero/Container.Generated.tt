@@ -1,4 +1,27 @@
-﻿<#@ template debug="false" hostspecific="true" language="C#" #>
+﻿/*
+The MIT License (MIT)
+
+Copyright (c) 2013 Maksim Volkau
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+<#@ template debug="false" hostspecific="true" language="C#" #>
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
@@ -12,7 +35,6 @@
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
-
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
 
@@ -70,13 +92,14 @@ using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;
 
-namespace DryIoc.Zero
+namespace DryIocZero
 {
 /* 
-Exceptions happened during resolution:
-======================================
-
+Exceptions during resolution:
+-----------------------------
 <#
+    if (exceptions.Count == 0)
+        WriteLine("no exceptions");
     foreach (var ex in exceptions)
     {
 #>
@@ -86,11 +109,11 @@ Exceptions happened during resolution:
 <#
     }
 #>
-======================================
+-----------------------------
 end of exception list
 */
 
-    partial class ZeroContainer
+    partial class Container
     {
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service, Type serviceType, IScope scope)

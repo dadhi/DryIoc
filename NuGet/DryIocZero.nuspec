@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <metadata>
+        <id>DryIocZero</id>
+        <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
+        <authors>Maksim Volkau</authors>
+        <copyright>Copyright © 2013 Maksim Volkau</copyright>
+        <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
+        <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>DryIocZero provides container to work on top of compile-time generated factory delegates, therefore decreasing application startup cost.</description>
+        <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
+        <releaseNotes>
+            - Container works on top of compile-time generated factory delegates for resolution roots.
+            - Complementary supports simple run-time registrations.
+        </releaseNotes>
+        <dependencies>
+            <dependency id="DryIoc.dll" version="(1.5,3.0.0)" />
+            <dependency id="DryIoc.MefAttributedModel.dll" version="(1.5,3.0.0)" />
+            <dependency id="ExpressionToCodeLib" version="[1.5.2,2.0.0)" />
+        </dependencies>
+        <frameworkAssemblies>
+            <frameworkAssembly assemblyName="System.ComponentModel.Composition" />
+        </frameworkAssemblies>
+        <references>
+            <!-- No explicit references in run-time, because dependencies are only needed in compile-time. -->
+        </references>
+    </metadata>
+    <files>
+        <file src="..\LICENSE.txt" />
+
+        <!--net45-->
+        <file src="..\Net45\DryIocZero\Container.cs" target="content\net45\DryIocZero" />
+        <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\net45\DryIocZero" />
+
+    </files>
+</package>

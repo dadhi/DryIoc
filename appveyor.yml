@@ -21,9 +21,7 @@ build_script:
 
 on_success:
   - ps: >-
-        Write-Host $env:COVERALLS_REPO_TOKEN
-        Write-Host $env:APPVEYOR_REPO_COMMIT_MESSAGE
-        if (Test-Path "./bin/Reports/Coverage.xml") { Write-Host "coverage exists" } else { Write-Host "no coverage!" }
+        Write-Host "branch: $env:APPVEYOR_REPO_BRANCH"
         .\packages\coveralls.net.0.5.0\csmacnz.Coveralls.exe --opencover -i ./bin/Reports/Coverage.xml --repoToken $env:COVERALLS_REPO_TOKEN --commitId $env:APPVEYOR_REPO_COMMIT --commitBranch $env:APPVEYOR_REPO_BRANCH --commitAuthor $env:APPVEYOR_REPO_COMMIT_AUTHOR --commitEmail $env:APPVEYOR_REPO_COMMIT_AUTHOR_EMAIL --commitMessage $env:APPVEYOR_REPO_COMMIT_MESSAGE --jobId $env:APPVEYOR_JOB_ID
 
 nuget:
