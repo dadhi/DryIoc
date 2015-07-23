@@ -23,8 +23,7 @@ namespace DryIoc.UnitTests
         public void Can_specify_do_Not_dispose_disposable_singleton_object()
         {
             var container = new Container();
-            container.Register<DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable).One()));
+            container.Register<DisposableService>(Reuse.Singleton, setup: Setup.With(preventDisposal: true));
 
             var service = container.Resolve<DisposableService>();
 
@@ -38,8 +37,7 @@ namespace DryIoc.UnitTests
         {
             using (var container = new Container().OpenScope())
             {
-                container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable).One()));
+                container.Register<IService, DisposableService>(Reuse.InCurrentScope, setup: Setup.With(preventDisposal: true));
 
                 var service = container.Resolve<IService>();
 
@@ -49,61 +47,13 @@ namespace DryIoc.UnitTests
             }
         }
 
-        [Test]
-        public void Can_resolve_explicitly_disposed_scoped_service_and_then_dispose_it()
-        {
-            using (var container = new Container().OpenScope())
-            {
-                container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable).One()));
-
-                var disposable = container.Resolve<ReuseHiddenDisposable>(typeof(IService));
-                disposable.Dispose();
-
-                Assert.That(disposable.IsDisposed, Is.True);
-                object result = null;
-                var targetEx = Assert.Throws<ContainerException>(() => result = disposable.Target);
-
-                Assert.That(targetEx.Message, Is.StringContaining(
-                    "Target DryIoc.UnitTests.CUT.DisposableService was already disposed in DryIoc.ReuseHiddenDisposable wrapper."));
-
-                var resolveEx = Assert.Throws<ContainerException>(() =>
-                    container.Resolve<IService>());
-                Assert.That(resolveEx.Message, Is.EqualTo(targetEx.Message));
-                GC.KeepAlive(result);
-            }
-        }
-
-        [Test]
-        public void Can_resolve_explicitly_disposed_singleton_and_then_dispose_it()
-        {
-            var container = new Container();
-            container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseHiddenDisposable).One()));
-
-            var disposable = container.Resolve<ReuseHiddenDisposable>(typeof(IService));
-            disposable.Dispose();
-
-            Assert.That(disposable.IsDisposed, Is.True);
-            object result = null;
-            var targetEx = Assert.Throws<ContainerException>(() => result = disposable.Target);
-            Assert.That(targetEx.Message, Is.StringContaining(
-                "Target DryIoc.UnitTests.CUT.DisposableService was already disposed in DryIoc.ReuseHiddenDisposable wrapper."));
-
-            var resolveEx = Assert.Throws<ContainerException>(() =>
-                container.Resolve<IService>());
-            Assert.That(resolveEx.Message, Is.EqualTo(targetEx.Message));
-            GC.KeepAlive(result);
-        }
-
         [Test, Explicit]
         public void Can_store_reused_object_as_weak_reference()
         {
             var container = new Container();
-            container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference).One()));
+            container.Register<IService, Service>(Reuse.Singleton, setup: Setup.With(weaklyReferenced: true));
 
-            var serviceWeakRef = container.Resolve<ReuseWeakReference>(typeof(IService));
+            var serviceWeakRef = new WeakReference(container.Resolve<IService>());
             Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
 
             GC.Collect();
@@ -111,20 +61,33 @@ namespace DryIoc.UnitTests
             GC.Collect();
             GC.KeepAlive(container);
 
-            Assert.That(serviceWeakRef.Ref.IsAlive, Is.False);
+            Assert.That(serviceWeakRef.IsAlive, Is.False);
         }
 
         [Test]
-        public void Can_resolve_reused_object_as_weak_reference_typed_proxy()
+        public void Can_store_as_WeakReference_in_current_scope()
         {
             var container = new Container();
-            container.Register<IService, Service>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference).One()));
+            container.Register<IService, DisposableService>(Reuse.InCurrentScope, setup: Setup.With(weaklyReferenced: true));
 
-            var serviceWeakRef = container.Resolve<ReuseWeakReference>(typeof(IService));
-            Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
+            using (var scope = container.OpenScope())
+            {
+                var service = scope.Resolve<IService>();
+                Assert.IsInstanceOf<DisposableService>(service);
+            }
+        }
 
-            GC.KeepAlive(serviceWeakRef.Target);
+        [Test]
+        public void Can_store_as_disposable_as_WeakReference_and_dispose_it_if_alive()
+        {
+            var container = new Container();
+            container.Register<DisposableService>(Reuse.InCurrentScope, setup: Setup.With(weaklyReferenced: true));
+            var scope = container.OpenScope();
+
+            var service = scope.Resolve<DisposableService>();
+
+            scope.Dispose();
+            Assert.IsTrue(service.IsDisposed);
         }
 
         [Test, Explicit]
@@ -132,7 +95,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                setup: Setup.With(reuseWrappers: new[] { typeof(ReuseHiddenDisposable), typeof(ReuseWeakReference) }));
+                setup: Setup.With(preventDisposal: true, weaklyReferenced: true));
 
             using (container.OpenScope())
             {
@@ -156,60 +119,20 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.With(reuseWrappers: new[] { typeof(ReuseHiddenDisposable), typeof(ReuseWeakReference) }));
+                setup: Setup.With(preventDisposal: true, weaklyReferenced: true));
 
-            var serviceWeakRef = container.Resolve<ReuseWeakReference>(typeof(IService));
-            var serviceDisposable = container.Resolve<ReuseHiddenDisposable>(typeof(IService));
+            var service = container.Resolve<IService>();
 
-            Assert.That(serviceWeakRef.Target, Is.SameAs(serviceDisposable));
-            GC.KeepAlive(serviceWeakRef.Target);
+            Assert.IsInstanceOf<DisposableService>(service);
         }
 
         [Test]
-        public void CanNot_nest_WeakRef_in_ExplicitlyDisposable_because_ref_is_not_disposable()
+        public void Should_Not_throw_if_reused_wrappers_registered_without_reuse_because_of_possible_ReuseMapping_rules()
         {
             var container = new Container();
-            var service = new DisposableService();
-            container.RegisterDelegate<IService>(r => service, Reuse.Singleton,
-                Setup.With(reuseWrappers: new[] { typeof(ReuseWeakReference), typeof(ReuseHiddenDisposable) }));
 
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<ReuseWeakReference>(typeof(IService)));
-        }
-
-        [Test]
-        public void Cannot_resolve_non_reused_service_as_WeakReference_without_required_type()
-        {
-            var container = new Container();
-            container.Register<IService, Service>();
-
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<ReuseWeakReference>());
-        }
-
-        [Test]
-        public void Should_throw_if_reused_wrappers_specified_without_reuse()
-        {
-            var container = new Container();
-            container.Register<IService, Service>(
-                setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference).One()));
-
-            var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<ReuseWeakReference>(typeof(IService)));
-
-            Assert.That(ex.Message, Is.StringContaining("Unable to resolve reuse wrapper DryIoc.ReuseWeakReference"));
-        }
-
-        [Test]
-        public void CanNot_resolve_non_reused_service_as_ExplicitlyDisposable()
-        {
-            var container = new Container();
-            container.Register<IService, Service>();
-
-            var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<ReuseHiddenDisposable>(typeof(IService)));
-
-            Assert.That(ex.Message, Is.StringContaining("Unable to resolve reuse wrapper DryIoc.ReuseHiddenDisposable"));
+            Assert.DoesNotThrow(() =>
+            container.Register<IService, Service>(setup: Setup.With(weaklyReferenced: true)));
         }
 
         [Test]
@@ -218,20 +141,20 @@ namespace DryIoc.UnitTests
             using (var container = new Container().OpenScope())
             {
                 container.Register<Service>();
-                container.Register<ServiceWithParameterAndDependency>(Reuse.InCurrentScope,
-                    setup: Setup.With(reuseWrappers: typeof(ReuseWeakReference).One()));
+                container.Register<ServiceWithParameterAndDependency>(
+                    Reuse.InCurrentScope, setup: Setup.With(weaklyReferenced: true));
 
-                var func = container.Resolve<Func<bool, ReuseWeakReference>>(typeof(ServiceWithParameterAndDependency));
-                var service = func(true).Target;
+                var func = container.Resolve<Func<bool, ServiceWithParameterAndDependency>>();
+                var service = func(true);
+
                 Assert.That(service, Is.InstanceOf<ServiceWithParameterAndDependency>());
             }
         }
 
-        [Test]
+        [Test, Ignore]
         public void Can_resolve_as_swapable_and_swap_based_on_current_value()
         {
-            var container = new Container(rules =>
-                rules.WithoutSingletonOptimization()); // NOTE: Test fails without it.
+            var container = new Container(rules => rules.WithoutSingletonOptimization()); // NOTE: Test fails without it.
             container.Register<Service>(Reuse.Singleton);
             container.Resolve<Service>();
 

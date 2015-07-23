@@ -31,7 +31,7 @@ namespace DryIoc.MefAttributedModel
     using System.Reflection;
     using System.Text;
     using DryIocAttributes;
-    
+
     /// <summary>Implements MEF Attributed Programming Model. 
     /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
     public static class AttributedModel
@@ -81,7 +81,7 @@ namespace DryIoc.MefAttributedModel
         {
             registrator.RegisterExports((IEnumerable<Type>)types);
         }
-        
+
         /// <summary>First scans (<see cref="Scan"/>) provided assemblies to find types annotated with
         /// <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.
         /// Then registers found types into registrator/container.</summary>
@@ -115,7 +115,7 @@ namespace DryIoc.MefAttributedModel
                 for (var i = 0; i < info.Exports.Length; i++)
                 {
                     var export = info.Exports[i];
-                    registrator.Register(factory, 
+                    registrator.Register(factory,
                         export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
                 }
             }
@@ -141,9 +141,9 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Created DTO.</returns>
         public static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type implementationType)
         {
-            if (implementationType.IsValueType() || 
+            if (implementationType.IsValueType() ||
                 implementationType.IsAbstract() && !implementationType.IsStatic() ||
-                implementationType.IsCompilerGenerated()) 
+                implementationType.IsCompilerGenerated())
                 return null;
             var attributes = GetAllExportRelatedAttributes(implementationType);
             return !IsExportDefined(attributes) ? null : GetRegistrationInfoOrDefault(implementationType, attributes);
@@ -158,7 +158,7 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Supported reuse object.</returns>
         public static IReuse GetReuse(ReuseType reuseType, string reuseName = null)
         {
-            return reuseType == ReuseType.Transient 
+            return reuseType == ReuseType.Transient
                 ? null
                 : SupportedReuseTypes.GetValueOrDefault(reuseType)
                     .ThrowIfNull(Error.UnsupportedReuseType, reuseType)
@@ -185,7 +185,7 @@ namespace DryIoc.MefAttributedModel
             {
                 var serviceInfo = ParameterServiceInfo.Of(parameter);
                 var attrs = parameter.GetAttributes().ToArray();
-                return attrs.Length == 0 ? serviceInfo : 
+                return attrs.Length == 0 ? serviceInfo :
                     serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
             };
         }
@@ -244,7 +244,7 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var container = request.Container;
-            serviceType = import.ContractType 
+            serviceType = import.ContractType
                 ?? container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? serviceType);
             var serviceKey = import.ContractKey;
 
@@ -260,7 +260,7 @@ namespace DryIoc.MefAttributedModel
                 var impl = import.ConstructorSignature == null ? null
                     : Made.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
-                container.Register(serviceType, implementationType, reuse, impl, 
+                container.Register(serviceType, implementationType, reuse, impl,
                     Setup.With(metadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
             }
 
@@ -300,8 +300,8 @@ namespace DryIoc.MefAttributedModel
                 else if (attribute is PartCreationPolicyAttribute)
                 {
                     var creationPolicy = ((PartCreationPolicyAttribute)attribute).CreationPolicy;
-                    info.Reuse = creationPolicy == CreationPolicy.NonShared 
-                        ? ReuseType.Transient 
+                    info.Reuse = creationPolicy == CreationPolicy.NonShared
+                        ? ReuseType.Transient
                         : ReuseType.Singleton;
                 }
                 else if (attribute is ReuseAttribute)
@@ -318,9 +318,13 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.AsResolutionRoot = true;
                 }
-                else if (attribute is ReuseWrappersAttribute)
+                else if (attribute is WeaklyReferenced)
                 {
-                    info.ReusedWrappers = ((ReuseWrappersAttribute)attribute).WrapperTypes;
+                    info.WeaklyReferenced = true;
+                }
+                else if (attribute is PreventDisposal)
+                {
+                    info.PreventDisposal = true;
                 }
                 else if (attribute is AsWrapperAttribute)
                 {
@@ -355,8 +359,8 @@ namespace DryIoc.MefAttributedModel
 
         private static bool IsExportDefined(Attribute[] attributes)
         {
-            return attributes.Length != 0 
-                && attributes.IndexOf(a => a is ExportAttribute || a is ExportManyAttribute) != -1 
+            return attributes.Length != 0
+                && attributes.IndexOf(a => a is ExportAttribute || a is ExportManyAttribute) != -1
                 && attributes.IndexOf(a => a is PartNotDiscoverableAttribute) == -1;
         }
 
@@ -369,12 +373,12 @@ namespace DryIoc.MefAttributedModel
 
             var currentExports = currentInfo.Exports;
             var exports = currentExports == null ? new[] { export }
-                : currentExports.Contains(export) ? currentExports 
+                : currentExports.Contains(export) ? currentExports
                 : currentExports.AppendOrUpdate(export);
             return exports;
         }
 
-        private static ExportInfo[] GetExportsFromExportManyAttribute(ExportedRegistrationInfo currentInfo, 
+        private static ExportInfo[] GetExportsFromExportManyAttribute(ExportedRegistrationInfo currentInfo,
             Type implementationType, ExportManyAttribute exportManyAttribute)
         {
             var contractTypes = Registrator.GetImplementedServiceTypes(implementationType, exportManyAttribute.NonPublic);
@@ -384,7 +388,7 @@ namespace DryIoc.MefAttributedModel
             var manyExports = contractTypes
                 .Select(t => new ExportInfo(t, exportManyAttribute.ContractName ?? exportManyAttribute.ContractKey))
                 .ToArray();
-            
+
             Throw.If(manyExports.Length == 0, Error.ExportManyDoesNotExportAnyType, implementationType, contractTypes);
 
             var currentExports = currentInfo.Exports;
@@ -448,7 +452,7 @@ namespace DryIoc.MefAttributedModel
         private static void RegisterFactoryMethods(IRegistrator registrator, ExportedRegistrationInfo factoryInfo)
         {
             // NOTE: Cast is required for NET35
-            var members = factoryInfo.ImplementationType.GetAll(t => 
+            var members = factoryInfo.ImplementationType.GetAll(t =>
                 t.DeclaredMethods.Cast<MemberInfo>().Concat(
                 t.DeclaredProperties.Cast<MemberInfo>().Concat(
                 t.DeclaredFields.Cast<MemberInfo>())));
@@ -473,7 +477,7 @@ namespace DryIoc.MefAttributedModel
                 for (var i = 0; i < serviceExports.Length; i++)
                 {
                     var export = serviceExports[i];
-                    registrator.Register(factory, 
+                    registrator.Register(factory,
                         export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
                 }
             }
@@ -557,9 +561,9 @@ namespace DryIoc.MefAttributedModel
                 : new AttributedModelException(errorCode, message, inner);
         }
 
-        private AttributedModelException(int error, string message) : base(error, message) {}
+        private AttributedModelException(int error, string message) : base(error, message) { }
 
-        private AttributedModelException(int error, string message, Exception innerException) : base(error, message, innerException) {}
+        private AttributedModelException(int error, string message, Exception innerException) : base(error, message, innerException) { }
     }
 
     /// <summary>Converts provided literal into valid C# code. Used for generating registration code 
@@ -648,12 +652,15 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Corresponds to <see cref="Setup.OpenResolutionScope"/>.</summary>
         public bool OpenResolutionScope;
-        
+
         /// <summary>Corresponds to <see cref="Setup.AsResolutionRoot"/>.</summary>
         public bool AsResolutionRoot;
 
-        /// <summary>Reuse wrappers defined for exported type.</summary>
-        public Type[] ReusedWrappers;
+        /// <summary>Specify to prevent disposal of reused instance if it is disposable</summary>
+        public bool PreventDisposal;
+
+        /// <summary>Specify to store reused instance as WeakReference.</summary>
+        public bool WeaklyReferenced;
 
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
@@ -666,12 +673,12 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Not null if exported with <see cref="AsWrapperAttribute"/>, contains info about wrapper.</summary>
         public WrapperInfo Wrapper;
-        
+
         /// <summary>True if exported with <see cref="AsFactoryAttribute"/>.</summary>
         public bool IsFactory;
 
         /// <summary>Type consisting of single method compatible with <see cref="Setup.Condition"/> type.</summary>
-        public Type ConditionType; 
+        public Type ConditionType;
 
         /// <summary>Creates factory out of registration info.</summary>
         /// <param name="made">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
@@ -699,13 +706,15 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(lazyMetadata, condition);
 
-            return Setup.With(true, lazyMetadata, null, condition, OpenResolutionScope, AsResolutionRoot, ReusedWrappers);
+            return Setup.With(true, lazyMetadata, null, condition, 
+                OpenResolutionScope, AsResolutionRoot, 
+                PreventDisposal, WeaklyReferenced);
         }
 
         private static RequestInfo ConvertRequestToInfo(Request request)
         {
             return request.Enumerate().Aggregate<Request, RequestInfo>(null, (parent, r) =>
-                new RequestInfo(parent, r.ResolvedFactoryType != FactoryType.Service, 
+                new RequestInfo(parent, r.ResolvedFactoryType != FactoryType.Service,
                     r.ServiceType, r.ServiceKey, r.ImplementationType));
         }
 
@@ -770,7 +779,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Contract type.</summary>
         /// <remarks>may be null if <see cref="ServiceTypeFullName"/> specified.</remarks>
         public Type ServiceType;
- 
+
         /// <summary>Full contract type name. Supposed to be used in lazy-loading scenario.</summary>
         public string ServiceTypeFullName;
 
@@ -778,7 +787,7 @@ namespace DryIoc.MefAttributedModel
         public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
 
         /// <summary>Default constructor is usually required by deserializer.</summary>
-        public ExportInfo() { } 
+        public ExportInfo() { }
 
         /// <summary>Creates exported info out of type and optional key.</summary>
         /// <param name="serviceType">Contract type to store.</param>
@@ -815,7 +824,7 @@ namespace DryIoc.MefAttributedModel
     {
         /// <summary>Index of wrapped type argument in open-generic wrapper.</summary>
         public int WrappedServiceTypeArgIndex;
-        
+
         /// <summary>Per name.</summary>
         public bool AlwaysWrapsRequiredServiceType;
 
@@ -830,7 +839,7 @@ namespace DryIoc.MefAttributedModel
         public override bool Equals(object obj)
         {
             var other = obj as WrapperInfo;
-            return other != null 
+            return other != null
                 && other.WrappedServiceTypeArgIndex == WrappedServiceTypeArgIndex
                 && other.AlwaysWrapsRequiredServiceType == AlwaysWrapsRequiredServiceType;
         }
@@ -860,7 +869,7 @@ namespace DryIoc.MefAttributedModel
         {
             if (DecoratedServiceKeyInfo == ServiceKeyInfo.Default && lazyMetadata == null && condition == null)
                 return Setup.Decorator;
-            
+
             return Setup.DecoratorWith(r =>
                 (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, r.ServiceKey)) &&
                 (lazyMetadata == null || Equals(lazyMetadata(), r.ResolvedFactory.Setup.Metadata)) &&

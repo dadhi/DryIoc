@@ -543,14 +543,6 @@ namespace DryIocZero
             return source.RemoveAt(source.IndexOf(value));
         }
 
-        /// <summary>Creates array consisting of single item.</summary>
-        /// <param name="item">item</param> <typeparam name="T">item type.</typeparam>
-        /// <returns>Array of one item.</returns>
-        public static T[] One<T>(this T item)
-        {
-            return new[] { item };
-        }
-
         /// <summary>Returns singleton empty array of provided type.</summary> 
         /// <typeparam name="T">Array item type.</typeparam> <returns>Empty array.</returns>
         public static T[] Empty<T>()
@@ -975,7 +967,7 @@ namespace DryIocZero
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <returns>Found scope or throws exception.</returns>
         /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
-        /// <exception cref="ZeroContainerException"> with code <see cref="Error.NoMatchedScopeFound"/>.</exception>
+        /// <exception cref="ContainerException"> with code <see cref="Error.NoMatchedScopeFound"/>.</exception>
         public IScope GetCurrentNamedScope(object name, bool throwIfNotFound)
         {
             var currentScope = ScopeContext == null ? OpenedScope : ScopeContext.GetCurrentOrDefault();
@@ -1334,33 +1326,49 @@ namespace DryIocZero
     /// <summary>Zero container exception.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable",
         Justification = "Not available in PCL.")]
-    public class ZeroContainerException : InvalidOperationException
+    public class ContainerException : InvalidOperationException
     {
         /// <summary>Error code.</summary>
         public int Error { get; private set; }
 
         /// <summary>Creates exception.</summary>
         /// <param name="error">Code.</param> <param name="message">Message.</param>
-        public ZeroContainerException(int error, string message)
+        public ContainerException(int error, string message)
             : base(message)
         {
             Error = error;
         }
     }
 
-    internal static class Throw
+    /// <summary>Simplifies throwing exceptions.</summary>
+    public static class Throw
     {
-        public static void It(int error, params object[] args)
+        /// <summary>Just throws exception with specified error code.</summary>
+        /// <param name="error">Code.</param> <param name="args">Arguments for error message.</param>
+        public static object It(int error, params object[] args)
         {
             var messageFormat = Error.Messages[error];
             var message = string.Format(messageFormat, args);
-            throw new ZeroContainerException(error, message);
+            throw new ContainerException(error, message);
         }
 
+        /// <summary>Throws is condition is true.</summary>
+        /// <param name="condition">Condition.</param>
+        /// <param name="error">Code.</param> <param name="args">Arguments for error message.</param>
+        /// <returns>Returns null if condition is false.</returns>
         public static object If(bool condition, int error, params object[] args)
         {
             if (condition) It(error, args);
             return null;
+        }
+
+        /// <summary>Throws if object is null.</summary>
+        /// <param name="obj">object to check.</param><param name="message">Error message.</param>
+        /// <returns>object if not null.</returns>
+        public static object ThrowNewErrorIfNull(this object obj, string message)
+        {
+            if (obj == null) It(Error.Of(message));
+            return obj;
         }
     }
 }

@@ -1,7 +1,5 @@
-﻿using System;
-using System.ComponentModel.Composition;
-using DryIocAttributes;
-using NUnit.Framework;
+﻿using NUnit.Framework;
+using DryIoc.MefAttributedModel.UnitTests.CUT;
 
 namespace DryIoc.MefAttributedModel.UnitTests
 {
@@ -65,16 +63,27 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Can_specify_reuse_wrapper_for_exported_service()
+        public void Can_specify_to_store_reused_instance_as_weak_reference()
         {
             var container = new Container().WithMefAttributedModel();
-            container.RegisterExports(typeof(SharedWithReuseWrapper));
+            container.RegisterExports(typeof(WeaklyReferencedService));
 
-            var serviceRef = container.Resolve<ReuseWeakReference>(typeof(SharedWithReuseWrapper));
+            var service = container.Resolve<WeaklyReferencedService>();
 
-            Assert.That(serviceRef.Target, Is.InstanceOf<SharedWithReuseWrapper>());
+            Assert.That(service, Is.InstanceOf<WeaklyReferencedService>());
+        }
 
-            GC.KeepAlive(serviceRef);
+        [Test]
+        public void Can_specify_to_prevent_disposal_for_reused_instance()
+        {
+            var container = new Container().WithMefAttributedModel();
+
+            container.RegisterExports(typeof(PreventDisposalService));
+
+            var service = container.Resolve<PreventDisposalService>();
+            container.Dispose();
+
+            Assert.IsFalse(service.IsDisposed);
         }
 
         [Test]
@@ -104,38 +113,5 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 Assert.AreSame(service, scoped.Resolve<WithNamedCurrentScope>());
             }
         }
-
-        [Export, TransientReuse]
-        public class ServiceWithReuseAttribute { }
-
-        [Export, SingletonReuse]
-        public class ServiceWithSingletonReuse { }
-
-        [Export, CurrentScopeReuse]
-        public class ServiceWithCurrentScopeReuse { }
-
-        [Export, ResolutionScopeReuse]
-        public class ServiceWithResolutionScopeReuse { }
-
-        [Export, ResolutionScopeReuse]
-        public class UserOfServiceWithResolutionScopeReuse
-        {
-            public ServiceWithResolutionScopeReuse One { get; set; }
-            public ServiceWithResolutionScopeReuse Another { get; set; }
-
-            public UserOfServiceWithResolutionScopeReuse(
-                ServiceWithResolutionScopeReuse one,
-                ServiceWithResolutionScopeReuse another)
-            {
-                One = one;
-                Another = another;
-            }
-        }
-
-        [Export, ReuseWrappers(typeof(ReuseWeakReference))]
-        public class SharedWithReuseWrapper { }
-
-        [Export, CurrentScopeReuse("ScopeA")]
-        public class WithNamedCurrentScope { }
     }
 }

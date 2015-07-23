@@ -194,8 +194,7 @@ namespace DryIoc
         internal static readonly ParameterExpression ResolutionScopeParamExpr =
             Expression.Parameter(typeof(IScope), "scope");
 
-        internal static readonly ParameterExpression[] FactoryDelegateParamsExpr = 
-            { StateParamExpr, ResolverContextParamExpr, ResolutionScopeParamExpr };
+        internal static readonly ParameterExpression[] FactoryDelegateParamsExpr = { StateParamExpr, ResolverContextParamExpr, ResolutionScopeParamExpr };
 
         internal static Expression GetResolutionScopeExpression(Request request)
         {
@@ -283,7 +282,7 @@ namespace DryIoc
         object IResolver.ResolveDefault(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             return _registry.Value.ResolveServiceFromCache(serviceType, _containerWeakRef)
-                ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null); 
+                ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
@@ -703,7 +702,7 @@ namespace DryIoc
                 }
             }
 
-            return wrappedType == null ? serviceType 
+            return wrappedType == null ? serviceType
                 : ((IContainer)this).GetWrappedTypeOrNullIfWrapsRequiredServiceType(wrappedType);
         }
 
@@ -793,7 +792,7 @@ namespace DryIoc
         /// <returns>Returns constant or state access expression for added items.</returns>
         public Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
-            itemType = itemType ?? (item == null ? typeof(object) : item.GetType());    
+            itemType = itemType ?? (item == null ? typeof(object) : item.GetType());
             var result = GetPrimitiveOrArrayExprOrDefault(item, itemType);
             if (result != null)
                 return result;
@@ -818,7 +817,7 @@ namespace DryIoc
                 return Expression.Constant(null, itemType);
 
             itemType = itemType ?? item.GetType();
-            
+
             if (itemType == typeof(DefaultKey))
                 return Expression.Call(typeof(DefaultKey), "Of", ArrayTools.Empty<Type>(),
                     Expression.Constant(((DefaultKey)item).RegistrationOrder));
@@ -1444,7 +1443,7 @@ namespace DryIoc
         /// <param name="condition">(optional) condition.</param>
         /// <returns>Container with new rule.</returns>
         /// <remarks>Types provider will be asked on each rule evaluation.</remarks>
-        public static IContainer WithAutoFallbackResolution(this IContainer container, 
+        public static IContainer WithAutoFallbackResolution(this IContainer container,
             IEnumerable<Type> implTypes,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
             Func<Request, bool> condition = null)
@@ -1461,7 +1460,7 @@ namespace DryIoc
         /// <param name="condition">(optional) condition.</param>
         /// <returns>Container with new rule.</returns>
         /// <remarks>Implementation types will be requested from assemblies only once, in this method call.</remarks>
-        public static IContainer WithAutoFallbackResolution(this IContainer container, 
+        public static IContainer WithAutoFallbackResolution(this IContainer container,
             IEnumerable<Assembly> implTypeAssemblies,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
             Func<Request, bool> condition = null)
@@ -1491,11 +1490,11 @@ namespace DryIoc
                 var reuse = currentScope != null
                     ? Reuse.InCurrentNamedScope(currentScope.Name)
                     : Reuse.Singleton;
-                
+
                 if (changeDefaultReuse != null)
                     reuse = changeDefaultReuse(reuse, request);
-                
-                request.Container.RegisterMany(implTypes, reuse, 
+
+                request.Container.RegisterMany(implTypes, reuse,
                     serviceTypeCondition: type => type.IsAssignableTo(request.ServiceType));
 
                 return request.Container.GetServiceFactoryOrDefault(request);
@@ -1772,10 +1771,10 @@ namespace DryIoc
 
             // Register array and its collection/list interfaces.
             var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
-            
+
             var arrayInterfaces = typeof(object[]).GetImplementedInterfaces()
                 .Where(t => t.IsGeneric()).Select(t => t.GetGenericTypeDefinition());
-            
+
             foreach (var arrayInterface in arrayInterfaces)
                 Wrappers = Wrappers.AddOrUpdate(arrayInterface, arrayExpr);
 
@@ -1800,16 +1799,6 @@ namespace DryIoc
             for (var i = 0; i < FuncTypes.Length; i++)
                 Wrappers = Wrappers.AddOrUpdate(FuncTypes[i],
                     new ExpressionFactory(GetFuncExpression, setup: Setup.WrapperWith(i)));
-
-            // Reuse wrappers
-            Wrappers = Wrappers
-                .AddOrUpdate(typeof(ReuseHiddenDisposable),
-                    new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
-                        setup: Setup.ReuseWrapper(ReuseWrapperFactory.HiddenDisposable)))
-
-                .AddOrUpdate(typeof(ReuseWeakReference),
-                    new ExpressionFactory(GetReusedObjectWrapperExpressionOrDefault,
-                        setup: Setup.ReuseWrapper(ReuseWrapperFactory.WeakReference)));
         }
 
         /// <summary>Unregistered/fallback wrapper resolution rule.</summary>
@@ -2038,26 +2027,6 @@ namespace DryIoc
             return metaExpr;
         }
 
-        private static Expression GetReusedObjectWrapperExpressionOrDefault(Request request)
-        {
-            var wrapperType = request.ServiceType;
-            var serviceType = request.Container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? wrapperType);
-            var serviceRequest = request.Push(serviceType);
-            var serviceFactory = request.Container.ResolveFactory(serviceRequest);
-            if (serviceFactory == null)
-                return null;
-
-            var reuse = request.Container.Rules.ReuseMapping == null
-                ? serviceFactory.Reuse
-                : request.Container.Rules.ReuseMapping(serviceFactory.Reuse, serviceRequest);
-
-            if (reuse != null && serviceFactory.Setup.ReuseWrappers.IndexOf(wrapperType) != -1)
-                return serviceFactory.GetExpressionOrDefault(serviceRequest, wrapperType);
-            Throw.If(request.IfUnresolved == IfUnresolved.Throw,
-                Error.UnableToResolveReuseWrapper, wrapperType, serviceRequest);
-            return null;
-        }
-
         /// <summary>Returns true if type is supported <see cref="FuncTypes"/>, and false otherwise.</summary>
         /// <param name="type">Type to check.</param><returns>True for func type, false otherwise.</returns>
         public static bool IsFunc(this Type type)
@@ -2084,7 +2053,7 @@ namespace DryIoc
         /// <summary>Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
         /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.</summary>
         public static readonly Rules Default = Empty.WithUnknownServiceResolvers(
-            WrappersSupport.ResolveWrappers, 
+            WrappersSupport.ResolveWrappers,
             ResolveFromFallbackContainers);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
@@ -2579,7 +2548,7 @@ namespace DryIoc
             IList<MemberBinding> memberBindingExprs = null;
             ParameterInfo[] parameters = null;
 
-            
+
             if (callExpr.NodeType == ExpressionType.New || callExpr.NodeType == ExpressionType.MemberInit)
             {
                 var newExpr = callExpr as NewExpression ?? ((MemberInitExpression)callExpr).NewExpression;
@@ -2663,7 +2632,7 @@ namespace DryIoc
                     Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg),
                         Error.UnexpectedExpressionInsteadOfArgMethod, methodCallExpr);
 
-                    if (methodCallExpr.Method.Name == Arg.ArgIndexMethodName) 
+                    if (methodCallExpr.Method.Name == Arg.ArgIndexMethodName)
                     {
                         var getArgValue = GetArgCustomValueProvider(methodCallExpr, argValues);
                         parameters = parameters.Details((r, p) => p.Equals(parameter)
@@ -3095,7 +3064,7 @@ namespace DryIoc
         /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>        
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void RegisterMany<TMadeResult>(this IRegistrator registrator, Made.Expr<TMadeResult> made, 
+        public static void RegisterMany<TMadeResult>(this IRegistrator registrator, Made.Expr<TMadeResult> made,
             IReuse reuse = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false,
@@ -3111,7 +3080,7 @@ namespace DryIoc
         /// <param name="action">(optional) User specified registration action: 
         /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
-        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies, 
+        public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies,
             RegisterManyAction action = null, bool nonPublicServiceTypes = false)
         {
             var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetTypesFromAssembly)
@@ -3129,7 +3098,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with existing service registrations.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void RegisterMany(this IRegistrator registrator, 
+        public static void RegisterMany(this IRegistrator registrator,
             IEnumerable<Assembly> implTypeAssemblies, Func<Type, bool> serviceTypeCondition,
             IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
@@ -3202,7 +3171,7 @@ namespace DryIoc
         /// <param name="instance">The pre-created instance of <paramref name="serviceType"/>.</param>
         /// <param name="reuse">(optional) By default means <see cref="Reuse.Singleton"/> as the longest available.</param>
         /// <param name="ifAlreadyRegistered">(optional) If Replace specified then existing instance may be replaced in scope without introducing new factory.</param>
-        /// <param name="preventDisposal">(optional) Prevents disposal of stored instance by wrapping it into <see cref="ReuseWrapper.HiddenDisposable"/>.</param>
+        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance.</param>
         /// <param name="weaklyReferenced">(optional) Store as WeakReference. </param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterInstance(this IContainer container, Type serviceType, object instance,
@@ -3226,13 +3195,10 @@ namespace DryIoc
             // Wrap instance if re
             if (setup != Setup.Default)
             {
-                var reuseWrappers = setup.ReuseWrappers;
-                for (var i = 0; i < reuseWrappers.Length; i++)
-                {
-                    var wrapperFactory = container.GetWrapperFactoryOrDefault(reuseWrappers[i]).ThrowIfNull();
-                    var wrapper = ((Setup.WrapperSetup)wrapperFactory.Setup).ReuseWrapperFactory;
-                    instance = wrapper.Wrap(instance);
-                }
+                if (setup.PreventDisposal)
+                    instance = new [] { instance };
+                if (setup.WeaklyReferenced)
+                    instance = new WeakReference(instance);
             }
 
             if (ifAlreadyRegistered == IfAlreadyRegistered.Replace) // Try get existing factory.
@@ -3265,18 +3231,15 @@ namespace DryIoc
             }
         }
 
-        private static readonly Setup WeaklyReferencedInstanceSetup = 
-            Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference });
-        private static readonly Setup HiddenDisposableInstanceSetup = 
-            Setup.With(reuseWrappers: new[] { ReuseWrapper.HiddenDisposable });
-        private static readonly Setup WeaklyReferencedHiddenDisposableInstanceSetup = 
-            Setup.With(reuseWrappers: new[] { ReuseWrapper.WeakReference, ReuseWrapper.HiddenDisposable });
+        private static readonly Setup WeaklyReferencedInstanceSetup = Setup.With(weaklyReferenced: true);
+        private static readonly Setup HiddenDisposableInstanceSetup = Setup.With(preventDisposal: true);
+        private static readonly Setup WeaklyReferencedHiddenDisposableInstanceSetup = Setup.With(weaklyReferenced: true, preventDisposal: true);
 
-        private static Expression GetThrowInstanceNoLongerAvailable(Request r)
+        private static Expression GetThrowInstanceNoLongerAvailable(Request request)
         {
-            return Expression.Call(typeof(Throw), "For", new[] { r.ServiceType },
-                Expression.Constant(Error.UnableToResolveUnknownService), Expression.Constant(r.ServiceType),
-                Expression.Constant(null), Expression.Constant(null), Expression.Constant(null));
+            Expression<Func<object>> throwUnableToResolve = () =>
+                Throw.It(Error.UnableToResolveUnknownService, request.ServiceType, null, null, null);
+            return Expression.Convert(throwUnableToResolve.Body, request.ServiceType);
         }
 
         /// <summary>Registers an externally created object of <typeparamref name="TService"/>. 
@@ -3286,14 +3249,14 @@ namespace DryIoc
         /// <param name="instance">The pre-created instance of <typeparamref name="TService"/>.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        /// <param name="preventDisposal">(optional) Prevents disposal of stored instance by wrapping it into <see cref="ReuseWrapper.HiddenDisposable"/>.</param>
+        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance.</param>
         /// <param name="weaklyReferenced">(optional) Store as WeakReference. </param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterInstance<TService>(this IContainer container, TService instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
-            container.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered, 
+            container.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered,
                 preventDisposal, weaklyReferenced, serviceKey);
         }
 
@@ -3527,7 +3490,7 @@ namespace DryIoc
             return (T)container.New(typeof(T), made);
         }
 
-        internal static Expression CreateResolutionExpression(Request request, 
+        internal static Expression CreateResolutionExpression(Request request,
             bool openResolutionScope = false, Type serviceType = null)
         {
             serviceType = serviceType ?? request.ServiceType;
@@ -3717,7 +3680,7 @@ namespace DryIoc
                     if (wrappedType != null)
                     {
                         var wrappedRequiredType = request.Container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(requiredServiceType);
-                        wrappedType.ThrowIfNotImplementedBy(wrappedRequiredType, Error.WrappedNotAssignableFromRequiredType, request);                           
+                        wrappedType.ThrowIfNotImplementedBy(wrappedRequiredType, Error.WrappedNotAssignableFromRequiredType, request);
                     }
                 }
             }
@@ -4104,7 +4067,7 @@ namespace DryIoc
 
         /// <summary>Implementation type of factory, if request was <see cref="WithResolvedFactory"/> factory, or null otherwise.</summary>
         public Type ImplementationType { get { return ResolvedFactory == null ? null : ResolvedFactory.ImplementationType; } }
-        
+
         /// <summary>Shortcut to FactoryType.</summary>
         public FactoryType ResolvedFactoryType { get { return ResolvedFactory == null ? FactoryType.Service : ResolvedFactory.FactoryType; } }
 
@@ -4283,7 +4246,7 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(Request parent, 
+        internal Request(Request parent,
             ContainerWeakRef containerWeakRef, ContainerWeakRef scopesWeakRef,
             IServiceInfo serviceInfo, Factory resolvedFactory,
             KV<bool[], ParameterExpression[]> funcArgs = null, IScope scope = null)
@@ -4335,9 +4298,11 @@ namespace DryIoc
         /// <summary>In addition to <see cref="AsResolutionRoot"/> opens scope.</summary>
         public virtual bool OpenResolutionScope { get { return false; } }
 
-        /// <summary>Specifies how to wrap the reused/shared instance to apply additional behavior, e.g. <see cref="WeakReference"/>, 
-        /// or disable disposing with <see cref="ReuseHiddenDisposable"/>, etc.</summary>
-        public virtual Type[] ReuseWrappers { get { return null; } }
+        /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
+        public virtual bool PreventDisposal { get { return false; } }
+
+        /// <summary>Stores reused instance as WeakReference.</summary>
+        public virtual bool WeaklyReferenced { get { return false; } }
 
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
@@ -4345,30 +4310,29 @@ namespace DryIoc
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
         /// <param name="cacheFactoryExpression">(optional)</param> <param name="lazyMetadata">(optional)</param> 
         /// <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param> <param name="condition">(optional)</param>
-        /// <param name="openResolutionScope">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
-        /// <param name="asResolutionRoot">(optional)</param>
-        /// <param name="reuseWrappers">(optional) Multiple reuse wrappers.</param>       
+        /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionRoot"/> but in addition opens new scope.</param>
+        /// <param name="asResolutionRoot">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
+        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
+        /// <param name="weaklyReferenced">(optional) Stores reused instance as WeakReference.</param>
         /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
         public static Setup With(bool cacheFactoryExpression = true,
             Func<object> lazyMetadata = null, object metadata = null,
-            Func<Request, bool> condition = null, 
+            Func<Request, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionRoot = false,
-            Type[] reuseWrappers = null)
+            bool preventDisposal = false, bool weaklyReferenced = false)
         {
-            if (cacheFactoryExpression && 
+            if (cacheFactoryExpression &&
                 lazyMetadata == null && metadata == null &&
-                condition == null && 
+                condition == null &&
                 openResolutionScope == false && asResolutionRoot == false &&
-                reuseWrappers.IsNullOrEmpty())
+                preventDisposal == false && weaklyReferenced == false)
                 return Default;
 
-            if (reuseWrappers != null && reuseWrappers.Length != 0)
-                for (var i = 0; i < reuseWrappers.Length; ++i)
-                    typeof(IReuseWrapper).ThrowIfNotImplementedBy(reuseWrappers[i], 
-                        Error.RegisteredReuseWrapperTypeIsNotReuseWrapper, i, reuseWrappers);
-
-            return new ServiceSetup(cacheFactoryExpression, lazyMetadata, metadata,
-                condition, openResolutionScope, asResolutionRoot, reuseWrappers);
+            return new ServiceSetup(cacheFactoryExpression,
+                lazyMetadata, metadata,
+                condition,
+                openResolutionScope, asResolutionRoot,
+                preventDisposal, weaklyReferenced);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -4380,16 +4344,8 @@ namespace DryIoc
         /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
         public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false)
         {
-            return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType ? Wrapper 
+            return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType ? Wrapper
                 : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType);
-        }
-
-        /// <summary>Reuse wrapper setup.</summary>
-        /// <param name="reuseWrapperFactory"></param>
-        /// <returns>New reuse wrapper setup.</returns>
-        public static Setup ReuseWrapper(IReuseWrapperFactory reuseWrapperFactory)
-        {
-            return new WrapperSetup(reuseWrapperFactory: reuseWrapperFactory.ThrowIfNull());
         }
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
@@ -4411,16 +4367,16 @@ namespace DryIoc
             public override object Metadata { get { return _metadata ?? (_metadata = _lazyMetadata == null ? null : _lazyMetadata()); } }
 
             public override bool AsResolutionRoot { get { return _isResolutionRoot || _openResolutionScope; } }
-
             public override bool OpenResolutionScope { get { return _openResolutionScope; } }
 
-            public override Type[] ReuseWrappers { get { return _reuseWrappers; } }
+            public override bool PreventDisposal { get { return _preventDisposal; } }
+            public override bool WeaklyReferenced { get { return _weaklyReferenced; } }
 
             public ServiceSetup(bool cacheFactoryExpression = true,
                 Func<object> lazyMetadata = null, object metadata = null,
-                Func<Request, bool> condition = null, 
+                Func<Request, bool> condition = null,
                 bool openResolutionScope = false, bool isResolutionRoot = false,
-                Type[] reuseWrappers = null)
+                bool preventDisposal = false, bool weaklyReferenced = false)
             {
                 _cacheFactoryExpression = cacheFactoryExpression;
                 _lazyMetadata = lazyMetadata;
@@ -4428,7 +4384,8 @@ namespace DryIoc
                 Condition = condition;
                 _openResolutionScope = openResolutionScope;
                 _isResolutionRoot = isResolutionRoot;
-                _reuseWrappers = reuseWrappers;
+                _preventDisposal = preventDisposal;
+                _weaklyReferenced = weaklyReferenced;
             }
 
             private readonly bool _cacheFactoryExpression;
@@ -4436,7 +4393,8 @@ namespace DryIoc
             private object _metadata;
             private readonly bool _openResolutionScope;
             private readonly bool _isResolutionRoot;
-            private readonly Type[] _reuseWrappers;
+            private readonly bool _preventDisposal;
+            private readonly bool _weaklyReferenced;
         }
 
         /// <summary>Setup for <see cref="DryIoc.FactoryType.Wrapper"/> factory.</summary>
@@ -4452,23 +4410,17 @@ namespace DryIoc
             /// <summary>Per name.</summary>
             public readonly bool AlwaysWrapsRequiredServiceType;
 
-            /// <summary>(optional) Tool for wrapping and unwrapping reused object.</summary>
-            public readonly IReuseWrapperFactory ReuseWrapperFactory;
-
             /// <summary>Constructs wrapper setup from optional wrapped type selector and reuse wrapper factory.</summary>
             /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param> 
             /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
-            /// <param name="reuseWrapperFactory">Need to be set for reuse wrapper.</param>
-            public WrapperSetup(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false, IReuseWrapperFactory reuseWrapperFactory = null)
+            public WrapperSetup(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
                 AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
-                ReuseWrapperFactory = reuseWrapperFactory;
             }
 
             /// <summary>Unwraps service type or returns its.</summary>
-            /// <param name="serviceType"></param>
-            /// <returns>Wrapped type or self.</returns>
+            /// <param name="serviceType"></param> <returns>Wrapped type or self.</returns>
             public Type GetWrappedTypeOrNullIfWrapsRequired(Type serviceType)
             {
                 if (AlwaysWrapsRequiredServiceType || !serviceType.IsGeneric())
@@ -4476,13 +4428,13 @@ namespace DryIoc
 
                 var typeArgs = serviceType.GetGenericParamsAndArgs();
                 var typeArgIndex = WrappedServiceTypeArgIndex;
-                serviceType.ThrowIf(typeArgs.Length > 1 && typeArgIndex == -1, 
+                serviceType.ThrowIf(typeArgs.Length > 1 && typeArgIndex == -1,
                     Error.GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex);
 
                 typeArgIndex = typeArgIndex != -1 ? typeArgIndex : 0;
-                serviceType.ThrowIf(typeArgIndex > typeArgs.Length - 1, 
+                serviceType.ThrowIf(typeArgIndex > typeArgs.Length - 1,
                     Error.GenericWrapperTypeArgIndexOutOfBounds, typeArgIndex);
-                
+
                 return typeArgs[typeArgIndex];
             }
         }
@@ -4734,6 +4686,8 @@ namespace DryIoc
         private static int _lastFactoryID;
         private Setup _setup;
 
+        // Example: The result for weak reference would be: 
+        // ((WeakReference)scope.GetOrAdd(id, () => new WeakReference(new Service()))).Target.ThrowIfNull(Error.Blah)
         private Expression GetScopedExpressionOrDefault(Expression serviceExpr, IReuse reuse, Request request, Type requiredWrapperType)
         {
             var getScopeExpr = reuse.GetScopeExpression(request);
@@ -4741,46 +4695,35 @@ namespace DryIoc
             var scopedInstanceId = reuse.GetScopedItemIdOrSelf(FactoryID, request);
             var scopedInstanceIdExpr = Expression.Constant(scopedInstanceId);
 
-            var wrapperTypes = Setup.ReuseWrappers;
-            if (wrapperTypes.IsNullOrEmpty())
+            if (Setup.PreventDisposal == false && Setup.WeaklyReferenced == false)
                 return Expression.Convert(
-                    Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(), scopedInstanceIdExpr, 
+                    Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(), scopedInstanceIdExpr,
                         Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>())), serviceType);
 
-            // First wrap serviceExpr with wrapper Wrap method.
-            var wrappers = new IReuseWrapperFactory[wrapperTypes.Length];
-            for (var i = 0; i < wrapperTypes.Length; ++i)
-            {
-                var wrapperType = wrapperTypes[i];
-                var wrapperFactory = request.Container.GetWrapperFactoryOrDefault(wrapperType).ThrowIfNull();
-                var wrapper = ((Setup.WrapperSetup)wrapperFactory.Setup).ReuseWrapperFactory;
+            if (Setup.PreventDisposal) 
+                serviceExpr = Expression.NewArrayInit(typeof(object), serviceExpr);
 
-                serviceExpr = Expression.Call(
-                    request.Container.GetOrAddStateItemExpression(wrapper, typeof(IReuseWrapperFactory)),
-                    "Wrap", ArrayTools.Empty<Type>(), serviceExpr);
+            if (Setup.WeaklyReferenced)
+                serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
 
-                wrappers[i] = wrapper; // save wrapper for later unwrap
-            }
-
-            // Makes call like this: scope.GetOrAdd(id, () => wrapper1.Wrap(wrapper0.Wrap(new Service)))
-            var getScopedServiceExpr = Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
+            Expression getScopedServiceExpr = Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
                 scopedInstanceIdExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
 
-            // Unwrap wrapped service in backward order like this: wrapper0.Unwrap(wrapper1.Unwrap(scope.GetOrAdd(...)))
-            for (var i = wrapperTypes.Length - 1; i >= 0; --i)
+            if (Setup.WeaklyReferenced) 
             {
-                var wrapperType = wrapperTypes[i];
-
-                // Stop on required wrapper type, if provided.
-                if (requiredWrapperType != null && requiredWrapperType == wrapperType)
-                    return Expression.Convert(getScopedServiceExpr, requiredWrapperType);
-
-                var wrapperExpr = request.Container.GetOrAddStateItemExpression(wrappers[i], typeof(IReuseWrapperFactory));
-                getScopedServiceExpr = Expression.Call(wrapperExpr, "Unwrap", ArrayTools.Empty<Type>(), getScopedServiceExpr);
+                var weakRefExpr = Expression.Convert(getScopedServiceExpr, typeof(WeakReference));
+                var weakRefTargetExpr = Expression.Property(weakRefExpr, "Target");
+                var throwIfTargetNullExpr = Expression.Call(typeof(Throw), "ThrowNewErrorIfNull", ArrayTools.Empty<Type>(),
+                    weakRefTargetExpr, Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
+                getScopedServiceExpr = throwIfTargetNullExpr;
             }
 
-            return requiredWrapperType != null ? null
-                : Expression.Convert(getScopedServiceExpr, serviceType);
+            if (Setup.PreventDisposal) 
+                getScopedServiceExpr = Expression.ArrayIndex(
+                    Expression.Convert(getScopedServiceExpr, typeof(object[])), 
+                    Expression.Constant(0, typeof(int)));
+
+            return requiredWrapperType != null ? null : Expression.Convert(getScopedServiceExpr, serviceType);
         }
 
         private Expression GetInstantiatedSingletonExpressionOrDefault(Expression serviceExpr, Request request, Type requiredWrapperType = null)
@@ -4789,34 +4732,32 @@ namespace DryIoc
             var scope = request.Scopes.SingletonScope;
             var scopedInstanceId = scope.GetScopedItemIdOrSelf(FactoryID);
 
-            var wrapperTypes = Setup.ReuseWrappers;
+            if (Setup.PreventDisposal)
+            {
+                var serviceFactory = factoryDelegate;
+                factoryDelegate = (st, cs, rs) => new[] { serviceFactory(st, cs, rs) };
+            }
+
+            if (Setup.WeaklyReferenced)
+            {
+                var serviceFactory = factoryDelegate;
+                factoryDelegate = (st, cs, rs) => new WeakReference(serviceFactory(st, cs, rs));
+            }
+
             var serviceType = serviceExpr.Type;
-            if (wrapperTypes == null || wrapperTypes.Length == 0)
+            if (Setup.PreventDisposal == false && Setup.WeaklyReferenced == false)
                 return request.Container.GetOrAddStateItemExpression(
                     scope.GetOrAdd(scopedInstanceId, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope)),
                     serviceType);
 
-            var wrappers = new IReuseWrapperFactory[wrapperTypes.Length];
-            for (var i = 0; i < wrapperTypes.Length; ++i)
-            {
-                var wrapperType = wrapperTypes[i];
-                var wrapperFactory = request.Container.GetWrapperFactoryOrDefault(wrapperType).ThrowIfNull();
-                var wrapper = ((Setup.WrapperSetup)wrapperFactory.Setup).ReuseWrapperFactory;
-                var serviceFactory = factoryDelegate;
-                factoryDelegate = (st, cs, rs) => wrapper.Wrap(serviceFactory(st, cs, rs));
-                wrappers[i] = wrapper;
-            }
-
             var wrappedService = scope.GetOrAdd(scopedInstanceId,
                 () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, null));
 
-            for (var i = wrapperTypes.Length - 1; i >= 0; --i)
-            {
-                var wrapperType = wrapperTypes[i];
-                if (requiredWrapperType == wrapperType)
-                    return request.Container.GetOrAddStateItemExpression(wrappedService, requiredWrapperType);
-                wrappedService = wrappers[i].Unwrap(wrappedService);
-            }
+            if (Setup.WeaklyReferenced)
+                wrappedService = ((WeakReference)wrappedService).Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed);
+
+            if (Setup.PreventDisposal)
+                wrappedService = ((object[])wrappedService)[0];
 
             return requiredWrapperType != null ? null
                 : request.Container.GetOrAddStateItemExpression(wrappedService, serviceType);
@@ -5697,10 +5638,9 @@ namespace DryIoc
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
-            if (!_items.IsEmpty)
-                foreach (var item in _items.Enumerate()
-                    .Where(it => it.Value is IDisposable || it.Value is IReuseWrapper)
-                    .OrderByDescending(it => it.Key))
+            var items = _items;
+            if (!items.IsEmpty)
+                foreach (var item in items.Enumerate().OrderByDescending(it => it.Key))
                     DisposeItem(item.Value);
             _items = ImTreeMapIntToObj.Empty;
         }
@@ -5710,7 +5650,7 @@ namespace DryIoc
         {
             return "{" +
                 (Name != null ? "Name=" + Name + ", " : string.Empty) +
-                (Parent == null ? "Parent=null" : "Parent=" + Parent) 
+                (Parent == null ? "Parent=null" : "Parent=" + Parent)
                 + "}";
         }
 
@@ -5724,25 +5664,21 @@ namespace DryIoc
 
         internal static void DisposeItem(object item)
         {
-            try
+            var disposable = item as IDisposable;
+            if (disposable == null)
             {
-                var disposable = item as IDisposable;
-                if (disposable != null)
-                    disposable.Dispose();
-                else
+                // Unwrap WeakReference if item wrapped in it.
+                var weakRefItem = item as WeakReference;
+                if (weakRefItem != null)
+                    disposable = weakRefItem.Target as IDisposable;
+            }
+            
+            if (disposable != null)
+                try { disposable.Dispose(); }
+                catch (Exception)
                 {
-                    var reused = item as IReuseWrapper;
-                    while (reused != null && !(reused is ReuseHiddenDisposable)
-                           && reused.Target != null && (disposable = reused.Target as IDisposable) == null)
-                        reused = reused.Target as IReuseWrapper;
-                    if (disposable != null)
-                        disposable.Dispose();
+                    // NOTE Ignoring disposing exception, they not so important for program to proceed.
                 }
-            }
-            catch (Exception)
-            {
-                // NOTE Ignoring disposing exception, they not so important for program to proceed.
-            }
         }
 
         #endregion
@@ -5753,7 +5689,7 @@ namespace DryIoc
     public sealed class SingletonScope : IScope
     {
         private static readonly int MaxItemArrayIncreaseStep = 32;
-        
+
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
         public IScope Parent { get { return null; } }
 
@@ -5816,8 +5752,9 @@ namespace DryIoc
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
-            if (!_factoryIdToIndexMap.IsEmpty)
-                foreach (var idToIndex in _factoryIdToIndexMap.Enumerate().OrderByDescending(it => it.Key))
+            var factoryIdToIndexMap = _factoryIdToIndexMap;
+            if (!factoryIdToIndexMap.IsEmpty)
+                foreach (var idToIndex in factoryIdToIndexMap.Enumerate().OrderByDescending(it => it.Key))
                     Scope.DisposeItem(_items[(int)idToIndex.Value]);
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
             _items = ArrayTools.Empty<object>();
@@ -6206,146 +6143,6 @@ namespace DryIoc
 
         /// <summary>Web request is just convention for reuse in <see cref="InCurrentNamedScope"/> with special name <see cref="WebRequestScopeName"/>.</summary>
         public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
-    }
-
-    /// <summary>Creates <see cref="IReuseWrapper"/> for target and unwraps matching wrapper.</summary>
-    public interface IReuseWrapperFactory
-    {
-        /// <summary>Wraps target value into new wrapper.</summary>
-        /// <param name="target">Input value. May be other wrapper.</param> <returns>New wrapper.</returns>
-        object Wrap(object target);
-
-        /// <summary>Unwraps wrapper of supported/matched wrapper type. Otherwise throws.</summary>
-        /// <param name="wrapper">Wrapper to unwrap.</param> <returns>Unwrapped value. May be nested wrapper.</returns>
-        object Unwrap(object wrapper);
-    }
-
-    /// <summary>Listing and implementations of out-of-the-box supported <see cref="IReuseWrapper"/> factories.</summary>
-    public static class ReuseWrapperFactory
-    {
-        /// <summary>Factory for <see cref="ReuseHiddenDisposable"/>.</summary>
-        public static readonly IReuseWrapperFactory HiddenDisposable = new HiddenDisposableFactory();
-
-        /// <summary>Factory for <see cref="ReuseWeakReference"/>.</summary>
-        public static readonly IReuseWrapperFactory WeakReference = new WeakReferenceFactory();
-
-        #region Implementation
-
-        private sealed class HiddenDisposableFactory : IReuseWrapperFactory
-        {
-            public object Wrap(object target)
-            {
-                return new ReuseHiddenDisposable((target as IDisposable).ThrowIfNull());
-            }
-
-            public object Unwrap(object wrapper)
-            {
-                return (wrapper as ReuseHiddenDisposable).ThrowIfNull().Target;
-            }
-        }
-
-        private sealed class WeakReferenceFactory : IReuseWrapperFactory
-        {
-            public object Wrap(object target)
-            {
-                return new ReuseWeakReference(target);
-            }
-
-            public object Unwrap(object wrapper)
-            {
-                return (wrapper as ReuseWeakReference).ThrowIfNull().Target.ThrowIfNull(Error.WeakrefReuseWrapperGced);
-            }
-        }
-
-        #endregion
-    }
-
-    /// <summary>Defines reused object wrapper.</summary>
-    public interface IReuseWrapper
-    {
-        /// <summary>Wrapped value.</summary>
-        object Target { get; }
-    }
-
-    /// <summary>Provides strongly-typed access to wrapped target.</summary>
-    public static class ReuseWrapper
-    {
-        /// <summary>Type of <see cref="ReuseHiddenDisposable"/> added for intellisense discoverability.</summary>
-        public static readonly Type HiddenDisposable = typeof(ReuseHiddenDisposable);
-        /// <summary>Type of <see cref="ReuseWeakReference"/> added for intellisense discoverability.</summary>
-        public static readonly Type WeakReference = typeof(ReuseWeakReference);
-
-        /// <summary>Unwraps input until target of <typeparamref name="T"/> is found. Returns found target, otherwise returns null.</summary>
-        /// <typeparam name="T">Target to stop search on.</typeparam>
-        /// <param name="reuseWrapper">Source reused wrapper to get target from.</param>
-        public static T TargetOrDefault<T>(this IReuseWrapper reuseWrapper) where T : class
-        {
-            var target = reuseWrapper.ThrowIfNull().Target;
-            while (!(target is T) && (target is IReuseWrapper))
-                target = ((IReuseWrapper)target).Target;
-            return target as T;
-        }
-    }
-
-    /// <summary>Wraps reused service object to prevent container to dispose service object. Intended to work only with <see cref="IDisposable"/> target.</summary>
-    public sealed class ReuseHiddenDisposable : IReuseWrapper
-    {
-        /// <summary>Constructs wrapper by wrapping input target.</summary>
-        /// <param name="target">Disposable target.</param>
-        public ReuseHiddenDisposable(IDisposable target)
-        {
-            _target = target;
-            _targetType = target.GetType();
-        }
-
-        /// <summary>Wrapped value.</summary>
-        public object Target
-        {
-            get
-            {
-                Throw.If(IsDisposed, Error.TargetWasAlreadyDisposed, _targetType, typeof(ReuseHiddenDisposable));
-                return _target;
-            }
-        }
-
-        /// <summary>True if target was disposed.</summary>
-        public bool IsDisposed
-        {
-            get { return _disposed == 1; }
-        }
-
-        /// <summary>Dispose target and mark wrapper as disposed.</summary>
-        public void Dispose()
-        {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
-                return;
-            _target.Dispose();
-            _target = null;
-        }
-
-        #region Implementation
-
-        private int _disposed;
-        private IDisposable _target;
-        private readonly Type _targetType;
-
-        #endregion
-    }
-
-    /// <summary>Wraps reused object as <see cref="WeakReference"/>. Allow wrapped object to be garbage collected.</summary>
-    public sealed class ReuseWeakReference : IReuseWrapper
-    {
-        /// <summary>Provides access to <see cref="WeakReference"/> members.</summary>
-        public readonly WeakReference Ref;
-
-        /// <summary>Wrapped value, delegates to <see cref="WeakReference.Target"/></summary>
-        public object Target { get { return Ref.Target; } }
-
-        /// <summary>Wraps input target into weak reference</summary> <param name="value">Value to wrap.</param>
-        public ReuseWeakReference(object value)
-        {
-            Ref = new WeakReference(value);
-        }
     }
 
     /// <summary>Specifies what to return when <see cref="IResolver"/> unable to resolve service.</summary>
@@ -6846,8 +6643,8 @@ namespace DryIoc
                 "Dependency {0} has shorter Reuse lifespan than its parent: {1}." + Environment.NewLine +
                 "{2} lifetime is shorter than {3}." + Environment.NewLine +
                 "You may turn Off this error with new Container(rules=>rules.EnableThrowIfDepenedencyHasShorterReuseLifespan(false))."),
-            WeakrefReuseWrapperGced = Of(
-                "Service with WeakReference reuse wrapper is garbage collected now, and no longer available."),
+            WeakRefReuseWrapperGCed = Of(
+                "Reused service wrapped in WeakReference is Garbage Collected and no longer available."),
             ServiceIsNotAssignableFromFactoryMethod = Of(
                 "Service of {0} is not assignable from factory method {1} when resolving: {2}."),
             FactoryObjIsNullInFactoryMethod = Of(
@@ -6871,18 +6668,12 @@ namespace DryIoc
             NotDirectScopeParent = Of(
                 "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." + Environment.NewLine +
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
-            UnableToResolveReuseWrapper = Of(
-                "Unable to resolve reuse wrapper {0} for: {1}"),
             WrappedNotAssignableFromRequiredType = Of(
                 "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}."),
             NoMatchedScopeFound = Of(
                 "Unable to find scope with matching name: {0}."),
             UnableToNewOpenGeneric = Of(
                 "Unable to New not concrete/open-generic type {0}."),
-            RegisteredReuseWrapperTypeIsNotReuseWrapper = Of(
-                "Registered reuse wrapper {1} at index {2} of {3} does not implement expected {0} interface."),
-            RecyclableReuseWrapperIsRecycled = Of(
-                "Recyclable wrapper is recycled."),
             NoMatchingScopeWhenRegisteringInstance = Of(
                 "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine +
                 "You could register delegate returning instance instead. That will succeed as long as scope is available at resolution."),
@@ -6967,20 +6758,6 @@ namespace DryIoc
             throw GetMatchedException(ErrorCheck.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
         }
 
-        /// <summary>Throws matched exception if throw condition is true. Passes <paramref name="arg0"/> to condition. 
-        /// Enables fluent syntax at cast of delegate creation. Otherwise return source <paramref name="arg0"/>.</summary>
-        /// <typeparam name="T">Type of source <paramref name="arg0"/>.</typeparam>
-        /// <param name="arg0">In case of exception <paramref name="arg0"/> will be used as first argument in formatted message.</param>
-        /// <param name="throwCondition">Condition to be evaluated, throws if result is true, otherwise - does nothing.</param>
-        /// <param name="error">Error code to match to exception thrown.</param>
-        /// <param name="arg1">Rest of arguments to formatted message.</param> <param name="arg2"></param> <param name="arg3"></param>
-        /// <returns><paramref name="arg0"/> if throw condition is false.</returns>
-        public static T ThrowIf<T>(this T arg0, Func<T, bool> throwCondition, int error = -1, object arg1 = null, object arg2 = null, object arg3 = null)
-        {
-            if (!throwCondition(arg0)) return arg0;
-            throw GetMatchedException(ErrorCheck.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
-        }
-
         /// <summary>Throws exception if <paramref name="arg"/> is null, otherwise returns <paramref name="arg"/>.</summary>
         /// <param name="arg">Argument to check for null.</param>
         /// <param name="error">Error code.</param>
@@ -7036,7 +6813,7 @@ namespace DryIoc
         /// <summary>Just throws the exception with the <paramref name="error"/> code.</summary>
         /// <param name="error">Error code.</param>
         /// <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
-        public static void It(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
+        public static object It(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
@@ -7049,6 +6826,15 @@ namespace DryIoc
         public static T For<T>(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
+        }
+
+        /// <summary>Throws if object is null.</summary>
+        /// <param name="obj">object to check.</param><param name="message">Error message.</param>
+        /// <returns>object if not null.</returns>
+        public static object ThrowNewErrorIfNull(this object obj, string message)
+        {
+            if (obj == null) It(Error.Of(message));
+            return obj;
         }
     }
 
@@ -7632,14 +7418,6 @@ namespace DryIoc
         public static T[] Remove<T>(this T[] source, T value)
         {
             return source.RemoveAt(source.IndexOf(value));
-        }
-
-        /// <summary>Creates array consisting of single item.</summary>
-        /// <param name="item">item</param> <typeparam name="T">item type.</typeparam>
-        /// <returns>Array of one item.</returns>
-        public static T[] One<T>(this T item)
-        {
-            return new[] { item };
         }
 
         /// <summary>Returns singleton empty array of provided type.</summary> 

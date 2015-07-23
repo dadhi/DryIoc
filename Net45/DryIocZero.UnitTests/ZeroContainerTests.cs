@@ -49,7 +49,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
             container.Register(typeof(Potato), (r, scope) => new Potato());
             container.Dispose();
-            Assert.Throws<ZeroContainerException>(() => container.ResolveDefault(typeof(Potato), false));
+            Assert.Throws<ContainerException>(() => container.ResolveDefault(typeof(Potato), false));
         }
 
         [Test]
@@ -77,7 +77,7 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var ex = Assert.Throws<ZeroContainerException>(
+            var ex = Assert.Throws<ContainerException>(
                 () => container.ResolveDefault(typeof(NotRegistered), false));
 
             Assert.AreEqual(ex.Error, Error.UnableToResolveService);

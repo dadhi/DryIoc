@@ -364,4 +364,47 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             A = a;
         }
     }
+
+    [Export, TransientReuse]
+    public class ServiceWithReuseAttribute { }
+
+    [Export, SingletonReuse]
+    public class ServiceWithSingletonReuse { }
+
+    [Export, CurrentScopeReuse]
+    public class ServiceWithCurrentScopeReuse { }
+
+    [Export, ResolutionScopeReuse]
+    public class ServiceWithResolutionScopeReuse { }
+
+    [Export, ResolutionScopeReuse]
+    public class UserOfServiceWithResolutionScopeReuse
+    {
+        public ServiceWithResolutionScopeReuse One { get; set; }
+        public ServiceWithResolutionScopeReuse Another { get; set; }
+
+        public UserOfServiceWithResolutionScopeReuse(
+            ServiceWithResolutionScopeReuse one,
+            ServiceWithResolutionScopeReuse another)
+        {
+            One = one;
+            Another = another;
+        }
+    }
+
+    [Export, CurrentScopeReuse("ScopeA")]
+    public class WithNamedCurrentScope { }
+
+    [Export, WeaklyReferenced, AsResolutionRoot]
+    public class WeaklyReferencedService { }
+
+    [Export, PreventDisposal, AsResolutionRoot]
+    public class PreventDisposalService : IDisposable
+    {
+        public bool IsDisposed;
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
 }

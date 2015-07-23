@@ -118,18 +118,11 @@ namespace DryIocAttributes
         public ResolutionScopeReuseAttribute() : base(ReuseType.ResolutionScope) { }
     }
 
-    /// <summary>Represents Reuse Wrappers defined for exported type.</summary>
-    public class ReuseWrappersAttribute : Attribute
-    {
-        /// <summary>Reuse Wrapper types.</summary>
-        public Type[] WrapperTypes { get; set; }
+    /// <summary>Mark exported reused service to be stored as WeakReference</summary>
+    public class WeaklyReferenced : Attribute {}
 
-        /// <summary>Creates attribute.</summary> <param name="wrapperTypes">Reuse Wrapper types.</param>
-        public ReuseWrappersAttribute(params Type[] wrapperTypes)
-        {
-            WrapperTypes = wrapperTypes;
-        }
-    }
+    /// <summary>Mark exported reused service to be Not disposed together with scope.</summary>
+    public class PreventDisposal : Attribute { }
 
     /// <summary>Defines export with arbitrary object key.</summary>
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
