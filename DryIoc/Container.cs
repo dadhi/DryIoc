@@ -1685,6 +1685,9 @@ namespace DryIoc
             Wrappers = Wrappers.AddOrUpdate(typeof(Meta<,>),
                 new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
+            Wrappers = Wrappers.AddOrUpdate(typeof(Tuple<,>),
+                new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
+
             Wrappers = Wrappers.AddOrUpdate(typeof(LambdaExpression),
                 new ExpressionFactory(GetFactoryExpression, setup: Setup.Wrapper));
 

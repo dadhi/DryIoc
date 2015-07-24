@@ -1,7 +1,5 @@
 using System;
-using System.Collections;
 using System.Linq;
-using System.Text;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -19,6 +17,18 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<Meta<ServiceWithMetadata, Metadata>>();
 
             Assert.That(service.Metadata.Assigned, Is.True);
+        }
+
+        [Test]
+        public void Can_resolve_metadata_as_Tuple()
+        {
+            var container = new Container();
+            container.Register(typeof(ServiceWithMetadata), setup: Setup.With(metadata: new Metadata { Assigned = true }));
+
+            var service = container.Resolve<Tuple<ServiceWithMetadata, Metadata>>();
+
+            Assert.That(service.Item1, Is.InstanceOf<ServiceWithMetadata>());
+            Assert.That(service.Item2.Assigned, Is.True);
         }
 
         [Test]
