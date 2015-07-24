@@ -43,7 +43,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AppendableArrayTests.cs" />
     <Compile Include="ConstructionTests.cs" />
     <Compile Include="IfUnresolvedTests.cs" />
     <Compile Include="InitializerTests.cs" />

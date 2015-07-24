@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using DryIoc.UnitTests;
 using NUnit.Framework;
 
 namespace DryIoc.Playground
@@ -141,7 +140,7 @@ namespace DryIoc.Playground
         {
             var tree = IntTree<KeyValuePair<Type, string>[]>.Empty;
 
-            var key = typeof(AppendableArrayTests);
+            var key = typeof(ImTreeArrayTests);
             var keyHash = key.GetHashCode();
             var value = "test";
 
@@ -198,7 +197,7 @@ namespace DryIoc.Playground
         {
             var tree = ImTreeMap<Type, string>.Empty;
 
-            var key = typeof(AppendableArrayTests);
+            var key = typeof(ImTreeArrayTests);
             var value = "test";
 
             tree = tree.AddOrUpdate(key, value);

@@ -42,9 +42,6 @@
     <Reference Include="System.Web" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\DryIoc.UnitTests\AppendableArrayTests.cs">
-      <Link>AppendableArrayTests.cs</Link>
-    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\ChildContainerTests.cs">
       <Link>ChildContainerTests.cs</Link>
     </Compile>
