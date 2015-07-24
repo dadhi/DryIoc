@@ -20,6 +20,7 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Supports .NET PCL, 3.5, 4.0, 4.5.
 * Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
 * [Wiki documentation][WikiHome] _(being updated for v2.0)_
+* [Notes for contributors](CONTRIBUTING.md)
 * __v1.4.1__ is stable: `PM> Install-Package DryIoc` 
 * __v2.0-rc2__ is out: `PM> Install-Package DryIoc -Pre`
 
@@ -42,7 +43,7 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Thread-safe and lock-free: registrations and resolutions could be made in parallel without corrupting container state. 
 * Detects recursive dependencies - cycles in object graph.
 * Throws exceptions as early as possible. Exception provides meaningful information about problem and context.
-* Resolve as `LanbdaExpression` to be clear about service creation expression.
+* Resolve as `LambdaExpression` to be clear about service creation expression.
 
 #### Features
 
@@ -54,8 +55,8 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Instance lifetime control or *Reuse* in DryIoc terms ([wiki](https://bitbucket.org/dadhi/dryioc/wiki/ReuseAndScopes)) :
     * Nested disposable scopes, ambient scope context.
     * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`, or define your own.
-    * Changing default reuse type per container via  `Rules.WithReuseMapping()`.
-    * Control over reused objects behavior via ReuseWrappers: `HiddenDisposable`, `WeakReference`, `Swapable`, and user-defined.
+    * Changing default reuse type per container via `Rules.WithReuseMapping()`.
+    * Control reused objects behavior with `preventDisposal` and `weaklyReferenced`.
 * Open-generics without special syntax.
 * Constructor, property and field injection.
 * Static or instance factory methods in addition to constructor. Factory methods support parameter injection same as constructors.
@@ -64,9 +65,9 @@ DryIoc is small, fast, capable IoC Container for .NET
 * Metadata object associating with registration.
 * Generic wrappers:
     * Service collections: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and as `I(ReadOnly)Collection|List`.
-    * Other: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>`, `KeyValuePair<TKey, T>`, and user-defined wrappers.
+    * Other: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>` or `Tuple<TMetadata, T>`, `KeyValuePair<TKey, T>`, and user-defined wrappers.
     * [Currying](http://en.wikipedia.org/wiki/Currying) over constructor (or factory method) arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
-    * Nested wrappers: e.g. `Meta<SomeMetadata, Func<ISomeService>>[]`.
+    * Nested wrappers: e.g. `Tuple<SomeMetadata, Func<ISomeService>>[]`.
 * [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern): Composite itself is excluded from result collection.
 * [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern). 
 * Context-based service selection on resolution.

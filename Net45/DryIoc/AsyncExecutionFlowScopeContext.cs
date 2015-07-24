@@ -40,7 +40,7 @@ namespace DryIoc
     }
 
     /// <summary>Stores scopes propagating through async-await boundaries.</summary>
-    public sealed class AsyncExecutionFlowScopeContext : IScopeContext
+    public sealed class AsyncExecutionFlowScopeContext : IScopeContext, IDisposable
     {
         /// <summary>Statically known name of root scope in this context.</summary>
         public static readonly string ScopeContextName = typeof(AsyncExecutionFlowScopeContext).FullName;
@@ -75,6 +75,9 @@ namespace DryIoc
             CallContext.LogicalSetData(_currentScopeEntryKey, scopeEntry);
             return newScope;
         }
+
+        /// <summary>Nothing to dispose.</summary>
+        public void Dispose() { }
 
         private static int _seedKey;
         private readonly string _currentScopeEntryKey;

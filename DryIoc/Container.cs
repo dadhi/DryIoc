@@ -121,7 +121,7 @@ namespace DryIoc
             if (scopeName == null)
                 scopeName = _openedScope != null ? null
                     : _scopeContext != null ? _scopeContext.RootScopeName
-                    : NoContextRootScopeName;
+                    : NonAmbientRootScopeName;
 
             var nestedOpenedScope = new Scope(_openedScope, scopeName);
 
@@ -135,7 +135,7 @@ namespace DryIoc
         }
 
         /// <summary>Provides root scope name when context is absent.</summary>
-        public static readonly object NoContextRootScopeName = typeof(IContainer).FullName;
+        public static readonly object NonAmbientRootScopeName = typeof(IContainer).FullName;
 
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
         /// Facade is the new empty container, with the same rules and scope context as current container. 
@@ -171,9 +171,8 @@ namespace DryIoc
                 Rules = Rules.Empty;
                 _registry.Swap(_ => Registry.Empty);
                 _singletonScope.Dispose();
-
-                if (_scopeContext is IDisposable)
-                    ((IDisposable)_scopeContext).Dispose();
+                if (_scopeContext != null)
+                    _scopeContext.Dispose();
             }
         }
 
@@ -2250,7 +2249,7 @@ namespace DryIoc
 
         /// <summary>Searches for constructor with all resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving as service and as Func&lt;TArgs..., TService&gt;.</summary>
-        public static FactoryMethodSelector ConstructorWithResolvableArguments = request =>
+        public static readonly FactoryMethodSelector ConstructorWithResolvableArguments = request =>
         {
             var implementationType = request.ImplementationType.ThrowIfNull();
             var ctors = implementationType.GetAllConstructors().ToArrayOrSelf();
@@ -5471,12 +5470,6 @@ namespace DryIoc
         /// <summary>Optional name object associated with scope.</summary>
         public object Name { get; private set; }
 
-        /// <summary>Returns true if scope disposed.</summary>
-        public bool IsDisposed
-        {
-            get { return _disposed == 1; }
-        }
-
         /// <summary>Create scope with optional parent and name.</summary>
         /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
         public Scope(IScope parent = null, object name = null)
@@ -5517,9 +5510,7 @@ namespace DryIoc
                 item = createValue();
             }
 
-            Ref.Swap(ref _items, items => items.AddOrUpdate(id, item)
-                .ThrowIf(_disposed == 1, Error.ScopeIsDisposed)); // check once more before saving items
-
+            Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
             return item;
         }
 
@@ -5593,12 +5584,6 @@ namespace DryIoc
 
         /// <summary>Optional name object associated with scope.</summary>
         public object Name { get { return null; } }
-
-        /// <summary>Returns true if scope disposed.</summary>
-        public bool IsDisposed
-        {
-            get { return _disposed == 1; }
-        }
 
         /// <summary>Creates scope.</summary>
         public SingletonScope()
@@ -5719,7 +5704,7 @@ namespace DryIoc
 
     /// <summary>Provides ambient current scope and optionally scope storage for container, 
     /// examples are HttpContext storage, Execution context, Thread local.</summary>
-    public interface IScopeContext
+    public interface IScopeContext : IDisposable
     {
         /// <summary>Name associated with context root scope - so the reuse may find scope context.</summary>
         string RootScopeName { get; }
@@ -6203,9 +6188,6 @@ namespace DryIoc
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
     public interface IContainer : IRegistrator, IResolver, IDisposable
     {
-        /// <summary>Returns true if container is disposed.</summary>
-        bool IsDisposed { get; }
-
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef ContainerWeakRef { get; }
 
@@ -6729,6 +6711,7 @@ namespace DryIoc
         /// <summary>Throws if object is null.</summary>
         /// <param name="obj">object to check.</param><param name="message">Error message.</param>
         /// <returns>object if not null.</returns>
+        /// <remarks>Called from generate code.</remarks>
         public static object ThrowNewErrorIfNull(this object obj, string message)
         {
             if (obj == null) It(Error.Of(message));
@@ -7968,13 +7951,6 @@ namespace DryIoc
         public T Swap(Func<T, T> getNewValue)
         {
             return Ref.Swap(ref _value, getNewValue);
-        }
-
-        /// <summary>Simplified version of Swap ignoring old value.</summary>
-        /// <param name="newValue">New value to set</param> <returns>Old value.</returns>
-        public T Swap(T newValue)
-        {
-            return Interlocked.Exchange(ref _value, newValue);
         }
 
         private T _value;

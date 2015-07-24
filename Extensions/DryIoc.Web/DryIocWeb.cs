@@ -71,7 +71,7 @@ namespace DryIoc.Web
 
     /// <summary>Stores current scope in <see cref="HttpContext.Items"/>.</summary>
     /// <remarks>Stateless context, so could be created multiple times and used from different places without side-effects.</remarks>
-    public sealed class HttpContextScopeContext : IScopeContext
+    public sealed class HttpContextScopeContext : IScopeContext, IDisposable
     {
         /// <summary>Provides default context items dictionary using <see cref="HttpContext.Current"/>.
         /// Could be overridden with any key-value dictionary where <see cref="HttpContext"/> is not available, e.g. in tests.</summary>
@@ -107,6 +107,9 @@ namespace DryIoc.Web
             _getContextItems()[_currentScopeEntryKey] = newCurrentScope;
             return newCurrentScope;
         }
+
+        /// <summary>Nothing to dispose.</summary>
+        public void Dispose() { }
 
         private readonly string _currentScopeEntryKey;
         private readonly Func<IDictionary> _getContextItems;

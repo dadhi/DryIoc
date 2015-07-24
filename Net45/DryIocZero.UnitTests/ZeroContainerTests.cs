@@ -80,7 +80,7 @@ namespace DryIocZero.UnitTests
             var ex = Assert.Throws<ContainerException>(
                 () => container.ResolveDefault(typeof(NotRegistered), false));
 
-            Assert.AreEqual(ex.Error, Error.UnableToResolveService);
+            Assert.AreEqual(ex.Error, Error.UnableToResolveDefaultService);
         }
 
         [Test]
