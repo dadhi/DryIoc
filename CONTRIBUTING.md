@@ -16,7 +16,7 @@ It may in a form of:
 
 ### Build from command line
 
-__Before sending me PR__ please build solution with _build.bat_ located in root folder.
+Before sending me Pull Request please build solution with _build.bat_ located in root folder.
 
 It will build all projects, will run unit tests with coverage, and will create NuGet packages.
 
@@ -26,11 +26,12 @@ Ensure that there are no project build errors or failing tests. Also check packa
 
 Open _DryIoc.sln_ located in root folder to develop in Visual Studio 2013. 
 
-Solution combines projects from all supported platform starting from .NET 3.5 (may be changed in future).
+Solution combines projects for all supported platforms starting from .NET 3.5 (may be changed in future).
 
-__Hint:__ To simplify development you may unload projects under solution root and platform folders except the one default platform you are working with. Usually in development mode I am unloading all except projects in _Net45_ and _Extensions_ folder. But before commit run _build.bat_ which builds for all platforms.
+__HINT:__ To simplify development you may unload projects under solution root and platform folders except the one platform you are working with.  
+Usually I am unloading everything except projects in _Net45_ and _Extensions_ folders. But before commit I do run _build.bat_ which builds all platforms.
 
-__Hint:__ Solution is configured to be built and run Unit Tests continuously with [NCrunch](http://www.ncrunch.net/). That's how I am usually develop - very rarely building project by hand.
+__HINT:__ Solution is configured to be built and run Unit Tests continuously with [NCrunch](http://www.ncrunch.net/). That's how I am usually develop - very rarely building project manually.
 
 ### FAQ
 
