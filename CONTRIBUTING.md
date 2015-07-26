@@ -4,7 +4,7 @@
 
 Your contribution to the DryIoc project and extensions is greatly appreciated.
 
-It may in a form of:
+It may come in a form of:
 
 - Comments to existing issues.
 - New issues.
