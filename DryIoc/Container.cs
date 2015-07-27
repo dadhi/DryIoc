@@ -2616,7 +2616,7 @@ namespace DryIoc
         private static ServiceDetails GetArgServiceDetails(MethodCallExpression methodCallExpr,
             Type dependencyType, IfUnresolved defaultIfUnresolved, object defaultValue)
         {
-            var requiredServiceType = methodCallExpr.Method.GetGenericArguments()[0];
+            var requiredServiceType = methodCallExpr.Method.GetGenericArguments().Last();
             if (requiredServiceType == dependencyType)
                 requiredServiceType = null;
 
@@ -2656,6 +2656,7 @@ namespace DryIoc
 
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
     /// Its methods are NOT actually called, they just used to reflect service info from call expression.</summary>
+    [SuppressMessage("ReSharper", "UnusedTypeParameter", Justification = "Type parameter is used by reflection.")]
     public static class Arg
     {
         /// <summary>Specifies required service type of parameter or member. If required type is the same as parameter/member type,
@@ -2664,11 +2665,22 @@ namespace DryIoc
         /// <returns>Returns some (ignored) value.</returns>
         public static TRequired Of<TRequired>() { return default(TRequired); }
 
+        /// <summary>Specifies both service and required service types.</summary>
+        /// <typeparam name="TService">Service type.</typeparam> <typeparam name="TRequired">Required service type.</typeparam>
+        /// <returns>Ignored default of Service type.</returns>
+        public static TService Of<TService, TRequired>() { return default(TService); }
+
         /// <summary>Specifies required service type of parameter or member. Plus specifies if-unresolved policy.</summary>
         /// <typeparam name="TRequired">Required service type if different from parameter/member type.</typeparam>
         /// <param name="ifUnresolved">Defines to throw or to return default if unresolved.</param>
         /// <returns>Returns some (ignored) value.</returns>
         public static TRequired Of<TRequired>(IfUnresolved ifUnresolved) { return default(TRequired); }
+
+        /// <summary>Specifies both service and required service types.</summary>
+        /// <typeparam name="TService">Service type.</typeparam> <typeparam name="TRequired">Required service type.</typeparam>
+        /// <param name="ifUnresolved">Defines to throw or to return default if unresolved.</param>
+        /// <returns>Ignored default of Service type.</returns>
+        public static TService Of<TService, TRequired>(IfUnresolved ifUnresolved) { return default(TService); }
 
         /// <summary>Specifies required service type of parameter or member. Plus specifies service key.</summary>
         /// <typeparam name="TRequired">Required service type if different from parameter/member type.</typeparam>
@@ -2676,12 +2688,25 @@ namespace DryIoc
         /// <returns>Returns some (ignored) value.</returns>
         public static TRequired Of<TRequired>(object serviceKey) { return default(TRequired); }
 
+        /// <summary>Specifies both service and required service types.</summary>
+        /// <typeparam name="TService">Service type.</typeparam> <typeparam name="TRequired">Required service type.</typeparam>
+        /// <param name="serviceKey">Service key object.</param>
+        /// <returns>Ignored default of Service type.</returns>
+        public static TService Of<TService, TRequired>(object serviceKey) { return default(TService); }
+
         /// <summary>Specifies required service type of parameter or member. Plus specifies if-unresolved policy. Plus specifies service key.</summary>
         /// <typeparam name="TRequired">Required service type if different from parameter/member type.</typeparam>
         /// <param name="ifUnresolved">Defines to throw or to return default if unresolved.</param>
         /// <param name="serviceKey">Service key object.</param>
         /// <returns>Returns some (ignored) value.</returns>
         public static TRequired Of<TRequired>(IfUnresolved ifUnresolved, object serviceKey) { return default(TRequired); }
+
+        /// <summary>Specifies both service and required service types.</summary>
+        /// <typeparam name="TService">Service type.</typeparam> <typeparam name="TRequired">Required service type.</typeparam>
+        /// <param name="ifUnresolved">Defines to throw or to return default if unresolved.</param>
+        /// <param name="serviceKey">Service key object.</param>
+        /// <returns>Ignored default of Service type.</returns>
+        public static TService Of<TService, TRequired>(IfUnresolved ifUnresolved, object serviceKey) { return default(TService); }
 
         /// <summary>Specifies argument index starting from 0 to use corresponding custom value factory, 
         /// similar to String.Format <c>"{0}, {1}, etc"</c>.</summary>
@@ -6448,7 +6473,7 @@ namespace DryIoc
 
             UnableToResolveUnknownService = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
-                "Please register service or specify Rules.WithUnknownServiceResolver."),
+                "Please register service or specify Rules.WithUnknownServiceResolvers."),
             UnableToResolveFromRegisteredServices = Of(
                 "Unable to resolve {0}" + Environment.NewLine +
                 "Where CurrentScope={1}" + Environment.NewLine +

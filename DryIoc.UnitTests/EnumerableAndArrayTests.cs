@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows.Input;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 

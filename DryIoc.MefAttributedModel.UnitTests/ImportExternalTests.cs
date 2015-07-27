@@ -41,18 +41,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void I_can_specify_metadata()
-        {
-            var container = new Container().WithMefAttributedModel();
-            container.RegisterExports(typeof(MyCode));
-
-            var code = container.Resolve<MyCode>();
-
-            Assert.That(code.Tool, Is.Not.Null);
-            Assert.That(code.ToolMeta, Is.EqualTo(MineMeta.Green));
-        }
-
-        [Test]
         public void I_can_import_or_export_fields_and_properties_as_well()
         {
             var container = new Container().WithMefAttributedModel();

@@ -135,19 +135,19 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export(typeof(IDecoratedResult)), TransientReuse, AsDecorator]
-    public class LazyDecorator : IDecoratedResult
+    [Export(typeof(IDecoratedResult)), TransientReuse, AsDecorator, AsResolutionRoot]
+    public class DynamicDecorator : IDecoratedResult
     {
-        private readonly Lazy<IDecoratedResult> _decorated;
+        private readonly IDecoratedResult _decorated;
 
-        public LazyDecorator(Lazy<IDecoratedResult> decorated)
+        public DynamicDecorator(IDecoratedResult decorated)
         {
             _decorated = decorated;
         }
 
         public int GetResult()
         {
-            return _decorated.Value.GetResult() + 1;
+            return _decorated.GetResult() + 1;
         }
     }
 }

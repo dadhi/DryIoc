@@ -48,27 +48,6 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    public enum MineMeta
-    {
-        Red,
-        Green
-    };
-
-    [ExportMany]
-    public class MyCode
-    {
-        public ExternalTool Tool { get; set; }
-        public MineMeta ToolMeta { get; set; }
-
-        public MyCode(
-            [ImportExternal(Metadata = MineMeta.Green, ConstructorSignature = new Type[0])] 
-            Meta<Lazy<ExternalTool>, MineMeta> tool)
-        {
-            Tool = tool.Value.Value;
-            ToolMeta = tool.Metadata;
-        }
-    }
-
     [ExportMany]
     public class ServiceWithFieldAndProperty
     {

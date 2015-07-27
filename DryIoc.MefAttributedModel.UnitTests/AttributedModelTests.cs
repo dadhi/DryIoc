@@ -176,11 +176,11 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Importing_LazyEnumerable()
         {
-            var container = new Container(r => r.WithMefAttributedModel());
+            var container = new Container(r => r.WithMefAttributedModel().WithResolveIEnumerableAsLazyEnumerable());
             container.RegisterExports(typeof(UseLazyEnumerable), typeof(Me));
 
-            Assert.IsInstanceOf<Me>(
-                container.Resolve<UseLazyEnumerable>().Mes.FirstOrDefault());
+            Assert.IsInstanceOf<LazyEnumerable<Me>>(
+                container.Resolve<UseLazyEnumerable>().Mes);
         }
 
         [Test]
