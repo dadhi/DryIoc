@@ -4610,7 +4610,7 @@ namespace DryIoc
             {
                 var weakRefExpr = Expression.Convert(getScopedServiceExpr, typeof(WeakReference));
                 var weakRefTargetExpr = Expression.Property(weakRefExpr, "Target");
-                var throwIfTargetNullExpr = Expression.Call(typeof(Throw), "ThrowNewErrorIfNull", ArrayTools.Empty<Type>(),
+                var throwIfTargetNullExpr = Expression.Call(typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull", ArrayTools.Empty<Type>(),
                     weakRefTargetExpr, Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
                 getScopedServiceExpr = throwIfTargetNullExpr;
             }
@@ -6707,14 +6707,17 @@ namespace DryIoc
         {
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
+    }
 
+    /// <summary>Called from generated code.</summary>
+    public static class ThrowInGeneratedCode
+    {
         /// <summary>Throws if object is null.</summary>
         /// <param name="obj">object to check.</param><param name="message">Error message.</param>
         /// <returns>object if not null.</returns>
-        /// <remarks>Called from generate code.</remarks>
         public static object ThrowNewErrorIfNull(this object obj, string message)
         {
-            if (obj == null) It(Error.Of(message));
+            if (obj == null) Throw.It(Error.Of(message));
             return obj;
         }
     }

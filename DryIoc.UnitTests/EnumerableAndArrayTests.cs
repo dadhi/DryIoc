@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows.Input;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -206,5 +207,23 @@ namespace DryIoc.UnitTests
 
             Assert.That(funcs.Length, Is.EqualTo(2));
         }
+
+        [Test]
+        public void Resolve_generic_wrappers()
+        {
+            var container = new Container();
+            container.Register<ICmd, X>();
+            container.Register<ICmd, Y>();
+            container.Register(typeof(MenuItem<>), setup: Setup.Wrapper);
+
+            var items = container.Resolve<MenuItem<ICmd>[]>();
+
+            Assert.AreEqual(2, items.Length);
+        }
+
+        public interface ICmd { }
+        public class X : ICmd { }
+        public class Y : ICmd { }
+        public class MenuItem<T> where T : ICmd { }
     }
 }

@@ -519,6 +519,25 @@ namespace DryIocZero
         IScope SetCurrent(SetCurrentScopeHandler setCurrentScope);
     }
 
+    /// <summary>Provides scope context by convention.</summary>
+    public static partial class ScopeContext
+    {
+        /// <summary>Default scope context.</summary>
+        public static IScopeContext Default
+        {
+            get
+            {
+                if (_default == null)
+                    GetDefaultScopeContext(ref _default);
+                return _default;
+            }
+        }
+
+        static partial void GetDefaultScopeContext(ref IScopeContext resultContext);
+
+        private static IScopeContext _default;
+    }
+
     /// <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="Ref.Swap{T}"/>.</summary>
     /// <typeparam name="T">Type of object to wrap.</typeparam>
     public sealed class Ref<T> where T : class
@@ -1323,14 +1342,17 @@ namespace DryIocZero
             if (condition) It(error, args);
             return null;
         }
+    }
 
+    /// <summary>Called from generated code.</summary>
+    public static class ThrowInGeneratedCode
+    {
         /// <summary>Throws if object is null.</summary>
         /// <param name="obj">object to check.</param><param name="message">Error message.</param>
         /// <returns>object if not null.</returns>
-        /// <remarks>Called from generate code.</remarks>
         public static object ThrowNewErrorIfNull(this object obj, string message)
         {
-            if (obj == null) It(Error.Of(message));
+            if (obj == null) Throw.It(Error.Of(message));
             return obj;
         }
     }
