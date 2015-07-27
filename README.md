@@ -1,4 +1,4 @@
-DryIoc is small, fast, capable IoC Container for .NET
+DryIoc is small, fast, and capable IoC Container for .NET
 =====================================================
 
 [![Build status](https://ci.appveyor.com/api/projects/status/te0oktwwf7xx5e3k/branch/dev)](https://ci.appveyor.com/project/MaksimVolkau/dryioc-426/branch/dev)
