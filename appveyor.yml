@@ -22,7 +22,7 @@ build_script:
 on_success:
   - ps: >-
         Write-Host $env:APPVEYOR_REPO_BRANCH
-        .\packages\coveralls.net.0.5.0\csmacnz.Coveralls.exe --opencover -i ./bin/Reports/Coverage.xml --repoToken $env:COVERALLS_REPO_TOKEN
+        .\packages\coveralls.net.0.6.0-beta0001\csmacnz.Coveralls.exe --opencover -i ./bin/Reports/Coverage.xml --repoToken $env:COVERALLS_REPO_TOKEN
 
 nuget:
   account_feed: true

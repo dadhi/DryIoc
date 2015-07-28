@@ -28,7 +28,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 
-namespace DryIocZero
+namespace DryIoc
 {
     /// <summary>Minimal container which allow to register service factory delegates and then resolve service from them.</summary>
     [SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly", Justification = "Does not contain any unmanaged resources.")]

@@ -69,7 +69,7 @@ namespace DryIoc
         public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
         {
             var oldScope = GetCurrentOrDefault();
-            var newScope = setCurrentScope.ThrowIfNull()(oldScope);
+            var newScope = setCurrentScope(oldScope);
             var scopeEntry = newScope == null ? null : new ScopeEntry<IScope>(newScope);
             CallContext.LogicalSetData(_currentScopeEntryKey, scopeEntry);
             return newScope;

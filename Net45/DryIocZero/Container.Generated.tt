@@ -27,7 +27,7 @@ THE SOFTWARE.
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.dll" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.dll" #>
-<#@ assembly Name="$(ProjectDir)\..\bin\Release\ExpressionToCodeLib.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import namespace="System.Linq.Expressions" #>
@@ -92,14 +92,14 @@ using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;
 
-namespace DryIocZero
+namespace DryIoc
 {
 /* 
 Exceptions during resolution:
 -----------------------------
 <#
     if (exceptions.Count == 0)
-        WriteLine("no exceptions");
+        WriteLine("All is fine");
     foreach (var ex in exceptions)
     {
 #>
