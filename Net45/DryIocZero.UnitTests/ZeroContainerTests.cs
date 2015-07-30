@@ -1,6 +1,5 @@
 ﻿using System.Linq;
 using NUnit.Framework;
-using DryIoc;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 
 namespace DryIocZero.UnitTests

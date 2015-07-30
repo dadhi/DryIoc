@@ -28,7 +28,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 
-namespace DryIoc
+namespace DryIocZero
 {
     /// <summary>Minimal container which allow to register service factory delegates and then resolve service from them.</summary>
     [SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly", Justification = "Does not contain any unmanaged resources.")]
@@ -1304,7 +1304,7 @@ namespace DryIoc
     }
 
     /// <summary>Zero container exception.</summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage",
+    [SuppressMessage("Microsoft.Usage",
         "CA2237:MarkISerializableTypesWithSerializable",
         Justification = "Not available in PCL.")]
     public class ContainerException : InvalidOperationException

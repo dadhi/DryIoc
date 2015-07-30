@@ -549,11 +549,20 @@ namespace DryIoc
             if (registrations.Length != 0)
             {
                 var currentScope = ((IScopeAccess)this).GetCurrentScope();
-                Throw.It(Error.UnableToResolveFromRegisteredServices, request, currentScope, request.Scope, registrations);
+
+                Throw.It(Error.UnableToResolveFromRegisteredServices, request, 
+                    currentScope, request.Scope, registrations);
             }
             else
             {
-                Throw.It(Error.UnableToResolveUnknownService, request);
+                var customUnknownServiceResolversCount = 
+                    (Rules.UnknownServiceResolvers ?? ArrayTools.Empty<Rules.UnknownServiceResolver>())
+                    .Except(Rules.Default.UnknownServiceResolvers).Count();
+                
+                var fallbackContainersCount = (Rules.FallbackContainers ?? ArrayTools.Empty<ContainerWeakRef>()).Length;
+
+                Throw.It(Error.UnableToResolveUnknownService, request, 
+                    fallbackContainersCount, customUnknownServiceResolversCount);
             }
         }
 
@@ -1432,9 +1441,80 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>Extension methods for automating common use-cases.</summary>
+    /// <summary>Convenient methods that require container.</summary>
     public static class ContainerTools
     {
+        /// <summary>For given instance resolves and sets properties and fields.
+        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
+        /// or if rules are not set it uses <see cref="PropertiesAndFields.Auto"/>, 
+        /// or you can specify your own rules with <paramref name="propertiesAndFields"/> parameter.</summary>
+        /// <typeparam name="TService">Input and returned instance type.</typeparam>Service (wrapped)
+        /// <param name="container">Usually a container instance, cause <see cref="Container"/> implements <see cref="IResolver"/></param>
+        /// <param name="instance">Service instance with properties to resolve and initialize.</param>
+        /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
+        /// <returns>Input instance with resolved dependencies, to enable fluent method composition.</returns>
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.And"/> method.</remarks>        
+        public static TService InjectPropertiesAndFields<TService>(this IContainer container,
+            TService instance, PropertiesAndFieldsSelector propertiesAndFields = null)
+        {
+            return (TService)container.InjectPropertiesAndFields(instance, propertiesAndFields);
+        }
+
+        /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
+        /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
+        /// <param name="concreteType">Type to instantiate.</param>
+        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        public static object New(this IContainer container, Type concreteType, Made made = null)
+        {
+            concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UnableToNewOpenGeneric);
+            var factory = new ReflectionFactory(concreteType, null, made, Setup.With(cacheFactoryExpression: false));
+            factory.ThrowIfInvalidRegistration(container, concreteType, null, isStaticallyChecked: false);
+            var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).WithResolvedFactory(factory);
+            var factoryDelegate = factory.GetDelegateOrDefault(request);
+            var service = factoryDelegate(container.ResolutionStateCache, container.ContainerWeakRef, null);
+            return service;
+        }
+
+        /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
+        /// <typeparam name="T">Type to instantiate.</typeparam>
+        /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
+        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        public static T New<T>(this IContainer container, Made made = null)
+        {
+            return (T)container.New(typeof(T), made);
+        }
+
+        /// <summary>Register new service type with factory for registered service type. 
+        /// Throw if no such registered service type in container.</summary>
+        /// <param name="container">Container</param> <param name="serviceType">New service type.</param>
+        /// <param name="registeredServiceType">Existing registered service type.</param>
+        /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
+        /// <remarks>Does nothing if registration is already exists.</remarks>
+        public static void RegisterMapping(this IContainer container, Type serviceType, Type registeredServiceType, 
+            object serviceKey = null, object registeredServiceKey = null)
+        {
+            var request = container.EmptyRequest.Push(registeredServiceType, registeredServiceKey);
+            var factory = container.GetServiceFactoryOrDefault(request);
+            factory.ThrowIfNull(Error.RegisterMappingNotFoundRegisteredService,
+                registeredServiceType, registeredServiceKey);
+            container.Register(factory, serviceType, serviceKey, IfAlreadyRegistered.Keep, false);
+        }
+
+        /// <summary>Register new service type with factory for registered service type. 
+        /// Throw if no such registered service type in container.</summary>
+        /// <param name="container">Container</param>
+        /// <typeparam name="TService">New service type.</typeparam>
+        /// <typeparam name="TRegisteredService">Existing registered service type.</typeparam>
+        /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
+        /// <remarks>Does nothing if registration is already exists.</remarks>
+        public static void RegisterMapping<TService, TRegisteredService>(this IContainer container,
+            object serviceKey = null, object registeredServiceKey = null)
+        {
+            container.RegisterMapping(typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
+        }
+
         /// <summary>Adds rule to register unknown service when it is resolved.</summary>
         /// <param name="container">Container to add rule to.</param>
         /// <param name="implTypes">Provider of implementation types.</param>
@@ -1941,7 +2021,7 @@ namespace DryIoc
     }
 
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
-    public sealed partial class Rules
+    public sealed class Rules
     {
         /// <summary>No rules specified.</summary>
         /// <remarks>Rules <see cref="UnknownServiceResolvers"/> are empty too.</remarks>
@@ -3368,48 +3448,6 @@ namespace DryIoc
             return behavior == ResolveManyBehavior.AsLazyEnumerable
                 ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, null, null).Cast<TService>()
                 : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
-        }
-
-        /// <summary>For given instance resolves and sets properties and fields.
-        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses <see cref="PropertiesAndFields.Auto"/>, 
-        /// or you can specify your own rules with <paramref name="propertiesAndFields"/> parameter.</summary>
-        /// <typeparam name="TService">Input and returned instance type.</typeparam>Service (wrapped)
-        /// <param name="container">Usually a container instance, cause <see cref="Container"/> implements <see cref="IResolver"/></param>
-        /// <param name="instance">Service instance with properties to resolve and initialize.</param>
-        /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
-        /// <returns>Input instance with resolved dependencies, to enable fluent method composition.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.And"/> method.</remarks>        
-        public static TService InjectPropertiesAndFields<TService>(this IContainer container,
-            TService instance, PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            return (TService)container.InjectPropertiesAndFields(instance, propertiesAndFields);
-        }
-
-        /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
-        /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
-        /// <param name="concreteType">Type to instantiate.</param>
-        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
-        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
-        public static object New(this IContainer container, Type concreteType, Made made = null)
-        {
-            concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UnableToNewOpenGeneric);
-            var factory = new ReflectionFactory(concreteType, null, made, Setup.With(cacheFactoryExpression: false));
-            factory.ThrowIfInvalidRegistration(container, concreteType, null, isStaticallyChecked: false);
-            var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).WithResolvedFactory(factory);
-            var factoryDelegate = factory.GetDelegateOrDefault(request);
-            var service = factoryDelegate(container.ResolutionStateCache, container.ContainerWeakRef, null);
-            return service;
-        }
-
-        /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
-        /// <typeparam name="T">Type to instantiate.</typeparam>
-        /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
-        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
-        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
-        public static T New<T>(this IContainer container, Made made = null)
-        {
-            return (T)container.New(typeof(T), made);
         }
 
         internal static Expression CreateResolutionExpression(Request request,
@@ -4968,7 +5006,7 @@ namespace DryIoc
 
                     if (implType != serviceType && serviceType != typeof(object) &&
                         Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1)
-                        Throw.It(Error.ImplementationIsNotAssignableToServiceType, implType, serviceType);
+                        Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
                 }
                 else if (implType != serviceType)
                 {
@@ -4988,7 +5026,7 @@ namespace DryIoc
                         }
 
                         if (!implementedTypeFound)
-                            Throw.It(Error.ImplementationIsNotAssignableToServiceType, implType, serviceType);
+                            Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
 
                         if (!containsAllTypeParams)
                             Throw.It(Error.RegisteringOpenGenericServiceWithMissingTypeArgs,
@@ -6473,17 +6511,21 @@ namespace DryIoc
 
             UnableToResolveUnknownService = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
-                "Please register service or specify Rules.WithUnknownServiceResolvers."),
+                "Where no service registrations found" + Environment.NewLine +
+                "  and number of Rules.FallbackContainers: {1}" + Environment.NewLine +
+                "  and number of Rules.UnknownServiceResolvers: {2}"),
+
             UnableToResolveFromRegisteredServices = Of(
                 "Unable to resolve {0}" + Environment.NewLine +
-                "Where CurrentScope={1}" + Environment.NewLine +
-                "  and ResolutionScope={2}" + Environment.NewLine +
-                "Found registrations:" + Environment.NewLine + "{3}"),
+                "Where CurrentScope: {1}" + Environment.NewLine +
+                "  and ResolutionScope: {2}" + Environment.NewLine +
+                "  and Found registrations:" + Environment.NewLine + "{3}"),
+
             ExpectedSingleDefaultFactory = Of(
                 "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
-            ImplementationIsNotAssignableToServiceType = Of(
-                "Implementation type {0} should be assignable to service type {1} but it is not."),
+            RegisterImplementationNotAssignableToServiceType = Of(
+                "Registering implementation type {0} not assignable to service type {1}."),
             MadeOfTypeNotAssignableToImplementationType = Of(
                 "Factory method made-of-type {1} should be assignable to implementation type {0} but it is not."),
             RegisteringOpenGenericRequiresFactoryProvider = Of(
@@ -6601,7 +6643,9 @@ namespace DryIoc
             ArgOfValueIndesIsOutOfProvidedArgValues = Of(
                 "Arg.OfValue index {0} is outside of provided value factories: {1}"),
             ResolutionNeedsRequiredServiceType = Of(
-                "Expecting required service type but it is not specified when resolving: {0}");
+                "Expecting required service type but it is not specified when resolving: {0}"),
+            RegisterMappingNotFoundRegisteredService = Of(
+                "When registering mapping unable to find factory of registered service type {0} and key {1}.");
 #pragma warning restore 1591 // "Missing XML-comment"
 
         /// <summary>Stores new error message and returns error code for it.</summary>

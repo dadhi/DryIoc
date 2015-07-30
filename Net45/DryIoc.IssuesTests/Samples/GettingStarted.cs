@@ -58,7 +58,9 @@ namespace DryIoc.IssuesTests.Samples
             Assert.That(ex.Message, Is.EqualTo(
 @"Unable to resolve DryIoc.IssuesTests.Samples.IService as parameter ""service""
   in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient.
-Please register service or specify Rules.WithUnknownServiceResolvers."));
+Where no service registrations found
+  and number of Rules.FallbackContainers: 0
+  and number of Rules.UnknownServiceResolvers: 0"));
         }
 
         [Test]

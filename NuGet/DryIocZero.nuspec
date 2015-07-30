@@ -17,14 +17,12 @@
         <dependencies>
             <dependency id="DryIoc.dll" version="(1.5,3.0.0)" />
             <dependency id="DryIoc.MefAttributedModel.dll" version="(1.5,3.0.0)" />
-            <dependency id="ExpressionToCodeLib" version="[1.5.2,2.0.0)" />
+            <dependency id="ExpressionToCodeLib" version="[1.5.4,2.0.0)" />
         </dependencies>
         <frameworkAssemblies>
             <frameworkAssembly assemblyName="System.ComponentModel.Composition" />
         </frameworkAssemblies>
-        <references>
-            <!-- No explicit references in run-time, because dependencies are only needed in compile-time. -->
-        </references>
+        <references /> <!-- Dependencies required only in Compile-time. -->
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />

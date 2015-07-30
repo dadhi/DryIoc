@@ -25,8 +25,9 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.dll" #>
-<#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.0.0-rc3build300\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.2.0.0-rc3build300\lib\net45\DryIocAttributes.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0-rc3build300\lib\net45\DryIoc.MefAttributedModel.dll" #>
 <#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import Namespace="System.Linq" #>
@@ -37,14 +38,7 @@ THE SOFTWARE.
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
-
 <#
-/* 
-requires assemblies:
-$(SolutionDir)packages\DryIoc.dll.2.0.0\lib\net45\DryIoc.dll
-$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0\lib\net45\DryIoc.MefAttributedModel.dll
-$(SolutionDir)packages\ExpressionToCodeLib.1.5.2.0\lib\net40-Client\ExpressionToCodeLib.dll
-*/
 
 var container = new Container(rules => rules
     .WithoutSingletonOptimization()
@@ -92,7 +86,7 @@ using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;
 
-namespace DryIoc
+namespace DryIocZero
 {
 /* 
 Exceptions during resolution:
