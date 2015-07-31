@@ -30,7 +30,6 @@
         <!--net45-->
         <file src="..\Net45\DryIocZero\Container.cs" target="content\net45\DryIocZero" />
         <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\net45\DryIocZero" />
-        <file src="..\Net45\DryIoc\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIocZero" />
-
+        <file src="..\Net45\DryIocZero\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIocZero" />
     </files>
 </package>

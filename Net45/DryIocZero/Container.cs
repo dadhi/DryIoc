@@ -79,10 +79,10 @@ namespace DryIocZero
             object service = null;
             if (_defaultFactories.Value.IsEmpty)
                 ResolveGenerated(ref service, serviceType, null);
-            return service ?? ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault);
+            return service ?? ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault, null);
         }
 
-        private object ResolveDefaultFromRuntimeRegistrationsFirst(Type serviceType, bool ifUnresolvedReturnDefault)
+        private object ResolveDefaultFromRuntimeRegistrationsFirst(Type serviceType, bool ifUnresolvedReturnDefault, IScope scope)
         {
             object service = null;
             var factories = _defaultFactories.Value;
@@ -113,7 +113,12 @@ namespace DryIocZero
         {
             object service = null;
             if (_keyedFactories.Value.IsEmpty)
-                ResolveGenerated(ref service, serviceType, serviceKey, scope);
+            {
+                if (serviceKey == null)
+                    ResolveGenerated(ref service, serviceType, scope);
+                else
+                    ResolveGenerated(ref service, serviceType, serviceKey, scope);
+            }
             return service ?? ResolveKeyedFromRuntimeRegistrationsFirst(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, scope);
         }
 
@@ -121,6 +126,9 @@ namespace DryIocZero
             bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
         {
             serviceType = requiredServiceType ?? serviceType;
+            if (serviceKey == null)
+                return ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault, scope);
+
             var keyedFactories = _keyedFactories.Value.GetValueOrDefault(serviceType);
             if (keyedFactories != null)
             {
