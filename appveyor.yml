@@ -2,10 +2,6 @@ version: 2.0.0.{build}
 os: Windows Server 2012
 test: off
 
-environment:
-  COVERALLS_REPO_TOKEN:
-    secure: wbdO3ggQGIggpCZU0oZiL2C6rQKf+ksiGllDbLD46fpC2eLyqnsmv4+LnG0bWVYA
-
 assembly_info:
   patch: true
   file: AssemblyInfo.*
@@ -18,11 +14,6 @@ artifacts:
 
 build_script:
   - .\BuildScripts\_main.bat -nopause
-
-on_success:
-  - ps: >-
-        Write-Host $env:APPVEYOR_REPO_BRANCH
-        .\packages\coveralls.net.0.6.0-beta0001\csmacnz.Coveralls.exe --opencover -i ./bin/Reports/Coverage.xml --repoToken $env:COVERALLS_REPO_TOKEN
 
 nuget:
   account_feed: true

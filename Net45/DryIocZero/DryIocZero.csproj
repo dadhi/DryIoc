@@ -43,7 +43,6 @@
     <Compile Include="AsyncExecutionFlowScopeContext.cs" />
     <Compile Include="Container.Generated.cs">
       <DependentUpon>Container.Generated.tt</DependentUpon>
-      <SubType>Code</SubType>
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
     </Compile>
@@ -62,11 +61,13 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Container.Generated.tt">
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Container.Generated.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>Container.Generated.cs</LastGenOutput>
-    </None>
-    <None Include="packages.config" />
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
