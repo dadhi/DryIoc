@@ -350,9 +350,6 @@ namespace DryIoc.MefAttributedModel
                 }
             }
 
-            if (info.FactoryType == FactoryType.Decorator)
-                info.Reuse = ReuseType.Transient;
-
             info.Exports.ThrowIfNull(Error.NoExport, implementationType);
             return info;
         }

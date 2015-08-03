@@ -168,7 +168,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_support_decorator_implementation_without_decorated_service_argument_in_constructor_for_reused_service()
+        public void Replacing_decorator_reuse_may_different_from_decorated_service()
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>(Reuse.Singleton);
@@ -178,7 +178,34 @@ namespace DryIoc.UnitTests
             var second = container.Resolve<IOperation>();
 
             Assert.That(first, Is.InstanceOf<AnotherOperation>());
+            Assert.That(first, Is.Not.SameAs(second));
+        }
+
+        [Test]
+        public void Replacing_decorator_may_be_non_transient()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.Register<IOperation, AnotherOperation>(Reuse.Singleton, setup: Setup.Decorator);
+
+            var first = container.Resolve<IOperation>();
+            var second = container.Resolve<IOperation>();
+
+            Assert.That(first, Is.InstanceOf<AnotherOperation>());
             Assert.That(first, Is.SameAs(second));
+        }
+
+        [Test]
+        public void Normal_decorator_may_be_non_transient()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, RetryOperationDecorator>(Reuse.Singleton, setup: Setup.Decorator);
+
+            var operation = container.Resolve<IOperation>();
+
+            Assert.That(operation, Is.InstanceOf<RetryOperationDecorator>());
+            Assert.That(((RetryOperationDecorator)operation).Decorated, Is.InstanceOf<SomeOperation>());
         }
 
         [Test]
@@ -190,7 +217,6 @@ namespace DryIoc.UnitTests
             container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
-            //var operationExpr = container.Resolve<DebugExpression<IOperation>>();
 
             Assert.That(operation, Is.InstanceOf<RetryOperationDecorator>());
             Assert.That(((RetryOperationDecorator)operation).Decorated, Is.InstanceOf<AnotherOperation>());
@@ -386,6 +412,43 @@ namespace DryIoc.UnitTests
             var decoratedFunc = ((FuncWithArgDecorator)operation).DecoratedFunc("hey");
             Assert.That(decoratedFunc, Is.InstanceOf<ParameterizedOperation>());
         }
+
+        [Test]
+        public void May_decorate_func_of_service()
+        {
+            var container = new Container();
+
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.Decorator);
+
+            var a = container.Resolve<IOperation>();
+            Assert.IsInstanceOf<AsyncOperationDecorator>(a);
+
+            var decorated = ((AsyncOperationDecorator)a).Decorated();
+            Assert.IsInstanceOf<SomeOperation>(decorated);
+        }
+
+        [Test]
+        public void May_next_func_decorator_inside_other_deocrator()
+        {
+            var container = new Container();
+
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.Register<IOperation, AsyncOperationDecorator>(Reuse.Singleton, setup: Setup.Decorator);
+            container.Register<IOperation, RetryOperationDecorator>(Reuse.Singleton, setup: Setup.Decorator);
+
+            var a = container.Resolve<IOperation>();
+            Assert.IsInstanceOf<RetryOperationDecorator>(a);
+
+            var nestedDecorator = ((RetryOperationDecorator)a).Decorated;
+            Assert.IsInstanceOf<AsyncOperationDecorator>(nestedDecorator);
+
+            var getOp = ((AsyncOperationDecorator)nestedDecorator).Decorated;
+
+            var decorated = getOp();
+            Assert.IsInstanceOf<SomeOperation>(decorated);
+            Assert.AreSame(decorated, getOp());
+        }
     }
 
     #region CUT
@@ -470,6 +533,16 @@ namespace DryIoc.UnitTests
         public RetryOperationDecorator(IOperation operation)
         {
             Decorated = operation;
+        }
+    }
+
+    public class AsyncOperationDecorator : IOperation
+    {
+        public readonly Func<IOperation> Decorated;
+
+        public AsyncOperationDecorator(Func<IOperation> a)
+        {
+            Decorated = a;
         }
     }
 
