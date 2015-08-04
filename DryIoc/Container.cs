@@ -537,9 +537,9 @@ namespace DryIoc
             return factory;
         }
 
-        private void ThrowUnableToResolve(Request request)
+        internal static void ThrowUnableToResolve(Request request)
         {
-            var registrations = ((IContainer)this).GetAllServiceFactories(request.ServiceType)
+            var registrations = request.Container.GetAllServiceFactories(request.ServiceType)
                 .Aggregate(new StringBuilder(), (s, f) =>
                     (f.Value.IsMatchingReuseScope(request)
                         ? s.Append("  ")
@@ -548,18 +548,20 @@ namespace DryIoc
 
             if (registrations.Length != 0)
             {
-                var currentScope = ((IScopeAccess)this).GetCurrentScope();
-
+                var currentScope = request.Scopes.GetCurrentScope();
                 Throw.It(Error.UnableToResolveFromRegisteredServices, request, 
                     currentScope, request.Scope, registrations);
             }
             else
             {
+                var rules = request.Container.Rules;
+                  
                 var customUnknownServiceResolversCount = 
-                    (Rules.UnknownServiceResolvers ?? ArrayTools.Empty<Rules.UnknownServiceResolver>())
+                    (rules.UnknownServiceResolvers ?? ArrayTools.Empty<Rules.UnknownServiceResolver>())
                     .Except(Rules.Default.UnknownServiceResolvers).Count();
                 
-                var fallbackContainersCount = (Rules.FallbackContainers ?? ArrayTools.Empty<ContainerWeakRef>()).Length;
+                var fallbackContainersCount = 
+                    (rules.FallbackContainers ?? ArrayTools.Empty<ContainerWeakRef>()).Length;
 
                 Throw.It(Error.UnableToResolveUnknownService, request, 
                     fallbackContainersCount, customUnknownServiceResolversCount);
@@ -2815,16 +2817,16 @@ namespace DryIoc
         /// <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. 
         ///     Default value means no reuse, aka Transient.</param>
-        /// <param name="with">(optional) specifies <see cref="Made"/>.</param>
+        /// <param name="made">(optional) specifies <see cref="Made"/>.</param>
         /// <param name="setup">(optional) Factory setup, by default is (<see cref="Setup.Default"/>)</param>
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register(this IRegistrator registrator, Type serviceType, Type implementationType,
-            IReuse reuse = null, Made with = null, Setup setup = null,
+            IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null)
         {
-            var factory = new ReflectionFactory(implementationType, reuse, with, setup);
+            var factory = new ReflectionFactory(implementationType, reuse, made, setup);
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
         }
 
@@ -2832,16 +2834,16 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="with">(optional) specifies <see cref="Made"/>.</param>
+        /// <param name="made">(optional) specifies <see cref="Made"/>.</param>
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup.Default"/>)</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register(this IRegistrator registrator, Type implementationType,
-            IReuse reuse = null, Made with = null, Setup setup = null,
+            IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null)
         {
-            var factory = new ReflectionFactory(implementationType, reuse, with, setup);
+            var factory = new ReflectionFactory(implementationType, reuse, made, setup);
             registrator.Register(factory, implementationType, serviceKey, ifAlreadyRegistered, false);
         }
 
@@ -3161,7 +3163,7 @@ namespace DryIoc
             registrator.RegisterDelegate(getDecorator, setup: Setup.DecoratorWith(condition));
         }
 
-        /// <summary>Registers an externally created object of <paramref name="serviceType"/>. 
+        /// <summary>Registers an externally created object of<paramref name= "serviceType" />.
         /// If no reuse specified instance will be stored in Singleton Scope, and disposed when container is disposed.</summary>
         /// <param name="container">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceType">Service type to register.</param>
@@ -3176,12 +3178,11 @@ namespace DryIoc
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
             if (instance != null)
-                instance.ThrowIfNotOf(serviceType, Error.RegisteredInstanceIsNotAssignableToServiceType);
+                instance.ThrowIfNotOf(serviceType, 
+                    Error.RegisteredInstanceIsNotAssignableToServiceType);
 
-            Throw.If(reuse is ResolutionScopeReuse, Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
-
-            reuse = reuse ?? Reuse.Singleton;
-            var request = container.EmptyRequest.Push(serviceType, serviceKey);
+            Throw.If(reuse is ResolutionScopeReuse, 
+                Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
 
             var setup = weaklyReferenced && preventDisposal
                 ? WeaklyReferencedHiddenDisposableInstanceSetup
@@ -3189,36 +3190,33 @@ namespace DryIoc
                 : preventDisposal ? HiddenDisposableInstanceSetup
                 : Setup.Default;
 
-            // Wrap instance if re
             if (setup != Setup.Default)
             {
                 if (setup.PreventDisposal)
-                    instance = new [] { instance };
+                    instance = new[] { instance };
                 if (setup.WeaklyReferenced)
                     instance = new WeakReference(instance);
             }
 
-            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace) // Try get existing factory.
-            {
-                var registeredFactory = container.GetServiceFactoryOrDefault(request);
+            reuse = reuse ?? Reuse.Singleton;
 
-                // If existing factory is the same kind: reuse and setup-wise, then we can just replace value in scope.
+            var request = container.EmptyRequest.Push(serviceType, serviceKey);
+            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
+            {
+                var registeredFactory = container.GetServiceFactoryOrDefault(request) as InstanceFactory;
+
+                // If existing instance factory is the same reuse and setup-wise, 
+                // then we can just replace instance in scope.
                 if (registeredFactory != null &&
                     registeredFactory.Reuse == reuse &&
                     registeredFactory.Setup == setup)
                 {
-                    var scope = reuse.GetScopeOrDefault(request)
-                        .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse);
-                    var scopedInstanceId = reuse.GetScopedItemIdOrSelf(registeredFactory.FactoryID, request);
-                    scope.SetOrAdd(scopedInstanceId, instance);
+                    registeredFactory.ReplaceInstance(instance, request);
                     return;
                 }
             }
 
-            // Create factory to locate instance in scope.
-            var instanceFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse, setup);
-            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
-                instanceFactory.FactoryID = -1; // NOTE Nasty hack to distinguish instance factories when replaced.
+            var instanceFactory = new InstanceFactory(instance, reuse, setup);
             if (container.Register(instanceFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
             {
                 var scope = reuse.GetScopeOrDefault(request)
@@ -3228,16 +3226,62 @@ namespace DryIoc
             }
         }
 
+        private sealed class InstanceFactory : Factory
+        {
+            public InstanceFactory(object instance, IReuse reuse, Setup setup) : base(reuse, setup)
+            {
+                _instance = instance;
+            }
+
+            public override Expression GetExpressionOrDefault(Request request)
+            {
+                return CreateExpressionOrDefault(request);
+            }
+
+            public override Expression CreateExpressionOrDefault(Request request)
+            {
+                var scope = Reuse.GetScopeOrDefault(request)
+                    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, _instance, Reuse);
+                var id = scope.GetScopedItemIdOrSelf(FactoryID);
+                scope.GetOrAdd(id, () => _instance);
+
+                var getScopeExpr = Reuse.GetScopeExpression(request);
+                var idExpr = Expression.Constant(id);
+
+                Expression getScopedServiceExpr = Expression.Call(
+                    getScopeExpr, "GetItemOrDefault", ArrayTools.Empty<Type>(), idExpr);
+
+                if (Setup.WeaklyReferenced)
+                {
+                    var weakRefExpr = Expression.Convert(getScopedServiceExpr, typeof(WeakReference));
+                    var weakRefTargetExpr = Expression.Property(weakRefExpr, "Target");
+                    var throwIfTargetNullExpr = Expression.Call(typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull", ArrayTools.Empty<Type>(),
+                        weakRefTargetExpr, Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
+                    getScopedServiceExpr = throwIfTargetNullExpr;
+                }
+
+                if (Setup.PreventDisposal)
+                    getScopedServiceExpr = Expression.ArrayIndex(
+                        Expression.Convert(getScopedServiceExpr, typeof(object[])),
+                        Expression.Constant(0, typeof(int)));
+
+                return Expression.Convert(getScopedServiceExpr, request.ServiceType);
+            }
+
+            public void ReplaceInstance(object instance, Request request)
+            {
+                Interlocked.Exchange(ref _instance, instance);
+                Reuse.GetScopeOrDefault(request)
+                    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, Reuse)
+                    .SetOrAdd(Reuse.GetScopedItemIdOrSelf(FactoryID, request), instance);
+            }
+
+            private object _instance;
+        }
+
         private static readonly Setup WeaklyReferencedInstanceSetup = Setup.With(weaklyReferenced: true);
         private static readonly Setup HiddenDisposableInstanceSetup = Setup.With(preventDisposal: true);
         private static readonly Setup WeaklyReferencedHiddenDisposableInstanceSetup = Setup.With(weaklyReferenced: true, preventDisposal: true);
-
-        private static Expression GetThrowInstanceNoLongerAvailable(Request request)
-        {
-            Expression<Func<object>> throwUnableToResolve = () =>
-                Throw.It(Error.UnableToResolveUnknownService, request.ServiceType, null, null, null);
-            return Expression.Convert(throwUnableToResolve.Body, request.ServiceType);
-        }
 
         /// <summary>Registers an externally created object of <typeparamref name="TService"/>. 
         /// If no reuse specified instance will be stored in Singleton Scope, and disposed when container is disposed.</summary>
@@ -4592,7 +4636,7 @@ namespace DryIoc
             }
 
             if (serviceExpr == null && request.IfUnresolved == IfUnresolved.Throw)
-                Throw.It(Error.UnableToResolveUnknownService, request);
+                Container.ThrowUnableToResolve(request);
 
             return serviceExpr;
         }
@@ -5513,6 +5557,11 @@ namespace DryIoc
         /// it stores only result of <paramref name="createValue"/> call.</remarks>
         object GetOrAdd(int id, CreateScopedValue createValue);
 
+        /// <summary>Gets item or null if nothing stored.</summary>
+        /// <param name="id">Id to search for.</param>
+        /// <returns>Stored item or null.</returns>
+        object GetItemOrDefault(int id);
+
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
         /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
         void SetOrAdd(int id, object item);
@@ -5559,6 +5608,14 @@ namespace DryIoc
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
             return _items.GetValueOrDefault(id) ?? TryGetOrAdd(id, createValue);
+        }
+
+        /// <summary>Gets item or null if nothing stored.</summary>
+        /// <param name="id">Id to search for.</param>
+        /// <returns>Stored item or null.</returns>
+        public object GetItemOrDefault(int id)
+        {
+            return _items.GetValueOrDefault(id);
         }
 
         private object TryGetOrAdd(int id, CreateScopedValue createValue)
@@ -5684,6 +5741,14 @@ namespace DryIoc
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
             return (id < _items.Length ? _items[id] : null) ?? TryGetOrAddToArray(id, createValue);
+        }
+
+        /// <summary>Gets item or null if nothing stored.</summary>
+        /// <param name="id">Id to search for.</param>
+        /// <returns>Stored item or null.</returns>
+        public object GetItemOrDefault(int id)
+        {
+            return id < _items.Length ? _items[id] : null;
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -6573,8 +6638,6 @@ namespace DryIoc
                 + "and the rest of parameters resolvable from Container when resolving: {1}."),
             RegedFactoryDlgResultNotOfServiceType = Of(
                 "Registered factory delegate returns service {0} is not assignable to {2}."),
-            RegisteredInstanceIsNotAssignableToServiceType = Of(
-                "Registered instance {0} is not assignable to serviceType {1}."),
             NotFoundSpecifiedWritablePropertyOrField = Of(
                 "Unable to find writable property or field \"{0}\" when resolving: {1}."),
             PushingToRequestWithoutFactory = Of(
@@ -6646,7 +6709,12 @@ namespace DryIoc
             ResolutionNeedsRequiredServiceType = Of(
                 "Expecting required service type but it is not specified when resolving: {0}"),
             RegisterMappingNotFoundRegisteredService = Of(
-                "When registering mapping unable to find factory of registered service type {0} and key {1}.");
+                "When registering mapping unable to find factory of registered service type {0} and key {1}."),
+            RegisteredInstanceIsNotAssignableToServiceType = Of(
+                "Registered instance {0} is not assignable to serviceType {1}."),
+            RegisteredInstanceIsNotAvailableInCurrentContext = Of(
+                "Registered instance of {0} is not available in a given context." + Environment.NewLine +
+                "It may mean that instance is requested from fallback container which is not supported at the moment.");
 #pragma warning restore 1591 // "Missing XML-comment"
 
         /// <summary>Stores new error message and returns error code for it.</summary>

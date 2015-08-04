@@ -49,12 +49,27 @@ namespace DryIoc.UnitTests
         public void When_registring_external_instance_with_prevent_disposal_parameter_Then_instance_should_Not_be_disposed()
         {
             var container = new Container();
-            var service = new DisposableService();
-            container.RegisterInstance<IService>(service, preventDisposal: true);
+            container.RegisterInstance<IService>(new DisposableService(), preventDisposal: true);
+            var service = container.Resolve<IService>();
 
             container.Dispose();
 
-            Assert.That(service.IsDisposed, Is.False);
+            Assert.IsFalse(((DisposableService)service).IsDisposed);
+        }
+
+
+        [Test]
+        public void Registering_instance_as_weak_reference_does_not_prevent_it_from_dispose()
+        {
+            var container = new Container();
+            var instance = new DisposableService();
+            container.RegisterInstance(instance, weaklyReferenced: true);
+            instance = container.Resolve<DisposableService>();
+
+            container.Dispose();
+
+            Assert.IsTrue(instance.IsDisposed);
+            GC.KeepAlive(instance);
         }
 
         [Test]

@@ -79,12 +79,11 @@ namespace DryIoc.UnitTests
         public void Wiping_singletons_should_not_delete_current_instance_value()
         {
             var container = new Container();
-            container.RegisterInstance("mine", Reuse.Singleton);
+            container.RegisterInstance("here", Reuse.Singleton);
 
-            var ex = Assert.Throws<ContainerException>(() =>
-                container.WithoutSingletonsAndCache().Resolve<string>());
+            var stillHere = container.WithoutSingletonsAndCache().Resolve<string>();
 
-            Assert.AreEqual(ex.Error, Error.UnableToResolveUnknownService);
+            Assert.AreEqual("here", stillHere);
         }
 
         [Test]
