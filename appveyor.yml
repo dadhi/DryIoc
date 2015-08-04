@@ -15,6 +15,9 @@ artifacts:
 build_script:
   - .\BuildScripts\_main.bat -nopause
 
+after_success:
+  - bash <(curl https://codecov.io/bash) 
+
 nuget:
   account_feed: true
   project_feed: true
