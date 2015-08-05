@@ -187,5 +187,44 @@ namespace DryIoc.UnitTests
 
         internal interface IPublicMe { }
         internal class InternalMe : IPublicMe { }
+
+        [Test]
+        public void Can_register_mapping_to_registered_service()
+        {
+            var container = new Container();
+            container.Register<Y>(Reuse.Singleton);
+
+            container.RegisterMapping<X, Y>();
+
+            Assert.AreSame(container.Resolve<X>(), container.Resolve<Y>());
+        }
+
+
+        [Test]
+        public void Register_mapping_should_throw_if_factory_is_not_found()
+        {
+            var container = new Container();
+            container.Register<Y>();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.RegisterMapping<X, Y>(registeredServiceKey: "a"));
+
+            Assert.AreEqual(Error.RegisterMappingNotFoundRegisteredService, ex.Error);
+        }
+
+        [Test]
+        public void Register_mapping_should_throw_if_new_service_type_is_compatible_with_registered_implementation()
+        {
+            var container = new Container();
+            container.Register<Y>();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.RegisterMapping(typeof(IDisposable), typeof(Y)));
+
+            Assert.AreEqual(Error.RegisterImplementationNotAssignableToServiceType, ex.Error);
+        }
+
+        public class X {}
+        public class Y : X {}
     }
 }

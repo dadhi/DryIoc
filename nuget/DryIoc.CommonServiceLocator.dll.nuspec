@@ -22,9 +22,9 @@
         <file src="..\LICENSE.txt" />
 
         <!-- for all platforms -->
-        <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.dll" target="lib" />
-        <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.pdb" target="lib" />
-        <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.xml" target="lib" />
+        <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.dll" target="lib\net40-Client" />
+        <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.pdb" target="lib\net40-Client" />
+        <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.xml" target="lib\net40-Client" />
 
         <!-- tools -->
         <file src="..\NuGet\DryIoc.snk" target="tools" />

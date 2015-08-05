@@ -101,9 +101,8 @@
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
+      <Project>{fed12e6e-8c44-4fb2-98bb-3a82ccfd20a2}</Project>
       <Name>DryIoc</Name>
-      <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

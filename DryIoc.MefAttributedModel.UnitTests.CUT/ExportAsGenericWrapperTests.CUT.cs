@@ -47,7 +47,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public FactoryWithArgsConsumer(IFactory<string, Two>[] twos, string message)
         {
-            Two = twos.ThrowIf(twos.Length == 0)[0].Create(message);
+            Two = twos[0].Create(message);
         }
 
         public Two Two { get; set; }

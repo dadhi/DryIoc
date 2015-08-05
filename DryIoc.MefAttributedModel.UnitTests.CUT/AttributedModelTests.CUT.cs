@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
 using DryIocAttributes;
@@ -259,9 +260,9 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [Export, PartCreationPolicy(CreationPolicy.Any)]
     public class UseLazyEnumerable
     {
-        public LazyEnumerable<Me> Mes { get; private set; }
+        public IEnumerable<Me> Mes { get; private set; }
 
-        public UseLazyEnumerable(LazyEnumerable<Me> mes)
+        public UseLazyEnumerable(IEnumerable<Me> mes)
         {
             Mes = mes;
         }

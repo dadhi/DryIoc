@@ -212,6 +212,20 @@ namespace DryIoc.UnitTests
             container.Dispose(); // singletons, registry, cache, is gone
         }
 
+        [Test]
+        public void Can_resolve_instance_from_fallback_container()
+        {
+            var container = new Container();
+
+            container.RegisterInstance("a");
+            container.RegisterInstance("b", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            var facade = container.CreateFacade();
+
+            var str = facade.Resolve<string>();
+            Assert.AreEqual("b", str);
+        }
+
         #region CUT
 
         internal class Foo : IDisposable

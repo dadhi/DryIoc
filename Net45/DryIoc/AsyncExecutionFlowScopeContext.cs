@@ -22,13 +22,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-using System.Threading;
-
 namespace DryIoc
 {
     using System;
     using System.Runtime.Remoting.Messaging;
     using System.Diagnostics.CodeAnalysis;
+    using System.Threading;
 
     static partial class ScopeContext
     {
@@ -70,7 +69,7 @@ namespace DryIoc
         public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
         {
             var oldScope = GetCurrentOrDefault();
-            var newScope = setCurrentScope.ThrowIfNull()(oldScope);
+            var newScope = setCurrentScope(oldScope);
             var scopeEntry = newScope == null ? null : new ScopeEntry<IScope>(newScope);
             CallContext.LogicalSetData(_currentScopeEntryKey, scopeEntry);
             return newScope;

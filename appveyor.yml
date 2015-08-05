@@ -2,16 +2,12 @@ version: 2.0.0.{build}
 os: Windows Server 2012
 test: off
 
-environment:
-  COVERALLS_REPO_TOKEN:
-    secure: wbdO3ggQGIggpCZU0oZiL2C6rQKf+ksiGllDbLD46fpC2eLyqnsmv4+LnG0bWVYA
-
 assembly_info:
   patch: true
   file: AssemblyInfo.*
   assembly_version: "{version}"
   assembly_file_version: "{version}"
-  assembly_informational_version: "2.0.0-rc2build{build}"
+  assembly_informational_version: "2.0.0-rc3build{build}"
 
 artifacts:
   - path: bin\NuGetPackages\*.nupkg
@@ -20,9 +16,7 @@ build_script:
   - .\BuildScripts\_main.bat -nopause
 
 on_success:
-  - ps: >-
-        Write-Host $env:APPVEYOR_REPO_BRANCH
-        .\packages\coveralls.net.0.5.0\csmacnz.Coveralls.exe --opencover -i ./bin/Reports/Coverage.xml --repoToken $env:COVERALLS_REPO_TOKEN
+  - bash <(curl https://codecov.io/bash) 
 
 nuget:
   account_feed: true

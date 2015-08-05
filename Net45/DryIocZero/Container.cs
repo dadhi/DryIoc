@@ -79,10 +79,10 @@ namespace DryIocZero
             object service = null;
             if (_defaultFactories.Value.IsEmpty)
                 ResolveGenerated(ref service, serviceType, null);
-            return service ?? ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault);
+            return service ?? ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault, null);
         }
 
-        private object ResolveDefaultFromRuntimeRegistrationsFirst(Type serviceType, bool ifUnresolvedReturnDefault)
+        private object ResolveDefaultFromRuntimeRegistrationsFirst(Type serviceType, bool ifUnresolvedReturnDefault, IScope scope)
         {
             object service = null;
             var factories = _defaultFactories.Value;
@@ -113,7 +113,12 @@ namespace DryIocZero
         {
             object service = null;
             if (_keyedFactories.Value.IsEmpty)
-                ResolveGenerated(ref service, serviceType, serviceKey, scope);
+            {
+                if (serviceKey == null)
+                    ResolveGenerated(ref service, serviceType, scope);
+                else
+                    ResolveGenerated(ref service, serviceType, serviceKey, scope);
+            }
             return service ?? ResolveKeyedFromRuntimeRegistrationsFirst(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, scope);
         }
 
@@ -121,6 +126,9 @@ namespace DryIocZero
             bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
         {
             serviceType = requiredServiceType ?? serviceType;
+            if (serviceKey == null)
+                return ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault, scope);
+
             var keyedFactories = _keyedFactories.Value.GetValueOrDefault(serviceType);
             if (keyedFactories != null)
             {
@@ -517,6 +525,25 @@ namespace DryIocZero
         /// Make it predictable by removing any side effects.</remarks>
         /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
         IScope SetCurrent(SetCurrentScopeHandler setCurrentScope);
+    }
+
+    /// <summary>Provides scope context by convention.</summary>
+    public static partial class ScopeContext
+    {
+        /// <summary>Default scope context.</summary>
+        public static IScopeContext Default
+        {
+            get
+            {
+                if (_default == null)
+                    GetDefaultScopeContext(ref _default);
+                return _default;
+            }
+        }
+
+        static partial void GetDefaultScopeContext(ref IScopeContext resultContext);
+
+        private static IScopeContext _default;
     }
 
     /// <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="Ref.Swap{T}"/>.</summary>
@@ -1285,7 +1312,7 @@ namespace DryIocZero
     }
 
     /// <summary>Zero container exception.</summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage",
+    [SuppressMessage("Microsoft.Usage",
         "CA2237:MarkISerializableTypesWithSerializable",
         Justification = "Not available in PCL.")]
     public class ContainerException : InvalidOperationException
@@ -1323,14 +1350,17 @@ namespace DryIocZero
             if (condition) It(error, args);
             return null;
         }
+    }
 
+    /// <summary>Called from generated code.</summary>
+    public static class ThrowInGeneratedCode
+    {
         /// <summary>Throws if object is null.</summary>
         /// <param name="obj">object to check.</param><param name="message">Error message.</param>
         /// <returns>object if not null.</returns>
-        /// <remarks>Called from generate code.</remarks>
         public static object ThrowNewErrorIfNull(this object obj, string message)
         {
-            if (obj == null) It(Error.Of(message));
+            if (obj == null) Throw.It(Error.Of(message));
             return obj;
         }
     }

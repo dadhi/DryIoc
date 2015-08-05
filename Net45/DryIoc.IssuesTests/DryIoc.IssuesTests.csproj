@@ -43,8 +43,8 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="ExpressionToCodeLib, Version=1.5.2.0, Culture=neutral, PublicKeyToken=b43a6eb33831e563, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\ExpressionToCodeLib.1.5.2.0\lib\net40-Client\ExpressionToCodeLib.dll</HintPath>
-      <Private>True</Private>
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll</HintPath>
     </Reference>
     <Reference Include="log4net, Version=1.2.13.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
       <HintPath>..\..\packages\log4net.2.0.3\lib\net40-full\log4net.dll</HintPath>

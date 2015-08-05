@@ -17,17 +17,6 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     [ExportMany]
-    public class FooConsumer
-    {
-        public Lazy<IFooService> Foo { get; set; }
-
-        public FooConsumer([Import, WithMetadata(FooMetadata.Blah)] Lazy<IFooService> foo)
-        {
-            Foo = foo;
-        }
-    }
-
-    [ExportMany]
     public class FooConsumerNotFound
     {
         public IFooService Foo { get; set; }

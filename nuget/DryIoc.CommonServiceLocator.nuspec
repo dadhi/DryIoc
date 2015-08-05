@@ -21,8 +21,8 @@
     <files>
         <file src="..\LICENSE.txt" />
 
-        <!--for all platforms-->
-        <file src="..\Extensions\DryIoc.CommonServiceLocator\DryIocServiceLocator.cs" target="content\DryIoc\CommonServiceLocator" />
+        <!--Using net40-Client as basic platform-->
+        <file src="..\Extensions\DryIoc.CommonServiceLocator\DryIocServiceLocator.cs" target="content\net40-Client\DryIoc\CommonServiceLocator" />
 
     </files>
 </package>

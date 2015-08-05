@@ -214,7 +214,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<FooFactory>(Reuse.Singleton);
-            container.Register(Made.Of(r => ServiceInfo.Of<FooFactory>(), factory => factory.Foo));
+            container.Register(Made.Of(r => ServiceInfo.Of<FooFactory>(), factory => factory.FooX));
 
             var foo = container.Resolve<IFoo>();
 
@@ -241,12 +241,12 @@ namespace DryIoc.UnitTests
 
         internal class FooFactory
         {
-            public readonly IFoo Foo;
+            public readonly IFoo FooX;
             public Blah Blah { get; private set; }
 
             public FooFactory()
             {
-                Foo = new Foo();
+                FooX = new Foo();
                 Blah = new Blah();
             }
         }
@@ -281,6 +281,34 @@ namespace DryIoc.UnitTests
             container.Register(Made.Of(() => (IA)GetAObject()));
 
             Assert.IsInstanceOf<A>(container.Resolve<IA>());
+        }
+
+        [Test]
+        public void Can_specify_requirement_service_type_for_the_wrapper()
+        {
+            var container = new Container();
+            container.Register<A>();
+            container.Register<MyWrapper>(setup: Setup.Wrapper);
+
+            container.Register(Made.Of(() => new UseMyWrapper(Arg.Of<MyWrapper, A>())));
+
+            container.Resolve<UseMyWrapper>();
+        }
+
+        public class MyWrapper {
+            public readonly object Service;
+            public MyWrapper(object service)
+            {
+                Service = service;
+            }
+        }
+
+        public class UseMyWrapper {
+            public readonly MyWrapper Wr;
+            public UseMyWrapper(MyWrapper wr)
+            {
+                Wr = wr;
+            }
         }
 
         public static object GetAObject()

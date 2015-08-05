@@ -116,7 +116,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(LazyOne<>),
-                with: Made.Of(t => t.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()))));
+                made: Made.Of(t => t.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()))));
             container.Register<Service>();
 
             var service = container.Resolve<LazyOne<Service>>();
@@ -343,7 +343,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
             container.Register(typeof(X<>), typeof(Y<>)));
 
-            Assert.AreEqual(ex.Error, Error.ImplementationIsNotAssignableToServiceType);
+            Assert.AreEqual(ex.Error, Error.RegisterImplementationNotAssignableToServiceType);
         }
 
         [Test]
