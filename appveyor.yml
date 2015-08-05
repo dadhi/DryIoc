@@ -15,7 +15,7 @@ artifacts:
 build_script:
   - .\BuildScripts\_main.bat -nopause
 
-after_success:
+on_success:
   - bash <(curl https://codecov.io/bash) 
 
 nuget:
