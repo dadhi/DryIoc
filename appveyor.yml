@@ -16,7 +16,7 @@ build_script:
   - .\BuildScripts\_main.bat -nopause
 
 on_success:
-  - "C:\Program Files (x86)\Git\bin\sh.exe" <(curl https://codecov.io/bash) 
+  - sh.exe <(curl https://codecov.io/bash) 
 
 nuget:
   account_feed: true
