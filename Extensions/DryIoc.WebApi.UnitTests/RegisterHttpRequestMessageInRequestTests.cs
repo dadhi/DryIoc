@@ -32,7 +32,7 @@ namespace DryIoc.WebApi.UnitTests
             // Register Null request in parent container in order to swap to actual request in current scope.
             // When resolving A container will find registered request dependency and cache access to it for fast performance.
 
-            const int parallelRequestCount = 10;
+            const int parallelRequestCount = 20;
             var tasks = new Task[parallelRequestCount];
             for (var i = 0; i < parallelRequestCount; i++)
             {

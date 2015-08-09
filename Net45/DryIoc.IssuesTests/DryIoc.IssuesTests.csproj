@@ -83,6 +83,7 @@
     <Compile Include="Issue123_TipsForMigrationFromAutofac.cs" />
     <Compile Include="Issue128_ResolveFailsWithSingletonsInOuterScope.cs" />
     <Compile Include="Issue135_DecoratorsIgnoredInChildScope.cs" />
+    <Compile Include="Issue144_NonPublic_property _as_FactoryMethod_causes_unexplained_NRE.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

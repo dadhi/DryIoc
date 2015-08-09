@@ -378,6 +378,33 @@ namespace DryIoc.UnitTests
             where TCommand : ReplayCommand<SpecialEntity>
         { }
 
+        [Test, Ignore]
+        public void Can_register_open_generic_returned_by_factory_method()
+        {
+            var container = new Container();
+
+            container.Register(typeof (IA<>), made: GetType().GetSingleDeclaredMethodOrNull("GetAOf"));
+
+            container.Resolve<IA<B>>();
+        }
+
+        public class B { }
+
+        internal interface IA<T> where T : new()
+        {
+            T Value { get; }
+        }
+
+        internal class A<T> : IA<T> where T : new()
+        {
+            public T Value { get { return new T(); } }
+        }
+
+        internal static A<T> GetAOf<T>() where T : new()
+        {
+            return new A<T>();
+        }
+
         #region CUT
 
         public class LazyOne<T>

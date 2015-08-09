@@ -49,7 +49,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_property_with_nonpublic_set_should_NOT_throw_and_should_preserve_original_property_value()
+        public void Resolving_property_with_nonpublic_setter_should_NOT_throw_and_should_preserve_original_property_value()
         {
             var container = new Container();
             container.Register(typeof(PropertyHolder));
