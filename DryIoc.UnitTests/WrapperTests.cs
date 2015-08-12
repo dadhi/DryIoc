@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq.Expressions;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -93,17 +94,24 @@ namespace DryIoc.UnitTests
             var factoryWeakRefs = container.Resolve<WeakReference[]>(typeof(Func<Service>));
             Assert.That(factoryWeakRefs.Length, Is.EqualTo(1));
         }
-    }
-
-    public class WrapperWithTwoArgs<T0, T1>
-    {
-        public T0 Arg0 { get; set; }
-        public T1 Arg1 { get; set; }
-
-        public WrapperWithTwoArgs(T0 arg0, T1 arg1)
+        public class WrapperWithTwoArgs<T0, T1>
         {
-            Arg0 = arg0;
-            Arg1 = arg1;
+            public T0 Arg0 { get; set; }
+            public T1 Arg1 { get; set; }
+
+            public WrapperWithTwoArgs(T0 arg0, T1 arg1)
+            {
+                Arg0 = arg0;
+                Arg1 = arg1;
+            }
+        }
+
+        [Test]
+        public void Resolving_array_of_required_service_type_wrapper_should_work()
+        {
+            var container = new Container();
+
+            container.Resolve<LambdaExpression[]>(typeof(A));
         }
     }
 }

@@ -230,7 +230,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Register(typeof(IService), typeof(AnotherService), serviceKey: "blah"));
 
-            Assert.That(ex.Message, Is.StringContaining("IService with the same key \"blah\""));
+            Assert.That(ex.Message, Is.StringContaining("with duplicate key [blah]"));
         }
 
         [Test]

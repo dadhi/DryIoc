@@ -228,9 +228,9 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var container = request.Container;
-            reflectedType = container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? reflectedType);
+            reflectedType = container.GetWrappedType(reflectedType, request.RequiredServiceType);
             var metadata = meta.Metadata;
-            var factory = container.GetAllServiceFactories(reflectedType)
+            var factory = container.GetAllServiceFactories(reflectedType, bothClosedAndOpenGenerics: true)
                 .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
                 .ThrowIfNull(Error.NotFindDependencyWithMetadata, reflectedType, metadata, request);
 
@@ -244,8 +244,7 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var container = request.Container;
-            serviceType = import.ContractType
-                ?? container.GetWrappedTypeOrNullIfWrapsRequiredServiceType(request.RequiredServiceType ?? serviceType);
+            serviceType = import.ContractType ?? container.GetWrappedType(serviceType, request.RequiredServiceType);
             var serviceKey = import.ContractKey;
 
             if (!container.IsRegistered(serviceType, serviceKey))

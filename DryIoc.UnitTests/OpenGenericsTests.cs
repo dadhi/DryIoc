@@ -102,13 +102,15 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_open_generic_registered_with_recursive_dependency_on_same_type_closed_generic_Resolving_it_should_throw()
+        public void Resolving_open_generic_with_recursive_dependency_of_the_same_type_should_throw()
         {
             var container = new Container();
             container.Register(typeof(GenericOne<>));
 
-            Assert.Throws<ContainerException>(
+            var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<GenericOne<string>>());
+
+            Assert.AreEqual(Error.RecursiveDependencyDetected, ex.Error);
         }
 
         [Test]
