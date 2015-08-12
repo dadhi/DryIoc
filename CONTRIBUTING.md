@@ -8,13 +8,27 @@ Changes can come in a form of:
 
 - Comments to existing issues
 - New issues
-- Pull Requests with improvements and issue fixes
+- Pull Requests with improvements, failed tests for the found bugs, and bug fixes
 - Documentation error corrections and new content
 - [StackOverflow](http://stackoverflow.com/questions/tagged/dryioc) questions and answers. Please tag questions with __dryioc__ tag for easy finding.
 
+### How to report issue step-by-step
+
+If you found the problem with DryIoc:
+
+ - Please check that you are using the latest DryIoc version `PM> Install-Package DryIoc -Pre`
+ - Then [create new issue](https://bitbucket.org/dadhi/dryioc/issues/new) with problem description.
+ - Optionally: to get the fast feedback, fast fix, and generally to make me happy (: 
+     - [Fork DryIoc](https://bitbucket.org/dadhi/dryioc/fork)
+     - Add failing tests reproducing your case into [DryIoc.IssuesTests](https://bitbucket.org/dadhi/dryioc/src/8510666893daaea1d07b49ba0dfcbf3f95dcccd4/Net45/DryIoc.IssuesTests/?at=dev) project. Check other files in project for general guidelines, but nothing is strict here
+     - Push your tests and create Pull Request
+     
+    Thank you!
+
+
 ## How to build and verify your changes
 
-### Build from the command line
+### Build from the command line 
 
 Before sending a Pull Request, please build solution with _build.bat_ located in the root folder.
 

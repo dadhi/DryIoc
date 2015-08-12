@@ -9,7 +9,7 @@ echo:Building %SLN% into %OUTDIR% . . .
 rem MSBuild 32-bit operating systems:
 rem HKLM\SOFTWARE\Microsoft\MSBuild\ToolsVersions\12.0
 
-for /f "tokens=2*" %%S in ('reg query HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuild\ToolsVersions\12.0 /v MSBuildToolsPath') do (
+for /f "tokens=2*" %%S in ('reg query HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuild\ToolsVersions\14.0 /v MSBuildToolsPath') do (
 
 	if exist "%%T" (
 

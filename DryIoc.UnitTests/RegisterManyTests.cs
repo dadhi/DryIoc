@@ -199,6 +199,16 @@ namespace DryIoc.UnitTests
             Assert.AreSame(container.Resolve<X>(), container.Resolve<Y>());
         }
 
+        [Test]
+        public void Can_register_mapping_to_not_assignable_service_of_the_same_implementation()
+        {
+            var container = new Container();
+            container.Register<I, Y>(Reuse.Singleton);
+
+            container.RegisterMapping<X, I>();
+
+            Assert.AreSame(container.Resolve<I>(), container.Resolve<X>());
+        }
 
         [Test]
         public void Register_mapping_should_throw_if_factory_is_not_found()
@@ -213,7 +223,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Register_mapping_should_throw_if_new_service_type_is_compatible_with_registered_implementation()
+        public void Register_mapping_should_throw_if_new_service_type_is_not_compatible_with_registered_implementation()
         {
             var container = new Container();
             container.Register<Y>();
@@ -224,7 +234,8 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(Error.RegisterImplementationNotAssignableToServiceType, ex.Error);
         }
 
+        public interface I {}
         public class X {}
-        public class Y : X {}
+        public class Y : X, I {}
     }
 }

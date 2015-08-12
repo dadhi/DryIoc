@@ -755,7 +755,7 @@ namespace DryIoc
 
             serviceType = requiredServiceType ?? serviceType;
 
-            var wrappedType = serviceType.GetElementTypeOrNull();
+            var wrappedType = serviceType.GetArrayElementTypeOrNull();
             if (wrappedType == null)
             {
                 var factory = ((IContainer)this).GetWrapperFactoryOrDefault(serviceType);
@@ -1646,6 +1646,16 @@ namespace DryIoc
                 return request.Container.GetServiceFactoryOrDefault(request);
             };
         }
+
+        /// <summary>Checks if custom value of the <paramref name="customValueType"/> is supported by DryIoc injection mechanism.</summary>
+        /// <param name="customValueType">Type to check</param> <returns>True if supported, false otherwise.c</returns>
+        public static bool IsSupportedInjectedCustomValueType(Type customValueType)
+        {
+            return customValueType == typeof(DefaultKey)
+                   || customValueType.IsAssignableTo(typeof(Type))
+                   || customValueType.IsPrimitive()
+                   || customValueType.IsArray && IsSupportedInjectedCustomValueType(customValueType.GetArrayElementTypeOrNull());
+        }
     }
 
     /// <summary>Used to represent multiple default service keys. 
@@ -1849,7 +1859,7 @@ namespace DryIoc
         public static readonly Rules.UnknownServiceResolver ResolveWrappers = request =>
         {
             var serviceType = request.ServiceType;
-            var itemType = serviceType.GetElementTypeOrNull();
+            var itemType = serviceType.GetArrayElementTypeOrNull();
             if (itemType != null)
                 serviceType = typeof(IEnumerable<>).MakeGenericType(itemType);
 
@@ -1881,7 +1891,7 @@ namespace DryIoc
                 collectionType.GetGenericDefinitionOrNull() == typeof(IEnumerable<>))
                 return GetLazyEnumerableExpressionOrDefault(request);
 
-            var itemType = collectionType.GetElementTypeOrNull() ?? collectionType.GetGenericParamsAndArgs()[0];
+            var itemType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericParamsAndArgs()[0];
 
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
@@ -2598,7 +2608,6 @@ namespace DryIoc
             IList<Expression> argExprs = null;
             IList<MemberBinding> memberBindingExprs = null;
             ParameterInfo[] parameters = null;
-
 
             if (callExpr.NodeType == ExpressionType.New || callExpr.NodeType == ExpressionType.MemberInit)
             {
@@ -4963,8 +4972,10 @@ namespace DryIoc
         /// <param name="source">Original parameters rules.</param> 
         /// <param name="getCustomValue">Custom value provider.</param>
         /// <returns>New parameters rules.</returns>
-        public static ParameterSelector Type<T>(this ParameterSelector source, Func<Request, object> getCustomValue)
+        public static ParameterSelector Type<T>(this ParameterSelector source, Func<Request, T> getCustomValue)
         {
+            Throw.If(ContainerTools.IsSupportedInjectedCustomValueType(typeof(T)) == false, 
+                Error.RegisteringWithNotSupportedDepedendencyCustomValueType, "parameter", typeof(T));
             return source.Details((r, p) => p.ParameterType == typeof(T) ? ServiceDetails.Of(getCustomValue(r)) : null);
         }
     }
@@ -6849,7 +6860,11 @@ namespace DryIoc
                 "Registered instance {0} is not assignable to serviceType {1}."),
             RegisteredInstanceIsNotAvailableInCurrentContext = Of(
                 "Registered instance of {0} is not available in a given context." + Environment.NewLine +
-                "It may mean that instance is requested from fallback container which is not supported at the moment.");
+                "It may mean that instance is requested from fallback container which is not supported at the moment."),
+            RegisteringWithNotSupportedDepedendencyCustomValueType = Of(
+                "Registering {0} dependency with not supported custom value type {1}." + Environment.NewLine + 
+                "Only DryIoc.DefaultValue, System.Type, .NET primitives types, or array of those are supported.");
+
 #pragma warning restore 1591 // "Missing XML-comment"
 
         /// <summary>Stores new error message and returns error code for it.</summary>
@@ -7150,7 +7165,7 @@ namespace DryIoc
 
         /// <summary>If type is array returns is element type, otherwise returns null.</summary>
         /// <param name="type">Source type.</param> <returns>Array element type or null.</returns>
-        public static Type GetElementTypeOrNull(this Type type)
+        public static Type GetArrayElementTypeOrNull(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
             return typeInfo.IsArray ? typeInfo.GetElementType() : null;

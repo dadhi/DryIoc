@@ -274,6 +274,27 @@ namespace DryIoc.UnitTests
             return string.Format("{0}.{1}", typeof(TTarget).Namespace, typeof(TTarget).Name);
         }
 
+        [Test]
+        public void If_you_register_not_a_primitive_value_then_container_should_throw()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Register<A>(made: Parameters.Of.Type(_ => new B())));
+
+            Assert.AreEqual(Error.RegisteringWithNotSupportedDepedendencyCustomValueType, ex.Error);
+        }
+
+        class A
+        {
+            public B B { get; private set; }
+
+            public A(B b)
+            {
+                B = b;
+            }
+        }
+
         #region CUT
 
         internal class FooWithIndexer
