@@ -36,16 +36,16 @@ It will build all projects, run unit tests with coverage, and create NuGet packa
 
 Make sure that there are no project build errors or failing tests. Also, check package creation errors for obvious issues, e.g. missing files.
 
-### Visual Studio solutionm
+### Develop in Visual Studio
 
 Open _DryIoc.sln_ located in the root folder to develop in Visual Studio 2013 and above. 
 
 Solution combines projects for all supported platforms starting from .NET 3.5 (may be changed in future).
 
-__HINT:__ To simplify development, you may unload projects under solution root and platform folders except the platform you are working with.  
-Usually, I unload everything except projects in _Net45_ and _Extensions_ folders. But before commit, I do run _build.bat_ which builds all platforms.
+__Hint:__ To simplify development, you may unload projects under solution root and platform folders except the platform you are working with.  
+Usually, I unload everything except projects in _Net45_ and _Extensions_ folders. But before commit, I do run _build.bat_ which builds all the platforms.
 
-__HINT:__ Solution is configured to be built and to run Unit Tests continuously with [NCrunch](http://www.ncrunch.net/). NCrunch allows developing with minimum manual project builds.
+__Hint:__ Solution is configured to be built and to run Unit Tests continuously with [NCrunch](http://www.ncrunch.net/). With NCrunch you may forget about manual builds.
 
 
 
