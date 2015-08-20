@@ -18,43 +18,44 @@ DryIoc is small, fast, and capable IoC Container for .NET
 
 * Designed for low-ceremony use, performance, and extensibility.
 * Supports .NET PCL, 3.5, 4.0, 4.5.
-* Available at NuGet as [code][DryIoc] or [dll][DryIoc.dll].
-* [Wiki documentation][WikiHome] _(being updated for v2.0)_
+* [Wiki documentation][WikiHome]
 * [Notes for contributors](CONTRIBUTING.md)
-* __v1.4.1__ is stable: `PM> Install-Package DryIoc` 
-* __v2.0-rc3__ is out: `PM> Install-Package DryIoc -Pre`
+* Available from NuGet as [DryIoc.dll] or source [DryIoc] (_in NuGet < 3.0_)
+* __DryIoc v2.0-rc3__ is latest: `PM> Install-Package DryIoc.dll -Pre`
+* __DryIoc v1.4.1__ is stable: `PM> Install-Package DryIoc.dll`
 
-#### Benchmarks
+## Benchmarks
 * [Performance](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
 * [Features](http://featuretests.apphb.com/DependencyInjection.html)
 
-#### Performance
+## Performance
 * General use-cases optimized for max speed.
 * Call-stack depth preserved as shallow as possible.
 * Memory footprint preserved as minimal as possible.
 
-#### Code/Library
+## Code/Library
 * Minimal setup requires single source file: *Container.cs*. 
 * Code written to be readable.
 * Public API is fully documented.
 
-#### Reliability
-* Unit-tested with 100% coverage.
+## Reliability
+* Unit-test suit with ~700 tests.
 * Thread-safe and lock-free: registrations and resolutions could be made in parallel without corrupting container state. 
 * Detects recursive dependencies - cycles in object graph.
 * Throws exceptions as early as possible. Exception provides meaningful information about problem and context.
 * Resolve as `LambdaExpression` to be clear about service creation expression.
 
-#### Features
+## Features
 
-* Register interface/type mapping, additionally supported: registering service once, registration update, unregister. 
+* Register interface/type mapping, additionally supported: registering service once, registration update, removing registration. 
 * Register user-defined delegate factory and register existing instance.
 * Register from assembly(ies) implementation types with automatically determined service types.
 * Register with arbitrary key and condition, multiple default registrations.
-* Resolve and ResolveMany. Unknown service resolution with `Rules.WithUnknownServiceResolvers()`. 
+* Resolve and ResolveMany. 
+* Unknown service resolution with `Rules.WithUnknownServiceResolvers()`. 
 * Instance lifetime control or *Reuse* in DryIoc terms ([wiki](https://bitbucket.org/dadhi/dryioc/wiki/ReuseAndScopes)) :
     * Nested disposable scopes, ambient scope context.
-    * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`, or define your own.
+    * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`. Plus you can define your own.
     * Changing default reuse type per container via `Rules.WithReuseMapping()`.
     * Control reused objects behavior with `preventDisposal` and `weaklyReferenced`.
 * Open-generics without special syntax.
@@ -70,9 +71,34 @@ DryIoc is small, fast, and capable IoC Container for .NET
     * Nested wrappers: e.g. `Tuple<SomeMetadata, Func<ISomeService>>[]`.
 * [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern): Composite itself is excluded from result collection.
 * [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern). 
-* Context-based service selection on resolution.
+* Context-based resolution.
 
-#### Extensions
+
+## Companions
+
+### __DryIocAttributes__
+
+NuGet: `PM> Install-Package DryIocAttributes.dll`
+
+- Extends [MEF](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) attributes to cover DryIoc features: metadata, advanced reuses, context based registration, decorators, etc.
+- Does not depend on DryIoc and may be used by other IoC framewors. 
+
+
+### DryIocZero
+
+NuGet: `PM> Install-Package DryIocZero`
+
+Standalone container based upon compile-time generated factories by DryIoc. 
+
+- Ensures _zero_ application bootstrapping time associated with IoC registrations.
+- Provides verification of DryIoc registration setup at compile-time by generating service factories. Basically - you can see how DryIoc resolves you roots.
+- Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
+- Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
+- Allows run-time registrations. You may register instances and factories at run-time.
+
+
+## Extensions
 * [MefAttributedModel] for [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx). Enables automatic types discovery and wiring.
 * [CommonServiceLocator](https://commonservicelocator.codeplex.com/)
 * ASP.NET: Web Forms, MVC, Web API, OWIN.
+
