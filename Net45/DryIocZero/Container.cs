@@ -70,6 +70,15 @@ namespace DryIocZero
 
         partial void ResolveGenerated(ref object service, Type serviceType, IScope scope);
 
+        /// <summary>Directly uses generated factories to resolve service. Or returns default if service does not have generated factory.</summary>
+        /// <param name="serviceType">Service type to lookup generated factory.</param> <returns>Created service or null.</returns>
+        public object ResolveGeneratedOrDefault(Type serviceType)
+        {
+            object service = null;
+            ResolveGenerated(ref service, serviceType, null);
+            return service;
+        }
+
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
@@ -88,14 +97,24 @@ namespace DryIocZero
             var factories = _defaultFactories.Value;
             var factory = factories.GetValueOrDefault(serviceType);
             if (factory == null)
-                ResolveGenerated(ref service, serviceType, null);
+                ResolveGenerated(ref service, serviceType, scope);
             else
-                service = ((StatelessFactoryDelegate)factory)(this, null);
+                service = ((StatelessFactoryDelegate)factory)(this, scope);
             return service ?? Throw.If(!ifUnresolvedReturnDefault,
                 Error.UnableToResolveDefaultService, serviceType, factories.IsEmpty ? string.Empty : "non-");
         }
 
         partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, IScope scope);
+
+        /// <summary>Directly uses generated factories to resolve service. Or returns default if service does not have generated factory.</summary>
+        /// <param name="serviceType">Service type to lookup generated factory.</param> <param name="serviceKey">Service key to locate factory.</param>
+        /// <returns>Created service or null.</returns>
+        public object ResolveGeneratedOrDefault(Type serviceType, object serviceKey)
+        {
+            object service = null;
+            ResolveGenerated(ref service, serviceType, serviceKey, null);
+            return service;
+        }
 
         /// <summary>Resolves keyed service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
