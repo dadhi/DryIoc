@@ -542,7 +542,7 @@ namespace DryIocZero
         /// <param name="setCurrentScope">Delegate to change the scope.</param>
         /// <remarks>Important: <paramref name="setCurrentScope"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
-        /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
+        /// <returns>New current scope. So it is convenient to use method in <c>using (var newScope = ctx.SetCurrent(...))</c>.</returns>
         IScope SetCurrent(SetCurrentScopeHandler setCurrentScope);
     }
 
@@ -656,13 +656,13 @@ namespace DryIocZero
         /// <summary>Value.</summary>
         public readonly object Value;
 
-        /// <summary>Left subtree/branch, or empty.</summary>
+        /// <summary>Left sub-tree/branch, or empty.</summary>
         public readonly ImTreeMapIntToObj Left;
 
-        /// <summary>Right subtree/branch, or empty.</summary>
+        /// <summary>Right sub-tree/branch, or empty.</summary>
         public readonly ImTreeMapIntToObj Right;
 
-        /// <summary>Height of longest subtree/branch. It is 0 for empty tree, and 1 for single node tree.</summary>
+        /// <summary>Height of longest sub-tree/branch. It is 0 for empty tree, and 1 for single node tree.</summary>
         public readonly int Height;
 
         /// <summary>Returns true is tree is empty.</summary>

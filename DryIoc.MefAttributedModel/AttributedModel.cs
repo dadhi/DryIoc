@@ -460,6 +460,9 @@ namespace DryIoc.MefAttributedModel
                     continue;
 
                 var memberReturnType = member.GetReturnTypeOrDefault();
+                if (memberReturnType.IsOpenGeneric())
+                    memberReturnType = memberReturnType.GetGenericTypeDefinition();
+
                 var registrationInfo = GetRegistrationInfoOrDefault(memberReturnType, attributes).ThrowIfNull();
 
                 var factoryExport = factoryInfo.Exports[0];
@@ -467,7 +470,7 @@ namespace DryIoc.MefAttributedModel
                     ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
 
                 var factoryMethod = FactoryMethod.Of(member, factoryServiceInfo);
-                var factory = registrationInfo.CreateFactory(Made.Of(_ => factoryMethod));
+                var factory = registrationInfo.CreateFactory(Made.Of(factoryMethod, memberReturnType));
 
                 var serviceExports = registrationInfo.Exports;
                 for (var i = 0; i < serviceExports.Length; i++)

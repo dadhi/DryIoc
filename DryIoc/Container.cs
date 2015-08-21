@@ -2412,7 +2412,7 @@ namespace DryIoc
         }
 
         /// <summary>Searches for constructor with all resolvable parameters or throws <see cref="ContainerException"/> if not found.
-        /// Works both for resolving as service and as Func&lt;TArgs..., TService&gt;.</summary>
+        /// Works both for resolving as service and as Func of TArgs... returning TService.</summary>
         public static readonly FactoryMethodSelector ConstructorWithResolvableArguments = request =>
         {
             var implementationType = request.ImplementationType.ThrowIfNull();
@@ -2551,6 +2551,14 @@ namespace DryIoc
                 ? Default : new Made(factoryMethod, parameters, propertiesAndFields);
         }
 
+        /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
+        /// <param name="factoryMethod">Known factory method.</param><param name="factoryMethodReturnType">... and its result type.</param>
+        /// <returns>New injection rules.</returns>
+        public static Made Of(FactoryMethod factoryMethod, Type factoryMethodReturnType)
+        {
+            return new Made(r => factoryMethod, factoryMethodKnownResultType: factoryMethodReturnType);
+        }
+
         /// <summary>Defines how to select constructor from implementation type.</summary>
         /// <param name="getConstructor">Delegate taking implementation type as input and returning selected constructor info.</param>
         /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
@@ -2674,10 +2682,10 @@ namespace DryIoc
         private Made(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             Type factoryMethodKnownResultType = null)
         {
-            FactoryMethodKnownResultType = factoryMethodKnownResultType;
             FactoryMethod = factoryMethod;
             Parameters = parameters;
             PropertiesAndFields = propertiesAndFields;
+            FactoryMethodKnownResultType = factoryMethodKnownResultType;
         }
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(
@@ -5315,7 +5323,7 @@ namespace DryIoc
 
         private readonly Type _implementationType;
         private readonly ClosedGenericFactoryGenerator _factoryGenerator;
-        private int _generatorFactoryID;
+        private readonly int _generatorFactoryID;
 
         private sealed class ClosedGenericFactoryGenerator : IConcreteFactoryGenerator
         {
@@ -5341,9 +5349,33 @@ namespace DryIoc
 
                 var closedTypeArgs = implementationType == serviceType.GetGenericDefinitionOrNull()
                     ? serviceType.GetGenericParamsAndArgs()
-                    : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, request);
+                    : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, request.ServiceType, request);
+
                 if (closedTypeArgs == null)
                     return null;
+
+                var made = _openGenericFactory.Made;
+                if (made.FactoryMethodKnownResultType == implementationType)
+                {
+                    var factoryMethod = made.FactoryMethod(request);
+                    var openMethod = factoryMethod.ConstructorOrMethodOrMember as MethodInfo;
+                    if (openMethod != null)
+                    {
+                        var methodTypeParams = openMethod.GetGenericArguments();
+                        var methodTypeArgs = new Type[methodTypeParams.Length];
+                        var implTypeParams = openMethod.ReturnType.GetGenericParamsAndArgs();
+
+                        var matchFound = MatchServiceWithImplementedTypeParams(
+                            methodTypeArgs, methodTypeParams, implTypeParams, closedTypeArgs);
+
+                        if (matchFound)
+                        {
+                            var closedMethod = openMethod.MakeGenericMethod(methodTypeArgs);
+                            var closedFactoryMethod = FactoryMethod.Of(closedMethod, factoryMethod.FactoryInfo);
+                            made = Made.Of(closedFactoryMethod, closedMethod.ReturnType);
+                        }
+                    }
+                }
 
                 Type closedImplementationType;
                 if (request.IfUnresolved == IfUnresolved.ReturnDefault)
@@ -5359,7 +5391,7 @@ namespace DryIoc
                 }
 
                 var closedGenericFactory = new ReflectionFactory(closedImplementationType,
-                    _openGenericFactory.Reuse, _openGenericFactory.Made, _openGenericFactory.Setup,
+                    _openGenericFactory.Reuse, made, _openGenericFactory.Setup,
                     _openGenericFactory.FactoryID);
 
                 // Storing generated factory ID to service type/key mapping to deleted generated factories when needed
@@ -5499,16 +5531,15 @@ namespace DryIoc
             return bindings.Count == 0 ? (Expression)newServiceExpr : Expression.MemberInit(newServiceExpr, bindings);
         }
 
-        private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(Type implType, Request request)
+        private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(Type openImplType, Type closedServiceType, Request request)
         {
-            var serviceType = request.ServiceType;
-            var serviceTypeArgs = serviceType.GetGenericParamsAndArgs();
-            var serviceTypeGenericDef = serviceType.GetGenericTypeDefinition();
+            var serviceTypeArgs = closedServiceType.GetGenericParamsAndArgs();
+            var serviceTypeGenericDef = closedServiceType.GetGenericTypeDefinition();
 
-            var implTypeParams = implType.GetGenericParamsAndArgs();
+            var implTypeParams = openImplType.GetGenericParamsAndArgs();
             var implTypeArgs = new Type[implTypeParams.Length];
 
-            var implementedTypes = implType.GetImplementedTypes();
+            var implementedTypes = openImplType.GetImplementedTypes();
 
             var matchFound = false;
             for (var i = 0; !matchFound && i < implementedTypes.Length; ++i)
@@ -5525,7 +5556,7 @@ namespace DryIoc
             if (!matchFound)
                 return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
                     : Throw.For<Type[]>(Error.NoMatchedImplementedTypesWithServiceType,
-                        implType, implementedTypes, request);
+                        openImplType, implementedTypes, request);
 
             // check constraints
             for (var i = 0; i < implTypeParams.Length; i++)
@@ -5556,7 +5587,7 @@ namespace DryIoc
             if (notMatchedIndex != -1)
                 return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
                     : Throw.For<Type[]>(Error.NotFoundOpenGenericImplTypeArgInService,
-                        implType, implTypeParams[notMatchedIndex], request);
+                        openImplType, implTypeParams[notMatchedIndex], request);
 
             return implTypeArgs;
         }
@@ -6748,7 +6779,7 @@ namespace DryIoc
                 "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
                 "Consider to register generic type definition {1} instead."),
             RegisteringNullImplementationTypeAndNoFactoryMethod = Of(
-                "Registering null implementation type withou FactoryMethod to use instead."),
+                "Registering without implementation type and without FactoryMethod to use instead."),
             RegisteringAbstractImplementationTypeAndNoFactoryMethod = Of(
                 "Registering abstract implementation type {0} when it is should be concrete. Also there is not FactoryMethod to use instead."),
             NoPublicConstructorDefined = Of(
@@ -7872,13 +7903,13 @@ namespace DryIoc
         /// <summary>Value.</summary>
         public readonly object Value;
 
-        /// <summary>Left subtree/branch, or empty.</summary>
+        /// <summary>Left sub-tree/branch, or empty.</summary>
         public readonly ImTreeMapIntToObj Left;
 
-        /// <summary>Right subtree/branch, or empty.</summary>
+        /// <summary>Right sub-tree/branch, or empty.</summary>
         public readonly ImTreeMapIntToObj Right;
 
-        /// <summary>Height of longest subtree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
+        /// <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
         public readonly int Height;
 
         /// <summary>Returns true is tree is empty.</summary>
@@ -8018,13 +8049,13 @@ namespace DryIoc
         /// <summary>In case of <see cref="Hash"/> conflicts for different keys contains conflicted keys with their values.</summary>
         public readonly KV<K, V>[] Conflicts;
 
-        /// <summary>Left subtree/branch, or empty.</summary>
+        /// <summary>Left sub-tree/branch, or empty.</summary>
         public readonly ImTreeMap<K, V> Left;
 
-        /// <summary>Right subtree/branch, or empty.</summary>
+        /// <summary>Right sub-tree/branch, or empty.</summary>
         public readonly ImTreeMap<K, V> Right;
 
-        /// <summary>Height of longest subtree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
+        /// <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
         public readonly int Height;
 
         /// <summary>Returns true if tree is empty.</summary>
