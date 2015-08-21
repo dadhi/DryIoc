@@ -44,16 +44,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 .StringContaining("IService as property \"Service\""));
         }
 
-
         [Test]
         public void AllowDefault_dependencies_could_be_nested()
         {
             var container = new Container().WithMefAttributedModel();
-
             container.RegisterExports(typeof(ClientNested), typeof(Client));
 
             var client = container.Resolve<ClientNested>();
-            Assert.That(client.Client, Is.Null);
+
+            Assert.IsNotNull(client.Client);
+            Assert.IsNull(client.Client.Service);
         }
 
         #region CUT

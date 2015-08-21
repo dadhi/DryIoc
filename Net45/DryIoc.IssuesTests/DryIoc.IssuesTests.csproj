@@ -87,6 +87,7 @@
     <Compile Include="Issue143_Mixing_closed_and_open_generics_subsumes_the_latter.cs" />
     <Compile Include="Issue144_NonPublic_property _as_FactoryMethod_causes_unexplained_NRE.cs" />
     <Compile Include="Issue145_SimplifyDefiningOfOpenGenericFactoryMethod.cs" />
+    <Compile Include="Issue148_NestedOptionalDependenciesPreventTheOuterDependencyFromInstantiating.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

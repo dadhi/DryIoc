@@ -2236,7 +2236,7 @@ namespace DryIoc
                 // updating IfUnresolved policy to ReturnDefault.
                 if (containerRequest.IfUnresolved != IfUnresolved.ReturnDefault)
                     containerRequest = containerRequest.WithChangedServiceInfo(info => // NOTE Code Smell
-                        ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfo(info));
+                        ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfoFromDependencyOwner(info));
 
                 var factory = containerWeakRef.Container.ResolveFactory(containerRequest);
                 if (factory != null)
@@ -3807,7 +3807,8 @@ namespace DryIoc
         /// <param name="owner">Dependency holder/owner info.</param>
         /// <param name="shouldInheritServiceKey">(optional) Self-explanatory. Usually set to true for wrapper and decorator info.</param>
         /// <returns>Either input dependency info, or new info with properties inherited from the owner.</returns>
-        public static IServiceInfo InheritInfo(this IServiceInfo dependency, IServiceInfo owner, bool shouldInheritServiceKey = false)
+        public static IServiceInfo InheritInfoFromDependencyOwner(this IServiceInfo dependency, IServiceInfo owner, 
+            bool shouldInheritServiceKey = false)
         {
             var ownerDetails = owner.Details;
             if (ownerDetails == null || ownerDetails == ServiceDetails.Default)
@@ -4208,7 +4209,7 @@ namespace DryIoc
                     scope /* input scope provided only for first request when Resolve called */);
 
             ResolvedFactory.ThrowIfNull(Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
-            var inheritedInfo = info.InheritInfo(ServiceInfo, ResolvedFactory.Setup.FactoryType != FactoryType.Service);
+            var inheritedInfo = info.InheritInfoFromDependencyOwner(ServiceInfo, ResolvedFactory.Setup.FactoryType != FactoryType.Service);
             return new Request(this, ContainerWeakRef, _scopesWeakRef, inheritedInfo, null, FuncArgs,
                 Scope /* then scope is copied into dependency requests */);
         }
@@ -5298,9 +5299,13 @@ namespace DryIoc
                             {
                                 var paramFactory = paramRequest.Container.ResolveFactory(paramRequest);
                                 paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
-                                if (paramExpr == null)
+                                // Meant that parent Or parameter itself allows default value, 
+                                // otherwise we did not get null but exception
+                                if (paramExpr == null)  
                                 {
-                                    if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+                                    // Check if parameter itself (without propagated parent details) 
+                                    // does not allow default, then stop checking the rest of parameters.
+                                    if (paramInfo.Details.IfUnresolved == IfUnresolved.Throw)
                                         return null;
 
                                     var defaultValue = paramInfo.Details.DefaultValue;
