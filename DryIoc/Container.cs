@@ -982,7 +982,7 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _doMethod = typeof(Container)
-            .GetSingleDeclaredMethodOrNull("DoAction", includeNonPublic: true);
+            .GetSingleMethodOrNull("DoAction", includeNonPublic: true);
         internal static Func<T, R> DoAction<T, R>(Action<T> action) where R : T
         {
             return x => { action(x); return (R)x; };
@@ -1960,7 +1960,7 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _resolveManyMethod =
-            typeof(IResolver).GetSingleDeclaredMethodOrNull("ResolveMany").ThrowIfNull();
+            typeof(IResolver).GetSingleMethodOrNull("ResolveMany").ThrowIfNull();
 
         private static Expression GetLazyEnumerableExpressionOrDefault(Request request)
         {
@@ -2385,7 +2385,7 @@ namespace DryIoc
         /// <summary>Constructor or method to use for service creation.</summary>
         public readonly MemberInfo ConstructorOrMethodOrMember;
 
-        /// <summary>Factory info to resolve if factory method is instance member.</summary>
+        /// <summary>Identifies factory service if factory method is instance member.</summary>
         public readonly ServiceInfo FactoryInfo;
 
         /// <summary>Wraps method and factory instance.</summary>
@@ -2395,13 +2395,6 @@ namespace DryIoc
         public static FactoryMethod Of(MemberInfo ctorOrMethodOrMember, ServiceInfo factoryInfo = null)
         {
             return new FactoryMethod(ctorOrMethodOrMember.ThrowIfNull(), factoryInfo);
-        }
-
-        /// <summary>Converts method to selector when selector parameter is not required.</summary>
-        /// <param name="method">Method to convert.</param> <returns>Result selector.</returns>
-        public static implicit operator FactoryMethodSelector(FactoryMethod method)
-        {
-            return _ => method;
         }
 
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
@@ -2512,21 +2505,6 @@ namespace DryIoc
             return Of(factoryMethod);
         }
 
-        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
-        /// <param name="factoryMethod">To return from <see cref="FactoryMethod"/>.</param> <returns>New rules.</returns>
-        public static implicit operator Made(FactoryMethod factoryMethod)
-        {
-            return Of(_ => factoryMethod);
-        }
-
-        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
-        /// <param name="factoryMethod">To create <see cref="DryIoc.FactoryMethod"/> and return it from <see cref="FactoryMethod"/>.</param> 
-        /// <returns>New rules.</returns>
-        public static implicit operator Made(MethodInfo factoryMethod)
-        {
-            return Of(_ => DryIoc.FactoryMethod.Of(factoryMethod));
-        }
-
         /// <summary>Creates rules with only <see cref="Parameters"/> specified.</summary>
         /// <param name="parameters">To use.</param> <returns>New rules.</returns>
         public static implicit operator Made(ParameterSelector parameters)
@@ -2552,11 +2530,27 @@ namespace DryIoc
         }
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
-        /// <param name="factoryMethod">Known factory method.</param><param name="factoryMethodReturnType">... and its result type.</param>
+        /// <param name="factoryMethod">Known factory method.</param>
         /// <returns>New injection rules.</returns>
-        public static Made Of(FactoryMethod factoryMethod, Type factoryMethodReturnType)
+        public static Made Of(FactoryMethod factoryMethod)
         {
-            return new Made(r => factoryMethod, factoryMethodKnownResultType: factoryMethodReturnType);
+            var methodReturnType = factoryMethod.ConstructorOrMethodOrMember.GetReturnTypeOrDefault();
+
+            // Normalizes open-generic type to open-generic definition, 
+            // because for base classes and return types it may not be the case.
+            if (methodReturnType != null && methodReturnType.IsOpenGeneric())
+                methodReturnType = methodReturnType.GetGenericTypeDefinition();
+
+            return new Made(_ => factoryMethod, factoryMethodKnownResultType: methodReturnType);
+        }
+
+        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
+        /// <param name="factoryMethodOrMember">To create service.</param>
+        /// <param name="factoryInfo">(optional) Factory info to resolve in case of instance member.</param>
+        /// <returns>New rules.</returns>
+        public static Made Of(MemberInfo factoryMethodOrMember, ServiceInfo factoryInfo = null)
+        {
+            return Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo));
         }
 
         /// <summary>Defines how to select constructor from implementation type.</summary>
@@ -2576,7 +2570,7 @@ namespace DryIoc
         /// or static method call <code lang="cs"><![CDATA[() => Car.Create(Arg.Of<IEngine>())]]></code></param>
         /// <param name="argValues">(optional) Primitive custom values for dependencies.</param>
         /// <returns>New Made specification.</returns>
-        public static Expr<TService> Of<TService>(
+        public static TypedMade<TService> Of<TService>(
             Expression<Func<TService>> serviceReturningExpr,
             params Func<Request, object>[] argValues)
         {
@@ -2590,7 +2584,7 @@ namespace DryIoc
         /// <param name="serviceReturningExpr">Method, property or field expression returning service.</param>
         /// <param name="argValues">(optional) Primitive custom values for dependencies.</param>
         /// <returns>New Made specification.</returns>
-        public static Expr<TService> Of<TFactory, TService>(
+        public static TypedMade<TService> Of<TFactory, TService>(
             Func<Request, ServiceInfo.Typed<TFactory>> getFactoryInfo,
             Expression<Func<TFactory, TService>> serviceReturningExpr,
             params Func<Request, object>[] argValues)
@@ -2601,7 +2595,7 @@ namespace DryIoc
             return FromExpression<TService>(r => getFactoryInfo(r).ThrowIfNull(), serviceReturningExpr, argValues);
         }
 
-        private static Expr<TService> FromExpression<TService>(
+        private static TypedMade<TService> FromExpression<TService>(
             Func<Request, ServiceInfo> getFactoryInfo,
             LambdaExpression serviceReturningExpr,
             params Func<Request, object>[] argValues)
@@ -2637,7 +2631,7 @@ namespace DryIoc
             {
                 var invokeExpr = ((InvocationExpression)callExpr);
                 var invokedDelegateExpr = invokeExpr.Expression;
-                var invokeMethod = invokedDelegateExpr.Type.GetSingleDeclaredMethodOrNull("Invoke");
+                var invokeMethod = invokedDelegateExpr.Type.GetSingleMethodOrNull("Invoke");
                 ctorOrMethodOrMember = invokeMethod;
                 parameters = invokeMethod.GetParameters();
                 argExprs = invokeExpr.Arguments;
@@ -2650,7 +2644,7 @@ namespace DryIoc
                     Error.UnexpectedFactoryMemberExpression, member);
                 ctorOrMethodOrMember = member;
             }
-            else return Throw.For<Expr<TService>>(Error.NotSupportedMadeExpression, callExpr);
+            else return Throw.For<TypedMade<TService>>(Error.NotSupportedMadeExpression, callExpr);
 
             FactoryMethodSelector factoryMethod = request =>
                 DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, getFactoryInfo == null ? null : getFactoryInfo(request));
@@ -2662,16 +2656,16 @@ namespace DryIoc
                 memberBindingExprs == null || memberBindingExprs.Count == 0 ? null
                 : ComposePropertiesAndFieldsSelector(memberBindingExprs, argValues);
 
-            return new Expr<TService>(factoryMethod, parameterSelector, propertiesAndFieldsSelector);
+            return new TypedMade<TService>(factoryMethod, parameterSelector, propertiesAndFieldsSelector);
         }
 
         /// <summary>Typed version of <see cref="Made"/> specified with statically typed expression tree.</summary>
         /// <typeparam name="TService">Type that expression returns.</typeparam>
-        public sealed class Expr<TService> : Made
+        public sealed class TypedMade<TService> : Made
         {
             /// <summary>Creates typed version.</summary>
             /// <param name="factoryMethod"></param> <param name="parameters"></param> <param name="propertiesAndFields"></param>
-            internal Expr(FactoryMethodSelector factoryMethod = null,
+            internal TypedMade(FactoryMethodSelector factoryMethod = null,
                 ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
                 : base(factoryMethod, parameters, propertiesAndFields, typeof(TService))
             { }
@@ -2988,7 +2982,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register<TService, TMadeResult>(this IRegistrator registrator,
-            Made.Expr<TMadeResult> made, IReuse reuse = null, Setup setup = null,
+            Made.TypedMade<TMadeResult> made, IReuse reuse = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null) where TMadeResult : TService
         {
@@ -3005,7 +2999,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register<TService>(this IRegistrator registrator,
-            Made.Expr<TService> made, IReuse reuse = null, Setup setup = null,
+            Made.TypedMade<TService> made, IReuse reuse = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null)
         {
@@ -3161,7 +3155,7 @@ namespace DryIoc
         /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>        
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        public static void RegisterMany<TMadeResult>(this IRegistrator registrator, Made.Expr<TMadeResult> made,
+        public static void RegisterMany<TMadeResult>(this IRegistrator registrator, Made.TypedMade<TMadeResult> made,
             IReuse reuse = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false,
@@ -5376,8 +5370,7 @@ namespace DryIoc
                         if (matchFound)
                         {
                             var closedMethod = openMethod.MakeGenericMethod(methodTypeArgs);
-                            var closedFactoryMethod = FactoryMethod.Of(closedMethod, factoryMethod.FactoryInfo);
-                            made = Made.Of(closedFactoryMethod, closedMethod.ReturnType);
+                            made = Made.Of(FactoryMethod.Of(closedMethod, factoryMethod.FactoryInfo));
                         }
                     }
                 }
@@ -5412,25 +5405,29 @@ namespace DryIoc
 
         private Type ValidateAndNormalizeImplementationType(Type implementationType)
         {
-            if (implementationType == null)
+            var factoryMethodResultType = Made.FactoryMethodKnownResultType;
+            if (implementationType == null || implementationType.IsAbstract())
             {
-                Throw.If(Made.FactoryMethod == null, Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
+                if (Made.FactoryMethod == null)
+                {
+                    Throw.If(implementationType == null,
+                        Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
+                    Throw.If(implementationType.IsAbstract(),
+                        Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, implementationType);
+                }
 
-                // Using non-abstract expression result type is pretty much safe for conditions and diagnostics
-                if (Made.FactoryMethodKnownResultType != null && !Made.FactoryMethodKnownResultType.IsAbstract())
-                    implementationType = Made.FactoryMethodKnownResultType;
+                implementationType = null; // Ensure that we do not have abstract implementation type
+
+                // Using non-abstract factory method result type is safe for conditions and diagnostics
+                if (factoryMethodResultType != null && !factoryMethodResultType.IsAbstract())
+                    implementationType = factoryMethodResultType;
             }
-            else if (implementationType.IsAbstract())
+            else if (factoryMethodResultType != null && factoryMethodResultType != implementationType)
             {
-                Throw.If(Made.FactoryMethod == null, Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod,
-                    implementationType);
-                implementationType = null; // Sure that abstract type could not be implementation 
+                implementationType.ThrowIfNotImplementedBy(factoryMethodResultType,
+                    Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType);
             }
-            else if (Made.FactoryMethodKnownResultType != null && Made.FactoryMethodKnownResultType != implementationType)
-            {
-                implementationType.ThrowIfNotImplementedBy(Made.FactoryMethodKnownResultType,
-                    Error.MadeOfTypeNotAssignableToImplementationType);
-            }
+
             return implementationType;
         }
 
@@ -6769,8 +6766,8 @@ namespace DryIoc
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
             RegisterImplementationNotAssignableToServiceType = Of(
                 "Registering implementation type {0} not assignable to service type {1}."),
-            MadeOfTypeNotAssignableToImplementationType = Of(
-                "Factory method made-of-type {1} should be assignable to implementation type {0} but it is not."),
+            RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType = Of(
+                "Registered factory method return type {1} should be assignable to implementation type {0} but it is not."),
             RegisteringOpenGenericRequiresFactoryProvider = Of(
                 "Unable to register not a factory provider for open-generic service {0}."),
             RegisteringOpenGenericImplWithNonGenericService = Of(
@@ -7346,7 +7343,7 @@ namespace DryIoc
         /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
         /// <param name="includeNonPublic">(optional) If set includes non public methods into search.</param>
         /// <returns>Found method or null.</returns>
-        public static MethodInfo GetSingleDeclaredMethodOrNull(this Type type, string name, bool includeNonPublic = false)
+        public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
         {
             var methods = type.GetTypeInfo().DeclaredMethods
                 .Where(m => (includeNonPublic || m.IsPublic) && m.Name == name)
@@ -7357,7 +7354,7 @@ namespace DryIoc
         /// <summary>Returns declared (not inherited) method by name and argument types, or null if not found.</summary>
         /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
         /// <param name="args">Argument types</param> <returns>Found method or null.</returns>
-        public static MethodInfo GetDeclaredMethodOrNull(this Type type, string name, params Type[] args)
+        public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] args)
         {
             return type.GetTypeInfo().DeclaredMethods.FirstOrDefault(m =>
                 m.Name == name && args.SequenceEqual(m.GetParameters().Select(p => p.ParameterType)));
@@ -7747,7 +7744,7 @@ namespace DryIoc
         /// <returns>Setter method info if it is defined for property.</returns>
         public static MethodInfo GetGetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
         {
-            return p.DeclaringType.GetSingleDeclaredMethodOrNull("get_" + p.Name, includeNonPublic);
+            return p.DeclaringType.GetSingleMethodOrNull("get_" + p.Name, includeNonPublic);
         }
 
         /// <summary>Portable version of PropertyInfo.GetSetMethod.</summary>
@@ -7756,7 +7753,7 @@ namespace DryIoc
         /// <returns>Setter method info if it is defined for property.</returns>
         public static MethodInfo GetSetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
         {
-            return p.DeclaringType.GetSingleDeclaredMethodOrNull("set_" + p.Name, includeNonPublic);
+            return p.DeclaringType.GetSingleMethodOrNull("set_" + p.Name, includeNonPublic);
         }
 
         /// <summary>Portable version of Type.GetGenericArguments.</summary>
@@ -7777,7 +7774,7 @@ namespace DryIoc
         static partial void GetCurrentManagedThreadID(ref int threadID);
 
         private static readonly MethodInfo _getEnvCurrentManagedThreadIdMethod =
-            typeof(Environment).GetDeclaredMethodOrNull("get_CurrentManagedThreadId", ArrayTools.Empty<Type>());
+            typeof(Environment).GetMethodOrNull("get_CurrentManagedThreadId", ArrayTools.Empty<Type>());
 
         private static readonly Func<int> _getEnvCurrentManagedThreadId =
             _getEnvCurrentManagedThreadIdMethod == null ? null :
@@ -7818,7 +7815,7 @@ namespace DryIoc
         /// <returns>Created delegate or null, if no method with such name is found.</returns>
         public static Func<TOwner, TReturn> GetMethodDelegateOrNull<TOwner, TReturn>(string methodName)
         {
-            var methodInfo = typeof(TOwner).GetDeclaredMethodOrNull(methodName, ArrayTools.Empty<Type>());
+            var methodInfo = typeof(TOwner).GetMethodOrNull(methodName, ArrayTools.Empty<Type>());
             if (methodInfo == null) return null;
             var thisExpr = Expression.Parameter(typeof(TOwner), "_");
             var methodCallExpr = Expression.Call(thisExpr, methodInfo, ArrayTools.Empty<Expression>());
@@ -7835,7 +7832,7 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _getDefaultMethod = typeof(ExpressionTools)
-            .GetDeclaredMethodOrNull("GetDefault", ArrayTools.Empty<Type>());
+            .GetMethodOrNull("GetDefault", ArrayTools.Empty<Type>());
         internal static T GetDefault<T>() { return default(T); }
     }
 

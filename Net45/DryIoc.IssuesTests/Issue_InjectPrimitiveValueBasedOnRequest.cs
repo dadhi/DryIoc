@@ -61,7 +61,7 @@ namespace DryIoc.IssuesTests
                 made: Made.Of(request =>
                 {
                     var targetType = request.ParentNonWrapper(p => p.ServiceType != typeof(ILog)).ImplementationType;
-                    return FactoryMethod.Of(typeof(LoggerFactory).GetDeclaredMethodOrNull("GetLog").MakeGenericMethod(targetType));
+                    return FactoryMethod.Of(typeof(LoggerFactory).GetMethodOrNull("GetLog").MakeGenericMethod(targetType));
                 }));
 
             // exercise

@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
             c.Register<User2>();
 
             c.Register<ILogger>(made: Made.Of(r => FactoryMethod.Of(
-                typeof(LofFactory).GetDeclaredMethodOrNull("GetLog")
+                typeof(LofFactory).GetMethodOrNull("GetLog")
                 .MakeGenericMethod(r.ParentNonWrapper().ImplementationType))),
                 setup: Setup.With(cacheFactoryExpression: false));
 

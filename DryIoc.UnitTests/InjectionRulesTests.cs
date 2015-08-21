@@ -257,7 +257,7 @@ namespace DryIoc.UnitTests
                 setup: Setup.With(false),
                 made: Made.Of(r =>
                 {
-                    var method = GetType().GetDeclaredMethodOrNull("GetTargetName");
+                    var method = GetType().GetMethodOrNull("GetTargetName");
                     var targetType = r.Parent.Parent.ImplementationType;
                     return FactoryMethod.Of(method.MakeGenericMethod(targetType));
                 }));

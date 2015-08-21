@@ -380,12 +380,12 @@ namespace DryIoc.UnitTests
             where TCommand : ReplayCommand<SpecialEntity>
         { }
 
-        [Test, Ignore]
+        [Test]
         public void Can_register_open_generic_returned_by_factory_method()
         {
             var container = new Container();
 
-            container.Register(typeof (IA<>), made: GetType().GetSingleDeclaredMethodOrNull("GetAOf"));
+            container.Register(typeof(IA<>), made: Made.Of(GetType().GetSingleMethodOrNull("GetAOf", true)));
 
             container.Resolve<IA<B>>();
         }
