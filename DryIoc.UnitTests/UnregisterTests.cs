@@ -350,5 +350,84 @@ namespace DryIoc.UnitTests
         internal interface IC {}
         internal class C : IC {}
         internal class C1 : IC {}
+
+        public class B : IDisposable
+        {
+            public bool IsDisposed;
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+        
+        public class A : IDisposable
+        {
+            public B B { get; private set; }
+
+            public bool IsDisposed;
+
+            public A(B b)
+            {
+                B = b;
+            }
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+        
+        [Test]
+        public void Unregister_singleton_resolution_root()
+        {
+            var container = new Container();
+            container.Register<A>(Reuse.Singleton);
+            container.Register<B>();
+
+            var a = container.Resolve<A>();
+
+            container.Unregister<A>();
+
+            Assert.Throws<ContainerException>(() => 
+            container.Resolve<A>()); // Will throw "Unable to resolve.." exception
+
+            // Unregistered singleton will be kept for container lifetime and won't be disposed either, 
+            // so you should take care of Dispose by yourself
+            // or you may register singleton as Setup.With(weaklyReferenced: true)
+            Assert.IsFalse(a.IsDisposed); 
+
+            // After that re-registering and resolving A should return different instance
+            container.Register<A>(Reuse.Singleton);
+
+            var a1 = container.Resolve<A>();
+            Assert.AreNotSame(a, a1);        
+        }
+
+        [Test]
+        public void Unregister_singleton_injected_redendency()
+        {
+            var container = new Container();
+            container.Register<A>();
+            container.Register<B>(Reuse.Singleton, setup: Setup.With(asResolutionRoot: true));
+
+            var a = container.Resolve<A>();
+
+            container.Unregister<B>();
+
+            Assert.Throws<ContainerException>(() =>
+            container.Resolve<A>()); // Will throw "Unable to resolve.." exception
+
+            // Unregistered singleton will be kept for container lifetime and won't be disposed either, 
+            // so you should take care of Dispose by yourself
+            // or you may register singleton as Setup.With(weaklyReferenced: true)
+            Assert.IsFalse(a.B.IsDisposed);
+
+            // After that re-registering and resolving A should return different instance
+            container.Register<B>(Reuse.Singleton);
+
+            var a1 = container.Resolve<A>();
+            Assert.AreNotSame(a, a1);
+        }
     }
 }
