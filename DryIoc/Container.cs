@@ -2386,7 +2386,7 @@ namespace DryIoc
         public readonly MemberInfo ConstructorOrMethodOrMember;
 
         /// <summary>Identifies factory service if factory method is instance member.</summary>
-        public readonly ServiceInfo FactoryInfo;
+        public readonly ServiceInfo FactoryServiceInfo;
 
         /// <summary>Wraps method and factory instance.</summary>
         /// <param name="ctorOrMethodOrMember">Constructor, static or instance method, property or field.</param>
@@ -2468,10 +2468,10 @@ namespace DryIoc
             return parameterFactory == null ? null : parameterFactory.GetExpressionOrDefault(parameterRequest);
         }
 
-        private FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryInfo = null)
+        private FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
         {
             ConstructorOrMethodOrMember = constructorOrMethodOrMember;
-            FactoryInfo = factoryInfo;
+            FactoryServiceInfo = factoryServiceInfo;
         }
     }
 
@@ -3862,7 +3862,7 @@ namespace DryIoc
         /// <returns>Created info.</returns>
         public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null)
         {
-            serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.ExpectedClosedGenericServiceType);
+            serviceType.ThrowIfNull();
             return serviceKey == null && ifUnresolved == IfUnresolved.Throw
                 ? new ServiceInfo(serviceType)
                 : new WithDetails(serviceType, ServiceDetails.Of(null, serviceKey, ifUnresolved));
@@ -4219,6 +4219,7 @@ namespace DryIoc
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             IScope scope = null)
         {
+            serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible);
             var details = ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
             return Push(DryIoc.ServiceInfo.Of(serviceType).WithDetails(details, this), scope ?? Scope);
         }
@@ -5229,9 +5230,9 @@ namespace DryIoc
 
             // If factory method is instance method, then resolve factory instance first.
             Expression factoryExpr = null;
-            if (factoryMethod.FactoryInfo != null)
+            if (factoryMethod.FactoryServiceInfo != null)
             {
-                var factoryRequest = request.Push(factoryMethod.FactoryInfo);
+                var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
                 var factoryFactory = factoryRequest.Container.ResolveFactory(factoryRequest);
                 factoryExpr = factoryFactory == null ? null : factoryFactory.GetExpressionOrDefault(factoryRequest);
                 if (factoryExpr == null)
@@ -5354,49 +5355,147 @@ namespace DryIoc
                     return null;
 
                 var made = _openGenericFactory.Made;
-                if (made.FactoryMethodKnownResultType == implementationType)
+                if (made.FactoryMethod != null)
                 {
-                    var factoryMethod = made.FactoryMethod(request);
-                    var openMethod = factoryMethod.ConstructorOrMethodOrMember as MethodInfo;
-                    if (openMethod != null)
-                    {
-                        var methodTypeParams = openMethod.GetGenericArguments();
-                        var methodTypeArgs = new Type[methodTypeParams.Length];
-                        var implTypeParams = openMethod.ReturnType.GetGenericParamsAndArgs();
-
-                        var matchFound = MatchServiceWithImplementedTypeParams(
-                            methodTypeArgs, methodTypeParams, implTypeParams, closedTypeArgs);
-
-                        if (matchFound)
-                        {
-                            var closedMethod = openMethod.MakeGenericMethod(methodTypeArgs);
-                            made = Made.Of(FactoryMethod.Of(closedMethod, factoryMethod.FactoryInfo));
-                        }
-                    }
+                    made = GetClosedGenericFactoryMethodOrDefault(made, closedTypeArgs, request);
+                    if (made == null)
+                        return null;
                 }
 
-                Type closedImplementationType;
-                if (request.IfUnresolved == IfUnresolved.ReturnDefault)
-                {
-                    try { closedImplementationType = implementationType.MakeGenericType(closedTypeArgs); }
-                    catch { return null; }
-                }
-                else
-                {
-                    closedImplementationType = Throw.IfThrows<ArgumentException, Type>(
-                       () => implementationType.MakeGenericType(closedTypeArgs),
-                       Error.NoMatchedGenericParamConstraints, implementationType, request);
-                }
+                var closedImplementationType = Throw.IfThrows<ArgumentException, Type>(
+                    () => implementationType.MakeGenericType(closedTypeArgs),
+                   request.IfUnresolved == IfUnresolved.Throw, 
+                   Error.NoMatchedGenericParamConstraints, implementationType, request);
+
+                if (closedImplementationType == null)
+                    return null;
 
                 var closedGenericFactory = new ReflectionFactory(closedImplementationType,
                     _openGenericFactory.Reuse, made, _openGenericFactory.Setup,
                     _openGenericFactory.FactoryID);
 
-                // Storing generated factory ID to service type/key mapping to deleted generated factories when needed
+                // Storing generated factory ID to service type/key mapping 
+                // to find/remove generated factories when needed
                 _generatedFactories.Swap(_ => _.AddOrUpdate(closedGenericFactory.FactoryID,
                     new KV<Type, object>(serviceType, request.ServiceKey)));
 
                 return closedGenericFactory;
+            }
+
+            private static Made GetClosedGenericFactoryMethodOrDefault(Made made, Type[] serviceTypeArgs, Request request)
+            {
+                var factoryMethod = made.FactoryMethod(request);
+                if (factoryMethod == null)
+                    return made; // return original made without changes
+
+                var factoryMember = factoryMethod.ConstructorOrMethodOrMember;
+                var factoryInfo = factoryMethod.FactoryServiceInfo;
+
+                var factoryResultType = factoryMember.GetReturnTypeOrDefault();
+                var implTypeParams = factoryResultType.GetGenericParamsAndArgs();
+
+                // Get method declaring type, and if its open-generic,
+                // then close it first. It is required to get actual method.
+                var factoryImplType = factoryMember.DeclaringType.ThrowIfNull();
+                if (factoryImplType.IsOpenGeneric())
+                {
+                    var factoryImplTypeParams = factoryImplType.GetGenericParamsAndArgs();
+                    var resultFactoryImplTypeArgs = new Type[factoryImplTypeParams.Length];
+
+                    var isFactoryImplTypeClosed = MatchServiceWithImplementedTypeParams(
+                        resultFactoryImplTypeArgs, factoryImplTypeParams,
+                        implTypeParams, serviceTypeArgs);
+
+                    if (!isFactoryImplTypeClosed)
+                        return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                            : Throw.For<Made>(Error.NoMatchedFactoryTypeWithFactoryMethodGenericTypeArgs,
+                                factoryImplType, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "), request);
+
+                    // For instance factory match its service type from the implementation factory type.
+                    if (factoryInfo != null)
+                    {
+                        // Open-generic service type is always normalized as generic type definition
+                        var factoryServiceType = factoryInfo.ServiceType;
+
+                        // Look for service type equivalent within factory implementation type base classes and interfaces,
+                        // because we need identical type arguments to match.
+                        if (factoryServiceType != factoryImplType)
+                            factoryServiceType = factoryImplType.GetImplementedTypes()
+                                .First(t => t.IsGeneric() && t.GetGenericTypeDefinition() == factoryServiceType);
+
+                        var factoryServiceTypeParams = factoryServiceType.GetGenericParamsAndArgs();
+                        var resultFactoryServiceTypeArgs = new Type[factoryServiceTypeParams.Length];
+
+                        var isFactoryServiceTypeClosed = MatchServiceWithImplementedTypeParams(
+                            resultFactoryServiceTypeArgs, factoryServiceTypeParams,
+                            factoryImplTypeParams, resultFactoryImplTypeArgs);
+
+                        // Replace factory info with close factory service type
+                        if (isFactoryServiceTypeClosed)
+                        {
+                            factoryServiceType = factoryServiceType.GetGenericTypeDefinition();
+                            var closedFactoryServiceType = Throw.IfThrows<ArgumentException, Type>(
+                                () => factoryServiceType.MakeGenericType(resultFactoryServiceTypeArgs),
+                                request.IfUnresolved == IfUnresolved.Throw,
+                                Error.NoMatchedGenericParamConstraints, factoryServiceType, request);
+                            if (closedFactoryServiceType == null)
+                                return null;
+
+                            // Copy factory info woth closed factory type
+                            factoryInfo = ServiceInfo.Of(closedFactoryServiceType)
+                                .WithDetails(factoryInfo.Details, request);
+                        }
+                    }
+
+                    // Close the factory type implementation 
+                    // and get factory member to use from it.
+                    var closedFactoryImplType = Throw.IfThrows<ArgumentException, Type>(
+                        () => factoryImplType.MakeGenericType(resultFactoryImplTypeArgs),
+                        request.IfUnresolved == IfUnresolved.Throw,
+                        Error.NoMatchedGenericParamConstraints, factoryImplType, request);
+                    if (closedFactoryImplType == null)
+                        return null;
+
+                    // Find corresponding mamber again, now from closed type
+                    var factoryMethodBase = factoryMember as MethodBase;
+                    if (factoryMethodBase != null)
+                    {
+                        var methodHandleProperty = typeof(MethodBase).GetPropertyOrNull("MethodHandle")
+                            .ThrowIfNull(Error.Of("Sorry, open-generic factory method declaring type {0} is not supported on this platform"), factoryImplType);
+                        factoryMember = MethodBase.GetMethodFromHandle(
+                            (RuntimeMethodHandle)methodHandleProperty.GetValue(factoryMethodBase, ArrayTools.Empty<object>()),
+                            closedFactoryImplType.TypeHandle);
+                    }
+                    else
+                    {
+                        ;
+                    }
+                }
+
+                // 4 - If faxctory method is actual method and still open-generic after closing its decalring type, 
+                // then match remaining method type parameters and make closed method
+                var openFactoryMethod = factoryMember as MethodInfo;
+                if (openFactoryMethod != null && openFactoryMethod.ContainsGenericParameters)
+                {
+                    var methodTypeParams = openFactoryMethod.GetGenericArguments();
+                    var resultMethodTypeArgs = new Type[methodTypeParams.Length];
+
+                    var isMethodClosed = MatchServiceWithImplementedTypeParams(
+                        resultMethodTypeArgs, methodTypeParams, implTypeParams, serviceTypeArgs);
+                    if (isMethodClosed)
+                    {
+                        var closedFactoryMethod = Throw.IfThrows<ArgumentException, MethodInfo>(
+                            () => openFactoryMethod.MakeGenericMethod(resultMethodTypeArgs),
+                            request.IfUnresolved == IfUnresolved.Throw,
+                            Error.NoMatchedGenericParamConstraints, factoryImplType, request);
+
+                        if (closedFactoryMethod == null)
+                            return null;
+
+                        made = Made.Of(FactoryMethod.Of(closedFactoryMethod, factoryInfo));
+                    }
+                }
+                return made;
             }
 
             private readonly ReflectionFactory _openGenericFactory;
@@ -5448,6 +5547,7 @@ namespace DryIoc
             if (!returnType.IsAssignableTo(request.ServiceType))
                 return Throw.IfThrows<InvalidOperationException, Expression>(
                     () => Expression.Convert(serviceExpr, request.ServiceType),
+                    request.IfUnresolved == IfUnresolved.Throw,
                     Error.ServiceIsNotAssignableFromFactoryMethod, request.ServiceType, ctorOrMethodOrMember, request);
 
             return serviceExpr;
@@ -5481,10 +5581,10 @@ namespace DryIoc
                     var member = factoryMethod.ConstructorOrMethodOrMember;
                     var isStaticMember = member.IsStatic();
 
-                    Throw.If(isStaticMember && factoryMethod.FactoryInfo != null,
-                        Error.FactoryObjProvidedButMethodIsStatic, factoryMethod.FactoryInfo, factoryMethod, request);
+                    Throw.If(isStaticMember && factoryMethod.FactoryServiceInfo != null,
+                        Error.FactoryObjProvidedButMethodIsStatic, factoryMethod.FactoryServiceInfo, factoryMethod, request);
 
-                    Throw.If(!isStaticMember && factoryMethod.FactoryInfo == null,
+                    Throw.If(!isStaticMember && factoryMethod.FactoryServiceInfo == null,
                         Error.FactoryObjIsNullInFactoryMethod, factoryMethod, request);
                 }
 
@@ -6790,6 +6890,10 @@ namespace DryIoc
                 "Unspecified how to select single constructor for implementation type {0} with {1} public constructors."),
             NoMatchedImplementedTypesWithServiceType = Of(
                 "Unable to match service with open-generic {0} implementing {1} when resolving {2}."),
+            NoMatchedFactoryTypeWithFactoryMethodGenericTypeArgs = Of(
+                "Unable to match open-generic factory type {0} with requested service type arguments <{1}> when resolving {2}."),
+            OpenGenericFactoryMethodDeclaringTypeIsNotSupportedOnThisPlatform = Of(
+                "Sorry, open-generic factory method declaring type {0} is not supported on this platform"),
             CtorIsMissingSomeParameters = Of(
                 "Constructor [{0}] of {1} misses some arguments required for {2} dependency."),
             UnableToSelectConstructor = Of(
@@ -6797,8 +6901,8 @@ namespace DryIoc
                 + "Please provide constructor selector when registering service."),
             ExpectedFuncWithMultipleArgs = Of(
                 "Expecting Func with one or more arguments but found {0}."),
-            ExpectedClosedGenericServiceType = Of(
-                "Expecting closed-generic service type but found {0}."),
+            ResolvingOpenGenericServiceTypeIsNotPossible = Of(
+                "Resolving open-generic service type is not possible for type: {0}."),
             RecursiveDependencyDetected = Of(
                 "Recursive dependency is detected when resolving" + Environment.NewLine + "{0}."),
             ScopeIsDisposed = Of(
@@ -6821,7 +6925,7 @@ namespace DryIoc
             TargetWasAlreadyDisposed = Of(
                 "Target {0} was already disposed in {1} wrapper."),
             NoMatchedGenericParamConstraints = Of(
-                "Service type does not match registered open-generic implementation constraints {0} when resolving {1}."),
+                "Open-generic service does not match with registered open-generic implementation constraints {0} when resolving: {1}."),
             GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex = Of(
                 "Generic wrapper type {0} should specify what type arg is wrapped, but it does not."),
             GenericWrapperTypeArgIndexOutOfBounds = Of(
@@ -7001,14 +7105,26 @@ namespace DryIoc
         /// <summary>Invokes <paramref name="operation"/> and in case of <typeparamref name="TEx"/> re-throws it as inner-exception.</summary>
         /// <typeparam name="TEx">Exception to check and handle, and then wrap as inner-exception.</typeparam>
         /// <typeparam name="T">Result of <paramref name="operation"/>.</typeparam>
-        /// <param name="operation">To invoke</param> <param name="error">Error code</param>
-        /// <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
+        /// <param name="operation">To invoke</param>
+        /// <param name="throwCondition">Condition to be evaluated, throws if result is true, otherwise - does nothing.</param>
+        /// <param name="error">Error code</param>
+        /// <param name="arg0"></param>
+        /// <param name="arg1"></param>
+        /// <param name="arg2"></param>
+        /// <param name="arg3"></param>
         /// <returns>Result of <paramref name="operation"/> if no exception.</returns>
-        public static T IfThrows<TEx, T>(Func<T> operation, int error, object arg0 = null, object arg1 = null,
-            object arg2 = null, object arg3 = null) where TEx : Exception
+        public static T IfThrows<TEx, T>(Func<T> operation, bool throwCondition, int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null) where TEx : Exception
         {
-            try { return operation(); }
-            catch (TEx ex) { throw GetMatchedException(ErrorCheck.OperationThrows, error, arg0, arg1, arg2, arg3, ex); }
+            try
+            {
+                return operation();
+            }
+            catch (TEx ex)
+            {
+                if (throwCondition)
+                    throw GetMatchedException(ErrorCheck.OperationThrows, error, arg0, arg1, arg2, arg3, ex);
+                return default(T);
+            }
         }
 
         /// <summary>Just throws the exception with the <paramref name="error"/> code.</summary>
@@ -7112,6 +7228,16 @@ namespace DryIoc
         public static Type[] GetImplementedInterfaces(this Type type)
         {
             return type.GetTypeInfo().ImplementedInterfaces.ToArrayOrSelf();
+        }
+
+        /// <summary>Gets all decalred and base members.</summary>
+        /// <param name="type">Type to get members from.</param> <returns>All members.</returns>
+        public static IEnumerable<MemberInfo> GetAllMembers(this Type type)
+        {
+            return type.GetAll(t =>
+                t.DeclaredMethods.Cast<MemberInfo>().Concat(
+                t.DeclaredProperties.Cast<MemberInfo>().Concat(
+                t.DeclaredFields.Cast<MemberInfo>())));
         }
 
         /// <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters from <paramref name="genericParameters"/>.</summary>

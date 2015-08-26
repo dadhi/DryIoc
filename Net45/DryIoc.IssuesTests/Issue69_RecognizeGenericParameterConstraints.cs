@@ -13,8 +13,7 @@ namespace DryIoc.IssuesTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IGeneric<SomeClass, string, ServiceDerivedClass, ServiceTDerivedClass<string>>>());
 
-            Assert.That(ex.Message, Is.StringContaining(
-                "Service type does not match registered open-generic implementation constraints"));
+            Assert.AreEqual(Error.NoMatchedGenericParamConstraints, ex.Error);
         }
 
         internal interface IGeneric<T1, T2, T3, T4> { }

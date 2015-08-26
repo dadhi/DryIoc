@@ -98,7 +98,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve(typeof(Service<>)));
 
-            Assert.That(ex.Message, Is.StringContaining("Service<>"));
+            Assert.AreEqual(Error.ResolvingOpenGenericServiceTypeIsNotPossible, ex.Error);
         }
 
         [Test]
@@ -405,6 +405,25 @@ namespace DryIoc.UnitTests
         internal static A<T> GetAOf<T>() where T : new()
         {
             return new A<T>();
+        }
+
+        [Test]
+        public void Selecting_constructor_in_open_generic_class_should_work()
+        {
+            var container = new Container();
+
+            container.Register(typeof(Zzz<>), 
+                made: Made.Of(typeof(Zzz<>).GetConstructorOrNull(args: typeof(string))));
+
+            container.RegisterInstance<string>("x");
+
+            container.Resolve<Zzz<string>>();
+        }
+
+        public class Zzz<T>
+        {
+            public Zzz(int a) {}
+            public Zzz(string b) {}
         }
 
         #region CUT

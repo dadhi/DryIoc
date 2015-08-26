@@ -5,7 +5,7 @@ set SLN="..\DryIoc.sln"
 set OUTDIR="..\bin\Release"
 
 set MSBUILDVER=%2
-if "%MSBUILDVER%"=="" set MSBUILDVER=14
+if "%MSBUILDVER%"=="" set MSBUILDVER=12
 echo:MsBuild version: %MSBUILDVER%
 
 echo:

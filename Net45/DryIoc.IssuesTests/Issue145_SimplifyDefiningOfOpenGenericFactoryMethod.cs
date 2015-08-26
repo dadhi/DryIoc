@@ -41,6 +41,98 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<E<string, int>>(e);
         }
 
+        [Test]
+        public void Should_map_static_open_generic_class_with_generic_factory_method()
+        {
+            var container = new Container();
+            container.RegisterExports(typeof(X<>));
+
+            container.RegisterInstance<int>(1);
+            var y = container.Resolve<Y<int, string>>();
+
+            Assert.AreEqual(1, y.Blah);
+        }
+
+        [Test]
+        public void Should_map_open_generic_class_with_generic_factory_method()
+        {
+            var container = new Container();
+            container.RegisterExports(typeof(Z<>));
+
+            container.RegisterInstance<string>("1");
+            var y = container.Resolve<Y<string, string>>();
+
+            Assert.AreEqual("1", y.Blah);
+        }
+
+        [Test]
+        public void Should_throw_when_mapping_service_with_incompatible_type_arguments()
+        {
+            var container = new Container();
+            container.RegisterExports(typeof(X<>));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<IY<int, string>>());
+
+            Assert.AreEqual(Error.NoMatchedImplementedTypesWithServiceType, ex.Error);
+        }
+
+        [Test]
+        public void Should_throw_when_mapping_factory_with_incompatible_type_arguments()
+        {
+            var container = new Container();
+            container.RegisterExports(typeof(X<>));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<IY<List<string>, Tuple<int, string>>>());
+
+            Assert.AreEqual(Error.NoMatchedFactoryTypeWithFactoryMethodGenericTypeArgs, ex.Error);
+        }
+
+        [Test]
+        public void Should_map_factory_field_with_compatible_type_arguments()
+        {
+            var container = new Container();
+            container.RegisterExports(typeof(X<>));
+
+            var y = container.Resolve<IY<List<int>, Tuple<string, int>>>();
+
+        }
+
+        [Export, AsFactory]
+        public static class X<A>
+        {
+            [Export]
+            public static Y<A, B> Get<B>(A a) { return new Y<A, B>(a); }
+
+            [Export(typeof(IY<,>))]
+            public static Y<int, A> YField = new Y<int, A>(1);
+        }
+
+        public interface IZ<T> {}
+
+        [Export(typeof(IZ<>)), AsFactory]
+        public class Z<A> : IZ<A>
+        {
+            // Deceptive method with the same signature as the closed-generic Get<string> below.
+            public Y<A, string> Get(string a) { return new Y<A, string>(default(A)); }
+
+            [Export]
+            public Y<A, B> Get<B>(A a) { return new Y<A, B>(a); }
+        }
+
+        public interface IY<T, T1> {}
+
+        public class Y<T, R> : IY<List<T>, Tuple<R, T>>
+        { 
+            public T Blah;
+
+            public Y(T t)
+            {
+                Blah = t;
+            }
+        }
+
         [Export, AsFactory]
         public static class CFactory
         {

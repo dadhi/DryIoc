@@ -377,7 +377,7 @@ namespace DryIoc.MefAttributedModel
         private static ExportInfo[] GetExportsFromExportManyAttribute(ExportedRegistrationInfo currentInfo,
             Type implementationType, ExportManyAttribute exportManyAttribute)
         {
-            var contractTypes = Registrator.GetImplementedServiceTypes(implementationType, exportManyAttribute.NonPublic);
+            var contractTypes = implementationType.GetImplementedServiceTypes(exportManyAttribute.NonPublic);
             if (!exportManyAttribute.Except.IsNullOrEmpty())
                 contractTypes = contractTypes.Except(exportManyAttribute.Except).ToArrayOrSelf();
 
@@ -447,12 +447,7 @@ namespace DryIoc.MefAttributedModel
 
         private static void RegisterFactoryMethods(IRegistrator registrator, ExportedRegistrationInfo factoryInfo)
         {
-            // NOTE: Cast is required for NET35
-            var members = factoryInfo.ImplementationType.GetAll(t =>
-                t.DeclaredMethods.Cast<MemberInfo>().Concat(
-                t.DeclaredProperties.Cast<MemberInfo>().Concat(
-                t.DeclaredFields.Cast<MemberInfo>())));
-
+            var members = factoryInfo.ImplementationType.GetAllMembers();
             foreach (var member in members)
             {
                 var attributes = member.GetAttributes().ToArrayOrSelf();
