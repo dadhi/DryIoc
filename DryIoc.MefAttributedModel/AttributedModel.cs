@@ -169,14 +169,13 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static FactoryMethod GetImportingConstructor(Request request)
+        private static ConstructorInfo GetImportingConstructor(Type implementationType, Request request)
         {
-            var implementationType = request.ImplementationType;
             var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
-            var constructor = constructors.Length == 1 ? constructors[0]
+            return constructors.Length == 1
+                ? constructors[0]
                 : constructors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
                     .ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implementationType);
-            return FactoryMethod.Of(constructor);
         }
 
         private static Func<ParameterInfo, ParameterServiceInfo> GetImportedParameter(Request request)
@@ -257,7 +256,7 @@ namespace DryIoc.MefAttributedModel
                 var reuse = GetReuse(reuseType, reuseName);
 
                 var impl = import.ConstructorSignature == null ? null
-                    : Made.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
+                    : Made.Of((t, r) => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
                 container.Register(serviceType, implementationType, reuse, impl,
                     Setup.With(metadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);

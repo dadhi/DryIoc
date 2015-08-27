@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests.Samples
             container.Register<IService, SomeService>();
 
             container.Register<ClassWithMultipleConstructors>(
-                made: Made.Of(t => t.GetConstructor(new[] { typeof(IService) })));
+                made: Made.Of((t, r) => t.GetConstructor(new[] { typeof(IService) })));
 
             var service = container.Resolve<ClassWithMultipleConstructors>();
             Assert.That(service, Is.Not.Null);
@@ -33,7 +33,7 @@ namespace DryIoc.IssuesTests.Samples
             var container = new Container();
             container.Register<IService, SomeService>();
 
-            container.Register<ClassWithInternalConstructor>(made: Made.Of(t => t.GetSingleConstructorOrNull(true)));
+            container.Register<ClassWithInternalConstructor>(made: Made.Of((t, r) => t.GetSingleConstructorOrNull(true)));
 
             var obj = container.Resolve<ClassWithInternalConstructor>();
             Assert.IsNotNull(obj);

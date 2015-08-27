@@ -97,6 +97,18 @@ namespace DryIoc.IssuesTests
 
             var y = container.Resolve<IY<List<int>, Tuple<string, int>>>();
 
+            Assert.IsInstanceOf<Y<int, string>>(y);
+        }
+
+        [Test]
+        public void Should_map_factory_proiperty_with_compatible_type_arguments()
+        {
+            var container = new Container();
+            container.RegisterExports(typeof(X<>));
+
+            var y = container.Resolve<IY<List<int>, Tuple<string, int>>>("property");
+
+            Assert.IsInstanceOf<Y<int, string>>(y);
         }
 
         [Export, AsFactory]
@@ -107,6 +119,9 @@ namespace DryIoc.IssuesTests
 
             [Export(typeof(IY<,>))]
             public static Y<int, A> YField = new Y<int, A>(1);
+
+            [Export("property", typeof(IY<,>))]
+            public static Y<int, A> YProperty { get { return YField; } }
         }
 
         public interface IZ<T> {}

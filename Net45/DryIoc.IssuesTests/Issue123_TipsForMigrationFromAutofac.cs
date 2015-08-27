@@ -278,7 +278,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void DryIoc_constructor_selection_plus_specs()
         {
-            var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments));
+            var container = new Container(rules => rules.With(Made.ConstructorWithResolvableArguments));
 
             container.Register(Made.Of(() => new A(Arg.Of<C>(IfUnresolved.ReturnDefault))));
             container.Register<B>();

@@ -6,7 +6,7 @@ namespace DryIoc.UnitTests
     [TestFixture]
     public class ContextDependentResolutionTests
     {
-        public static class LofFactory
+        public static class LogFactory
         {
             public static ILogger GetLog<T>()
             {
@@ -22,8 +22,7 @@ namespace DryIoc.UnitTests
             c.Register<User2>();
 
             c.Register<ILogger>(made: Made.Of(r => FactoryMethod.Of(
-                typeof(LofFactory).GetMethodOrNull("GetLog")
-                .MakeGenericMethod(r.ParentNonWrapper().ImplementationType))),
+                typeof(LogFactory).GetMethodOrNull("GetLog").MakeGenericMethod(r.ParentNonWrapper().ImplementationType))),
                 setup: Setup.With(cacheFactoryExpression: false));
 
             Assert.That(c.Resolve<User2>().Logger, Is.InstanceOf<Logger<User2>>());

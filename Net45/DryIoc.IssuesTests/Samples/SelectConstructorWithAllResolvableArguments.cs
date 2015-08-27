@@ -11,7 +11,7 @@ namespace DryIoc.IssuesTests.Samples
             var container = new Container();
             container.Register<IDependency, SomeDependency>();
 
-            container.Register<SomeClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
+            container.Register<SomeClient>(made: Made.ConstructorWithResolvableArguments);
 
             var client = container.Resolve<SomeClient>();
             Assert.That(client.Dependency, Is.Not.Null);

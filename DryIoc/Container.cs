@@ -556,7 +556,7 @@ namespace DryIoc
             var factory = GetServiceFactoryOrDefault(request, Rules.FactorySelector);
             if (factory != null && factory.FactoryGenerator != null)
             {
-                factory = factory.FactoryGenerator.GenerateFactoryOrDefault(request);
+                factory = factory.FactoryGenerator.GenerateResolvedFactoryOrDefault(request);
                 if (factory != null)
                 {
                     var serviceKey = request.ServiceKey is DefaultKey ? null : request.ServiceKey;
@@ -681,7 +681,7 @@ namespace DryIoc
                         // Cache closed generic registration produced by open-generic decorator.
                         if (i >= openGenericDecoratorIndex && decorator.FactoryGenerator != null)
                         {
-                            decorator = decorator.FactoryGenerator.GenerateFactoryOrDefault(request);
+                            decorator = decorator.FactoryGenerator.GenerateResolvedFactoryOrDefault(request);
                             Register(decorator, serviceType, null, IfAlreadyRegistered.AppendNotKeyed, false);
                         }
 
@@ -1865,7 +1865,7 @@ namespace DryIoc
 
             var factory = request.Container.GetWrapperFactoryOrDefault(serviceType);
             if (factory != null && factory.FactoryGenerator != null)
-                factory = factory.FactoryGenerator.GenerateFactoryOrDefault(request);
+                factory = factory.FactoryGenerator.GenerateResolvedFactoryOrDefault(request);
 
             return factory;
         };
@@ -2118,7 +2118,7 @@ namespace DryIoc
             ResolveFromFallbackContainers);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
-        public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
+        public ConstructorSelector Constructor { get { return _made.Constructor; } }
 
         /// <summary>Shorthand to <see cref="Made.Parameters"/></summary>
         public ParameterSelector Parameters { get { return _made.Parameters; } }
@@ -2129,13 +2129,13 @@ namespace DryIoc
         /// <summary>Returns new instance of the rules with specified <see cref="Made"/>.</summary>
         /// <returns>New rules with specified <see cref="Made"/>.</returns>
         public Rules With(
-            FactoryMethodSelector factoryMethod = null,
+            ConstructorSelector constructor = null,
             ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             var newRules = (Rules)MemberwiseClone();
             newRules._made = Made.Of(
-                factoryMethod ?? newRules._made.FactoryMethod,
+                constructor ?? newRules._made.Constructor, null,
                 parameters ?? newRules._made.Parameters,
                 propertiesAndFields ?? newRules._made.PropertiesAndFields);
             return newRules;
@@ -2382,8 +2382,8 @@ namespace DryIoc
     /// <summary>Wraps constructor or factory method optionally with factory instance to create service.</summary>
     public sealed class FactoryMethod
     {
-        /// <summary>Constructor or method to use for service creation.</summary>
-        public readonly MemberInfo ConstructorOrMethodOrMember;
+        /// <summary>Method to use for service creation.</summary>
+        public readonly MemberInfo MethodOrMember;
 
         /// <summary>Identifies factory service if factory method is instance member.</summary>
         public readonly ServiceInfo FactoryServiceInfo;
@@ -2400,80 +2400,26 @@ namespace DryIoc
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
-            return new StringBuilder().Print(ConstructorOrMethodOrMember.DeclaringType)
-                .Append("::").Append(ConstructorOrMethodOrMember).ToString();
+            return new StringBuilder().Print(MethodOrMember.DeclaringType)
+                .Append("::").Append(MethodOrMember).ToString();
         }
 
-        /// <summary>Searches for constructor with all resolvable parameters or throws <see cref="ContainerException"/> if not found.
-        /// Works both for resolving as service and as Func of TArgs... returning TService.</summary>
-        public static readonly FactoryMethodSelector ConstructorWithResolvableArguments = request =>
+        private FactoryMethod(MemberInfo methodOrMember, ServiceInfo factoryServiceInfo = null)
         {
-            var implementationType = request.ImplementationType.ThrowIfNull();
-            var ctors = implementationType.GetAllConstructors().ToArrayOrSelf();
-            if (ctors.Length == 0)
-                return null; // Delegate handling of constructor absence to caller code.
-            if (ctors.Length == 1)
-                return Of(ctors[0]);
-
-            var ctorsWithMoreParamsFirst = ctors
-                .Select(c => new { Ctor = c, Params = c.GetParameters() })
-                .OrderByDescending(x => x.Params.Length);
-
-            var factory = (request.ResolvedFactory as ReflectionFactory).ThrowIfNull();
-            var parameterSelector = request.Container.Rules.Parameters.And(factory.Made.Parameters)(request);
-
-            if (request.IsNestedInFuncWithArgs())
-            {
-                // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
-                var funcType = request.Parent.ServiceType;
-                var funcArgs = funcType.GetGenericParamsAndArgs();
-                var inputArgCount = funcArgs.Length - 1;
-
-                var matchedCtor = ctorsWithMoreParamsFirst
-                    .Where(x => x.Params.Length >= inputArgCount)
-                    .FirstOrDefault(x =>
-                    {
-                        var matchedIndecesMask = 0;
-                        return x.Params.Except(
-                            x.Params.Where(p =>
-                            {
-                                var inputArgIndex = funcArgs.IndexOf(p.ParameterType);
-                                if (inputArgIndex == -1 || inputArgIndex == inputArgCount ||
-                                    (matchedIndecesMask & inputArgIndex << 1) != 0)
-                                    // input argument was already matched by another parameter
-                                    return false;
-                                matchedIndecesMask |= inputArgIndex << 1;
-                                return true;
-                            })).All(p => ResolveParameter(p, parameterSelector, request) != null);
-                    });
-
-                var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindMatchingCtorForFuncWithArgs, funcType, request).Ctor;
-                return Of(ctor);
-            }
-            else
-            {
-                var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(x =>
-                    x.Params.All(p => ResolveParameter(p, parameterSelector, request) != null));
-                var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request).Ctor;
-                return Of(ctor);
-            }
-        };
-
-        private static Expression ResolveParameter(ParameterInfo parameter,
-            Func<ParameterInfo, ParameterServiceInfo> parameterSelector, Request request)
-        {
-            var parameterServiceInfo = parameterSelector(parameter) ?? ParameterServiceInfo.Of(parameter);
-            var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault, request));
-            var parameterFactory = request.Container.ResolveFactory(parameterRequest);
-            return parameterFactory == null ? null : parameterFactory.GetExpressionOrDefault(parameterRequest);
-        }
-
-        private FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
-        {
-            ConstructorOrMethodOrMember = constructorOrMethodOrMember;
+            MethodOrMember = methodOrMember;
             FactoryServiceInfo = factoryServiceInfo;
         }
     }
+
+    /// <summary>Delegate that should return single factory method for request.</summary>
+    /// <param name="request">Request to resolve.</param>
+    /// <returns>Factory method wrapper over constructor or method.</returns>
+    public delegate FactoryMethod FactoryMethodSelector(Request request);
+
+    /// <summary>Delegate that should return single constructor from <paramref name="closedIplementationType"/>.</summary>
+    /// <param name="closedIplementationType">Type to instantiate.</param> <param name="request">Resolution context.</param>
+    /// <returns>Selected constructor.</returns>
+    public delegate ConstructorInfo ConstructorSelector(Type closedIplementationType, Request request);
 
     /// <summary>Rules how to: <list type="bullet">
     /// <item>Select constructor for creating service with <see cref="FactoryMethod"/>.</item>
@@ -2482,11 +2428,14 @@ namespace DryIoc
     /// </list></summary>
     public class Made
     {
+        /// <summary>When invoked returns single constructor of provided type.</summary>
+        public readonly ConstructorSelector Constructor;
+
         /// <summary>Returns delegate to select constructor based on provided request.</summary>
         public FactoryMethodSelector FactoryMethod { get; private set; }
 
         /// <summary>Return type of strongly-typed factory method expression.</summary>
-        public Type FactoryMethodKnownResultType { get; private set; }
+        public Type KnownResultType { get; private set; }
 
         /// <summary>Specifies how constructor parameters should be resolved: 
         /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
@@ -2499,10 +2448,10 @@ namespace DryIoc
         public static readonly Made Default = new Made();
 
         /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
-        /// <param name="factoryMethod">To use.</param> <returns>New rules.</returns>
-        public static implicit operator Made(FactoryMethodSelector factoryMethod)
+        /// <param name="constructorSelector">To use.</param> <returns>New rules.</returns>
+        public static implicit operator Made(ConstructorSelector constructorSelector)
         {
-            return Of(factoryMethod);
+            return Of(constructorSelector);
         }
 
         /// <summary>Creates rules with only <see cref="Parameters"/> specified.</summary>
@@ -2520,13 +2469,20 @@ namespace DryIoc
         }
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
-        /// <param name="factoryMethod">(optional)</param> <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
+        /// <param name="constructor">(optional)</param> <param name="factoryMethod">(optional)</param> <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
         /// <returns>New injection rules or <see cref="Default"/>.</returns>
-        public static Made Of(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null)
+        public static Made Of(
+            ConstructorSelector constructor = null, FactoryMethodSelector factoryMethod = null, 
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            return factoryMethod == null && parameters == null && propertiesAndFields == null
-                ? Default : new Made(factoryMethod, parameters, propertiesAndFields);
+            return constructor == null && factoryMethod == null && parameters == null && propertiesAndFields == null
+                ? Default : new Made(constructor, factoryMethod, parameters, propertiesAndFields);
+        }
+
+        /// <summary>Returns made of constructor.</summary> <param name="constructor"></param> <returns></returns>
+        public static Made Of(ConstructorInfo constructor)
+        {
+            return Of((t, r) => constructor);
         }
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
@@ -2534,14 +2490,22 @@ namespace DryIoc
         /// <returns>New injection rules.</returns>
         public static Made Of(FactoryMethod factoryMethod)
         {
-            var methodReturnType = factoryMethod.ConstructorOrMethodOrMember.GetReturnTypeOrDefault();
+            var methodReturnType = factoryMethod.MethodOrMember.GetReturnTypeOrDefault();
 
             // Normalizes open-generic type to open-generic definition, 
             // because for base classes and return types it may not be the case.
             if (methodReturnType != null && methodReturnType.IsOpenGeneric())
                 methodReturnType = methodReturnType.GetGenericTypeDefinition();
 
-            return new Made(_ => factoryMethod, factoryMethodKnownResultType: methodReturnType);
+            return new Made(null, _ => factoryMethod, knownResultType: methodReturnType);
+        }
+
+        /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
+        /// <param name="factoryMethodSelector">Known factory method.</param>
+        /// <returns>New injection rules.</returns>
+        public static Made Of(FactoryMethodSelector factoryMethodSelector)
+        {
+            return new Made(null, factoryMethodSelector);
         }
 
         /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
@@ -2551,16 +2515,6 @@ namespace DryIoc
         public static Made Of(MemberInfo factoryMethodOrMember, ServiceInfo factoryInfo = null)
         {
             return Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo));
-        }
-
-        /// <summary>Defines how to select constructor from implementation type.</summary>
-        /// <param name="getConstructor">Delegate taking implementation type as input and returning selected constructor info.</param>
-        /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
-        /// <returns>New instance of <see cref="Made"/> with <see cref="FactoryMethod"/> set to specified delegate.</returns>
-        public static Made Of(Func<Type, ConstructorInfo> getConstructor, ParameterSelector parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            return Of(r => DryIoc.FactoryMethod.Of(getConstructor(r.ImplementationType)), parameters, propertiesAndFields);
         }
 
         /// <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
@@ -2606,7 +2560,8 @@ namespace DryIoc
                     Expression.Lambda(((UnaryExpression)callExpr).Operand, ArrayTools.Empty<ParameterExpression>()),
                     argValues);
 
-            MemberInfo ctorOrMethodOrMember;
+            ConstructorInfo constructor = null;
+            MemberInfo methodOrMember = null;
             IList<Expression> argExprs = null;
             IList<MemberBinding> memberBindingExprs = null;
             ParameterInfo[] parameters = null;
@@ -2614,7 +2569,7 @@ namespace DryIoc
             if (callExpr.NodeType == ExpressionType.New || callExpr.NodeType == ExpressionType.MemberInit)
             {
                 var newExpr = callExpr as NewExpression ?? ((MemberInitExpression)callExpr).NewExpression;
-                ctorOrMethodOrMember = newExpr.Constructor;
+                constructor = newExpr.Constructor;
                 parameters = newExpr.Constructor.GetParameters();
                 argExprs = newExpr.Arguments;
                 if (callExpr is MemberInitExpression)
@@ -2623,7 +2578,7 @@ namespace DryIoc
             else if (callExpr.NodeType == ExpressionType.Call)
             {
                 var methodCallExpr = ((MethodCallExpression)callExpr);
-                ctorOrMethodOrMember = methodCallExpr.Method;
+                methodOrMember = methodCallExpr.Method;
                 parameters = methodCallExpr.Method.GetParameters();
                 argExprs = methodCallExpr.Arguments;
             }
@@ -2632,7 +2587,7 @@ namespace DryIoc
                 var invokeExpr = ((InvocationExpression)callExpr);
                 var invokedDelegateExpr = invokeExpr.Expression;
                 var invokeMethod = invokedDelegateExpr.Type.GetSingleMethodOrNull("Invoke");
-                ctorOrMethodOrMember = invokeMethod;
+                methodOrMember = invokeMethod;
                 parameters = invokeMethod.GetParameters();
                 argExprs = invokeExpr.Arguments;
             }
@@ -2642,12 +2597,16 @@ namespace DryIoc
                 var member = ((MemberExpression)callExpr).Member;
                 Throw.If(!(member is PropertyInfo) && !(member is FieldInfo),
                     Error.UnexpectedFactoryMemberExpression, member);
-                ctorOrMethodOrMember = member;
+                methodOrMember = member;
             }
             else return Throw.For<TypedMade<TService>>(Error.NotSupportedMadeExpression, callExpr);
 
-            FactoryMethodSelector factoryMethod = request =>
-                DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, getFactoryInfo == null ? null : getFactoryInfo(request));
+            var constructorSelector = constructor == null ? (ConstructorSelector)null 
+                : (type, request) => constructor; 
+
+            var factoryMethodSelector = methodOrMember == null ? (FactoryMethodSelector)null
+                : request => DryIoc.FactoryMethod.Of(methodOrMember, 
+                    getFactoryInfo == null ? null : getFactoryInfo(request));
 
             var parameterSelector = parameters.IsNullOrEmpty() ? null
                 : ComposeParameterSelectorFromArgs(parameters, argExprs, argValues);
@@ -2656,7 +2615,7 @@ namespace DryIoc
                 memberBindingExprs == null || memberBindingExprs.Count == 0 ? null
                 : ComposePropertiesAndFieldsSelector(memberBindingExprs, argValues);
 
-            return new TypedMade<TService>(factoryMethod, parameterSelector, propertiesAndFieldsSelector);
+            return new TypedMade<TService>(constructorSelector, factoryMethodSelector, parameterSelector, propertiesAndFieldsSelector);
         }
 
         /// <summary>Typed version of <see cref="Made"/> specified with statically typed expression tree.</summary>
@@ -2664,22 +2623,88 @@ namespace DryIoc
         public sealed class TypedMade<TService> : Made
         {
             /// <summary>Creates typed version.</summary>
-            /// <param name="factoryMethod"></param> <param name="parameters"></param> <param name="propertiesAndFields"></param>
-            internal TypedMade(FactoryMethodSelector factoryMethod = null,
+            /// <param name="constructor"></param> <param name="factoryMethod"></param> 
+            /// <param name="parameters"></param> <param name="propertiesAndFields"></param>
+            internal TypedMade(
+                ConstructorSelector constructor = null, FactoryMethodSelector factoryMethod = null,
                 ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
-                : base(factoryMethod, parameters, propertiesAndFields, typeof(TService))
+                : base(constructor, factoryMethod, parameters, propertiesAndFields, typeof(TService))
             { }
+        }
+
+        /// <summary>Searches for constructor with all resolvable parameters or throws <see cref="ContainerException"/> if not found.
+        /// Works both for resolving as service and as Func of TArgs... returning TService.</summary>
+        public static readonly ConstructorSelector ConstructorWithResolvableArguments = (implementationType, request) =>
+        {
+            var ctors = implementationType.GetAllConstructors().ToArrayOrSelf();
+            if (ctors.Length == 0)
+                return null; // Delegate handling of constructor absence to caller code.
+            if (ctors.Length == 1)
+                return ctors[0];
+
+            var ctorsWithMoreParamsFirst = ctors
+                .Select(c => new {Constructor = c, Params = c.GetParameters()})
+                .OrderByDescending(x => x.Params.Length);
+
+            // note: this expectation of ReflectionFactory smells here
+            var factory = (request.ResolvedFactory as ReflectionFactory).ThrowIfNull();
+            var parameterSelector = request.Container.Rules.Parameters.And(factory.Made.Parameters)(request);
+
+            if (!request.IsNestedInFuncWithArgs())
+                return ctorsWithMoreParamsFirst
+                    .FirstOrDefault(c => c.Params.All(p => ResolveParameter(p, parameterSelector, request) != null))
+                    .ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request)
+                    .Constructor;
+            
+            // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
+            var funcType = request.Parent.ServiceType;
+            var funcArgs = funcType.GetGenericParamsAndArgs();
+            var inputArgCount = funcArgs.Length - 1;
+
+            var matchedCtor = ctorsWithMoreParamsFirst
+                .Where(x => x.Params.Length >= inputArgCount)
+                .FirstOrDefault(x =>
+                {
+                    var matchedIndecesMask = 0;
+                    return x.Params.Except(x.Params
+                        .Where(p =>
+                        {
+                            var inputArgIndex = funcArgs.IndexOf(p.ParameterType);
+                            if (inputArgIndex == -1 || inputArgIndex == inputArgCount ||
+                                (matchedIndecesMask & inputArgIndex << 1) != 0)
+                                // input argument was already matched by another parameter
+                                return false;
+                            matchedIndecesMask |= inputArgIndex << 1;
+                            return true;
+                        }))
+                        .All(p => ResolveParameter(p, parameterSelector, request) != null);
+                })
+                .ThrowIfNull(Error.UnableToFindMatchingCtorForFuncWithArgs, funcType, request)
+                .Constructor;
+
+            return matchedCtor;
+        };
+
+        private static Expression ResolveParameter(ParameterInfo parameter,
+            Func<ParameterInfo, ParameterServiceInfo> parameterSelector, Request request)
+        {
+            var parameterServiceInfo = parameterSelector(parameter) ?? ParameterServiceInfo.Of(parameter);
+            var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault, request));
+            var parameterFactory = request.Container.ResolveFactory(parameterRequest);
+            return parameterFactory == null ? null : parameterFactory.GetExpressionOrDefault(parameterRequest);
         }
 
         #region Implementation
 
-        private Made(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            Type factoryMethodKnownResultType = null)
+        private Made(ConstructorSelector constructor = null, FactoryMethodSelector factoryMethod = null, 
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
+            Type knownResultType = null)
         {
+            Constructor = constructor;
             FactoryMethod = factoryMethod;
             Parameters = parameters;
             PropertiesAndFields = propertiesAndFields;
-            FactoryMethodKnownResultType = factoryMethodKnownResultType;
+            KnownResultType = knownResultType;
         }
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(
@@ -4575,12 +4600,12 @@ namespace DryIoc
     /// creating closed-generic type reflection factory from registered open-generic prototype factory.</summary>
     public interface IConcreteFactoryGenerator
     {
-        /// <summary>Returns factories created by <see cref="GenerateFactoryOrDefault"/> so far.</summary>
+        /// <summary>Returns factories created by <see cref="GenerateResolvedFactoryOrDefault"/> so far.</summary>
         IEnumerable<KV<Type, object>> ServiceTypeAndKeyOfGeneratedFactories { get; }
 
         /// <summary>Method applied for factory provider, returns new factory per request.</summary>
         /// <param name="request">Request to resolve.</param> <returns>Returns new factory per request.</returns>
-        Factory GenerateFactoryOrDefault(Request request);
+        Factory GenerateResolvedFactoryOrDefault(Request request);
     }
 
     /// <summary>Base class for different ways to instantiate service: 
@@ -4626,7 +4651,7 @@ namespace DryIoc
         public virtual Type ImplementationType { get { return null; } }
 
         /// <summary>Indicates that Factory is factory provider and 
-        /// consumer should call <see cref="IConcreteFactoryGenerator.GenerateFactoryOrDefault"/>  to get concrete factory.</summary>
+        /// consumer should call <see cref="IConcreteFactoryGenerator.GenerateResolvedFactoryOrDefault"/>  to get concrete factory.</summary>
         public virtual IConcreteFactoryGenerator FactoryGenerator { get { return null; } }
 
         /// <summary>Marks generated factory and identifies the generator id. 
@@ -4888,11 +4913,6 @@ namespace DryIoc
 
         #endregion
     }
-
-    /// <summary>Declares delegate to get single factory method or constructor for resolved request.</summary>
-    /// <param name="request">Request to resolve.</param>
-    /// <returns>Factory method wrapper over constructor or method.</returns>
-    public delegate FactoryMethod FactoryMethodSelector(Request request);
 
     /// <summary>Specifies how to get parameter info for injected parameter and resolved request</summary>
     /// <remarks>Request is for parameter method owner not for parameter itself.</remarks>
@@ -5163,28 +5183,28 @@ namespace DryIoc
         {
             base.ThrowIfInvalidRegistration(container, serviceType, serviceKey, isStaticallyChecked);
 
-            var implType = _implementationType;
-            if (implType == null)
+            var implementationType = _implementationType;
+            if (implementationType == null)
                 return;
 
             if (!isStaticallyChecked)
             {
-                if (!implType.IsGenericDefinition())
+                if (!implementationType.IsGenericDefinition())
                 {
-                    if (implType.IsOpenGeneric())
+                    if (implementationType.IsOpenGeneric())
                         Throw.It(Error.RegisteringNotAGenericTypedefImplType,
-                            implType, implType.GetGenericDefinitionOrNull());
+                            implementationType, implementationType.GetGenericDefinitionOrNull());
 
-                    if (implType != serviceType && serviceType != typeof(object) &&
-                        Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1)
-                        Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
+                    if (implementationType != serviceType && serviceType != typeof(object) &&
+                        Array.IndexOf(implementationType.GetImplementedTypes(), serviceType) == -1)
+                        Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implementationType, serviceType);
                 }
-                else if (implType != serviceType)
+                else if (implementationType != serviceType)
                 {
                     if (serviceType.IsGenericDefinition())
                     {
-                        var implTypeParams = implType.GetGenericParamsAndArgs();
-                        var implementedTypes = implType.GetImplementedTypes();
+                        var implTypeParams = implementationType.GetGenericParamsAndArgs();
+                        var implementedTypes = implementationType.GetImplementedTypes();
 
                         var implementedTypeFound = false;
                         var containsAllTypeParams = false;
@@ -5197,26 +5217,26 @@ namespace DryIoc
                         }
 
                         if (!implementedTypeFound)
-                            Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
+                            Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implementationType, serviceType);
 
                         if (!containsAllTypeParams)
                             Throw.It(Error.RegisteringOpenGenericServiceWithMissingTypeArgs,
-                                implType, serviceType,
+                                implementationType, serviceType,
                                 implementedTypes.Where(t => t.GetGenericDefinitionOrNull() == serviceType));
                     }
-                    else if (implType.IsGeneric() && serviceType.IsOpenGeneric())
+                    else if (implementationType.IsGeneric() && serviceType.IsOpenGeneric())
                         Throw.It(Error.RegisteringNotAGenericTypedefServiceType,
                             serviceType, serviceType.GetGenericDefinitionOrNull());
                     else
-                        Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
+                        Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implementationType, serviceType);
                 }
             }
 
-            if (Made.FactoryMethod == null && container.Rules.FactoryMethod == null)
+            if (Made.FactoryMethod == null && Made.Constructor == null && container.Rules.Constructor == null)
             {
-                var publicCounstructorCount = implType.GetAllConstructors().Count();
+                var publicCounstructorCount = implementationType.GetAllConstructors().Count();
                 if (publicCounstructorCount != 1)
-                    Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, implType, publicCounstructorCount);
+                    Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, implementationType, publicCounstructorCount);
             }
         }
 
@@ -5226,21 +5246,45 @@ namespace DryIoc
         /// <param name="request">Request for service to resolve.</param> <returns>Created expression.</returns>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            var factoryMethod = GetFactoryMethod(request);
-
-            // If factory method is instance method, then resolve factory instance first.
+            MemberInfo methodOrMember = null;
             Expression factoryExpr = null;
-            if (factoryMethod.FactoryServiceInfo != null)
-            {
-                var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
-                var factoryFactory = factoryRequest.Container.ResolveFactory(factoryRequest);
-                factoryExpr = factoryFactory == null ? null : factoryFactory.GetExpressionOrDefault(factoryRequest);
-                if (factoryExpr == null)
-                    return null;
-            }
+            ConstructorInfo constructor = null;
 
+            var factoryMethodSelector = Made.FactoryMethod;
+            if (factoryMethodSelector != null)
+            {
+                var factoryMethod = factoryMethodSelector(request)
+                    .ThrowIfNull(Error.Of("Unable to select factory method when resolving {0}"), request);
+
+                methodOrMember = factoryMethod.MethodOrMember;
+
+                Throw.If(methodOrMember.IsStatic() && factoryMethod.FactoryServiceInfo != null,
+                    Error.FactoryObjProvidedButMethodIsStatic, factoryMethod.FactoryServiceInfo, factoryMethod, request);
+                Throw.If(!methodOrMember.IsStatic() && factoryMethod.FactoryServiceInfo == null,
+                    Error.FactoryObjIsNullInFactoryMethod, factoryMethod, request);
+
+                // If factory method is instance method, then resolve factory instance first.
+                if (factoryMethod.FactoryServiceInfo != null)
+                {
+                    var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
+                    var factoryFactory = factoryRequest.Container.ResolveFactory(factoryRequest);
+                    factoryExpr = factoryFactory == null ? null : factoryFactory.GetExpressionOrDefault(factoryRequest);
+                    if (factoryExpr == null)
+                        return null;
+                }
+            }
+            else
+            {
+                var constructorSelector = Made.Constructor ?? request.Container.Rules.Constructor;
+                if (constructorSelector != null)
+                    constructor = constructorSelector(_implementationType, request)
+                        .ThrowIfNull(Error.UnableToGetConstructorFromSelector, _implementationType);
+                else
+                    constructor = _implementationType.GetSingleConstructorOrNull();
+            }
+            
             Expression[] paramExprs = null;
-            var constructorOrMethod = factoryMethod.ConstructorOrMethodOrMember as MethodBase;
+            var constructorOrMethod = methodOrMember as MethodBase ?? constructor;
             if (constructorOrMethod != null)
             {
                 var parameters = constructorOrMethod.GetParameters();
@@ -5316,7 +5360,24 @@ namespace DryIoc
                 }
             }
 
-            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember, factoryExpr, paramExprs, request);
+            if (constructor != null)
+                return InitPropertiesAndFields(Expression.New(constructor, paramExprs), request);
+
+            var method = methodOrMember as MethodInfo;
+            var serviceExpr = method != null
+                ? (Expression)Expression.Call(factoryExpr, method, paramExprs)
+                : (methodOrMember is PropertyInfo
+                    ? Expression.Property(factoryExpr, (PropertyInfo)methodOrMember)
+                    : Expression.Field(factoryExpr, (FieldInfo)methodOrMember));
+
+            var returnType = methodOrMember.GetReturnTypeOrDefault().ThrowIfNull();
+            if (!returnType.IsAssignableTo(request.ServiceType))
+                return Throw.IfThrows<InvalidOperationException, Expression>(
+                    () => Expression.Convert(serviceExpr, request.ServiceType),
+                    request.IfUnresolved == IfUnresolved.Throw,
+                    Error.ServiceIsNotAssignableFromFactoryMethod, request.ServiceType, methodOrMember, request);
+
+            return serviceExpr;
         }
 
         #region Implementation
@@ -5342,7 +5403,7 @@ namespace DryIoc
                 _openGenericFactory = openGenericFactory;
             }
 
-            public Factory GenerateFactoryOrDefault(Request request)
+            public Factory GenerateResolvedFactoryOrDefault(Request request)
             {
                 var serviceType = request.ServiceType;
                 var implementationType = _openGenericFactory._implementationType;
@@ -5388,7 +5449,7 @@ namespace DryIoc
                 if (factoryMethod == null)
                     return made; // return original made without changes
 
-                var factoryMember = factoryMethod.ConstructorOrMethodOrMember;
+                var factoryMember = factoryMethod.MethodOrMember;
                 var factoryInfo = factoryMethod.FactoryServiceInfo;
 
                 var factoryResultType = factoryMember.GetReturnTypeOrDefault();
@@ -5460,42 +5521,59 @@ namespace DryIoc
                     var factoryMethodBase = factoryMember as MethodBase;
                     if (factoryMethodBase != null)
                     {
-                        var methodHandleProperty = typeof(MethodBase).GetPropertyOrNull("MethodHandle")
-                            .ThrowIfNull(Error.Of("Sorry, open-generic factory method declaring type {0} is not supported on this platform"), factoryImplType);
-                        factoryMember = MethodBase.GetMethodFromHandle(
-                            (RuntimeMethodHandle)methodHandleProperty.GetValue(factoryMethodBase, ArrayTools.Empty<object>()),
-                            closedFactoryImplType.TypeHandle);
+                        var factoryMethodParameters = factoryMethodBase.GetParameters();
+                        var targetMethods = closedFactoryImplType.GetAll(t => t.DeclaredMethods)
+                            .Where(m => m.Name == factoryMember.Name && m.GetParameters().Length == factoryMethodParameters.Length)
+                            .ToArray();
+
+                        if (targetMethods.Length == 1)
+                            factoryMember = targetMethods[0];
+                        else // Fallback to  MethodHandle only if methods have similar signatures
+                        {
+                            var methodHandleProperty = typeof(MethodBase).GetPropertyOrNull("MethodHandle")
+                                .ThrowIfNull(Error.OpenGenericFactoryMethodDeclaringTypeIsNotSupportedOnThisPlatform, factoryImplType);
+                            factoryMember = MethodBase.GetMethodFromHandle(
+                                (RuntimeMethodHandle)methodHandleProperty.GetValue(factoryMethodBase, ArrayTools.Empty<object>()),
+                                closedFactoryImplType.TypeHandle);
+                        }
+
                     }
-                    else
+                    else if (factoryMember is FieldInfo)
                     {
-                        ;
+                        factoryMember = closedFactoryImplType.GetAll(t => t.DeclaredFields)
+                            .Single(f => f.Name == factoryMember.Name);
+                    }
+                    else if (factoryMember is PropertyInfo)
+                    {
+                        factoryMember = closedFactoryImplType.GetAll(t => t.DeclaredProperties)
+                            .Single(f => f.Name == factoryMember.Name);
                     }
                 }
 
                 // 4 - If faxctory method is actual method and still open-generic after closing its decalring type, 
                 // then match remaining method type parameters and make closed method
-                var openFactoryMethod = factoryMember as MethodInfo;
-                if (openFactoryMethod != null && openFactoryMethod.ContainsGenericParameters)
+                var actualMethod = factoryMember as MethodInfo;
+                if (actualMethod != null && actualMethod.ContainsGenericParameters)
                 {
-                    var methodTypeParams = openFactoryMethod.GetGenericArguments();
+                    var methodTypeParams = actualMethod.GetGenericArguments();
                     var resultMethodTypeArgs = new Type[methodTypeParams.Length];
 
                     var isMethodClosed = MatchServiceWithImplementedTypeParams(
                         resultMethodTypeArgs, methodTypeParams, implTypeParams, serviceTypeArgs);
                     if (isMethodClosed)
                     {
-                        var closedFactoryMethod = Throw.IfThrows<ArgumentException, MethodInfo>(
-                            () => openFactoryMethod.MakeGenericMethod(resultMethodTypeArgs),
+                        factoryMember = Throw.IfThrows<ArgumentException, MethodInfo>(
+                            () => actualMethod.MakeGenericMethod(resultMethodTypeArgs),
                             request.IfUnresolved == IfUnresolved.Throw,
                             Error.NoMatchedGenericParamConstraints, factoryImplType, request);
 
-                        if (closedFactoryMethod == null)
+                        if (factoryMember == null)
                             return null;
-
-                        made = Made.Of(FactoryMethod.Of(closedFactoryMethod, factoryInfo));
                     }
                 }
-                return made;
+
+                var newMade = Made.Of(factoryMember, factoryInfo);
+                return newMade;
             }
 
             private readonly ReflectionFactory _openGenericFactory;
@@ -5504,10 +5582,10 @@ namespace DryIoc
 
         private Type ValidateAndNormalizeImplementationType(Type implementationType)
         {
-            var factoryMethodResultType = Made.FactoryMethodKnownResultType;
+            var factoryMethodResultType = Made.KnownResultType;
             if (implementationType == null || implementationType.IsAbstract())
             {
-                if (Made.FactoryMethod == null)
+                if (Made.FactoryMethod == null && Made.Constructor == null)
                 {
                     Throw.If(implementationType == null,
                         Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
@@ -5530,29 +5608,6 @@ namespace DryIoc
             return implementationType;
         }
 
-        private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember, Expression factoryExpr, Expression[] paramExprs, Request request)
-        {
-            var ctor = ctorOrMethodOrMember as ConstructorInfo;
-            if (ctor != null)
-                return InitPropertiesAndFields(Expression.New(ctor, paramExprs), request);
-
-            var method = ctorOrMethodOrMember as MethodInfo;
-            var serviceExpr = method != null
-                ? (Expression)Expression.Call(factoryExpr, method, paramExprs)
-                : (ctorOrMethodOrMember is PropertyInfo
-                    ? Expression.Property(factoryExpr, (PropertyInfo)ctorOrMethodOrMember)
-                    : Expression.Field(factoryExpr, (FieldInfo)ctorOrMethodOrMember));
-
-            var returnType = ctorOrMethodOrMember.GetReturnTypeOrDefault().ThrowIfNull();
-            if (!returnType.IsAssignableTo(request.ServiceType))
-                return Throw.IfThrows<InvalidOperationException, Expression>(
-                    () => Expression.Convert(serviceExpr, request.ServiceType),
-                    request.IfUnresolved == IfUnresolved.Throw,
-                    Error.ServiceIsNotAssignableFromFactoryMethod, request.ServiceType, ctorOrMethodOrMember, request);
-
-            return serviceExpr;
-        }
-
         private static Expression TryInjectResolver(IServiceInfo serviceInfo)
         {
             return serviceInfo.ServiceType == typeof(IResolver) &&
@@ -5567,34 +5622,6 @@ namespace DryIoc
                    serviceInfo.Details.ServiceKey == null && serviceInfo.Details.RequiredServiceType == null
                 ? Container.GetResolutionScopeExpression(request)
                 : null;
-        }
-
-        private FactoryMethod GetFactoryMethod(Request request)
-        {
-            var implType = _implementationType;
-            var factoryMethodSelector = Made.FactoryMethod ?? request.Container.Rules.FactoryMethod;
-            if (factoryMethodSelector != null)
-            {
-                var factoryMethod = factoryMethodSelector(request);
-                if (factoryMethod != null && !(factoryMethod.ConstructorOrMethodOrMember is ConstructorInfo))
-                {
-                    var member = factoryMethod.ConstructorOrMethodOrMember;
-                    var isStaticMember = member.IsStatic();
-
-                    Throw.If(isStaticMember && factoryMethod.FactoryServiceInfo != null,
-                        Error.FactoryObjProvidedButMethodIsStatic, factoryMethod.FactoryServiceInfo, factoryMethod, request);
-
-                    Throw.If(!isStaticMember && factoryMethod.FactoryServiceInfo == null,
-                        Error.FactoryObjIsNullInFactoryMethod, factoryMethod, request);
-                }
-
-                return factoryMethod.ThrowIfNull(Error.UnableToGetConstructorFromSelector, implType);
-            }
-
-            var ctors = implType.GetAllConstructors().ToArrayOrSelf();
-            Throw.If(ctors.Length == 0, Error.NoPublicConstructorDefined, implType);
-            Throw.If(ctors.Length > 1, Error.UnableToSelectConstructor, ctors.Length, implType);
-            return FactoryMethod.Of(ctors[0]);
         }
 
         private Expression InitPropertiesAndFields(NewExpression newServiceExpr, Request request)
