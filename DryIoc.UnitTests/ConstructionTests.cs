@@ -9,7 +9,8 @@ namespace DryIoc.UnitTests
         public void Can_use_static_method_for_service_creation()
         {
             var container = new Container();
-            container.Register<SomeService>(made: Made.Of(typeof(SomeService).GetMethodOrNull("Create")));
+            container.Register<SomeService>(made: Made.Of(
+                r => FactoryMethod.Of(r.ImplementationType.GetMethodOrNull("Create"))));
 
             var service = container.Resolve<SomeService>();
 
@@ -141,9 +142,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<IService>(
-                made: Made.Of(typeof(ServiceFactory).GetMethodOrNull("Create"), 
-                    ServiceInfo.Of<ServiceFactory>()));
+            container.Register<IService, SomeService>(made: Made.Of(
+                r => FactoryMethod.Of(
+                    typeof(ServiceFactory).GetMethodOrNull("Create"), 
+                    ServiceInfo.Of<ServiceFactory>())));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());

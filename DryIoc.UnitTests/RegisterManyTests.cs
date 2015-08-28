@@ -177,7 +177,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_register_internal_implementations()
         {
-            var container = new Container(r => r.With(Made.ConstructorWithResolvableArguments));
+            var container = new Container(r => r.With(FactoryMethod.ConstructorWithResolvableArguments));
             container.RegisterMany(new[] { typeof(InternalMe).GetAssembly() }, nonPublicServiceTypes: true);
             
             var service = container.Resolve<IPublicMe>();

@@ -129,7 +129,7 @@ namespace DryIoc.IssuesTests
         [Export(typeof(IZ<>)), AsFactory]
         public class Z<A> : IZ<A>
         {
-            // Deceptive method with the same signature as the closed-generic Get<string> below.
+            // Deceiving method with the same signature as the closed-generic Get<string> below.
             public Y<A, string> Get(string a) { return new Y<A, string>(default(A)); }
 
             [Export]

@@ -118,7 +118,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(LazyOne<>),
-                made: Made.Of((t, r) => t.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()))));
+                made: Made.Of(t => t.GetAllConstructors()
+                    .FirstOrDefault(c => c.GetParameters().Any(p => p.ParameterType.GetGenericDefinitionOrNull() == typeof(Func<>)))));
             container.Register<Service>();
 
             var service = container.Resolve<LazyOne<Service>>();
@@ -415,7 +416,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(Zzz<>), 
                 made: Made.Of(typeof(Zzz<>).GetConstructorOrNull(args: typeof(string))));
 
-            container.RegisterInstance("x");
+            container.RegisterInstance<string>("x");
 
             container.Resolve<Zzz<string>>();
         }
