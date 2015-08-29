@@ -4975,11 +4975,11 @@ namespace DryIoc
                   PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(ifUnresolved: ifUnresolved), r);
             return r =>
             {
-                var properties = r.ImplementationType.GetDeclaredAndInherited(_ => _.DeclaredProperties)
+                var properties = r.ImplementationType.GetDeclaredAndBase(_ => _.DeclaredProperties)
                     .Where(p => p.IsInjectable(withNonPublic, withPrimitive))
                     .Select(m => getInfo(m, r));
                 return !withFields ? properties :
-                    properties.Concat(r.ImplementationType.GetDeclaredAndInherited(_ => _.DeclaredFields)
+                    properties.Concat(r.ImplementationType.GetDeclaredAndBase(_ => _.DeclaredFields)
                     .Where(f => f.IsInjectable(withNonPublic, withPrimitive))
                     .Select(m => getInfo(m, r)));
             };
@@ -5373,7 +5373,7 @@ namespace DryIoc
 
                     if (!isFactoryImplTypeClosed)
                         return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
-                            : Throw.For<FactoryMethod>(Error.NoMatchedFactoryTypeWithFactoryMethodGenericTypeArgs,
+                            : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs,
                                 factoryImplType, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "), request);
 
                     // For instance factory match its service type from the implementation factory type.
@@ -5426,7 +5426,7 @@ namespace DryIoc
                     if (factoryMethodBase != null)
                     {
                         var factoryMethodParameters = factoryMethodBase.GetParameters();
-                        var targetMethods = closedFactoryImplType.GetDeclaredAndInherited(t => t.DeclaredMethods)
+                        var targetMethods = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredMethods)
                             .Where(m => m.Name == factoryMember.Name && m.GetParameters().Length == factoryMethodParameters.Length)
                             .ToArray();
 
@@ -5444,12 +5444,12 @@ namespace DryIoc
                     }
                     else if (factoryMember is FieldInfo)
                     {
-                        factoryMember = closedFactoryImplType.GetDeclaredAndInherited(t => t.DeclaredFields)
+                        factoryMember = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredFields)
                             .Single(f => f.Name == factoryMember.Name);
                     }
                     else if (factoryMember is PropertyInfo)
                     {
-                        factoryMember = closedFactoryImplType.GetDeclaredAndInherited(t => t.DeclaredProperties)
+                        factoryMember = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredProperties)
                             .Single(f => f.Name == factoryMember.Name);
                     }
                 }
@@ -5464,16 +5464,20 @@ namespace DryIoc
 
                     var isMethodClosed = MatchServiceWithImplementedTypeParams(
                         resultMethodTypeArgs, methodTypeParams, implTypeParams, serviceTypeArgs);
-                    if (isMethodClosed)
-                    {
-                        factoryMember = Throw.IfThrows<ArgumentException, MethodInfo>(
-                            () => openFactoryMethod.MakeGenericMethod(resultMethodTypeArgs),
-                            request.IfUnresolved == IfUnresolved.Throw,
-                            Error.NoMatchedGenericParamConstraints, factoryImplType, request);
 
-                        if (factoryMember == null)
-                            return null;
-                    }
+                    if (!isMethodClosed)
+                        return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                            : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodWithServiceTypeArgs,
+                                openFactoryMethod, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "),
+                                request);
+                    
+                    factoryMember = Throw.IfThrows<ArgumentException, MethodInfo>(
+                        () => openFactoryMethod.MakeGenericMethod(resultMethodTypeArgs),
+                        request.IfUnresolved == IfUnresolved.Throw,
+                        Error.NoMatchedGenericParamConstraints, factoryImplType, request);
+
+                    if (factoryMember == null)
+                        return null;
                 }
 
                 return FactoryMethod.Of(factoryMember, factoryInfo);
@@ -5676,20 +5680,25 @@ namespace DryIoc
         }
 
         private static bool MatchServiceWithImplementedTypeParams(
-            Type[] matchedImplArgs, Type[] implParams, Type[] implementedParams, Type[] serviceArgs)
+            Type[] resultImplArgs, Type[] implParams, Type[] serviceParams, Type[] serviceArgs, int resultCount = 0)
+
         {
-            for (var i = 0; i < implementedParams.Length; i++)
+            for (var i = 0; i < serviceParams.Length; i++)
             {
                 var serviceArg = serviceArgs[i];
-                var implementedParam = implementedParams[i];
+                var implementedParam = serviceParams[i];
                 if (implementedParam.IsGenericParameter)
                 {
                     var paramIndex = implParams.IndexOf(implementedParam);
                     if (paramIndex != -1)
                     {
-                        if (matchedImplArgs[paramIndex] == null)
-                            matchedImplArgs[paramIndex] = serviceArg;
-                        else if (matchedImplArgs[paramIndex] != serviceArg)
+                        if (resultImplArgs[paramIndex] == null)
+                        {
+                            resultImplArgs[paramIndex] = serviceArg;
+                            if (++resultCount == resultImplArgs.Length)
+                                return true;
+                        }
+                        else if (resultImplArgs[paramIndex] != serviceArg)
                             return false; // more than one service type arg is matching with single impl type param
                     }
                 }
@@ -5699,7 +5708,7 @@ namespace DryIoc
                         implementedParam.GetGenericDefinitionOrNull() != serviceArg.GetGenericDefinitionOrNull())
                         return false; // type param and arg are of different types
 
-                    if (!MatchServiceWithImplementedTypeParams(matchedImplArgs, implParams,
+                    if (!MatchServiceWithImplementedTypeParams(resultImplArgs, implParams,
                         implementedParam.GetGenericParamsAndArgs(), serviceArg.GetGenericParamsAndArgs()))
                         return false; // nested match failed due either one of above reasons.
                 }
@@ -6871,8 +6880,10 @@ namespace DryIoc
                 "Unspecified how to select single constructor for implementation type {0} with {1} public constructors."),
             NoMatchedImplementedTypesWithServiceType = Of(
                 "Unable to match service with open-generic {0} implementing {1} when resolving {2}."),
-            NoMatchedFactoryTypeWithFactoryMethodGenericTypeArgs = Of(
-                "Unable to match open-generic factory type {0} with requested service type arguments <{1}> when resolving {2}."),
+            NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs = Of(
+                "Unable to match open-generic factory method Declaring type {0} with requested service type arguments <{1}> when resolving {2}."),
+            NoMatchedFactoryMethodWithServiceTypeArgs = Of(
+                "Unable to match open-generic factory method {0} with requested service type arguments <{1}> when resolving {2}."),
             OpenGenericFactoryMethodDeclaringTypeIsNotSupportedOnThisPlatform = Of(
                 "[Specific to this .NET version] Unable to match method or constructor {0} from open-generic declaring type {1} to closed-generic type {2}, " + Environment.NewLine +
                 "Please give thje method an unique name to distinguish it from other overloads."),
@@ -7218,7 +7229,7 @@ namespace DryIoc
         /// <param name="type">Type to get members from.</param> <returns>All members.</returns>
         public static IEnumerable<MemberInfo> GetAllMembers(this Type type)
         {
-            return type.GetDeclaredAndInherited(t =>
+            return type.GetDeclaredAndBase(t =>
                 t.DeclaredMethods.Cast<MemberInfo>().Concat(
                 t.DeclaredProperties.Cast<MemberInfo>().Concat(
                 t.DeclaredFields.Cast<MemberInfo>())));
@@ -7405,13 +7416,13 @@ namespace DryIoc
         /// <typeparam name="T">Details type: properties, fields, methods, etc.</typeparam>
         /// <param name="type">Input type.</param> <param name="getDeclared">Get declared type details.</param>
         /// <returns>Enumerated details info objects.</returns>
-        public static IEnumerable<T> GetDeclaredAndInherited<T>(this Type type, Func<TypeInfo, IEnumerable<T>> getDeclared)
+        public static IEnumerable<T> GetDeclaredAndBase<T>(this Type type, Func<TypeInfo, IEnumerable<T>> getDeclared)
         {
             var typeInfo = type.GetTypeInfo();
             var declared = getDeclared(typeInfo);
             var baseType = typeInfo.BaseType;
             return baseType == null || baseType == typeof(object) ? declared
-                : declared.Concat(baseType.GetDeclaredAndInherited(getDeclared));
+                : declared.Concat(baseType.GetDeclaredAndBase(getDeclared));
         }
 
         /// <summary>Enumerates all constructors from input type.</summary>
@@ -7475,7 +7486,7 @@ namespace DryIoc
         /// <returns>Found property or null.</returns>
         public static PropertyInfo GetPropertyOrNull(this Type type, string name)
         {
-            return type.GetDeclaredAndInherited(_ => _.DeclaredProperties).FirstOrDefault(p => p.Name == name);
+            return type.GetDeclaredAndBase(_ => _.DeclaredProperties).FirstOrDefault(p => p.Name == name);
         }
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
@@ -7483,7 +7494,7 @@ namespace DryIoc
         /// <returns>Found field or null.</returns>
         public static FieldInfo GetFieldOrNull(this Type type, string name)
         {
-            return type.GetDeclaredAndInherited(_ => _.DeclaredFields).FirstOrDefault(p => p.Name == name);
+            return type.GetDeclaredAndBase(_ => _.DeclaredFields).FirstOrDefault(p => p.Name == name);
         }
 
         /// <summary>Returns type assembly.</summary> <param name="type">Input type</param> <returns>Type assembly.</returns>

@@ -48,7 +48,7 @@ namespace DryIoc.IssuesTests
             container.RegisterExports(typeof(X<>));
 
             container.RegisterInstance<int>(1);
-            var y = container.Resolve<Y<int, string>>();
+            var y = container.Resolve<Y<int, double>>();
 
             Assert.AreEqual(1, y.Blah);
         }
@@ -78,7 +78,7 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void Should_throw_when_mapping_factory_with_incompatible_type_arguments()
+        public void Should_throw_when_mapping_factory_mathod_declaring_type_with_incompatible_type_arguments()
         {
             var container = new Container();
             container.RegisterExports(typeof(X<>));
@@ -86,7 +86,19 @@ namespace DryIoc.IssuesTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<IY<List<string>, Tuple<int, string>>>());
 
-            Assert.AreEqual(Error.NoMatchedFactoryTypeWithFactoryMethodGenericTypeArgs, ex.Error);
+            Assert.AreEqual(Error.NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs, ex.Error);
+        }
+
+        [Test]
+        public void Should_throw_when_mapping_factory_method_with_incompatible_type_arguments()
+        {
+            var container = new Container();
+            container.RegisterExports(typeof(XX<>));
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<Y<string, int>>());
+
+            Assert.AreEqual(Error.NoMatchedFactoryMethodWithServiceTypeArgs, ex.Error);
         }
 
         [Test]
@@ -101,7 +113,7 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void Should_map_factory_proiperty_with_compatible_type_arguments()
+        public void Should_map_factory_property_with_compatible_type_arguments()
         {
             var container = new Container();
             container.RegisterExports(typeof(X<>));
@@ -122,6 +134,16 @@ namespace DryIoc.IssuesTests
 
             [Export("property", typeof(IY<,>))]
             public static Y<int, A> YProperty { get { return YField; } }
+        }
+
+        [Export, AsFactory]
+        public static class XX<A>
+        {
+            [Export]
+            public static Y<A, IList<B>> Get<B>(A a)
+            {
+                return new Y<A, IList<B>>(a);
+            }
         }
 
         public interface IZ<T> {}
