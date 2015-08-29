@@ -3272,11 +3272,12 @@ namespace DryIoc
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
             if (instance != null)
-                instance.ThrowIfNotOf(serviceType,
-                    Error.RegisteringInstanceNotAssignableToServiceType);
+                instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
 
-            Throw.If(reuse is ResolutionScopeReuse,
-                Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
+            Throw.If(reuse is ResolutionScopeReuse, Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
+
+            reuse = reuse ?? Reuse.Singleton;
+            var request = container.EmptyRequest.Push(serviceType, serviceKey);
 
             var setup = weaklyReferenced && preventDisposal
                 ? WeaklyReferencedHiddenDisposableInstanceSetup
@@ -3284,33 +3285,36 @@ namespace DryIoc
                 : preventDisposal ? HiddenDisposableInstanceSetup
                 : Setup.Default;
 
+            // Wrap instance if re
             if (setup != Setup.Default)
             {
                 if (setup.PreventDisposal)
-                    instance = new[] { instance };
+                    instance = new [] { instance };
                 if (setup.WeaklyReferenced)
                     instance = new WeakReference(instance);
             }
 
-            reuse = reuse ?? Reuse.Singleton;
-
-            var request = container.EmptyRequest.Push(serviceType, serviceKey);
-            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
+            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace) // Try get existing factory.
             {
-                var registeredFactory = container.GetServiceFactoryOrDefault(request) as InstanceFactory;
+                var registeredFactory = container.GetServiceFactoryOrDefault(request);
 
-                // If existing instance factory is the same reuse and setup-wise, 
-                // then we can just replace instance in scope.
+                // If existing factory is the same kind: reuse and setup-wise, then we can just replace value in scope.
                 if (registeredFactory != null &&
                     registeredFactory.Reuse == reuse &&
                     registeredFactory.Setup == setup)
                 {
-                    registeredFactory.ReplaceInstance(instance, request);
+                    var scope = reuse.GetScopeOrDefault(request)
+                        .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse);
+                    var scopedInstanceId = reuse.GetScopedItemIdOrSelf(registeredFactory.FactoryID, request);
+                    scope.SetOrAdd(scopedInstanceId, instance);
                     return;
                 }
             }
 
-            var instanceFactory = new InstanceFactory(instance, reuse, setup);
+            // Create factory to locate instance in scope.
+            var instanceFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse, setup);
+            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
+                instanceFactory.FactoryID = -1; // NOTE Hack to distinguish instance factories when replaced.
             if (container.Register(instanceFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
             {
                 var scope = reuse.GetScopeOrDefault(request)
@@ -3320,62 +3324,16 @@ namespace DryIoc
             }
         }
 
-        private sealed class InstanceFactory : Factory
-        {
-            public InstanceFactory(object instance, IReuse reuse, Setup setup) : base(reuse, setup)
-            {
-                _instance = instance;
-            }
-
-            public override Expression GetExpressionOrDefault(Request request)
-            {
-                return CreateExpressionOrDefault(request);
-            }
-
-            public override Expression CreateExpressionOrDefault(Request request)
-            {
-                var scope = Reuse.GetScopeOrDefault(request)
-                    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, _instance, Reuse);
-                var id = scope.GetScopedItemIdOrSelf(FactoryID);
-                scope.SetOrAdd(id, _instance);
-
-                var getScopeExpr = Reuse.GetScopeExpression(request);
-                var idExpr = Expression.Constant(id);
-
-                Expression getScopedServiceExpr = Expression.Call(
-                    getScopeExpr, "GetItemOrDefault", ArrayTools.Empty<Type>(), idExpr);
-
-                if (Setup.WeaklyReferenced)
-                {
-                    var weakRefExpr = Expression.Convert(getScopedServiceExpr, typeof(WeakReference));
-                    var weakRefTargetExpr = Expression.Property(weakRefExpr, "Target");
-                    var throwIfTargetNullExpr = Expression.Call(typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull", ArrayTools.Empty<Type>(),
-                        weakRefTargetExpr, Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
-                    getScopedServiceExpr = throwIfTargetNullExpr;
-                }
-
-                if (Setup.PreventDisposal)
-                    getScopedServiceExpr = Expression.ArrayIndex(
-                        Expression.Convert(getScopedServiceExpr, typeof(object[])),
-                        Expression.Constant(0, typeof(int)));
-
-                return Expression.Convert(getScopedServiceExpr, request.ServiceType);
-            }
-
-            public void ReplaceInstance(object instance, Request request)
-            {
-                Interlocked.Exchange(ref _instance, instance);
-                Reuse.GetScopeOrDefault(request)
-                    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, Reuse)
-                    .SetOrAdd(Reuse.GetScopedItemIdOrSelf(FactoryID, request), instance);
-            }
-
-            private object _instance;
-        }
-
         private static readonly Setup WeaklyReferencedInstanceSetup = Setup.With(weaklyReferenced: true);
         private static readonly Setup HiddenDisposableInstanceSetup = Setup.With(preventDisposal: true);
         private static readonly Setup WeaklyReferencedHiddenDisposableInstanceSetup = Setup.With(weaklyReferenced: true, preventDisposal: true);
+
+        private static Expression GetThrowInstanceNoLongerAvailable(Request request)
+        {
+            Expression<Func<object>> throwUnableToResolve = () =>
+                Throw.It(Error.UnableToResolveUnknownService, request.ServiceType, null, null, null);
+            return Expression.Convert(throwUnableToResolve.Body, request.ServiceType);
+        }
 
         /// <summary>Registers an externally created object of <typeparamref name="TService"/>. 
         /// If no reuse specified instance will be stored in Singleton Scope, and disposed when container is disposed.</summary>
@@ -4873,7 +4831,8 @@ namespace DryIoc
             var serviceType = serviceExpr.Type;
             if (Setup.PreventDisposal == false && Setup.WeaklyReferenced == false)
                 return request.Container.GetOrAddStateItemExpression(
-                    scope.GetOrAdd(scopedInstanceId, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope)),
+                    scope.GetOrAdd(scopedInstanceId, 
+                        () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope)),
                     serviceType);
 
             var wrappedService = scope.GetOrAdd(scopedInstanceId,

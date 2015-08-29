@@ -12,7 +12,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.RegisterInstance("a", Reuse.Singleton, IfAlreadyRegistered.Replace);
-            container.RegisterInstance("b", Reuse.Singleton, IfAlreadyRegistered.Replace);
+            container.RegisterInstance("z", Reuse.Singleton, IfAlreadyRegistered.Replace);
         }
 
         [Test]
@@ -35,8 +35,8 @@ namespace DryIoc.UnitTests
 
             using (var scope = container.OpenScope())
             {
-                scope.RegisterInstance("b", Reuse.InCurrentScope, IfAlreadyRegistered.Replace);
-                Assert.AreEqual("b", scope.Resolve<string>());
+                scope.RegisterInstance("bbbb", Reuse.InCurrentScope, IfAlreadyRegistered.Replace);
+                Assert.AreEqual("bbbb", scope.Resolve<string>());
             }
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<string>());
@@ -76,26 +76,15 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Wiping_singletons_should_not_delete_current_instance_value()
-        {
-            var container = new Container();
-            container.RegisterInstance("here", Reuse.Singleton);
-
-            var stillHere = container.WithoutSingletonsAndCache().Resolve<string>();
-
-            Assert.AreEqual("here", stillHere);
-        }
-
-        [Test]
         public void Register_instance_with_different_if_already_registered_policies()
         {
             var container = new Container();
-            container.RegisterInstance("mine", Reuse.Singleton);
-            Assert.AreEqual("mine", container.Resolve<string>());
+            container.RegisterInstance("nya", Reuse.Singleton);
+            Assert.AreEqual("nya", container.Resolve<string>());
 
             container.RegisterInstance("yours", Reuse.Singleton);
 
-            CollectionAssert.AreEquivalent(new[] { "mine", "yours" },
+            CollectionAssert.AreEquivalent(new[] { "nya", "yours" },
                 container.Resolve<string[]>());
         }
 
