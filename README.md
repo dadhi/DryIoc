@@ -81,7 +81,7 @@ DryIoc is small, fast, and capable IoC Container for .NET
 NuGet: `PM> Install-Package DryIocAttributes.dll`
 
 - Extends [MEF](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) attributes to cover DryIoc features: metadata, advanced reuses, context based registration, decorators, etc.
-- Does not depend on DryIoc and may be used by other IoC framewors. 
+- Does not depend on DryIoc and may be used by other IoC frameworks. 
 
 
 ### DryIocZero
@@ -91,14 +91,13 @@ NuGet: `PM> Install-Package DryIocZero`
 Standalone container based upon compile-time generated factories by DryIoc. 
 
 - Ensures _zero_ application bootstrapping time associated with IoC registrations.
-- Provides verification of DryIoc registration setup at compile-time by generating service factories. Basically - you can see how DryIoc resolves you roots.
+- Provides verification of DryIoc registration setup at compile-time by generating service factories. Basically - you can see how DryIoc is creating things.
 - Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
 - Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
-- Allows run-time registrations. You may register instances and factories at run-time.
+- Allows run-time registrations too. You may register instances and factories at run-time.
 
 
 ## Extensions
 * [MefAttributedModel] for [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx). Enables automatic types discovery and wiring.
 * [CommonServiceLocator](https://commonservicelocator.codeplex.com/)
 * ASP.NET: Web Forms, MVC, Web API, OWIN.
-
