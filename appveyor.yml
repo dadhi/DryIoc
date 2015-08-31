@@ -12,6 +12,9 @@ assembly_info:
 artifacts:
   - path: bin\NuGetPackages\*.nupkg
 
+install:
+  - choco install git /GitAndUnixToolsOnPath
+
 build_script:
   - .\BuildScripts\_main.bat -nopause
 

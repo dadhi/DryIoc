@@ -1,5 +1,5 @@
-DryIoc is small, fast, and capable IoC Container for .NET
-=====================================================
+DryIoc is small, fast, and skillful IoC Container for .NET
+==========================================================
 
 [![Build status](https://ci.appveyor.com/api/projects/status/te0oktwwf7xx5e3k/branch/dev)](https://ci.appveyor.com/project/MaksimVolkau/dryioc-426/branch/dev)
 [![FollowDryIoc](https://img.shields.io/badge/Follow-%40DryIoc-blue.svg)](https://twitter.com/DryIoc) 
@@ -53,7 +53,7 @@ DryIoc is small, fast, and capable IoC Container for .NET
 * Register with arbitrary key and condition, multiple default registrations.
 * Resolve and ResolveMany. 
 * Unknown service resolution with `Rules.WithUnknownServiceResolvers()`. 
-* Instance lifetime control or *Reuse* in DryIoc terms ([wiki](https://bitbucket.org/dadhi/dryioc/wiki/ReuseAndScopes)) :
+* Instance lifetime control or *Reuse* in DryIoc terms:
     * Nested disposable scopes, ambient scope context.
     * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`. Plus you can define your own.
     * Changing default reuse type per container via `Rules.WithReuseMapping()`.
