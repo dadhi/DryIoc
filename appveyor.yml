@@ -13,7 +13,7 @@ artifacts:
   - path: bin\NuGetPackages\*.nupkg
 
 install:
-  - choco install git /GitAndUnixToolsOnPath
+  - choco install git --params="/GitAndUnixToolsOnPath"
 
 build_script:
   - .\BuildScripts\_main.bat -nopause
