@@ -68,6 +68,16 @@ namespace DryIoc
             return new Container(rules, registryWithoutCache, _singletonScope, scopeContext, _openedScope, _disposed);
         }
 
+        /// <summary>Produces new container which prevents any further registrations.</summary>
+        /// <param name="ignoreInsteadOfThrow">(optional) Controls what to do with the next registration: ignore or throw exception.
+        /// Throws exception by default.</param>
+        /// <returns>New container preserving all current container state but prohiting registrations.</returns>
+        public IContainer WithNoMoreRegisrationAllowed(bool ignoreInsteadOfThrow = false)
+        {
+            var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
+            return new Container(Rules, readonlyRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
+        }
+
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// It will preserve resolved services in Singleton/Current scope.</summary>
         /// <returns>New container with empty cache.</returns>
@@ -1117,11 +1127,14 @@ namespace DryIoc
             public readonly Ref<ImTreeMapIntToObj> FactoryExpressionCache;
             public readonly Ref<object[]> ResolutionStateCache;
 
+            private enum IsChangePermitted { Permitted, Error, Ignored }
+            private readonly IsChangePermitted _isChangePermitted;
+
             public Registry WithoutCache()
             {
                 return new Registry(Services, Decorators, _wrappers,
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty), Ref.Of(ImTreeMap<KV<Type, object>, FactoryDelegate>.Empty),
-                    Ref.Of(ImTreeMapIntToObj.Empty), Ref.Of(ArrayTools.Empty<object>()));
+                    Ref.Of(ImTreeMapIntToObj.Empty), Ref.Of(ArrayTools.Empty<object>()), _isChangePermitted);
             }
 
             private Registry(ImTreeMap<Type, Factory> wrapperFactories = null)
@@ -1131,7 +1144,8 @@ namespace DryIoc
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMap<KV<Type, object>, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMapIntToObj.Empty),
-                    Ref.Of(ArrayTools.Empty<object>()))
+                    Ref.Of(ArrayTools.Empty<object>()),
+                    IsChangePermitted.Permitted)
             { }
 
             private Registry(
@@ -1141,7 +1155,8 @@ namespace DryIoc
                 Ref<ImTreeMap<Type, FactoryDelegate>> defaultFactoryDelegateCache,
                 Ref<ImTreeMap<KV<Type, object>, FactoryDelegate>> keyedFactoryDelegateCache,
                 Ref<ImTreeMapIntToObj> factoryExpressionCache,
-                Ref<object[]> resolutionStateCache)
+                Ref<object[]> resolutionStateCache,
+                IsChangePermitted isChangePermitted)
             {
                 Services = services;
                 Decorators = decorators;
@@ -1150,6 +1165,7 @@ namespace DryIoc
                 KeyedFactoryDelegateCache = keyedFactoryDelegateCache;
                 FactoryExpressionCache = factoryExpressionCache;
                 ResolutionStateCache = resolutionStateCache;
+                _isChangePermitted = isChangePermitted;
             }
 
             private Registry WithServices(ImTreeMap<Type, object> services)
@@ -1157,7 +1173,7 @@ namespace DryIoc
                 return services == Services ? this :
                     new Registry(services, Decorators, _wrappers,
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef());
+                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef(), _isChangePermitted);
             }
 
             private Registry WithDecorators(ImTreeMap<Type, Factory[]> decorators)
@@ -1165,7 +1181,7 @@ namespace DryIoc
                 return decorators == Decorators ? this :
                     new Registry(Services, decorators, _wrappers,
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef());
+                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef(), _isChangePermitted);
             }
 
             private Registry WithWrappers(ImTreeMap<Type, Factory> wrappers)
@@ -1173,7 +1189,7 @@ namespace DryIoc
                 return wrappers == _wrappers ? this :
                     new Registry(Services, Decorators, wrappers,
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef());
+                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef(), _isChangePermitted);
             }
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
@@ -1195,6 +1211,11 @@ namespace DryIoc
 
             public Registry Register(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
             {
+                if (_isChangePermitted != IsChangePermitted.Permitted)
+                    return _isChangePermitted == IsChangePermitted.Ignored ? this
+                        : Throw.For<Registry>(Error.NoMoreRegistrationsAllowed, 
+                            serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factory);
+
                 return factory.FactoryType == FactoryType.Service
                     ? WithService(factory, serviceType, serviceKey, ifAlreadyRegistered)
                     : factory.FactoryType == FactoryType.Decorator
@@ -1332,7 +1353,7 @@ namespace DryIoc
                 {
                     registry = new Registry(services, Decorators, _wrappers,
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef());
+                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef(), _isChangePermitted);
 
                     if (replacedFactory != null)
                         registry = WithoutFactoryCache(registry, replacedFactory, serviceType, serviceKey);
@@ -1343,6 +1364,11 @@ namespace DryIoc
 
             public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
             {
+                if (_isChangePermitted != IsChangePermitted.Permitted)
+                    return _isChangePermitted == IsChangePermitted.Ignored ? this
+                        : Throw.For<Registry>(Error.NoMoreUnregistrationsAllowed,
+                            serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factoryType);
+
                 switch (factoryType)
                 {
                     case FactoryType.Wrapper:
@@ -1482,6 +1508,14 @@ namespace DryIoc
                 return registry;
             }
 
+            public Registry WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow)
+            {
+                var isChangePermitted = ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error;
+                return new Registry(Services, Decorators, _wrappers, 
+                    DefaultFactoryDelegateCache, KeyedFactoryDelegateCache, FactoryExpressionCache, ResolutionStateCache,
+                    isChangePermitted);
+            }
+
             public object ResolveServiceFromCache(Type serviceType, IResolverContext resolverContext)
             {
                 var factoryDelegate = DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
@@ -1596,7 +1630,7 @@ namespace DryIoc
         {
             return container.ThrowIfNull().With(rules =>
                 rules.WithUnknownServiceResolvers(
-                    AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
+                    Rules.AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
         }
 
         /// <summary>Adds rule to register unknown service when it is resolved.</summary>
@@ -1616,36 +1650,6 @@ namespace DryIoc
                 .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated())
                 .ToArray();
             return container.WithAutoFallbackResolution(types, changeDefaultReuse, condition);
-        }
-
-        /// <summary>Fallback rule to automatically register requested service with Reuse based on resolution source.</summary>
-        /// <param name="implTypes">Assemblies to look for implementation types.</param>
-        /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
-        /// <param name="condition">(optional) condition.</param>
-        /// <returns>Rule.</returns>
-        public static Rules.UnknownServiceResolver AutoRegisterUnknownServiceRule(
-            IEnumerable<Type> implTypes,
-            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
-            Func<Request, bool> condition = null)
-        {
-            return request =>
-            {
-                if (condition != null && !condition(request))
-                    return null;
-
-                var currentScope = request.Scopes.GetCurrentScope();
-                var reuse = currentScope != null
-                    ? Reuse.InCurrentNamedScope(currentScope.Name)
-                    : Reuse.Singleton;
-
-                if (changeDefaultReuse != null)
-                    reuse = changeDefaultReuse(reuse, request);
-
-                request.Container.RegisterMany(implTypes, reuse,
-                    serviceTypeCondition: type => type.IsAssignableTo(request.ServiceType));
-
-                return request.Container.GetServiceFactoryOrDefault(request);
-            };
         }
 
         /// <summary>Checks if custom value of the <paramref name="customValueType"/> is supported by DryIoc injection mechanism.</summary>
@@ -2199,6 +2203,36 @@ namespace DryIoc
             var newRules = (Rules)MemberwiseClone();
             newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.Append(rules);
             return newRules;
+        }
+
+        /// <summary>Fallback rule to automatically register requested service with Reuse based on resolution source.</summary>
+        /// <param name="implTypes">Assemblies to look for implementation types.</param>
+        /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
+        /// <param name="condition">(optional) condition.</param>
+        /// <returns>Rule.</returns>
+        public static Rules.UnknownServiceResolver AutoRegisterUnknownServiceRule(
+            IEnumerable<Type> implTypes,
+            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
+            Func<Request, bool> condition = null)
+        {
+            return request =>
+            {
+                if (condition != null && !condition(request))
+                    return null;
+
+                var currentScope = request.Scopes.GetCurrentScope();
+                var reuse = currentScope != null
+                    ? Reuse.InCurrentNamedScope(currentScope.Name)
+                    : Reuse.Singleton;
+
+                if (changeDefaultReuse != null)
+                    reuse = changeDefaultReuse(reuse, request);
+
+                request.Container.RegisterMany(implTypes, reuse,
+                    serviceTypeCondition: type => type.IsAssignableTo(request.ServiceType));
+
+                return request.Container.GetServiceFactoryOrDefault(request);
+            };
         }
 
         /// <summary>List of containers to fallback resolution to.</summary>
@@ -6597,6 +6631,12 @@ namespace DryIoc
         /// <returns>New container.</returns>
         IContainer With(Func<Rules, Rules> configure = null, IScopeContext scopeContext = null);
 
+        /// <summary>Produces new container which prevents any further registrations.</summary>
+        /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with resgitrations: ignore or throw exception.
+        /// Throws exception by default.</param>
+        /// <returns>New container preserving all current container state but prohiting registrations.</returns>
+        IContainer WithNoMoreRegisrationAllowed(bool ignoreInsteadOfThrow = false);
+
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// It will preserve resolved services in Singleton/Current scope.</summary>
         /// <returns>New container with empty cache.</returns>
@@ -6853,7 +6893,8 @@ namespace DryIoc
                 "  and Found registrations:" + Environment.NewLine + "{3}"),
 
             ExpectedSingleDefaultFactory = Of(
-                "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." + Environment.NewLine +
+                "Expecting single default registration of {0} but found many:" + Environment.NewLine + "{1}." +
+                Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
             RegisterImplementationNotAssignableToServiceType = Of(
                 "Registering implementation type {0} not assignable to service type {1}."),
@@ -6866,10 +6907,12 @@ namespace DryIoc
             RegisteringOpenGenericServiceWithMissingTypeArgs = Of(
                 "Unable to register open-generic implementation {0} because service {1} should specify all type arguments, but specifies only {2}."),
             RegisteringNotAGenericTypedefImplType = Of(
-                "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
+                "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." +
+                Environment.NewLine +
                 "Consider to register generic type definition {1} instead."),
             RegisteringNotAGenericTypedefServiceType = Of(
-                "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
+                "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." +
+                Environment.NewLine +
                 "Consider to register generic type definition {1} instead."),
             RegisteringNullImplementationTypeAndNoFactoryMethod = Of(
                 "Registering without implementation type and without FactoryMethod to use instead."),
@@ -6886,7 +6929,8 @@ namespace DryIoc
             NoMatchedFactoryMethodWithServiceTypeArgs = Of(
                 "Unable to match open-generic factory method {0} with requested service type arguments <{1}> when resolving {2}."),
             OpenGenericFactoryMethodDeclaringTypeIsNotSupportedOnThisPlatform = Of(
-                "[Specific to this .NET version] Unable to match method or constructor {0} from open-generic declaring type {1} to closed-generic type {2}, " + Environment.NewLine +
+                "[Specific to this .NET version] Unable to match method or constructor {0} from open-generic declaring type {1} to closed-generic type {2}, " +
+                Environment.NewLine +
                 "Please give thje method an unique name to distinguish it from other overloads."),
             CtorIsMissingSomeParameters = Of(
                 "Constructor [{0}] of {1} misses some arguments required for {2} dependency."),
@@ -6956,7 +7000,8 @@ namespace DryIoc
             ContainerIsDisposed = Of(
                 "Container is disposed and its operations are no longer available."),
             NotDirectScopeParent = Of(
-                "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." + Environment.NewLine +
+                "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." +
+                Environment.NewLine +
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
             WrappedNotAssignableFromRequiredType = Of(
                 "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}."),
@@ -6995,8 +7040,14 @@ namespace DryIoc
                 "Registered instance of {0} is not available in a given context." + Environment.NewLine +
                 "It may mean that instance is requested from fallback container which is not supported at the moment."),
             RegisteringWithNotSupportedDepedendencyCustomValueType = Of(
-                "Registering {0} dependency with not supported custom value type {1}." + Environment.NewLine + 
-                "Only DryIoc.DefaultValue, System.Type, .NET primitives types, or array of those are supported.");
+                "Registering {0} dependency with not supported custom value type {1}." + Environment.NewLine +
+                "Only DryIoc.DefaultValue, System.Type, .NET primitives types, or array of those are supported."),
+            NoMoreRegistrationsAllowed = Of(
+                "Container does not allow further registrations." + Environment.NewLine +
+                "Attempting to register {0}{1} with implementation factory {2}."),
+            NoMoreUnregistrationsAllowed = Of(
+                "Container does not allow further (un)registrations." + Environment.NewLine +
+                "Attempting to unregister {0}{1} with factory type {2}.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

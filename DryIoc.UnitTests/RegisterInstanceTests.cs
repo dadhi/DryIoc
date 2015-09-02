@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using System.Linq.Expressions;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -111,6 +112,44 @@ namespace DryIoc.UnitTests
             var regAfter = container.GetServiceRegistrations().Single();
 
             Assert.AreEqual(regBefore.Factory.FactoryID, regAfter.Factory.FactoryID);
+        }
+
+        interface I { }
+        class C : I { }
+        class D { public D(I i) { } }
+
+        [Test]
+        public void Should_throw_on_reuse_mismatch()
+        {
+            var c = new Container();
+
+            c.RegisterInstance<I>(new C(), reuse: new ShortReuse());
+            c.Register<D>(Reuse.Singleton);
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                c.Resolve<D>());
+
+            Assert.AreEqual(Error.DependencyHasShorterReuseLifespan, ex.Error);
+        }
+
+        class ShortReuse : IReuse
+        {
+            public int Lifespan { get { return 50; } }
+
+            public IScope GetScopeOrDefault(Request request)
+            {
+                return request.Scopes.SingletonScope;
+            }
+
+            public Expression GetScopeExpression(Request request)
+            {
+                return Expression.Property(Container.ScopesExpr, "SingletonScope");
+            }
+
+            public int GetScopedItemIdOrSelf(int factoryID, Request request)
+            {
+                return request.Scopes.SingletonScope.GetScopedItemIdOrSelf(factoryID);
+            }
         }
     }
 }

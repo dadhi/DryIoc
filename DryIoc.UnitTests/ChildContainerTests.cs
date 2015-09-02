@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq.Expressions;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -232,44 +231,34 @@ namespace DryIoc.UnitTests
             //Assert.IsNull(str);
         }
 
-        interface I { }
-        class C : I { }
-        class D { public D(I i) { } }
-
         [Test]
-        public void Should_throw_on_reuse_mismatch()
+        public void Can_produce_container_which_throws_on_further_registrations()
         {
             var c = new Container();
+            c.Register<Foo>();
 
-            c.Register<I, C>(reuse: new ShortReuse());
-            c.Register<D>(reuse: Reuse.Singleton);
+            var frozen = c.WithNoMoreRegisrationAllowed();
 
             var ex = Assert.Throws<ContainerException>(() => 
-                c.Resolve<D>());
+                frozen.Register<Blah>());
 
-            Assert.AreEqual(Error.DependencyHasShorterReuseLifespan, ex.Error);
+            Assert.AreEqual(Error.NoMoreRegistrationsAllowed, ex.Error);
         }
 
-        class ShortReuse : IReuse
+        [Test]
+        public void Can_produce_container_which_throws_on_further_unregistrations()
         {
-            public int Lifespan { get { return 50; } }
-            
-            public IScope GetScopeOrDefault(Request request)
-            {
-                return request.Scopes.SingletonScope;
-            }
+            var c = new Container();
+            c.Register<Foo>();
 
-            public Expression GetScopeExpression(Request request)
-            {
-                return Expression.Property(Container.ScopesExpr, "SingletonScope");
-            }
+            var frozen = c.WithNoMoreRegisrationAllowed();
 
-            public int GetScopedItemIdOrSelf(int factoryID, Request request)
-            {
-                return factoryID;
-            }
+            var ex = Assert.Throws<ContainerException>(() =>
+                frozen.Unregister<Blah>());
+
+            Assert.AreEqual(Error.NoMoreUnregistrationsAllowed, ex.Error);
         }
-
+        
         #region CUT
 
         internal class Foo : IDisposable
