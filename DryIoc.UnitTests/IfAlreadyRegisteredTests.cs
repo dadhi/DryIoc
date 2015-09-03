@@ -11,15 +11,19 @@ namespace DryIoc.UnitTests
         public void By_default_appends_new_default_registration()
         {
             var container = new Container();
-            container.Register<IService, Service>();
-            container.Register<IService, AnotherService>();
+            container.Register<I, X>();
+            container.Register<I, Y>();
 
-            var services = container.Resolve<IService[]>();
+            var services = container.Resolve<I[]>();
 
             CollectionAssert.AreEqual(
-                new[] {typeof(Service), typeof(AnotherService) }, 
-                services.Select(s => s.GetType()));
+                new[] {typeof(X), typeof(Y) }, 
+                services.Select(s => s.GetType()).ToArray());
         }
+
+        public interface I { }
+        public class X : I { }
+        public class Y : I { }
 
         [Test]
         public void I_can_say_to_Throw_on_new_default_registration()
@@ -83,7 +87,7 @@ namespace DryIoc.UnitTests
 
             CollectionAssert.AreEqual(
                 new[] { typeof(Service), typeof(AnotherService) },
-                services.Select(service => service.GetType()));
+                services.Select(service => service.GetType()).ToArray());
         }
     }
 }

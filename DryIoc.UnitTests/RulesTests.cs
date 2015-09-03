@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -11,18 +10,6 @@ namespace DryIoc.UnitTests
     [TestFixture]
     public class RulesTests
     {
-        [Test]
-        public void It_is_possible_to_remove_Enumerable_support_per_container()
-        {
-            var container = new Container();
-            container.Unregister(typeof(IEnumerable<>), factoryType: FactoryType.Wrapper);
-
-            container.Register<Service>();
-
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<Service[]>());
-        }
-
         [Test]
         public void Given_service_with_two_ctors_I_can_specify_what_ctor_to_choose_for_resolve()
         {

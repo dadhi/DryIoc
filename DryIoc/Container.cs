@@ -299,6 +299,11 @@ namespace DryIoc
                 ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
+        private static object GetKeyedServiceCacheKey(object serviceKey, Type requiredServiceType)
+        {
+            return null;
+        }
+
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
         {
             if (requiredServiceType != null)
@@ -340,11 +345,9 @@ namespace DryIoc
                 return null;
 
             var resultService = keyedFactory(request.Container.ResolutionStateCache, _containerWeakRef, scope);
-
             // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
             if (factory.Setup.CacheFactoryExpression && requiredServiceType == null)
                 registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(keyedCacheKey, keyedFactory));
-
             return resultService;
         }
 
@@ -364,12 +367,8 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var registry = _registry.Value;
-            var service = factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, scope);
-
-            if (factory.Setup.CacheFactoryExpression)
-                registry.DefaultFactoryDelegateCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
-
+            var service = factoryDelegate(_registry.Value.ResolutionStateCache.Value, _containerWeakRef, scope);
+            _registry.Value.DefaultFactoryDelegateCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
             return service;
         }
 
@@ -575,12 +574,14 @@ namespace DryIoc
             }
 
             if (factory == null)
-            {
-                var unknownServiceResolvers = Rules.UnknownServiceResolvers;
-                if (!unknownServiceResolvers.IsNullOrEmpty())
-                    for (var i = 0; factory == null && i < unknownServiceResolvers.Length; i++)
-                        factory = unknownServiceResolvers[i](request);
-            }
+                factory = WrappersSupport.ResolveWrappers(request);
+
+            if (factory == null && !Rules.FallbackContainers.IsNullOrEmpty())
+                factory = ResolveFromFallbackContainers(Rules.FallbackContainers, request);
+            
+            if (factory == null && !Rules.UnknownServiceResolvers.IsNullOrEmpty())
+                for (var i = 0; factory == null && i < Rules.UnknownServiceResolvers.Length; i++)
+                    factory = Rules.UnknownServiceResolvers[i](request);
 
             if (factory == null && request.IfUnresolved == IfUnresolved.Throw)
                 ThrowUnableToResolve(request);
@@ -588,10 +589,33 @@ namespace DryIoc
             return factory;
         }
 
+        private static Factory ResolveFromFallbackContainers(ContainerWeakRef[] fallbackContainers, Request request)
+        {
+            for (var i = 0; i < fallbackContainers.Length; i++)
+            {
+                var containerWeakRef = fallbackContainers[i];
+                var containerRequest = request.WithNewContainer(containerWeakRef);
+
+                // Continue to next parent if factory is not found in first parent by
+                // updating IfUnresolved policy to ReturnDefault.
+                if (containerRequest.IfUnresolved != IfUnresolved.ReturnDefault)
+                    containerRequest = containerRequest.WithChangedServiceInfo(info => // NOTE Code Smell
+                        ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfoFromDependencyOwner(info));
+
+                var factory = containerWeakRef.Container.ResolveFactory(containerRequest);
+                if (factory != null)
+                    return factory;
+            }
+
+            return null;
+        }
+
         internal static void ThrowUnableToResolve(Request request)
         {
             var container = request.Container;
-            var registrations = container.GetAllServiceFactories(request.ServiceType, bothClosedAndOpenGenerics: true)
+
+            var registrations = container
+                .GetAllServiceFactories(request.ServiceType, bothClosedAndOpenGenerics: true)
                 .Aggregate(new StringBuilder(), (s, f) =>
                     (f.Value.IsMatchingReuseScope(request)
                         ? s.Append("  ")
@@ -599,24 +623,12 @@ namespace DryIoc
                         .AppendLine(f.ToString()));
 
             if (registrations.Length != 0)
-            {
-                var currentScope = request.Scopes.GetCurrentScope();
                 Throw.It(Error.UnableToResolveFromRegisteredServices, request,
-                    currentScope, request.Scope, registrations);
-            }
+                    request.Scopes.GetCurrentScope(), request.Scope, registrations);
             else
-            {
-                var rules = container.Rules;
-                var customUnknownServiceResolversCount =
-                    (rules.UnknownServiceResolvers ?? ArrayTools.Empty<Rules.UnknownServiceResolver>())
-                    .Except(Rules.Default.UnknownServiceResolvers).Count();
-
-                var fallbackContainersCount =
-                    (rules.FallbackContainers ?? ArrayTools.Empty<ContainerWeakRef>()).Length;
-
                 Throw.It(Error.UnableToResolveUnknownService, request,
-                    fallbackContainersCount, customUnknownServiceResolversCount);
-            }
+                    container.Rules.FallbackContainers.EmptyIfNull().Length,
+                    container.Rules.UnknownServiceResolvers.EmptyIfNull().Length);
         }
 
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
@@ -660,7 +672,7 @@ namespace DryIoc
 
             // We are already resolving decorator for the service, so stop now.
             var parent = request.ParentNonWrapper();
-            if (!parent.IsEmpty && parent.ResolvedFactory.FactoryType == FactoryType.Decorator)
+            if (!parent.IsEmpty && parent.ResolvedFactoryType == FactoryType.Decorator)
                 return null;
 
             var container = request.Container;
@@ -746,8 +758,8 @@ namespace DryIoc
 
             if (!Rules.FallbackContainers.IsNullOrEmpty())
             {
-                var fallbackDecorators = Rules.FallbackContainers.SelectMany(r =>
-                    r.Container.GetDecoratorFactoriesOrDefault(serviceType) ?? ArrayTools.Empty<Factory>())
+                var fallbackDecorators = Rules.FallbackContainers.SelectMany(c =>
+                    c.Container.GetDecoratorFactoriesOrDefault(serviceType) ?? ArrayTools.Empty<Factory>())
                     .ToArrayOrSelf();
                 if (!fallbackDecorators.IsNullOrEmpty())
                     decorators = decorators == null
@@ -1882,7 +1894,7 @@ namespace DryIoc
         public static bool IsNestedInFuncWithArgs(this Request request)
         {
             return !request.Parent.IsEmpty && request.Parent.Enumerate()
-                .TakeWhile(r => r.ResolvedFactory.FactoryType == FactoryType.Wrapper)
+                .TakeWhile(r => r.ResolvedFactoryType == FactoryType.Wrapper)
                 .Any(r => r.ServiceType.IsFuncWithArgs());
         }
 
@@ -2116,11 +2128,8 @@ namespace DryIoc
         /// <remarks>Rules <see cref="UnknownServiceResolvers"/> are empty too.</remarks>
         public static readonly Rules Empty = new Rules();
 
-        /// <summary>Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
-        /// Check <see cref="WrappersSupport.ResolveWrappers"/> for details.</summary>
-        public static readonly Rules Default = Empty.WithUnknownServiceResolvers(
-            WrappersSupport.ResolveWrappers,
-            ResolveFromFallbackContainers);
+        /// <summary>No rules as staring point.</summary>
+        public static readonly Rules Default = Empty;
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
@@ -2210,7 +2219,7 @@ namespace DryIoc
         /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
         /// <param name="condition">(optional) condition.</param>
         /// <returns>Rule.</returns>
-        public static Rules.UnknownServiceResolver AutoRegisterUnknownServiceRule(
+        public static UnknownServiceResolver AutoRegisterUnknownServiceRule(
             IEnumerable<Type> implTypes,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
             Func<Request, bool> condition = null)
@@ -2254,31 +2263,6 @@ namespace DryIoc
             var newRules = (Rules)MemberwiseClone();
             newRules.FallbackContainers = newRules.FallbackContainers.Remove(container.ContainerWeakRef);
             return newRules;
-        }
-
-        private static Factory ResolveFromFallbackContainers(Request request)
-        {
-            var fallbackContainers = request.Container.Rules.FallbackContainers;
-            if (fallbackContainers.IsNullOrEmpty())
-                return null;
-
-            for (var i = 0; i < fallbackContainers.Length; i++)
-            {
-                var containerWeakRef = fallbackContainers[i];
-                var containerRequest = request.WithNewContainer(containerWeakRef);
-
-                // Continue to next parent if factory is not found in first parent by
-                // updating IfUnresolved policy to ReturnDefault.
-                if (containerRequest.IfUnresolved != IfUnresolved.ReturnDefault)
-                    containerRequest = containerRequest.WithChangedServiceInfo(info => // NOTE Code Smell
-                        ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfoFromDependencyOwner(info));
-
-                var factory = containerWeakRef.Container.ResolveFactory(containerRequest);
-                if (factory != null)
-                    return factory;
-            }
-
-            return null;
         }
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
@@ -7686,6 +7670,13 @@ namespace DryIoc
         public static bool IsNullOrEmpty<T>(this T[] source)
         {
             return source == null || source.Length == 0;
+        }
+
+        /// <summary>Returns empty array instead of null, or source array otherwise.</summary> <typeparam name="T">Type of array item.</typeparam>
+        /// <param name="source">Source array.</param> <returns>Empty array or source.</returns>
+        public static T[] EmptyIfNull<T>(this T[] source)
+        {
+            return source ?? Empty<T>();
         }
 
         /// <summary>Returns source enumerable if it is array, otherwise converts source to array.</summary>

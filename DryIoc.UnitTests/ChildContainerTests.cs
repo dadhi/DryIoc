@@ -96,7 +96,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
             childContainer.Resolve<FruitJuice>());
 
-            Assert.AreEqual(ex.Error, Error.ContainerIsDisposed);
+            Assert.AreEqual(Error.ContainerIsDisposed, ex.Error);
         }
 
         [Test]
