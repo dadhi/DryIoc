@@ -91,7 +91,7 @@ NuGet: `PM> Install-Package DryIocZero`
 Standalone container based upon compile-time generated factories by DryIoc. 
 
 - Ensures _zero_ application bootstrapping time associated with IoC registrations.
-- Provides verification of DryIoc registration setup at compile-time by generating service factories. Basically - you can see how DryIoc is creating things.
+- Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically - you can see how DryIoc is creating things.
 - Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
 - Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
 - Allows run-time registrations too. You may register instances and factories at run-time.

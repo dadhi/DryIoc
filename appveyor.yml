@@ -2,6 +2,19 @@ version: 2.0.0.{build}
 os: Windows Server 2012
 test: off
 
+environment:
+  CODECOV_TOKEN:
+    secure: 5KhRL8Us1o7f3qgvMWYjmYUaaayFBMBkSn1YHs93wvzPrbx+2YpooScYIR14o/Q9
+
+install:
+  - choco install git --params="/GitAndUnixToolsOnPath"
+
+build_script:
+  - .\BuildScripts\_main.bat -nopause
+
+on_success:
+  - bash <(curl https://codecov.io/bash) 
+
 assembly_info:
   patch: true
   file: AssemblyInfo.*
@@ -11,15 +24,6 @@ assembly_info:
 
 artifacts:
   - path: bin\NuGetPackages\*.nupkg
-
-install:
-  - choco install git --params="/GitAndUnixToolsOnPath"
-
-build_script:
-  - .\BuildScripts\_main.bat -nopause
-
-on_success:
-  - sh.exe <(curl https://codecov.io/bash) 
 
 nuget:
   account_feed: true
