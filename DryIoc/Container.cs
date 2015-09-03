@@ -299,11 +299,6 @@ namespace DryIoc
                 ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
-        private static object GetKeyedServiceCacheKey(object serviceKey, Type requiredServiceType)
-        {
-            return null;
-        }
-
         object IResolver.ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
         {
             if (requiredServiceType != null)
@@ -327,13 +322,13 @@ namespace DryIoc
                     : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, scope);
             }
 
-            var keyedCacheKey = new KV<Type, object>(serviceType, serviceKey);
-            if (requiredServiceType == null)
-            {
-                var cachedKeyedFactory = registry.KeyedFactoryDelegateCache.Value.GetValueOrDefault(keyedCacheKey);
-                if (cachedKeyedFactory != null)
-                    return cachedKeyedFactory(registry.ResolutionStateCache.Value, _containerWeakRef, scope);
-            }
+            // including required service type as part of the key
+            var cacheKey = new KV<Type, object>(serviceType, 
+                requiredServiceType == null ? serviceKey : new KV<object, Type>(serviceKey, requiredServiceType));
+
+            var cachedFactory = registry.KeyedFactoryDelegateCache.Value.GetValueOrDefault(cacheKey);
+            if (cachedFactory != null)
+                return cachedFactory(registry.ResolutionStateCache.Value, _containerWeakRef, scope);
 
             ThrowIfContainerDisposed();
 
@@ -345,7 +340,7 @@ namespace DryIoc
                 return null;
 
             var service = keyedFactory(request.Container.ResolutionStateCache, _containerWeakRef, scope);
-            registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(keyedCacheKey, keyedFactory));
+            registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(cacheKey, keyedFactory));
             return service;
         }
 
@@ -1514,7 +1509,10 @@ namespace DryIoc
                 if (serviceKey == null)
                     registry.DefaultFactoryDelegateCache.Swap(_ => _.Update(serviceType, null));
                 else
-                    registry.KeyedFactoryDelegateCache.Swap(_ => _.Update(new KV<Type, object>(serviceType, serviceKey), null));
+                {
+                    var cacheKey = new KV<Type, object>(serviceType, serviceKey);
+                    registry.KeyedFactoryDelegateCache.Swap(_ => _.Update(cacheKey, null));
+                }
 
                 if (factory.FactoryGenerator != null)
                     foreach (var f in factory.FactoryGenerator.ServiceTypeAndKeyOfGeneratedFactories)

@@ -212,7 +212,7 @@ namespace DryIoc.UnitTests
             container.Dispose(); // singletons, registry, cache, is gone
         }
 
-        [Test]//, Explicit("CreateFacade does something fishy with instance, need to check.")]
+        [Test]
         public void Can_resolve_instance_from_fallback_container_If_instance_registered_as_delegate()
         {
             var container = new Container();
