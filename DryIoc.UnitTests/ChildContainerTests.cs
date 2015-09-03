@@ -212,23 +212,18 @@ namespace DryIoc.UnitTests
             container.Dispose(); // singletons, registry, cache, is gone
         }
 
-        [Test, Explicit("CreateFacade does something fishy with instance, need to check.")]
+        [Test]//, Explicit("CreateFacade does something fishy with instance, need to check.")]
         public void Can_resolve_instance_from_fallback_container_If_instance_registered_as_delegate()
         {
             var container = new Container();
 
             container.RegisterDelegate(_ => "a");
-            //container.RegisterDelegate(_ => "a2", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.RegisterDelegate(_ => "a2", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             var facade = container.CreateFacade();
 
             var str = facade.Resolve<string>();
-            Assert.AreEqual("a", str);
-
-            //// note: something fishy is here
-            //facade = facade.With(rules => rules.WithoutFallbackContainer(container));
-            //str = facade.Resolve<string>(ifUnresolved: IfUnresolved.ReturnDefault);
-            //Assert.IsNull(str);
+            Assert.AreEqual("a2", str);
         }
 
         [Test]

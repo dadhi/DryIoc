@@ -43,7 +43,7 @@ namespace DryIoc
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
         /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadScopeContext"/>.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
-            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), new SingletonScope(), scopeContext)
+            : this(rules ?? Rules.Default, Ref.Of(Registry.WithWrappers()), new SingletonScope(), scopeContext)
         { }
 
         /// <summary>Creates new container with configured rules.</summary>
@@ -180,7 +180,7 @@ namespace DryIoc
             }
             else // for Container created with constructor.
             {
-                Rules = Rules.Empty;
+                Rules = Rules.Default;
                 _registry.Swap(_ => Registry.Empty);
                 _singletonScope.Dispose();
                 if (_scopeContext != null)
@@ -344,11 +344,9 @@ namespace DryIoc
             if (keyedFactory == null)
                 return null;
 
-            var resultService = keyedFactory(request.Container.ResolutionStateCache, _containerWeakRef, scope);
-            // Cache factory only after it is invoked without errors to prevent not-working entries in cache.
-            if (factory.Setup.CacheFactoryExpression && requiredServiceType == null)
-                registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(keyedCacheKey, keyedFactory));
-            return resultService;
+            var service = keyedFactory(request.Container.ResolutionStateCache, _containerWeakRef, scope);
+            registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(keyedCacheKey, keyedFactory));
+            return service;
         }
 
         private object ResolveAndCacheDefaultDelegate(Type serviceType, bool ifUnresolvedReturnDefault, IScope scope)
@@ -1126,7 +1124,12 @@ namespace DryIoc
         private sealed class Registry
         {
             public static readonly Registry Empty = new Registry();
-            public static readonly Registry Default = new Registry(WrappersSupport.Wrappers);
+
+            // Not a field because it contain mutable/swappable cache, so the static will reference changing state
+            public static Registry WithWrappers()
+            {
+                return new Registry(WrappersSupport.Wrappers);
+            }
 
             // Factories:
             public readonly ImTreeMap<Type, object> Services;
@@ -2124,12 +2127,8 @@ namespace DryIoc
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
     {
-        /// <summary>No rules specified.</summary>
-        /// <remarks>Rules <see cref="UnknownServiceResolvers"/> are empty too.</remarks>
-        public static readonly Rules Empty = new Rules();
-
         /// <summary>No rules as staring point.</summary>
-        public static readonly Rules Default = Empty;
+        public static readonly Rules Default = new Rules();
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
