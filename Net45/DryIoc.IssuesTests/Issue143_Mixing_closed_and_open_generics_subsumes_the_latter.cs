@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -63,6 +64,21 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
+        public void Resolving_open_generic_composite_should_work_with_ResolveMany()
+        {
+            var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+
+            container.Register(typeof(I<int>), typeof(C));
+            container.Register(typeof(I<>), typeof(M<>));
+
+            var ies = container.Resolve<IEnumerable<I<int>>>().ToArray();
+
+            Assert.AreEqual(2, ies.Length);
+            Assert.IsInstanceOf<C>(ies.OfType<M<int>>().Single().Ies.Single());
+        }
+
+
+        [Test]
         public void Resolving_open_generic_composite_as_ResolveMany_should_work()
         {
             var container = new Container();
@@ -80,9 +96,9 @@ namespace DryIoc.IssuesTests
         {
             public I<T>[] Ies { get; private set; }
 
-            public M(I<T>[] ies)
+            public M(IEnumerable<I<T>> ies)
             {
-                Ies = ies;
+                Ies = ies.ToArray();
             }
         }
     }

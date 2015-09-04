@@ -368,30 +368,26 @@ namespace DryIoc
         IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, IScope scope)
         {
             var container = ((IContainer)this);
-            var itemServiceType = requiredServiceType ?? serviceType;
-            var items = container.GetAllServiceFactories(itemServiceType);
+            var itemType = requiredServiceType ?? serviceType;
+            var items = container.GetAllServiceFactories(itemType);
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
-            if (itemServiceType.IsClosedGeneric())
+            if (itemType.IsClosedGeneric())
             {
-                var serviceGenericDefinition = itemServiceType.GetGenericDefinitionOrNull();
-                KV<object, Factory>[] closedGenericItems = null;
-                openGenericItems = container.GetAllServiceFactories(serviceGenericDefinition)
-                    // Exclude open-generics that already have generated required closed-generic service.
-                    .Where(x => (closedGenericItems ?? (closedGenericItems = items.ToArray()))
-                        .All(i => i.Value.GeneratorFactoryID != x.Value.FactoryID))
-                    .Select(x => new ServiceRegistrationInfo(x.Value, serviceGenericDefinition, x.Key));
+                var itemTypeGenericDefinition = itemType.GetGenericDefinitionOrNull();
+                openGenericItems = container.GetAllServiceFactories(itemTypeGenericDefinition)
+                    .Select(x => new ServiceRegistrationInfo(x.Value, itemTypeGenericDefinition, x.Key));
             }
 
             // Append registered generic types with compatible variance, 
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
             IEnumerable<ServiceRegistrationInfo> variantGenericItems = null;
-            if (itemServiceType.IsGeneric() && container.Rules.VariantGenericTypesInResolvedCollection)
+            if (itemType.IsGeneric() && container.Rules.VariantGenericTypesInResolvedCollection)
                 variantGenericItems = container.GetServiceRegistrations()
                     .Where(x => x.ServiceType.IsGeneric()
-                        && x.ServiceType.GetGenericTypeDefinition() == itemServiceType.GetGenericTypeDefinition()
-                        && x.ServiceType != itemServiceType
-                        && x.ServiceType.IsAssignableTo(itemServiceType));
+                        && x.ServiceType.GetGenericTypeDefinition() == itemType.GetGenericTypeDefinition()
+                        && x.ServiceType != itemType
+                        && x.ServiceType.IsAssignableTo(itemType));
 
             if (serviceKey != null) // include only single item matching key.
             {
@@ -406,7 +402,17 @@ namespace DryIoc
             {
                 items = items.Where(x => !compositeParentKey.Equals(x.Key));
                 if (openGenericItems != null)
-                    openGenericItems = openGenericItems.Where(x => !compositeParentKey.Equals(x.OptionalServiceKey));
+                    openGenericItems = openGenericItems
+                        .Where(x =>
+                        {
+                            if (compositeParentKey.Equals(x.OptionalServiceKey))
+                                return false;
+                            if (x.Factory.FactoryGenerator != null)
+                                return x.Factory.FactoryGenerator.GeneratedFactories.Enumerate()
+                                    .All(f => !compositeParentKey.Equals(f.Key.Value));
+
+                            return true;
+                        });
                 if (variantGenericItems != null)
                     variantGenericItems = variantGenericItems.Where(x => !compositeParentKey.Equals(x.OptionalServiceKey));
             }
@@ -558,12 +564,12 @@ namespace DryIoc
             var factory = GetServiceFactoryOrDefault(request, Rules.FactorySelector);
             if (factory != null && factory.FactoryGenerator != null)
             {
-                factory = factory.FactoryGenerator.GenerateFactoryOrDefault(request);
-                if (factory != null)
-                {
-                    var serviceKey = request.ServiceKey is DefaultKey ? null : request.ServiceKey;
-                    Register(factory, request.ServiceType, serviceKey, IfAlreadyRegistered.AppendNotKeyed, false);
-                }
+                factory = factory.FactoryGenerator.GetGeneratedOrGenerateFactoryOrDefault(request);
+                //if (factory != null)
+                //{
+                //    var serviceKey = request.ServiceKey is DefaultKey ? null : request.ServiceKey;
+                //    //Register(factory, request.ServiceType, serviceKey, IfAlreadyRegistered.AppendNotKeyed, false);
+                //}
             }
 
             if (factory == null)
@@ -633,16 +639,14 @@ namespace DryIoc
         {
             var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
-            var factories = RegistryEntryToKeyFactoryPairs(entry);
+            var factories = GetRegistryEntryKeyFactoryPairs(entry);
 
             if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
             {
                 var openGenericEntry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
                 if (openGenericEntry != null)
                 {
-                    var openGenericFactories = RegistryEntryToKeyFactoryPairs(openGenericEntry)
-                        .Where(ogf => factories.All(f => f.Value.GeneratorFactoryID != ogf.Value.FactoryID))
-                        .ToArray();
+                    var openGenericFactories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArray();
                     factories = factories.Concat(openGenericFactories);
                 }
             }
@@ -650,7 +654,7 @@ namespace DryIoc
             return factories;
         }
 
-        private static IEnumerable<KV<object, Factory>> RegistryEntryToKeyFactoryPairs(object entry)
+        private static IEnumerable<KV<object, Factory>> GetRegistryEntryKeyFactoryPairs(object entry)
         {
             return entry == null ? Enumerable.Empty<KV<object, Factory>>()
                 : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Value, (Factory)entry) }
@@ -696,7 +700,7 @@ namespace DryIoc
                         // Cache closed generic registration produced by open-generic decorator.
                         if (i >= openGenericDecoratorIndex && decorator.FactoryGenerator != null)
                         {
-                            decorator = decorator.FactoryGenerator.GenerateFactoryOrDefault(request);
+                            decorator = decorator.FactoryGenerator.GetGeneratedOrGenerateFactoryOrDefault(request);
                             Register(decorator, serviceType, null, IfAlreadyRegistered.AppendNotKeyed, false);
                         }
 
@@ -1515,8 +1519,8 @@ namespace DryIoc
                 }
 
                 if (factory.FactoryGenerator != null)
-                    foreach (var f in factory.FactoryGenerator.ServiceTypeAndKeyOfGeneratedFactories)
-                        registry = registry.Unregister(factory.FactoryType, f.Key, f.Value, null);
+                    foreach (var f in factory.FactoryGenerator.GeneratedFactories.Enumerate())
+                        registry = registry.Unregister(factory.FactoryType, f.Key.Key, f.Key.Value, null);
 
                 return registry;
             }
@@ -1883,7 +1887,7 @@ namespace DryIoc
 
             var factory = request.Container.GetWrapperFactoryOrDefault(serviceType);
             if (factory != null && factory.FactoryGenerator != null)
-                factory = factory.FactoryGenerator.GenerateFactoryOrDefault(request);
+                factory = factory.FactoryGenerator.GetGeneratedOrGenerateFactoryOrDefault(request);
 
             return factory;
         };
@@ -1921,8 +1925,7 @@ namespace DryIoc
             {
                 var requiredItemGenericDefinition = requiredItemType.GetGenericDefinitionOrNull();
                 var openGenericItems = container.GetAllServiceFactories(requiredItemGenericDefinition)
-                    .Where(ogi => items.All(i => i.Factory.GeneratorFactoryID != ogi.Value.FactoryID))
-                    .Select(kv => new ServiceRegistrationInfo(kv.Value, requiredItemGenericDefinition, kv.Key))
+                    .Select(keyFactory => new ServiceRegistrationInfo(keyFactory.Value, requiredItemGenericDefinition, keyFactory.Key))
                     .ToArray();
                 items = items.Append(openGenericItems);
             }
@@ -1948,7 +1951,9 @@ namespace DryIoc
             {
                 var parentFactoryID = parent.ResolvedFactory.FactoryID;
                 items = items
-                    .Where(x => x.Factory.FactoryID != parentFactoryID)
+                    .Where(x => x.Factory.FactoryID != parentFactoryID 
+                        && (x.Factory.FactoryGenerator == null 
+                        ||  x.Factory.FactoryGenerator.GeneratedFactories.Enumerate().All(f => f.Value.FactoryID != parentFactoryID)))
                     .ToArray();
             }
 
@@ -4120,29 +4125,37 @@ namespace DryIoc
         /// <summary>Indicates that request is empty initial request: there is no <see cref="ServiceInfo"/> in such a request.</summary>
         public bool IsEmpty { get { return ServiceInfo == null; } }
 
+        /// <summary>Returns true if request originated from first Resolve call.</summary>
+        public bool IsCompositionRoot { get { return Scope == null; } }
+
+        /// <summary>Optionally associated resolution scope.</summary>
+        public readonly IScope Scope;
+
         /// <summary>Previous request in dependency chain. It <see cref="IsEmpty"/> for resolution root.</summary>
         public readonly Request Parent;
 
+        // note: Mutable: may change service key from null to exact Default.
         /// <summary>Requested service id info and commanded resolution behavior.</summary>
         public IServiceInfo ServiceInfo { get; private set; }
 
         /// <summary>Factory found in container to resolve this request.</summary>
         public readonly Factory ResolvedFactory;
-
+        
+        // note: Mutable: tracks used parameters
         /// <summary>User provided arguments: key tracks what args are still unused.</summary>
         public readonly KV<bool[], ParameterExpression[]> FuncArgs;
 
-        /// <summary>Weak reference to container.</summary>
+        /// <summary>Weak reference to container. May be replaced in request flowed from parent to child container.</summary>
         public readonly ContainerWeakRef ContainerWeakRef;
-        private readonly ContainerWeakRef _scopesWeakRef;
 
         /// <summary>Provides access to container currently bound to request. 
         /// By default it is container initiated request by calling resolve method,
         /// but could be changed along the way: for instance when resolving from parent container.</summary>
         public IContainer Container { get { return ContainerWeakRef.Container; } }
 
-        /// <summary>Separate access to scopes.</summary>
+        /// <summary>Separate from container because while container may be switched from parent to child, scopes should be from child/facade.</summary>
         public IScopeAccess Scopes { get { return _scopesWeakRef.Scopes; } }
+        private readonly ContainerWeakRef _scopesWeakRef;
 
         /// <summary>Shortcut access to <see cref="IServiceInfo.ServiceType"/>.</summary>
         public Type ServiceType { get { return ServiceInfo == null ? null : ServiceInfo.ServiceType; } }
@@ -4161,12 +4174,6 @@ namespace DryIoc
 
         /// <summary>Shortcut to FactoryType.</summary>
         public FactoryType ResolvedFactoryType { get { return ResolvedFactory == null ? FactoryType.Service : ResolvedFactory.FactoryType; } }
-
-        /// <summary>Resolution scope.</summary>
-        public readonly IScope Scope;
-
-        /// <summary>Returns true if request originated from first Resolve call.</summary>
-        public bool IsCompositionRoot { get { return Scope == null; } }
 
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
         /// <param name="info">Info about service to resolve.</param> <param name="scope">(optional) Resolution scope.</param>
@@ -4551,12 +4558,12 @@ namespace DryIoc
     /// creating closed-generic type reflection factory from registered open-generic prototype factory.</summary>
     public interface IConcreteFactoryGenerator
     {
-        /// <summary>Returns factories created by <see cref="GenerateFactoryOrDefault"/> so far.</summary>
-        IEnumerable<KV<Type, object>> ServiceTypeAndKeyOfGeneratedFactories { get; }
+        /// <summary>todo:  </summary>
+        ImTreeMap<KV<Type, object>, ReflectionFactory> GeneratedFactories { get; }
 
         /// <summary>Method applied for factory provider, returns new factory per request.</summary>
         /// <param name="request">Request to resolve.</param> <returns>Returns new factory per request.</returns>
-        Factory GenerateFactoryOrDefault(Request request);
+        Factory GetGeneratedOrGenerateFactoryOrDefault(Request request);
     }
 
     /// <summary>Base class for different ways to instantiate service: 
@@ -4602,12 +4609,8 @@ namespace DryIoc
         public virtual Type ImplementationType { get { return null; } }
 
         /// <summary>Indicates that Factory is factory provider and 
-        /// consumer should call <see cref="IConcreteFactoryGenerator.GenerateFactoryOrDefault"/>  to get concrete factory.</summary>
+        /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedOrGenerateFactoryOrDefault"/>  to get concrete factory.</summary>
         public virtual IConcreteFactoryGenerator FactoryGenerator { get { return null; } }
-
-        /// <summary>Marks generated factory and identifies the generator id. 
-        /// Value -1 indicates that factory is not generated.</summary>
-        public virtual int GeneratorFactoryID { get { return -1; } }
 
         /// <summary>Get next factory ID in a atomic way.</summary><returns>The ID.</returns>
         public static int GetNextID()
@@ -5107,21 +5110,16 @@ namespace DryIoc
         /// <summary>Provides closed-generic factory for registered open-generic variant.</summary>
         public override IConcreteFactoryGenerator FactoryGenerator { get { return _factoryGenerator; } }
 
-        /// <summary>Indicates that factory is for closed-generic type and been generated by open-generic original factory.</summary>
-        public override int GeneratorFactoryID { get { return _generatorFactoryID; } }
-
         /// <summary>Injection rules set for Constructor, Parameters, Properties and Fields.</summary>
         public readonly Made Made;
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">(optional) Optional if Made.FactoryMethod is present Non-abstract close or open generic type.</param>
         /// <param name="reuse">(optional)</param> <param name="made">(optional)</param> <param name="setup">(optional)</param>
-        /// <param name="generatorFactoryID">(optional) Specifies that factory is generated from open-generic original with specified ID.</param>
-        public ReflectionFactory(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null, int generatorFactoryID = -1)
+        public ReflectionFactory(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
             : base(reuse, setup)
         {
             Made = made ?? Made.Default;
-            _generatorFactoryID = generatorFactoryID;
 
             _implementationType = ValidateAndNormalizeImplementationType(implementationType);
 
@@ -5300,18 +5298,12 @@ namespace DryIoc
 
         private readonly Type _implementationType;
         private readonly ClosedGenericFactoryGenerator _factoryGenerator;
-        private readonly int _generatorFactoryID;
 
         private sealed class ClosedGenericFactoryGenerator : IConcreteFactoryGenerator
         {
-            public IEnumerable<KV<Type, object>> ServiceTypeAndKeyOfGeneratedFactories
+            public ImTreeMap<KV<Type, object>, ReflectionFactory> GeneratedFactories
             {
-                get
-                {
-                    return _generatedFactories.Value.IsEmpty
-                        ? Enumerable.Empty<KV<Type, object>>()
-                        : _generatedFactories.Value.Enumerate().Select(f => f.Value);
-                }
+                get { return _generatedFactories.Value; }
             }
 
             public ClosedGenericFactoryGenerator(ReflectionFactory openGenericFactory)
@@ -5319,11 +5311,21 @@ namespace DryIoc
                 _openGenericFactory = openGenericFactory;
             }
 
-            public Factory GenerateFactoryOrDefault(Request request)
+            public Factory GetGeneratedOrGenerateFactoryOrDefault(Request request)
             {
+                var serviceType = request.ServiceType;
+                var generatedFactoryKey = new KV<Type, object>(serviceType, request.ServiceKey);
+
+                var generatedFactories = _generatedFactories.Value;
+                if (!generatedFactories.IsEmpty)
+                {
+                    var generatedFactory = generatedFactories.GetValueOrDefault(generatedFactoryKey);
+                    if (generatedFactory != null)
+                        return generatedFactory;
+                }
+
                 request = request.WithResolvedFactory(_openGenericFactory);
 
-                var serviceType = request.ServiceType;
                 var implementationType = _openGenericFactory._implementationType;
 
                 var closedTypeArgs = implementationType == serviceType.GetGenericDefinitionOrNull()
@@ -5337,7 +5339,7 @@ namespace DryIoc
                 if (made.FactoryMethod != null)
                 {
                     var factoryMethod = made.FactoryMethod(request)
-                        .ThrowIfNull(Error.Of("Got null factory method when resolving {0}"), request);
+                        .ThrowIfNull(Error.Of("Got null factory method when resolving {0}"), request); // todo: mpove to Error
 
                     var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request);
                     if (closedFactoryMethod == null) // may be null only for IfUnresolved.ReturnDefault
@@ -5355,14 +5357,11 @@ namespace DryIoc
                     return null;
 
                 var closedGenericFactory = new ReflectionFactory(closedImplementationType,
-                    _openGenericFactory.Reuse, made, _openGenericFactory.Setup,
-                    _openGenericFactory.FactoryID);
+                    _openGenericFactory.Reuse, made, _openGenericFactory.Setup);
 
                 // Storing generated factory ID to service type/key mapping 
                 // to find/remove generated factories when needed
-                _generatedFactories.Swap(_ => _.AddOrUpdate(closedGenericFactory.FactoryID,
-                    new KV<Type, object>(serviceType, request.ServiceKey)));
-
+                _generatedFactories.Swap(_ => _.AddOrUpdate(generatedFactoryKey, closedGenericFactory));
                 return closedGenericFactory;
             }
 
@@ -5500,7 +5499,8 @@ namespace DryIoc
             }
 
             private readonly ReflectionFactory _openGenericFactory;
-            private readonly Ref<ImTreeMap<int, KV<Type, object>>> _generatedFactories = Ref.Of(ImTreeMap<int, KV<Type, object>>.Empty);
+            private readonly Ref<ImTreeMap<KV<Type, object>, ReflectionFactory>> 
+                _generatedFactories = Ref.Of(ImTreeMap<KV<Type, object>, ReflectionFactory>.Empty);
         }
 
         private Type ValidateAndNormalizeImplementationType(Type implementationType)
