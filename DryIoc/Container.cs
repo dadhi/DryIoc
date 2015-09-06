@@ -365,7 +365,8 @@ namespace DryIoc
             return service;
         }
 
-        IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, IScope scope)
+        IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, 
+            object compositeParentKey, Type compositeParentRequiredType, IScope scope)
         {
             var container = ((IContainer)this);
             var itemType = requiredServiceType ?? serviceType;
@@ -400,21 +401,20 @@ namespace DryIoc
 
             if (compositeParentKey != null) // exclude composite parent from items
             {
-                items = items.Where(x => !compositeParentKey.Equals(x.Key));
+                if (compositeParentRequiredType == null)
+                    items = items
+                        .Where(x => !compositeParentKey.Equals(x.Key));
+
                 if (openGenericItems != null)
                     openGenericItems = openGenericItems
-                        .Where(x =>
-                        {
-                            if (compositeParentKey.Equals(x.OptionalServiceKey))
-                                return false;
-                            if (x.Factory.FactoryGenerator != null)
-                                return x.Factory.FactoryGenerator.GeneratedFactories.Enumerate()
-                                    .All(f => !compositeParentKey.Equals(f.Key.Value));
+                        .Where(x => !compositeParentKey.Equals(x.OptionalServiceKey) 
+                            ||(compositeParentRequiredType != null 
+                            && compositeParentRequiredType.IsOpenGeneric() 
+                            && compositeParentRequiredType != x.ServiceType));
 
-                            return true;
-                        });
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Where(x => !compositeParentKey.Equals(x.OptionalServiceKey));
+                    variantGenericItems = variantGenericItems
+                        .Where(x => !compositeParentKey.Equals(x.OptionalServiceKey));
             }
 
             foreach (var item in items)
@@ -563,17 +563,10 @@ namespace DryIoc
         {
             var factory = GetServiceFactoryOrDefault(request, Rules.FactorySelector);
             if (factory != null && factory.FactoryGenerator != null)
-            {
-                factory = factory.FactoryGenerator.GetGeneratedOrGenerateFactoryOrDefault(request);
-                //if (factory != null)
-                //{
-                //    var serviceKey = request.ServiceKey is DefaultKey ? null : request.ServiceKey;
-                //    //Register(factory, request.ServiceType, serviceKey, IfAlreadyRegistered.AppendNotKeyed, false);
-                //}
-            }
+                factory = factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
 
             if (factory == null)
-                factory = WrappersSupport.ResolveWrappers(request);
+                factory = WrappersSupport.ResolveWrapperOrGetDefault(request);
 
             if (factory == null && !Rules.FallbackContainers.IsNullOrEmpty())
                 factory = ResolveFromFallbackContainers(Rules.FallbackContainers, request);
@@ -700,7 +693,7 @@ namespace DryIoc
                         // Cache closed generic registration produced by open-generic decorator.
                         if (i >= openGenericDecoratorIndex && decorator.FactoryGenerator != null)
                         {
-                            decorator = decorator.FactoryGenerator.GetGeneratedOrGenerateFactoryOrDefault(request);
+                            decorator = decorator.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
                             Register(decorator, serviceType, null, IfAlreadyRegistered.AppendNotKeyed, false);
                         }
 
@@ -1509,18 +1502,23 @@ namespace DryIoc
 
             private static Registry WithoutFactoryCache(Registry registry, Factory factory, Type serviceType, object serviceKey = null)
             {
-                registry.FactoryExpressionCache.Swap(_ => _.Update(factory.FactoryID, null));
-                if (serviceKey == null)
-                    registry.DefaultFactoryDelegateCache.Swap(_ => _.Update(serviceType, null));
+                if (factory.FactoryGenerator != null)
+                {
+                    foreach (var f in factory.FactoryGenerator.GeneratedFactories.Enumerate())
+                        WithoutFactoryCache(registry, f.Value, f.Key.Key, f.Key.Value);
+                }
                 else
                 {
-                    var cacheKey = new KV<Type, object>(serviceType, serviceKey);
-                    registry.KeyedFactoryDelegateCache.Swap(_ => _.Update(cacheKey, null));
-                }
+                    registry.FactoryExpressionCache.Swap(_ => _.Update(factory.FactoryID, null));
 
-                if (factory.FactoryGenerator != null)
-                    foreach (var f in factory.FactoryGenerator.GeneratedFactories.Enumerate())
-                        registry = registry.Unregister(factory.FactoryType, f.Key.Key, f.Key.Value, null);
+                    if (serviceKey == null)
+                        registry.DefaultFactoryDelegateCache.Swap(_ => _.Update(serviceType, null));
+                    else
+                    {
+                        var cacheKey = new KV<Type, object>(serviceType, serviceKey);
+                        registry.KeyedFactoryDelegateCache.Swap(_ => _.Update(cacheKey, null));
+                    }
+                }
 
                 return registry;
             }
@@ -1827,7 +1825,7 @@ namespace DryIoc
     /// <item>Open-generic services</item>
     /// <item>Service generics wrappers and arrays using <see cref="Rules.UnknownServiceResolvers"/> extension point.
     /// Supported wrappers include: Func of <see cref="FuncTypes"/>, Lazy, Many, IEnumerable, arrays, Meta, KeyValuePair, DebugExpression.
-    /// All wrapper factories are added into collection <see cref="Wrappers"/> and searched by <see cref="ResolveWrappers"/>
+    /// All wrapper factories are added into collection <see cref="Wrappers"/> and searched by <see cref="ResolveWrapperOrGetDefault"/>
     /// unregistered resolution rule.</item>
     /// </list></summary>
     public static class WrappersSupport
@@ -1877,8 +1875,10 @@ namespace DryIoc
                     new ExpressionFactory(GetFuncExpressionOrDefault, setup: Setup.WrapperWith(i)));
         }
 
-        /// <summary>Unregistered/fallback wrapper resolution rule.</summary>
-        public static readonly Rules.UnknownServiceResolver ResolveWrappers = request =>
+        /// <summary>Returns wrapper factory. For open-generic wrapper - generated closed factory first.</summary>
+        /// <param name="request">Wrapper request.</param>
+        /// <returns>Found wrapper factory or default null otherwise.</returns>
+        public static Factory ResolveWrapperOrGetDefault(Request request)
         {
             var serviceType = request.ServiceType;
             var itemType = serviceType.GetArrayElementTypeOrNull();
@@ -1887,10 +1887,10 @@ namespace DryIoc
 
             var factory = request.Container.GetWrapperFactoryOrDefault(serviceType);
             if (factory != null && factory.FactoryGenerator != null)
-                factory = factory.FactoryGenerator.GetGeneratedOrGenerateFactoryOrDefault(request);
+                factory = factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
 
             return factory;
-        };
+        }
 
         /// <summary>Checks if request has parent with service type of Func with arguments. 
         /// Often required to check in lazy scenarios.</summary>
@@ -1990,26 +1990,31 @@ namespace DryIoc
             if (IsNestedInFuncWithArgs(request))
                 return null;
 
-            var itemServiceType = request.ServiceType.GetGenericParamsAndArgs()[0];
-            var itemRequiredServiceType = request.Container.GetWrappedType(itemServiceType, request.RequiredServiceType);
+            var itemType = request.ServiceType.GetGenericParamsAndArgs()[0];
+            var requiredItemType = request.Container.GetWrappedType(itemType, request.RequiredServiceType);
 
             // Composite pattern support: find composite parent key to exclude from result.
             object compositeParentKey = null;
+            Type compositeParentRequiredType = null;
             var parent = request.ParentNonWrapper();
-            if (!parent.IsEmpty && parent.ServiceType == itemRequiredServiceType)
+            if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
+            {
                 compositeParentKey = parent.ServiceKey;
+                compositeParentRequiredType = parent.RequiredServiceType;
+            }
 
             var callResolveManyExpr = Expression.Call(Container.ResolverExpr, _resolveManyMethod,
-                Expression.Constant(itemServiceType),
+                Expression.Constant(itemType),
                 request.Container.GetOrAddStateItemExpression(request.ServiceKey),
-                Expression.Constant(itemRequiredServiceType),
+                Expression.Constant(requiredItemType),
                 request.Container.GetOrAddStateItemExpression(compositeParentKey),
+                Expression.Constant(compositeParentRequiredType, typeof(Type)),
                 Container.GetResolutionScopeExpression(request));
 
-            if (itemServiceType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
-                callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemServiceType }, callResolveManyExpr);
+            if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
+                callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemType }, callResolveManyExpr);
 
-            var lazyEnumerableCtor = typeof(LazyEnumerable<>).MakeGenericType(itemServiceType).GetSingleConstructorOrNull();
+            var lazyEnumerableCtor = typeof(LazyEnumerable<>).MakeGenericType(itemType).GetSingleConstructorOrNull();
             return Expression.New(lazyEnumerableCtor, callResolveManyExpr);
         }
 
@@ -3558,7 +3563,8 @@ namespace DryIoc
             object serviceKey = null)
         {
             return behavior == ResolveManyBehavior.AsLazyEnumerable
-                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, null, null).Cast<TService>()
+                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, 
+                    compositeParentKey: null, compositeParentRequiredType: null, scope: null).Cast<TService>()
                 : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
         }
 
@@ -4558,12 +4564,12 @@ namespace DryIoc
     /// creating closed-generic type reflection factory from registered open-generic prototype factory.</summary>
     public interface IConcreteFactoryGenerator
     {
-        /// <summary>todo:  </summary>
+        /// <summary>Generated factories so far, identified by the service type and key pair.</summary>
         ImTreeMap<KV<Type, object>, ReflectionFactory> GeneratedFactories { get; }
 
-        /// <summary>Method applied for factory provider, returns new factory per request.</summary>
+        /// <summary>Returns factory per request. May track already generated factories and return one without regenerating.</summary>
         /// <param name="request">Request to resolve.</param> <returns>Returns new factory per request.</returns>
-        Factory GetGeneratedOrGenerateFactoryOrDefault(Request request);
+        Factory GetGeneratedFactoryOrDefault(Request request);
     }
 
     /// <summary>Base class for different ways to instantiate service: 
@@ -4609,7 +4615,7 @@ namespace DryIoc
         public virtual Type ImplementationType { get { return null; } }
 
         /// <summary>Indicates that Factory is factory provider and 
-        /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedOrGenerateFactoryOrDefault"/>  to get concrete factory.</summary>
+        /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactoryOrDefault"/>  to get concrete factory.</summary>
         public virtual IConcreteFactoryGenerator FactoryGenerator { get { return null; } }
 
         /// <summary>Get next factory ID in a atomic way.</summary><returns>The ID.</returns>
@@ -5311,7 +5317,7 @@ namespace DryIoc
                 _openGenericFactory = openGenericFactory;
             }
 
-            public Factory GetGeneratedOrGenerateFactoryOrDefault(Request request)
+            public Factory GetGeneratedFactoryOrDefault(Request request)
             {
                 var serviceType = request.ServiceType;
                 var generatedFactoryKey = new KV<Type, object>(serviceType, request.ServiceKey);
@@ -5339,7 +5345,7 @@ namespace DryIoc
                 if (made.FactoryMethod != null)
                 {
                     var factoryMethod = made.FactoryMethod(request)
-                        .ThrowIfNull(Error.Of("Got null factory method when resolving {0}"), request); // todo: mpove to Error
+                        .ThrowIfNull(Error.GotNullFactoryWhenResolvingService, request); // todo: move to Error
 
                     var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request);
                     if (closedFactoryMethod == null) // may be null only for IfUnresolved.ReturnDefault
@@ -6475,9 +6481,11 @@ namespace DryIoc
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
         /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
+        /// <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, IScope scope);
+        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, 
+            object compositeParentKey, Type compositeParentRequiredType, IScope scope);
     }
 
     /// <summary>Specifies options to handle situation when registering some service already present in the registry.</summary>
@@ -7028,7 +7036,9 @@ namespace DryIoc
                 "Attempting to register {0}{1} with implementation factory {2}."),
             NoMoreUnregistrationsAllowed = Of(
                 "Container does not allow further (un)registrations." + Environment.NewLine +
-                "Attempting to unregister {0}{1} with factory type {2}.");
+                "Attempting to unregister {0}{1} with factory type {2}."),
+            GotNullFactoryWhenResolvingService = Of(
+                "Got null factory method when resolving {0}");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

@@ -98,7 +98,7 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var handlers = container.ResolveMany(typeof(ISomeDb), null, null, null, null).Cast<ISomeDb>().ToArray<ISomeDb>();
+            var handlers = container.ResolveMany(typeof(ISomeDb), null, null, null, null, null).Cast<ISomeDb>().ToArray<ISomeDb>();
 
             Assert.AreEqual(1, handlers.Length);
         }

@@ -72,7 +72,7 @@ namespace DryIocZero
 
         /// <summary>Directly uses generated factories to resolve service. Or returns default if service does not have generated factory.</summary>
         /// <param name="serviceType">Service type to lookup generated factory.</param> <returns>Created service or null.</returns>
-        public object ResolveGeneratedOrDefault(Type serviceType)
+        public object ResolveGeneratedOrGetDefault(Type serviceType)
         {
             object service = null;
             ResolveGenerated(ref service, serviceType, null);
@@ -109,7 +109,7 @@ namespace DryIocZero
         /// <summary>Directly uses generated factories to resolve service. Or returns default if service does not have generated factory.</summary>
         /// <param name="serviceType">Service type to lookup generated factory.</param> <param name="serviceKey">Service key to locate factory.</param>
         /// <returns>Created service or null.</returns>
-        public object ResolveGeneratedOrDefault(Type serviceType, object serviceKey)
+        public object ResolveGeneratedOrGetDefault(Type serviceType, object serviceKey)
         {
             object service = null;
             ResolveGenerated(ref service, serviceType, serviceKey, null);
@@ -166,6 +166,16 @@ namespace DryIocZero
 
         partial void ResolveManyGenerated(ref IEnumerable<KV> services, Type serviceType);
 
+        /// <summary>Resolves meny generated only services. Ignores runtime registrations.</summary>
+        /// <param name="serviceType">Service type.</param>
+        /// <returns>Collection of service key - service pairs.</returns>
+        public IEnumerable<KV> ResolveManyGeneratedOrGetEmpty(Type serviceType)
+        {
+            var manyGenerated = Enumerable.Empty<KV>();
+            ResolveManyGenerated(ref manyGenerated, serviceType);
+            return manyGenerated;
+        }
+
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
         /// this type. Excludes for result composite parent identified by <paramref name="compositeParentKey"/>.</summary>
@@ -173,9 +183,11 @@ namespace DryIocZero
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
         /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
+        /// <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, IScope scope)
+        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, 
+            object compositeParentKey, Type compositeParentRequiredType, IScope scope)
         {
             serviceType = requiredServiceType ?? serviceType;
 
@@ -453,9 +465,11 @@ namespace DryIocZero
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
         /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
+        /// <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, IScope scope);
+        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, 
+            object compositeParentKey, Type compositeParentRequiredType, IScope scope);
     }
 
     /// <summary>Provides access to scopes.</summary>
