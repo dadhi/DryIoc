@@ -7,14 +7,41 @@ namespace DryIoc.IssuesTests
     public class Issue153_ContextDependentResolutionOnlyWorksForTheVeryFirstContext
     {
         [Test]
+        public void Context_based_setup_should_work_for_different_context()
+        {
+            var c = new Container();
+            c.Register<C>();
+            c.Register<D>();
+            c.Register(Made.Of(() => new Str { S = Arg.Index<string>(0) }, r => r.Parent.ImplementationType.Name));
+
+            var x = c.Resolve<C>();
+            var y = c.Resolve<D>();
+
+            Assert.AreEqual("C", x.S.S);
+            Assert.AreEqual("D", y.S.S);
+        }
+
+        class Str { public string S; }
+
+        class C
+        {
+            public Str S;
+            public C(Str s) { S = s; }
+        }
+
+        class D
+        {
+            public Str S;
+            public D(Str s) { S = s; }
+        }
+
+        [Test]
         public void Lazy_expression_should_not_be_exessively_compiled()
         {
             var c = new Container();
             c.Register<A>();
             c.Register<B>();
-            c.Register(
-                Made.Of(() => new Foo { S = Arg.Index<string>(0) }, r => r.Parent.ToString()),
-                setup: Setup.With(cacheFactoryExpression: false));
+            c.Register(Made.Of(() => new Foo { S = Arg.Index<string>(0) }, r => r.Parent.ToString()));
 
             var y = c.Resolve<B>();
             var x = c.Resolve<A>();

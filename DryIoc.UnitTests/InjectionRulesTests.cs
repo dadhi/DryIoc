@@ -224,7 +224,6 @@ namespace DryIoc.UnitTests
             container.Register<MyService>();
             container.Register<ConnectionStringProvider>(Reuse.Singleton);
             container.Register<IConnectionStringProvider, ConnectionNamingConnectionStringProvider>(
-                setup: Setup.With(false),
                 made: Made.Of(parameters: request => parameter =>
                 {
                     if (parameter.ParameterType != typeof(string))
@@ -254,7 +253,6 @@ namespace DryIoc.UnitTests
                 Made.Of(() => new ConnectionNamingConnectionStringProvider(default(ConnectionStringProvider), Arg.Of<string>("targetName"))));
 
             container.Register<string>(serviceKey: "targetName",
-                setup: Setup.With(false),
                 made: Made.Of(r =>
                 {
                     var method = GetType().GetMethodOrNull("GetTargetName");

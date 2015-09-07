@@ -696,8 +696,7 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(lazyMetadata, condition);
 
-            return Setup.With(true, lazyMetadata, null, condition, 
-                OpenResolutionScope, AsResolutionRoot, 
+            return Setup.With(lazyMetadata, null, condition, OpenResolutionScope, AsResolutionRoot, 
                 PreventDisposal, WeaklyReferenced);
         }
 

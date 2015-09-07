@@ -1584,7 +1584,7 @@ namespace DryIoc
         public static object New(this IContainer container, Type concreteType, Made made = null)
         {
             concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UnableToNewOpenGeneric);
-            var factory = new ReflectionFactory(concreteType, null, made, Setup.With(cacheFactoryExpression: false));
+            var factory = new ReflectionFactory(concreteType, Reuse.Transient, made);
             factory.ThrowIfInvalidRegistration(container, concreteType, null, isStaticallyChecked: false);
             var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).WithResolvedFactory(factory);
             var factoryDelegate = factory.GetDelegateOrDefault(request);
@@ -2514,6 +2514,10 @@ namespace DryIoc
         /// <summary>Return type of strongly-typed factory method expression.</summary>
         public Type FactoryMethodKnownResultType { get; private set; }
 
+        /// <summary>True is made has properties or parameters with custom value.
+        /// That's mean the whole made become context based which affects caching</summary>
+        public bool HasCustomDependencyValue { get; private set; }
+
         /// <summary>Specifies how constructor parameters should be resolved: 
         /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
         public ParameterSelector Parameters { get; private set; }
@@ -2677,14 +2681,16 @@ namespace DryIoc
             FactoryMethodSelector factoryMethod = request =>
                 DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, getFactoryInfo == null ? null : getFactoryInfo(request));
 
+            var hasCustomValue = false;
+
             var parameterSelector = parameters.IsNullOrEmpty() ? null
-                : ComposeParameterSelectorFromArgs(parameters, argExprs, argValues);
+                : ComposeParameterSelectorFromArgs(ref hasCustomValue, parameters, argExprs, argValues);
 
             var propertiesAndFieldsSelector =
                 memberBindingExprs == null || memberBindingExprs.Count == 0 ? null
-                : ComposePropertiesAndFieldsSelector(memberBindingExprs, argValues);
+                : ComposePropertiesAndFieldsSelector(ref hasCustomValue, memberBindingExprs, argValues);
 
-            return new TypedMade<TService>(factoryMethod, parameterSelector, propertiesAndFieldsSelector);
+            return new TypedMade<TService>(factoryMethod, parameterSelector, propertiesAndFieldsSelector, hasCustomValue);
         }
 
         /// <summary>Typed version of <see cref="Made"/> specified with statically typed expression tree.</summary>
@@ -2693,24 +2699,27 @@ namespace DryIoc
         {
             /// <summary>Creates typed version.</summary>
             /// <param name="factoryMethod"></param> <param name="parameters"></param> <param name="propertiesAndFields"></param>
+            /// <param name="hasCustomValue"></param>
             internal TypedMade(FactoryMethodSelector factoryMethod = null,
-                ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
-                : base(factoryMethod, parameters, propertiesAndFields, typeof(TService))
+                ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
+                bool hasCustomValue = false)
+                : base(factoryMethod, parameters, propertiesAndFields, typeof(TService), hasCustomValue)
             { }
         }
 
         #region Implementation
 
         private Made(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            Type factoryMethodKnownResultType = null)
+            Type factoryMethodKnownResultType = null, bool hasCustomValue = false)
         {
             FactoryMethod = factoryMethod;
             Parameters = parameters;
             PropertiesAndFields = propertiesAndFields;
             FactoryMethodKnownResultType = factoryMethodKnownResultType;
+            HasCustomDependencyValue = hasCustomValue;
         }
 
-        private static ParameterSelector ComposeParameterSelectorFromArgs(
+        private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
             ParameterInfo[] parameterInfos, IList<Expression> argExprs, params Func<Request, object>[] argValues)
         {
             var parameters = DryIoc.Parameters.Of;
@@ -2729,6 +2738,7 @@ namespace DryIoc
                         parameters = parameters.Details((r, p) => p.Equals(parameter)
                             ? ServiceDetails.Of(getArgValue(r))
                             : null);
+                        hasCustomValue = true;
                     }
                     else // handle service details
                     {
@@ -2746,7 +2756,7 @@ namespace DryIoc
             return parameters;
         }
 
-        private static PropertiesAndFieldsSelector ComposePropertiesAndFieldsSelector(
+        private static PropertiesAndFieldsSelector ComposePropertiesAndFieldsSelector(ref bool hasCustomValue,
             IList<MemberBinding> memberBindings, params Func<Request, object>[] argValues)
         {
             var propertiesAndFields = DryIoc.PropertiesAndFields.Of;
@@ -2777,6 +2787,7 @@ namespace DryIoc
                         {
                             PropertyOrFieldServiceInfo.Of(member).WithDetails(ServiceDetails.Of(getArgValue(r)), r)
                         });
+                        hasCustomValue = true;
                     }
                     else
                     {
@@ -4394,9 +4405,6 @@ namespace DryIoc
         /// <summary>Predicate to check if factory could be used for resolved request.</summary>
         public virtual Func<Request, bool> Condition { get; private set; }
 
-        /// <summary>Set to true allows to cache and use cached factored service expression.</summary>
-        public virtual bool CacheFactoryExpression { get { return false; } }
-
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
 
@@ -4418,31 +4426,27 @@ namespace DryIoc
         public static readonly Setup Default = new ServiceSetup();
 
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
-        /// <param name="cacheFactoryExpression">(optional)</param> <param name="lazyMetadata">(optional)</param> 
+        /// <param name="lazyMetadata">(optional) Delegate to get actual metadata later, for instance from attribute.</param> 
         /// <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param> <param name="condition">(optional)</param>
         /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionRoot"/> but in addition opens new scope.</param>
         /// <param name="asResolutionRoot">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
         /// <param name="weaklyReferenced">(optional) Stores reused instance as WeakReference.</param>
         /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
-        public static Setup With(bool cacheFactoryExpression = true,
+        public static Setup With(
             Func<object> lazyMetadata = null, object metadata = null,
             Func<Request, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false)
         {
-            if (cacheFactoryExpression &&
-                lazyMetadata == null && metadata == null &&
+            if (lazyMetadata == null && metadata == null &&
                 condition == null &&
                 openResolutionScope == false && asResolutionRoot == false &&
                 preventDisposal == false && weaklyReferenced == false)
                 return Default;
 
-            return new ServiceSetup(cacheFactoryExpression,
-                lazyMetadata, metadata,
-                condition,
-                openResolutionScope, asResolutionRoot,
-                preventDisposal, weaklyReferenced);
+            return new ServiceSetup(lazyMetadata, metadata, condition, 
+                openResolutionScope, asResolutionRoot, preventDisposal, weaklyReferenced);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -4472,8 +4476,6 @@ namespace DryIoc
         {
             public override FactoryType FactoryType { get { return FactoryType.Service; } }
 
-            public override bool CacheFactoryExpression { get { return _cacheFactoryExpression; } }
-
             public override object Metadata { get { return _metadata ?? (_metadata = _lazyMetadata == null ? null : _lazyMetadata()); } }
 
             public override bool AsResolutionRoot { get { return _isResolutionRoot || _openResolutionScope; } }
@@ -4482,13 +4484,11 @@ namespace DryIoc
             public override bool PreventDisposal { get { return _preventDisposal; } }
             public override bool WeaklyReferenced { get { return _weaklyReferenced; } }
 
-            public ServiceSetup(bool cacheFactoryExpression = true,
-                Func<object> lazyMetadata = null, object metadata = null,
-                Func<Request, bool> condition = null,
-                bool openResolutionScope = false, bool isResolutionRoot = false,
+            public ServiceSetup(Func<object> lazyMetadata = null, object metadata = null, 
+                Func<Request, bool> condition = null, 
+                bool openResolutionScope = false, bool isResolutionRoot = false, 
                 bool preventDisposal = false, bool weaklyReferenced = false)
             {
-                _cacheFactoryExpression = cacheFactoryExpression;
                 _lazyMetadata = lazyMetadata;
                 _metadata = metadata;
                 Condition = condition;
@@ -4498,7 +4498,6 @@ namespace DryIoc
                 _weaklyReferenced = weaklyReferenced;
             }
 
-            private readonly bool _cacheFactoryExpression;
             private readonly Func<object> _lazyMetadata;
             private object _metadata;
             private readonly bool _openResolutionScope;
@@ -4549,10 +4548,14 @@ namespace DryIoc
             }
         }
 
-        private sealed class DecoratorSetup : Setup
+        /// <summary>Setup applied to decorators.</summary>
+        public sealed class DecoratorSetup : Setup
         {
+            /// <summary>Returns Decorator factory type.</summary>
             public override FactoryType FactoryType { get { return FactoryType.Decorator; } }
 
+            /// <summary>Creates decorator setup with optional condition.</summary>
+            /// <param name="condition">(optional)</param>
             public DecoratorSetup(Func<Request, bool> condition = null)
             {
                 Condition = condition;
@@ -4690,6 +4693,17 @@ namespace DryIoc
         /// <returns>Created expression.</returns>
         public abstract Expression CreateExpressionOrDefault(Request request);
 
+        /// <summary>Allows derived factories to override or reuse caching policy used by
+        /// <see cref="GetExpressionOrDefault"/>. By default only service setup and no 
+        /// user passed arguments may be cached.</summary>
+        /// <param name="request">Context.</param>
+        /// <returns>True if factory expression could be cached.</returns>
+        protected virtual bool IsFactoryExpressionCacheable(Request request)
+        {
+            return request.FuncArgs == null 
+                && !(Setup is Setup.WrapperSetup || Setup is Setup.DecoratorSetup);
+        }
+
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
         /// <param name="request">Request for service.</param>
@@ -4712,7 +4726,7 @@ namespace DryIoc
                     : null;
             var isReplacingDecorator = decoratorExpr != null && !(decoratorExpr is LambdaExpression);
 
-            var isCacheable = Setup.CacheFactoryExpression && !isReplacingDecorator && request.FuncArgs == null;
+            var isCacheable = IsFactoryExpressionCacheable(request) && !isReplacingDecorator;
             if (isCacheable)
             {
                 var cachedServiceExpr = request.Container.GetCachedFactoryExpressionOrDefault(FactoryID);
@@ -5201,6 +5215,19 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Add to base rules: do not cache if Made is context based.</summary>
+        /// <param name="request">Context.</param>
+        /// <returns>True if factory expression could be cached.</returns>
+        protected override bool IsFactoryExpressionCacheable(Request request)
+        {
+            return base.IsFactoryExpressionCacheable(request)
+                 && (Made == Made.Default
+                 // No caching for context dependend Made which is:
+                 // - We don't know the result returned by factory method - it depends on request
+                 // - or even if we do know the result type, some dependency is using custom value which depends on request
+                 || (Made.FactoryMethodKnownResultType != null && !Made.HasCustomDependencyValue));
+        }
+        
         /// <summary>Creates service expression, so for registered implementation type "Service", 
         /// you will get "new Service()". If there is <see cref="Reuse"/> specified, then expression will
         /// contain call to <see cref="Scope"/> returned by reuse.</summary>
@@ -5345,7 +5372,7 @@ namespace DryIoc
                 if (made.FactoryMethod != null)
                 {
                     var factoryMethod = made.FactoryMethod(request)
-                        .ThrowIfNull(Error.GotNullFactoryWhenResolvingService, request); // todo: move to Error
+                        .ThrowIfNull(Error.GotNullFactoryWhenResolvingService, request);
 
                     var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request);
                     if (closedFactoryMethod == null) // may be null only for IfUnresolved.ReturnDefault

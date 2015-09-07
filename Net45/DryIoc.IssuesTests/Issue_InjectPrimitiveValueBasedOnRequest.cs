@@ -57,7 +57,6 @@ namespace DryIoc.IssuesTests
             // setup
             _subject.Register<Target>();
             _subject.Register<ILog, Log>(
-                setup: Setup.With(cacheFactoryExpression: false),
                 made: Made.Of(request =>
                 {
                     var targetType = request.ParentNonWrapper(p => p.ServiceType != typeof(ILog)).ImplementationType;
