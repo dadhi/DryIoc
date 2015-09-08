@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System;
+using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
@@ -28,17 +29,44 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_be_able_to_decorated_created_type()
+        public void Should_be_able_to_decorate_created_type()
         {
             var container = new Container();
             container.Register<Wheels>();
-            container.Register<Wheels>(
-                made: Made.Of(() => CarFactory.DecorateWheels(default(Wheels))), 
-                setup: Setup.Decorator);
+            container.Register(Made.Of(() => CarFactory.DecorateWheels(default(Wheels))), setup: Setup.Decorator);
 
             var car = container.New<Car>();
 
             Assert.That(car.Wheels.Paint, Is.EqualTo("decorated"));
+        }
+
+        [Test]
+        public void Should_be_able_to_create_Func_wrapper_of_type()
+        {
+            var container = new Container();
+            container.Register<Wheels>();
+
+            var getCar = container.New<Func<Car>>();
+            Assert.IsNotNull(getCar());
+        }
+
+        [Test]
+        public void Should_be_able_to_create_Func_with_argument_of_type()
+        {
+            var container = new Container();
+
+            var getCar = container.New<Func<Wheels, Car>>();
+            Assert.IsNotNull(getCar(new Wheels()));
+        }
+
+        [Test]
+        public void Should_be_able_to_create_Lazy_with_argument_of_type()
+        {
+            var container = new Container();
+            container.Register<Wheels>();
+
+            var car = container.New<Lazy<Car>>();
+            Assert.IsNotNull(car.Value);
         }
 
         [Test]
@@ -59,7 +87,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.New(typeof(DoorFor<>)));
 
-            Assert.AreEqual(ex.Error, Error.UnableToNewOpenGeneric);
+            Assert.AreEqual(Error.ResolvingOpenGenericServiceTypeIsNotPossible, ex.Error);
         }
 
         internal class Wheels

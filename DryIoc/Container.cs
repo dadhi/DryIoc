@@ -1576,23 +1576,22 @@ namespace DryIoc
             return (TService)container.InjectPropertiesAndFields(instance, propertiesAndFields);
         }
 
-        /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
+        /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
         /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
-        /// <param name="concreteType">Type to instantiate.</param>
+        /// <param name="concreteType">Type to instantiate. Wrappers (Func, Lazy, etc.) is also supported.</param>
         /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
         /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
         public static object New(this IContainer container, Type concreteType, Made made = null)
         {
-            concreteType.ThrowIfNull().ThrowIf(concreteType.IsOpenGeneric(), Error.UnableToNewOpenGeneric);
-            var factory = new ReflectionFactory(concreteType, Reuse.Transient, made);
-            factory.ThrowIfInvalidRegistration(container, concreteType, null, isStaticallyChecked: false);
-            var request = container.EmptyRequest.Push(ServiceInfo.Of(concreteType)).WithResolvedFactory(factory);
-            var factoryDelegate = factory.GetDelegateOrDefault(request);
-            var service = factoryDelegate(container.ResolutionStateCache, container.ContainerWeakRef, null);
-            return service;
+            var facade = container.CreateFacade();
+            var implType = facade.GetWrappedType(concreteType, null);
+            facade.Register(implType, made: made);
+
+            // NOTE Facade is not disposed because if concreteType is Lazy<T> it need to hold on facade yet.
+            return facade.Resolve(concreteType);
         }
 
-        /// <summary>Creates service using container for injecting parameters without registering anything.</summary>
+        /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
         /// <typeparam name="T">Type to instantiate.</typeparam>
         /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
         /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
@@ -7029,8 +7028,6 @@ namespace DryIoc
                 "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}."),
             NoMatchedScopeFound = Of(
                 "Unable to find scope with matching name: {0}."),
-            UnableToNewOpenGeneric = Of(
-                "Unable to New not concrete/open-generic type {0}."),
             NoMatchingScopeWhenRegisteringInstance = Of(
                 "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine +
                 "You could register delegate returning instance instead. That will succeed as long as scope is available at resolution."),
