@@ -21,17 +21,17 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual("D", y.S.S);
         }
 
-        class Str { public string S; }
+        class Str { public string S { get; set; } }
 
         class C
         {
-            public Str S;
+            public readonly Str S;
             public C(Str s) { S = s; }
         }
 
         class D
         {
-            public Str S;
+            public readonly Str S;
             public D(Str s) { S = s; }
         }
 

@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.31101.0
+VisualStudioVersion = 12.0.40629.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SpeedTestApp", "DryIoc.SpeedTestApp\DryIoc.SpeedTestApp.csproj", "{A9C4E2CC-3CA9-4F04-8544-A2837B045643}"
 EndProject
@@ -155,6 +155,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocAttributes", "Net40\DryIocAttributes\DryIocAttributes.csproj", "{6DCB5CCD-ADA2-4C6A-A864-CC396BF718AD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero.UnitTests", "Net45\DryIocZero.UnitTests\DryIocZero.UnitTests.csproj", "{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero", "PCL\DryIocZero\DryIocZero.csproj", "{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero", "PCL-Net45\DryIocZero\DryIocZero.csproj", "{3B9FA7C3-844E-41B4-8B57-ADA9F3431469}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -354,6 +358,14 @@ Global
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B9FA7C3-844E-41B4-8B57-ADA9F3431469}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B9FA7C3-844E-41B4-8B57-ADA9F3431469}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B9FA7C3-844E-41B4-8B57-ADA9F3431469}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B9FA7C3-844E-41B4-8B57-ADA9F3431469}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -398,5 +410,7 @@ Global
 		{741C3558-4A90-41D2-A45F-48CB27C15347} = {C8C71EEF-0C64-4A33-96F8-D22C6E429741}
 		{6DCB5CCD-ADA2-4C6A-A864-CC396BF718AD} = {84205448-1773-45D6-8D42-548A7997A7E1}
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
+		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA} = {CE5E598E-5A34-40EA-9110-AD2663BAD177}
+		{3B9FA7C3-844E-41B4-8B57-ADA9F3431469} = {C8C71EEF-0C64-4A33-96F8-D22C6E429741}
 	EndGlobalSection
 EndGlobal

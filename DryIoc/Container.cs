@@ -4700,7 +4700,8 @@ namespace DryIoc
         /// <returns>True if factory expression could be cached.</returns>
         protected virtual bool IsFactoryExpressionCacheable(Request request)
         {
-            return request.FuncArgs == null 
+            return request.FuncArgs == null
+                && Setup.Condition == null 
                 && !(Setup is Setup.WrapperSetup || Setup is Setup.DecoratorSetup);
         }
 
@@ -5130,7 +5131,7 @@ namespace DryIoc
         /// <summary>Provides closed-generic factory for registered open-generic variant.</summary>
         public override IConcreteFactoryGenerator FactoryGenerator { get { return _factoryGenerator; } }
 
-        /// <summary>Injection rules set for Constructor, Parameters, Properties and Fields.</summary>
+        /// <summary>Injection rules set for Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
         public readonly Made Made;
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
@@ -5141,10 +5142,10 @@ namespace DryIoc
         {
             Made = made ?? Made.Default;
 
-            _implementationType = ValidateAndNormalizeImplementationType(implementationType);
-
-            if (_implementationType != null && _implementationType.IsGenericDefinition())
+            if (implementationType != null && implementationType.IsGenericDefinition())
                 _factoryGenerator = new ClosedGenericFactoryGenerator(this);
+
+            _implementationType = ValidateAndNormalizeImplementationType(implementationType);
         }
 
         /// <summary>Before registering factory checks that ImplementationType is assignable, Or
@@ -5361,36 +5362,41 @@ namespace DryIoc
 
                 var implementationType = _openGenericFactory._implementationType;
 
-                var closedTypeArgs = implementationType == serviceType.GetGenericDefinitionOrNull()
+                var closedTypeArgs = implementationType == null ||
+                    implementationType == serviceType.GetGenericDefinitionOrNull()
                     ? serviceType.GetGenericParamsAndArgs()
                     : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, request.ServiceType, request);
 
                 if (closedTypeArgs == null)
                     return null;
 
-                var made = _openGenericFactory.Made;
-                if (made.FactoryMethod != null)
+                var closedMade = _openGenericFactory.Made;
+                if (closedMade.FactoryMethod != null)
                 {
-                    var factoryMethod = made.FactoryMethod(request)
+                    var factoryMethod = closedMade.FactoryMethod(request)
                         .ThrowIfNull(Error.GotNullFactoryWhenResolvingService, request);
 
                     var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request);
                     if (closedFactoryMethod == null) // may be null only for IfUnresolved.ReturnDefault
                         return null;
 
-                    made = Made.Of(_ => closedFactoryMethod, made.Parameters, made.PropertiesAndFields);
+                    closedMade = Made.Of(_ => closedFactoryMethod, closedMade.Parameters, closedMade.PropertiesAndFields);
                 }
 
-                var closedImplementationType = Throw.IfThrows<ArgumentException, Type>(
-                    () => implementationType.MakeGenericType(closedTypeArgs),
-                   request.IfUnresolved == IfUnresolved.Throw, 
-                   Error.NoMatchedGenericParamConstraints, implementationType, request);
+                Type closedImplementationType = null;
+                if (implementationType != null)
+                {
+                    closedImplementationType = Throw.IfThrows<ArgumentException, Type>(
+                        () => implementationType.MakeGenericType(closedTypeArgs),
+                        request.IfUnresolved == IfUnresolved.Throw,
+                        Error.NoMatchedGenericParamConstraints, implementationType, request);
 
-                if (closedImplementationType == null)
-                    return null;
+                    if (closedImplementationType == null)
+                        return null;                    
+                }
 
-                var closedGenericFactory = new ReflectionFactory(closedImplementationType,
-                    _openGenericFactory.Reuse, made, _openGenericFactory.Setup);
+                var closedGenericFactory = new ReflectionFactory(
+                    closedImplementationType, _openGenericFactory.Reuse, closedMade, _openGenericFactory.Setup);
 
                 // Storing generated factory ID to service type/key mapping 
                 // to find/remove generated factories when needed

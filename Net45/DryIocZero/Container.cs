@@ -26,6 +26,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 
 namespace DryIocZero
@@ -72,6 +73,8 @@ namespace DryIocZero
 
         /// <summary>Directly uses generated factories to resolve service. Or returns default if service does not have generated factory.</summary>
         /// <param name="serviceType">Service type to lookup generated factory.</param> <returns>Created service or null.</returns>
+        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
+        [SuppressMessage("ReSharper", "ExpressionIsAlwaysNull", Justification = "Per design")]
         public object ResolveGeneratedOrGetDefault(Type serviceType)
         {
             object service = null;
@@ -83,6 +86,8 @@ namespace DryIocZero
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
+        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
+        [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
         public object ResolveDefault(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             object service = null;
@@ -109,6 +114,8 @@ namespace DryIocZero
         /// <summary>Directly uses generated factories to resolve service. Or returns default if service does not have generated factory.</summary>
         /// <param name="serviceType">Service type to lookup generated factory.</param> <param name="serviceKey">Service key to locate factory.</param>
         /// <returns>Created service or null.</returns>
+        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
+        [SuppressMessage("ReSharper", "ExpressionIsAlwaysNull", Justification = "Per design")]
         public object ResolveGeneratedOrGetDefault(Type serviceType, object serviceKey)
         {
             object service = null;
@@ -128,6 +135,8 @@ namespace DryIocZero
         /// This method covers all possible resolution input parameters comparing to <see cref="IResolver.ResolveDefault"/>, and
         /// by specifying the same parameters as for <see cref="IResolver.ResolveDefault"/> should return the same result.
         /// </remarks>
+        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
+        [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
         public object ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
         {
             object service = null;
@@ -141,6 +150,8 @@ namespace DryIocZero
             return service ?? ResolveKeyedFromRuntimeRegistrationsFirst(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, scope);
         }
 
+        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
+        [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
         private object ResolveKeyedFromRuntimeRegistrationsFirst(Type serviceType, object serviceKey,
             bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
         {
@@ -338,10 +349,7 @@ namespace DryIocZero
         {
             var matchingScope = GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost);
             return matchingScope
-                   ??
-                   (IScope)
-                       Throw.If(throwIfNotFound, Error.NoMatchedScopeFound,
-                           new KV(assignableFromServiceType, serviceKey));
+                   ?? (IScope)Throw.If(throwIfNotFound, Error.NoMatchedScopeFound,new KV(assignableFromServiceType, serviceKey));
         }
 
         private static IScope GetMatchingScopeOrDefault(IScope scope, Type assignableFromServiceType, object serviceKey,
@@ -355,8 +363,9 @@ namespace DryIocZero
             {
                 var name = scope.Name as KV;
                 if (name != null &&
-                    (assignableFromServiceType == null || assignableFromServiceType.IsInstanceOfType(name.Key) &&
-                     (serviceKey == null || serviceKey.Equals(name.Value))))
+                    (assignableFromServiceType == null
+                    || name.Key != null && assignableFromServiceType.GetTypeInfo().IsAssignableFrom(name.Key.GetType().GetTypeInfo())) 
+                    && (serviceKey == null || serviceKey.Equals(name.Value)))
                 {
                     matchedScope = scope;
                     if (!outermost) // break on first found match.
@@ -433,8 +442,7 @@ namespace DryIocZero
         int GetScopedItemIdOrSelf(int externalId);
     }
 
-    /// <summary>Declares minimal API for service resolution.
-    /// The user friendly convenient methods are implemented as extension methods in <see cref="Resolver"/> class.</summary>
+    /// <summary>Declares minimal API for service resolution.</summary>
     /// <remarks>Resolve default and keyed is separated because of micro optimization for faster resolution.</remarks>
     public interface IResolver
     {

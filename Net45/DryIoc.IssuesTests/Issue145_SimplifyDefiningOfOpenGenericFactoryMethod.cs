@@ -11,6 +11,41 @@ namespace DryIoc.IssuesTests
     public class Issue145_SimplifyDefiningOfOpenGenericFactoryMethod
     {
         [Test]
+        public void Register_manually()
+        {
+            var container = new Container();
+            container.Register(typeof(Factory<>));
+            container.Register(typeof(IService<,>), 
+                made: Made.Of(typeof(Factory<>).GetSingleMethodOrNull("Create"), ServiceInfo.Of(typeof(Factory<>))));
+
+            container.RegisterMany(new [] { typeof(Foo) });
+
+            container.Resolve<IService<Foo, string>>();
+        }
+
+        [Export, AsFactory]
+        public class Factory<A>
+        {
+            [Export]
+            public IService<A, B> Create<B>(A a)
+            {
+                var service = new ServiceImpl<A, B>();
+                service.Initialize(a);
+                return service;
+            }
+        }
+
+        public class Foo { }
+        public class Bar { }
+
+        public interface IService<T, R> {}
+
+        private class ServiceImpl<T, R> : IService<T, R>
+        {
+            public void Initialize(T t) { }
+        }
+
+        [Test]
         public void Should_map_nested_generic_parameters()
         {
             var container = new Container();

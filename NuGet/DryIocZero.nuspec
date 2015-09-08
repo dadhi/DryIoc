@@ -11,8 +11,11 @@
         <description>DryIocZero provides container to work on top of compile-time generated factory delegates, therefore decreasing application startup cost.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
         <releaseNotes>
-            - Container works on top of compile-time generated factory delegates for resolution roots.
-            - Complementary supports simple run-time registrations.
+            - Ensures "zero" application bootstrapping time associated with IoC registrations.
+            - Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically - you can see how DryIoc is creating things.
+            - Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
+            - Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
+            - Allows run-time registrations too. You may register instances and factories at run-time.
         </releaseNotes>
         <dependencies>
             <dependency id="DryIoc.dll" version="(1.5,3.0.0)" />
@@ -31,5 +34,15 @@
         <file src="..\Net45\DryIocZero\Container.cs" target="content\net45\DryIocZero" />
         <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\net45\DryIocZero" />
         <file src="..\Net45\DryIocZero\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIocZero" />
+
+        <!-- PCL: Profile259 .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <file src="..\Net45\DryIocZero\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
+        <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
+
+        <!-- PCL: Profile328 .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <file src="..\Net45\DryIocZero\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
+        <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
+        <file src="..\PCL\DryIocZero\Ported-net45.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
+
     </files>
 </package>

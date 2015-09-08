@@ -41,7 +41,7 @@ namespace System.Reflection
     using Collections.Generic;
     using Linq;
 
-    /// <summary>Adds extension method to Type to return corresponding <see cref="TypeInfo"/> for it.</summary>
+    /// <summary>Provides <see cref="GetTypeInfo"/> for the type.</summary>
     public static class TypeInfoTools
     {
         /// <summary>Wraps input type into <see cref="TypeInfo"/> structure.</summary>
@@ -51,7 +51,6 @@ namespace System.Reflection
             return new TypeInfo(type);
         }
     }
-
 
     /// <summary>Partial analog of TypeInfo existing in .NET 4.5 and higher.</summary>
     public struct TypeInfo
