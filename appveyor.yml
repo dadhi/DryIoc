@@ -2,17 +2,8 @@ version: 2.0.0.{build}
 os: Windows Server 2012
 test: off
 
-environment:
-  CODECOV_TOKEN:
-    secure: 5KhRL8Us1o7f3qgvMWYjmYUaaayFBMBkSn1YHs93wvzPrbx+2YpooScYIR14o/Q9
-
 build_script:
   - .\BuildScripts\_main.bat -nopause
-
-on_success:
-    - "SET PATH=C:\\Python34;C:\\Python34\\Scripts;%PATH%"
-    - pip install codecov
-    - codecov -f "./bin/Reports/Coverage.xml"
 
 assembly_info:
   patch: true
