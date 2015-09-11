@@ -2,8 +2,17 @@ version: 2.0.0.{build}
 os: Windows Server 2012
 test: off
 
+environment:
+  COVERALLS_REPO_TOKEN:
+    secure: +9KpQEetcFiHf3hSU9r3RnPyCB6QmO3YSSIlIBPAD/PyLnX/I7d41MQ0tht0SN9D
+
 build_script:
   - .\BuildScripts\_main.bat -nopause
+
+on_success:
+- ps: >-
+    $coveralls = (Resolve-Path "packages/coveralls.net.*/tools/csmacnz.coveralls.exe").ToString()
+    & $coveralls --opencover -i "bin/Reports/Coverage.xml" --repoToken $env:COVERALLS_REPO_TOKEN --commitId $env:APPVEYOR_REPO_COMMIT --commitBranch $env:APPVEYOR_REPO_BRANCH --commitAuthor $env:APPVEYOR_REPO_COMMIT_AUTHOR --commitEmail $env:APPVEYOR_REPO_COMMIT_AUTHOR_EMAIL --commitMessage $env:APPVEYOR_REPO_COMMIT_MESSAGE --jobId $env:APPVEYOR_JOB_ID
 
 assembly_info:
   patch: true
