@@ -6,14 +6,13 @@ environment:
   CODECOV_TOKEN:
     secure: 5KhRL8Us1o7f3qgvMWYjmYUaaayFBMBkSn1YHs93wvzPrbx+2YpooScYIR14o/Q9
 
-install:
-  - choco install git --params="/GitAndUnixToolsOnPath"
-
 build_script:
   - .\BuildScripts\_main.bat -nopause
 
 on_success:
-  - bash <(curl https://codecov.io/bash) 
+    - "SET PATH=C:\\Python34;C:\\Python34\\Scripts;%PATH%"
+    - pip install codecov
+    - codecov -f "./bin/Reports/Coverage.xml"
 
 assembly_info:
   patch: true
