@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
             var c = new Container();
             c.Register<C>();
             c.Register<D>();
-            c.Register(Made.Of(() => new Str { S = Arg.Index<string>(0) }, r => r.Parent.ImplementationType.Name));
+            c.Register(Made.Of(() => new Str { S = Arg.Index<string>(0) }, r => r.Parent.ImplementationTypeIfKnown.Name));
 
             var x = c.Resolve<C>();
             var y = c.Resolve<D>();

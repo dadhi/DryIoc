@@ -299,7 +299,8 @@ namespace DryIoc
                 ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
-        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
+        object IResolver.ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope,
+            RequestInfo requestInfo)
         {
             if (requiredServiceType != null)
                 if (requiredServiceType.IsAssignableTo(serviceType))
@@ -322,9 +323,13 @@ namespace DryIoc
                     : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, scope);
             }
 
-            // including required service type as part of the key
-            var cacheKey = new KV<Type, object>(serviceType, 
-                requiredServiceType == null ? serviceKey : new KV<object, Type>(serviceKey, requiredServiceType));
+            var cacheKeyPart = serviceKey;
+            if (requiredServiceType != null)
+                cacheKeyPart = new KV<object, Type>(cacheKeyPart, requiredServiceType);
+            if (requestInfo != null)
+                cacheKeyPart = new KV<object, RequestInfo>(cacheKeyPart, requestInfo);
+
+            var cacheKey = new KV<Type, object>(serviceType, cacheKeyPart);
 
             var cachedFactory = registry.KeyedFactoryDelegateCache.Value.GetValueOrDefault(cacheKey);
             if (cachedFactory != null)
@@ -354,7 +359,7 @@ namespace DryIoc
 
             // The situation is possible for multiple default services registered.
             if (request.ServiceKey != null)
-                return ((IResolver)this).ResolveKeyed(serviceType, request.ServiceKey, ifUnresolvedReturnDefault, null, scope);
+                return ((IResolver)this).ResolveKeyed(serviceType, request.ServiceKey, ifUnresolvedReturnDefault, null, scope, null);
 
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
@@ -365,8 +370,8 @@ namespace DryIoc
             return service;
         }
 
-        IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, 
-            object compositeParentKey, Type compositeParentRequiredType, IScope scope)
+        IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType,
+            object compositeParentKey, Type compositeParentRequiredType, IScope scope, RequestInfo requestInfo)
         {
             var container = ((IContainer)this);
             var itemType = requiredServiceType ?? serviceType;
@@ -419,7 +424,7 @@ namespace DryIoc
 
             foreach (var item in items)
             {
-                var service = ((IResolver)this).ResolveKeyed(serviceType, item.Key, true, requiredServiceType, scope);
+                var service = ((IResolver)this).ResolveKeyed(serviceType, item.Key, true, requiredServiceType, scope, requestInfo);
                 if (service != null) // skip unresolved items
                     yield return service;
             }
@@ -427,7 +432,7 @@ namespace DryIoc
             if (openGenericItems != null)
                 foreach (var item in openGenericItems)
                 {
-                    var service = ((IResolver)this).ResolveKeyed(serviceType, item.OptionalServiceKey, true, item.ServiceType, scope);
+                    var service = ((IResolver)this).ResolveKeyed(serviceType, item.OptionalServiceKey, true, item.ServiceType, scope, requestInfo);
                     if (service != null) // skip unresolved items
                         yield return service;
                 }
@@ -435,7 +440,7 @@ namespace DryIoc
             if (variantGenericItems != null)
                 foreach (var item in variantGenericItems)
                 {
-                    var service = ((IResolver)this).ResolveKeyed(serviceType, item.OptionalServiceKey, true, item.ServiceType, scope);
+                    var service = ((IResolver)this).ResolveKeyed(serviceType, item.OptionalServiceKey, true, item.ServiceType, scope, requestInfo);
                     if (service != null) // skip unresolved items
                         yield return service;
                 }
@@ -2002,13 +2007,16 @@ namespace DryIoc
                 compositeParentRequiredType = parent.RequiredServiceType;
             }
 
+            var requestInfoExpr = Expression.Constant(null, typeof(RequestInfo));
+
             var callResolveManyExpr = Expression.Call(Container.ResolverExpr, _resolveManyMethod,
                 Expression.Constant(itemType),
                 request.Container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(requiredItemType),
                 request.Container.GetOrAddStateItemExpression(compositeParentKey),
                 Expression.Constant(compositeParentRequiredType, typeof(Type)),
-                Container.GetResolutionScopeExpression(request));
+                Container.GetResolutionScopeExpression(request),
+                requestInfoExpr);
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
                 callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemType }, callResolveManyExpr);
@@ -2587,7 +2595,7 @@ namespace DryIoc
         /// <returns>New Made specification.</returns>
         public static TypedMade<TService> Of<TService>(
             Expression<Func<TService>> serviceReturningExpr,
-            params Func<Request, object>[] argValues)
+            params Func<RequestInfo, object>[] argValues)
         {
             return FromExpression<TService>(null, serviceReturningExpr, argValues);
         }
@@ -2602,7 +2610,7 @@ namespace DryIoc
         public static TypedMade<TService> Of<TFactory, TService>(
             Func<Request, ServiceInfo.Typed<TFactory>> getFactoryInfo,
             Expression<Func<TFactory, TService>> serviceReturningExpr,
-            params Func<Request, object>[] argValues)
+            params Func<RequestInfo, object>[] argValues)
             where TFactory : class
         {
             getFactoryInfo.ThrowIfNull();
@@ -2613,7 +2621,7 @@ namespace DryIoc
         private static TypedMade<TService> FromExpression<TService>(
             Func<Request, ServiceInfo> getFactoryInfo,
             LambdaExpression serviceReturningExpr,
-            params Func<Request, object>[] argValues)
+            params Func<RequestInfo, object>[] argValues)
         {
             var callExpr = serviceReturningExpr.ThrowIfNull().Body;
             if (callExpr.NodeType == ExpressionType.Convert) // proceed without Cast expression.
@@ -2703,7 +2711,7 @@ namespace DryIoc
         }
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
-            ParameterInfo[] parameterInfos, IList<Expression> argExprs, params Func<Request, object>[] argValues)
+            ParameterInfo[] parameterInfos, IList<Expression> argExprs, params Func<RequestInfo, object>[] argValues)
         {
             var parameters = DryIoc.Parameters.Of;
             for (var i = 0; i < argExprs.Count; i++)
@@ -2740,7 +2748,7 @@ namespace DryIoc
         }
 
         private static PropertiesAndFieldsSelector ComposePropertiesAndFieldsSelector(ref bool hasCustomValue,
-            IList<MemberBinding> memberBindings, params Func<Request, object>[] argValues)
+            IList<MemberBinding> memberBindings, params Func<RequestInfo, object>[] argValues)
         {
             var propertiesAndFields = DryIoc.PropertiesAndFields.Of;
             for (var i = 0; i < memberBindings.Count; i++)
@@ -2786,7 +2794,7 @@ namespace DryIoc
             return propertiesAndFields;
         }
 
-        private static Func<Request, object> GetArgCustomValueProvider(MethodCallExpression methodCallExpr, Func<Request, object>[] argValues)
+        private static Func<RequestInfo, object> GetArgCustomValueProvider(MethodCallExpression methodCallExpr, Func<RequestInfo, object>[] argValues)
         {
             Throw.If(argValues.IsNullOrEmpty(), Error.ArgOfValueIsProvidedButNoArgValues);
 
@@ -3496,7 +3504,8 @@ namespace DryIoc
         /// ]]></code></example>
         public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
-            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolved == IfUnresolved.ReturnDefault, requiredServiceType, null);
+            var ifUnresolvedReturnDefault = ifUnresolved == IfUnresolved.ReturnDefault;
+            return (TService)resolver.ResolveKeyed(typeof(TService), null, ifUnresolvedReturnDefault, requiredServiceType, null, null);
         }
 
         /// <summary>Returns instance of <paramref name="serviceType"/> searching for <paramref name="requiredServiceType"/>.
@@ -3519,7 +3528,7 @@ namespace DryIoc
             var ifUnresolvedReturnDefault = ifUnresolved == IfUnresolved.ReturnDefault;
             return serviceKey == null && requiredServiceType == null
                 ? resolver.ResolveDefault(serviceType, ifUnresolvedReturnDefault)
-                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, null);
+                : resolver.ResolveKeyed(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, null, null);
         }
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
@@ -3557,8 +3566,7 @@ namespace DryIoc
             object serviceKey = null)
         {
             return behavior == ResolveManyBehavior.AsLazyEnumerable
-                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, 
-                    compositeParentKey: null, compositeParentRequiredType: null, scope: null).Cast<TService>()
+                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, null, null, null, null).Cast<TService>()
                 : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
         }
 
@@ -3575,9 +3583,12 @@ namespace DryIoc
                 ? Container.GetResolutionScopeExpression(request)
                 : Container.ResolutionScopeParamExpr;
 
+            var requestInfo = RequestInfo.Of(request);
+            var requestInfoExpr = requestInfo.ToExpression(request);
+
             var resolveExpr = Expression.Call(Container.ResolverExpr, "ResolveKeyed", ArrayTools.Empty<Type>(),
-                serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr,
-                getOrNewCallExpr);
+                serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr, getOrNewCallExpr,
+                requestInfoExpr);
 
             return Expression.Convert(resolveExpr, serviceType);
         }
@@ -6458,6 +6469,134 @@ namespace DryIoc
         ReturnDefault
     }
 
+    /// <summary>Dependency request path information.</summary>
+    public sealed class RequestInfo : IEnumerable<RequestInfo>
+    {
+        /// <summary>Converts input request into its slim version of <see cref="RequestInfo"/> </summary>
+        /// <param name="request">Request to convert</param> <returns>Mirrored request info.</returns>
+        public static RequestInfo Of(Request request)
+        {
+            if (request == null || request.IsEmpty)
+                return Empty;
+            return new RequestInfo(Of(request.Parent),
+                request.ResolvedFactoryType != FactoryType.Service,
+                request.ServiceType,
+                request.ServiceKey,
+                request.ImplementationType);
+        }
+
+        /// <summary>Converts input request into its slim version of <see cref="RequestInfo"/> </summary>
+        /// <param name="request">Request to convert</param> <returns>Mirrored request info.</returns>
+        public static implicit operator RequestInfo(Request request)
+        {
+            return Of(request);
+        }
+
+        /// <summary>Parent request or null for root resolution request.</summary>
+        public readonly RequestInfo Parent;
+
+        /// <summary>False for Decorators and Wrappers.</summary>
+        public readonly bool IsDecoratorOrWrapper;
+
+        /// <summary>Asked service type.</summary>
+        public readonly Type ServiceType;
+
+        /// <summary>Optional service key.</summary>
+        public readonly object OptionalServiceKey;
+
+        /// <summary>Implementation type.</summary>
+        public readonly Type ImplementationTypeIfKnown;
+
+        /// <summary>Creates info.</summary>
+        /// <param name="parent"></param> <param name="isDecoratorOrWrapper"></param> <param name="serviceType"></param>
+        /// <param name="optionalServiceKey"></param> <param name="implementationTypeIfKnown"></param>
+        public RequestInfo(RequestInfo parent,
+            bool isDecoratorOrWrapper, Type serviceType, object optionalServiceKey, Type implementationTypeIfKnown)
+        {
+            Parent = parent;
+            IsDecoratorOrWrapper = isDecoratorOrWrapper;
+            ServiceType = serviceType;
+            OptionalServiceKey = optionalServiceKey;
+            ImplementationTypeIfKnown = implementationTypeIfKnown;
+        }
+
+        /// <summary>Returns all request until the root - parent is null.</summary>
+        /// <returns>Requests from the last to first.</returns>
+        public IEnumerator<RequestInfo> GetEnumerator()
+        {
+            for (var i = this; i != Empty; i = i.Parent)
+                yield return i;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        /// <summary>Returns hash code combined from info fields plus its parent.</summary>
+        /// <returns>Combined hash code.</returns>
+        public override int GetHashCode()
+        {
+            var hash = 0;
+            for (var i = this; i != Empty; i = i.Parent)
+            {
+                var currentHash = i.ServiceType.GetHashCode();
+                if (i.IsDecoratorOrWrapper)
+                    currentHash = CombineHashCodes(currentHash, i.IsDecoratorOrWrapper.GetHashCode());
+                if (i.OptionalServiceKey != null)
+                    currentHash = CombineHashCodes(currentHash, i.OptionalServiceKey.GetHashCode());
+                if (i.ImplementationTypeIfKnown != null)
+                    currentHash = CombineHashCodes(currentHash, i.ImplementationTypeIfKnown.GetHashCode());
+                
+                hash = hash == 0 ? currentHash : CombineHashCodes(hash, currentHash);
+            }
+            return hash;
+        }
+
+        // Inspired by System.Tuple.CombineHashCodes
+        private static int CombineHashCodes(int h1, int h2)
+        {
+            unchecked
+            {
+                return (h1 << 5) + h1 ^ h2;
+            }
+        }
+
+        /// <summary>Represents all request info stack as expression.</summary>
+        /// <param name="request">Required to access container facilities for expression conversion.</param>
+        /// <returns>Returns result expression.</returns>
+        public Expression ToExpression(Request request)
+        {
+            Expression result = Expression.Field(null, typeof(RequestInfo).GetFieldOrNull("Empty")); // todo: move to field
+            for (var i = this; i != Empty; i = i.Parent)
+            {
+                var serviceKeyExpr = Expression.Convert(
+                    request.Container.GetOrAddStateItemExpression(request.ServiceKey), 
+                    typeof(object));
+
+                result = Expression.New(typeof(RequestInfo).GetSingleConstructorOrNull(),
+                    result,  // parent
+                    Expression.Constant(i.IsDecoratorOrWrapper, typeof(bool)),
+                    Expression.Constant(i.ServiceType, typeof(Type)),
+                    serviceKeyExpr,
+                    Expression.Constant(i.ImplementationTypeIfKnown, typeof(Type)));
+            }
+            return result;
+        }
+
+        /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
+        public static readonly RequestInfo Empty = new RequestInfo(null, false, null, null, null);
+
+        /// <summary>Returns first non wrapper parent or <see cref="Empty"/></summary> <returns></returns>
+        public RequestInfo ParentNonWrapper()
+        {
+            for (var p = Parent; p != Empty; p = p.Parent)
+                if (!p.IsDecoratorOrWrapper)
+                    return p;
+            return Empty;
+        }
+    }
+
     /// <summary>Declares minimal API for service resolution.
     /// The user friendly convenient methods are implemented as extension methods in <see cref="Resolver"/> class.</summary>
     /// <remarks>Resolve default and keyed is separated because of micro optimization for faster resolution.</remarks>
@@ -6476,12 +6615,14 @@ namespace DryIoc
         /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
         ///     or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
         /// <param name="scope">Propagated resolution scope.</param>
+        /// <param name="requestInfo">Dependency resolution path info.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         /// <remarks>
         /// This method covers all possible resolution input parameters comparing to <see cref="ResolveDefault"/>, and
         /// by specifying the same parameters as for <see cref="ResolveDefault"/> should return the same result.
         /// </remarks>
-        object ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope);
+        object ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope,
+            RequestInfo requestInfo);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
@@ -6492,9 +6633,11 @@ namespace DryIoc
         /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
         /// <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
+        /// <param name="requestInfo">Dependency resolution path info.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
         IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, 
-            object compositeParentKey, Type compositeParentRequiredType, IScope scope);
+            object compositeParentKey, Type compositeParentRequiredType, IScope scope,
+            RequestInfo requestInfo);
     }
 
     /// <summary>Specifies options to handle situation when registering some service already present in the registry.</summary>

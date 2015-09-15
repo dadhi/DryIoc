@@ -219,7 +219,7 @@ namespace DryIocAttributes
         public object ContractKey { get; set; }
     }
 
-    /// <summary></summary>
+    /// <summary>Dependency request path information.</summary>
     public sealed class RequestInfo : IEnumerable<RequestInfo>
     {
         /// <summary>Parent request or null for root resolution request.</summary>
@@ -232,22 +232,22 @@ namespace DryIocAttributes
         public readonly Type ServiceType;
         
         /// <summary>Optional service key.</summary>
-        public readonly object ServiceKey;
+        public readonly object OptionalServiceKey;
 
         /// <summary>Implementation type.</summary>
-        public readonly Type ImplementationTypeIfAvailable;
+        public readonly Type ImplementationTypeIfKnown;
 
         /// <summary>Creates info.</summary>
         /// <param name="parent"></param> <param name="isDecoratorOrWrapper"></param> <param name="serviceType"></param>
-        /// <param name="serviceKey"></param> <param name="implementationTypeIfAvailable"></param>
+        /// <param name="optionalServiceKey"></param> <param name="implementationTypeIfKnown"></param>
         public RequestInfo(RequestInfo parent, 
-            bool isDecoratorOrWrapper, Type serviceType, object serviceKey, Type implementationTypeIfAvailable)
+            bool isDecoratorOrWrapper, Type serviceType, object optionalServiceKey, Type implementationTypeIfKnown)
         {
             Parent = parent;
             IsDecoratorOrWrapper = isDecoratorOrWrapper;
             ServiceType = serviceType;
-            ServiceKey = serviceKey;
-            ImplementationTypeIfAvailable = implementationTypeIfAvailable;
+            OptionalServiceKey = optionalServiceKey;
+            ImplementationTypeIfKnown = implementationTypeIfKnown;
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>

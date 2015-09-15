@@ -70,7 +70,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         {
             public override bool Evaluate(RequestInfo request)
             {
-                return request.ImplementationTypeIfAvailable == typeof(SlowHandler);
+                return request.ImplementationTypeIfKnown == typeof(SlowHandler);
             }
         }
     }

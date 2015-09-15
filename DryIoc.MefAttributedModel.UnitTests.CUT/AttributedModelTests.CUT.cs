@@ -291,7 +291,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public override bool Evaluate(RequestInfo request)
         {
-            return request.Any(r => r.ImplementationTypeIfAvailable == _parentImplementationType);
+            return request.Any(r => r.ImplementationTypeIfKnown == _parentImplementationType);
         }
 
         private readonly Type _parentImplementationType;
