@@ -43,6 +43,7 @@
     <Compile Include="AsyncExecutionFlowScopeContext.cs" />
     <Compile Include="Container.Generated.cs">
       <DependentUpon>Container.Generated.tt</DependentUpon>
+      <SubType>Code</SubType>
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
     </Compile>

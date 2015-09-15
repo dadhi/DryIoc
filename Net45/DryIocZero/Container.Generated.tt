@@ -46,7 +46,7 @@ THE SOFTWARE.
 <#
 // - Configure container for compile-time gen and use MEF to discover types
 var container = new Container(rules => rules
-    .WithoutSingletonOptimization()
+    .WithoutEagerCachingSingletonForFasterAccess()
     .WithMefAttributedModel());
 
 // - Register implementation types

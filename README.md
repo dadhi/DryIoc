@@ -56,7 +56,6 @@ DryIoc is small, fast, and skillful IoC Container for .NET
 * Instance lifetime control or *Reuse* in DryIoc terms:
     * Nested disposable scopes, ambient scope context.
     * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`. Plus you can define your own.
-    * Changing default reuse type per container via `Rules.WithReuseMapping()`.
     * Control reused objects behavior with `preventDisposal` and `weaklyReferenced`.
 * Open-generics without special syntax.
 * Constructor, property and field injection.

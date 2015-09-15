@@ -2220,6 +2220,17 @@ namespace DryIoc
             return newRules;
         }
 
+        /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
+        /// If no resolver was found then <see cref="UnknownServiceResolvers"/> will stay the same instance, 
+        /// so it could be check for remove success or fail.</summary>
+        /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
+        public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.Remove(rule);
+            return newRules;
+        }
+
         /// <summary>Fallback rule to automatically register requested service with Reuse based on resolution source.</summary>
         /// <param name="implTypes">Assemblies to look for implementation types.</param>
         /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
@@ -2271,17 +2282,6 @@ namespace DryIoc
             return newRules;
         }
 
-        /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
-        /// If no resolver was found then <see cref="UnknownServiceResolvers"/> will stay the same instance, 
-        /// so it could be check for remove success or fail.</summary>
-        /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
-        public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.Remove(rule);
-            return newRules;
-        }
-
         /// <summary>Turns on/off exception throwing when dependency has shorter reuse lifespan than its parent.</summary>
         public bool ThrowIfDependencyHasShorterReuseLifespan { get; private set; }
 
@@ -2294,32 +2294,16 @@ namespace DryIoc
             return newRules;
         }
 
-        /// <summary>Defines mapping from registered reuse to what will be actually used.</summary>
-        /// <param name="reuse">Service registered reuse</param> <param name="request">Context.</param> <returns>Mapped result reuse to use.</returns>
-        public delegate IReuse ReuseMappingRule(IReuse reuse, Request request);
-
-        /// <summary>Gets rule to retrieve actual reuse from registered one. May be null, so the registered reuse will be used.
-        /// Could be used to specify different reuse container wide, for instance <see cref="Reuse.Singleton"/> instead of <see cref="Reuse.Transient"/>.</summary>
-        public ReuseMappingRule ReuseMapping { get; private set; }
-
-        /// <summary>Sets the <see cref="ReuseMapping"/> rule.</summary> <param name="rule">Rule to set, may be null.</param> <returns>New rules.</returns>
-        public Rules WithReuseMapping(ReuseMappingRule rule)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.ReuseMapping = rule;
-            return newRules;
-        }
-
         /// <summary>Allow to instantiate singletons during resolution (but not inside of Func). Instantiated singletons
         /// will be copied to <see cref="IContainer.ResolutionStateCache"/> for faster access.</summary>
-        public bool SingletonOptimization { get; private set; }
+        public bool EagerCachingSingletonForFasterAccess { get; private set; }
 
-        /// <summary>Disables <see cref="SingletonOptimization"/></summary>
+        /// <summary>Disables <see cref="EagerCachingSingletonForFasterAccess"/></summary>
         /// <returns>New rules with singleton optimization turned off.</returns>
-        public Rules WithoutSingletonOptimization()
+        public Rules WithoutEagerCachingSingletonForFasterAccess()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.SingletonOptimization = false;
+            newRules.EagerCachingSingletonForFasterAccess = false;
             return newRules;
         }
 
@@ -2397,7 +2381,7 @@ namespace DryIoc
             _made = Made.Default;
             ThrowIfDependencyHasShorterReuseLifespan = true;
             ImplicitCheckForReuseMatchingScope = true;
-            SingletonOptimization = true;
+            EagerCachingSingletonForFasterAccess = true;
             VariantGenericTypesInResolvedCollection = true;
         }
 
@@ -4644,15 +4628,12 @@ namespace DryIoc
             if (!rules.ImplicitCheckForReuseMatchingScope)
                 return true;
 
-            var reuseMapping = rules.ReuseMapping;
-            var reuse = reuseMapping == null ? Reuse : reuseMapping(Reuse, request);
+            if (Reuse is ResolutionScopeReuse)
+                return Reuse.GetScopeOrDefault(request) != null;
 
-            if (reuse is ResolutionScopeReuse)
-                return reuse.GetScopeOrDefault(request) != null;
-
-            if (reuse is CurrentScopeReuse)
+            if (Reuse is CurrentScopeReuse)
                 return request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc())
-                    || reuse.GetScopeOrDefault(request) != null;
+                    || Reuse.GetScopeOrDefault(request) != null;
 
             return true;
         }
@@ -4716,9 +4697,7 @@ namespace DryIoc
 
             request = request.WithResolvedFactory(this);
 
-            var reuseMappingRule = request.Container.Rules.ReuseMapping;
-            var reuse = reuseMappingRule == null ? Reuse : reuseMappingRule(Reuse, request);
-            ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
+            ThrowIfReuseHasShorterLifespanThanParent(Reuse, request);
 
             // Here's lookup for decorators
             var decoratorExpr = FactoryType == FactoryType.Service
@@ -4735,15 +4714,15 @@ namespace DryIoc
             }
 
             var serviceExpr = isReplacingDecorator ? decoratorExpr : CreateExpressionOrDefault(request);
-            if (serviceExpr != null && reuse != null && !isReplacingDecorator)
+            if (serviceExpr != null && Reuse != null && !isReplacingDecorator)
             {
                 // The singleton optimization: eagerly create singleton and put it into state for fast access.
-                if (reuse is SingletonReuse &&
-                    FactoryType == FactoryType.Service && request.Container.Rules.SingletonOptimization &&
+                if (Reuse is SingletonReuse &&
+                    FactoryType == FactoryType.Service && request.Container.Rules.EagerCachingSingletonForFasterAccess &&
                     (request.Parent.IsEmpty || !request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc())))
                     serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
                 else
-                    serviceExpr = GetScopedExpressionOrDefault(serviceExpr, reuse, request);
+                    serviceExpr = GetScopedExpressionOrDefault(serviceExpr, Reuse, request);
             }
 
             if (serviceExpr != null)
@@ -5837,11 +5816,9 @@ namespace DryIoc
                 request.Container.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request); // via expression creation
 
-            var rules = request.Container.Rules;
-            var reuse = rules.ReuseMapping == null ? Reuse : rules.ReuseMapping(Reuse, request);
-            ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
-
-            if (reuse != null)
+            ThrowIfReuseHasShorterLifespanThanParent(Reuse, request);
+            
+            if (Reuse != null)
                 return base.GetDelegateOrDefault(request); // use expression creation
 
             return (state, r, scope) => _factoryDelegate(r.Resolver);

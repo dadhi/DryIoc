@@ -33,7 +33,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Non_optimized_singleton_registered_with_multiple_interfaces_should_be_the_same()
         {
-            var container = new Container(r => r.WithoutSingletonOptimization());
+            var container = new Container(r => r.WithoutEagerCachingSingletonForFasterAccess());
             container.RegisterMany<Someberry>(Reuse.Singleton);
 
             var product = container.Resolve<IProduct>();
@@ -48,7 +48,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Non_optimized_singleton_injected_as_different_interfaces_should_be_the_same()
         {
-            var container = new Container(r => r.WithoutSingletonOptimization());
+            var container = new Container(r => r.WithoutEagerCachingSingletonForFasterAccess());
             container.RegisterMany<Someberry>(Reuse.Singleton);
             container.Register<SomeEater>();
             container.Register<ProductEater>();

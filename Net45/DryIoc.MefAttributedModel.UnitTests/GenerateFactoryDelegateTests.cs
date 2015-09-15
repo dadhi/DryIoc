@@ -13,7 +13,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Can_load_types_from_assembly_and_generate_some_resolutions()
         {
             var container = new Container(rules => rules
-                .WithoutSingletonOptimization()
+                .WithoutEagerCachingSingletonForFasterAccess()
                 .WithMefAttributedModel());
 
             var types = typeof(BirdFactory).GetAssembly().GetLoadedTypes();
@@ -29,7 +29,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Generate_factory_delegate_for_exported_static_factory_method()
         {
             var container = new Container(rules => rules
-                .WithoutSingletonOptimization()
+                .WithoutEagerCachingSingletonForFasterAccess()
                 .WithMefAttributedModel());
 
             container.RegisterExports(typeof(BirdFactory));

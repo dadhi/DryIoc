@@ -444,20 +444,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_replace_singleton_reuse_with_transient_in_container()
-        {
-            var container = new Container(rules => rules
-                .WithReuseMapping((reuse, _) => reuse is SingletonReuse ? Reuse.Transient : reuse));
-
-            container.Register<Service>(Reuse.Singleton);
-
-            var one = container.Resolve<Service>();
-            var two = container.Resolve<Service>();
-
-            Assert.That(one, Is.Not.SameAs(two));
-        }
-
-        [Test]
         public void Can_disposed_resolution_reused_services()
         {
             var container = new Container();

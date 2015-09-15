@@ -126,7 +126,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_turn_Off_singleton_optimization()
         {
-            var container = new Container(r => r.WithoutSingletonOptimization());
+            var container = new Container(r => r.WithoutEagerCachingSingletonForFasterAccess());
             container.Register<FooHey>(Reuse.Singleton);
 
             var singleton = container.Resolve<LambdaExpression>(typeof(FooHey));
