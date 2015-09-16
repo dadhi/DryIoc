@@ -312,14 +312,14 @@ namespace DryIoc
             if (scope != null)
                 scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
 
-            var registry = _registry.Value;
+            var registryValue = _registry.Value;
 
             // If service key is null, then use resolve default instead of keyed.
             if (serviceKey == null && requiredServiceType == null)
             {
-                var defaultFactory = registry.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+                var defaultFactory = registryValue.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
                 return defaultFactory != null
-                    ? defaultFactory(registry.ResolutionStateCache.Value, _containerWeakRef, scope)
+                    ? defaultFactory(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope)
                     : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, scope);
             }
 
@@ -331,9 +331,9 @@ namespace DryIoc
 
             var cacheKey = new KV<Type, object>(serviceType, cacheKeyPart);
 
-            var cachedFactory = registry.KeyedFactoryDelegateCache.Value.GetValueOrDefault(cacheKey);
+            var cachedFactory = registryValue.KeyedFactoryDelegateCache.Value.GetValueOrDefault(cacheKey);
             if (cachedFactory != null)
-                return cachedFactory(registry.ResolutionStateCache.Value, _containerWeakRef, scope);
+                return cachedFactory(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope);
 
             ThrowIfContainerDisposed();
 
@@ -344,8 +344,11 @@ namespace DryIoc
             if (keyedFactory == null)
                 return null;
 
-            var service = keyedFactory(request.Container.ResolutionStateCache, _containerWeakRef, scope);
-            registry.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(cacheKey, keyedFactory));
+            var service = keyedFactory(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope);
+            
+            // Cache service factory delegate
+            registryValue.KeyedFactoryDelegateCache.Swap(_ => _.AddOrUpdate(cacheKey, keyedFactory));
+            
             return service;
         }
 
@@ -365,8 +368,12 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var service = factoryDelegate(_registry.Value.ResolutionStateCache.Value, _containerWeakRef, scope);
-            _registry.Value.DefaultFactoryDelegateCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+            var registryValue = _registry.Value;
+            var service = factoryDelegate(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope);
+
+            // cache service creation delegate
+            registryValue.DefaultFactoryDelegateCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+            
             return service;
         }
 
@@ -1517,7 +1524,9 @@ namespace DryIoc
                     registry.FactoryExpressionCache.Swap(_ => _.Update(factory.FactoryID, null));
 
                     if (serviceKey == null)
+                    {
                         registry.DefaultFactoryDelegateCache.Swap(_ => _.Update(serviceType, null));
+                    }
                     else
                     {
                         var cacheKey = new KV<Type, object>(serviceType, serviceKey);
