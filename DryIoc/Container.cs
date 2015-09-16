@@ -6479,7 +6479,7 @@ namespace DryIoc
             if (request == null || request.IsEmpty)
                 return Empty;
             return new RequestInfo(Of(request.Parent),
-                request.ResolvedFactoryType != FactoryType.Service,
+                request.ResolvedFactoryType,
                 request.ServiceType,
                 request.ServiceKey,
                 request.ImplementationType);
@@ -6496,7 +6496,7 @@ namespace DryIoc
         public readonly RequestInfo Parent;
 
         /// <summary>False for Decorators and Wrappers.</summary>
-        public readonly bool IsDecoratorOrWrapper;
+        public readonly FactoryType FactoryType;
 
         /// <summary>Asked service type.</summary>
         public readonly Type ServiceType;
@@ -6508,13 +6508,12 @@ namespace DryIoc
         public readonly Type ImplementationTypeIfKnown;
 
         /// <summary>Creates info.</summary>
-        /// <param name="parent"></param> <param name="isDecoratorOrWrapper"></param> <param name="serviceType"></param>
+        /// <param name="parent"></param> <param name="factoryType"></param> <param name="serviceType"></param>
         /// <param name="optionalServiceKey"></param> <param name="implementationTypeIfKnown"></param>
-        public RequestInfo(RequestInfo parent,
-            bool isDecoratorOrWrapper, Type serviceType, object optionalServiceKey, Type implementationTypeIfKnown)
+        public RequestInfo(RequestInfo parent, FactoryType factoryType, Type serviceType, object optionalServiceKey, Type implementationTypeIfKnown)
         {
             Parent = parent;
-            IsDecoratorOrWrapper = isDecoratorOrWrapper;
+            FactoryType = factoryType;
             ServiceType = serviceType;
             OptionalServiceKey = optionalServiceKey;
             ImplementationTypeIfKnown = implementationTypeIfKnown;
@@ -6541,8 +6540,8 @@ namespace DryIoc
             for (var i = this; i != Empty; i = i.Parent)
             {
                 var currentHash = i.ServiceType.GetHashCode();
-                if (i.IsDecoratorOrWrapper)
-                    currentHash = CombineHashCodes(currentHash, i.IsDecoratorOrWrapper.GetHashCode());
+                if (i.FactoryType != FactoryType.Service)
+                    currentHash = CombineHashCodes(currentHash, i.FactoryType.GetHashCode());
                 if (i.OptionalServiceKey != null)
                     currentHash = CombineHashCodes(currentHash, i.OptionalServiceKey.GetHashCode());
                 if (i.ImplementationTypeIfKnown != null)
@@ -6576,7 +6575,7 @@ namespace DryIoc
 
                 result = Expression.New(typeof(RequestInfo).GetSingleConstructorOrNull(),
                     result,  // parent
-                    Expression.Constant(i.IsDecoratorOrWrapper, typeof(bool)),
+                    Expression.Constant(i.FactoryType, typeof(FactoryType)),
                     Expression.Constant(i.ServiceType, typeof(Type)),
                     serviceKeyExpr,
                     Expression.Constant(i.ImplementationTypeIfKnown, typeof(Type)));
@@ -6585,13 +6584,13 @@ namespace DryIoc
         }
 
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, false, null, null, null);
+        public static readonly RequestInfo Empty = new RequestInfo(null, FactoryType.Service, null, null, null);
 
         /// <summary>Returns first non wrapper parent or <see cref="Empty"/></summary> <returns></returns>
         public RequestInfo ParentNonWrapper()
         {
             for (var p = Parent; p != Empty; p = p.Parent)
-                if (!p.IsDecoratorOrWrapper)
+                if (p.FactoryType != FactoryType.Wrapper)
                     return p;
             return Empty;
         }

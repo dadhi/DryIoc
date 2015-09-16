@@ -220,7 +220,7 @@ namespace DryIocAttributes
     }
 
     /// <summary>Dependency request path information.</summary>
-    public sealed class RequestInfo : IEnumerable<RequestInfo>
+    public sealed class RequestInfo : IEnumerable<RequestInfo> // todo: Make consistent with DryIoc.RequestInfo
     {
         /// <summary>Parent request or null for root resolution request.</summary>
         public readonly RequestInfo Parent;
