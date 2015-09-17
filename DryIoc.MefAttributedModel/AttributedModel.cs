@@ -687,24 +687,35 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == FactoryType.Wrapper)
                 return Wrapper == null ? Setup.Wrapper : Wrapper.GetSetup();
 
-            var condition = ConditionType == null ? (Func<Request, bool>)null
-                : (request => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
-                    .Evaluate(ConvertRequestToInfo(request)));
+            var condition = ConditionType == null ? (Func<DryIoc.RequestInfo, bool>)null
+                : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
+                    .Evaluate(ConvertRequestInfo(r));
 
             var lazyMetadata = HasMetadataAttribute ? (Func<object>)(() => GetMetadata(attributes)) : null;
 
             if (FactoryType == FactoryType.Decorator)
-                return Decorator == null ? Setup.Decorator : Decorator.GetSetup(lazyMetadata, condition);
+                return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
             return Setup.With(lazyMetadata, null, condition, OpenResolutionScope, AsResolutionRoot, 
                 PreventDisposal, WeaklyReferenced);
         }
 
-        private static RequestInfo ConvertRequestToInfo(Request request)
+        private static DryIocAttributes.RequestInfo ConvertRequestInfo(DryIoc.RequestInfo requestInfo)
         {
-            return request.Enumerate().Aggregate<Request, RequestInfo>(null, (parent, r) =>
-                new RequestInfo(parent, r.ResolvedFactoryType != FactoryType.Service,
-                    r.ServiceType, r.ServiceKey, r.ImplementationType));
+            if (requestInfo.IsEmpty)
+                return RequestInfo.Empty;
+
+            var serviceKind = 
+                requestInfo.FactoryType == FactoryType.Decorator ? ServiceKind.Decorator : 
+                requestInfo.FactoryType == FactoryType.Wrapper ? ServiceKind.Wrapper :
+                ServiceKind.Service;
+
+            return new DryIocAttributes.RequestInfo(
+                ConvertRequestInfo(requestInfo.Parent),
+                serviceKind,
+                requestInfo.ServiceType,
+                requestInfo.OptionalServiceKey,
+                requestInfo.ImplementationTypeIfKnown);
         }
 
         /// <summary>Compares with another info for equality.</summary>
@@ -851,17 +862,15 @@ namespace DryIoc.MefAttributedModel
         public ServiceKeyInfo DecoratedServiceKeyInfo;
 
         /// <summary>Converts info to corresponding decorator setup.</summary>
-        /// <param name="lazyMetadata">(optional) Metadata that may be associated by decorator.</param>
         /// <param name="condition">(optional) <see cref="Setup.Condition"/>.</param>
         /// <returns>Setup.</returns>
-        public Setup GetSetup(Func<object> lazyMetadata = null, Func<Request, bool> condition = null)
+        public Setup GetSetup(Func<DryIoc.RequestInfo, bool> condition = null)
         {
-            if (DecoratedServiceKeyInfo == ServiceKeyInfo.Default && lazyMetadata == null && condition == null)
+            if (DecoratedServiceKeyInfo == ServiceKeyInfo.Default && condition == null)
                 return Setup.Decorator;
 
             return Setup.DecoratorWith(r =>
-                (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, r.ServiceKey)) &&
-                (lazyMetadata == null || Equals(lazyMetadata(), r.ResolvedFactory.Setup.Metadata)) &&
+                (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, r.OptionalServiceKey)) &&
                 (condition == null || condition(r)));
         }
 

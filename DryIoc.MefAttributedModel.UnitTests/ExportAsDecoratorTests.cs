@@ -21,19 +21,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Decorator_can_be_applied_based_on_Metadata()
-        {
-            var container = new Container();
-            container.RegisterExports(typeof(RetryHandlerDecorator), typeof(FastHandler), typeof(SlowHandler));
-
-            Assert.That(container.Resolve<IHandler>("slow"), Is.InstanceOf<SlowHandler>());
-
-            var fast = container.Resolve<IHandler>("fast");
-            Assert.That(fast, Is.InstanceOf<RetryHandlerDecorator>());
-            Assert.That(((RetryHandlerDecorator)fast).Handler, Is.InstanceOf<FastHandler>());
-        }
-
-        [Test]
         public void Decorator_can_be_applied_based_on_both_name_and_Metadata()
         {
             var container = new Container();

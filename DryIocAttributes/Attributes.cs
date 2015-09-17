@@ -219,18 +219,35 @@ namespace DryIocAttributes
         public object ContractKey { get; set; }
     }
 
-    /// <summary>Dependency request path information.</summary>
-    public sealed class RequestInfo : IEnumerable<RequestInfo> // todo: Make consistent with DryIoc.RequestInfo
+    /// <summary>Type of services supported by Container.</summary>
+    public enum ServiceKind
     {
+        /// <summary>(default) Defines normal service factory</summary>
+        Service,
+        /// <summary>Defines decorator factory</summary>
+        Decorator,
+        /// <summary>Defines wrapper factory.</summary>
+        Wrapper
+    };
+
+    /// <summary>Dependency request path information.</summary>
+    public sealed class RequestInfo : IEnumerable<RequestInfo>
+    {
+        /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
+        public static readonly RequestInfo Empty = new RequestInfo(null, ServiceKind.Service, null, null, null);
+
+        /// <summary>Returns true for an empty request.</summary>
+        public bool IsEmpty { get { return ServiceType == null; } }
+
         /// <summary>Parent request or null for root resolution request.</summary>
         public readonly RequestInfo Parent;
 
         /// <summary>False for Decorators and Wrappers.</summary>
-        public readonly bool IsDecoratorOrWrapper; 
+        public readonly ServiceKind ServiceKind;
 
         /// <summary>Asked service type.</summary>
         public readonly Type ServiceType;
-        
+
         /// <summary>Optional service key.</summary>
         public readonly object OptionalServiceKey;
 
@@ -238,23 +255,31 @@ namespace DryIocAttributes
         public readonly Type ImplementationTypeIfKnown;
 
         /// <summary>Creates info.</summary>
-        /// <param name="parent"></param> <param name="isDecoratorOrWrapper"></param> <param name="serviceType"></param>
+        /// <param name="parent"></param> <param name="serviceKind"></param> <param name="serviceType"></param>
         /// <param name="optionalServiceKey"></param> <param name="implementationTypeIfKnown"></param>
-        public RequestInfo(RequestInfo parent, 
-            bool isDecoratorOrWrapper, Type serviceType, object optionalServiceKey, Type implementationTypeIfKnown)
+        public RequestInfo(RequestInfo parent, ServiceKind serviceKind, Type serviceType, object optionalServiceKey, Type implementationTypeIfKnown)
         {
             Parent = parent;
-            IsDecoratorOrWrapper = isDecoratorOrWrapper;
+            ServiceKind = serviceKind;
             ServiceType = serviceType;
             OptionalServiceKey = optionalServiceKey;
             ImplementationTypeIfKnown = implementationTypeIfKnown;
+        }
+
+        /// <summary>Returns first non wrapper parent or <see cref="Empty"/></summary> <returns></returns>
+        public RequestInfo ParentNonWrapper()
+        {
+            for (var p = Parent; p != Empty; p = p.Parent)
+                if (p.ServiceKind != ServiceKind.Wrapper)
+                    return p;
+            return Empty;
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>
         /// <returns>Requests from the last to first.</returns>
         public IEnumerator<RequestInfo> GetEnumerator()
         {
-            for (var i = this; i != null; i = i.Parent)
+            for (var i = this; i != Empty; i = i.Parent)
                 yield return i;
         }
 

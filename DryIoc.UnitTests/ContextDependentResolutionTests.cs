@@ -52,13 +52,13 @@ namespace DryIoc.UnitTests
             container.Register<ImportConditionObject3>();
 
             container.Register<IExportConditionInterface, ExportConditionalObject>(
-                setup: Setup.With(condition: r => r.ParentNonWrapper().ImplementationType == typeof(ImportConditionObject1)));
+                setup: Setup.With(condition: r => r.ParentNonWrapper().ImplementationTypeIfKnown == typeof(ImportConditionObject1)));
 
             container.Register<IExportConditionInterface, ExportConditionalObject2>(
-                setup: Setup.With(condition: r => r.ParentNonWrapper().ImplementationType == typeof(ImportConditionObject2)));
+                setup: Setup.With(condition: r => r.ParentNonWrapper().ImplementationTypeIfKnown == typeof(ImportConditionObject2)));
 
             container.Register<IExportConditionInterface, ExportConditionalObject3>(
-                setup: Setup.With(condition: r => r.ParentNonWrapper().ImplementationType == typeof(ImportConditionObject3)));
+                setup: Setup.With(condition: r => r.ParentNonWrapper().ImplementationTypeIfKnown == typeof(ImportConditionObject3)));
 
             Assert.IsInstanceOf<ExportConditionalObject>(container.Resolve<ImportConditionObject1>().ExportConditionInterface);
             Assert.IsInstanceOf<ExportConditionalObject2>(container.Resolve<ImportConditionObject2>().ExportConditionInterface);

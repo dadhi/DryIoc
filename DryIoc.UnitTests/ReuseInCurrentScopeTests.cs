@@ -183,41 +183,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_select_different_service_in_and_out_of_open_scope_based_on_registered_reuse()
-        {
-            var container = new Container();
-
-            // two client versions: root and scoped
-            container.Register<IClient, Client>(setup: Setup.With(condition: r => r.Scopes.GetCurrentScope() == null));
-            container.Register<IClient, ClientScoped>(Reuse.InCurrentScope);
-
-            // uses
-            container.Register<IServ, Serv>(Reuse.Singleton);
-
-            // two dependency versions:
-            container.Register<IDep, Dep>(setup: Setup.With(condition: r => r.Scopes.GetCurrentScope() == null));
-            container.Register<IDep, DepScoped>(Reuse.InCurrentScope);
-
-            var client = container.Resolve<IClient>();
-
-            Assert.That(client, Is.InstanceOf<Client>());
-            Assert.That(client.Dep, Is.InstanceOf<Dep>());
-            Assert.That(client.Serv, Is.InstanceOf<Serv>());
-
-            using (var scope = container.OpenScope())
-            {
-                var scopedClient = scope.Resolve<IClient>();
-
-                Assert.That(scopedClient, Is.InstanceOf<ClientScoped>());
-                Assert.That(scopedClient.Dep, Is.InstanceOf<DepScoped>());
-                Assert.That(scopedClient.Serv, Is.InstanceOf<Serv>());
-            }
-
-            client = container.Resolve<IClient>();
-            Assert.That(client, Is.InstanceOf<Client>());
-        }
-
-        [Test]
         public void Can_resolve_many_filtering_out_not_scoped_services()
         {
             var container = new Container();

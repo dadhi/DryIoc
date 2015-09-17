@@ -34,7 +34,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportMany, AsDecorator, WithMetadata(2)]
+    [ExportMany, AsDecorator]
     public class RetryHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -45,7 +45,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportMany, AsDecorator(ContractName = "transact"), WithMetadata(1)]
+    [ExportMany, AsDecorator(ContractName = "transact")]
     public class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
