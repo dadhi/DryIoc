@@ -3592,7 +3592,8 @@ namespace DryIoc
                 ? Container.GetResolutionScopeExpression(request)
                 : Container.ResolutionScopeParamExpr;
 
-            var requestInfo = RequestInfo.Of(request);
+            // Only parent is converted passed to resolve, the current request is formed by rest of Resolve parameters
+            var requestInfo = RequestInfo.Of(request.Parent); 
             var requestInfoExpr = requestInfo.ToExpression(request);
 
             var resolveExpr = Expression.Call(Container.ResolverExpr, "ResolveKeyed", ArrayTools.Empty<Type>(),
