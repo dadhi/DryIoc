@@ -182,7 +182,7 @@ namespace DryIoc.UnitTests
             Assert.IsNotNull(vm.Log);
         }
 
-        [Test]
+        [Test, Ignore]
         public void Can_specify_to_resolve_corresponding_log_in_resolution_scope_automagically_Without_condition()
         {
             var container = new Container();
