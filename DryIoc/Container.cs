@@ -676,7 +676,7 @@ namespace DryIoc
 
             // We are already resolving decorator for the service, so stop now.
             var parent = request.ParentNonWrapper();
-            if (!parent.IsEmpty && parent.ResolvedFactoryType == FactoryType.Decorator)
+            if (!parent.IsEmpty && parent.FactoryType == FactoryType.Decorator)
                 return null;
 
             var container = request.Container;
@@ -1964,12 +1964,12 @@ namespace DryIoc
             var parent = request.ParentNonWrapper();
             if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
             {
-                var compositeParentKey = parent.ServiceKey ?? DefaultKey.Value;
+                var compositeParentKey = parent.OptionalServiceKey ?? DefaultKey.Value;
                 items = items
                     .Where(x => !compositeParentKey.Equals(x.OptionalServiceKey)
-                        || (parent.RequiredServiceType != null
-                        && parent.RequiredServiceType.IsGenericDefinition()
-                        && parent.RequiredServiceType != x.ServiceType))
+                        || (parent.OptionalRequiredServiceType != null
+                        && parent.OptionalRequiredServiceType.IsGenericDefinition()
+                        && parent.OptionalRequiredServiceType != x.ServiceType))
                     .ToArray();
             }
 
@@ -2015,8 +2015,8 @@ namespace DryIoc
             var parent = request.ParentNonWrapper();
             if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
             {
-                compositeParentKey = parent.ServiceKey ?? DefaultKey.Value;
-                compositeParentRequiredType = parent.RequiredServiceType;
+                compositeParentKey = parent.OptionalServiceKey ?? DefaultKey.Value;
+                compositeParentRequiredType = parent.OptionalRequiredServiceType;
             }
 
             var requestInfoExpr = Expression.Constant(null, typeof(RequestInfo));
@@ -4152,6 +4152,15 @@ namespace DryIoc
         /// <summary>Returns true if request originated from first Resolve call.</summary>
         public bool IsCompositionRoot { get { return IsEmpty && _parentRequestInfo == null; } }
 
+        /// <summary>Returns true for the first service in request.</summary> <returns></returns>
+        public bool IsFirstServiceInRequest()
+        {
+            var p = Parent;
+            while (!p.IsEmpty && p.ResolvedFactory.FactoryType == FactoryType.Wrapper)
+                p = p.Parent;
+            return p.IsEmpty;
+        }
+
         /// <summary>Optionally associated resolution scope.</summary>
         public readonly IScope Scope;
 
@@ -4308,12 +4317,20 @@ namespace DryIoc
 
         /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
         /// If not found returns <see cref="IsEmpty"/> request.</summary> <returns>Found parent or <see cref="IsEmpty"/> request.</returns>
-        public Request ParentNonWrapper()
+        public RequestInfo ParentNonWrapper()
         {
             var p = Parent;
             while (!p.IsEmpty && p.ResolvedFactory.FactoryType == FactoryType.Wrapper)
                 p = p.Parent;
-            return p;
+            if (!p.IsEmpty && p._parentRequestInfo != null)
+            {
+                for (var pi = _parentRequestInfo; !pi.IsEmpty; pi = pi.Parent)
+                    if (pi.FactoryType != FactoryType.Wrapper)
+                        return pi;
+                return RequestInfo.Empty;
+            }
+
+            return RequestInfo.Of(p);
         }
 
         /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
@@ -4741,7 +4758,7 @@ namespace DryIoc
         public virtual Expression GetExpressionOrDefault(Request request)
         {
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
-            if (Setup.AsResolutionRoot && !request.ParentNonWrapper().IsEmpty)
+            if (Setup.AsResolutionRoot && !request.IsFirstServiceInRequest())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             request = request.WithResolvedFactory(this);
