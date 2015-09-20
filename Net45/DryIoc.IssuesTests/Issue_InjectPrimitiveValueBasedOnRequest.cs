@@ -40,7 +40,7 @@ namespace DryIoc.IssuesTests
             _container.Register<ILog, Log>(
                 serviceKey: "normal",
                 made: Parameters.Of.Type(request =>
-                    request.ParentNonWrapper(p => p.ServiceType != typeof(ILog)).ImplementationType.FullName));
+                    request.ParentNonWrapper(p => p.ServiceType != typeof(ILog)).ImplementationTypeIfKnown.FullName));
             
             _container.Register<ILog, LogWrapper>();
 
@@ -57,7 +57,7 @@ namespace DryIoc.IssuesTests
             _container.Register<ILog, Log>(
                 made: Made.Of(request =>
                 {
-                    var targetType = request.ParentNonWrapper(p => p.ServiceType != typeof(ILog)).ImplementationType;
+                    var targetType = request.ParentNonWrapper(p => p.ServiceType != typeof(ILog)).ImplementationTypeIfKnown;
                     return FactoryMethod.Of(typeof(LoggerFactory).GetMethodOrNull("GetLog").MakeGenericMethod(targetType));
                 }));
 

@@ -702,7 +702,7 @@ namespace DryIoc
                     var decorator = serviceDecorators[i];
                     var decoratorRequest = request.WithResolvedFactory(decorator);
                     var decoratorCondition = decorator.Setup.Condition;
-                    if (decoratorCondition == null || decoratorCondition(request))
+                    if (decoratorCondition == null || decoratorCondition(RequestInfo.Of(request)))
                     {
                         // Cache closed generic registration produced by open-generic decorator.
                         if (i >= openGenericDecoratorIndex && decorator.FactoryGenerator != null)
@@ -955,7 +955,7 @@ namespace DryIoc
                     {
                         var initializerFactory = initializerFactories[j];
                         var condition = initializerFactory.Setup.Condition;
-                        if (condition == null || condition(request))
+                        if (condition == null || condition(RequestInfo.Of(request)))
                         {
                             var decoratorRequest =
                                 request.WithChangedServiceInfo(_ => ServiceInfo.Of(initializerActionType))
@@ -981,7 +981,7 @@ namespace DryIoc
                         .WithResolvedFactory(decoratorFactory);
 
                     var condition = decoratorFactory.Setup.Condition;
-                    if (condition == null || condition(request))
+                    if (condition == null || condition(RequestInfo.Of(request)))
                     {
                         var funcExpr = decoratorFactory.GetExpressionOrDefault(decoratorRequest);
                         if (funcExpr != null)
@@ -2739,7 +2739,7 @@ namespace DryIoc
                     {
                         var getArgValue = GetArgCustomValueProvider(methodCallExpr, argValues);
                         parameters = parameters.Details((r, p) => p.Equals(parameter)
-                            ? ServiceDetails.Of(getArgValue(r))
+                            ? ServiceDetails.Of(getArgValue(RequestInfo.Of(r)))
                             : null);
                         hasCustomValue = true;
                     }
@@ -2788,7 +2788,8 @@ namespace DryIoc
                         var getArgValue = GetArgCustomValueProvider(methodCallExpr, argValues);
                         propertiesAndFields = propertiesAndFields.And(r => new[]
                         {
-                            PropertyOrFieldServiceInfo.Of(member).WithDetails(ServiceDetails.Of(getArgValue(r)), r)
+                            PropertyOrFieldServiceInfo.Of(member).WithDetails(
+                                ServiceDetails.Of(getArgValue(RequestInfo.Of(r))), r)
                         });
                         hasCustomValue = true;
                     }
@@ -4316,33 +4317,31 @@ namespace DryIoc
         }
 
         /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
-        /// If not found returns <see cref="IsEmpty"/> request.</summary> <returns>Found parent or <see cref="IsEmpty"/> request.</returns>
-        public RequestInfo ParentNonWrapper()
+        /// If not found returns <see cref="IsEmpty"/> request.</summary> 
+        /// <param name="condition">Condition, e.g. to find root request condition may be: <code lang="cs"><![CDATA[p => p.Parent.IsEmpty]]></code></param>
+        /// <returns>Found parent or <see cref="IsEmpty"/> request.</returns>
+        public RequestInfo ParentNonWrapper(Func<RequestInfo, bool> condition = null)
         {
             var p = Parent;
-            while (!p.IsEmpty && p.ResolvedFactory.FactoryType == FactoryType.Wrapper)
+            while (!p.IsEmpty && 
+                (p.ResolvedFactory.FactoryType == FactoryType.Wrapper ||
+                 condition != null && !condition(RequestInfo.Of(p))))
                 p = p.Parent;
-            if (!p.IsEmpty && p._parentRequestInfo != null)
+
+            if (!p.IsEmpty)
+                return RequestInfo.Of(p);
+
+            if (p._parentRequestInfo != null)
             {
-                for (var pi = _parentRequestInfo; !pi.IsEmpty; pi = pi.Parent)
-                    if (pi.FactoryType != FactoryType.Wrapper)
-                        return pi;
-                return RequestInfo.Empty;
+                var pi = _parentRequestInfo;
+                while (!pi.IsEmpty &&
+                    (pi.FactoryType != FactoryType.Wrapper ||
+                    condition != null && !condition(pi)))
+                    pi = pi.Parent;
+                return pi;
             }
 
-            return RequestInfo.Of(p);
-        }
-
-        /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
-        /// If not found returns <see cref="IsEmpty"/> request.</summary>
-        /// <param name="condition">Condition, e.g. to find root request condition may be: <code lang="cs"><![CDATA[p => p.Parent.IsEmpty]]></code></param>
-        /// <returns>Found parent or empty request.</returns>
-        public Request ParentNonWrapper(Func<Request, bool> condition)
-        {
-            var p = Parent;
-            while (!p.IsEmpty && (p.ResolvedFactory.FactoryType == FactoryType.Wrapper || !condition(p)))
-                p = p.Parent;
-            return p;
+            return RequestInfo.Empty;
         }
 
         /// <summary>Enumerates all request stack parents. Last returned will <see cref="IsEmpty"/> empty parent.</summary>
@@ -4654,7 +4653,8 @@ namespace DryIoc
         /// <returns>True if condition met or no condition setup.</returns>
         public bool CheckCondition(Request request)
         {
-            return (Setup.Condition == null || Setup.Condition(request)) && HasMatchingReuseScope(request);
+            return (Setup.Condition == null || Setup.Condition(RequestInfo.Of(request))) 
+                && HasMatchingReuseScope(request);
         }
 
         /// <summary>Shortcut for <see cref="DryIoc.Setup.FactoryType"/>.</summary>
@@ -6545,13 +6545,6 @@ namespace DryIoc
                 Of(request.Parent));
         }
 
-        /// <summary>Converts input request into its slim version of <see cref="RequestInfo"/> </summary>
-        /// <param name="request">Request to convert</param> <returns>Mirrored request info.</returns>
-        public static implicit operator RequestInfo(Request request)
-        {
-            return Of(request);
-        }
-
         /// <summary>Parent request or null for root resolution request.</summary>
         public readonly RequestInfo Parent;
 
@@ -6621,12 +6614,17 @@ namespace DryIoc
             return GetEnumerator();
         }
 
+        /// <summary>Represent request as string</summary>
+        /// <returns></returns>
         public override string ToString()
         {
-            return string.Format("{0} : {1} as {2}", 
-                ImplementationTypeIfKnown, ServiceType, OptionalServiceKey);
+            if (IsEmpty) return "{{root}}";
+            return string.Format("{0} : {1} with key {{{2}}} and parent {{{3}}}", 
+                ImplementationTypeIfKnown, ServiceType, OptionalServiceKey, Parent);
         }
 
+        /// <summary>Returns true if request info and passed object are equal, and threir parents recursively are equal.</summary>
+        /// <param name="obj"></param> <returns></returns>
         public override bool Equals(object obj)
         {
             var other = obj as RequestInfo;
