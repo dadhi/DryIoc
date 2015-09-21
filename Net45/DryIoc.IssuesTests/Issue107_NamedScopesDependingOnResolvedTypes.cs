@@ -207,7 +207,7 @@ namespace DryIoc.IssuesTests
 
         internal enum Areas { First, Second }
 
-        [Test]
+        [Test, Ignore]
         public void Can_reuse_and_locate_based_on_object_graph_itself()
         {
             var container = new Container();

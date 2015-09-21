@@ -182,7 +182,7 @@ namespace DryIoc.UnitTests
             Assert.IsNotNull(vm.Log);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_specify_to_resolve_corresponding_log_in_resolution_scope_automagically_Without_condition()
         {
             var container = new Container();
@@ -191,8 +191,8 @@ namespace DryIoc.UnitTests
             container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
 
             container.Register<Log>(Reuse.InResolutionScopeOf<IViewModel>(outermost: true));
-
-            container.Register<Log>(setup: Setup.With(condition: request => request.IsEmpty));
+            container.Register<Log>(setup: Setup.With(
+                condition: request => request.Parent.IsResolutionRoot));
 
             var presenter = container.Resolve<ViewModel1Presenter>();
 
