@@ -643,7 +643,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Corresponds to <see cref="Setup.OpenResolutionScope"/>.</summary>
         public bool OpenResolutionScope;
 
-        /// <summary>Corresponds to <see cref="Setup.AsResolutionRoot"/>.</summary>
+        /// <summary>Corresponds to <see cref="Setup.AsResolutionCall"/>.</summary>
         public bool AsResolutionRoot;
 
         /// <summary>Specify to prevent disposal of reused instance if it is disposable</summary>

@@ -312,7 +312,8 @@ namespace DryIoc
 
             object cacheContextKey = requiredServiceType;
             if (!parentRequestInfo.IsEmpty)
-                cacheContextKey = new KV<object, RequestInfo>(cacheContextKey, parentRequestInfo);
+                cacheContextKey = cacheContextKey == null ? (object)parentRequestInfo 
+                     : new KV<object, RequestInfo>(cacheContextKey, parentRequestInfo);
 
             // Check cache first:
             var registryValue = _registry.Value;
@@ -523,11 +524,12 @@ namespace DryIoc
             bool outermost, bool throwIfNotFound)
         {
             return GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost)
-                ?? (!throwIfNotFound ? null : Throw.For<IScope>(Error.NoMatchedScopeFound,
-                new KV<Type, object>(assignableFromServiceType, serviceKey)));
+                ?? (!throwIfNotFound ? null 
+                : Throw.For<IScope>(Error.NoMatchedScopeFound, new KV<Type, object>(assignableFromServiceType, serviceKey)));
         }
 
-        private static IScope GetMatchingScopeOrDefault(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost)
+        private static IScope GetMatchingScopeOrDefault(IScope scope, Type assignableFromServiceType, object serviceKey, 
+            bool outermost)
         {
             if (assignableFromServiceType == null && serviceKey == null)
                 return scope;
@@ -4166,8 +4168,8 @@ namespace DryIoc
         /// <summary>Returns true if request is First in First Resolve call.</summary>
         public bool IsResolutionRoot { get { return IsResolutionCall && _parentRequestInfo.IsEmpty; } }
 
-        /// <summary>Returns true for the First service in request.</summary> <returns></returns>
-        public bool IsFirstServiceInRequest()
+        /// <summary>Returns true for the First Service in resolve call.</summary> <returns></returns>
+        public bool IsFirstNonWrapperInResolveCall()
         {
             var p = Parent;
             while (!p.IsEmpty && p.ResolvedFactory.FactoryType == FactoryType.Wrapper)
@@ -4499,9 +4501,9 @@ namespace DryIoc
         /// <summary>Indicates that injected expression should be: 
         /// <c><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></c>
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
-        public virtual bool AsResolutionRoot { get { return false; } }
+        public virtual bool AsResolutionCall { get { return false; } }
 
-        /// <summary>In addition to <see cref="AsResolutionRoot"/> opens scope.</summary>
+        /// <summary>In addition to <see cref="AsResolutionCall"/> opens scope.</summary>
         public virtual bool OpenResolutionScope { get { return false; } }
 
         /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
@@ -4566,7 +4568,7 @@ namespace DryIoc
 
             public override object Metadata { get { return _metadata ?? (_metadata = _lazyMetadata == null ? null : _lazyMetadata()); } }
 
-            public override bool AsResolutionRoot { get { return _isResolutionRoot || _openResolutionScope; } }
+            public override bool AsResolutionCall { get { return _asResolutionCall; } }
             public override bool OpenResolutionScope { get { return _openResolutionScope; } }
 
             public override bool PreventDisposal { get { return _preventDisposal; } }
@@ -4574,14 +4576,14 @@ namespace DryIoc
 
             public ServiceSetup(Func<object> lazyMetadata = null, object metadata = null,
                 Func<RequestInfo, bool> condition = null,
-                bool openResolutionScope = false, bool isResolutionRoot = false,
+                bool openResolutionScope = false, bool asResolutionCall = false,
                 bool preventDisposal = false, bool weaklyReferenced = false)
             {
+                Condition = condition;
                 _lazyMetadata = lazyMetadata;
                 _metadata = metadata;
-                Condition = condition;
                 _openResolutionScope = openResolutionScope;
-                _isResolutionRoot = isResolutionRoot;
+                _asResolutionCall = asResolutionCall || openResolutionScope;
                 _preventDisposal = preventDisposal;
                 _weaklyReferenced = weaklyReferenced;
             }
@@ -4589,7 +4591,7 @@ namespace DryIoc
             private readonly Func<object> _lazyMetadata;
             private object _metadata;
             private readonly bool _openResolutionScope;
-            private readonly bool _isResolutionRoot;
+            private readonly bool _asResolutionCall;
             private readonly bool _preventDisposal;
             private readonly bool _weaklyReferenced;
         }
@@ -4788,7 +4790,9 @@ namespace DryIoc
         {
             return request.FuncArgs == null
                 && Setup.Condition == null
-                && !(Setup is Setup.WrapperSetup || Setup is Setup.DecoratorSetup);
+                && !Setup.AsResolutionCall
+                && !(Setup is Setup.WrapperSetup || Setup is Setup.DecoratorSetup)
+                && !(Reuse is ResolutionScopeReuse || Reuse is CurrentScopeReuse);
         }
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
@@ -4798,7 +4802,7 @@ namespace DryIoc
         public virtual Expression GetExpressionOrDefault(Request request)
         {
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
-            if (Setup.AsResolutionRoot && !request.IsFirstServiceInRequest())
+            if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolveCall())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             request = request.WithResolvedFactory(this);
