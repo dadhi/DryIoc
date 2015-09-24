@@ -5,9 +5,9 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue122_DecoratorIsNotHandledAcrossResolutionRoots
+    public class Issue122_DecoratorOfLazyResultsInStackOverflowException
     {
-        [Test, Explicit]
+        [Test]
         public void Decorator_may_be_applied_to_decorated_Lazy()
         {
             var container = new Container().WithMefAttributedModel();

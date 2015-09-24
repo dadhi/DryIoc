@@ -80,7 +80,7 @@
     <Compile Include="Issue110_SupportContravarianceInResolveMany.cs" />
     <Compile Include="Issue110_HidingMultipleContravariantImplementationsBehindComposite.cs" />
     <Compile Include="Issue116_InvokeFactoryConstructorTwoTimes.cs" />
-    <Compile Include="Issue122_DecoratorIsNotHandledAcrossResolutionRoots.cs" />
+    <Compile Include="Issue122_DecoratorOfLazyResultsInStackOverflowException.cs" />
     <Compile Include="Issue123_TipsForMigrationFromAutofac.cs" />
     <Compile Include="Issue128_ResolveFailsWithSingletonsInOuterScope.cs" />
     <Compile Include="Issue135_DecoratorsIgnoredInChildScope.cs" />
