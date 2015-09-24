@@ -22,8 +22,7 @@ namespace DryIoc.UnitTests
             c.Register<User2>();
 
             c.Register<ILogger>(made: Made.Of(r => FactoryMethod.Of(
-                typeof(LogFactory).GetMethodOrNull("GetLog")
-                .MakeGenericMethod(r.ParentNonWrapper().ImplementationTypeIfKnown))));
+                typeof(LogFactory).GetMethodOrNull("GetLog").MakeGenericMethod(r.Parent.ImplementationTypeIfKnown))));
 
             Assert.That(c.Resolve<User2>().Logger, Is.InstanceOf<Logger<User2>>());
             Assert.That(c.Resolve<User1>().Logger, Is.InstanceOf<Logger<User1>>());
@@ -52,13 +51,13 @@ namespace DryIoc.UnitTests
             container.Register<ImportConditionObject3>();
 
             container.Register<IExportConditionInterface, ExportConditionalObject>(
-                setup: Setup.With(condition: r => r.ParentNonWrapper().ImplementationTypeIfKnown == typeof(ImportConditionObject1)));
+                setup: Setup.With(condition: r => r.Parent.ImplementationTypeIfKnown == typeof(ImportConditionObject1)));
 
             container.Register<IExportConditionInterface, ExportConditionalObject2>(
-                setup: Setup.With(condition: r => r.ParentNonWrapper().ImplementationTypeIfKnown == typeof(ImportConditionObject2)));
+                setup: Setup.With(condition: r => r.Parent.ImplementationTypeIfKnown == typeof(ImportConditionObject2)));
 
             container.Register<IExportConditionInterface, ExportConditionalObject3>(
-                setup: Setup.With(condition: r => r.ParentNonWrapper().ImplementationTypeIfKnown == typeof(ImportConditionObject3)));
+                setup: Setup.With(condition: r => r.Parent.ImplementationTypeIfKnown == typeof(ImportConditionObject3)));
 
             Assert.IsInstanceOf<ExportConditionalObject>(container.Resolve<ImportConditionObject1>().ExportConditionInterface);
             Assert.IsInstanceOf<ExportConditionalObject2>(container.Resolve<ImportConditionObject2>().ExportConditionInterface);

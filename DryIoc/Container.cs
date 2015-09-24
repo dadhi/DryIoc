@@ -320,11 +320,9 @@ namespace DryIoc
             var cacheEntry = registryValue.KeyedFactoryDelegateCache.Value.GetValueOrDefault(cacheEntryKey);
             if (cacheEntry != null)
             {
-                FactoryDelegate cachedFactoryDelegate;
-                if (cacheContextKey == null)
-                    cachedFactoryDelegate = cacheEntry.Key;
-                else
-                    cachedFactoryDelegate = (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
+                var cachedFactoryDelegate = cacheContextKey == null 
+                    ? cacheEntry.Key 
+                    : (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
 
                 if (cachedFactoryDelegate != null)
                     return cachedFactoryDelegate(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope);
@@ -679,7 +677,7 @@ namespace DryIoc
                 return null;
 
             // We are already resolving decorator for the service, so stop now.
-            var parent = request.ParentNonWrapper();
+            var parent = request.Parent;
             if (!parent.IsEmpty && parent.FactoryType == FactoryType.Decorator)
                 return null;
 
@@ -1104,7 +1102,7 @@ namespace DryIoc
                 var defaultFactory = defaultFactories[0];
 
                 // NOTE: For resolution root sets correct default key to be used in delegate cache.
-                if (request.Parent.IsEmpty)
+                if (request.ParentRequest.IsEmpty)
                     request.ChangeServiceKey(defaultFactory.Key);
 
                 return defaultFactory.Value;
@@ -1923,8 +1921,8 @@ namespace DryIoc
         /// <returns>True if has Func parent.</returns>
         public static bool IsNestedInFuncWithArgs(this Request request)
         {
-            return !request.Parent.IsEmpty && request.Parent.Enumerate()
-                .TakeWhile(r => r.ResolvedFactoryType == FactoryType.Wrapper)
+            return !request.ParentRequest.IsEmpty && request.ParentRequest.Enumerate()
+                .TakeWhile(r => r.FactoryType == FactoryType.Wrapper)
                 .Any(r => r.ServiceType.IsFuncWithArgs());
         }
 
@@ -1971,7 +1969,7 @@ namespace DryIoc
             }
 
             // Composite pattern support: filter out composite root from available keys.
-            var parent = request.ParentNonWrapper();
+            var parent = request.Parent;
             if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
             {
                 var compositeParentKey = parent.OptionalServiceKey ?? DefaultKey.Value;
@@ -2022,7 +2020,7 @@ namespace DryIoc
             // Composite pattern support: find composite parent key to exclude from result.
             object compositeParentKey = null;
             Type compositeParentRequiredType = null;
-            var parent = request.ParentNonWrapper();
+            var parent = request.Parent;
             if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
             {
                 compositeParentKey = parent.OptionalServiceKey ?? DefaultKey.Value;
@@ -2464,7 +2462,7 @@ namespace DryIoc
             if (request.IsNestedInFuncWithArgs())
             {
                 // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
-                var funcType = request.Parent.ServiceType;
+                var funcType = request.ParentRequest.ServiceType;
                 var funcArgs = funcType.GetGenericParamsAndArgs();
                 var inputArgCount = funcArgs.Length - 1;
 
@@ -3610,7 +3608,7 @@ namespace DryIoc
                 : Container.ResolutionScopeParamExpr;
 
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
-            var requestInfoExpr = request.Parent.ToRequestInfo().ToExpression(container);
+            var requestInfoExpr = request.ParentRequest.ToRequestInfo().ToExpression(container);
 
             var resolveExpr = Expression.Call(Container.ResolverExpr, "ResolveKeyed", ArrayTools.Empty<Type>(),
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr, getOrNewCallExpr,
@@ -4163,7 +4161,7 @@ namespace DryIoc
         public bool IsEmpty { get { return _serviceInfo == null; } }
 
         /// <summary>Returns true if request is First in Resolve call.</summary>
-        public bool IsResolutionCall { get { return !IsEmpty && Parent.IsEmpty; } }
+        public bool IsResolutionCall { get { return !IsEmpty && ParentRequest.IsEmpty; } }
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
         public bool IsResolutionRoot { get { return IsResolutionCall && _parentRequestInfo.IsEmpty; } }
@@ -4171,17 +4169,43 @@ namespace DryIoc
         /// <summary>Returns true for the First Service in resolve call.</summary> <returns></returns>
         public bool IsFirstNonWrapperInResolveCall()
         {
-            var p = Parent;
+            var p = ParentRequest;
             while (!p.IsEmpty && p.ResolvedFactory.FactoryType == FactoryType.Wrapper)
-                p = p.Parent;
+                p = p.ParentRequest;
             return p.IsEmpty;
+        }
+
+        /// <summary>Searches parent request stack upward and returns closest parent of <see cref="DryIoc.FactoryType.Service"/>.</summary>
+        public RequestInfo Parent
+        {
+            get
+            {
+                var pr = ParentRequest;
+                if (!pr.IsEmpty && pr.FactoryType != FactoryType.Wrapper)
+                    return pr.ToRequestInfo();
+
+                while (!pr.IsEmpty && pr.FactoryType == FactoryType.Wrapper)
+                    pr = pr.ParentRequest;
+
+                if (!pr.IsEmpty)
+                    return pr.ToRequestInfo();
+
+                if (_parentRequestInfo.IsEmpty) 
+                    return RequestInfo.Empty;
+
+                var pi = _parentRequestInfo;
+                while (!pi.IsEmpty && pi.FactoryType == FactoryType.Wrapper)
+                    pi = pi.Parent;
+
+                return pi;
+            }
         }
 
         /// <summary>Optionally associated resolution scope.</summary>
         public readonly IScope Scope;
 
         /// <summary>Previous request in dependency chain. It <see cref="IsEmpty"/> for resolution root.</summary>
-        public readonly Request Parent;
+        public readonly Request ParentRequest;
 
         /// <summary>Factory found in container to resolve this request.</summary>
         public readonly Factory ResolvedFactory;
@@ -4217,7 +4241,7 @@ namespace DryIoc
         public Type ImplementationType { get { return ResolvedFactory == null ? null : ResolvedFactory.ImplementationType; } }
 
         /// <summary>Shortcut to FactoryType.</summary>
-        public FactoryType ResolvedFactoryType { get { return ResolvedFactory == null ? FactoryType.Service : ResolvedFactory.FactoryType; } }
+        public FactoryType FactoryType { get { return ResolvedFactory == null ? FactoryType.Service : ResolvedFactory.FactoryType; } }
 
         /// <summary>Relative number representing reuse lifespan.</summary>
         public int ReuseLifespan { get { return ResolvedFactory == null ? 0 : ResolvedFactory.Reuse == null ? 0 : ResolvedFactory.Reuse.Lifespan; } }
@@ -4254,14 +4278,7 @@ namespace DryIoc
             IScope scope = null, RequestInfo parentRequestInfo = null)
         {
             serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible);
-            
             var details = ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
-
-            if (parentRequestInfo != null)
-            {
-                ;
-            }
-
             return Push(ServiceInfo.Of(serviceType).WithDetails(details, this), scope ?? Scope, parentRequestInfo);
         }
 
@@ -4270,7 +4287,7 @@ namespace DryIoc
         /// <returns>New request with new info but the rest intact: e.g. <see cref="ResolvedFactory"/>.</returns>
         public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
-            return new Request(Parent, ContainerWeakRef, _scopesWeakRef, getInfo(_serviceInfo), ResolvedFactory, FuncArgs, 
+            return new Request(ParentRequest, ContainerWeakRef, _scopesWeakRef, getInfo(_serviceInfo), ResolvedFactory, FuncArgs, 
                 Scope, _parentRequestInfo);
         }
 
@@ -4305,7 +4322,7 @@ namespace DryIoc
 
             var funcArgsUsage = new bool[funcArgExprs.Length];
             var funcArgsUsageAndExpr = new KV<bool[], ParameterExpression[]>(funcArgsUsage, funcArgExprs);
-            return new Request(Parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, ResolvedFactory, funcArgsUsageAndExpr, 
+            return new Request(ParentRequest, ContainerWeakRef, _scopesWeakRef, _serviceInfo, ResolvedFactory, funcArgsUsageAndExpr, 
                 Scope, _parentRequestInfo);
         }
 
@@ -4315,7 +4332,7 @@ namespace DryIoc
         /// <returns>Request with replaced container.</returns>
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
-            return new Request(Parent, newContainer, _scopesWeakRef, _serviceInfo, ResolvedFactory, FuncArgs, 
+            return new Request(ParentRequest, newContainer, _scopesWeakRef, _serviceInfo, ResolvedFactory, FuncArgs, 
                 Scope, _parentRequestInfo);
         }
 
@@ -4328,11 +4345,11 @@ namespace DryIoc
                 return this; // resolving only once, no need to check recursion again.
 
             if (factory.FactoryType == FactoryType.Service)
-                for (var p = Parent; !p.IsEmpty; p = p.Parent)
+                for (var p = ParentRequest; !p.IsEmpty; p = p.ParentRequest)
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID,
                         Error.RecursiveDependencyDetected, Print(factory.FactoryID));
 
-            return new Request(Parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, factory, FuncArgs, 
+            return new Request(ParentRequest, ContainerWeakRef, _scopesWeakRef, _serviceInfo, factory, FuncArgs, 
                 Scope, _parentRequestInfo);
         }
 
@@ -4344,49 +4361,21 @@ namespace DryIoc
                 return _parentRequestInfo;
 
             var parentRequestInfo = 
-                !Parent.IsEmpty ? Parent.ToRequestInfo() : 
+                !ParentRequest.IsEmpty ? ParentRequest.ToRequestInfo() : 
                 !_parentRequestInfo.IsEmpty ? _parentRequestInfo
                 : RequestInfo.Empty;
 
             return new RequestInfo(
                 ServiceType, RequiredServiceType, ServiceKey,
-                ResolvedFactoryType, ImplementationType, ReuseLifespan, // todo: may be optimized to directly extract from ResolvedFactory
+                FactoryType, ImplementationType, ReuseLifespan, // todo: may be optimized to directly extract from ResolvedFactory
                 parentRequestInfo);
-        }
-
-        /// <summary>Searches parent request stack upward and returns closest parent of <see cref="FactoryType.Service"/>.
-        /// If not found returns <see cref="IsEmpty"/> request.</summary> 
-        /// <param name="condition">Condition, e.g. to find root request condition may be: <code lang="cs"><![CDATA[p => p.Parent.IsEmpty]]></code></param>
-        /// <returns>Found parent or <see cref="IsEmpty"/> request.</returns>
-        public RequestInfo ParentNonWrapper(Func<RequestInfo, bool> condition = null)
-        {
-            var p = Parent;
-            while (!p.IsEmpty &&
-                   (p.ResolvedFactory.FactoryType == FactoryType.Wrapper ||
-                    condition != null && !condition(p.ToRequestInfo())))
-                p = p.Parent;
-
-            if (!p.IsEmpty)
-                return p.ToRequestInfo();
-
-            if (!p._parentRequestInfo.IsEmpty)
-            {
-                var pi = _parentRequestInfo;
-                while (!pi.IsEmpty &&
-                       (pi.FactoryType != FactoryType.Wrapper ||
-                        condition != null && !condition(pi)))
-                    pi = pi.Parent;
-                return pi;
-            }
-
-            return RequestInfo.Empty;
         }
 
         /// <summary>Enumerates all request stack parents. Last returned will <see cref="IsEmpty"/> empty parent.</summary>
         /// <returns>Unfolding parents.</returns>
         public IEnumerable<Request> Enumerate()
         {
-            for (var r = this; !r.IsEmpty; r = r.Parent)
+            for (var r = this; !r.IsEmpty; r = r.ParentRequest)
                 yield return r;
         }
 
@@ -4418,13 +4407,13 @@ namespace DryIoc
                 return s;
 
             s = recursiveFactoryID == -1 ? s : s.Append(" <--recursive");
-            foreach (var r in Parent.Enumerate())
+            foreach (var r in ParentRequest.Enumerate())
             {
                 s = r.PrintCurrent(s.AppendLine().Append("  in "));
                 if (r.ResolvedFactory.FactoryID == recursiveFactoryID)
                     s = s.Append(" <--recursive");
 
-                if (r.Parent.IsEmpty && !r._parentRequestInfo.IsEmpty)
+                if (r.ParentRequest.IsEmpty && !r._parentRequestInfo.IsEmpty)
                     s = s.AppendLine().Append("  in ").Append(r._parentRequestInfo);
             }
 
@@ -4440,7 +4429,7 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(Request parent,
+        internal Request(Request parentRequest,
             ContainerWeakRef containerWeakRef, 
             ContainerWeakRef scopesWeakRef,
             IServiceInfo serviceInfo, 
@@ -4449,7 +4438,7 @@ namespace DryIoc
             IScope scope,
             RequestInfo parentRequestInfo)
         {
-            Parent = parent;
+            ParentRequest = parentRequest;
 
             _serviceInfo = serviceInfo;
 
@@ -4740,7 +4729,7 @@ namespace DryIoc
                 return Reuse.GetScopeOrDefault(request) != null;
 
             if (Reuse is CurrentScopeReuse)
-                return request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc())
+                return request.ParentRequest.Enumerate().Any(r => r.ServiceType.IsFunc())
                     || Reuse.GetScopeOrDefault(request) != null;
 
             return true;
@@ -4829,7 +4818,7 @@ namespace DryIoc
                 // The singleton optimization: eagerly create singleton and put it into state for fast access.
                 if (Reuse is SingletonReuse &&
                     FactoryType == FactoryType.Service && request.Container.Rules.EagerCachingSingletonForFasterAccess &&
-                    (request.Parent.IsEmpty || !request.Parent.Enumerate().Any(r => r.ServiceType.IsFunc())))
+                    (request.ParentRequest.IsEmpty || !request.ParentRequest.Enumerate().Any(r => r.ServiceType.IsFunc())))
                     serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
                 else
                     serviceExpr = GetScopedExpressionOrDefault(serviceExpr, Reuse, request);
@@ -4856,10 +4845,10 @@ namespace DryIoc
             if (reuse != null && reuse.Lifespan > 0 && !request.Parent.IsEmpty &&
                 request.Container.Rules.ThrowIfDependencyHasShorterReuseLifespan)
             {
-                var parentReuseLifespan = request.Parent.ReuseLifespan;
+                var parentReuseLifespan = request.ParentRequest.ReuseLifespan;
                 if (parentReuseLifespan != 0)
                     Throw.If(reuse.Lifespan < parentReuseLifespan,
-                        Error.DependencyHasShorterReuseLifespan, request.PrintCurrent(), request.Parent, reuse, parentReuseLifespan);
+                        Error.DependencyHasShorterReuseLifespan, request.PrintCurrent(), request.ParentRequest, reuse, parentReuseLifespan);
             }
         }
 
@@ -6624,15 +6613,6 @@ namespace DryIoc
             FactoryType = factoryType;
             ImplementationTypeIfKnown = implementationTypeIfKnown;
             ReuseLifespan = reuseLifespan;
-        }
-
-        /// <summary>Returns first non wrapper parent or <see cref="Empty"/></summary> <returns></returns>
-        public RequestInfo ParentNonWrapper()
-        {
-            for (var p = Parent; p != Empty; p = p.Parent)
-                if (p.FactoryType != FactoryType.Wrapper)
-                    return p;
-            return Empty;
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>
