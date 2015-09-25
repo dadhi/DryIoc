@@ -23,10 +23,10 @@ THE SOFTWARE.
 */
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 
 namespace DryIocAttributes
 {
@@ -220,7 +220,7 @@ namespace DryIocAttributes
     }
 
     /// <summary>Type of services supported by Container.</summary>
-    public enum ServiceKind
+    public enum RegistrationType
     {
         /// <summary>(default) Defines normal service factory</summary>
         Service,
@@ -231,61 +231,152 @@ namespace DryIocAttributes
     };
 
     /// <summary>Dependency request path information.</summary>
-    public sealed class RequestInfo : IEnumerable<RequestInfo>
+    public sealed class RequestInfo
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, ServiceKind.Service, null, null, null);
+        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, RegistrationType.Service, null, 0, null);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty { get { return ServiceType == null; } }
 
+        /// <summary>Returns true if request is the first in a chain.</summary>
+        public bool IsResolutionRoot { get { return !IsEmpty && Parent.IsEmpty; } }
+
         /// <summary>Parent request or null for root resolution request.</summary>
         public readonly RequestInfo Parent;
-
-        /// <summary>False for Decorators and Wrappers.</summary>
-        public readonly ServiceKind ServiceKind;
 
         /// <summary>Asked service type.</summary>
         public readonly Type ServiceType;
 
+        /// <summary>Required service type if specified.</summary>
+        public readonly Type RequiredServiceType;
+
         /// <summary>Optional service key.</summary>
-        public readonly object OptionalServiceKey;
+        public readonly object ServiceKey;
+
+        /// <summary>False for Decorators and Wrappers.</summary>
+        public readonly RegistrationType FactoryType;
 
         /// <summary>Implementation type.</summary>
-        public readonly Type ImplementationTypeIfKnown;
+        public readonly Type ImplementationType;
+
+        /// <summary>Relative number representing reuse lifespan.</summary>
+        public readonly int ReuseLifespan;
 
         /// <summary>Creates info.</summary>
-        /// <param name="parent"></param> <param name="serviceKind"></param> <param name="serviceType"></param>
-        /// <param name="optionalServiceKey"></param> <param name="implementationTypeIfKnown"></param>
-        public RequestInfo(RequestInfo parent, ServiceKind serviceKind, Type serviceType, object optionalServiceKey, Type implementationTypeIfKnown)
+        /// <param name="serviceType"></param>
+        /// <param name="requiredServiceType"></param>
+        /// <param name="serviceKey"></param>
+        /// <param name="factoryType"></param>
+        /// <param name="implementationType"></param>
+        /// <param name="reuseLifespan"></param>
+        /// <param name="parent"></param>
+        public RequestInfo(
+            Type serviceType, Type requiredServiceType, object serviceKey,
+            RegistrationType factoryType, Type implementationType, int reuseLifespan,
+            RequestInfo parent)
         {
             Parent = parent;
-            ServiceKind = serviceKind;
-            ServiceType = serviceType;
-            OptionalServiceKey = optionalServiceKey;
-            ImplementationTypeIfKnown = implementationTypeIfKnown;
-        }
 
-        /// <summary>Returns first non wrapper parent or <see cref="Empty"/></summary> <returns></returns>
-        public RequestInfo ParentNonWrapper()
-        {
-            for (var p = Parent; p != Empty; p = p.Parent)
-                if (p.ServiceKind != ServiceKind.Wrapper)
-                    return p;
-            return Empty;
+            // Service info:
+            ServiceType = serviceType;
+            RequiredServiceType = requiredServiceType;
+            ServiceKey = serviceKey;
+
+            // Implementation info:
+            FactoryType = factoryType;
+            ImplementationType = implementationType;
+            ReuseLifespan = reuseLifespan;
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>
         /// <returns>Requests from the last to first.</returns>
-        public IEnumerator<RequestInfo> GetEnumerator()
+        public IEnumerable<RequestInfo> Enumerate()
         {
             for (var i = this; i != Empty; i = i.Parent)
                 yield return i;
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
+        /// <summary>Represent request as string</summary>
+        /// <returns></returns>
+        public override string ToString()
         {
-            return GetEnumerator();
+            if (IsEmpty)
+                return "{{empty}}";
+
+            var s = new StringBuilder();
+
+            if (FactoryType != RegistrationType.Service)
+                s.Append(FactoryType.ToString().ToLower()).Append(' ');
+            if (ImplementationType != null && ImplementationType != ServiceType)
+                s.Append(ImplementationType).Append(": ");
+
+            s.Append(ServiceType);
+
+            if (RequiredServiceType != null)
+                s.Append(" with RequiredServiceType=").Append(RequiredServiceType);
+
+            if (ServiceKey != null)
+                s.Append(" with ServiceKey=").Append('{').Append(ServiceKey).Append('}');
+
+            if (ReuseLifespan != 0)
+                s.Append(" with ReuseLifespan=").Append(ReuseLifespan);
+
+            return s.ToString();
+        }
+
+        /// <summary>Returns true if request info and passed object are equal, and threir parents recursively are equal.</summary>
+        /// <param name="obj"></param> <returns></returns>
+        public override bool Equals(object obj)
+        {
+            var other = obj as RequestInfo;
+            return other != null
+                && other.ServiceType == ServiceType
+                && other.RequiredServiceType == RequiredServiceType
+                && other.ServiceKey == ServiceKey
+
+                && other.FactoryType == FactoryType
+                && other.ImplementationType == ImplementationType
+                && other.ReuseLifespan == ReuseLifespan
+
+                && Equals(other.Parent, Parent);
+        }
+
+        /// <summary>Returns hash code combined from info fields plus its parent.</summary>
+        /// <returns>Combined hash code.</returns>
+        public override int GetHashCode()
+        {
+            var hash = 0;
+            for (var i = this; i != Empty; i = i.Parent)
+            {
+                var currentHash = i.ServiceType.GetHashCode();
+                if (i.RequiredServiceType != null)
+                    currentHash = CombineHashCodes(currentHash, i.RequiredServiceType.GetHashCode());
+
+                if (i.ServiceKey != null)
+                    currentHash = CombineHashCodes(currentHash, i.ServiceKey.GetHashCode());
+
+                if (i.FactoryType != RegistrationType.Service)
+                    currentHash = CombineHashCodes(currentHash, i.FactoryType.GetHashCode());
+
+                if (i.ImplementationType != null && i.ImplementationType != i.ServiceType)
+                    currentHash = CombineHashCodes(currentHash, i.ImplementationType.GetHashCode());
+
+                if (i.ReuseLifespan != 0)
+                    currentHash = CombineHashCodes(currentHash, i.ReuseLifespan);
+
+                hash = hash == 0 ? currentHash : CombineHashCodes(hash, currentHash);
+            }
+            return hash;
+        }
+
+        // Inspired by System.Tuple.CombineHashCodes
+        private static int CombineHashCodes(int h1, int h2)
+        {
+            unchecked
+            {
+                return (h1 << 5) + h1 ^ h2;
+            }
         }
     }
 

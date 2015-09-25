@@ -14,7 +14,7 @@ namespace DryIoc.IssuesTests
 
             container.Register(Made.Of(
                 () => log4net.LogManager.GetLogger(Arg.Index<Type>(0)), 
-                    request => request.Parent.ImplementationTypeIfKnown));
+                    request => request.Parent.ImplementationType));
 
             Assert.DoesNotThrow(() =>
                 container.Resolve<A>());

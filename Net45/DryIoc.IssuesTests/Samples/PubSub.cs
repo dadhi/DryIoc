@@ -36,8 +36,8 @@ namespace DryIoc.IssuesTests.Samples
                         .FirstOrDefault(m => m.GetAttributes(typeof(ReceiveAttribute)).Count() == 1);
                     r.Resolve<PubSubHub>().Subscribe(message => receive.ThrowIfNull().Invoke(s, new[] { message }));
                 }, 
-                r => r.ImplementationTypeIfKnown != null 
-                  && r.ImplementationTypeIfKnown.GetAttributes(typeof(SubscriberAttribute)).Count() == 1);
+                r => r.ImplementationType != null 
+                  && r.ImplementationType.GetAttributes(typeof(SubscriberAttribute)).Count() == 1);
             
             container.Register<AttributedSubscriber>();
 

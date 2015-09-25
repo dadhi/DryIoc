@@ -705,17 +705,19 @@ namespace DryIoc.MefAttributedModel
             if (requestInfo.IsEmpty)
                 return RequestInfo.Empty;
 
-            var serviceKind = 
-                requestInfo.FactoryType == FactoryType.Decorator ? ServiceKind.Decorator : 
-                requestInfo.FactoryType == FactoryType.Wrapper ? ServiceKind.Wrapper :
-                ServiceKind.Service;
+            var registrationType = 
+                requestInfo.FactoryType == FactoryType.Decorator ? RegistrationType.Decorator : 
+                requestInfo.FactoryType == FactoryType.Wrapper ? RegistrationType.Wrapper :
+                RegistrationType.Service;
 
             return new DryIocAttributes.RequestInfo(
-                ConvertRequestInfo(requestInfo.Parent),
-                serviceKind,
                 requestInfo.ServiceType,
-                requestInfo.OptionalServiceKey,
-                requestInfo.ImplementationTypeIfKnown);
+                requestInfo.RequiredServiceType,
+                requestInfo.ServiceKey,
+                registrationType,
+                requestInfo.ImplementationType,
+                requestInfo.ReuseLifespan,
+                ConvertRequestInfo(requestInfo.Parent));
         }
 
         /// <summary>Compares with another info for equality.</summary>
@@ -870,7 +872,7 @@ namespace DryIoc.MefAttributedModel
                 return Setup.Decorator;
 
             return Setup.DecoratorWith(r =>
-                (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, r.OptionalServiceKey)) &&
+                (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, r.ServiceKey)) &&
                 (condition == null || condition(r)));
         }
 

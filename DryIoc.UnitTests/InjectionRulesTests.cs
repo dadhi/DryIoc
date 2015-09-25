@@ -228,7 +228,7 @@ namespace DryIoc.UnitTests
                 {
                     if (parameter.ParameterType != typeof(string))
                         return null;
-                    var targetType = request.ParentRequest.ImplementationType;
+                    var targetType = request.Parent.ImplementationType;
                     var targetName = string.Format("{0}.{1}", targetType.Namespace, targetType.Name);
                     return ParameterServiceInfo.Of(parameter)
                         .WithDetails(ServiceDetails.Of(defaultValue: targetName), request);
@@ -256,7 +256,7 @@ namespace DryIoc.UnitTests
                 made: Made.Of(r =>
                 {
                     var method = GetType().GetMethodOrNull("GetTargetName");
-                    var targetType = r.ParentRequest.ParentRequest.ImplementationType;
+                    var targetType = r.Parent.Parent.ImplementationType;
                     return FactoryMethod.Of(method.MakeGenericMethod(targetType));
                 }));
 
