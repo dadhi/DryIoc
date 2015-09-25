@@ -23,11 +23,10 @@ namespace DryIoc.IssuesTests
 
             Assert.IsTrue(b.IsDisposed);
             Assert.IsTrue(b.A.IsDisposed);
-            Assert.IsFalse(a.IsDisposed);   // Parent a is not disposed - because parent is not disposed.
+            Assert.IsFalse(a.IsDisposed);   // Parent A is not disposed - because parent kernel is not disposed.
 
             parentKernel.Dispose();
             Assert.IsTrue(a.IsDisposed);    // Disposed now.
-
         }
 
         public class A : IDisposable

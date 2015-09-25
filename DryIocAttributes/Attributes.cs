@@ -297,8 +297,8 @@ namespace DryIocAttributes
                 yield return i;
         }
 
-        /// <summary>Represent request as string</summary>
-        /// <returns></returns>
+        /// <summary>Prints request and its parents chain into string.</summary>
+        /// <returns>Result string.</returns>
         public override string ToString()
         {
             if (IsEmpty)
@@ -321,6 +321,9 @@ namespace DryIocAttributes
 
             if (ReuseLifespan != 0)
                 s.Append(" with ReuseLifespan=").Append(ReuseLifespan);
+
+            if (!Parent.IsEmpty)
+                s.AppendLine().Append("  in ").Append(Parent);
 
             return s.ToString();
         }

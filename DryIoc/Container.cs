@@ -3598,7 +3598,7 @@ namespace DryIoc
                 : Container.ResolutionScopeParamExpr;
 
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
-            var requestInfoExpr = request.ParentOrWrapper.ToExpression(container);
+            var requestInfoExpr = ToExpression(request.ParentOrWrapper, container);
 
             var resolveExpr = Expression.Call(Container.ResolverExpr, "ResolveKeyed", ArrayTools.Empty<Type>(),
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr, getOrNewCallExpr,
@@ -3606,6 +3606,36 @@ namespace DryIoc
 
             return Expression.Convert(resolveExpr, serviceType);
         }
+
+        private static readonly FieldInfo _emptyField = typeof(RequestInfo).GetFieldOrNull("Empty");
+
+        /// <summary>Represents construction of whole request info stack as expression.</summary>
+        /// <param name="r">Request info to convert to expression.</param>
+        /// <param name="container">Required to access container facilities for expression conversion.</param>
+        /// <returns>Returns result expression.</returns>
+        public static Expression ToExpression(RequestInfo r, IContainer container)
+        {
+            Expression result = Expression.Field(null, _emptyField);
+            for (; !r.IsEmpty; r = r.Parent)
+            {
+                var serviceKeyExpr = Expression.Convert(
+                    container.GetOrAddStateItemExpression(r.ServiceKey),
+                    typeof(object));
+
+                result = Expression.New(typeof(RequestInfo).GetSingleConstructorOrNull(),
+                    Expression.Constant(r.ServiceType, typeof(Type)),
+                    Expression.Constant(r.RequiredServiceType, typeof(Type)),
+                    serviceKeyExpr,
+
+                    Expression.Constant(r.FactoryType, typeof(FactoryType)),
+                    Expression.Constant(r.ImplementationType, typeof(Type)),
+                    Expression.Constant(r.ReuseLifespan, typeof(int)),
+
+                    result); // parent
+            }
+            return result;
+        }
+
     }
 
     /// <summary>Specifies result of <see cref="Resolver.ResolveMany{TService}"/>: either dynamic(lazy) or fixed view.</summary>
@@ -4430,7 +4460,7 @@ namespace DryIoc
             }
 
             if (!_parentRequestInfo.IsEmpty)
-                    s = s.AppendLine().Append("  in ").Append(_parentRequestInfo);
+                s = s.AppendLine().Append("  in ").Append(_parentRequestInfo);
 
             return s;
         }
@@ -6641,11 +6671,10 @@ namespace DryIoc
                 yield return i;
         }
 
-        /// <summary>Represent request as string</summary>
-        /// <returns></returns>
+        /// <summary>Prints request with all its parents to string.</summary> <returns>The string.</returns>
         public override string ToString()
         {
-            if (IsEmpty) 
+            if (IsEmpty)
                 return "{{empty}}";
 
             var s = new StringBuilder();
@@ -6662,9 +6691,12 @@ namespace DryIoc
 
             if (ServiceKey != null)
                 s.Append(" with ServiceKey=").Print(ServiceKey, "\"");
- 
+
             if (ReuseLifespan != 0)
                 s.Append(" with ReuseLifespan=").Append(ReuseLifespan);
+
+            if (!Parent.IsEmpty)
+                s.AppendLine().Append("  in ").Append(Parent); // recursion
 
             return s.ToString();
         }
@@ -6721,34 +6753,6 @@ namespace DryIoc
             {
                 return (h1 << 5) + h1 ^ h2;
             }
-        }
-
-        private static readonly FieldInfo _emptyField = typeof(RequestInfo).GetFieldOrNull("Empty");
-
-        /// <summary>Represents all request info stack as expression.</summary>
-        /// <param name="container">Required to access container facilities for expression conversion.</param>
-        /// <returns>Returns result expression.</returns>
-        public Expression ToExpression(IContainer container)
-        {
-            Expression result = Expression.Field(null, _emptyField);
-            for (var r = this; !r.IsEmpty; r = r.Parent)
-            {
-                var serviceKeyExpr = Expression.Convert(
-                    container.GetOrAddStateItemExpression(r.ServiceKey),
-                    typeof(object));
-
-                result = Expression.New(typeof(RequestInfo).GetSingleConstructorOrNull(),
-                    Expression.Constant(r.ServiceType, typeof(Type)),
-                    Expression.Constant(r.RequiredServiceType, typeof(Type)),
-                    serviceKeyExpr,
-
-                    Expression.Constant(r.FactoryType, typeof(FactoryType)),
-                    Expression.Constant(r.ImplementationType, typeof(Type)),
-                    Expression.Constant(r.ReuseLifespan, typeof(int)),
-
-                    result); // parent
-            }
-            return result;
         }
     }
 
