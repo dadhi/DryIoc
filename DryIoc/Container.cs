@@ -1321,7 +1321,7 @@ namespace DryIoc
                             case IfAlreadyRegistered.Replace:
                                 replacedFactory = oldFactory ?? oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
 
-                                if (((Factory)newFactory).FactoryID == -1)
+                                if (((Factory)newFactory).FactoryID == -1) // Note hack for RegisterInstance
                                     ((Factory)newFactory).FactoryID = replacedFactory != null ? replacedFactory.FactoryID : Factory.GetNextID();
 
                                 return oldFactories == null ? newFactory
@@ -1378,6 +1378,9 @@ namespace DryIoc
                             }));
                     });
                 }
+
+                if (factory.FactoryID == -1) // Note hack for RegisterInstance
+                    factory.FactoryID = Factory.GetNextID();
 
                 var registry = this;
                 if (registry.Services != services)

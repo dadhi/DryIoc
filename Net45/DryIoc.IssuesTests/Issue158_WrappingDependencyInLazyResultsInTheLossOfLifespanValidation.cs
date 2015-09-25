@@ -15,8 +15,10 @@ namespace DryIoc.IssuesTests
 
             var scope = c.OpenScope();
 
-            Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() => 
                 scope.Resolve<C>());
+
+            Assert.AreEqual(Error.DependencyHasShorterReuseLifespan, ex.Error);
         }
 
         class C 
