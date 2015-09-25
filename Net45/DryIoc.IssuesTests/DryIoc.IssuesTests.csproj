@@ -92,6 +92,7 @@
     <Compile Include="Issue157_ContainerResolveFactoryIsNotThreadSafe.cs" />
     <Compile Include="Issue158_WrappingDependencyInLazyResultsInTheLossOfLifespanValidation.cs" />
     <Compile Include="Issue164_EventAggregatorImpl.cs" />
+    <Compile Include="Issue166_Disposing_Facade_is_disposing_facade_parent.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

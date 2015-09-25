@@ -308,7 +308,9 @@ namespace DryIoc
             if (parentRequestInfo == null)
                 parentRequestInfo = RequestInfo.Empty;
 
-            var cacheEntryKey = new KV<Type, object>(serviceType, serviceKey);
+            object cacheEntryKey = serviceType;
+            if (serviceKey != null)
+                cacheEntryKey = new KV<object, object>(cacheEntryKey, serviceKey);
 
             object cacheContextKey = requiredServiceType;
             if (!parentRequestInfo.IsEmpty)
@@ -1149,9 +1151,7 @@ namespace DryIoc
 
             // key: KV where Key is ServiceType and object is ServiceKey
             // value: FactoryDelegate or/and IntTreeMap<contextBasedKeyObject, FactoryDelegate>
-            public readonly Ref<ImTreeMap<
-                KV<Type, object>, 
-                KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>
+            public readonly Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>
                 >> KeyedFactoryDelegateCache;
             
             public readonly Ref<ImTreeMapIntToObj> FactoryExpressionCache;
@@ -1164,7 +1164,7 @@ namespace DryIoc
             {
                 return new Registry(Services, Decorators, _wrappers,
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty), 
-                    Ref.Of(ImTreeMap<KV<Type, object>, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
+                    Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
                     Ref.Of(ImTreeMapIntToObj.Empty), Ref.Of(ArrayTools.Empty<object>()), _isChangePermitted);
             }
 
@@ -1173,7 +1173,7 @@ namespace DryIoc
                     ImTreeMap<Type, Factory[]>.Empty,
                     wrapperFactories ?? ImTreeMap<Type, Factory>.Empty,
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
-                    Ref.Of(ImTreeMap<KV<Type, object>, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
+                    Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
                     Ref.Of(ImTreeMapIntToObj.Empty),
                     Ref.Of(ArrayTools.Empty<object>()),
                     IsChangePermitted.Permitted)
@@ -1184,7 +1184,7 @@ namespace DryIoc
                 ImTreeMap<Type, Factory[]> decorators,
                 ImTreeMap<Type, Factory> wrappers,
                 Ref<ImTreeMap<Type, FactoryDelegate>> defaultFactoryDelegateCache,
-                Ref<ImTreeMap<KV<Type, object>, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> keyedFactoryDelegateCache,
+                Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> keyedFactoryDelegateCache,
                 Ref<ImTreeMapIntToObj> factoryExpressionCache,
                 Ref<object[]> resolutionStateCache,
                 IsChangePermitted isChangePermitted)
@@ -1540,7 +1540,8 @@ namespace DryIoc
                     registry.DefaultFactoryDelegateCache.Swap(_ => _.Update(serviceType, null));
 
                     // clean keyed/context cache from keyed and context based resolutions
-                    var keyedCacheKey = new KV<Type, object>(serviceType, serviceKey);
+                    var keyedCacheKey = serviceKey == null ? serviceType 
+                        : (object)new KV<object, object>(serviceType, serviceKey);
                     registry.KeyedFactoryDelegateCache.Swap(_ => _.Update(keyedCacheKey, null));
                 }
 
