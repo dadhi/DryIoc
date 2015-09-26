@@ -94,6 +94,7 @@
     <Compile Include="Issue164_EventAggregatorImpl.cs" />
     <Compile Include="Issue166_Disposing_Facade_is_disposing_facade_parent.cs" />
     <Compile Include="Issue168_RegisterInstanceWithIfAlreadyRegisteredReplaceReplacesWrongRegistration.cs" />
+    <Compile Include="Issue169_FalseAlarmCheckingScopeLifetimeConsistencyForFuncWrapper.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
