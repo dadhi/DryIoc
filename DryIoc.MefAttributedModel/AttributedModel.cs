@@ -260,7 +260,7 @@ namespace DryIoc.MefAttributedModel
                     : Made.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
                 container.Register(serviceType, implementationType, reuse, impl,
-                    Setup.With(metadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
+                    Setup.With(metadataOrFuncOfMetadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
             }
 
             return ServiceDetails.Of(serviceType, serviceKey);
@@ -696,8 +696,7 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            return Setup.With(lazyMetadata, null, condition, OpenResolutionScope, AsResolutionRoot, 
-                PreventDisposal, WeaklyReferenced);
+            return Setup.With(lazyMetadata, condition, OpenResolutionScope, AsResolutionRoot, PreventDisposal, WeaklyReferenced /*, todo: */);
         }
 
         private static DryIocAttributes.RequestInfo ConvertRequestInfo(DryIoc.RequestInfo requestInfo)

@@ -35,7 +35,7 @@ namespace DryIoc.UnitTests.Memory
         {
             var container = new Container();
 
-            container.Register(typeof(IService), typeof(Service), setup: Setup.With(metadata: "007"));
+            container.Register(typeof(IService), typeof(Service), setup: Setup.With(metadataOrFuncOfMetadata: "007"));
             var servicesOne = container.Resolve<IEnumerable<Meta<Lazy<IService>, string>>>();
             var servicesTwo = container.Resolve<IEnumerable<Meta<Lazy<IService>, string>>>();
 

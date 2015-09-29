@@ -38,7 +38,7 @@ namespace DryIoc.IssuesTests
         public void Auto_activated_with_metadata()
         {
             var container = new Container();
-            container.Register<ISpecific, Foo>(setup: Setup.With(metadata: Metadata.AutoActivated.It));
+            container.Register<ISpecific, Foo>(setup: Setup.With(metadataOrFuncOfMetadata: Metadata.AutoActivated.It));
             container.Register<INormal, Bar>();
 
             var registrations = container.GetServiceRegistrations()

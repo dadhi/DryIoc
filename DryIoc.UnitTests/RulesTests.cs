@@ -57,8 +57,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules.With(parameters: GetServiceFromWithMetadataAttribute));
 
-            container.Register(typeof(IFooService), typeof(FooHey), setup: Setup.With(metadata: FooMetadata.Hey));
-            container.Register(typeof(IFooService), typeof(FooBlah), setup: Setup.With(metadata: FooMetadata.Blah));
+            container.Register(typeof(IFooService), typeof(FooHey), setup: Setup.With(metadataOrFuncOfMetadata: FooMetadata.Hey));
+            container.Register(typeof(IFooService), typeof(FooBlah), setup: Setup.With(metadataOrFuncOfMetadata: FooMetadata.Blah));
             container.Register(typeof(FooConsumer));
 
             var service = container.Resolve<FooConsumer>();

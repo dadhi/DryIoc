@@ -187,7 +187,7 @@ namespace DryIoc.UnitTests
         public void If_some_item_is_not_resolved_then_it_will_return_empty_collection()
         {
             var container = new Container();
-            container.Register<Service>(setup: Setup.With(metadata: 1));
+            container.Register<Service>(setup: Setup.With(metadataOrFuncOfMetadata: 1));
 
             var items = container.Resolve<IEnumerable<Meta<Service, bool>>>();
 

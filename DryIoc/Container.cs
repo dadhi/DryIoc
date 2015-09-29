@@ -4573,8 +4573,7 @@ namespace DryIoc
         public static readonly Setup Default = new ServiceSetup();
 
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
-        /// <param name="lazyMetadata">(optional) Delegate to get actual metadata later, for instance from attribute.</param> 
-        /// <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param> <param name="condition">(optional)</param>
+        /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> <param name="condition">(optional)</param>
         /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
         /// <param name="asResolutionCall">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
@@ -4582,20 +4581,20 @@ namespace DryIoc
         /// <param name="allowDisposableTransient">(optional) Allows registering transient disposable.</param>
         /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
         public static Setup With(
-            Func<object> lazyMetadata = null, object metadata = null,
+            object metadataOrFuncOfMetadata = null,
             Func<RequestInfo, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionCall = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false)
         {
-            if (lazyMetadata == null && metadata == null &&
+            if (metadataOrFuncOfMetadata == null &&
                 condition == null &&
                 openResolutionScope == false && asResolutionCall == false &&
                 preventDisposal == false && weaklyReferenced == false &&
                 allowDisposableTransient == false)
                 return Default;
 
-            return new ServiceSetup(lazyMetadata, metadata, condition,
+            return new ServiceSetup(metadataOrFuncOfMetadata, condition,
                 openResolutionScope, asResolutionCall, preventDisposal, weaklyReferenced, allowDisposableTransient);
         }
 
@@ -4626,7 +4625,18 @@ namespace DryIoc
         {
             public override FactoryType FactoryType { get { return FactoryType.Service; } }
 
-            public override object Metadata { get { return _metadata ?? (_metadata = _lazyMetadata == null ? null : _lazyMetadata()); } }
+            /// <summary>Evaluates metadata if it spoecified as Func of object, and replaces Func with its result!.
+            /// Otherwise just returns metadata object.</summary>
+            /// <remarks>Invokation of Func metadata is Not thread-safe. Please take care of that inside the Func.</remarks>
+            public override object Metadata
+            {
+                get
+                {
+                    return _metadataOrFuncOfMetadata is Func<object> 
+                        ? (_metadataOrFuncOfMetadata = ((Func<object>)_metadataOrFuncOfMetadata).Invoke())
+                        : _metadataOrFuncOfMetadata;
+                }
+            }
 
             public override bool AsResolutionCall { get { return _asResolutionCall; } }
             public override bool OpenResolutionScope { get { return _openResolutionScope; } }
@@ -4636,15 +4646,14 @@ namespace DryIoc
 
             public override bool AllowDisposableTransient { get { return _allowDisposableTransient; }}
 
-            public ServiceSetup(Func<object> lazyMetadata = null, object metadata = null,
+            public ServiceSetup(object metadataOrFuncOfMetadata = null,
                 Func<RequestInfo, bool> condition = null,
                 bool openResolutionScope = false, bool asResolutionCall = false,
                 bool preventDisposal = false, bool weaklyReferenced = false,
                 bool allowDisposableTransient = false)
             {
                 Condition = condition;
-                _lazyMetadata = lazyMetadata;
-                _metadata = metadata;
+                _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
                 _openResolutionScope = openResolutionScope;
                 _asResolutionCall = asResolutionCall || openResolutionScope;
                 _preventDisposal = preventDisposal;
@@ -4652,8 +4661,7 @@ namespace DryIoc
                 _allowDisposableTransient = allowDisposableTransient;
             }
 
-            private readonly Func<object> _lazyMetadata;
-            private object _metadata;
+            private object _metadataOrFuncOfMetadata;
             private readonly bool _openResolutionScope;
             private readonly bool _asResolutionCall;
             private readonly bool _preventDisposal;
