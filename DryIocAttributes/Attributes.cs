@@ -497,5 +497,5 @@ namespace DryIocAttributes
         | AttributeTargets.Property
         | AttributeTargets.Field,
         Inherited = false)]
-    public class AsResolutionRoot : Attribute { }
+    public class AsResolutionCall : Attribute { }
 }

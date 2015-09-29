@@ -313,7 +313,7 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.OpenResolutionScope = true;
                 }
-                else if (attribute is AsResolutionRoot)
+                else if (attribute is AsResolutionCall)
                 {
                     info.AsResolutionRoot = true;
                 }

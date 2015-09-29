@@ -2323,6 +2323,18 @@ namespace DryIoc
             return newRules;
         }
 
+        /// <summary> When set to true, prevents </summary>
+        public bool ThrowOnRegisteringDisposableTransient { get; private set; }
+
+        /// <summary>Turns Off the rule <see cref="ThrowOnRegisteringDisposableTransient"/>.</summary>
+        /// <returns></returns>
+        public Rules WithoutThrowOnRegisteringDisposableTransient()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.ThrowOnRegisteringDisposableTransient = false;
+            return newRules;
+        }
+
         /// <summary>Allow to instantiate singletons during resolution (but not inside of Func). Instantiated singletons
         /// will be copied to <see cref="IContainer.ResolutionStateCache"/> for faster access.</summary>
         public bool EagerCachingSingletonForFasterAccess { get; private set; }
@@ -2409,6 +2421,7 @@ namespace DryIoc
         {
             _made = Made.Default;
             ThrowIfDependencyHasShorterReuseLifespan = true;
+            ThrowOnRegisteringDisposableTransient = true;
             ImplicitCheckForReuseMatchingScope = true;
             EagerCachingSingletonForFasterAccess = true;
             VariantGenericTypesInResolvedCollection = true;
@@ -4541,31 +4554,37 @@ namespace DryIoc
         /// <summary>Stores reused instance as WeakReference.</summary>
         public virtual bool WeaklyReferenced { get { return false; } }
 
+        /// <summary> Allows registering transient disposable. </summary>
+        public virtual bool AllowDisposableTransient { get { return false; } }
+
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
 
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
         /// <param name="lazyMetadata">(optional) Delegate to get actual metadata later, for instance from attribute.</param> 
         /// <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param> <param name="condition">(optional)</param>
-        /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionRoot"/> but in addition opens new scope.</param>
-        /// <param name="asResolutionRoot">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
+        /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
+        /// <param name="asResolutionCall">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
         /// <param name="weaklyReferenced">(optional) Stores reused instance as WeakReference.</param>
+        /// <param name="allowDisposableTransient">(optional) Allows registering transient disposable.</param>
         /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
         public static Setup With(
             Func<object> lazyMetadata = null, object metadata = null,
             Func<RequestInfo, bool> condition = null,
-            bool openResolutionScope = false, bool asResolutionRoot = false,
-            bool preventDisposal = false, bool weaklyReferenced = false)
+            bool openResolutionScope = false, bool asResolutionCall = false,
+            bool preventDisposal = false, bool weaklyReferenced = false,
+            bool allowDisposableTransient = false)
         {
             if (lazyMetadata == null && metadata == null &&
                 condition == null &&
-                openResolutionScope == false && asResolutionRoot == false &&
-                preventDisposal == false && weaklyReferenced == false)
+                openResolutionScope == false && asResolutionCall == false &&
+                preventDisposal == false && weaklyReferenced == false &&
+                allowDisposableTransient == false)
                 return Default;
 
             return new ServiceSetup(lazyMetadata, metadata, condition,
-                openResolutionScope, asResolutionRoot, preventDisposal, weaklyReferenced);
+                openResolutionScope, asResolutionCall, preventDisposal, weaklyReferenced, allowDisposableTransient);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -4603,10 +4622,13 @@ namespace DryIoc
             public override bool PreventDisposal { get { return _preventDisposal; } }
             public override bool WeaklyReferenced { get { return _weaklyReferenced; } }
 
+            public override bool AllowDisposableTransient { get { return _allowDisposableTransient; }}
+
             public ServiceSetup(Func<object> lazyMetadata = null, object metadata = null,
                 Func<RequestInfo, bool> condition = null,
                 bool openResolutionScope = false, bool asResolutionCall = false,
-                bool preventDisposal = false, bool weaklyReferenced = false)
+                bool preventDisposal = false, bool weaklyReferenced = false,
+                bool allowDisposableTransient = false)
             {
                 Condition = condition;
                 _lazyMetadata = lazyMetadata;
@@ -4615,6 +4637,7 @@ namespace DryIoc
                 _asResolutionCall = asResolutionCall || openResolutionScope;
                 _preventDisposal = preventDisposal;
                 _weaklyReferenced = weaklyReferenced;
+                _allowDisposableTransient = allowDisposableTransient;
             }
 
             private readonly Func<object> _lazyMetadata;
@@ -4623,6 +4646,7 @@ namespace DryIoc
             private readonly bool _asResolutionCall;
             private readonly bool _preventDisposal;
             private readonly bool _weaklyReferenced;
+            private readonly bool _allowDisposableTransient;
         }
 
         /// <summary>Setup for <see cref="DryIoc.FactoryType.Wrapper"/> factory.</summary>
@@ -4785,6 +4809,13 @@ namespace DryIoc
             if (!isStaticallyChecked)
                 if (serviceType.IsGenericDefinition() && FactoryGenerator == null)
                     Throw.It(Error.RegisteringOpenGenericRequiresFactoryProvider, serviceType);
+
+            if (Reuse == null && 
+                (Setup.AllowDisposableTransient == false && container.Rules.ThrowOnRegisteringDisposableTransient) &&
+                FactoryType != FactoryType.Wrapper &&
+                (ImplementationType.IsAssignableTo(typeof(IDisposable)) || serviceType.IsAssignableTo(typeof(IDisposable))))
+                Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer,
+                    serviceType, serviceKey ?? "{no key}", this);
 
             if (Setup.FactoryType == FactoryType.Wrapper)
             {
@@ -7351,7 +7382,11 @@ namespace DryIoc
                 "Container does not allow further (un)registrations." + Environment.NewLine +
                 "Attempting to unregister {0}{1} with factory type {2}."),
             GotNullFactoryWhenResolvingService = Of(
-                "Got null factory method when resolving {0}");
+                "Got null factory method when resolving {0}"),
+            RegisteredDisposableTransientWontBeDisposedByContainer = Of(
+                "Registered Disposable Transient service {0} with key {1} and factory {2} won't be disposed by container." + Environment.NewLine + 
+                "DryIoc does not hold reference to resolved transients, and therefore does not control their dispose." + Environment.NewLine +
+                "To silence this exception specify the rule with new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient())");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

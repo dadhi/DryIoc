@@ -154,6 +154,42 @@ namespace DryIoc.UnitTests
         internal class Me : IMe {}
         internal class MiniMe : IMe {}
 
+        [Test]
+        public void Container_should_throw_on_registering_disposable_transient()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Register<AD>());
+
+            Assert.AreEqual(Error.RegisteredDisposableTransientWontBeDisposedByContainer, ex.Error);
+        }
+
+        [Test]
+        public void I_can_silence_throw_on_registering_disposable_transient_for_specific_registration()
+        {
+            var container = new Container();
+
+            Assert.DoesNotThrow(() => 
+            container.Register<AD>(setup: Setup.With(allowDisposableTransient: true)));
+        }
+
+        [Test]
+        public void I_can_silence_throw_on_registering_disposable_transient_for_whole_container()
+        {
+            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+
+            Assert.DoesNotThrow(() => 
+            container.Register<AD>());
+        }
+
+        class AD : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
+
         #region CUT
 
         public class SomeService { }

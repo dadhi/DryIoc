@@ -152,7 +152,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(serviceKey: "another");
-            container.Register<IService, DisposableService>(serviceKey: EnumKey.Some);
+            container.Register<IService, OneService>(serviceKey: EnumKey.Some);
 
             var pairs = container.Resolve<KeyValuePair<object, Func<IService>>[]>();
 

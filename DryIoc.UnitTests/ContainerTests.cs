@@ -298,7 +298,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>();
-            container.Register<IService, DisposableService>(ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+            container.Register<IService, OneService>(ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());

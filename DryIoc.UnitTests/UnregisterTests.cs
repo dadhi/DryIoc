@@ -194,7 +194,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>();
-            container.Register<IService, DisposableService>(serviceKey: 2);
+            container.Register<IService, OneService>(serviceKey: 2);
 
             var lastDefaultKey = DefaultKey.Value.Next();
             container.Unregister(typeof(IService), lastDefaultKey);
@@ -210,7 +210,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>();
-            container.Register<IService, DisposableService>(serviceKey: 2);
+            container.Register<IService, OneService>(serviceKey: 2);
 
             var lastDefaultKey = DefaultKey.Value.Next();
             container.Unregister(typeof(IService), lastDefaultKey);
@@ -381,7 +381,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Unregister_singleton_resolution_root()
         {
-            var container = new Container();
+            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
             container.Register<A>(Reuse.Singleton);
             container.Register<B>();
 
@@ -407,9 +407,9 @@ namespace DryIoc.UnitTests
         [Test]
         public void Unregister_singleton_injected_redendency()
         {
-            var container = new Container();
+            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
             container.Register<A>();
-            container.Register<B>(Reuse.Singleton, setup: Setup.With(asResolutionRoot: true));
+            container.Register<B>(Reuse.Singleton, setup: Setup.With(asResolutionCall: true));
 
             var a = container.Resolve<A>();
 

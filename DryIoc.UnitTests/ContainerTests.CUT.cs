@@ -32,6 +32,8 @@ namespace DryIoc.UnitTests.CUT
 
 	public class Service : IService { }
 
+	public class OneService : IService { }
+
 	public class AnotherService : IService { }
 
 	public class ServiceWithDependency : IService

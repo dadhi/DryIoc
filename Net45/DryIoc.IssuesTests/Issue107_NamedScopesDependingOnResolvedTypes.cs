@@ -408,6 +408,7 @@ namespace DryIoc.IssuesTests
             // and therefore has its own ResolutionScope! So every dependency (e.g. ICar) down the resolve method 
             // registered with `Reuse.InResolutionScope` will reside in the new resolution scope. 
             container.Register<AreaWithOneCar>(
+                reuse: Reuse.InResolutionScope,
                 setup: Setup.With(openResolutionScope: true)); // NOTE: remove setup parameter to see what happens
 
             container.Register<SomeTool>();
@@ -454,9 +455,9 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register<ICar, SmallCar>(Reuse.InResolutionScope);
-            container.Register<AreaWithOneCar>(setup: Setup.With(openResolutionScope: true));
+            container.Register<AreaWithOneCar>(Reuse.InResolutionScope, setup: Setup.With(openResolutionScope: true));
             container.Register<SomeTool>();
-            container.Register<CarefulAreaManager>();
+            container.Register<CarefulAreaManager>(Reuse.InResolutionScope);
 
             var manager = container.Resolve<CarefulAreaManager>();
             var area = manager.Areas.First();

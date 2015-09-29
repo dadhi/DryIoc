@@ -167,7 +167,7 @@ namespace DryIoc.UnitTests
             container.RegisterMany(new[] { GetType().GetAssembly() }, (r, types, type) =>
             {
                 if (type.GetAllConstructors().Count() == 1)
-                    r.RegisterMany(types, type);
+                    r.RegisterMany(types, type, Reuse.Singleton);
             });
 
             var registrations = container.GetServiceRegistrations().Select(r => r.ServiceType).ToArray();
@@ -177,8 +177,11 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_register_internal_implementations()
         {
-            var container = new Container(r => r.With(FactoryMethod.ConstructorWithResolvableArguments));
-            container.RegisterMany(new[] { typeof(InternalMe).GetAssembly() }, nonPublicServiceTypes: true);
+            var container = new Container(r => r
+                .With(FactoryMethod.ConstructorWithResolvableArguments));
+
+            container.RegisterMany(new[] { typeof(InternalMe).GetAssembly() }, nonPublicServiceTypes: true, 
+                action: (registrator, types, type) => registrator.RegisterMany(types, type, Reuse.Singleton));
             
             var service = container.Resolve<IPublicMe>();
 
@@ -226,7 +229,7 @@ namespace DryIoc.UnitTests
         public void Register_mapping_should_throw_if_new_service_type_is_not_compatible_with_registered_implementation()
         {
             var container = new Container();
-            container.Register<Y>();
+            container.Register<Y>(Reuse.Singleton);
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.RegisterMapping(typeof(IDisposable), typeof(Y)));

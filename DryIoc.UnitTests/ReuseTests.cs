@@ -159,7 +159,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<AccountUser>();
-            container.Register<Account, CarefulAccount>(setup: Setup.With(openResolutionScope: true));
+            container.Register<Account, CarefulAccount>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
             container.Register<Log, DisposableLog>(Reuse.InResolutionScopeOf<Account>());
 
             var user = container.Resolve<AccountUser>();
@@ -410,11 +410,11 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_disposed_resolution_reused_services()
+        public void Can_dispose_resolution_reused_services()
         {
             var container = new Container();
             container.Register<SomeDep>(Reuse.InResolutionScope);
-            container.Register<SomeRoot>();
+            container.Register<SomeRoot>(Reuse.Singleton);
 
             var root = container.Resolve<SomeRoot>();
             root.Dispose();

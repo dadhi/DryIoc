@@ -230,12 +230,12 @@ namespace DryIoc.UnitTests
         public void Can_produce_container_which_throws_on_further_registrations()
         {
             var c = new Container();
-            c.Register<Foo>();
+            c.Register<Foo>(Reuse.Singleton);
 
             var frozen = c.WithNoMoreRegisrationAllowed();
 
             var ex = Assert.Throws<ContainerException>(() => 
-                frozen.Register<Blah>());
+                frozen.Register<Blah>(Reuse.Singleton));
 
             Assert.AreEqual(Error.NoMoreRegistrationsAllowed, ex.Error);
         }
@@ -244,7 +244,7 @@ namespace DryIoc.UnitTests
         public void Can_produce_container_which_throws_on_further_unregistrations()
         {
             var c = new Container();
-            c.Register<Foo>();
+            c.Register<Foo>(Reuse.Singleton);
 
             var frozen = c.WithNoMoreRegisrationAllowed();
 

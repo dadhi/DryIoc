@@ -135,7 +135,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export(typeof(IDecoratedResult)), TransientReuse, AsDecorator, AsResolutionRoot]
+    [Export(typeof(IDecoratedResult)), TransientReuse, AsDecorator, AsResolutionCall]
     public class DynamicDecorator : IDecoratedResult
     {
         private readonly IDecoratedResult _decorated;

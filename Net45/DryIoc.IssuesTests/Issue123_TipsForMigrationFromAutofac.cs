@@ -13,9 +13,9 @@ namespace DryIoc.IssuesTests
         public void How_to_get_all_registrations_in_registration_order()
         {
             var container = new Container();
-            container.Register<IFoo, FooBar>();
-            container.Register<IBar, FooBar>(serviceKey: 1);
-            container.Register<IBar, FooBar>();
+            container.Register<IFoo, FooBar>(Reuse.Singleton);
+            container.Register<IBar, FooBar>(Reuse.Singleton, serviceKey: 1);
+            container.Register<IBar, FooBar>(Reuse.Singleton);
 
             var regsInOrder = container.GetServiceRegistrations()
                 .OrderBy(factory => factory.FactoryRegistrationOrder)
@@ -61,7 +61,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.RegisterMany<FooBar>(serviceTypeCondition: type => type.IsInterface);
+            container.RegisterMany<FooBar>(serviceTypeCondition: type => type.IsInterface, reuse: Reuse.Singleton);
 
             Assert.NotNull(container.Resolve<IFoo>());
             Assert.NotNull(container.Resolve<IBar>());
@@ -73,7 +73,7 @@ namespace DryIoc.IssuesTests
         public void IDisposable_should_be_excluded_from_register_many()
         {
             var container = new Container();
-            container.RegisterMany<FooBar>(serviceTypeCondition: type => type.IsInterface);
+            container.RegisterMany<FooBar>(serviceTypeCondition: type => type.IsInterface, reuse: Reuse.Singleton);
 
             var fooBar = container.Resolve<IDisposable>(IfUnresolved.ReturnDefault);
 
@@ -213,7 +213,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
             container.Register(typeof(DryIocOwned<>), setup: Setup.Wrapper);
-            container.Register<My>();
+            container.Register<My>(Reuse.InResolutionScope);
             container.Register<Cake>(Reuse.InResolutionScopeOf<My>());
 
             var my = container.Resolve<My>();
