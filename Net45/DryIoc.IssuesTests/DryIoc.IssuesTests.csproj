@@ -91,6 +91,7 @@
     <Compile Include="Issue153_ContextDependentResolutionOnlyWorksForTheVeryFirstContext.cs" />
     <Compile Include="Issue157_ContainerResolveFactoryIsNotThreadSafe.cs" />
     <Compile Include="Issue158_WrappingDependencyInLazyResultsInTheLossOfLifespanValidation.cs" />
+    <Compile Include="Issue159_Context_based_injection_doesnt_work_with_InjectPropertiesAndFields.cs" />
     <Compile Include="Issue164_EventAggregatorImpl.cs" />
     <Compile Include="Issue166_Disposing_Facade_is_disposing_facade_parent.cs" />
     <Compile Include="Issue168_RegisterInstanceWithIfAlreadyRegisteredReplaceReplacesWrongRegistration.cs" />

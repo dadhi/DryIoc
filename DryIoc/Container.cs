@@ -810,24 +810,36 @@ namespace DryIoc
 
         /// <summary>For given instance resolves and sets properties and fields.</summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
-        /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
+        /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.
+        /// If not specified then method will use container <see cref="DryIoc.Rules.PropertiesAndFields"/>, 
+        /// or if not specified method fallbacks to <see cref="PropertiesAndFields.Auto"/>.</param>
         /// <returns>Instance with assigned properties and fields.</returns>
         /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.And"/> method.</remarks>        
         public object InjectPropertiesAndFields(object instance, PropertiesAndFieldsSelector propertiesAndFields)
         {
-            propertiesAndFields = propertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.Auto;
+            propertiesAndFields = propertiesAndFields 
+                ?? Rules.PropertiesAndFields 
+                ?? PropertiesAndFields.Auto;
 
             var instanceType = instance.ThrowIfNull().GetType();
 
-            var request = _emptyRequest.Push(instanceType)
-                .WithResolvedFactory(new ReflectionFactory(instanceType));
+            var resolver = (IResolver)this;
+            var request = _emptyRequest.Push(instanceType).WithResolvedFactory(new ReflectionFactory(instanceType));
+            var requestInfo = request.ToRequestInfo();
 
             foreach (var serviceInfo in propertiesAndFields(request))
                 if (serviceInfo != null)
                 {
                     var details = serviceInfo.Details;
-                    var value = request.Container.Resolve(serviceInfo.ServiceType,
-                        details.ServiceKey, details.IfUnresolved, details.RequiredServiceType);
+
+                    var value = resolver.ResolveKeyed(
+                        serviceInfo.ServiceType,
+                        details.ServiceKey,
+                        details.IfUnresolved == IfUnresolved.ReturnDefault,
+                        details.RequiredServiceType,
+                        scope: null,
+                        parentRequestInfo: requestInfo);
+
                     if (value != null)
                         serviceInfo.SetValue(instance, value);
                 }
