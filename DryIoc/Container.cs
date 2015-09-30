@@ -899,6 +899,18 @@ namespace DryIoc
             return index;
         }
 
+        /// <summary>Idea: Produce new container with Rules instructing to generate expression for ResolutionCall dependencies.
+        /// Then using this container for each resolution root service registration do: get expression, put together with its service type key.
+        /// Then return thos expressions.</summary>
+        /// <returns></returns>
+        public KV<object, LambdaExpression>[] GenerateResolutionRootsExpressions()
+        {
+            // todo:
+            //var container = With(rules => rules.WithGeneratedResolutionCallsExpressions());
+            //var serviceRegistrations = container.GetServiceRegistrations().Where(r => r.Factory.Setup.AsResolutionRoot).ToArray();
+            return new KV<object, LambdaExpression>[] {};
+        }
+
         /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings), 
         /// otherwise invokes <see cref="GetOrAddStateItem"/> and wraps access to added item (by returned index) into expression: state => state.Get(index).</summary>
         /// <param name="item">Item to wrap or to add.</param> <param name="itemType">(optional) Specific type of item, otherwise item <see cref="object.GetType()"/>.</param>
@@ -2178,6 +2190,11 @@ namespace DryIoc
         /// <summary>No rules as staring point.</summary>
         public static readonly Rules Default = new Rules();
 
+        /// <summary>Dependency nesting level where to split object graph into separate Resolve call 
+        /// to optimize performance of large object graph.</summary>
+        /// <remarks>At the moment the value is predefined. Not sure if it should be user-defined.</remarks>
+        public readonly int LevelToSplitObjectGraphIntoResolveCalls = 6;
+
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
 
@@ -2323,43 +2340,6 @@ namespace DryIoc
             return newRules;
         }
 
-        /// <summary>Turns on/off exception throwing when dependency has shorter reuse lifespan than its parent.</summary>
-        public bool ThrowIfDependencyHasShorterReuseLifespan { get; private set; }
-
-        /// <summary>Returns new rules with <see cref="ThrowIfDependencyHasShorterReuseLifespan"/> set to specified value.</summary>
-        /// <returns>New rules with new setting value.</returns>
-        public Rules WithoutThrowIfDependencyHasShorterReuseLifespan()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.ThrowIfDependencyHasShorterReuseLifespan = false;
-            return newRules;
-        }
-
-        /// <summary> When set to true, prevents </summary>
-        public bool ThrowOnRegisteringDisposableTransient { get; private set; }
-
-        /// <summary>Turns Off the rule <see cref="ThrowOnRegisteringDisposableTransient"/>.</summary>
-        /// <returns></returns>
-        public Rules WithoutThrowOnRegisteringDisposableTransient()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.ThrowOnRegisteringDisposableTransient = false;
-            return newRules;
-        }
-
-        /// <summary>Allow to instantiate singletons during resolution (but not inside of Func). Instantiated singletons
-        /// will be copied to <see cref="IContainer.ResolutionStateCache"/> for faster access.</summary>
-        public bool EagerCachingSingletonForFasterAccess { get; private set; }
-
-        /// <summary>Disables <see cref="EagerCachingSingletonForFasterAccess"/></summary>
-        /// <returns>New rules with singleton optimization turned off.</returns>
-        public Rules WithoutEagerCachingSingletonForFasterAccess()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.EagerCachingSingletonForFasterAccess = false;
-            return newRules;
-        }
-
         /// <summary>Given item object and its type should return item "pure" expression presentation, 
         /// without side-effects or external dependencies. 
         /// e.g. for string "blah" <code lang="cs"><![CDATA[]]>Expression.Constant("blah", typeof(string))</code>.
@@ -2385,59 +2365,126 @@ namespace DryIoc
             return newRules;
         }
 
+        /// <summary>Turns on/off exception throwing when dependency has shorter reuse lifespan than its parent.</summary>
+        public bool ThrowIfDependencyHasShorterReuseLifespan
+        {
+            get { return (_settings & Settings.ThrowIfDependencyHasShorterReuseLifespan) != 0; }
+        }
+
+        /// <summary>Returns new rules with <see cref="ThrowIfDependencyHasShorterReuseLifespan"/> set to specified value.</summary>
+        /// <returns>New rules with new setting value.</returns>
+        public Rules WithoutThrowIfDependencyHasShorterReuseLifespan()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules._settings ^= Settings.ThrowIfDependencyHasShorterReuseLifespan;
+            return newRules;
+        }
+
+        /// <summary> When set to true, prevents </summary>
+        public bool ThrowOnRegisteringDisposableTransient
+        {
+            get { return (_settings & Settings.ThrowOnRegisteringDisposableTransient) != 0; }
+        }
+
+        /// <summary>Turns Off the rule <see cref="ThrowOnRegisteringDisposableTransient"/>.</summary>
+        /// <returns></returns>
+        public Rules WithoutThrowOnRegisteringDisposableTransient()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules._settings ^= Settings.ThrowOnRegisteringDisposableTransient;
+            return newRules;
+        }
+
+        /// <summary>Allow to instantiate singletons during resolution (but not inside of Func). Instantiated singletons
+        /// will be copied to <see cref="IContainer.ResolutionStateCache"/> for faster access.</summary>
+        public bool EagerCachingSingletonForFasterAccess
+        {
+            get { return (_settings & Settings.EagerCachingSingletonForFasterAccess) != 0; }
+        }
+
+        /// <summary>Disables <see cref="EagerCachingSingletonForFasterAccess"/></summary>
+        /// <returns>New rules with singleton optimization turned off.</returns>
+        public Rules WithoutEagerCachingSingletonForFasterAccess()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules._settings ^= Settings.EagerCachingSingletonForFasterAccess;
+            return newRules;
+        }
+
         /// <summary>Flag acting in implicit <see cref="Setup.Condition"/> for service registered with not null <see cref="IReuse"/>.
         /// Condition skips resolution if no matching scope found.</summary>
-        public bool ImplicitCheckForReuseMatchingScope { get; private set; }
+        public bool ImplicitCheckForReuseMatchingScope
+        {
+            get { return (_settings & Settings.ImplicitCheckForReuseMatchingScope) != 0; }
+        }
 
         /// <summary>Removes <see cref="ImplicitCheckForReuseMatchingScope"/></summary>
         /// <returns>New rules.</returns>
         public Rules WithoutImplicitCheckForReuseMatchingScope()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.ImplicitCheckForReuseMatchingScope = false;
+            newRules._settings ^= Settings.ImplicitCheckForReuseMatchingScope;
             return newRules;
         }
 
         /// <summary>Specifies to resolve IEnumerable as LazyEnumerable.</summary>
-        public bool ResolveIEnumerableAsLazyEnumerable { get; private set; }
+        public bool ResolveIEnumerableAsLazyEnumerable
+        {
+            get { return (_settings & Settings.ResolveIEnumerableAsLazyEnumerable) != 0; }
+        }
 
         /// <summary>Sets flag <see cref="ResolveIEnumerableAsLazyEnumerable"/>.</summary>
         /// <returns>Returns new rules with flag set.</returns>
         public Rules WithResolveIEnumerableAsLazyEnumerable()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.ResolveIEnumerableAsLazyEnumerable = true;
+            newRules._settings |= Settings.ResolveIEnumerableAsLazyEnumerable;
             return newRules;
         }
 
         /// <summary>Flag instructs to include covariant compatible types in resolved collection, array and many.</summary>
-        public bool VariantGenericTypesInResolvedCollection { get; private set; }
+        public bool VariantGenericTypesInResolvedCollection
+        {
+            get { return (_settings & Settings.VariantGenericTypesInResolvedCollection) != 0; }
+        }
 
         /// <summary>Unsets flag <see cref="VariantGenericTypesInResolvedCollection"/>.</summary>
         /// <returns>Returns new rules with flag set.</returns>
         public Rules WithoutVariantGenericTypesInResolvedCollection()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.VariantGenericTypesInResolvedCollection = false;
+            newRules._settings ^= Settings.VariantGenericTypesInResolvedCollection;
             return newRules;
         }
 
         #region Implementation
 
-        private Made _made;
-#pragma warning disable 169
-        private bool _factoryDelegateCompilationToDynamicAssembly; // NOTE: used by .NET 4 and higher versions.
-#pragma warning restore 169
-
         private Rules()
         {
             _made = Made.Default;
-            ThrowIfDependencyHasShorterReuseLifespan = true;
-            ThrowOnRegisteringDisposableTransient = true;
-            ImplicitCheckForReuseMatchingScope = true;
-            EagerCachingSingletonForFasterAccess = true;
-            VariantGenericTypesInResolvedCollection = true;
+            _settings = DEFAULT_SETTINGS;
         }
+
+        private Made _made;
+
+        [Flags] private enum Settings : short
+        {
+            ThrowIfDependencyHasShorterReuseLifespan = 1,
+            ThrowOnRegisteringDisposableTransient = 2,
+            ImplicitCheckForReuseMatchingScope = 4,
+            EagerCachingSingletonForFasterAccess = 8,
+            VariantGenericTypesInResolvedCollection = 16,
+            ResolveIEnumerableAsLazyEnumerable = 32
+        }
+
+        private const Settings DEFAULT_SETTINGS = 
+            Settings.ThrowIfDependencyHasShorterReuseLifespan 
+            | Settings.ThrowOnRegisteringDisposableTransient 
+            | Settings.ImplicitCheckForReuseMatchingScope 
+            | Settings.EagerCachingSingletonForFasterAccess 
+            | Settings.VariantGenericTypesInResolvedCollection;
+
+        private Settings _settings;
 
         #endregion
     }
@@ -4581,29 +4628,6 @@ namespace DryIoc
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
 
-        /// <summary>Flags: set of settings for the registered factory.</summary>
-        [Flags]
-        public enum Settings
-        {
-            /// <summary>Default behavior - no custom settings.</summary>
-            Default = 0x0,
-
-            /// <summary>If true dependency expression will be "r.Resolve(...)" instead of inline creation (new) expression.</summary>
-            AsResolutionCall = 0x1,
-
-            /// <summary>Instructs container to open new scope when injected. If specified then <see cref="Settings.AsResolutionCall"/> is set automatically.</summary>
-            OpenResolutionScope = 0x2,
-
-            /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
-            PreventDisposal = 0x4,
-
-            /// <summary>Stores reused instance as WeakReference.</summary>
-            WeaklyReferenced = 0x8,
-
-            /// <summary>Allows to register disposable transients.</summary>
-            AllowDisposableTransient = 0x10
-        }
-
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
         /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> <param name="condition">(optional)</param>
         /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
@@ -4625,8 +4649,8 @@ namespace DryIoc
                 allowDisposableTransient == false)
                 return Default;
 
-            return new ServiceSetup(metadataOrFuncOfMetadata, condition,
-                openResolutionScope, asResolutionCall, preventDisposal, weaklyReferenced, allowDisposableTransient);
+            return new ServiceSetup(condition,
+                metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, preventDisposal, weaklyReferenced, allowDisposableTransient);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -4669,35 +4693,43 @@ namespace DryIoc
                 }
             }
 
-            public override bool AsResolutionCall { get { return _asResolutionCall; } }
-            public override bool OpenResolutionScope { get { return _openResolutionScope; } }
+            public override bool AsResolutionCall { get { return (_settings & Settings.AsResolutionCall) != 0; } }
+            public override bool OpenResolutionScope { get { return (_settings & Settings.OpenResolutionScope) != 0; } }
+            public override bool PreventDisposal { get { return (_settings & Settings.PreventDisposal) != 0; } }
+            public override bool WeaklyReferenced { get { return (_settings & Settings.WeaklyReferenced) != 0; } }
+            public override bool AllowDisposableTransient { get { return (_settings & Settings.AllowDisposableTransient) != 0; }}
 
-            public override bool PreventDisposal { get { return _preventDisposal; } }
-            public override bool WeaklyReferenced { get { return _weaklyReferenced; } }
-
-            public override bool AllowDisposableTransient { get { return _allowDisposableTransient; }}
-
-            public ServiceSetup(object metadataOrFuncOfMetadata = null,
-                Func<RequestInfo, bool> condition = null,
-                bool openResolutionScope = false, bool asResolutionCall = false,
-                bool preventDisposal = false, bool weaklyReferenced = false,
+            public ServiceSetup(Func<RequestInfo, bool> condition = null, object metadataOrFuncOfMetadata = null, 
+                bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false, bool weaklyReferenced = false, 
                 bool allowDisposableTransient = false)
             {
                 Condition = condition;
                 _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
-                _openResolutionScope = openResolutionScope;
-                _asResolutionCall = asResolutionCall || openResolutionScope;
-                _preventDisposal = preventDisposal;
-                _weaklyReferenced = weaklyReferenced;
-                _allowDisposableTransient = allowDisposableTransient;
+
+                if (asResolutionCall || openResolutionScope)
+                    _settings |= Settings.AsResolutionCall;
+                if (openResolutionScope)
+                    _settings |= Settings.OpenResolutionScope;
+                if (preventDisposal)
+                    _settings |= Settings.PreventDisposal;
+                if (weaklyReferenced)
+                    _settings |= Settings.WeaklyReferenced;
+                if (allowDisposableTransient)
+                    _settings |= Settings.AllowDisposableTransient;
             }
 
             private object _metadataOrFuncOfMetadata;
-            private readonly bool _openResolutionScope;
-            private readonly bool _asResolutionCall;
-            private readonly bool _preventDisposal;
-            private readonly bool _weaklyReferenced;
-            private readonly bool _allowDisposableTransient;
+
+            [Flags] private enum Settings : short
+            {
+                AsResolutionCall = 1,
+                OpenResolutionScope = 2,
+                PreventDisposal = 4,
+                WeaklyReferenced = 8,
+                AllowDisposableTransient = 16
+            }
+
+            private readonly Settings _settings;
         }
 
         /// <summary>Setup for <see cref="DryIoc.FactoryType.Wrapper"/> factory.</summary>
@@ -4913,8 +4945,10 @@ namespace DryIoc
         public virtual Expression GetExpressionOrDefault(Request request)
         {
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
-            if ((Setup.AsResolutionCall || request.DeepLevel == 5) && 
-                !request.IsFirstNonWrapperInResolveCall())
+            if (Setup.AsResolutionCall && request.IsFirstNonWrapperInResolveCall() 
+                || request.DeepLevel == request.Container.Rules.LevelToSplitObjectGraphIntoResolveCalls
+                // note: Split only if not wrapped in Func with args - Propagation of args across Resolve boundaries is not supported at the moment
+                && !request.ParentOrWrapper.Enumerate().Any(p => p.ServiceType.IsFuncWithArgs()))  
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             request = request.WithResolvedFactory(this);
@@ -7129,6 +7163,12 @@ namespace DryIoc
         /// <param name="item">Item to find in existing items with <see cref="object.Equals(object, object)"/> or add if not found.</param>
         /// <returns>Index of found or added item.</returns>
         int GetOrAddStateItem(object item);
+
+        /// <summary>Idea: Produce new container with Rules instructing to generate expression for ResolutionCall dependencies.
+        /// Then using this container for each resolution root service registration do: get expression, put together with its service type key.
+        /// Then return thos expressions.</summary>
+        /// <returns></returns>
+        KV<object, LambdaExpression>[] GenerateResolutionRootsExpressions();
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand, 
