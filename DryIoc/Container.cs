@@ -3634,7 +3634,8 @@ namespace DryIoc
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
             var requestInfoExpr = ToExpression(request.ParentOrWrapper, container);
 
-            var resolveExpr = Expression.Call(Container.ResolverExpr, "ResolveKeyed", ArrayTools.Empty<Type>(),
+            var resolveExpr = Expression.Call(
+                Container.ResolverExpr, "ResolveKeyed", ArrayTools.Empty<Type>(),
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr, getOrNewCallExpr,
                 requestInfoExpr);
 
@@ -4274,6 +4275,12 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Counting nesting levels. May be used to split object graph if level is too deep.</summary>
+        public readonly int DeepLevel;
+
+        /// <summary>Weak reference to container. May be replaced in request flowed from parent to child container.</summary>
+        public readonly ContainerWeakRef ContainerWeakRef;
+
         /// <summary>Optionally associated resolution scope.</summary>
         public readonly IScope Scope;
 
@@ -4283,9 +4290,6 @@ namespace DryIoc
         // note: Mutable: tracks used parameters
         /// <summary>User provided arguments: key tracks what args are still unused.</summary>
         public readonly KV<bool[], ParameterExpression[]> FuncArgs;
-
-        /// <summary>Weak reference to container. May be replaced in request flowed from parent to child container.</summary>
-        public readonly ContainerWeakRef ContainerWeakRef;
 
         /// <summary>Provides access to container currently bound to request. 
         /// By default it is container initiated request by calling resolve method,
@@ -4326,11 +4330,12 @@ namespace DryIoc
             if (IsEmpty)
                 return new Request(this, ContainerWeakRef, _scopesWeakRef, info.ThrowIfNull(), null, null,
                     scope /* input scope provided only for first request when Resolve called */,
-                    parentRequestInfo ?? RequestInfo.Empty);
+                    parentRequestInfo ?? RequestInfo.Empty,
+                    deepLevel: 1);
 
             ResolvedFactory.ThrowIfNull(Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
             var inheritedInfo = info.InheritInfoFromDependencyOwner(_serviceInfo, ResolvedFactory.Setup.FactoryType != FactoryType.Service);
-            return new Request(this, ContainerWeakRef, _scopesWeakRef, inheritedInfo, null, FuncArgs, Scope, _parentRequestInfo);
+            return new Request(this, ContainerWeakRef, _scopesWeakRef, inheritedInfo, null, FuncArgs, Scope, _parentRequestInfo, DeepLevel + 1);
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls Push.</summary>
@@ -4501,7 +4506,8 @@ namespace DryIoc
             Factory resolvedFactory,
             KV<bool[], ParameterExpression[]> funcArgs, 
             IScope scope,
-            RequestInfo parentRequestInfo = null)
+            RequestInfo parentRequestInfo = null,
+            int deepLevel = 0)
         {
             _serviceInfo = serviceInfo;
 
@@ -4516,6 +4522,8 @@ namespace DryIoc
 
             _parentRequestInfo = parentRequestInfo;
             _parent = parent;
+
+            DeepLevel = deepLevel;
         }
 
         // note: Mutable: may change service key from null to exact Default.
@@ -4523,6 +4531,7 @@ namespace DryIoc
 
         private readonly ContainerWeakRef _scopesWeakRef;
         private readonly RequestInfo _parentRequestInfo;
+
         private readonly Request _parent;
 
         #endregion
@@ -4572,6 +4581,29 @@ namespace DryIoc
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
 
+        /// <summary>Flags: set of settings for the registered factory.</summary>
+        [Flags]
+        public enum Settings
+        {
+            /// <summary>Default behavior - no custom settings.</summary>
+            Default = 0x0,
+
+            /// <summary>If true dependency expression will be "r.Resolve(...)" instead of inline creation (new) expression.</summary>
+            AsResolutionCall = 0x1,
+
+            /// <summary>Instructs container to open new scope when injected. If specified then <see cref="Settings.AsResolutionCall"/> is set automatically.</summary>
+            OpenResolutionScope = 0x2,
+
+            /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
+            PreventDisposal = 0x4,
+
+            /// <summary>Stores reused instance as WeakReference.</summary>
+            WeaklyReferenced = 0x8,
+
+            /// <summary>Allows to register disposable transients.</summary>
+            AllowDisposableTransient = 0x10
+        }
+
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
         /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> <param name="condition">(optional)</param>
         /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
@@ -4587,8 +4619,7 @@ namespace DryIoc
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false)
         {
-            if (metadataOrFuncOfMetadata == null &&
-                condition == null &&
+            if (metadataOrFuncOfMetadata == null && condition == null &&
                 openResolutionScope == false && asResolutionCall == false &&
                 preventDisposal == false && weaklyReferenced == false &&
                 allowDisposableTransient == false)
@@ -4882,7 +4913,8 @@ namespace DryIoc
         public virtual Expression GetExpressionOrDefault(Request request)
         {
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
-            if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolveCall())
+            if ((Setup.AsResolutionCall || request.DeepLevel == 5) && 
+                !request.IsFirstNonWrapperInResolveCall())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             request = request.WithResolvedFactory(this);
@@ -7406,7 +7438,8 @@ namespace DryIoc
             RegisteredDisposableTransientWontBeDisposedByContainer = Of(
                 "Registered Disposable Transient service {0} with key {1} and factory {2} won't be disposed by container." + Environment.NewLine + 
                 "DryIoc does not hold reference to resolved transients, and therefore does not control their dispose." + Environment.NewLine +
-                "To silence this exception specify the rule with new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient())");
+                "To silence this exception Register<YourService>(setup: Setup.With(allowDisposableTransient: true))" + Environment.NewLine +
+                "or set the rule per container with new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient()).");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

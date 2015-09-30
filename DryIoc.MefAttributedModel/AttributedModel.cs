@@ -317,13 +317,17 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.AsResolutionRoot = true;
                 }
-                else if (attribute is WeaklyReferenced)
+                else if (attribute is WeaklyReferencedAttribute)
                 {
                     info.WeaklyReferenced = true;
                 }
-                else if (attribute is PreventDisposal)
+                else if (attribute is PreventDisposalAttribute)
                 {
                     info.PreventDisposal = true;
+                }
+                else if (attribute is AllowsDisposableTransientAttribute)
+                {
+                    info.AllowsDisposableTransient = true;
                 }
                 else if (attribute is AsWrapperAttribute)
                 {
@@ -646,11 +650,14 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Corresponds to <see cref="Setup.AsResolutionCall"/>.</summary>
         public bool AsResolutionRoot;
 
-        /// <summary>Specify to prevent disposal of reused instance if it is disposable</summary>
+        /// <summary>Specifies to prevent disposal of reused instance if it is disposable</summary>
         public bool PreventDisposal;
 
-        /// <summary>Specify to store reused instance as WeakReference.</summary>
+        /// <summary>Specifies to store reused instance as WeakReference.</summary>
         public bool WeaklyReferenced;
+
+        /// <summary>Allows disposable transient to be resgitered.</summary>
+        public bool AllowsDisposableTransient;
 
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
@@ -691,12 +698,13 @@ namespace DryIoc.MefAttributedModel
                 : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
                     .Evaluate(ConvertRequestInfo(r));
 
-            var lazyMetadata = HasMetadataAttribute ? (Func<object>)(() => GetMetadata(attributes)) : null;
+            var lazyMetadata = !HasMetadataAttribute ? null : (Func<object>)(() => GetMetadata(attributes));
 
             if (FactoryType == FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            return Setup.With(lazyMetadata, condition, OpenResolutionScope, AsResolutionRoot, PreventDisposal, WeaklyReferenced /*, todo: */);
+            return Setup.With(lazyMetadata, condition, OpenResolutionScope, AsResolutionRoot, 
+                PreventDisposal, WeaklyReferenced, AllowsDisposableTransient);
         }
 
         private static DryIocAttributes.RequestInfo ConvertRequestInfo(DryIoc.RequestInfo requestInfo)

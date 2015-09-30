@@ -118,11 +118,14 @@ namespace DryIocAttributes
         public ResolutionScopeReuseAttribute() : base(ReuseType.ResolutionScope) { }
     }
 
-    /// <summary>Mark exported reused service to be stored as WeakReference</summary>
-    public class WeaklyReferenced : Attribute {}
+    /// <summary>Marks exported reused service to be stored as WeakReference</summary>
+    public class WeaklyReferencedAttribute : Attribute {}
 
-    /// <summary>Mark exported reused service to be Not disposed together with scope.</summary>
-    public class PreventDisposal : Attribute { }
+    /// <summary>Marks exported reused service to be Not disposed together with scope.</summary>
+    public class PreventDisposalAttribute : Attribute { }
+
+    /// <summary>Allows disposable transient to be exported.</summary>
+    public class AllowsDisposableTransientAttribute : Attribute { }
 
     /// <summary>Defines export with arbitrary object key.</summary>
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",

@@ -408,4 +408,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             IsDisposed = true;
         }
     }
+
+    [Export, AllowsDisposableTransient]
+    public sealed class Abc { }
 }

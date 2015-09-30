@@ -87,6 +87,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
+        public void Can_set_AllowsDisposableTransient()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(Abc));
+
+            var abc = container.Resolve<Abc>();
+
+            Assert.IsNotNull(abc);
+        }
+
+        [Test]
         public void When_no_named_current_scope_reuse_Then_it_should_throw()
         {
             var container = new Container().WithMefAttributedModel();
