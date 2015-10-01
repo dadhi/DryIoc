@@ -2193,7 +2193,7 @@ namespace DryIoc
         /// <summary>Dependency nesting level where to split object graph into separate Resolve call 
         /// to optimize performance of large object graph.</summary>
         /// <remarks>At the moment the value is predefined. Not sure if it should be user-defined.</remarks>
-        public readonly int LevelToSplitObjectGraphIntoResolveCalls = 6;
+        public readonly int LevelToSplitObjectGraphIntoResolveCalls = 5;
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
@@ -4265,8 +4265,10 @@ namespace DryIoc
         public bool IsResolutionRoot { get { return IsResolutionCall && _parentRequestInfo.IsEmpty; } }
 
         /// <summary>Returns true for the First Service in resolve call.</summary> <returns></returns>
-        public bool IsFirstNonWrapperInResolveCall()
+        public bool IsFirstNonWrapperInResolutionCall()
         {
+            if (IsResolutionCall && _parent.FactoryType != FactoryType.Wrapper)
+                return true;
             var p = _parent;
             while (!p.IsEmpty && p.ResolvedFactory.FactoryType == FactoryType.Wrapper)
                 p = p._parent;
@@ -4933,7 +4935,7 @@ namespace DryIoc
         {
             return request.FuncArgs == null
                 && Setup.Condition == null
-                && !Setup.AsResolutionCall
+                && !Setup.AsResolutionCall 
                 && !(Setup is Setup.WrapperSetup || Setup is Setup.DecoratorSetup)
                 && !(Reuse is ResolutionScopeReuse || Reuse is CurrentScopeReuse);
         }
@@ -4945,8 +4947,8 @@ namespace DryIoc
         public virtual Expression GetExpressionOrDefault(Request request)
         {
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
-            if (Setup.AsResolutionCall && request.IsFirstNonWrapperInResolveCall() 
-                || request.DeepLevel == request.Container.Rules.LevelToSplitObjectGraphIntoResolveCalls
+            if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolutionCall() 
+                || request.DeepLevel >= request.Container.Rules.LevelToSplitObjectGraphIntoResolveCalls
                 // note: Split only if not wrapped in Func with args - Propagation of args across Resolve boundaries is not supported at the moment
                 && !request.ParentOrWrapper.Enumerate().Any(p => p.ServiceType.IsFuncWithArgs()))  
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
