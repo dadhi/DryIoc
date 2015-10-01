@@ -4409,7 +4409,8 @@ namespace DryIoc
         /// <returns>New request with new info but the rest intact: e.g. <see cref="ResolvedFactory"/>.</returns>
         public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
-            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, getInfo(_serviceInfo), ResolvedFactory, FuncArgs, Scope, _parentRequestInfo);
+            var changedServiceInfo = getInfo(_serviceInfo);
+            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, changedServiceInfo, ResolvedFactory, FuncArgs, Scope, _parentRequestInfo, DeepLevel);
         }
 
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -4443,7 +4444,7 @@ namespace DryIoc
 
             var funcArgsUsage = new bool[funcArgExprs.Length];
             var funcArgsUsageAndExpr = new KV<bool[], ParameterExpression[]>(funcArgsUsage, funcArgExprs);
-            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, ResolvedFactory, funcArgsUsageAndExpr, Scope, _parentRequestInfo);
+            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, ResolvedFactory, funcArgsUsageAndExpr, Scope, _parentRequestInfo, DeepLevel);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container, 
@@ -4452,7 +4453,7 @@ namespace DryIoc
         /// <returns>Request with replaced container.</returns>
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
-            return new Request(_parent, newContainer, _scopesWeakRef, _serviceInfo, ResolvedFactory, FuncArgs, Scope, _parentRequestInfo);
+            return new Request(_parent, newContainer, _scopesWeakRef, _serviceInfo, ResolvedFactory, FuncArgs, Scope, _parentRequestInfo, DeepLevel);
         }
 
         /// <summary>Returns new request with set <see cref="ResolvedFactory"/>.</summary>
@@ -4468,7 +4469,7 @@ namespace DryIoc
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID,
                         Error.RecursiveDependencyDetected, Print(factory.FactoryID));
 
-            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, factory, FuncArgs, Scope, _parentRequestInfo);
+            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, factory, FuncArgs, Scope, _parentRequestInfo, DeepLevel);
         }
 
         /// <summary>Converts input request into its slim version of <see cref="RequestInfo"/> </summary>
@@ -4558,18 +4559,17 @@ namespace DryIoc
             RequestInfo parentRequestInfo = null,
             int deepLevel = 0)
         {
-            _serviceInfo = serviceInfo;
-
             ContainerWeakRef = containerWeakRef;
             _scopesWeakRef = scopesWeakRef;
-            
-            ResolvedFactory = resolvedFactory;
-            
-            FuncArgs = funcArgs;
-            
+            _parentRequestInfo = parentRequestInfo;
             Scope = scope;
 
-            _parentRequestInfo = parentRequestInfo;
+            _serviceInfo = serviceInfo;
+            
+            ResolvedFactory = resolvedFactory;
+
+            FuncArgs = funcArgs;
+
             _parent = parent;
 
             DeepLevel = deepLevel;
