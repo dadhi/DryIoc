@@ -3402,47 +3402,44 @@ namespace DryIoc
 
             var setup = weaklyReferenced && preventDisposal
                 ? WeaklyReferencedHiddenDisposableInstanceSetup
-                : weaklyReferenced ? WeaklyReferencedInstanceSetup
-                : preventDisposal ? HiddenDisposableInstanceSetup
-                : Setup.Default;
+                : weaklyReferenced
+                    ? WeaklyReferencedInstanceSetup
+                    : preventDisposal
+                        ? HiddenDisposableInstanceSetup
+                        : Setup.Default;
 
-            // Wrap instance if re
             if (setup != Setup.Default)
             {
                 if (setup.PreventDisposal)
-                    instance = new[] { instance };
+                    instance = new[] {instance};
                 if (setup.WeaklyReferenced)
                     instance = new WeakReference(instance);
             }
 
+            Factory factory = null;
             if (ifAlreadyRegistered == IfAlreadyRegistered.Replace) // Try get existing factory.
-            {
-                var registeredFactory = container.GetServiceFactoryOrDefault(request);
+                factory = container.GetServiceFactoryOrDefault(request);
 
-                // If existing factory is the same kind: reuse and setup-wise, then we can just replace value in scope.
-                if (registeredFactory != null &&
-                    registeredFactory.Reuse == reuse &&
-                    registeredFactory.Setup == setup)
-                {
-                    var scope = reuse.GetScopeOrDefault(request)
-                        .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse);
-                    var scopedInstanceId = reuse.GetScopedItemIdOrSelf(registeredFactory.FactoryID, request);
-                    scope.SetOrAdd(scopedInstanceId, instance);
+            if (factory == null ||
+                factory.Reuse != reuse || factory.Setup != setup)
+            {
+                factory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse, setup);
+
+                // NOTE Hack to distinguish instance factories when replaced.
+                if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
+                    factory.FactoryID = -1;
+
+                if (!container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered,
+                    isStaticallyChecked: false))
                     return;
-                }
             }
+            
+            var scope = reuse.GetScopeOrDefault(request)
+                .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse);
 
-            // Create factory to locate instance in scope.
-            var instanceFactory = new ExpressionFactory(GetThrowInstanceNoLongerAvailable, reuse, setup);
-            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
-                instanceFactory.FactoryID = -1; // NOTE Hack to distinguish instance factories when replaced.
-            if (container.Register(instanceFactory, serviceType, serviceKey, ifAlreadyRegistered, false))
-            {
-                var scope = reuse.GetScopeOrDefault(request)
-                    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse);
-                var scopedInstanceId = reuse.GetScopedItemIdOrSelf(instanceFactory.FactoryID, request);
-                scope.SetOrAdd(scopedInstanceId, instance);
-            }
+            var scopedInstanceId = reuse.GetScopedItemIdOrSelf(factory.FactoryID, request);
+
+            scope.SetOrAdd(scopedInstanceId, instance);
         }
 
         private static readonly Setup WeaklyReferencedInstanceSetup = Setup.With(weaklyReferenced: true);
@@ -8041,16 +8038,14 @@ namespace DryIoc
         /// <returns>Array of loaded types.</returns>
         public static Type[] GetLoadedTypes(this Assembly assembly)
         {
-            Type[] types;
             try
             {
-                types = Portable.GetAssemblyTypes(assembly).ToArrayOrSelf();
+                return Portable.GetAssemblyTypes(assembly).ToArrayOrSelf();
             }
             catch (ReflectionTypeLoadException ex)
             {
-                types = ex.Types.Where(type => type != null).ToArrayOrSelf();
+                return ex.Types.Where(type => type != null).ToArray();
             }
-            return types;
         }
 
         #region Implementation

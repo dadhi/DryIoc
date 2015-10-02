@@ -21,7 +21,8 @@ DryIoc is small, fast, and skillful IoC Container for .NET
 * [Wiki documentation][WikiHome]
 * [Notes for contributors](CONTRIBUTING.md)
 * Available from NuGet as [DryIoc.dll] or source [DryIoc] (_in NuGet < 3.0_)
-* __DryIoc v2.0-rc3__ is latest: `PM> Install-Package DryIoc.dll -Pre`
+* __DryIoc v2.0-rc3__ is the latest: `PM> Install-Package DryIoc.dll -Pre`
+    * Check [what's new](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-versions)
 * __DryIoc v1.4.1__ is stable: `PM> Install-Package DryIoc.dll`
 
 ## Benchmarks
@@ -97,6 +98,6 @@ Standalone container based upon compile-time generated factories by DryIoc.
 
 
 ## Extensions
-* [MefAttributedModel] for [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx). Enables automatic types discovery and wiring.
+* [MefAttributedModel](https://bitbucket.org/dadhi/dryioc/wiki/Extensions/MefAttributedModel) for [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx). Enables automatic types discovery and wiring.
 * [CommonServiceLocator](https://commonservicelocator.codeplex.com/)
 * ASP.NET: Web Forms, MVC, Web API, OWIN.
