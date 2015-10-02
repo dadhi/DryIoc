@@ -200,7 +200,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             GivenAssemblyWithExportedTypes();
             WhenIRegisterAllExportedTypes();
 
-            Assert.IsInstanceOf<ExportConditionalObject>(_container.Resolve<ImportConditionObject1>().ExportConditionInterface);
+            Assert.IsInstanceOf<ExportConditionalObject1>(_container.Resolve<ImportConditionObject1>().ExportConditionInterface);
             Assert.IsInstanceOf<ExportConditionalObject2>(_container.Resolve<ImportConditionObject2>().ExportConditionInterface);
             Assert.IsInstanceOf<ExportConditionalObject3>(_container.Resolve<ImportConditionObject3>().ExportConditionInterface);
         }
@@ -213,7 +213,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var b = container.Resolve<LambdaExpression>(typeof(B));
 
-            Assert.That(b.ToString(), Is.StringContaining("ResolveKeyed(DryIoc.MefAttributedModel.UnitTests.CUT.A"));
+            Assert.That(b.ToString(), Is.StringContaining("Resolve(DryIoc.MefAttributedModel.UnitTests.CUT.A"));
         }
 
         #region Implementation

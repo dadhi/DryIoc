@@ -227,7 +227,7 @@ end of exception list
 
         internal static object Create_12(IResolverContext r, IScope scope)
         {
-            return new DryIoc.MefAttributedModel.UnitTests.CUT.B((DryIoc.MefAttributedModel.UnitTests.CUT.A)r.Resolver.ResolveKeyed(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.A), (object)null, false, default(System.Type), scope));
+            return new DryIoc.MefAttributedModel.UnitTests.CUT.B((DryIoc.MefAttributedModel.UnitTests.CUT.A)r.Resolver.Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.A), (object)null, false, default(System.Type), scope));
         }
 
         internal static object Create_13(IResolverContext r, IScope scope)

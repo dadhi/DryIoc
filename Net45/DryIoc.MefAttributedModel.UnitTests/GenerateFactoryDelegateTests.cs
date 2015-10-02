@@ -39,5 +39,26 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.DoesNotThrow(() => ExpressionStringify.With(true, true).ToCode(factoryExpr));
         }
+
+        [Test]
+        public void Can_generate_all_ResolutionCalls_eagerly()
+        {
+            var container = new Container(rules => rules
+                .WithMefAttributedModel()
+                .WithoutEagerCachingSingletonForFasterAccess()
+                .WithEagerGenerationOfResolutionCallsExpressions());
+
+            container.RegisterExports(
+                typeof(ImportConditionObject1),
+                typeof(ImportConditionObject2),
+                typeof(ImportConditionObject3),
+                typeof(ExportConditionalObject1),
+                typeof(ExportConditionalObject2),
+                typeof(ExportConditionalObject3));
+
+            var serviceRegistrations = container.GetServiceRegistrations()
+                //.Where(r => r.Factory.Setup.AsResolutionRoot)
+                .ToArray();
+        }
     }
 }

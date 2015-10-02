@@ -88,7 +88,7 @@ namespace DryIocZero
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
-        public object ResolveDefault(Type serviceType, bool ifUnresolvedReturnDefault)
+        public object ResolveNonKeyedServiceFast(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             object service = null;
             if (_defaultFactories.Value.IsEmpty)
@@ -132,12 +132,12 @@ namespace DryIocZero
         /// <param name="scope">Propagated resolution scope.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         /// <remarks>
-        /// This method covers all possible resolution input parameters comparing to <see cref="IResolver.ResolveDefault"/>, and
-        /// by specifying the same parameters as for <see cref="IResolver.ResolveDefault"/> should return the same result.
+        /// This method covers all possible resolution input parameters comparing to <see cref="IResolver.ResolveNonKeyedServiceFast"/>, and
+        /// by specifying the same parameters as for <see cref="IResolver.ResolveNonKeyedServiceFast"/> should return the same result.
         /// </remarks>
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
-        public object ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
+        public object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
         {
             object service = null;
             if (_keyedFactories.Value.IsEmpty)
@@ -147,12 +147,12 @@ namespace DryIocZero
                 else
                     ResolveGenerated(ref service, serviceType, serviceKey, scope);
             }
-            return service ?? ResolveKeyedFromRuntimeRegistrationsFirst(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, scope);
+            return service ?? ResolveFromRuntimeRegistrationsFirst(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, scope);
         }
 
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
-        private object ResolveKeyedFromRuntimeRegistrationsFirst(Type serviceType, object serviceKey,
+        private object ResolveFromRuntimeRegistrationsFirst(Type serviceType, object serviceKey,
             bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
         {
             serviceType = requiredServiceType ?? serviceType;
@@ -450,7 +450,7 @@ namespace DryIocZero
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
-        object ResolveDefault(Type serviceType, bool ifUnresolvedReturnDefault);
+        object ResolveNonKeyedServiceFast(Type serviceType, bool ifUnresolvedReturnDefault);
 
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
@@ -461,10 +461,10 @@ namespace DryIocZero
         /// <param name="scope">Propagated resolution scope.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         /// <remarks>
-        /// This method covers all possible resolution input parameters comparing to <see cref="ResolveDefault"/>, and
-        /// by specifying the same parameters as for <see cref="ResolveDefault"/> should return the same result.
+        /// This method covers all possible resolution input parameters comparing to <see cref="ResolveNonKeyedServiceFast"/>, and
+        /// by specifying the same parameters as for <see cref="ResolveNonKeyedServiceFast"/> should return the same result.
         /// </remarks>
-        object ResolveKeyed(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope);
+        object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with

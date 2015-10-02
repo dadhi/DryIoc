@@ -21,7 +21,7 @@ namespace DryIoc.IssuesTests
             {
 				var rootExpr = scope.Resolve<LambdaExpression>(typeof(Root));
                 var rootStr = rootExpr.ToString();
-                var resolveCallIndex = rootStr.IndexOf("ResolveKeyed(", StringComparison.Ordinal);
+                var resolveCallIndex = rootStr.IndexOf("Resolve(", StringComparison.Ordinal);
                 Assert.AreNotEqual(-1, resolveCallIndex);
             }
 		}

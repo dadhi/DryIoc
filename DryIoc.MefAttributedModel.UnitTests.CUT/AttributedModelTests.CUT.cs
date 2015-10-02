@@ -313,13 +313,13 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public ForImportCondition3ParentAttribute() : base(typeof(ImportConditionObject3)) { }
     }
 
-    [ForImportCondition1Parent]
-    public class ExportConditionalObject : IExportConditionInterface { }
+    [ForImportCondition1Parent, AsResolutionCall]
+    public class ExportConditionalObject1 : IExportConditionInterface { }
 
     [ForImportCondition2Parent]
     public class ExportConditionalObject2 : IExportConditionInterface { }
 
-    [ForImportCondition3Parent]
+    [ForImportCondition3Parent, AsResolutionCall]
     public class ExportConditionalObject3 : IExportConditionInterface { }
 
     [Export]

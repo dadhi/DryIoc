@@ -13,7 +13,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
             container.Register(typeof(Potato), (r, scope) => new Potato());
 
-            var potato = container.ResolveDefault(typeof(Potato), false);
+            var potato = container.ResolveNonKeyedServiceFast(typeof(Potato), false);
             
             Assert.IsNotNull(potato);
         }
@@ -24,7 +24,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
             container.Register(typeof(Potato), "mashed", (r, scope) => new Potato());
 
-            var potato = container.ResolveKeyed(typeof(Potato), "mashed", false, null, null);
+            var potato = container.Resolve(typeof(Potato), "mashed", false, null, null);
 
             Assert.IsNotNull(potato);
         }
@@ -38,7 +38,7 @@ namespace DryIocZero.UnitTests
             container.Register(typeof(Potato), (r, scope) => new Potato());
             using (var scope = container.OpenScope())
             {
-                var potato = scope.ResolveDefault(typeof(Potato), false);
+                var potato = scope.ResolveNonKeyedServiceFast(typeof(Potato), false);
                 Assert.IsNotNull(potato);
             }
         }
@@ -49,7 +49,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
             container.Register(typeof(Potato), (r, scope) => new Potato());
             container.Dispose();
-            Assert.Throws<ContainerException>(() => container.ResolveDefault(typeof(Potato), false));
+            Assert.Throws<ContainerException>(() => container.ResolveNonKeyedServiceFast(typeof(Potato), false));
         }
 
         [Test]
@@ -57,9 +57,9 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var service = container.ResolveDefault(typeof(ISomeDb), false);
+            var service = container.ResolveNonKeyedServiceFast(typeof(ISomeDb), false);
             Assert.NotNull(service);
-            Assert.AreSame(service, container.ResolveDefault(typeof(ISomeDb), false));
+            Assert.AreSame(service, container.ResolveNonKeyedServiceFast(typeof(ISomeDb), false));
         }
 
         [Test]
@@ -67,9 +67,9 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var service = container.ResolveKeyed(typeof(IMultiExported), "c", false, null, null);
+            var service = container.Resolve(typeof(IMultiExported), "c", false, null, null);
             Assert.NotNull(service);
-            Assert.AreSame(service, container.ResolveKeyed(typeof(IMultiExported), "c", false, null, null));
+            Assert.AreSame(service, container.Resolve(typeof(IMultiExported), "c", false, null, null));
         }
 
         [Test]
@@ -78,7 +78,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<ContainerException>(
-                () => container.ResolveDefault(typeof(NotRegistered), false));
+                () => container.ResolveNonKeyedServiceFast(typeof(NotRegistered), false));
 
             Assert.AreEqual(ex.Error, Error.UnableToResolveDefaultService);
         }
@@ -88,7 +88,7 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var nullService = container.ResolveDefault(typeof(NotRegistered), true);
+            var nullService = container.ResolveNonKeyedServiceFast(typeof(NotRegistered), true);
 
             Assert.IsNull(nullService);
         }
