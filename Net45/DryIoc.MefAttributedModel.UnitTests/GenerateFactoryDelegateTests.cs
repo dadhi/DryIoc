@@ -46,7 +46,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var container = new Container(rules => rules
                 .WithMefAttributedModel()
                 .WithoutEagerCachingSingletonForFasterAccess()
-                .WithEagerGenerationOfResolutionCallsExpressions());
+                .WithEagerGenerationOfResolutionCallExpressions());
 
             container.RegisterExports(
                 typeof(ImportConditionObject1),

@@ -4,7 +4,7 @@ setlocal EnableDelayedExpansion
 
 set NUNIT="packages\NUnit.Runners\tools\nunit-console.exe"
 set OPENCOVER="packages\OpenCover\OpenCover.Console.exe"
-set REPORTGEN="packages\ReportGenerator\ReportGenerator.exe"
+set REPORTGEN="packages\ReportGenerator.2.3.2.0\tools\ReportGenerator.exe"
 set REPORTS=bin\Reports
 set COVERAGE="%REPORTS%\Coverage.xml"
 
@@ -37,7 +37,7 @@ echo:
 %REPORTGEN%^
  -reports:%COVERAGE%^
  -targetdir:%REPORTS%^
- -reporttypes:Html;HtmlSummary^
+ -reporttypes:Html;HtmlSummary;Badges^
  -filters:-*Test*
 
 rem start %REPORTS%\index.htm

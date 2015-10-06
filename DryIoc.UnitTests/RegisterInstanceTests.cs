@@ -151,5 +151,44 @@ namespace DryIoc.UnitTests
                 return request.Scopes.SingletonScope.GetScopedItemIdOrSelf(factoryID);
             }
         }
+
+        [Test]
+        public void Can_register_instance_with_keep_option()
+        {
+            var container = new Container();
+            container.RegisterInstance("a");
+
+            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+
+            var s = container.Resolve<string>();
+            Assert.AreEqual("a", s);
+        }
+
+        [Test]
+        public void Given_multiple_already_registered_services_When_registering_with_keep_option_Then_no_exception_should_be_thrown()
+        {
+            var container = new Container();
+
+            container.RegisterInstance("a");
+            container.RegisterInstance("b");
+
+            Assert.DoesNotThrow(() => 
+            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep));
+        }
+
+        [Test]
+        public void Given_multiple_already_registered_services_When_registering_with_Replace_option_Then_no_exception_should_be_thrown()
+        {
+            var container = new Container();
+
+            container.RegisterInstance("a");
+            container.RegisterInstance("b");
+
+            Assert.DoesNotThrow(() =>
+            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Replace));
+
+            var strings = container.Resolve<string[]>();
+            CollectionAssert.AreEqual(new[] { "a", "x" }, strings);
+        }
     }
 }
