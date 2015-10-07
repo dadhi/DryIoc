@@ -411,4 +411,24 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     [Export, AllowsDisposableTransient]
     public sealed class Abc { }
+
+    public class Daah<A>
+    {
+        [Export, AsFactory]
+        public class Fooh<B> where B : A
+        {
+            [Export]
+            public static Aaa<T> GetA<T>() where T : B, new()
+            {
+                return new Aaa<T>();
+            }
+        }
+    }
+
+    public class A1 { }
+    public class A2 : A1 { }
+
+    public class Aaa<T>
+    {
+    }
 }

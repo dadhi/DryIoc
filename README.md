@@ -18,11 +18,11 @@ DryIoc is small, fast, and skillful IoC Container for .NET
 
 * Designed for low-ceremony use, performance, and extensibility.
 * Supports .NET PCL, 3.5, 4.0, 4.5.
-* [Wiki documentation][WikiHome]
-* [Notes for contributors](CONTRIBUTING.md)
-* Available from NuGet as [DryIoc.dll] or source [DryIoc] (_in NuGet < 3.0_)
+* [Documentation wiki][WikiHome]
+* [Contributing guide](CONTRIBUTING.md)
+* Available at NuGet as [DryIoc.dll] or source [DryIoc] (_in NuGet < 3.0_)
 * __DryIoc v2.0-rc3__ is the latest: `PM> Install-Package DryIoc.dll -Pre`
-    * [What's new](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-versions)
+    * [What's New](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-versions)
 * __DryIoc v1.4.1__ is stable: `PM> Install-Package DryIoc.dll`
 
 ## Benchmarks

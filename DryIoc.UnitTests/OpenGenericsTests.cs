@@ -512,5 +512,4 @@ namespace DryIoc.UnitTests
 
         #endregion
     }
-
 }

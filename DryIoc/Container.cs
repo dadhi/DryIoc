@@ -299,9 +299,6 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope,
             RequestInfo preResolveParent)
         {
-            if (scope != null)
-                scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
-
             if (preResolveParent == null)
                 preResolveParent = RequestInfo.Empty;
 
@@ -313,6 +310,9 @@ namespace DryIoc
             if (!preResolveParent.IsEmpty)
                 cacheContextKey = cacheContextKey == null ? (object)preResolveParent
                      : new KV<object, RequestInfo>(cacheContextKey, preResolveParent);
+
+            if (scope != null)
+                scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
 
             // Check cache first:
             var registryValue = _registry.Value;
@@ -2392,17 +2392,14 @@ namespace DryIoc
         }
         
         /// <summary>Instructs to generate ResolutionCall dependency creation expression, instead of just Resolve call expression.</summary>
-        public bool EagerGenerationOfResolutionCallExpressions
-        {
-            get { return (_settings & Settings.EagerGenerationOfResolutionCallExpressions) != 0; }
-        }
+        public Ref<ImTreeMap<RequestInfo, Expression>> DependencyResolutionCallExpressions { get; private set; }
 
-        /// <summary>Disables <see cref="EagerGenerationOfResolutionCallExpressions"/></summary>
+        /// <summary>Disables <see cref="DependencyResolutionCallExpressions"/></summary>
         /// <returns>New rules with singleton optimization turned off.</returns>
-        public Rules WithEagerGenerationOfResolutionCallExpressions()
+        public Rules WithDependencyResolutionCallExpressions()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules._settings &= Settings.EagerGenerationOfResolutionCallExpressions;
+            newRules.DependencyResolutionCallExpressions = Ref.Of(ImTreeMap<RequestInfo, Expression>.Empty);
             return newRules;
         }
 
@@ -2470,8 +2467,7 @@ namespace DryIoc
             ImplicitCheckForReuseMatchingScope = 4,
             VariantGenericTypesInResolvedCollection = 8,
             ResolveIEnumerableAsLazyEnumerable = 16,
-            EagerCachingSingletonForFasterAccess = 32,
-            EagerGenerationOfResolutionCallExpressions = 64
+            EagerCachingSingletonForFasterAccess = 32
         }
 
         private const Settings DEFAULT_SETTINGS =
@@ -3665,28 +3661,44 @@ namespace DryIoc
         {
             var container = request.Container;
             var serviceType = request.ServiceType;
+            var serviceKey = request.ServiceKey;
+            var newPreResolveParent = request.ParentOrWrapper;
 
-            if (container.Rules.EagerGenerationOfResolutionCallExpressions)
+            if (container.Rules.DependencyResolutionCallExpressions != null &&
+                (request.PreResolveParent.IsEmpty ||
+                !request.PreResolveParent.EqualsWithoutParent(newPreResolveParent)))
             {
-                ; // todo: Generate expression and put into some storage
+                var scope = request.Scope;
+                if (scope != null)
+                    scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
+
+                var newRequest = request.Container.EmptyRequest.Push(serviceType, serviceKey,
+                    IfUnresolved.ReturnDefault, request.RequiredServiceType, scope,
+                    newPreResolveParent);
+
+                var factory = request.Container.ResolveFactory(newRequest);
+                var factoryExpr = factory == null ? null : factory.GetExpressionOrDefault(newRequest);
+                if (factoryExpr != null)
+                    container.Rules.DependencyResolutionCallExpressions.Swap(
+                        expr => expr.AddOrUpdate(newRequest.ToRequestInfo(), factoryExpr));
             }
 
             var serviceTypeExpr = container.GetOrAddStateItemExpression(serviceType, typeof(Type));
             var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.ReturnDefault, typeof(bool));
             var requiredServiceTypeExpr = container.GetOrAddStateItemExpression(request.RequiredServiceType, typeof(Type));
-            var serviceKeyExpr = Expression.Convert(container.GetOrAddStateItemExpression(request.ServiceKey), typeof(object));
+            var serviceKeyExpr = Expression.Convert(container.GetOrAddStateItemExpression(serviceKey), typeof(object));
 
             var getOrNewCallExpr = openResolutionScope
                 ? Container.GetResolutionScopeExpression(request)
                 : Container.ResolutionScopeParamExpr;
 
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
-            var preResolveParent = ToExpression(request.ParentOrWrapper, container);
+            var preResolveParentExpr = ToExpression(newPreResolveParent, container);
 
             var resolveCallExpr = Expression.Call(
                 Container.ResolverExpr, "Resolve", ArrayTools.Empty<Type>(),
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr, getOrNewCallExpr,
-                preResolveParent);
+                preResolveParentExpr);
 
             var resolveExpr = Expression.Convert(resolveCallExpr, serviceType);
             return resolveExpr;
@@ -4287,7 +4299,7 @@ namespace DryIoc
         public bool IsResolutionCall { get { return !IsEmpty && _parent.IsEmpty; } }
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool IsResolutionRoot { get { return IsResolutionCall && _preResolveParent.IsEmpty; } }
+        public bool IsResolutionRoot { get { return IsResolutionCall && PreResolveParent.IsEmpty; } }
 
         /// <summary>Returns true for the First Service in resolve call.</summary> <returns></returns>
         public bool IsFirstNonWrapperInResolutionCall()
@@ -4329,7 +4341,7 @@ namespace DryIoc
                     return RequestInfo.Empty;
 
                 if (_parent.IsEmpty)
-                    return _preResolveParent.Enumerate().FirstOrDefault(p => p.FactoryType != FactoryType.Wrapper)
+                    return PreResolveParent.Enumerate().FirstOrDefault(p => p.FactoryType != FactoryType.Wrapper)
                         ?? RequestInfo.Empty;
 
                 return _parent.FactoryType != FactoryType.Wrapper
@@ -4344,9 +4356,19 @@ namespace DryIoc
             get
             {
                 return IsEmpty ? RequestInfo.Empty
-                    : _parent.IsEmpty ? _preResolveParent
+                    : _parent.IsEmpty ? PreResolveParent
                     : _parent.ToRequestInfo();
             }
+        }
+
+        /// <summary>Get first parfent request with satisfied condition.</summary>
+        /// <param name="condition">Condition to stop on.</param> <returns>Request info of found parent.</returns>
+        public RequestInfo FirstParentOrEmpty(Func<RequestInfo, bool> condition) // todo: add explicit skipWrappers parameter
+        {
+            var p = ParentOrWrapper;
+            while (!p.IsEmpty && !condition(p))
+                p = p.Parent;
+            return p;
         }
 
         /// <summary>Counting nesting levels. May be used to split object graph if level is too deep.</summary>
@@ -4409,7 +4431,7 @@ namespace DryIoc
 
             ResolvedFactory.ThrowIfNull(Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
             var inheritedInfo = info.InheritInfoFromDependencyOwner(_serviceInfo, ResolvedFactory.Setup.FactoryType != FactoryType.Service);
-            return new Request(this, ContainerWeakRef, _scopesWeakRef, inheritedInfo, null, FuncArgs, Scope, _preResolveParent, Level + 1);
+            return new Request(this, ContainerWeakRef, _scopesWeakRef, inheritedInfo, null, FuncArgs, Scope, PreResolveParent, Level + 1);
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls Push.</summary>
@@ -4435,7 +4457,7 @@ namespace DryIoc
         public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
             var changedServiceInfo = getInfo(_serviceInfo);
-            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, changedServiceInfo, ResolvedFactory, FuncArgs, Scope, _preResolveParent, Level);
+            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, changedServiceInfo, ResolvedFactory, FuncArgs, Scope, PreResolveParent, Level);
         }
 
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -4469,7 +4491,7 @@ namespace DryIoc
 
             var funcArgsUsage = new bool[funcArgExprs.Length];
             var funcArgsUsageAndExpr = new KV<bool[], ParameterExpression[]>(funcArgsUsage, funcArgExprs);
-            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, ResolvedFactory, funcArgsUsageAndExpr, Scope, _preResolveParent, Level);
+            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, ResolvedFactory, funcArgsUsageAndExpr, Scope, PreResolveParent, Level);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container, 
@@ -4478,7 +4500,7 @@ namespace DryIoc
         /// <returns>Request with replaced container.</returns>
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
-            return new Request(_parent, newContainer, _scopesWeakRef, _serviceInfo, ResolvedFactory, FuncArgs, Scope, _preResolveParent, Level);
+            return new Request(_parent, newContainer, _scopesWeakRef, _serviceInfo, ResolvedFactory, FuncArgs, Scope, PreResolveParent, Level);
         }
 
         /// <summary>Returns new request with set <see cref="ResolvedFactory"/>.</summary>
@@ -4494,7 +4516,7 @@ namespace DryIoc
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID,
                         Error.RecursiveDependencyDetected, Print(factory.FactoryID));
 
-            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, factory, FuncArgs, Scope, _preResolveParent, Level);
+            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, factory, FuncArgs, Scope, PreResolveParent, Level);
         }
 
         /// <summary>Converts input request into its slim version of <see cref="RequestInfo"/> </summary>
@@ -4507,7 +4529,7 @@ namespace DryIoc
                     ServiceType, RequiredServiceType, ServiceKey,
                     FactoryType, ImplementationType, ReuseLifespan,
                     _parent.IsEmpty
-                        ? _preResolveParent
+                        ? PreResolveParent
                         : _parent.ToRequestInfo());
         }
 
@@ -4559,8 +4581,8 @@ namespace DryIoc
                     s = s.Append(" <--recursive");
             }
 
-            if (!_preResolveParent.IsEmpty)
-                s = s.AppendLine().Append("  in ").Append(_preResolveParent);
+            if (!PreResolveParent.IsEmpty)
+                s = s.AppendLine().Append("  in ").Append(PreResolveParent);
 
             return s;
         }
@@ -4586,7 +4608,7 @@ namespace DryIoc
         {
             ContainerWeakRef = containerWeakRef;
             _scopesWeakRef = scopesWeakRef;
-            _preResolveParent = preResolveParent;
+            PreResolveParent = preResolveParent;
             Scope = scope;
 
             _serviceInfo = serviceInfo;
@@ -4604,7 +4626,9 @@ namespace DryIoc
         private IServiceInfo _serviceInfo;
 
         private readonly ContainerWeakRef _scopesWeakRef;
-        private readonly RequestInfo _preResolveParent;
+
+        /// <summary>Outside context provided for request from Resolve method.</summary>
+        public readonly RequestInfo PreResolveParent;
 
         private readonly Request _parent;
 
@@ -6878,21 +6902,33 @@ namespace DryIoc
             return Print(new StringBuilder()).ToString();
         }
 
-        /// <summary>Returns true if request info and passed object are equal, and threir parents recursively are equal.</summary>
+        /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
         /// <param name="obj"></param> <returns></returns>
         public override bool Equals(object obj)
         {
-            var other = obj as RequestInfo;
-            return other != null
-                && other.ServiceType == ServiceType
+            return Equals(obj as RequestInfo);
+        }
+
+        /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
+        /// <param name="other"></param> <returns></returns>
+        public bool Equals(RequestInfo other)
+        {
+            return other != null && EqualsWithoutParent(other) 
+                && (Parent == null && other.Parent == null
+                || (Parent != null && Parent.EqualsWithoutParent(other.Parent)));
+        }
+
+        /// <summary>Compares infos regarding properies but not their parents.</summary>
+        /// <param name="other">Info to compare for equality.</param> <returns></returns>
+        public bool EqualsWithoutParent(RequestInfo other)
+        {
+            return other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
                 && other.ServiceKey == ServiceKey
 
                 && other.FactoryType == FactoryType
                 && other.ImplementationType == ImplementationType
-                && other.ReuseLifespan == ReuseLifespan
-
-                && Equals(other.Parent, Parent);
+                && other.ReuseLifespan == ReuseLifespan;
         }
 
         /// <summary>Returns hash code combined from info fields plus its parent.</summary>
@@ -6957,8 +6993,7 @@ namespace DryIoc
         /// This method covers all possible resolution input parameters comparing to <see cref="ResolveNonKeyedServiceFast"/>, and
         /// by specifying the same parameters as for <see cref="ResolveNonKeyedServiceFast"/> should return the same result.
         /// </remarks>
-        object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope,
-            RequestInfo preResolveParent);
+        object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope, RequestInfo preResolveParent);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with

@@ -1,5 +1,7 @@
-﻿using System.Linq;
+﻿using System.ComponentModel.Composition;
+using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
+using DryIocAttributes;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
@@ -95,6 +97,32 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 .ToArray();
 
             Assert.AreEqual(1, registrations.Length);
+        }
+
+        [Test, Explicit("Related to #141: Support Decorators with open-generic factory methods of T")]
+        public void Can_export_decorator_of_T()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(Bee), typeof(D));
+
+            container.Resolve<IBug>();
+        }
+
+        internal interface IBug { }
+        
+        [Export(typeof(IBug))]
+        internal class Bee : IBug
+        {
+        }
+
+        [Export, AsFactory]
+        internal static class D
+        {
+            [Export(typeof(IBug)), AsDecorator]
+            public static TBug Decorate<TBug>(TBug bug) where TBug : IBug
+            {
+                return bug;
+            }
         }
     }
 }
