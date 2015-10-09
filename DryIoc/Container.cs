@@ -4261,15 +4261,14 @@ namespace DryIoc
     /// Request implements <see cref="IResolver"/> interface on top of provided container, which could be use by delegate factories.</summary>
     public sealed class Request
     {
-        // todo
-        class ResolverContext
+        internal sealed class ResolverContext
         {
             public readonly ContainerWeakRef ContainerWeakRef;
             public readonly ContainerWeakRef ScopesWeakRef;
-            public readonly Scope Scope;
+            public readonly IScope Scope;
             public readonly RequestInfo PreResolveParent;
 
-            public ResolverContext(ContainerWeakRef container, ContainerWeakRef scopes, Scope scope, RequestInfo preResolveParent)
+            public ResolverContext(ContainerWeakRef container, ContainerWeakRef scopes, IScope scope, RequestInfo preResolveParent)
             {
                 ContainerWeakRef = container;
                 ScopesWeakRef = scopes;
@@ -4277,9 +4276,21 @@ namespace DryIoc
                 PreResolveParent = preResolveParent;
             }
 
-            public ResolverContext WithNewContainer(ContainerWeakRef newContainer)
+            public ResolverContext With(ContainerWeakRef newContainer)
             {
                 return new ResolverContext(newContainer, ScopesWeakRef, Scope, PreResolveParent);
+            }
+
+            public ResolverContext With(IScope scope)
+            {
+                return scope == null ? this
+                    : new ResolverContext(ContainerWeakRef, ScopesWeakRef, scope, PreResolveParent);
+            }
+
+            public ResolverContext With(RequestInfo preResolveParent)
+            {
+                return preResolveParent == null || preResolveParent.IsEmpty ? this
+                    : new ResolverContext(ContainerWeakRef, ScopesWeakRef, Scope, preResolveParent);
             }
         }
 
@@ -4289,7 +4300,8 @@ namespace DryIoc
         /// <returns>New empty request.</returns>
         public static Request CreateEmpty(ContainerWeakRef container)
         {
-            return new Request(null, container, container, null, null, null, null, RequestInfo.Empty);
+            var resolverContext = new ResolverContext(container, container, null, RequestInfo.Empty);
+            return new Request(null, resolverContext, null, null, null);
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="_serviceInfo"/> in such a request.</summary>
@@ -4300,6 +4312,9 @@ namespace DryIoc
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
         public bool IsResolutionRoot { get { return IsResolutionCall && PreResolveParent.IsEmpty; } }
+
+        /// <summary>Request prior to Resolve call.</summary>
+        public RequestInfo PreResolveParent { get { return _resolverContext.PreResolveParent; } }
 
         /// <summary>Returns true for the First Service in resolve call.</summary> <returns></returns>
         public bool IsFirstNonWrapperInResolutionCall()
@@ -4371,29 +4386,29 @@ namespace DryIoc
             return p;
         }
 
-        /// <summary>Counting nesting levels. May be used to split object graph if level is too deep.</summary>
-        public readonly int Level;
-
         /// <summary>Weak reference to container. May be replaced in request flowed from parent to child container.</summary>
-        public readonly ContainerWeakRef ContainerWeakRef;
-
-        /// <summary>Optionally associated resolution scope.</summary>
-        public readonly IScope Scope;
-
-        /// <summary>Factory found in container to resolve this request.</summary>
-        public readonly Factory ResolvedFactory;
-
-        // note: Mutable: tracks used parameters
-        /// <summary>User provided arguments: key tracks what args are still unused.</summary>
-        public readonly KV<bool[], ParameterExpression[]> FuncArgs;
+        public ContainerWeakRef ContainerWeakRef { get { return _resolverContext.ContainerWeakRef; } }
 
         /// <summary>Provides access to container currently bound to request. 
         /// By default it is container initiated request by calling resolve method,
         /// but could be changed along the way: for instance when resolving from parent container.</summary>
-        public IContainer Container { get { return ContainerWeakRef.Container; } }
+        public IContainer Container { get { return _resolverContext.ContainerWeakRef.Container; } }
 
         /// <summary>Separate from container because while container may be switched from parent to child, scopes should be from child/facade.</summary>
-        public IScopeAccess Scopes { get { return _scopesWeakRef.Scopes; } }
+        public IScopeAccess Scopes { get { return _resolverContext.ScopesWeakRef.Scopes; } }
+
+        /// <summary>Optionally associated resolution scope.</summary>
+        public IScope Scope { get { return _resolverContext.Scope; } }
+
+        /// <summary>Factory found in container to resolve this request.</summary>
+        public readonly Factory ResolvedFactory;
+
+        /// <summary>User provided arguments: key tracks what args are still unused.</summary>
+        /// <remarks>Mutable: tracks used parameters</remarks>
+        public readonly KV<bool[], ParameterExpression[]> FuncArgs;
+
+        /// <summary>Counting nesting levels. May be used to split object graph if level is too deep.</summary>
+        public readonly int Level;
 
         /// <summary>Shortcut access to <see cref="IServiceInfo.ServiceType"/>.</summary>
         public Type ServiceType { get { return _serviceInfo == null ? null : _serviceInfo.ServiceType; } }
@@ -4423,15 +4438,15 @@ namespace DryIoc
         /// <remarks>Existing/parent request should be resolved to factory (<see cref="WithResolvedFactory"/>), before pushing info into it.</remarks>
         public Request Push(IServiceInfo info, IScope scope = null, RequestInfo preResolveParent = null)
         {
+            info.ThrowIfNull();
             if (IsEmpty)
-                return new Request(this, ContainerWeakRef, _scopesWeakRef, info.ThrowIfNull(), null, null,
-                    scope /* input scope provided only for first request when Resolve called */,
-                    preResolveParent ?? RequestInfo.Empty,
-                    level: 1);
+                return new Request(this, 
+                    _resolverContext.With(scope).With(preResolveParent), 
+                    info, null, null, level: 1);
 
             ResolvedFactory.ThrowIfNull(Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
             var inheritedInfo = info.InheritInfoFromDependencyOwner(_serviceInfo, ResolvedFactory.Setup.FactoryType != FactoryType.Service);
-            return new Request(this, ContainerWeakRef, _scopesWeakRef, inheritedInfo, null, FuncArgs, Scope, PreResolveParent, Level + 1);
+            return new Request(this, _resolverContext, inheritedInfo, null, FuncArgs, Level + 1);
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls Push.</summary>
@@ -4457,7 +4472,7 @@ namespace DryIoc
         public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
             var changedServiceInfo = getInfo(_serviceInfo);
-            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, changedServiceInfo, ResolvedFactory, FuncArgs, Scope, PreResolveParent, Level);
+            return new Request(_parent, _resolverContext, changedServiceInfo, ResolvedFactory, FuncArgs, Level);
         }
 
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -4491,7 +4506,7 @@ namespace DryIoc
 
             var funcArgsUsage = new bool[funcArgExprs.Length];
             var funcArgsUsageAndExpr = new KV<bool[], ParameterExpression[]>(funcArgsUsage, funcArgExprs);
-            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, ResolvedFactory, funcArgsUsageAndExpr, Scope, PreResolveParent, Level);
+            return new Request(_parent, _resolverContext, _serviceInfo, ResolvedFactory, funcArgsUsageAndExpr, Level);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container, 
@@ -4500,7 +4515,8 @@ namespace DryIoc
         /// <returns>Request with replaced container.</returns>
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
-            return new Request(_parent, newContainer, _scopesWeakRef, _serviceInfo, ResolvedFactory, FuncArgs, Scope, PreResolveParent, Level);
+            return new Request(_parent, _resolverContext.With(newContainer), 
+                _serviceInfo, ResolvedFactory, FuncArgs, Level);
         }
 
         /// <summary>Returns new request with set <see cref="ResolvedFactory"/>.</summary>
@@ -4516,7 +4532,7 @@ namespace DryIoc
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID,
                         Error.RecursiveDependencyDetected, Print(factory.FactoryID));
 
-            return new Request(_parent, ContainerWeakRef, _scopesWeakRef, _serviceInfo, factory, FuncArgs, Scope, PreResolveParent, Level);
+            return new Request(_parent, _resolverContext, _serviceInfo, factory, FuncArgs, Level);
         }
 
         /// <summary>Converts input request into its slim version of <see cref="RequestInfo"/> </summary>
@@ -4596,41 +4612,22 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(Request parent,
-            ContainerWeakRef containerWeakRef,
-            ContainerWeakRef scopesWeakRef,
-            IServiceInfo serviceInfo,
-            Factory resolvedFactory,
-            KV<bool[], ParameterExpression[]> funcArgs,
-            IScope scope,
-            RequestInfo preResolveParent = null,
+        internal Request(Request parent, ResolverContext resolverContext, 
+            IServiceInfo serviceInfo, Factory resolvedFactory, 
+            KV<bool[], ParameterExpression[]> funcArgs, 
             int level = 0)
         {
-            ContainerWeakRef = containerWeakRef;
-            _scopesWeakRef = scopesWeakRef;
-            PreResolveParent = preResolveParent;
-            Scope = scope;
-
-            _serviceInfo = serviceInfo;
-
-            ResolvedFactory = resolvedFactory;
-
-            FuncArgs = funcArgs;
-
             _parent = parent;
-
+            _resolverContext = resolverContext;
+            _serviceInfo = serviceInfo;
+            ResolvedFactory = resolvedFactory;
+            FuncArgs = funcArgs;
             Level = level;
         }
 
-        // note: Mutable: may change service key from null to exact Default.
-        private IServiceInfo _serviceInfo;
-
-        private readonly ContainerWeakRef _scopesWeakRef;
-
-        /// <summary>Outside context provided for request from Resolve method.</summary>
-        public readonly RequestInfo PreResolveParent;
-
         private readonly Request _parent;
+        private readonly ResolverContext _resolverContext;
+        private IServiceInfo _serviceInfo; // note: Mutable so the default key could be set
 
         #endregion
     }
