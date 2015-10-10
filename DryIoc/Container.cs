@@ -2528,7 +2528,7 @@ namespace DryIoc
             if (request.IsWrappedInFuncWithArgs())
             {
                 // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
-                var funcType = request.ParentOrWrapper.ServiceType;
+                var funcType = request.Ancestor().ServiceType;
                 var funcArgs = funcType.GetGenericParamsAndArgs();
                 var inputArgCount = funcArgs.Length - 1;
 
@@ -3662,7 +3662,7 @@ namespace DryIoc
             var container = request.Container;
             var serviceType = request.ServiceType;
             var serviceKey = request.ServiceKey;
-            var newPreResolveParent = request.ParentOrWrapper;
+            var newPreResolveParent = request.Ancestor();
 
             if (container.Rules.DependencyResolutionCallExpressions != null &&
                 (request.PreResolveParent.IsEmpty ||
@@ -3673,7 +3673,7 @@ namespace DryIoc
                     scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
 
                 var newRequest = request.Container.EmptyRequest.Push(serviceType, serviceKey,
-                    IfUnresolved.ReturnDefault, request.RequiredServiceType, scope,
+                    request.IfUnresolved, request.RequiredServiceType, scope,
                     newPreResolveParent);
 
                 var factory = request.Container.ResolveFactory(newRequest);
@@ -4347,7 +4347,7 @@ namespace DryIoc
                     .Any(r => r.ServiceType.IsFuncWithArgs());
         }
 
-        /// <summary>Searches parent request stack upward and returns closest parent of <see cref="DryIoc.FactoryType.Service"/>.</summary>
+        /// <summary>Returns "logical" parent of request, skip immediate parent wrappers if any.</summary>
         public RequestInfo Parent
         {
             get
@@ -4365,25 +4365,21 @@ namespace DryIoc
             }
         }
 
-        /// <summary>Immediate parent including wrappers.</summary>
-        public RequestInfo ParentOrWrapper
+        /// <summary>Gets first ancestor request which satisfies the condition, 
+        /// or empty if no ancestor is found.</summary>
+        /// <param name="condition">(optional) Condition to stop on.</param>
+        /// <returns>Request info of found parent.</returns>
+        public RequestInfo Ancestor(Func<RequestInfo, bool> condition = null)
         {
-            get
-            {
-                return IsEmpty ? RequestInfo.Empty
-                    : _parent.IsEmpty ? PreResolveParent
-                    : _parent.ToRequestInfo();
-            }
-        }
+            if (IsEmpty)
+                return RequestInfo.Empty;
 
-        /// <summary>Get first parfent request with satisfied condition.</summary>
-        /// <param name="condition">Condition to stop on.</param> <returns>Request info of found parent.</returns>
-        public RequestInfo FirstParentOrEmpty(Func<RequestInfo, bool> condition) // todo: add explicit skipWrappers parameter
-        {
-            var p = ParentOrWrapper;
-            while (!p.IsEmpty && !condition(p))
-                p = p.Parent;
-            return p;
+            var parent = _parent.IsEmpty ? PreResolveParent : _parent.ToRequestInfo();
+            if (condition != null)
+                while (!parent.IsEmpty && !condition(parent))
+                    parent = parent.Parent;
+
+            return parent;
         }
 
         /// <summary>Weak reference to container. May be replaced in request flowed from parent to child container.</summary>
@@ -4995,7 +4991,7 @@ namespace DryIoc
             if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolutionCall()
                 || request.Level >= request.Container.Rules.LevelToSplitObjectGraphIntoResolveCalls
                 // note: Split only if not wrapped in Func with args - Propagation of args across Resolve boundaries is not supported at the moment
-                && !request.ParentOrWrapper.Enumerate().Any(p => p.ServiceType.IsFuncWithArgs()))
+                && request.Ancestor(p => p.ServiceType.IsFuncWithArgs()).IsEmpty)
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             request = request.WithResolvedFactory(this);
@@ -5022,7 +5018,7 @@ namespace DryIoc
                 // The singleton optimization: eagerly create singleton and put it into state for fast access.
                 if (Reuse is SingletonReuse &&
                     FactoryType == FactoryType.Service &&
-                    !request.ParentOrWrapper.Enumerate().Any(r => r.ServiceType.IsFunc()) &&
+                    request.Ancestor(r => r.ServiceType.IsFunc()).IsEmpty &&
                     request.Container.Rules.EagerCachingSingletonForFasterAccess)
                     serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
                 else
@@ -5058,8 +5054,7 @@ namespace DryIoc
 
             if (reuse.Lifespan < parent.ReuseLifespan)
                 Throw.It(Error.DependencyHasShorterReuseLifespan,
-                    request.PrintCurrent(), reuse,
-                    parent.ReuseLifespan, request.ParentOrWrapper);
+                    request.PrintCurrent(), reuse, parent.ReuseLifespan, request.Ancestor());
         }
 
         /// <summary>Creates factory delegate from service expression and returns it.
