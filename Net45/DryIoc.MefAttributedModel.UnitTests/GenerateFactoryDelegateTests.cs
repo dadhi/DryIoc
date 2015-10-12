@@ -94,6 +94,43 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(1, depList.Length);
         }
 
+        [Test]
+        public void Can_generate_expression_for_all_ResolutionRoots()
+        {
+            IContainer container = new Container(rules => rules
+                .WithMefAttributedModel()
+                .WithoutEagerCachingSingletonForFasterAccess()
+                .WithDependencyResolutionCallExpressions());
+
+            container.RegisterExports(
+                typeof(ImportConditionObject1),
+                typeof(ImportConditionObject2),
+                typeof(ImportConditionObject3),
+                typeof(ExportConditionalObject1),
+                typeof(ExportConditionalObject2),
+                typeof(ExportConditionalObject3));
+
+            var serviceRegistrations = container.GetServiceRegistrations()
+                .Where(r => r.Factory.Setup.AsResolutionRoot)
+                .ToArray();
+
+            var roots = ImTreeMap<KV<Type, object>, Expression>.Empty;
+            foreach (var r in serviceRegistrations)
+            {
+                var request = container.EmptyRequest.Push(r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
+                var factoryExpr = r.Factory.GetExpressionOrDefault(request);
+                if (factoryExpr != null)
+                    roots = roots.AddOrUpdate(new KV<Type, object>(r.ServiceType, r.OptionalServiceKey), factoryExpr);
+            }
+
+            var rootList = roots.Enumerate().ToArray();
+            Assert.AreEqual(3, rootList.Length);
+
+            var depList = container.Rules.DependencyResolutionCallExpressions.Value.Enumerate().ToArray();
+            Assert.AreEqual(2, depList.Length);
+        }
+
+
         public class LazyUser
         {
             public LazyUser(Lazy<LazyDep> s) {}

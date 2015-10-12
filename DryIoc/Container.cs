@@ -4657,6 +4657,9 @@ namespace DryIoc
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
         public virtual bool AsResolutionCall { get { return false; } }
 
+        /// <summary>Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</summary>
+        public virtual bool AsResolutionRoot { get { return false; } }
+        
         /// <summary>In addition to <see cref="AsResolutionCall"/> opens scope.</summary>
         public virtual bool OpenResolutionScope { get { return false; } }
 
@@ -4676,6 +4679,7 @@ namespace DryIoc
         /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> <param name="condition">(optional)</param>
         /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
         /// <param name="asResolutionCall">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
+        /// <param name="asResolutionRoot">(optional) Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
         /// <param name="weaklyReferenced">(optional) Stores reused instance as WeakReference.</param>
         /// <param name="allowDisposableTransient">(optional) Allows registering transient disposable.</param>
@@ -4683,18 +4687,19 @@ namespace DryIoc
         public static Setup With(
             object metadataOrFuncOfMetadata = null,
             Func<RequestInfo, bool> condition = null,
-            bool openResolutionScope = false, bool asResolutionCall = false,
+            bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false)
         {
             if (metadataOrFuncOfMetadata == null && condition == null &&
-                openResolutionScope == false && asResolutionCall == false &&
+                openResolutionScope == false && asResolutionCall == false && asResolutionRoot == false &&
                 preventDisposal == false && weaklyReferenced == false &&
                 allowDisposableTransient == false)
                 return Default;
 
             return new ServiceSetup(condition,
-                metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, preventDisposal, weaklyReferenced, allowDisposableTransient);
+                metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, asResolutionRoot,
+                preventDisposal, weaklyReferenced, allowDisposableTransient);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -4738,13 +4743,15 @@ namespace DryIoc
             }
 
             public override bool AsResolutionCall { get { return (_settings & Settings.AsResolutionCall) != 0; } }
+            public override bool AsResolutionRoot { get { return (_settings & Settings.AsResolutionRoot) != 0; } }
             public override bool OpenResolutionScope { get { return (_settings & Settings.OpenResolutionScope) != 0; } }
             public override bool PreventDisposal { get { return (_settings & Settings.PreventDisposal) != 0; } }
             public override bool WeaklyReferenced { get { return (_settings & Settings.WeaklyReferenced) != 0; } }
             public override bool AllowDisposableTransient { get { return (_settings & Settings.AllowDisposableTransient) != 0; } }
 
             public ServiceSetup(Func<RequestInfo, bool> condition = null, object metadataOrFuncOfMetadata = null,
-                bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false, bool weaklyReferenced = false,
+                bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
+                bool preventDisposal = false, bool weaklyReferenced = false,
                 bool allowDisposableTransient = false)
             {
                 Condition = condition;
@@ -4760,6 +4767,8 @@ namespace DryIoc
                     _settings |= Settings.WeaklyReferenced;
                 if (allowDisposableTransient)
                     _settings |= Settings.AllowDisposableTransient;
+                if (asResolutionRoot)
+                    _settings |= Settings.AsResolutionRoot;
             }
 
             private object _metadataOrFuncOfMetadata;
@@ -4771,7 +4780,8 @@ namespace DryIoc
                 OpenResolutionScope = 2,
                 PreventDisposal = 4,
                 WeaklyReferenced = 8,
-                AllowDisposableTransient = 16
+                AllowDisposableTransient = 16,
+                AsResolutionRoot = 32
             }
 
             private readonly Settings _settings;

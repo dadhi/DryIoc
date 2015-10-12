@@ -315,6 +315,10 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is AsResolutionCall)
                 {
+                    info.AsResolutionCall = true;
+                }
+                else if (attribute is AsResolutionRoot)
+                {
                     info.AsResolutionRoot = true;
                 }
                 else if (attribute is WeaklyReferencedAttribute)
@@ -648,6 +652,9 @@ namespace DryIoc.MefAttributedModel
         public bool OpenResolutionScope;
 
         /// <summary>Corresponds to <see cref="Setup.AsResolutionCall"/>.</summary>
+        public bool AsResolutionCall;
+
+        /// <summary>Corresponds to <see cref="Setup.AsResolutionRoot"/>.</summary>
         public bool AsResolutionRoot;
 
         /// <summary>Specifies to prevent disposal of reused instance if it is disposable</summary>
@@ -703,7 +710,8 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            return Setup.With(lazyMetadata, condition, OpenResolutionScope, AsResolutionRoot, 
+            return Setup.With(lazyMetadata, condition,
+                OpenResolutionScope, AsResolutionCall, AsResolutionRoot, 
                 PreventDisposal, WeaklyReferenced, AllowsDisposableTransient);
         }
 

@@ -322,7 +322,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [ForImportCondition3Parent, AsResolutionCall]
     public class ExportConditionalObject3 : IExportConditionInterface { }
 
-    [Export]
+    [Export, AsResolutionRoot]
     public class ImportConditionObject1
     {
         public IExportConditionInterface ExportConditionInterface { get; set; }
@@ -332,7 +332,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export]
+    [Export, AsResolutionRoot]
     public class ImportConditionObject2
     {
         public IExportConditionInterface ExportConditionInterface { get; set; }
@@ -342,7 +342,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export]
+    [Export, AsResolutionRoot]
     public class ImportConditionObject3
     {
         public IExportConditionInterface ExportConditionInterface { get; set; }

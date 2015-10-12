@@ -501,4 +501,13 @@ namespace DryIocAttributes
         | AttributeTargets.Field,
         Inherited = false)]
     public class AsResolutionCall : Attribute { }
+
+    /// <summary>Marker for resolution root exports.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field,
+        Inherited = false)]
+    public class AsResolutionRoot : Attribute { }
+
 }
