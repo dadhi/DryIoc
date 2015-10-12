@@ -43,7 +43,7 @@ namespace DryIoc
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
         /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadScopeContext"/>.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
-            : this(rules ?? Rules.Default, Ref.Of(Registry.WithWrappers()), new SingletonScope(), scopeContext)
+            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), new SingletonScope(), scopeContext)
         { }
 
         /// <summary>Creates new container with configured rules.</summary>
@@ -299,8 +299,7 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope,
             RequestInfo preResolveParent)
         {
-            if (preResolveParent == null)
-                preResolveParent = RequestInfo.Empty;
+            preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
             object cacheEntryKey = serviceType;
             if (serviceKey != null)
@@ -338,6 +337,9 @@ namespace DryIoc
 
             var service = factoryDelegate(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope);
 
+            if (registryValue.Services.IsEmpty)
+                return service;
+
             // Cache factory Only after we successfully got the service from it.
             var cachedContextFactories = (cacheEntry == null ? null : cacheEntry.Value) ?? ImTreeMap<object, FactoryDelegate>.Empty;
             if (cacheContextKey == null)
@@ -373,8 +375,8 @@ namespace DryIoc
             var registryValue = _registry.Value;
             var service = factoryDelegate(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope);
 
-            // cache service creation delegate
-            registryValue.DefaultFactoryDelegateCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+            if (!registryValue.Services.IsEmpty)
+                registryValue.DefaultFactoryDelegateCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
 
             return service;
         }
@@ -843,7 +845,9 @@ namespace DryIoc
         /// <param name="factoryExpression">Value to cache.</param>
         public void CacheFactoryExpression(int factoryID, Expression factoryExpression)
         {
-            _registry.Value.FactoryExpressionCache.Swap(_ => _.AddOrUpdate(factoryID, factoryExpression));
+            var registry = _registry.Value;
+            if (!registry.Services.IsEmpty)
+                registry.FactoryExpressionCache.Swap(_ => _.AddOrUpdate(factoryID, factoryExpression));
         }
 
         /// <summary>Searches and returns cached factory expression, or null if not found.</summary>
@@ -1144,11 +1148,7 @@ namespace DryIoc
         {
             public static readonly Registry Empty = new Registry();
 
-            // Not a field because it contain mutable/swappable cache, so the static will reference changing state
-            public static Registry WithWrappers()
-            {
-                return new Registry(WrappersSupport.Wrappers);
-            }
+            public static readonly Registry Default = new Registry(WrappersSupport.Wrappers);
 
             // Factories:
             public readonly ImTreeMap<Type, object> Services;
@@ -1160,8 +1160,7 @@ namespace DryIoc
 
             // key: KV where Key is ServiceType and object is ServiceKey
             // value: FactoryDelegate or/and IntTreeMap<contextBasedKeyObject, FactoryDelegate>
-            public readonly Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>
-                >> KeyedFactoryDelegateCache;
+            public readonly Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> KeyedFactoryDelegateCache;
 
             public readonly Ref<ImTreeMapIntToObj> FactoryExpressionCache;
             public readonly Ref<object[]> ResolutionStateCache;
