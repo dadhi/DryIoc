@@ -2320,6 +2320,18 @@ namespace DryIoc
             return newRules;
         }
 
+        /// <summary>Reuse to use instead of default Transient reuse or when no registration reuse provided.</summary>
+        public IReuse DefaultReuseInsteadOfTransient { get; private set; }
+
+        /// <summary>Sets different reuse from Transient when no registration reuse is specified.</summary>
+        /// <param name="defaultReuseInsteadOfTransient">Resue value.</param> <returns>New rules with provided default reuse setup.</returns>
+        public Rules WithDefaultReuseInsteadOfTransient(IReuse defaultReuseInsteadOfTransient)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.DefaultReuseInsteadOfTransient = defaultReuseInsteadOfTransient;
+            return newRules;
+        }
+
         /// <summary>Given item object and its type should return item "pure" expression presentation, 
         /// without side-effects or external dependencies. 
         /// e.g. for string "blah" <code lang="cs"><![CDATA[]]>Expression.Constant("blah", typeof(string))</code>.
@@ -4997,48 +5009,52 @@ namespace DryIoc
         /// <returns>Service expression.</returns>
         public virtual Expression GetExpressionOrDefault(Request request)
         {
+            var container = request.Container;
+            
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
             if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolutionCall()
-                || request.Level >= request.Container.Rules.LevelToSplitObjectGraphIntoResolveCalls
+                || request.Level >= container.Rules.LevelToSplitObjectGraphIntoResolveCalls
                 // note: Split only if not wrapped in Func with args - Propagation of args across Resolve boundaries is not supported at the moment
                 && request.Ancestor(p => p.ServiceType.IsFuncWithArgs()).IsEmpty)
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             request = request.WithResolvedFactory(this);
 
-            ThrowIfReuseHasShorterLifespanThanParent(Reuse, request);
+            var reuse = Reuse ?? container.Rules.DefaultReuseInsteadOfTransient;
+
+            ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
 
             // Here's lookup for decorators
             var decoratorExpr = FactoryType == FactoryType.Service
-                    ? request.Container.GetDecoratorExpressionOrDefault(request)
+                    ? container.GetDecoratorExpressionOrDefault(request)
                     : null;
             var isReplacingDecorator = decoratorExpr != null && !(decoratorExpr is LambdaExpression);
 
             var isCacheable = IsFactoryExpressionCacheable(request) && !isReplacingDecorator;
             if (isCacheable)
             {
-                var cachedServiceExpr = request.Container.GetCachedFactoryExpressionOrDefault(FactoryID);
+                var cachedServiceExpr = container.GetCachedFactoryExpressionOrDefault(FactoryID);
                 if (cachedServiceExpr != null)
                     return decoratorExpr == null ? cachedServiceExpr : Expression.Invoke(decoratorExpr, cachedServiceExpr);
             }
 
             var serviceExpr = isReplacingDecorator ? decoratorExpr : CreateExpressionOrDefault(request);
-            if (serviceExpr != null && Reuse != null && !isReplacingDecorator)
+            if (serviceExpr != null && reuse != null && !isReplacingDecorator)
             {
                 // The singleton optimization: eagerly create singleton and put it into state for fast access.
-                if (Reuse is SingletonReuse &&
+                if (reuse is SingletonReuse &&
                     FactoryType == FactoryType.Service &&
                     request.Ancestor(r => r.ServiceType.IsFunc()).IsEmpty &&
-                    request.Container.Rules.EagerCachingSingletonForFasterAccess)
+                    container.Rules.EagerCachingSingletonForFasterAccess)
                     serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
                 else
-                    serviceExpr = GetScopedExpressionOrDefault(serviceExpr, Reuse, request);
+                    serviceExpr = GetScopedExpressionOrDefault(serviceExpr, reuse, request);
             }
 
             if (serviceExpr != null)
             {
                 if (isCacheable)
-                    request.Container.CacheFactoryExpression(FactoryID, serviceExpr);
+                    container.CacheFactoryExpression(FactoryID, serviceExpr);
 
                 if (!isReplacingDecorator && decoratorExpr != null)
                     serviceExpr = Expression.Invoke(decoratorExpr, serviceExpr);

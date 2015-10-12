@@ -561,6 +561,21 @@ namespace DryIoc.UnitTests
             private readonly IDisposable _scope;
         }
 
+        [Test]
+        public void Can_sepcify_default_reuse_per_Container_different_from_Transient()
+        {
+            var container = new Container(r => r.WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+            container.Register<Abc>();
+
+            using (var scope = container.OpenScope())
+            {
+                var abc = scope.Resolve<Abc>();
+                Assert.AreSame(abc, scope.Resolve<Abc>());
+            }
+        }
+
+        public class Abc { }
+
         #region CUT
 
         public class Soose
