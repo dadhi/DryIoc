@@ -27,6 +27,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 
 namespace DryIocZero
@@ -109,7 +110,7 @@ namespace DryIocZero
                 Error.UnableToResolveDefaultService, serviceType, factories.IsEmpty ? string.Empty : "non-");
         }
 
-        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, IScope scope);
+        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, DryIoc.RequestInfo preRequestInfo, IScope scope);
 
         /// <summary>Directly uses generated factories to resolve service. Or returns default if service does not have generated factory.</summary>
         /// <param name="serviceType">Service type to lookup generated factory.</param> <param name="serviceKey">Service key to locate factory.</param>
@@ -119,41 +120,42 @@ namespace DryIocZero
         public object ResolveGeneratedOrGetDefault(Type serviceType, object serviceKey)
         {
             object service = null;
-            ResolveGenerated(ref service, serviceType, serviceKey, null);
+            ResolveGenerated(ref service, serviceType, serviceKey, null, null, null);
             return service;
         }
 
-        /// <summary>Resolves keyed service from container and returns created service object.</summary>
+        /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="serviceKey">Optional service key used for registering service.</param>
         /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
         /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
         ///     or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
+        /// <param name="preResolveParent">Dependency resolution path info.</param>
         /// <param name="scope">Propagated resolution scope.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         /// <remarks>
-        /// This method covers all possible resolution input parameters comparing to <see cref="IResolver.ResolveNonKeyedServiceFast"/>, and
-        /// by specifying the same parameters as for <see cref="IResolver.ResolveNonKeyedServiceFast"/> should return the same result.
+        /// This method covers all possible resolution input parameters comparing to <see cref="ResolveNonKeyedServiceFast"/>, and
+        /// by specifying the same parameters as for <see cref="ResolveNonKeyedServiceFast"/> should return the same result.
         /// </remarks>
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
-        public object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
+        public object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, DryIoc.RequestInfo preResolveParent, IScope scope)
         {
             object service = null;
             if (_keyedFactories.Value.IsEmpty)
             {
-                if (serviceKey == null)
+                if (serviceKey == null && requiredServiceType == null && preResolveParent == null)
                     ResolveGenerated(ref service, serviceType, scope);
                 else
-                    ResolveGenerated(ref service, serviceType, serviceKey, scope);
+                    ResolveGenerated(ref service, serviceType, serviceKey, requiredServiceType, preResolveParent, scope);
             }
-            return service ?? ResolveFromRuntimeRegistrationsFirst(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, scope);
+            return service ?? ResolveFromRuntimeRegistrationsFirst(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, preResolveParent, scope);
         }
 
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
         private object ResolveFromRuntimeRegistrationsFirst(Type serviceType, object serviceKey,
-            bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope)
+            bool ifUnresolvedReturnDefault, Type requiredServiceType, DryIoc.RequestInfo preRequestInfo, IScope scope)
         {
             serviceType = requiredServiceType ?? serviceType;
             if (serviceKey == null)
@@ -170,7 +172,7 @@ namespace DryIocZero
 
             // If not resolved from runtime registration then try resolve generated
             object service = null;
-            ResolveGenerated(ref service, serviceType, serviceKey, scope);
+            ResolveGenerated(ref service, serviceType, serviceKey, requiredServiceType, preRequestInfo, scope);
             return service ?? Throw.If(!ifUnresolvedReturnDefault,
                 Error.UnableToResolveKeyedService, serviceType, serviceKey, keyedFactories == null ? string.Empty : "non-");
         }
@@ -195,10 +197,10 @@ namespace DryIocZero
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
         /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
         /// <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
+        /// <param name="preRequestInfo"></param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, 
-            object compositeParentKey, Type compositeParentRequiredType, IScope scope)
+        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, Type compositeParentRequiredType, DryIoc.RequestInfo preRequestInfo, IScope scope)
         {
             serviceType = requiredServiceType ?? serviceType;
 
@@ -442,7 +444,8 @@ namespace DryIocZero
         int GetScopedItemIdOrSelf(int externalId);
     }
 
-    /// <summary>Declares minimal API for service resolution.</summary>
+    /// <summary>Declares minimal API for service resolution.
+    /// The user friendly convenient methods are implemented as extension methods in <see cref="Resolver"/> class.</summary>
     /// <remarks>Resolve default and keyed is separated because of micro optimization for faster resolution.</remarks>
     public interface IResolver
     {
@@ -458,13 +461,15 @@ namespace DryIocZero
         /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
         /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
         ///     or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
+        /// <param name="preResolveParent">Dependency resolution path info.</param>
         /// <param name="scope">Propagated resolution scope.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         /// <remarks>
         /// This method covers all possible resolution input parameters comparing to <see cref="ResolveNonKeyedServiceFast"/>, and
         /// by specifying the same parameters as for <see cref="ResolveNonKeyedServiceFast"/> should return the same result.
         /// </remarks>
-        object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, IScope scope);
+        object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, 
+            DryIoc.RequestInfo preResolveParent, IScope scope);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
@@ -474,10 +479,11 @@ namespace DryIocZero
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
         /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
         /// <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
+        /// <param name="preResolveParent">Dependency resolution path info.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, 
-            object compositeParentKey, Type compositeParentRequiredType, IScope scope);
+        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, Type compositeParentRequiredType, 
+            DryIoc.RequestInfo preResolveParent, IScope scope);
     }
 
     /// <summary>Provides access to scopes.</summary>
@@ -1403,6 +1409,184 @@ namespace DryIocZero
         {
             if (obj == null) Throw.It(Error.Of(message));
             return obj;
+        }
+    }
+}
+
+namespace DryIoc
+{
+    /// <summary>Type of services supported by Container.</summary>
+    public enum FactoryType
+    {
+        /// <summary>(default) Defines normal service factory</summary>
+        Service,
+        /// <summary>Defines decorator factory</summary>
+        Decorator,
+        /// <summary>Defines wrapper factory.</summary>
+        Wrapper
+    };
+
+    /// <summary>Dependency request path information.</summary>
+    public sealed class RequestInfo
+    {
+        /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
+        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, FactoryType.Service, null, 0, null);
+
+        /// <summary>Returns true for an empty request.</summary>
+        public bool IsEmpty { get { return ServiceType == null; } }
+
+        /// <summary>Returns true if request is the first in a chain.</summary>
+        public bool IsResolutionRoot { get { return !IsEmpty && Parent.IsEmpty; } }
+
+        /// <summary>Parent request or null for root resolution request.</summary>
+        public readonly RequestInfo Parent;
+
+        /// <summary>Asked service type.</summary>
+        public readonly Type ServiceType;
+
+        /// <summary>Required service type if specified.</summary>
+        public readonly Type RequiredServiceType;
+
+        /// <summary>Optional service key.</summary>
+        public readonly object ServiceKey;
+
+        /// <summary>False for Decorators and Wrappers.</summary>
+        public readonly FactoryType FactoryType;
+
+        /// <summary>Implementation type.</summary>
+        public readonly Type ImplementationType;
+
+        /// <summary>Relative number representing reuse lifespan.</summary>
+        public readonly int ReuseLifespan;
+
+        /// <summary>Creates info.</summary>
+        /// <param name="serviceType"></param>
+        /// <param name="requiredServiceType"></param>
+        /// <param name="serviceKey"></param>
+        /// <param name="factoryType"></param>
+        /// <param name="implementationType"></param>
+        /// <param name="reuseLifespan"></param>
+        /// <param name="parent"></param>
+        public RequestInfo(
+            Type serviceType, Type requiredServiceType, object serviceKey,
+            FactoryType factoryType, Type implementationType, int reuseLifespan,
+            RequestInfo parent)
+        {
+            Parent = parent;
+
+            // Service info:
+            ServiceType = serviceType;
+            RequiredServiceType = requiredServiceType;
+            ServiceKey = serviceKey;
+
+            // Implementation info:
+            FactoryType = factoryType;
+            ImplementationType = implementationType;
+            ReuseLifespan = reuseLifespan;
+        }
+
+        /// <summary>Returns all request until the root - parent is null.</summary>
+        /// <returns>Requests from the last to first.</returns>
+        public IEnumerable<RequestInfo> Enumerate()
+        {
+            for (var i = this; !i.IsEmpty; i = i.Parent)
+                yield return i;
+        }
+
+        /// <summary>Prints request with all its parents to string.</summary> <returns>The string.</returns>
+        public override string ToString()
+        {
+            if (IsEmpty)
+                return "{{empty}}";
+
+            var s = new StringBuilder();
+
+            if (FactoryType != FactoryType.Service)
+                s.Append(FactoryType.ToString().ToLower()).Append(' ');
+            if (ImplementationType != null && ImplementationType != ServiceType)
+                s.Append(ImplementationType).Append(": ");
+
+            s.Append(ServiceType);
+
+            if (RequiredServiceType != null)
+                s.Append(" with RequiredServiceType=").Append(RequiredServiceType);
+
+            if (ServiceKey != null)
+                s.Append(" with ServiceKey=").Append('{').Append(ServiceKey).Append('}');
+
+            if (ReuseLifespan != 0)
+                s.Append(" with ReuseLifespan=").Append(ReuseLifespan);
+
+            if (!Parent.IsEmpty)
+                s.AppendLine().Append("  in ").Append(Parent);
+
+            return s.ToString();
+        }
+
+        /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
+        /// <param name="obj"></param> <returns></returns>
+        public override bool Equals(object obj)
+        {
+            return Equals(obj as RequestInfo);
+        }
+
+        /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
+        /// <param name="other"></param> <returns></returns>
+        public bool Equals(RequestInfo other)
+        {
+            return other != null && EqualsWithoutParent(other)
+                && (Parent == null && other.Parent == null
+                || (Parent != null && Parent.EqualsWithoutParent(other.Parent)));
+        }
+
+        /// <summary>Compares infos regarding properies but not their parents.</summary>
+        /// <param name="other">Info to compare for equality.</param> <returns></returns>
+        public bool EqualsWithoutParent(RequestInfo other)
+        {
+            return other.ServiceType == ServiceType
+                && other.RequiredServiceType == RequiredServiceType
+                && other.ServiceKey == ServiceKey
+
+                && other.FactoryType == FactoryType
+                && other.ImplementationType == ImplementationType
+                && other.ReuseLifespan == ReuseLifespan;
+        }
+
+        /// <summary>Returns hash code combined from info fields plus its parent.</summary>
+        /// <returns>Combined hash code.</returns>
+        public override int GetHashCode()
+        {
+            var hash = 0;
+            for (var i = this; i != Empty; i = i.Parent)
+            {
+                var currentHash = i.ServiceType.GetHashCode();
+                if (i.RequiredServiceType != null)
+                    currentHash = CombineHashCodes(currentHash, i.RequiredServiceType.GetHashCode());
+
+                if (i.ServiceKey != null)
+                    currentHash = CombineHashCodes(currentHash, i.ServiceKey.GetHashCode());
+
+                if (i.FactoryType != FactoryType.Service)
+                    currentHash = CombineHashCodes(currentHash, i.FactoryType.GetHashCode());
+
+                if (i.ImplementationType != null && i.ImplementationType != i.ServiceType)
+                    currentHash = CombineHashCodes(currentHash, i.ImplementationType.GetHashCode());
+
+                if (i.ReuseLifespan != 0)
+                    currentHash = CombineHashCodes(currentHash, i.ReuseLifespan);
+
+                hash = hash == 0 ? currentHash : CombineHashCodes(hash, currentHash);
+            }
+            return hash;
+        }
+
+        // Inspired by System.Tuple.CombineHashCodes
+        private static int CombineHashCodes(int h1, int h2)
+        {
+            unchecked
+            {
+                return (h1 << 5) + h1 ^ h2;
+            }
         }
     }
 }

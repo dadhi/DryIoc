@@ -51,13 +51,13 @@
             The user friendly convenient methods are implemented as extension methods in <see cref="T:DryIoc.Resolver"/> class.</summary>
             <remarks>Resolve default and keyed is separated because of micro optimization for faster resolution.</remarks>
         </member>
-        <member name="M:DryIoc.IResolver.ResolveDefault(System.Type,System.Boolean)">
+        <member name="M:DryIoc.IResolver.ResolveNonKeyedServiceFast(System.Type,System.Boolean)">
             <summary>Resolves service from container and returns created service object.</summary>
             <param name="serviceType">Service type to search and to return.</param>
             <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
             <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         </member>
-        <member name="M:DryIoc.IResolver.ResolveKeyed(System.Type,System.Object,System.Boolean,System.Type,DryIoc.IScope)">
+        <member name="M:DryIoc.IResolver.Resolve(System.Type,System.Object,System.Boolean,System.Type,DryIoc.IScope,DryIoc.RequestInfo)">
             <summary>Resolves service from container and returns created service object.</summary>
             <param name="serviceType">Service type to search and to return.</param>
             <param name="serviceKey">Optional service key used for registering service.</param>
@@ -65,13 +65,14 @@
             <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
                 or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
             <param name="scope">Propagated resolution scope.</param>
+            <param name="preResolveParent">Dependency resolution path info.</param>
             <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
             <remarks>
-            This method covers all possible resolution input parameters comparing to <see cref="M:DryIoc.IResolver.ResolveDefault(System.Type,System.Boolean)"/>, and
-            by specifying the same parameters as for <see cref="M:DryIoc.IResolver.ResolveDefault(System.Type,System.Boolean)"/> should return the same result.
+            This method covers all possible resolution input parameters comparing to <see cref="M:DryIoc.IResolver.ResolveNonKeyedServiceFast(System.Type,System.Boolean)"/>, and
+            by specifying the same parameters as for <see cref="M:DryIoc.IResolver.ResolveNonKeyedServiceFast(System.Type,System.Boolean)"/> should return the same result.
             </remarks>
         </member>
-        <member name="M:DryIoc.IResolver.ResolveMany(System.Type,System.Object,System.Type,System.Object,DryIoc.IScope)">
+        <member name="M:DryIoc.IResolver.ResolveMany(System.Type,System.Object,System.Type,System.Object,System.Type,DryIoc.IScope,DryIoc.RequestInfo)">
             <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
             empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
             this type. Excludes for result composite parent identified by <paramref name="compositeParentKey"/>.</summary>
@@ -79,7 +80,9 @@
             <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
             <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
             <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
+            <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
             <param name="scope">propagated resolution scope, may be null.</param>
+            <param name="requestInfo">Dependency resolution path info.</param>
             <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
         </member>
         <member name="M:DryIoc.IContainer.With(System.Func{DryIoc.Rules,DryIoc.Rules},DryIoc.IScopeContext)">
@@ -87,6 +90,12 @@
             <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
             <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>
             <returns>New container.</returns>
+        </member>
+        <member name="M:DryIoc.IContainer.WithNoMoreRegisrationAllowed(System.Boolean)">
+            <summary>Produces new container which prevents any further registrations.</summary>
+            <param name="ignoreInsteadOfThrow">(optional)Controls what to do with resgitrations: ignore or throw exception.
+            Throws exception by default.</param>
+            <returns>New container preserving all current container state but prohiting registrations.</returns>
         </member>
         <member name="M:DryIoc.IContainer.WithoutCache">
             <summary>Returns new container with all expression, delegate, items cache removed/reset.
@@ -133,10 +142,12 @@
             <param name="request">Factory request.</param>
             <returns>Found registered factory or null.</returns>
         </member>
-        <member name="M:DryIoc.IContainer.GetAllServiceFactories(System.Type)">
+        <member name="M:DryIoc.IContainer.GetAllServiceFactories(System.Type,System.Boolean)">
             <summary>Finds all registered default and keyed service factories and returns them.
             It skips decorators and wrappers.</summary>
-            <param name="serviceType"></param>
+            <param name="serviceType">Service type to look for, may be open-generic type too.</param>
+            <param name="bothClosedAndOpenGenerics">(optional) For generic serviceType instructs to look for
+            both closed and open-generic registrations.</param>
             <returns>Enumerable of found pairs.</returns>
             <remarks>Returned Key item should not be null - it should be <see cref="F:DryIoc.DefaultKey.Value"/>.</remarks>
         </member>
@@ -160,11 +171,12 @@
             <returns>Instance with assigned properties and fields.</returns>
             <remarks>Different Rules could be combined together using <see cref="M:DryIoc.PropertiesAndFields.And(DryIoc.PropertiesAndFieldsSelector,DryIoc.PropertiesAndFieldsSelector)"/> method.</remarks>     
         </member>
-        <member name="M:DryIoc.IContainer.GetWrappedTypeOrNullIfWrapsRequiredServiceType(System.Type)">
+        <member name="M:DryIoc.IContainer.GetWrappedType(System.Type,System.Type)">
             <summary>If <paramref name="serviceType"/> is generic type then this method checks if the type registered as generic wrapper,
             and recursively unwraps and returns its type argument. This type argument is the actual service type we want to find.
             Otherwise, method returns the input <paramref name="serviceType"/>.</summary>
             <param name="serviceType">Type to unwrap. Method will return early if type is not generic.</param>
+            <param name="requiredServiceType">Required service type or null if don't care.</param>
             <returns>Unwrapped service type in case it corresponds to registered generic wrapper, or input type in all other cases.</returns>
         </member>
         <member name="M:DryIoc.IContainer.CacheFactoryExpression(System.Int32,System.Linq.Expressions.Expression)">
@@ -252,6 +264,12 @@
             <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>
             <returns>New container.</returns>
         </member>
+        <member name="M:DryIoc.Container.WithNoMoreRegisrationAllowed(System.Boolean)">
+            <summary>Produces new container which prevents any further registrations.</summary>
+            <param name="ignoreInsteadOfThrow">(optional) Controls what to do with the next registration: ignore or throw exception.
+            Throws exception by default.</param>
+            <returns>New container preserving all current container state but prohiting registrations.</returns>
+        </member>
         <member name="M:DryIoc.Container.WithoutCache">
             <summary>Returns new container with all expression, delegate, items cache removed/reset.
             It will preserve resolved services in Singleton/Current scope.</summary>
@@ -296,6 +314,21 @@
         </member>
         <member name="M:DryIoc.Container.Dispose">
             <summary>Disposes container current scope and that means container itself.</summary>
+        </member>
+        <member name="F:DryIoc.Container.StateParamExpr">
+            <summary>State parameter expression in FactoryDelegate.</summary>
+        </member>
+        <member name="F:DryIoc.Container.ResolverContextParamExpr">
+            <summary>Resolver context parameter expression in FactoryDelegate.</summary>
+        </member>
+        <member name="F:DryIoc.Container.ResolverExpr">
+            <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        </member>
+        <member name="F:DryIoc.Container.ScopesExpr">
+            <summary>Access to scopes in FactoryDelegate.</summary>
+        </member>
+        <member name="F:DryIoc.Container.ResolutionScopeParamExpr">
+            <summary>Resolution scope parameter expression in FactoryDelegate.</summary>
         </member>
         <member name="M:DryIoc.Container.GetServiceRegistrations">
             <summary>Returns all registered service factories with their Type and optional Key.</summary>
@@ -363,7 +396,9 @@
         <member name="M:DryIoc.Container.InjectPropertiesAndFields(System.Object,DryIoc.PropertiesAndFieldsSelector)">
             <summary>For given instance resolves and sets properties and fields.</summary>
             <param name="instance">Service instance with properties to resolve and initialize.</param>
-            <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
+            <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.
+            If not specified then method will use container <see cref="P:DryIoc.Rules.PropertiesAndFields"/>, 
+            or if not specified method fallbacks to <see cref="F:DryIoc.PropertiesAndFields.Auto"/>.</param>
             <returns>Instance with assigned properties and fields.</returns>
             <remarks>Different Rules could be combined together using <see cref="M:DryIoc.PropertiesAndFields.And(DryIoc.PropertiesAndFieldsSelector,DryIoc.PropertiesAndFieldsSelector)"/> method.</remarks>        
         </member>
@@ -410,7 +445,50 @@
             <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
         </member>
         <member name="T:DryIoc.ContainerTools">
-            <summary>Extension methods for automating common use-cases.</summary>
+            <summary>Convenient methods that require container.</summary>
+        </member>
+        <member name="M:DryIoc.ContainerTools.InjectPropertiesAndFields``1(DryIoc.IContainer,``0,DryIoc.PropertiesAndFieldsSelector)">
+            <summary>For given instance resolves and sets properties and fields.
+            It respects <see cref="P:DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
+            or if rules are not set it uses <see cref="F:DryIoc.PropertiesAndFields.Auto"/>, 
+            or you can specify your own rules with <paramref name="propertiesAndFields"/> parameter.</summary>
+            <typeparam name="TService">Input and returned instance type.</typeparam>Service (wrapped)
+            <param name="container">Usually a container instance, cause <see cref="T:DryIoc.Container"/> implements <see cref="T:DryIoc.IResolver"/></param>
+            <param name="instance">Service instance with properties to resolve and initialize.</param>
+            <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
+            <returns>Input instance with resolved dependencies, to enable fluent method composition.</returns>
+            <remarks>Different Rules could be combined together using <see cref="M:DryIoc.PropertiesAndFields.And(DryIoc.PropertiesAndFieldsSelector,DryIoc.PropertiesAndFieldsSelector)"/> method.</remarks>        
+        </member>
+        <member name="M:DryIoc.ContainerTools.New(DryIoc.IContainer,System.Type,DryIoc.Made)">
+            <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
+            <param name="container">Container to use for type creation and injecting its dependencies.</param>
+            <param name="concreteType">Type to instantiate. Wrappers (Func, Lazy, etc.) is also supported.</param>
+            <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+            <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        </member>
+        <member name="M:DryIoc.ContainerTools.New``1(DryIoc.IContainer,DryIoc.Made)">
+            <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
+            <typeparam name="T">Type to instantiate.</typeparam>
+            <param name="container">Container to use for type creation and injecting its dependencies.</param>
+            <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+            <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        </member>
+        <member name="M:DryIoc.ContainerTools.RegisterMapping(DryIoc.IContainer,System.Type,System.Type,System.Object,System.Object)">
+            <summary>Registers new service type with factory for registered service type. 
+            Throw if no such registered service type in container.</summary>
+            <param name="container">Container</param> <param name="serviceType">New service type.</param>
+            <param name="registeredServiceType">Existing registered service type.</param>
+            <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
+            <remarks>Does nothing if registration is already exists.</remarks>
+        </member>
+        <member name="M:DryIoc.ContainerTools.RegisterMapping``2(DryIoc.IContainer,System.Object,System.Object)">
+            <summary>Registers new service type with factory for registered service type. 
+            Throw if no such registered service type in container.</summary>
+            <param name="container">Container</param>
+            <typeparam name="TService">New service type.</typeparam>
+            <typeparam name="TRegisteredService">Existing registered service type.</typeparam>
+            <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
+            <remarks>Does nothing if registration is already exists.</remarks>
         </member>
         <member name="M:DryIoc.ContainerTools.WithAutoFallbackResolution(DryIoc.IContainer,System.Collections.Generic.IEnumerable{System.Type},System.Func{DryIoc.IReuse,DryIoc.Request,DryIoc.IReuse},System.Func{DryIoc.Request,System.Boolean})">
             <summary>Adds rule to register unknown service when it is resolved.</summary>
@@ -430,12 +508,9 @@
             <returns>Container with new rule.</returns>
             <remarks>Implementation types will be requested from assemblies only once, in this method call.</remarks>
         </member>
-        <member name="M:DryIoc.ContainerTools.AutoRegisterUnknownServiceRule(System.Collections.Generic.IEnumerable{System.Type},System.Func{DryIoc.IReuse,DryIoc.Request,DryIoc.IReuse},System.Func{DryIoc.Request,System.Boolean})">
-            <summary>Fallback rule to automatically register requested service with Reuse based on resolution source.</summary>
-            <param name="implTypes">Assemblies to look for implementation types.</param>
-            <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
-            <param name="condition">(optional) condition.</param>
-            <returns>Rule.</returns>
+        <member name="M:DryIoc.ContainerTools.IsSupportedInjectedCustomValueType(System.Type)">
+            <summary>Checks if custom value of the <paramref name="customValueType"/> is supported by DryIoc injection mechanism.</summary>
+            <param name="customValueType">Type to check</param> <returns>True if supported, false otherwise.c</returns>
         </member>
         <member name="T:DryIoc.DefaultKey">
             <summary>Used to represent multiple default service keys. 
@@ -524,7 +599,7 @@
             <item>Open-generic services</item>
             <item>Service generics wrappers and arrays using <see cref="P:DryIoc.Rules.UnknownServiceResolvers"/> extension point.
             Supported wrappers include: Func of <see cref="F:DryIoc.WrappersSupport.FuncTypes"/>, Lazy, Many, IEnumerable, arrays, Meta, KeyValuePair, DebugExpression.
-            All wrapper factories are added into collection <see cref="F:DryIoc.WrappersSupport.Wrappers"/> and searched by <see cref="F:DryIoc.WrappersSupport.ResolveWrappers"/>
+            All wrapper factories are added into collection <see cref="F:DryIoc.WrappersSupport.Wrappers"/> and searched by <see cref="M:DryIoc.WrappersSupport.ResolveWrapperOrGetDefault(DryIoc.Request)"/>
             unregistered resolution rule.</item>
             </list></summary>
         </member>
@@ -534,18 +609,14 @@
         <member name="F:DryIoc.WrappersSupport.Wrappers">
             <summary>Registered wrappers by their concrete or generic definition service type.</summary>
         </member>
-        <member name="F:DryIoc.WrappersSupport.ResolveWrappers">
-            <summary>Unregistered/fallback wrapper resolution rule.</summary>
-        </member>
-        <member name="M:DryIoc.WrappersSupport.IsNestedInFuncWithArgs(DryIoc.Request)">
-            <summary>Checks if request has parent with service type of Func with arguments. 
-            Often required to check in lazy scenarios.</summary>
-            <param name="request">Request too check.</param>
-            <returns>True if has Func parent.</returns>
+        <member name="M:DryIoc.WrappersSupport.ResolveWrapperOrGetDefault(DryIoc.Request)">
+            <summary>Returns wrapper factory. For open-generic wrapper - generated closed factory first.</summary>
+            <param name="request">Wrapper request.</param>
+            <returns>Found wrapper factory or default null otherwise.</returns>
         </member>
         <member name="M:DryIoc.WrappersSupport.GetMetaExpressionOrDefault(DryIoc.Request)">
-            <remarks>If service key is not specified in request then it will search for all
-            registered factory with the same metadata type, despite keys.</remarks>
+            <remarks>If service key is not specified in request then method will search for all
+            registered factories with the same metadata type ignoring keys.</remarks>
         </member>
         <member name="M:DryIoc.WrappersSupport.IsFunc(System.Type)">
             <summary>Returns true if type is supported <see cref="F:DryIoc.WrappersSupport.FuncTypes"/>, and false otherwise.</summary>
@@ -558,13 +629,13 @@
         <member name="T:DryIoc.Rules">
             <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
         </member>
-        <member name="F:DryIoc.Rules.Empty">
-            <summary>No rules specified.</summary>
-            <remarks>Rules <see cref="P:DryIoc.Rules.UnknownServiceResolvers"/> are empty too.</remarks>
-        </member>
         <member name="F:DryIoc.Rules.Default">
-            <summary>Default rules with support for generic wrappers: IEnumerable, Many, arrays, Func, Lazy, Meta, KeyValuePair, DebugExpression.
-            Check <see cref="F:DryIoc.WrappersSupport.ResolveWrappers"/> for details.</summary>
+            <summary>No rules as staring point.</summary>
+        </member>
+        <member name="F:DryIoc.Rules.LevelToSplitObjectGraphIntoResolveCalls">
+            <summary>Dependency nesting level where to split object graph into separate Resolve call 
+            to optimize performance of large object graph.</summary>
+            <remarks>At the moment the value is predefined. Not sure if it should be user-defined.</remarks>
         </member>
         <member name="M:DryIoc.Rules.With(DryIoc.FactoryMethodSelector,DryIoc.ParameterSelector,DryIoc.PropertiesAndFieldsSelector)">
             <summary>Returns new instance of the rules with specified <see cref="T:DryIoc.Made"/>.</summary>
@@ -588,6 +659,19 @@
             <summary>Appends resolver to current unknown service resolvers.</summary>
             <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
         </member>
+        <member name="M:DryIoc.Rules.WithoutUnknownServiceResolver(DryIoc.Rules.UnknownServiceResolver)">
+            <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
+            If no resolver was found then <see cref="P:DryIoc.Rules.UnknownServiceResolvers"/> will stay the same instance, 
+            so it could be check for remove success or fail.</summary>
+            <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
+        </member>
+        <member name="M:DryIoc.Rules.AutoRegisterUnknownServiceRule(System.Collections.Generic.IEnumerable{System.Type},System.Func{DryIoc.IReuse,DryIoc.Request,DryIoc.IReuse},System.Func{DryIoc.Request,System.Boolean})">
+            <summary>Fallback rule to automatically register requested service with Reuse based on resolution source.</summary>
+            <param name="implTypes">Assemblies to look for implementation types.</param>
+            <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
+            <param name="condition">(optional) condition.</param>
+            <returns>Rule.</returns>
+        </member>
         <member name="M:DryIoc.Rules.WithFallbackContainer(DryIoc.IContainer)">
             <summary>Appends WeakReference fallback container to end of the list.</summary>
             <param name="container">To append.</param> <returns>New rules.</returns>
@@ -596,27 +680,30 @@
             <summary>Removes WeakReference to fallback container from the list.</summary>
             <param name="container">To remove.</param> <returns>New rules.</returns>
         </member>
-        <member name="M:DryIoc.Rules.WithoutUnknownServiceResolver(DryIoc.Rules.UnknownServiceResolver)">
-            <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
-            If no resolver was found then <see cref="P:DryIoc.Rules.UnknownServiceResolvers"/> will stay the same instance, 
-            so it could be check for remove success or fail.</summary>
-            <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
-        </member>
-        <member name="M:DryIoc.Rules.WithoutThrowIfDependencyHasShorterReuseLifespan">
-            <summary>Returns new rules with <see cref="P:DryIoc.Rules.ThrowIfDependencyHasShorterReuseLifespan"/> set to specified value.</summary>
-            <returns>New rules with new setting value.</returns>
-        </member>
-        <member name="M:DryIoc.Rules.WithReuseMapping(DryIoc.Rules.ReuseMappingRule)">
-            <summary>Sets the <see cref="P:DryIoc.Rules.ReuseMapping"/> rule.</summary> <param name="rule">Rule to set, may be null.</param> <returns>New rules.</returns>
-        </member>
-        <member name="M:DryIoc.Rules.WithoutSingletonOptimization">
-            <summary>Disables <see cref="P:DryIoc.Rules.SingletonOptimization"/></summary>
-            <returns>New rules with singleton optimization turned off.</returns>
+        <member name="M:DryIoc.Rules.WithDefaultReuseInsteadOfTransient(DryIoc.IReuse)">
+            <summary>Sets different reuse from Transient when no registration reuse is specified.</summary>
+            <param name="defaultReuseInsteadOfTransient">Resue value.</param> <returns>New rules with provided default reuse setup.</returns>
         </member>
         <member name="M:DryIoc.Rules.WithItemToExpressionConverter(DryIoc.Rules.ItemToExpressionConverterRule)">
             <summary>Overrides previous rule. You may return null from new rule to fallback to old one.</summary>
             <param name="itemToExpressionOrDefault">Converts item to expression or returns null to fallback to old rule.</param>
             <returns>New rules</returns>
+        </member>
+        <member name="M:DryIoc.Rules.WithoutThrowIfDependencyHasShorterReuseLifespan">
+            <summary>Returns new rules with <see cref="P:DryIoc.Rules.ThrowIfDependencyHasShorterReuseLifespan"/> set to specified value.</summary>
+            <returns>New rules with new setting value.</returns>
+        </member>
+        <member name="M:DryIoc.Rules.WithoutThrowOnRegisteringDisposableTransient">
+            <summary>Turns Off the rule <see cref="P:DryIoc.Rules.ThrowOnRegisteringDisposableTransient"/>.</summary>
+            <returns></returns>
+        </member>
+        <member name="M:DryIoc.Rules.WithoutEagerCachingSingletonForFasterAccess">
+            <summary>Disables <see cref="P:DryIoc.Rules.EagerCachingSingletonForFasterAccess"/></summary>
+            <returns>New rules with singleton optimization turned off.</returns>
+        </member>
+        <member name="M:DryIoc.Rules.WithDependencyResolutionCallExpressions">
+            <summary>Disables <see cref="P:DryIoc.Rules.DependencyResolutionCallExpressions"/></summary>
+            <returns>New rules with singleton optimization turned off.</returns>
         </member>
         <member name="M:DryIoc.Rules.WithoutImplicitCheckForReuseMatchingScope">
             <summary>Removes <see cref="P:DryIoc.Rules.ImplicitCheckForReuseMatchingScope"/></summary>
@@ -626,8 +713,8 @@
             <summary>Sets flag <see cref="P:DryIoc.Rules.ResolveIEnumerableAsLazyEnumerable"/>.</summary>
             <returns>Returns new rules with flag set.</returns>
         </member>
-        <member name="M:DryIoc.Rules.WithoutCovariantTypesInResolvedCollection">
-            <summary>Unsets flag <see cref="P:DryIoc.Rules.CovariantTypesInResolvedCollection"/>.</summary>
+        <member name="M:DryIoc.Rules.WithoutVariantGenericTypesInResolvedCollection">
+            <summary>Unsets flag <see cref="P:DryIoc.Rules.VariantGenericTypesInResolvedCollection"/>.</summary>
             <returns>Returns new rules with flag set.</returns>
         </member>
         <member name="P:DryIoc.Rules.FactoryMethod">
@@ -650,19 +737,24 @@
         <member name="P:DryIoc.Rules.FallbackContainers">
             <summary>List of containers to fallback resolution to.</summary>
         </member>
-        <member name="P:DryIoc.Rules.ThrowIfDependencyHasShorterReuseLifespan">
-            <summary>Turns on/off exception throwing when dependency has shorter reuse lifespan than its parent.</summary>
-        </member>
-        <member name="P:DryIoc.Rules.ReuseMapping">
-            <summary>Gets rule to retrieve actual reuse from registered one. May be null, so the registered reuse will be used.
-            Could be used to specify different reuse container wide, for instance <see cref="F:DryIoc.Reuse.Singleton"/> instead of <see cref="F:DryIoc.Reuse.Transient"/>.</summary>
-        </member>
-        <member name="P:DryIoc.Rules.SingletonOptimization">
-            <summary>Allow to instantiate singletons during resolution (but not inside of Func). Instantiated singletons
-            will be copied to <see cref="P:DryIoc.IContainer.ResolutionStateCache"/> for faster access.</summary>
+        <member name="P:DryIoc.Rules.DefaultReuseInsteadOfTransient">
+            <summary>Reuse to use instead of default Transient reuse or when no registration reuse provided.</summary>
         </member>
         <member name="P:DryIoc.Rules.ItemToExpressionConverter">
             <summary>Mapping between Type and its ToExpression converter delegate.</summary>
+        </member>
+        <member name="P:DryIoc.Rules.ThrowIfDependencyHasShorterReuseLifespan">
+            <summary>Turns on/off exception throwing when dependency has shorter reuse lifespan than its parent.</summary>
+        </member>
+        <member name="P:DryIoc.Rules.ThrowOnRegisteringDisposableTransient">
+            <summary> When set to true, prevents </summary>
+        </member>
+        <member name="P:DryIoc.Rules.EagerCachingSingletonForFasterAccess">
+            <summary>Allow to instantiate singletons during resolution (but not inside of Func). Instantiated singletons
+            will be copied to <see cref="P:DryIoc.IContainer.ResolutionStateCache"/> for faster access.</summary>
+        </member>
+        <member name="P:DryIoc.Rules.DependencyResolutionCallExpressions">
+            <summary>Instructs to generate ResolutionCall dependency creation expression, instead of just Resolve call expression.</summary>
         </member>
         <member name="P:DryIoc.Rules.ImplicitCheckForReuseMatchingScope">
             <summary>Flag acting in implicit <see cref="P:DryIoc.Setup.Condition"/> for service registered with not null <see cref="T:DryIoc.IReuse"/>.
@@ -671,7 +763,7 @@
         <member name="P:DryIoc.Rules.ResolveIEnumerableAsLazyEnumerable">
             <summary>Specifies to resolve IEnumerable as LazyEnumerable.</summary>
         </member>
-        <member name="P:DryIoc.Rules.CovariantTypesInResolvedCollection">
+        <member name="P:DryIoc.Rules.VariantGenericTypesInResolvedCollection">
             <summary>Flag instructs to include covariant compatible types in resolved collection, array and many.</summary>
         </member>
         <member name="T:DryIoc.Rules.FactorySelectorRule">
@@ -684,10 +776,6 @@
             <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
             Applied in specified array order until return not null <see cref="T:DryIoc.Factory"/>.</summary> 
             <param name="request">Request to return factory for</param> <returns>Factory to resolve request, or null if unable to resolve.</returns>
-        </member>
-        <member name="T:DryIoc.Rules.ReuseMappingRule">
-            <summary>Defines mapping from registered reuse to what will be actually used.</summary>
-            <param name="reuse">Service registered reuse</param> <param name="request">Context.</param> <returns>Mapped result reuse to use.</returns>
         </member>
         <member name="T:DryIoc.Rules.ItemToExpressionConverterRule">
             <summary>Given item object and its type should return item "pure" expression presentation, 
@@ -704,8 +792,8 @@
         <member name="F:DryIoc.FactoryMethod.ConstructorOrMethodOrMember">
             <summary>Constructor or method to use for service creation.</summary>
         </member>
-        <member name="F:DryIoc.FactoryMethod.FactoryInfo">
-            <summary>Factory info to resolve if factory method is instance member.</summary>
+        <member name="F:DryIoc.FactoryMethod.FactoryServiceInfo">
+            <summary>Identifies factory service if factory method is instance member.</summary>
         </member>
         <member name="M:DryIoc.FactoryMethod.Of(System.Reflection.MemberInfo,DryIoc.ServiceInfo)">
             <summary>Wraps method and factory instance.</summary>
@@ -713,16 +801,12 @@
             <param name="factoryInfo">Factory info to resolve in case of instance <paramref name="ctorOrMethodOrMember"/>.</param>
             <returns>New factory method wrapper.</returns>
         </member>
-        <member name="M:DryIoc.FactoryMethod.op_Implicit(DryIoc.FactoryMethod)~DryIoc.FactoryMethodSelector">
-            <summary>Converts method to selector when selector parameter is not required.</summary>
-            <param name="method">Method to convert.</param> <returns>Result selector.</returns>
-        </member>
         <member name="M:DryIoc.FactoryMethod.ToString">
             <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
         </member>
         <member name="F:DryIoc.FactoryMethod.ConstructorWithResolvableArguments">
             <summary>Searches for constructor with all resolvable parameters or throws <see cref="T:DryIoc.ContainerException"/> if not found.
-            Works both for resolving as service and as Func&lt;TArgs..., TService&gt;.</summary>
+            Works both for resolving as service and as Func of TArgs... returning TService.</summary>
         </member>
         <member name="T:DryIoc.Made">
             <summary>Rules how to: <list type="bullet">
@@ -738,15 +822,6 @@
             <summary>Creates rules with only <see cref="P:DryIoc.Made.FactoryMethod"/> specified.</summary>
             <param name="factoryMethod">To use.</param> <returns>New rules.</returns>
         </member>
-        <member name="M:DryIoc.Made.op_Implicit(DryIoc.FactoryMethod)~DryIoc.Made">
-            <summary>Creates rules with only <see cref="P:DryIoc.Made.FactoryMethod"/> specified.</summary>
-            <param name="factoryMethod">To return from <see cref="P:DryIoc.Made.FactoryMethod"/>.</param> <returns>New rules.</returns>
-        </member>
-        <member name="M:DryIoc.Made.op_Implicit(System.Reflection.MethodInfo)~DryIoc.Made">
-            <summary>Creates rules with only <see cref="P:DryIoc.Made.FactoryMethod"/> specified.</summary>
-            <param name="factoryMethod">To create <see cref="T:DryIoc.FactoryMethod"/> and return it from <see cref="P:DryIoc.Made.FactoryMethod"/>.</param> 
-            <returns>New rules.</returns>
-        </member>
         <member name="M:DryIoc.Made.op_Implicit(DryIoc.ParameterSelector)~DryIoc.Made">
             <summary>Creates rules with only <see cref="P:DryIoc.Made.Parameters"/> specified.</summary>
             <param name="parameters">To use.</param> <returns>New rules.</returns>
@@ -760,13 +835,24 @@
             <param name="factoryMethod">(optional)</param> <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
             <returns>New injection rules or <see cref="F:DryIoc.Made.Default"/>.</returns>
         </member>
+        <member name="M:DryIoc.Made.Of(DryIoc.FactoryMethod)">
+            <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="F:DryIoc.Made.Default"/> rules.</summary>
+            <param name="factoryMethod">Known factory method.</param>
+            <returns>New injection rules.</returns>
+        </member>
+        <member name="M:DryIoc.Made.Of(System.Reflection.MemberInfo,DryIoc.ServiceInfo)">
+            <summary>Creates rules with only <see cref="P:DryIoc.Made.FactoryMethod"/> specified.</summary>
+            <param name="factoryMethodOrMember">To create service.</param>
+            <param name="factoryInfo">(optional) Factory info to resolve in case of instance member.</param>
+            <returns>New rules.</returns>
+        </member>
         <member name="M:DryIoc.Made.Of(System.Func{System.Type,System.Reflection.ConstructorInfo},DryIoc.ParameterSelector,DryIoc.PropertiesAndFieldsSelector)">
             <summary>Defines how to select constructor from implementation type.</summary>
             <param name="getConstructor">Delegate taking implementation type as input and returning selected constructor info.</param>
             <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
             <returns>New instance of <see cref="T:DryIoc.Made"/> with <see cref="P:DryIoc.Made.FactoryMethod"/> set to specified delegate.</returns>
         </member>
-        <member name="M:DryIoc.Made.Of``1(System.Linq.Expressions.Expression{System.Func{``0}},System.Func{DryIoc.Request,System.Object}[])">
+        <member name="M:DryIoc.Made.Of``1(System.Linq.Expressions.Expression{System.Func{``0}},System.Func{DryIoc.RequestInfo,System.Object}[])">
             <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
             <typeparam name="TService">Type with constructor or static method.</typeparam>
             <param name="serviceReturningExpr">Expression tree with call to constructor with properties: 
@@ -775,7 +861,7 @@
             <param name="argValues">(optional) Primitive custom values for dependencies.</param>
             <returns>New Made specification.</returns>
         </member>
-        <member name="M:DryIoc.Made.Of``2(System.Func{DryIoc.Request,DryIoc.ServiceInfo.Typed{``0}},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Func{DryIoc.Request,System.Object}[])">
+        <member name="M:DryIoc.Made.Of``2(System.Func{DryIoc.Request,DryIoc.ServiceInfo.Typed{``0}},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Func{DryIoc.RequestInfo,System.Object}[])">
             <summary>Defines creation info from factory method call Expression without using strings.
             You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="T:System.Reflection.MethodInfo"/>.</summary>
             <typeparam name="TFactory">Factory type.</typeparam> <typeparam name="TService">Factory product type.</typeparam>
@@ -787,8 +873,12 @@
         <member name="P:DryIoc.Made.FactoryMethod">
             <summary>Returns delegate to select constructor based on provided request.</summary>
         </member>
-        <member name="P:DryIoc.Made.ExpressionResultType">
-            <summary>Return type of strongly-typed expression.</summary>
+        <member name="P:DryIoc.Made.FactoryMethodKnownResultType">
+            <summary>Return type of strongly-typed factory method expression.</summary>
+        </member>
+        <member name="P:DryIoc.Made.HasCustomDependencyValue">
+            <summary>True is made has properties or parameters with custom value.
+            That's mean the whole made become context based which affects caching</summary>
         </member>
         <member name="P:DryIoc.Made.Parameters">
             <summary>Specifies how constructor parameters should be resolved: 
@@ -797,13 +887,14 @@
         <member name="P:DryIoc.Made.PropertiesAndFields">
             <summary>Specifies what <see cref="T:DryIoc.ServiceInfo"/> should be used when resolving property or field.</summary>
         </member>
-        <member name="T:DryIoc.Made.Expr`1">
+        <member name="T:DryIoc.Made.TypedMade`1">
             <summary>Typed version of <see cref="T:DryIoc.Made"/> specified with statically typed expression tree.</summary>
             <typeparam name="TService">Type that expression returns.</typeparam>
         </member>
-        <member name="M:DryIoc.Made.Expr`1.#ctor(DryIoc.FactoryMethodSelector,DryIoc.ParameterSelector,DryIoc.PropertiesAndFieldsSelector)">
+        <member name="M:DryIoc.Made.TypedMade`1.#ctor(DryIoc.FactoryMethodSelector,DryIoc.ParameterSelector,DryIoc.PropertiesAndFieldsSelector,System.Boolean)">
             <summary>Creates typed version.</summary>
             <param name="factoryMethod"></param> <param name="parameters"></param> <param name="propertiesAndFields"></param>
+            <param name="hasCustomValue"></param>
         </member>
         <member name="T:DryIoc.Arg">
             <summary>Class for defining parameters/properties/fields service info in <see cref="T:DryIoc.Made"/> expressions.
@@ -885,17 +976,17 @@
             <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
             <param name="reuse">(optional) <see cref="T:DryIoc.IReuse"/> implementation, e.g. <see cref="F:DryIoc.Reuse.Singleton"/>. 
                 Default value means no reuse, aka Transient.</param>
-            <param name="with">(optional) specifies <see cref="T:DryIoc.Made"/>.</param>
+            <param name="made">(optional) specifies <see cref="T:DryIoc.Made"/>.</param>
             <param name="setup">(optional) Factory setup, by default is (<see cref="F:DryIoc.Setup.Default"/>)</param>
             <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
             <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="M:System.Object.GetHashCode"/> and <see cref="M:System.Object.Equals(System.Object)"/>.</param>
         </member>
         <member name="M:DryIoc.Registrator.Register(DryIoc.IRegistrator,System.Type,DryIoc.IReuse,DryIoc.Made,DryIoc.Setup,DryIoc.IfAlreadyRegistered,System.Object)">
-            <summary>Registers service of <paramref name="implementationType"/>. ServiceType will be the same as <paramref name="implementationType"/>.</summary>
+            <summary>Registers service of <paramref name="serviceAndMayBeImplementationType"/>. ServiceType will be the same as <paramref name="serviceAndMayBeImplementationType"/>.</summary>
             <param name="registrator">Any <see cref="T:DryIoc.IRegistrator"/> implementation, e.g. <see cref="T:DryIoc.Container"/>.</param>
-            <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
+            <param name="serviceAndMayBeImplementationType">Implementation type. Concrete and open-generic class are supported.</param>
             <param name="reuse">(optional) <see cref="T:DryIoc.IReuse"/> implementation, e.g. <see cref="F:DryIoc.Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-            <param name="with">(optional) specifies <see cref="T:DryIoc.Made"/>.</param>
+            <param name="made">(optional) specifies <see cref="T:DryIoc.Made"/>.</param>
             <param name="setup">(optional) factory setup, by default is (<see cref="F:DryIoc.Setup.Default"/>)</param>
             <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
             <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="M:System.Object.GetHashCode"/> and <see cref="M:System.Object.Equals(System.Object)"/>.</param>
@@ -921,7 +1012,7 @@
             <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
             <param name="serviceKey">(optional) Service key (name). Could be of any of type with overridden <see cref="M:System.Object.GetHashCode"/> and <see cref="M:System.Object.Equals(System.Object)"/>.</param>
         </member>
-        <member name="M:DryIoc.Registrator.Register``2(DryIoc.IRegistrator,DryIoc.Made.Expr{``1},DryIoc.IReuse,DryIoc.Setup,DryIoc.IfAlreadyRegistered,System.Object)">
+        <member name="M:DryIoc.Registrator.Register``2(DryIoc.IRegistrator,DryIoc.Made.TypedMade{``1},DryIoc.IReuse,DryIoc.Setup,DryIoc.IfAlreadyRegistered,System.Object)">
             <summary>Registers service type returned by Made expression.</summary>
             <typeparam name="TService">The type of service.</typeparam>
             <typeparam name="TMadeResult">The type returned by Made expression.</typeparam>
@@ -932,7 +1023,7 @@
             <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
             <param name="serviceKey">(optional) Service key (name). Could be of any of type with overridden <see cref="M:System.Object.GetHashCode"/> and <see cref="M:System.Object.Equals(System.Object)"/>.</param>
         </member>
-        <member name="M:DryIoc.Registrator.Register``1(DryIoc.IRegistrator,DryIoc.Made.Expr{``0},DryIoc.IReuse,DryIoc.Setup,DryIoc.IfAlreadyRegistered,System.Object)">
+        <member name="M:DryIoc.Registrator.Register``1(DryIoc.IRegistrator,DryIoc.Made.TypedMade{``0},DryIoc.IReuse,DryIoc.Setup,DryIoc.IfAlreadyRegistered,System.Object)">
             <summary>Registers service type returned by Made expression.</summary>
             <typeparam name="TService">The type of service.</typeparam>
             <param name="registrator">Any <see cref="T:DryIoc.IRegistrator"/> implementation, e.g. <see cref="T:DryIoc.Container"/>.</param>
@@ -955,7 +1046,9 @@
             <summary>List of types excluded by default from RegisterMany convention.</summary>
         </member>
         <member name="M:DryIoc.Registrator.GetImplementedServiceTypes(System.Type,System.Boolean)">
-            <summary>Returns many service types implemented by source type. Used by RegisterMany method.</summary>
+            <summary>Returns only those types that could be used as service types of <paramref name="type"/>. It means that
+            for open-generic <paramref name="type"/> its service type should supply all type arguments
+            Used by RegisterMany method.</summary>
             <param name="type">Source type: may be concrete, abstract or generic definition.</param> 
             <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
             <returns>Array of types or empty.</returns>
@@ -992,7 +1085,7 @@
             <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
             <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="M:System.Object.GetHashCode"/> and <see cref="M:System.Object.Equals(System.Object)"/>.</param>
         </member>
-        <member name="M:DryIoc.Registrator.RegisterMany``1(DryIoc.IRegistrator,DryIoc.Made.Expr{``0},DryIoc.IReuse,DryIoc.Setup,DryIoc.IfAlreadyRegistered,System.Func{System.Type,System.Boolean},System.Boolean,System.Object)">
+        <member name="M:DryIoc.Registrator.RegisterMany``1(DryIoc.IRegistrator,DryIoc.Made.TypedMade{``0},DryIoc.IReuse,DryIoc.Setup,DryIoc.IfAlreadyRegistered,System.Func{System.Type,System.Boolean},System.Boolean,System.Object)">
             <summary>Registers single registration for all implemented public interfaces and base classes.</summary>
             <typeparam name="TMadeResult">The type returned by Made factory expression.</typeparam>
             <param name="registrator">Any <see cref="T:DryIoc.IRegistrator"/> implementation, e.g. <see cref="T:DryIoc.Container"/>.</param>
@@ -1052,7 +1145,7 @@
             <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
             <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="M:System.Object.GetHashCode"/> and <see cref="M:System.Object.Equals(System.Object)"/>.</param>
         </member>
-        <member name="M:DryIoc.Registrator.RegisterDelegateDecorator``1(DryIoc.IRegistrator,System.Func{DryIoc.IResolver,System.Func{``0,``0}},System.Func{DryIoc.Request,System.Boolean})">
+        <member name="M:DryIoc.Registrator.RegisterDelegateDecorator``1(DryIoc.IRegistrator,System.Func{DryIoc.IResolver,System.Func{``0,``0}},System.Func{DryIoc.RequestInfo,System.Boolean})">
             <summary>Registers decorator function that gets decorated value as input and return decorator.</summary>
             <typeparam name="TService">Registered service type to decorate.</typeparam>
             <param name="registrator">Registrator/Container.</param>
@@ -1060,7 +1153,7 @@
             <param name="condition">(optional) Condition for decorator application.</param>
         </member>
         <member name="M:DryIoc.Registrator.RegisterInstance(DryIoc.IContainer,System.Type,System.Object,DryIoc.IReuse,DryIoc.IfAlreadyRegistered,System.Boolean,System.Boolean,System.Object)">
-            <summary>Registers an externally created object of <paramref name="serviceType"/>. 
+            <summary>Registers an externally created object of<paramref name="serviceType"/>.
             If no reuse specified instance will be stored in Singleton Scope, and disposed when container is disposed.</summary>
             <param name="container">Any <see cref="T:DryIoc.IRegistrator"/> implementation, e.g. <see cref="T:DryIoc.Container"/>.</param>
             <param name="serviceType">Service type to register.</param>
@@ -1083,7 +1176,7 @@
             <param name="weaklyReferenced">(optional) Store as WeakReference. </param>
             <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="M:System.Object.GetHashCode"/> and <see cref="M:System.Object.Equals(System.Object)"/>.</param>
         </member>
-        <member name="M:DryIoc.Registrator.RegisterInitializer``1(DryIoc.IRegistrator,System.Action{``0,DryIoc.IResolver},System.Func{DryIoc.Request,System.Boolean})">
+        <member name="M:DryIoc.Registrator.RegisterInitializer``1(DryIoc.IRegistrator,System.Action{``0,DryIoc.IResolver},System.Func{DryIoc.RequestInfo,System.Boolean})">
             <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
             Check example below for using initializer to automatically subscribe to singleton event aggregator.
             You can register multiple initializers for single service. 
@@ -1225,31 +1318,11 @@
             ]]></code>
             </remarks>
         </member>
-        <member name="M:DryIoc.Resolver.InjectPropertiesAndFields``1(DryIoc.IContainer,``0,DryIoc.PropertiesAndFieldsSelector)">
-            <summary>For given instance resolves and sets properties and fields.
-            It respects <see cref="P:DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-            or if rules are not set it uses <see cref="F:DryIoc.PropertiesAndFields.Auto"/>, 
-            or you can specify your own rules with <paramref name="propertiesAndFields"/> parameter.</summary>
-            <typeparam name="TService">Input and returned instance type.</typeparam>Service (wrapped)
-            <param name="container">Usually a container instance, cause <see cref="T:DryIoc.Container"/> implements <see cref="T:DryIoc.IResolver"/></param>
-            <param name="instance">Service instance with properties to resolve and initialize.</param>
-            <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
-            <returns>Input instance with resolved dependencies, to enable fluent method composition.</returns>
-            <remarks>Different Rules could be combined together using <see cref="M:DryIoc.PropertiesAndFields.And(DryIoc.PropertiesAndFieldsSelector,DryIoc.PropertiesAndFieldsSelector)"/> method.</remarks>        
-        </member>
-        <member name="M:DryIoc.Resolver.New(DryIoc.IContainer,System.Type,DryIoc.Made)">
-            <summary>Creates service using container for injecting parameters without registering anything.</summary>
-            <param name="container">Container to use for type creation and injecting its dependencies.</param>
-            <param name="concreteType">Type to instantiate.</param>
-            <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
-            <returns>Object instantiated by constructor or object returned by factory method.</returns>
-        </member>
-        <member name="M:DryIoc.Resolver.New``1(DryIoc.IContainer,DryIoc.Made)">
-            <summary>Creates service using container for injecting parameters without registering anything.</summary>
-            <typeparam name="T">Type to instantiate.</typeparam>
-            <param name="container">Container to use for type creation and injecting its dependencies.</param>
-            <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
-            <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        <member name="M:DryIoc.Resolver.ToExpression(DryIoc.RequestInfo,DryIoc.IContainer)">
+            <summary>Represents construction of whole request info stack as expression.</summary>
+            <param name="request">Request info to convert to expression.</param>
+            <param name="container">Required to access container facilities for expression conversion.</param>
+            <returns>Returns result expression.</returns>
         </member>
         <member name="T:DryIoc.ResolveManyBehavior">
             <summary>Specifies result of <see cref="M:DryIoc.Resolver.ResolveMany``1(DryIoc.IResolver,System.Type,DryIoc.ResolveManyBehavior,System.Object)"/>: either dynamic(lazy) or fixed view.</summary>
@@ -1319,10 +1392,10 @@
         <member name="M:DryIoc.ServiceInfoTools.WithDetails``1(``0,DryIoc.ServiceDetails,DryIoc.Request)">
             <summary>Combines service info with details: the main task is to combine service and required service type.</summary>
             <typeparam name="T">Type of <see cref="T:DryIoc.IServiceInfo"/>.</typeparam>
-            <param name="info">Source info.</param> <param name="details">Details to combine with info.</param> 
+            <param name="serviceInfo">Source info.</param> <param name="details">Details to combine with info.</param> 
             <param name="request">Owner request.</param> <returns>Original source or new combined info.</returns>
         </member>
-        <member name="M:DryIoc.ServiceInfoTools.InheritInfo(DryIoc.IServiceInfo,DryIoc.IServiceInfo,System.Boolean)">
+        <member name="M:DryIoc.ServiceInfoTools.InheritInfoFromDependencyOwner(DryIoc.IServiceInfo,DryIoc.IServiceInfo,System.Boolean)">
             <summary>Enables propagation/inheritance of info between dependency and its owner: 
             for instance <see cref="P:DryIoc.ServiceDetails.RequiredServiceType"/> for wrappers.</summary>
             <param name="dependency">Dependency info.</param>
@@ -1430,34 +1503,48 @@
             <param name="container">Reference to container issued the request. Could be changed later with <see cref="M:DryIoc.Request.WithNewContainer(DryIoc.ContainerWeakRef)"/> method.</param>
             <returns>New empty request.</returns>
         </member>
-        <member name="F:DryIoc.Request.Parent">
-            <summary>Previous request in dependency chain. It <see cref="P:DryIoc.Request.IsEmpty"/> for resolution root.</summary>
+        <member name="M:DryIoc.Request.IsFirstNonWrapperInResolutionCall">
+            <summary>Returns true for the First Service in resolve call.</summary> <returns></returns>
+        </member>
+        <member name="M:DryIoc.Request.IsWrappedInFunc">
+            <summary>Checks if request is wrapped in Func - where Func is one of request immediate wrappers.</summary>
+            <returns>True if has Func ancestor.</returns>
+        </member>
+        <member name="M:DryIoc.Request.IsWrappedInFuncWithArgs">
+            <summary>Checks if request has parent with service type of Func with arguments. 
+            Often required to check in lazy scenarios.</summary> <returns>True if has Func with arguments ancestor.</returns>
+        </member>
+        <member name="M:DryIoc.Request.Ancestor(System.Func{DryIoc.RequestInfo,System.Boolean})">
+            <summary>Gets first ancestor request which satisfies the condition, 
+            or empty if no ancestor is found.</summary>
+            <param name="condition">(optional) Condition to stop on.</param>
+            <returns>Request info of found parent.</returns>
         </member>
         <member name="F:DryIoc.Request.ResolvedFactory">
             <summary>Factory found in container to resolve this request.</summary>
         </member>
         <member name="F:DryIoc.Request.FuncArgs">
-            <summary>List of specified arguments to use instead of resolving them.</summary>
+            <summary>User provided arguments: key tracks what args are still unused.</summary>
+            <remarks>Mutable: tracks used parameters</remarks>
         </member>
-        <member name="F:DryIoc.Request.ContainerWeakRef">
-            <summary>Weak reference to container.</summary>
+        <member name="F:DryIoc.Request.Level">
+            <summary>Counting nesting levels. May be used to split object graph if level is too deep.</summary>
         </member>
-        <member name="F:DryIoc.Request.Scope">
-            <summary>Resolution scope.</summary>
-        </member>
-        <member name="M:DryIoc.Request.Push(DryIoc.IServiceInfo,DryIoc.IScope)">
+        <member name="M:DryIoc.Request.Push(DryIoc.IServiceInfo,DryIoc.IScope,DryIoc.RequestInfo)">
             <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
             <param name="info">Info about service to resolve.</param> <param name="scope">(optional) Resolution scope.</param>
+            <param name="preResolveParent">(optional) (optional) Request info beyond/preceding Resolve call.</param>
             <returns>New request for provided info.</returns>
-            <remarks>Current request should be resolved to factory (<see cref="M:DryIoc.Request.WithResolvedFactory(DryIoc.Factory)"/>), before pushing info into it.</remarks>
+            <remarks>Existing/parent request should be resolved to factory (<see cref="M:DryIoc.Request.WithResolvedFactory(DryIoc.Factory)"/>), before pushing info into it.</remarks>
         </member>
-        <member name="M:DryIoc.Request.Push(System.Type,System.Object,DryIoc.IfUnresolved,System.Type,DryIoc.IScope)">
+        <member name="M:DryIoc.Request.Push(System.Type,System.Object,DryIoc.IfUnresolved,System.Type,DryIoc.IScope,DryIoc.RequestInfo)">
             <summary>Composes service description into <see cref="T:DryIoc.IServiceInfo"/> and calls Push.</summary>
             <param name="serviceType">Service type to resolve.</param>
             <param name="serviceKey">(optional) Service key to resolve.</param>
             <param name="ifUnresolved">(optional) Instructs how to handle unresolved service.</param>
             <param name="requiredServiceType">(optional) Registered/unwrapped service type to find.</param>
             <param name="scope">(optional) Resolution scope.</param>
+            <param name="preResolveParent">(optional) Request info beyond/preceding Resolve call.</param>
             <returns>New request with provided info.</returns>
         </member>
         <member name="M:DryIoc.Request.WithChangedServiceInfo(System.Func{DryIoc.IServiceInfo,DryIoc.IServiceInfo})">
@@ -1489,18 +1576,13 @@
             <param name="factory">Factory to which request is resolved.</param>
             <returns>New request with set factory.</returns>
         </member>
-        <member name="M:DryIoc.Request.ParentNonWrapper">
-            <summary>Searches parent request stack upward and returns closest parent of <see cref="F:DryIoc.FactoryType.Service"/>.
-            If not found returns <see cref="P:DryIoc.Request.IsEmpty"/> request.</summary> <returns>Found parent or <see cref="P:DryIoc.Request.IsEmpty"/> request.</returns>
-        </member>
-        <member name="M:DryIoc.Request.ParentNonWrapper(System.Func{DryIoc.Request,System.Boolean})">
-            <summary>Searches parent request stack upward and returns closest parent of <see cref="F:DryIoc.FactoryType.Service"/>.
-            If not found returns <see cref="P:DryIoc.Request.IsEmpty"/> request.</summary>
-            <param name="condition">Condition, e.g. to find root request condition may be: <code lang="cs"><![CDATA[p => p.Parent.IsEmpty]]></code></param>
-            <returns>Found parent or empty request.</returns>
+        <member name="M:DryIoc.Request.ToRequestInfo">
+            <summary>Converts input request into its slim version of <see cref="T:DryIoc.RequestInfo"/> </summary>
+            <returns>Mirrored request info.</returns>
         </member>
         <member name="M:DryIoc.Request.Enumerate">
-            <summary>Enumerates all request stack parents. Last returned will <see cref="P:DryIoc.Request.IsEmpty"/> empty parent.</summary>
+            <summary>Enumerates all request stack parents. 
+            Last returned will <see cref="P:DryIoc.Request.IsEmpty"/> empty parent.</summary>
             <returns>Unfolding parents.</returns>
         </member>
         <member name="M:DryIoc.Request.PrintCurrent(System.Text.StringBuilder)">
@@ -1519,10 +1601,22 @@
             <returns>String with info.</returns>
         </member>
         <member name="P:DryIoc.Request.IsEmpty">
-            <summary>Indicates that request is empty initial request: there is no <see cref="P:DryIoc.Request.ServiceInfo"/> in such a request.</summary>
+            <summary>Indicates that request is empty initial request: there is no <see cref="F:DryIoc.Request._serviceInfo"/> in such a request.</summary>
         </member>
-        <member name="P:DryIoc.Request.ServiceInfo">
-            <summary>Requested service id info and commanded resolution behavior.</summary>
+        <member name="P:DryIoc.Request.IsResolutionCall">
+            <summary>Returns true if request is First in Resolve call.</summary>
+        </member>
+        <member name="P:DryIoc.Request.IsResolutionRoot">
+            <summary>Returns true if request is First in First Resolve call.</summary>
+        </member>
+        <member name="P:DryIoc.Request.PreResolveParent">
+            <summary>Request prior to Resolve call.</summary>
+        </member>
+        <member name="P:DryIoc.Request.Parent">
+            <summary>Returns "logical" parent of request, skip immediate parent wrappers if any.</summary>
+        </member>
+        <member name="P:DryIoc.Request.ContainerWeakRef">
+            <summary>Weak reference to container. May be replaced in request flowed from parent to child container.</summary>
         </member>
         <member name="P:DryIoc.Request.Container">
             <summary>Provides access to container currently bound to request. 
@@ -1530,7 +1624,10 @@
             but could be changed along the way: for instance when resolving from parent container.</summary>
         </member>
         <member name="P:DryIoc.Request.Scopes">
-            <summary>Separate access to scopes.</summary>
+            <summary>Separate from container because while container may be switched from parent to child, scopes should be from child/facade.</summary>
+        </member>
+        <member name="P:DryIoc.Request.Scope">
+            <summary>Optionally associated resolution scope.</summary>
         </member>
         <member name="P:DryIoc.Request.ServiceType">
             <summary>Shortcut access to <see cref="P:DryIoc.IServiceInfo.ServiceType"/>.</summary>
@@ -1547,11 +1644,11 @@
         <member name="P:DryIoc.Request.ImplementationType">
             <summary>Implementation type of factory, if request was <see cref="M:DryIoc.Request.WithResolvedFactory(DryIoc.Factory)"/> factory, or null otherwise.</summary>
         </member>
-        <member name="P:DryIoc.Request.ResolvedFactoryType">
+        <member name="P:DryIoc.Request.FactoryType">
             <summary>Shortcut to FactoryType.</summary>
         </member>
-        <member name="P:DryIoc.Request.IsCompositionRoot">
-            <summary>Returns true if request originated from first Resolve call.</summary>
+        <member name="P:DryIoc.Request.ReuseLifespan">
+            <summary>Relative number representing reuse lifespan.</summary>
         </member>
         <member name="T:DryIoc.FactoryType">
             <summary>Type of services supported by Container.</summary>
@@ -1571,14 +1668,15 @@
         <member name="F:DryIoc.Setup.Default">
             <summary>Default setup for service factories.</summary>
         </member>
-        <member name="M:DryIoc.Setup.With(System.Boolean,System.Func{System.Object},System.Object,System.Func{DryIoc.Request,System.Boolean},System.Boolean,System.Boolean,System.Boolean,System.Boolean)">
+        <member name="M:DryIoc.Setup.With(System.Object,System.Func{DryIoc.RequestInfo,System.Boolean},System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean)">
             <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="F:DryIoc.Setup.Default"/> setup will be returned.</summary>
-            <param name="cacheFactoryExpression">(optional)</param> <param name="lazyMetadata">(optional)</param> 
-            <param name="metadata">(optional) Overrides <paramref name="lazyMetadata"/></param> <param name="condition">(optional)</param>
-            <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionRoot"/> but in addition opens new scope.</param>
-            <param name="asResolutionRoot">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
+            <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> <param name="condition">(optional)</param>
+            <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
+            <param name="asResolutionCall">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
+            <param name="asResolutionRoot">(optional) Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</param>
             <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
             <param name="weaklyReferenced">(optional) Stores reused instance as WeakReference.</param>
+            <param name="allowDisposableTransient">(optional) Allows registering transient disposable.</param>
             <returns>New setup object or <see cref="F:DryIoc.Setup.Default"/>.</returns>
         </member>
         <member name="F:DryIoc.Setup.Wrapper">
@@ -1593,7 +1691,7 @@
         <member name="F:DryIoc.Setup.Decorator">
             <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
         </member>
-        <member name="M:DryIoc.Setup.DecoratorWith(System.Func{DryIoc.Request,System.Boolean})">
+        <member name="M:DryIoc.Setup.DecoratorWith(System.Func{DryIoc.RequestInfo,System.Boolean})">
             <summary>Creates setup with optional condition.</summary>
             <param name="condition">(optional)</param> <returns>New setup with condition or <see cref="F:DryIoc.Setup.Decorator"/>.</returns>
         </member>
@@ -1604,25 +1702,33 @@
         <member name="P:DryIoc.Setup.Condition">
             <summary>Predicate to check if factory could be used for resolved request.</summary>
         </member>
-        <member name="P:DryIoc.Setup.CacheFactoryExpression">
-            <summary>Set to true allows to cache and use cached factored service expression.</summary>
-        </member>
         <member name="P:DryIoc.Setup.Metadata">
             <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         </member>
-        <member name="P:DryIoc.Setup.AsResolutionRoot">
+        <member name="P:DryIoc.Setup.AsResolutionCall">
             <summary>Indicates that injected expression should be: 
             <c><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></c>
             instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
         </member>
+        <member name="P:DryIoc.Setup.AsResolutionRoot">
+            <summary>Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</summary>
+        </member>
         <member name="P:DryIoc.Setup.OpenResolutionScope">
-            <summary>In addition to <see cref="P:DryIoc.Setup.AsResolutionRoot"/> opens scope.</summary>
+            <summary>In addition to <see cref="P:DryIoc.Setup.AsResolutionCall"/> opens scope.</summary>
         </member>
         <member name="P:DryIoc.Setup.PreventDisposal">
             <summary>Prevents disposal of reused instance if it is disposable.</summary>
         </member>
         <member name="P:DryIoc.Setup.WeaklyReferenced">
             <summary>Stores reused instance as WeakReference.</summary>
+        </member>
+        <member name="P:DryIoc.Setup.AllowDisposableTransient">
+            <summary> Allows registering transient disposable. </summary>
+        </member>
+        <member name="P:DryIoc.Setup.ServiceSetup.Metadata">
+            <summary>Evaluates metadata if it spoecified as Func of object, and replaces Func with its result!.
+            Otherwise just returns metadata object.</summary>
+            <remarks>Invokation of Func metadata is Not thread-safe. Please take care of that inside the Func.</remarks>
         </member>
         <member name="T:DryIoc.Setup.WrapperSetup">
             <summary>Setup for <see cref="F:DryIoc.FactoryType.Wrapper"/> factory.</summary>
@@ -1646,16 +1752,26 @@
         <member name="P:DryIoc.Setup.WrapperSetup.FactoryType">
             <summary>Returns <see cref="F:DryIoc.FactoryType.Wrapper"/> type.</summary>
         </member>
-        <member name="T:DryIoc.IConcreteFactoryProvider">
+        <member name="T:DryIoc.Setup.DecoratorSetup">
+            <summary>Setup applied to decorators.</summary>
+        </member>
+        <member name="M:DryIoc.Setup.DecoratorSetup.#ctor(System.Func{DryIoc.RequestInfo,System.Boolean})">
+            <summary>Creates decorator setup with optional condition.</summary>
+            <param name="condition">(optional)</param>
+        </member>
+        <member name="P:DryIoc.Setup.DecoratorSetup.FactoryType">
+            <summary>Returns Decorator factory type.</summary>
+        </member>
+        <member name="T:DryIoc.IConcreteFactoryGenerator">
             <summary>Facility for creating concrete factories from some template/prototype. Example: 
             creating closed-generic type reflection factory from registered open-generic prototype factory.</summary>
         </member>
-        <member name="M:DryIoc.IConcreteFactoryProvider.ProvideConcreteFactory(DryIoc.Request)">
-            <summary>Method applied for factory provider, returns new factory per request.</summary>
+        <member name="M:DryIoc.IConcreteFactoryGenerator.GetGeneratedFactoryOrDefault(DryIoc.Request)">
+            <summary>Returns factory per request. May track already generated factories and return one without regenerating.</summary>
             <param name="request">Request to resolve.</param> <returns>Returns new factory per request.</returns>
         </member>
-        <member name="P:DryIoc.IConcreteFactoryProvider.ProvidedFactoriesServiceTypeKey">
-            <summary>Returns factories created by <see cref="M:DryIoc.IConcreteFactoryProvider.ProvideConcreteFactory(DryIoc.Request)"/> so far.</summary>
+        <member name="P:DryIoc.IConcreteFactoryGenerator.GeneratedFactories">
+            <summary>Generated factories so far, identified by the service type and key pair.</summary>
         </member>
         <member name="T:DryIoc.Factory">
             <summary>Base class for different ways to instantiate service: 
@@ -1685,7 +1801,7 @@
             <param name="reuse">(optional)</param>
             <param name="setup">(optional)</param>
         </member>
-        <member name="M:DryIoc.Factory.IsMatchingReuseScope(DryIoc.Request)">
+        <member name="M:DryIoc.Factory.HasMatchingReuseScope(DryIoc.Request)">
             <summary>Returns true if for factory Reuse exists matching resolution or current Scope.</summary>
             <param name="request"></param> <returns>True if matching Scope exists.</returns>
         </member>
@@ -1702,12 +1818,17 @@
             <param name="request">Service request.</param>
             <returns>Created expression.</returns>
         </member>
-        <member name="M:DryIoc.Factory.GetExpressionOrDefault(DryIoc.Request,System.Type)">
+        <member name="M:DryIoc.Factory.IsFactoryExpressionCacheable(DryIoc.Request)">
+            <summary>Allows derived factories to override or reuse caching policy used by
+            <see cref="M:DryIoc.Factory.GetExpressionOrDefault(DryIoc.Request)"/>. By default only service setup and no 
+            user passed arguments may be cached.</summary>
+            <param name="request">Context.</param>
+            <returns>True if factory expression could be cached.</returns>
+        </member>
+        <member name="M:DryIoc.Factory.GetExpressionOrDefault(DryIoc.Request)">
             <summary>Returns service expression: either by creating it with <see cref="M:DryIoc.Factory.CreateExpressionOrDefault(DryIoc.Request)"/> or taking expression from cache.
-            Before returning method may transform the expression  by applying <see cref="F:DryIoc.Factory.Reuse"/>, or/and decorators if found any.
-            If <paramref name="reuseWrapperType"/> specified: result expression may be of required wrapper type.</summary>
+            Before returning method may transform the expression  by applying <see cref="F:DryIoc.Factory.Reuse"/>, or/and decorators if found any.</summary>
             <param name="request">Request for service.</param>
-            <param name="reuseWrapperType">(optional) Reuse wrapper type of expression to return.</param>
             <returns>Service expression.</returns>
         </member>
         <member name="M:DryIoc.Factory.ThrowIfReuseHasShorterLifespanThanParent(DryIoc.IReuse,DryIoc.Request)">
@@ -1735,9 +1856,9 @@
         <member name="P:DryIoc.Factory.ImplementationType">
             <summary>Non-abstract closed implementation type. May be null if not known beforehand, e.g. in <see cref="T:DryIoc.DelegateFactory"/>.</summary>
         </member>
-        <member name="P:DryIoc.Factory.Provider">
+        <member name="P:DryIoc.Factory.FactoryGenerator">
             <summary>Indicates that Factory is factory provider and 
-            consumer should call <see cref="M:DryIoc.IConcreteFactoryProvider.ProvideConcreteFactory(DryIoc.Request)"/>  to get concrete factory.</summary>
+            consumer should call <see cref="M:DryIoc.IConcreteFactoryGenerator.GetGeneratedFactoryOrDefault(DryIoc.Request)"/>  to get concrete factory.</summary>
         </member>
         <member name="T:DryIoc.FactoryMethodSelector">
             <summary>Declares delegate to get single factory method or constructor for resolved request.</summary>
@@ -1794,7 +1915,7 @@
             <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
             <returns>Combined selector.</returns>
         </member>
-        <member name="M:DryIoc.Parameters.Type``1(DryIoc.ParameterSelector,System.Func{DryIoc.Request,System.Object})">
+        <member name="M:DryIoc.Parameters.Type``1(DryIoc.ParameterSelector,System.Func{DryIoc.Request,``0})">
             <summary>Specify parameter by type and set custom value to it.</summary>
             <typeparam name="T">Parameter type.</typeparam>
             <param name="source">Original parameters rules.</param> 
@@ -1844,14 +1965,14 @@
             <param name="name">Target member name.</param> <param name="getCustomValue">Custom value provider.</param>
             <returns>Return new combined selector.</returns>
         </member>
-        <member name="M:DryIoc.PropertiesAndFields.Match(System.Reflection.PropertyInfo,System.Boolean,System.Boolean)">
+        <member name="M:DryIoc.PropertiesAndFields.IsInjectable(System.Reflection.PropertyInfo,System.Boolean,System.Boolean)">
             <summary>Returns true if property matches flags provided.</summary>
             <param name="property">Property to match</param>
             <param name="withNonPublic">Says to include non public properties.</param>
             <param name="withPrimitive">Says to include properties of primitive type.</param>
             <returns>True if property is matched and false otherwise.</returns>
         </member>
-        <member name="M:DryIoc.PropertiesAndFields.Match(System.Reflection.FieldInfo,System.Boolean,System.Boolean)">
+        <member name="M:DryIoc.PropertiesAndFields.IsInjectable(System.Reflection.FieldInfo,System.Boolean,System.Boolean)">
             <summary>Returns true if field matches flags provided.</summary>
             <param name="field">Field to match.</param>
             <param name="withNonPublic">Says to include non public fields.</param>
@@ -1867,7 +1988,7 @@
             creates expression for each reflected dependency, and composes result service expression.</summary>
         </member>
         <member name="F:DryIoc.ReflectionFactory.Made">
-            <summary>Injection rules set for Constructor, Parameters, Properties and Fields.</summary>
+            <summary>Injection rules set for Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
         </member>
         <member name="M:DryIoc.ReflectionFactory.#ctor(System.Type,DryIoc.IReuse,DryIoc.Made,DryIoc.Setup)">
             <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
@@ -1883,6 +2004,11 @@
             <param name="serviceKey">(ignored)</param>
             <param name="isStaticallyChecked">Skips service type check. Means that service and implementation are statically checked.</param>
         </member>
+        <member name="M:DryIoc.ReflectionFactory.IsFactoryExpressionCacheable(DryIoc.Request)">
+            <summary>Add to base rules: do not cache if Made is context based.</summary>
+            <param name="request">Context.</param>
+            <returns>True if factory expression could be cached.</returns>
+        </member>
         <member name="M:DryIoc.ReflectionFactory.CreateExpressionOrDefault(DryIoc.Request)">
             <summary>Creates service expression, so for registered implementation type "Service", 
             you will get "new Service()". If there is <see cref="T:DryIoc.Reuse"/> specified, then expression will
@@ -1892,7 +2018,7 @@
         <member name="P:DryIoc.ReflectionFactory.ImplementationType">
             <summary>Non-abstract service implementation type. May be open generic.</summary>
         </member>
-        <member name="P:DryIoc.ReflectionFactory.Provider">
+        <member name="P:DryIoc.ReflectionFactory.FactoryGenerator">
             <summary>Provides closed-generic factory for registered open-generic variant.</summary>
         </member>
         <member name="T:DryIoc.ExpressionFactory">
@@ -1906,6 +2032,24 @@
         <member name="M:DryIoc.ExpressionFactory.CreateExpressionOrDefault(DryIoc.Request)">
             <summary>Creates service expression using wrapped delegate.</summary>
             <param name="request">Request to resolve.</param> <returns>Expression returned by stored delegate.</returns>
+        </member>
+        <member name="T:DryIoc.InstanceFactory">
+            <summary>Factory representing external service object registered with <see cref="M:DryIoc.Registrator.RegisterInstance(DryIoc.IContainer,System.Type,System.Object,DryIoc.IReuse,DryIoc.IfAlreadyRegistered,System.Boolean,System.Boolean,System.Object)"/>.</summary>
+        </member>
+        <member name="M:DryIoc.InstanceFactory.#ctor(System.Object,DryIoc.IReuse,DryIoc.Setup)">
+            <summary>Creates factory wrapping provided instance.</summary>
+            <param name="instance">Instance may be already wrapped in WeakReference or single element array to prevent disposal.</param>
+            <param name="reuse"></param> <param name="setup"></param>
+        </member>
+        <member name="M:DryIoc.InstanceFactory.ReplaceInstance(System.Object)">
+            <summary>Replaces current instance with new one.</summary> <param name="newInstance"></param>
+        </member>
+        <member name="M:DryIoc.InstanceFactory.CreateExpressionOrDefault(DryIoc.Request)">
+            <summary>The method should not be really called. That's why it returns excpetion throwing expression.</summary>
+            <param name="request">Context</param> <returns>Expression throwing exception.</returns>
+        </member>
+        <member name="P:DryIoc.InstanceFactory.ImplementationType">
+            <summary>Instance type, or null for null instance.</summary>
         </member>
         <member name="T:DryIoc.DelegateFactory">
             <summary>This factory is the thin wrapper for user provided delegate 
@@ -1947,6 +2091,11 @@
             <remarks>Scope does not store <paramref name="createValue"/> (no memory leak here), 
             it stores only result of <paramref name="createValue"/> call.</remarks>
         </member>
+        <member name="M:DryIoc.IScope.GetItemOrDefault(System.Int32)">
+            <summary>Gets item or null if nothing stored.</summary>
+            <param name="id">Id to search for.</param>
+            <returns>Stored item or null.</returns>
+        </member>
         <member name="M:DryIoc.IScope.SetOrAdd(System.Int32,System.Object)">
             <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
             <param name="id">To set value at.</param> <param name="item">Value to set.</param>
@@ -1982,6 +2131,11 @@
             <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
             <returns>Created and stored object.</returns>
             <exception cref="T:DryIoc.ContainerException">if scope is disposed.</exception>
+        </member>
+        <member name="M:DryIoc.Scope.GetItemOrDefault(System.Int32)">
+            <summary>Gets item or null if nothing stored.</summary>
+            <param name="id">Id to search for.</param>
+            <returns>Stored item or null.</returns>
         </member>
         <member name="M:DryIoc.Scope.SetOrAdd(System.Int32,System.Object)">
             <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -2019,6 +2173,11 @@
             <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
             <returns>Created and stored object.</returns>
             <exception cref="T:DryIoc.ContainerException">if scope is disposed.</exception>
+        </member>
+        <member name="M:DryIoc.SingletonScope.GetItemOrDefault(System.Int32)">
+            <summary>Gets item or null if nothing stored.</summary>
+            <param name="id">Id to search for.</param>
+            <returns>Stored item or null.</returns>
         </member>
         <member name="M:DryIoc.SingletonScope.SetOrAdd(System.Int32,System.Object)">
             <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -2260,6 +2419,76 @@
         <member name="F:DryIoc.IfUnresolved.ReturnDefault">
             <summary>Specifies to return default value instead of throwing error.</summary>
         </member>
+        <member name="T:DryIoc.RequestInfo">
+            <summary>Dependency request path information.</summary>
+        </member>
+        <member name="F:DryIoc.RequestInfo.Empty">
+            <summary>Represents empty info (indicated by null <see cref="F:DryIoc.RequestInfo.ServiceType"/>).</summary>
+        </member>
+        <member name="F:DryIoc.RequestInfo.Parent">
+            <summary>Parent request or null for root resolution request.</summary>
+        </member>
+        <member name="F:DryIoc.RequestInfo.ServiceType">
+            <summary>Asked service type.</summary>
+        </member>
+        <member name="F:DryIoc.RequestInfo.RequiredServiceType">
+            <summary>Required service type if specified.</summary>
+        </member>
+        <member name="F:DryIoc.RequestInfo.ServiceKey">
+            <summary>Optional service key.</summary>
+        </member>
+        <member name="F:DryIoc.RequestInfo.FactoryType">
+            <summary>False for Decorators and Wrappers.</summary>
+        </member>
+        <member name="F:DryIoc.RequestInfo.ImplementationType">
+            <summary>Implementation type.</summary>
+        </member>
+        <member name="F:DryIoc.RequestInfo.ReuseLifespan">
+            <summary>Relative number representing reuse lifespan.</summary>
+        </member>
+        <member name="M:DryIoc.RequestInfo.#ctor(System.Type,System.Type,System.Object,DryIoc.FactoryType,System.Type,System.Int32,DryIoc.RequestInfo)">
+            <summary>Creates info.</summary>
+            <param name="serviceType"></param>
+            <param name="requiredServiceType"></param>
+            <param name="serviceKey"></param>
+            <param name="factoryType"></param>
+            <param name="implementationType"></param>
+            <param name="reuseLifespan"></param>
+            <param name="parent"></param>
+        </member>
+        <member name="M:DryIoc.RequestInfo.Enumerate">
+            <summary>Returns all request until the root - parent is null.</summary>
+            <returns>Requests from the last to first.</returns>
+        </member>
+        <member name="M:DryIoc.RequestInfo.Print(System.Text.StringBuilder)">
+            <summary>Prints request with all its parents to string.</summary> <returns>The string.</returns>
+            <param name="s">Where to print.</param><returns><paramref name="s"/> with appended info.</returns>
+        </member>
+        <member name="M:DryIoc.RequestInfo.ToString">
+            <summary>Prints request with all its parents to string.</summary> <returns>The string.</returns>
+        </member>
+        <member name="M:DryIoc.RequestInfo.Equals(System.Object)">
+            <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
+            <param name="obj"></param> <returns></returns>
+        </member>
+        <member name="M:DryIoc.RequestInfo.Equals(DryIoc.RequestInfo)">
+            <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
+            <param name="other"></param> <returns></returns>
+        </member>
+        <member name="M:DryIoc.RequestInfo.EqualsWithoutParent(DryIoc.RequestInfo)">
+            <summary>Compares infos regarding properies but not their parents.</summary>
+            <param name="other">Info to compare for equality.</param> <returns></returns>
+        </member>
+        <member name="M:DryIoc.RequestInfo.GetHashCode">
+            <summary>Returns hash code combined from info fields plus its parent.</summary>
+            <returns>Combined hash code.</returns>
+        </member>
+        <member name="P:DryIoc.RequestInfo.IsEmpty">
+            <summary>Returns true for an empty request.</summary>
+        </member>
+        <member name="P:DryIoc.RequestInfo.IsResolutionRoot">
+            <summary>Returns true if request is the first in a chain.</summary>
+        </member>
         <member name="T:DryIoc.IfAlreadyRegistered">
             <summary>Specifies options to handle situation when registering some service already present in the registry.</summary>
         </member>
@@ -2435,12 +2664,17 @@
              <param name="arg2"></param> <param name="arg3"></param>
             <returns><paramref name="arg0"/> if no exception.</returns>
         </member>
-        <member name="M:DryIoc.Throw.IfThrows``2(System.Func{``1},System.Int32,System.Object,System.Object,System.Object,System.Object)">
+        <member name="M:DryIoc.Throw.IfThrows``2(System.Func{``1},System.Boolean,System.Int32,System.Object,System.Object,System.Object,System.Object)">
             <summary>Invokes <paramref name="operation"/> and in case of <typeparamref name="TEx"/> re-throws it as inner-exception.</summary>
             <typeparam name="TEx">Exception to check and handle, and then wrap as inner-exception.</typeparam>
             <typeparam name="T">Result of <paramref name="operation"/>.</typeparam>
-            <param name="operation">To invoke</param> <param name="error">Error code</param>
-            <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
+            <param name="operation">To invoke</param>
+            <param name="throwCondition">Condition to be evaluated, throws if result is true, otherwise - does nothing.</param>
+            <param name="error">Error code</param>
+            <param name="arg0"></param>
+            <param name="arg1"></param>
+            <param name="arg2"></param>
+            <param name="arg3"></param>
             <returns>Result of <paramref name="operation"/> if no exception.</returns>
         </member>
         <member name="M:DryIoc.Throw.It(System.Int32,System.Object,System.Object,System.Object,System.Object)">
@@ -2483,10 +2717,14 @@
             <param name="type">Source type</param>
             <returns>Collection of interface types.</returns>
         </member>
+        <member name="M:DryIoc.ReflectionTools.GetAllMembers(System.Type)">
+            <summary>Gets all decalred and base members.</summary>
+            <param name="type">Type to get members from.</param> <returns>All members.</returns>
+        </member>
         <member name="M:DryIoc.ReflectionTools.ContainsAllGenericTypeParameters(System.Type,System.Type[])">
-            <summary>Returns true if <paramref name="type"/> contains all generic parameters from <paramref name="genericParams"/>.</summary>
-            <param name="type">Expected to be open-generic type.</param>
-            <param name="genericParams">Generic parameters.</param>
+            <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters from <paramref name="genericParameters"/>.</summary>
+            <param name="openGenericType">Expected to be open-generic type.</param>
+            <param name="genericParameters">Generic parameters.</param>
             <returns>Returns true if contains and false otherwise.</returns>
         </member>
         <member name="M:DryIoc.ReflectionTools.IsCompilerGenerated(System.Type)">
@@ -2523,7 +2761,7 @@
             <param name="type">Generic parameter type.</param>
             <returns>Array of interface and base class constraints.</returns>
         </member>
-        <member name="M:DryIoc.ReflectionTools.GetElementTypeOrNull(System.Type)">
+        <member name="M:DryIoc.ReflectionTools.GetArrayElementTypeOrNull(System.Type)">
             <summary>If type is array returns is element type, otherwise returns null.</summary>
             <param name="type">Source type.</param> <returns>Array element type or null.</returns>
         </member>
@@ -2576,7 +2814,7 @@
             <param name="inherit">(optional) Additionally check for attributes inherited from base type.</param>
             <returns>Sequence of found attributes or empty.</returns>
         </member>
-        <member name="M:DryIoc.ReflectionTools.GetAll``1(System.Type,System.Func{System.Reflection.TypeInfo,System.Collections.Generic.IEnumerable{``0}})">
+        <member name="M:DryIoc.ReflectionTools.GetDeclaredAndBase``1(System.Type,System.Func{System.Reflection.TypeInfo,System.Collections.Generic.IEnumerable{``0}})">
             <summary>Recursive method to enumerate all input type and its base types for specific details.
             Details are returned by <paramref name="getDeclared"/> delegate.</summary>
             <typeparam name="T">Details type: properties, fields, methods, etc.</typeparam>
@@ -2600,15 +2838,16 @@
         <member name="M:DryIoc.ReflectionTools.GetSingleConstructorOrNull(System.Type,System.Boolean)">
             <summary>Returns single constructor, otherwise if no or more than one: returns false.</summary>
             <param name="type">Type to inspect.</param>
-            <param name="includeNonPublic">If set, counts non-public constructors.</param>
+            <param name="includeNonPublic">(optional) If set includes non-public constructors.</param>
             <returns>Single constructor or null.</returns>
         </member>
-        <member name="M:DryIoc.ReflectionTools.GetSingleDeclaredMethodOrNull(System.Type,System.String)">
+        <member name="M:DryIoc.ReflectionTools.GetSingleMethodOrNull(System.Type,System.String,System.Boolean)">
             <summary>Returns single declared (not inherited) method by name, or null if not found.</summary>
             <param name="type">Input type</param> <param name="name">Method name to look for.</param>
+            <param name="includeNonPublic">(optional) If set includes non public methods into search.</param>
             <returns>Found method or null.</returns>
         </member>
-        <member name="M:DryIoc.ReflectionTools.GetDeclaredMethodOrNull(System.Type,System.String,System.Type[])">
+        <member name="M:DryIoc.ReflectionTools.GetMethodOrNull(System.Type,System.String,System.Type[])">
             <summary>Returns declared (not inherited) method by name and argument types, or null if not found.</summary>
             <param name="type">Input type</param> <param name="name">Method name to look for.</param>
             <param name="args">Argument types</param> <returns>Found method or null.</returns>
@@ -2639,10 +2878,6 @@
         <member name="M:DryIoc.ReflectionTools.IsBackingField(System.Reflection.FieldInfo)">
             <summary>Returns true if field is backing field for property.</summary>
             <param name="field">Field to check.</param> <returns>Returns true if field is backing property.</returns>
-        </member>
-        <member name="M:DryIoc.ReflectionTools.IsPublic(System.Reflection.PropertyInfo)">
-            <summary>Returns true if property is public.</summary>
-            <param name="property">Property check.</param> <returns>Returns result of check.</returns>
         </member>
         <member name="M:DryIoc.ReflectionTools.IsIndexer(System.Reflection.PropertyInfo)">
             <summary>Returns true if property is indexer: aka this[].</summary>
@@ -2683,6 +2918,10 @@
         <member name="M:DryIoc.ArrayTools.IsNullOrEmpty``1(``0[])">
             <summary>Returns true if array is null or have no items.</summary> <typeparam name="T">Type of array item.</typeparam>
             <param name="source">Source array to check.</param> <returns>True if null or has no items, false otherwise.</returns>
+        </member>
+        <member name="M:DryIoc.ArrayTools.EmptyIfNull``1(``0[])">
+            <summary>Returns empty array instead of null, or source array otherwise.</summary> <typeparam name="T">Type of array item.</typeparam>
+            <param name="source">Source array.</param> <returns>Empty array or source.</returns>
         </member>
         <member name="M:DryIoc.ArrayTools.ToArrayOrSelf``1(System.Collections.Generic.IEnumerable{``0})">
             <summary>Returns source enumerable if it is array, otherwise converts source to array.</summary>
@@ -2772,11 +3011,11 @@
             <returns>String builder with appended output.</returns>
         </member>
         <member name="F:DryIoc.PrintTools.GetTypeNameDefault">
-            <summary>Default delegate to print Type details: by default print <see cref="P:System.Type.FullName"/> and
-            spare namespace if it start with "System."</summary>
+            <summary>Default delegate to print Type details: by default prints Type FullName and
+            skips namespace if it start with "System."</summary>
         </member>
         <member name="M:DryIoc.PrintTools.Print(System.Text.StringBuilder,System.Type,System.Func{System.Type,System.String})">
-            <summary>Appends <see cref="T:System.Type"/> object details to string builder.</summary>
+            <summary>Appends type details to string builder.</summary>
             <param name="s">String builder to append output to.</param>
             <param name="type">Input type to print.</param>
             <param name="getTypeName">(optional) Delegate to provide custom type details.</param>
@@ -2785,17 +3024,23 @@
         <member name="T:DryIoc.Portable">
             <summary>Ports some methods from .Net 4.0/4.5</summary>
         </member>
-        <member name="F:DryIoc.Portable.GetTypesFromAssembly">
-            <summary>Portable version of Assembly.GetTypes.</summary>
-        </member>
-        <member name="F:DryIoc.Portable.GetPropertyGetMethod">
-            <summary>Portable version of PropertyInfo.GetGetMethod.</summary>
-        </member>
-        <member name="F:DryIoc.Portable.GetPropertySetMethod">
-            <summary>Portable version of PropertyInfo.GetSetMethod.</summary>
-        </member>
         <member name="F:DryIoc.Portable.GetGenericArguments">
             <summary>Portable version of Type.GetGenericArguments.</summary>
+        </member>
+        <member name="F:DryIoc.Portable.GetAssemblyTypes">
+            <summary>Portable version of Assembly.GetTypes or Assembly.DefinedTypes.</summary>
+        </member>
+        <member name="M:DryIoc.Portable.GetGetMethodOrNull(System.Reflection.PropertyInfo,System.Boolean)">
+            <summary>Portable version of PropertyInfo.GetGetMethod.</summary>
+            <param name="p">Target property info</param>
+            <param name="includeNonPublic">(optional) If set then consider non-public getter</param>
+            <returns>Setter method info if it is defined for property.</returns>
+        </member>
+        <member name="M:DryIoc.Portable.GetSetMethodOrNull(System.Reflection.PropertyInfo,System.Boolean)">
+            <summary>Portable version of PropertyInfo.GetSetMethod.</summary>
+            <param name="p">Target property info</param>
+            <param name="includeNonPublic">(optional) If set then consider non-public setter</param>
+            <returns>Setter method info if it is defined for property.</returns>
         </member>
         <member name="M:DryIoc.Portable.GetCurrentManagedThreadID">
             <summary>Returns managed Thread ID either from Environment or Thread.CurrentThread whichever is available.</summary>
@@ -2829,7 +3074,7 @@
             <returns>Default value expression.</returns>
         </member>
         <member name="T:DryIoc.KV`2">
-            <summary>Immutable Key-Value. It is reference type (could be check for null), 
+            <summary>Immutable Key-Value pair. It is reference type (could be check for null), 
             which is different from System value type <see cref="T:System.Collections.Generic.KeyValuePair`2"/>.
             In addition provides <see cref="M:DryIoc.KV`2.Equals(System.Object)"/> and <see cref="M:DryIoc.KV`2.GetHashCode"/> implementations.</summary>
             <typeparam name="K">Type of Key.</typeparam><typeparam name="V">Type of Value.</typeparam>
@@ -2866,7 +3111,7 @@
             <summary>Simple immutable AVL tree with integer keys and object values.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMapIntToObj.Empty">
-            <summary>Empty tree to start with. The <see cref="F:DryIoc.ImTreeMapIntToObj.Height"/> of the empty tree is 0.</summary>
+            <summary>Empty tree to start with.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMapIntToObj.Key">
             <summary>Key.</summary>
@@ -2875,13 +3120,13 @@
             <summary>Value.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMapIntToObj.Left">
-            <summary>Left subtree/branch, or empty.</summary>
+            <summary>Left sub-tree/branch, or empty.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMapIntToObj.Right">
-            <summary>Right subtree/branch, or empty.</summary>
+            <summary>Right sub-tree/branch, or empty.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMapIntToObj.Height">
-            <summary>Height of longest subtree/branch. It is 0 for empty tree, and 1 for single node tree.</summary>
+            <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
         </member>
         <member name="M:DryIoc.ImTreeMapIntToObj.AddOrUpdate(System.Int32,System.Object)">
             <summary>Returns new tree with added or updated value for specified key.</summary>
@@ -2890,8 +3135,8 @@
         </member>
         <member name="M:DryIoc.ImTreeMapIntToObj.AddOrUpdate(System.Int32,System.Object,DryIoc.ImTreeMapIntToObj.UpdateValue)">
             <summary>Returns new tree with added or updated value for specified key.</summary>
-            <param name="key"></param> <param name="value"></param>
-            <param name="updateValue">Delegate to get updated value based on its old and new value.</param>
+            <param name="key">Key</param> <param name="value">Value</param>
+            <param name="updateValue">(optional) Delegate to calculate new value from and old and a new value.</param>
             <returns>New tree.</returns>
         </member>
         <member name="M:DryIoc.ImTreeMapIntToObj.Update(System.Int32,System.Object)">
@@ -2911,14 +3156,14 @@
             <summary>Returns true is tree is empty.</summary>
         </member>
         <member name="T:DryIoc.ImTreeMapIntToObj.UpdateValue">
-            <summary>Delegate to get updated value based on its old and new value.</summary>
-            <param name="oldValue">Old</param> <param name="newValue">New</param> <returns>Update result</returns>
+            <summary>Delegate to calculate new value from and old and a new value.</summary>
+            <param name="oldValue">Old</param> <param name="newValue">New</param> <returns>Calculated result.</returns>
         </member>
         <member name="T:DryIoc.ImTreeMap`2">
             <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMap`2.Empty">
-            <summary>Empty tree to start with. The <see cref="F:DryIoc.ImTreeMap`2.Height"/> of the empty tree is 0.</summary>
+            <summary>Empty tree to start with.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMap`2.Key">
             <summary>Key of type K that should support <see cref="M:System.Object.Equals(System.Object)"/> and <see cref="M:System.Object.GetHashCode"/>.</summary>
@@ -2927,19 +3172,19 @@
             <summary>Value of any type V.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMap`2.Hash">
-            <summary>Hash calculated from <see cref="F:DryIoc.ImTreeMap`2.Key"/> with <see cref="M:System.Object.GetHashCode"/>. Hash is stored to improve speed.</summary>
+            <summary>Calculated key hash.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMap`2.Conflicts">
             <summary>In case of <see cref="F:DryIoc.ImTreeMap`2.Hash"/> conflicts for different keys contains conflicted keys with their values.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMap`2.Left">
-            <summary>Left subtree/branch, or empty.</summary>
+            <summary>Left sub-tree/branch, or empty.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMap`2.Right">
-            <summary>Right subtree/branch, or empty.</summary>
+            <summary>Right sub-tree/branch, or empty.</summary>
         </member>
         <member name="F:DryIoc.ImTreeMap`2.Height">
-            <summary>Height of longest subtree/branch. It is 0 for empty tree, and 1 for single node tree.</summary>
+            <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
         </member>
         <member name="M:DryIoc.ImTreeMap`2.AddOrUpdate(`0,`1,DryIoc.Update{`1})">
             <summary>Returns new tree with added key-value. If value with the same key is exist, then
@@ -2951,8 +3196,7 @@
         </member>
         <member name="M:DryIoc.ImTreeMap`2.Update(`0,`1,DryIoc.Update{`1})">
             <summary>Looks for <paramref name="key"/> and replaces its value with new <paramref name="value"/>, or 
-            it may use <paramref name="update"/> for more complex update logic. Returns new tree with updated value,
-            or the SAME tree if key is not found.</summary>
+            runs custom update handler (<paramref name="update"/>) with old and new value to get the updated result.</summary>
             <param name="key">Key to look for.</param>
             <param name="value">New value to replace key value with.</param>
             <param name="update">(optional) Delegate for custom update logic, it gets old and new <paramref name="value"/>
@@ -2960,8 +3204,8 @@
             <returns>New tree with updated value or the SAME tree if no key found.</returns>
         </member>
         <member name="M:DryIoc.ImTreeMap`2.GetValueOrDefault(`0,`1)">
-            <summary>Searches for key in tree and returns the value if found, or <paramref name="defaultValue"/> otherwise.</summary>
-            <param name="key">Key to look for.</param> <param name="defaultValue">Value to return if key is not found.</param>
+            <summary>Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.</summary>
+            <param name="key">Key to look for.</param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
             <returns>Found value or <paramref name="defaultValue"/>.</returns>
         </member>
         <member name="M:DryIoc.ImTreeMap`2.Enumerate">
@@ -2970,7 +3214,7 @@
             <returns>Sequence of enumerated key value pairs.</returns>
         </member>
         <member name="P:DryIoc.ImTreeMap`2.IsEmpty">
-            <summary>Returns true is tree is empty.</summary>
+            <summary>Returns true if tree is empty.</summary>
         </member>
         <member name="T:DryIoc.Ref">
             <summary>Provides optimistic-concurrency consistent <see cref="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})"/> operation.</summary>
@@ -2982,7 +3226,7 @@
             <returns>New ref.</returns>
         </member>
         <member name="M:DryIoc.Ref.NewRef``1(DryIoc.Ref{``0})">
-            <summary>Creates new ref to original ref value.</summary> <typeparam name="T">Type of ref value.</typeparam>
+            <summary>Creates new ref to the value of original ref.</summary> <typeparam name="T">Ref value type.</typeparam>
             <param name="original">Original ref.</param> <returns>New ref to original value.</returns>
         </member>
         <member name="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})">
@@ -3001,10 +3245,10 @@
         </member>
         <member name="M:DryIoc.Ref`1.#ctor(`0)">
             <summary>Creates ref to object, optionally with initial value provided.</summary>
-            <param name="initialValue">Initial object value.</param>
+            <param name="initialValue">(optional) Initial value.</param>
         </member>
         <member name="M:DryIoc.Ref`1.Swap(System.Func{`0,`0})">
-            <summary>Exchanges currently hold object with <paramref name="getNewValue"/> result: see <see cref="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})"/> for details.</summary>
+            <summary>Exchanges currently hold object with <paramref name="getNewValue"/> - see <see cref="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})"/> for details.</summary>
             <param name="getNewValue">Delegate to produce new object value from current one passed as parameter.</param>
             <returns>Returns old object value the same way as <see cref="M:System.Threading.Interlocked.Exchange(System.Int32@,System.Int32)"/></returns>
             <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>

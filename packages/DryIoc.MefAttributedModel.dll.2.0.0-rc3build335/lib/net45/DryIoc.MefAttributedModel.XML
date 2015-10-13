@@ -150,14 +150,20 @@
         <member name="F:DryIoc.MefAttributedModel.ExportedRegistrationInfo.OpenResolutionScope">
             <summary>Corresponds to <see cref="P:DryIoc.Setup.OpenResolutionScope"/>.</summary>
         </member>
+        <member name="F:DryIoc.MefAttributedModel.ExportedRegistrationInfo.AsResolutionCall">
+            <summary>Corresponds to <see cref="P:DryIoc.Setup.AsResolutionCall"/>.</summary>
+        </member>
         <member name="F:DryIoc.MefAttributedModel.ExportedRegistrationInfo.AsResolutionRoot">
             <summary>Corresponds to <see cref="P:DryIoc.Setup.AsResolutionRoot"/>.</summary>
         </member>
         <member name="F:DryIoc.MefAttributedModel.ExportedRegistrationInfo.PreventDisposal">
-            <summary>Specify to prevent disposal of reused instance if it is disposable</summary>
+            <summary>Specifies to prevent disposal of reused instance if it is disposable</summary>
         </member>
         <member name="F:DryIoc.MefAttributedModel.ExportedRegistrationInfo.WeaklyReferenced">
-            <summary>Specify to store reused instance as WeakReference.</summary>
+            <summary>Specifies to store reused instance as WeakReference.</summary>
+        </member>
+        <member name="F:DryIoc.MefAttributedModel.ExportedRegistrationInfo.AllowsDisposableTransient">
+            <summary>Allows disposable transient to be resgitered.</summary>
         </member>
         <member name="F:DryIoc.MefAttributedModel.ExportedRegistrationInfo.HasMetadataAttribute">
             <summary>True if exported type has metadata.</summary>
@@ -252,9 +258,8 @@
         <member name="F:DryIoc.MefAttributedModel.DecoratorInfo.DecoratedServiceKeyInfo">
             <summary>Decorated service key info. Info wrapper is required for serialization.</summary>
         </member>
-        <member name="M:DryIoc.MefAttributedModel.DecoratorInfo.GetSetup(System.Func{System.Object},System.Func{DryIoc.Request,System.Boolean})">
+        <member name="M:DryIoc.MefAttributedModel.DecoratorInfo.GetSetup(System.Func{DryIoc.RequestInfo,System.Boolean})">
             <summary>Converts info to corresponding decorator setup.</summary>
-            <param name="lazyMetadata">(optional) Metadata that may be associated by decorator.</param>
             <param name="condition">(optional) <see cref="P:DryIoc.Setup.Condition"/>.</param>
             <returns>Setup.</returns>
         </member>

@@ -77,11 +77,14 @@
         <member name="M:DryIocAttributes.ResolutionScopeReuseAttribute.#ctor">
             <summary>Creates attribute.</summary>
         </member>
-        <member name="T:DryIocAttributes.WeaklyReferenced">
-            <summary>Mark exported reused service to be stored as WeakReference</summary>
+        <member name="T:DryIocAttributes.WeaklyReferencedAttribute">
+            <summary>Marks exported reused service to be stored as WeakReference</summary>
         </member>
-        <member name="T:DryIocAttributes.PreventDisposal">
-            <summary>Mark exported reused service to be Not disposed together with scope.</summary>
+        <member name="T:DryIocAttributes.PreventDisposalAttribute">
+            <summary>Marks exported reused service to be Not disposed together with scope.</summary>
+        </member>
+        <member name="T:DryIocAttributes.AllowsDisposableTransientAttribute">
+            <summary>Allows disposable transient to be exported.</summary>
         </member>
         <member name="T:DryIocAttributes.ExportWithKeyAttribute">
             <summary>Defines export with arbitrary object key.</summary>
@@ -139,32 +142,76 @@
         <member name="P:DryIocAttributes.AsDecoratorAttribute.ContractKey">
             <summary>Contract key of decorated type.</summary>
         </member>
+        <member name="T:DryIocAttributes.RegistrationType">
+            <summary>Type of services supported by Container.</summary>
+        </member>
+        <member name="F:DryIocAttributes.RegistrationType.Service">
+            <summary>(default) Defines normal service factory</summary>
+        </member>
+        <member name="F:DryIocAttributes.RegistrationType.Decorator">
+            <summary>Defines decorator factory</summary>
+        </member>
+        <member name="F:DryIocAttributes.RegistrationType.Wrapper">
+            <summary>Defines wrapper factory.</summary>
+        </member>
         <member name="T:DryIocAttributes.RequestInfo">
-            <summary></summary>
+            <summary>Dependency request path information.</summary>
+        </member>
+        <member name="F:DryIocAttributes.RequestInfo.Empty">
+            <summary>Represents empty info (indicated by null <see cref="F:DryIocAttributes.RequestInfo.ServiceType"/>).</summary>
         </member>
         <member name="F:DryIocAttributes.RequestInfo.Parent">
             <summary>Parent request or null for root resolution request.</summary>
         </member>
-        <member name="F:DryIocAttributes.RequestInfo.IsDecoratorOrWrapper">
-            <summary>False for Decorators and Wrappers.</summary>
-        </member>
         <member name="F:DryIocAttributes.RequestInfo.ServiceType">
             <summary>Asked service type.</summary>
+        </member>
+        <member name="F:DryIocAttributes.RequestInfo.RequiredServiceType">
+            <summary>Required service type if specified.</summary>
         </member>
         <member name="F:DryIocAttributes.RequestInfo.ServiceKey">
             <summary>Optional service key.</summary>
         </member>
-        <member name="F:DryIocAttributes.RequestInfo.ImplementationTypeIfAvailable">
+        <member name="F:DryIocAttributes.RequestInfo.FactoryType">
+            <summary>False for Decorators and Wrappers.</summary>
+        </member>
+        <member name="F:DryIocAttributes.RequestInfo.ImplementationType">
             <summary>Implementation type.</summary>
         </member>
-        <member name="M:DryIocAttributes.RequestInfo.#ctor(DryIocAttributes.RequestInfo,System.Boolean,System.Type,System.Object,System.Type)">
-            <summary>Creates info.</summary>
-            <param name="parent"></param> <param name="isDecoratorOrWrapper"></param> <param name="serviceType"></param>
-            <param name="serviceKey"></param> <param name="implementationTypeIfAvailable"></param>
+        <member name="F:DryIocAttributes.RequestInfo.ReuseLifespan">
+            <summary>Relative number representing reuse lifespan.</summary>
         </member>
-        <member name="M:DryIocAttributes.RequestInfo.GetEnumerator">
+        <member name="M:DryIocAttributes.RequestInfo.#ctor(System.Type,System.Type,System.Object,DryIocAttributes.RegistrationType,System.Type,System.Int32,DryIocAttributes.RequestInfo)">
+            <summary>Creates info.</summary>
+            <param name="serviceType"></param>
+            <param name="requiredServiceType"></param>
+            <param name="serviceKey"></param>
+            <param name="factoryType"></param>
+            <param name="implementationType"></param>
+            <param name="reuseLifespan"></param>
+            <param name="parent"></param>
+        </member>
+        <member name="M:DryIocAttributes.RequestInfo.Enumerate">
             <summary>Returns all request until the root - parent is null.</summary>
             <returns>Requests from the last to first.</returns>
+        </member>
+        <member name="M:DryIocAttributes.RequestInfo.ToString">
+            <summary>Prints request and its parents chain into string.</summary>
+            <returns>Result string.</returns>
+        </member>
+        <member name="M:DryIocAttributes.RequestInfo.Equals(System.Object)">
+            <summary>Returns true if request info and passed object are equal, and threir parents recursively are equal.</summary>
+            <param name="obj"></param> <returns></returns>
+        </member>
+        <member name="M:DryIocAttributes.RequestInfo.GetHashCode">
+            <summary>Returns hash code combined from info fields plus its parent.</summary>
+            <returns>Combined hash code.</returns>
+        </member>
+        <member name="P:DryIocAttributes.RequestInfo.IsEmpty">
+            <summary>Returns true for an empty request.</summary>
+        </member>
+        <member name="P:DryIocAttributes.RequestInfo.IsResolutionRoot">
+            <summary>Returns true if request is the first in a chain.</summary>
         </member>
         <member name="T:DryIocAttributes.ExportConditionAttribute">
             <summary>Base type for exported type Setup Condition.</summary>
@@ -225,6 +272,9 @@
         </member>
         <member name="T:DryIocAttributes.OpenResolutionScopeAttribute">
             <summary>Exported type should open resolution scope when injected.</summary>
+        </member>
+        <member name="T:DryIocAttributes.AsResolutionCall">
+            <summary>Marker for resolution root exports.</summary>
         </member>
         <member name="T:DryIocAttributes.AsResolutionRoot">
             <summary>Marker for resolution root exports.</summary>

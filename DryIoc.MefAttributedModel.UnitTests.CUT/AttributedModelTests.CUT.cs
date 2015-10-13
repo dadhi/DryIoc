@@ -235,7 +235,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportMany, AsResolutionCall]
+    [ExportMany, AsResolutionRoot]
     public class DbMan : ISomeDb, IAnotherDb
     {
     }
@@ -352,10 +352,10 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export, AsResolutionCall, TransientReuse]
+    [Export, AsResolutionRoot, TransientReuse]
     public class A {}
 
-    [Export, AsResolutionCall, TransientReuse]
+    [Export, AsResolutionRoot, TransientReuse]
     public class B
     {
         public readonly A A;
@@ -396,10 +396,10 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [Export, CurrentScopeReuse("ScopeA")]
     public class WithNamedCurrentScope { }
 
-    [Export, WeaklyReferenced, AsResolutionCall]
+    [Export, WeaklyReferenced, AsResolutionRoot]
     public class WeaklyReferencedService { }
 
-    [Export, PreventDisposal, AsResolutionCall]
+    [Export, PreventDisposal, AsResolutionRoot]
     public class PreventDisposalService : IDisposable
     {
         public bool IsDisposed;

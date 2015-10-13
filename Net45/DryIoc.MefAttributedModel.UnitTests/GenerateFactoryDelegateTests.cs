@@ -130,6 +130,30 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(2, depList.Length);
         }
 
+        [Test]
+        public void Can_generate_expression_for_all_ResolutionRoots_and_Calls_with_dedicated_method()
+        {
+            var container = new Container().WithMefAttributedModel();
+
+            container.RegisterExports(
+                typeof(ImportConditionObject1),
+                typeof(ImportConditionObject2),
+                typeof(ImportConditionObject3),
+                typeof(ExportConditionalObject1),
+                typeof(ExportConditionalObject2),
+                typeof(ExportConditionalObject3));
+
+            ImTreeMap<KV<Type, object>, Expression> resolutionsRoots;
+            ImTreeMap<RequestInfo, Expression> resolutionCallDependencies;
+            ImTreeMap<KV<Type, object>, ContainerException> resolutionErrors;
+            container.GenerateResolutionFactoryExpressions(out resolutionsRoots, out resolutionCallDependencies, out resolutionErrors);
+            
+            var rootList = resolutionsRoots.Enumerate().ToArray();
+            Assert.AreEqual(3, rootList.Length);
+
+            var depList = resolutionCallDependencies.Enumerate().ToArray();
+            Assert.AreEqual(2, depList.Length);
+        }
 
         public class LazyUser
         {

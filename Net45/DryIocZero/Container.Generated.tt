@@ -25,13 +25,12 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.0.0-rc3build300\lib\net45\DryIoc.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.2.0.0-rc3build300\lib\net45\DryIocAttributes.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0-rc3build300\lib\net45\DryIoc.MefAttributedModel.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.0.0-rc3build335\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.2.0.0-rc3build335\lib\net45\DryIocAttributes.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0-rc3build335\lib\net45\DryIoc.MefAttributedModel.dll" #>
 <#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
-<#@ import namespace="System.Collections.Generic" #>
 <#@ import Namespace="System.Linq" #>
-<#@ import namespace="System.Linq.Expressions" #>
+<#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Text" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
@@ -45,46 +44,32 @@ THE SOFTWARE.
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
 <#
 // - Configure container for compile-time gen and use MEF to discover types
-var container = new Container(rules => rules
-    .WithoutEagerCachingSingletonForFasterAccess()
-    .WithMefAttributedModel());
+var container = new Container().WithMefAttributedModel();
 
 // - Register implementation types
 var types = typeof(IDecoratedResult).Assembly.GetLoadedTypes();
 container.RegisterExports(types);
-// -------------------------
+
+ImTreeMap<KV<Type, object>, Expression> resolutionRoots;
+ImTreeMap<RequestInfo, Expression> resolutionCallDependencies;
+ImTreeMap<KV<Type, object>, ContainerException> resolutionErrors;
+container.GenerateResolutionFactoryExpressions(out resolutionRoots, out resolutionCallDependencies, out resolutionErrors);
 
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 var objectToCode = ObjectStringify.WithFullTypeNames;
 
-var idSeed = 0;
-var exceptions = new List<Exception>();
-var factories = container.GetServiceRegistrations()
-    .Where(r => !r.ServiceType.IsGenericDefinition())
-    .Where(r => r.Factory.Setup.AsResolutionRoot)
-    .Select(r =>
+var factories = resolutionRoots.Enumerate()
+   .Select((r, i) =>
     {
-        try
-        {
-            var factoryExpr = container.Resolve<LambdaExpression>(r.OptionalServiceKey, IfUnresolved.Throw, r.ServiceType);
-            
-            var serviceTypeCode = objectToCode.PlainObjectToCode(r.ServiceType, typeof(Type));
-            var serviceKeyCode = r.OptionalServiceKey == null ? "null"
-                : new StringBuilder().AppendCode(r.OptionalServiceKey).ToString();
-                
-            var expressionCode = exprToCode.ToCode(factoryExpr.Body);
-
-            return new { Id = ++idSeed, Type = serviceTypeCode, Key = serviceKeyCode, Expression = expressionCode };
-
-        }
-        catch (Exception ex)
-        {
-            exceptions.Add(ex);
-            return null;
-        }
+        var serviceTypeCode = objectToCode.PlainObjectToCode(r.Key.Key, typeof(Type));
+        var serviceKeyCode = r.Key.Value == null ? "null" : new StringBuilder().AppendCode(r.Key.Value).ToString();
+        var expressionCode = exprToCode.ToCode(r.Value);
+        return new { Id = i, Type = serviceTypeCode, Key = serviceKeyCode, Expression = expressionCode };
     })
     .Where(r => r != null)
     .ToArray();
+
+var errors = resolutionErrors.Enumerate().Select(e => e.Value).ToArray();
 #>
 using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
@@ -96,9 +81,9 @@ namespace DryIocZero
 Exceptions during resolution:
 -----------------------------
 <#
-    if (exceptions.Count == 0)
+    if (errors.Length == 0)
         WriteLine("All is fine");
-    foreach (var ex in exceptions)
+    foreach (var ex in errors)
     {
 #>
 <#=objectToCode.TypeNameToCode(ex.GetType())#>:
@@ -131,7 +116,7 @@ end of exception list
         }
 
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, IScope scope)
+        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, DryIoc.RequestInfo preRequestInfo, IScope scope)
         {
 <#
         var groupCount = 0;
