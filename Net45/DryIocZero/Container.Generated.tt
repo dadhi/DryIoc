@@ -31,11 +31,12 @@ THE SOFTWARE.
 <#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
-<#@ import Namespace="System.Text" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 <#
+IContainer container = new Container();
+
 // User code goes from here:
 // -------------------------
 // - Add assemblies with implementation types to register
@@ -43,12 +44,12 @@ THE SOFTWARE.
 <#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
 <#
-// - Configure container for compile-time gen and use MEF to discover types
-var container = new Container().WithMefAttributedModel();
-
-// - Register implementation types
+// - Register implementation types exported via MEF AttributedModel
+container = container.WithMefAttributedModel();
 var types = typeof(IDecoratedResult).Assembly.GetLoadedTypes();
 container.RegisterExports(types);
+// -------------------------
+// end of User setup.
 
 ImTreeMap<KV<Type, object>, Expression> resolutionRoots;
 ImTreeMap<RequestInfo, Expression> resolutionCallDependencies;
@@ -57,23 +58,29 @@ container.GenerateResolutionFactoryExpressions(out resolutionRoots, out resoluti
 
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 var objectToCode = ObjectStringify.WithFullTypeNames;
+Func<object, string> code = x => 
+    x == null ? "null"
+    : x is DefaultKey ? "DefaultKey.Of(" + ((DefaultKey)x).RegistrationOrder + ")" 
+    : x is Expression ? exprToCode.ToCode((Expression)x)
+    : objectToCode.PlainObjectToCode(x);
 
-var factories = resolutionRoots.Enumerate()
-   .Select((r, i) =>
+var roots = resolutionRoots.Enumerate()
+    .Select((r, i) => new { Index = i, ServiceType = code(r.Key.Key), ServiceKey = code(r.Key.Value), Expression = code(r.Value) });
+
+var deps = resolutionCallDependencies.Enumerate()
+    .Select((r, i) => new
     {
-        var serviceTypeCode = objectToCode.PlainObjectToCode(r.Key.Key, typeof(Type));
-        var serviceKeyCode = r.Key.Value == null ? "null" : new StringBuilder().AppendCode(r.Key.Value).ToString();
-        var expressionCode = exprToCode.ToCode(r.Value);
-        return new { Id = i, Type = serviceTypeCode, Key = serviceKeyCode, Expression = expressionCode };
-    })
-    .Where(r => r != null)
-    .ToArray();
+        Index = i, ServiceType = code(r.Key.ServiceType), ServiceKey = code(r.Key.ServiceKey), Expression = code(r.Value),
+        RequiredServiceType = code(r.Key.RequiredServiceType),
+        PreResolveParent = code(container.RequestInfoToExpression(r.Key.Parent))
+    });
 
 var errors = resolutionErrors.Enumerate().Select(e => e.Value).ToArray();
 #>
 using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;
+using DryIoc; // namespace defined in DryIocZero to access shared DryIoc definitions
 
 namespace DryIocZero
 {
@@ -82,7 +89,7 @@ Exceptions during resolution:
 -----------------------------
 <#
     if (errors.Length == 0)
-        WriteLine("All is fine");
+        WriteLine("No errors - generation was successful.");
     foreach (var ex in errors)
     {
 #>
@@ -102,43 +109,71 @@ end of exception list
         partial void ResolveGenerated(ref object service, Type serviceType, IScope scope)
         {
 <#
-        var count = 0;
-        foreach (var factory in factories.Where(f => f.Key == "null"))
+        var index = 0;
+        foreach (var factory in roots.Where(f => f.ServiceKey == "null"))
         {
-            if (count++ > 0) WriteLine(@"
+            if (index++ > 0) WriteLine(@"
             else");
 #>
-            if (serviceType == <#= factory.Type #>)
-                service = Create_<#= factory.Id #>(this, scope);
+            if (serviceType == <#= factory.ServiceType #>)
+                service = Create_<#= factory.Index #>(this, scope);
 <#
         }
 #>
         }
 
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, DryIoc.RequestInfo preRequestInfo, IScope scope)
+        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, 
+            Type requiredServiceType, RequestInfo preRequestParent, IScope scope)
         {
 <#
-        var groupCount = 0;
-        foreach (var factoryGroup in factories.Where(f => f.Key != "null").GroupBy(f => f.Type))
+        index = 0;
+        foreach (var rootGroup in roots.Where(f => f.ServiceKey != "null").GroupBy(f => f.ServiceType))
         {
-            if (groupCount++ > 0) WriteLine(@"
+            if (index++ > 0) WriteLine(@"
             else");
 #>
-            if (serviceType == <#= factoryGroup.Key #>) 
+            if (serviceType == <#= rootGroup.Key #>) 
             {
 <#
-            var inGroupCount = 0;
-            foreach (var factory in factoryGroup)
+            var innerIndex = 0;
+            foreach (var root in rootGroup)
             {
-                if (inGroupCount++ > 0) WriteLine(@"
+                if (innerIndex++ > 0) WriteLine(@"
                 else");
 #>
-                if (<#= factory.Key #>.Equals(serviceKey))
-                    service = Create_<#= factory.Id #>(this, scope);
+                if (<#= root.ServiceKey #>.Equals(serviceKey))
+                    service = Create_<#= root.Index #>(this, scope);
 <#
             }
 
+#>
+            }
+<#
+        }
+#>
+<#
+        index = 0;
+        foreach (var depGroup in deps.GroupBy(x => x.ServiceType))
+        {
+            if (index++ > 0) WriteLine(@"
+            else");
+#>
+            if (serviceType == <#= depGroup.Key #>) 
+            {
+<#
+            var innerIndex = 0;
+            foreach (var dep in depGroup)
+            {
+                if (innerIndex++ > 0) WriteLine(@"
+                else");
+#>
+                if (Equals(serviceKey, <#= dep.ServiceKey #>) &&
+                    requiredServiceType == <#= dep.RequiredServiceType #> &&
+                    Equals(preRequestParent, <#= dep.PreResolveParent #>)) 
+                    service = CreateDependency_<#= dep.Index #>(this, scope);
+<#
+            }
 #>
             }
 <#
@@ -156,16 +191,16 @@ end of exception list
         private IEnumerable<KV> ResolveManyGenerated(Type serviceType)
         {
 <#
-        foreach (var factoryGroup in factories.GroupBy(f => f.Type))
+        foreach (var rootGroup in roots.GroupBy(f => f.ServiceType))
         {
 #>
-            if (serviceType == <#= factoryGroup.Key #>)
+            if (serviceType == <#= rootGroup.Key #>)
             {
 <#
-            foreach (var factory in factoryGroup)
+            foreach (var factory in rootGroup)
             {
 #>
-                yield return new KV(<#= factory.Key #>, (StatelessFactoryDelegate)Create_<#= factory.Id #>);
+                yield return new KV(<#= factory.ServiceKey #>, (StatelessFactoryDelegate)Create_<#= factory.Index #>);
 <#
             }
 #>
@@ -174,19 +209,31 @@ end of exception list
 <#
         }
 #>
-        }
+    }
 
 <#
-    foreach (var factory in factories)
+    foreach (var root in roots)
     {
 #>
-        internal static object Create_<#=factory.Id#>(IResolverContext r, IScope scope)
+        internal static object Create_<#=root.Index#>(IResolverContext r, IScope scope)
         {
-            return <#= factory.Expression #>;
+            return <#= root.Expression #>;
         }
 
 <#        
     }
 #>
+<#
+    foreach (var dep in deps)
+    {
+#>
+        internal static object CreateDependency_<#=dep.Index#>(IResolverContext r, IScope scope)
+        {
+            return <#= dep.Expression #>;
+        }
+
+<#        
     }
+#>
+}
 }

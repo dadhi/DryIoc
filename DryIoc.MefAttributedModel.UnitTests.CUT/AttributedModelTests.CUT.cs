@@ -352,7 +352,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export, AsResolutionRoot, TransientReuse]
+    [Export, AsResolutionCall, TransientReuse]
     public class A {}
 
     [Export, AsResolutionRoot, TransientReuse]

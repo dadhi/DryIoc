@@ -24,7 +24,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
             container.Register(typeof(Potato), "mashed", (r, scope) => new Potato());
 
-            var potato = container.Resolve(typeof(Potato), "mashed", false, null, null);
+            var potato = container.Resolve(typeof(Potato), "mashed");
 
             Assert.IsNotNull(potato);
         }
@@ -67,9 +67,9 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var service = container.Resolve(typeof(IMultiExported), "c", false, null, null);
+            var service = container.Resolve(typeof(IMultiExported), "c");
             Assert.NotNull(service);
-            Assert.AreSame(service, container.Resolve(typeof(IMultiExported), "c", false, null, null));
+            Assert.AreSame(service, container.Resolve(typeof(IMultiExported), "c"));
         }
 
         [Test]
@@ -98,7 +98,7 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var handlers = container.ResolveMany(typeof(ISomeDb), null, null, null, null, null).Cast<ISomeDb>().ToArray<ISomeDb>();
+            var handlers = container.ResolveMany(typeof(ISomeDb)).Cast<ISomeDb>().ToArray<ISomeDb>();
 
             Assert.AreEqual(1, handlers.Length);
         }

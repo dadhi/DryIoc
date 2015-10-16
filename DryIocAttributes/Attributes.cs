@@ -487,27 +487,27 @@ namespace DryIocAttributes
     }
 
     /// <summary>Exported type should open resolution scope when injected.</summary>
-    [AttributeUsage(AttributeTargets.Class 
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
         | AttributeTargets.Method 
         | AttributeTargets.Property 
-        | AttributeTargets.Field,
-        Inherited = false)]
+        | AttributeTargets.Field)]
     public class OpenResolutionScopeAttribute : Attribute { }
 
     /// <summary>Marker for resolution root exports.</summary>
     [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
         | AttributeTargets.Method
         | AttributeTargets.Property
-        | AttributeTargets.Field,
-        Inherited = false)]
+        | AttributeTargets.Field)]
     public class AsResolutionCall : Attribute { }
 
     /// <summary>Marker for resolution root exports.</summary>
     [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
         | AttributeTargets.Method
         | AttributeTargets.Property
-        | AttributeTargets.Field,
-        Inherited = false)]
+        | AttributeTargets.Field)]
     public class AsResolutionRoot : Attribute { }
 
 }

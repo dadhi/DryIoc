@@ -86,7 +86,7 @@ echo:
 call :ParseVersion "Net45\DryIocZero\Properties\AssemblyInfo.cs"
 echo:DryIocZero v%VER%
 echo:============================
-rem %NUGET% pack "NuGet\DryIocZero.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack "NuGet\DryIocZero.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 rem -Symbols
 
 echo: 

@@ -29,6 +29,8 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
+using DryIoc;
+using DryIocZero;
 
 namespace DryIocZero
 {
@@ -110,7 +112,7 @@ namespace DryIocZero
                 Error.UnableToResolveDefaultService, serviceType, factories.IsEmpty ? string.Empty : "non-");
         }
 
-        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, DryIoc.RequestInfo preRequestInfo, IScope scope);
+        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent, IScope scope);
 
         /// <summary>Directly uses generated factories to resolve service. Or returns default if service does not have generated factory.</summary>
         /// <param name="serviceType">Service type to lookup generated factory.</param> <param name="serviceKey">Service key to locate factory.</param>
@@ -139,7 +141,9 @@ namespace DryIocZero
         /// </remarks>
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
-        public object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, DryIoc.RequestInfo preResolveParent, IScope scope)
+        public object Resolve(Type serviceType, object serviceKey, 
+            bool ifUnresolvedReturnDefault = false, Type requiredServiceType = null, 
+            RequestInfo preResolveParent = null, IScope scope = null)
         {
             object service = null;
             if (_keyedFactories.Value.IsEmpty)
@@ -155,9 +159,11 @@ namespace DryIocZero
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
         private object ResolveFromRuntimeRegistrationsFirst(Type serviceType, object serviceKey,
-            bool ifUnresolvedReturnDefault, Type requiredServiceType, DryIoc.RequestInfo preRequestInfo, IScope scope)
+            bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent, IScope scope)
         {
             serviceType = requiredServiceType ?? serviceType;
+            preResolveParent = preResolveParent ?? RequestInfo.Empty;
+
             if (serviceKey == null)
                 return ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault, scope);
 
@@ -172,7 +178,7 @@ namespace DryIocZero
 
             // If not resolved from runtime registration then try resolve generated
             object service = null;
-            ResolveGenerated(ref service, serviceType, serviceKey, requiredServiceType, preRequestInfo, scope);
+            ResolveGenerated(ref service, serviceType, serviceKey, requiredServiceType, preResolveParent, scope);
             return service ?? Throw.If(!ifUnresolvedReturnDefault,
                 Error.UnableToResolveKeyedService, serviceType, serviceKey, keyedFactories == null ? string.Empty : "non-");
         }
@@ -197,12 +203,15 @@ namespace DryIocZero
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
         /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
         /// <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
-        /// <param name="preRequestInfo"></param>
+        /// <param name="preResolveParent">(optional) Dependency resolution path info prior to resolve.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, Type compositeParentRequiredType, DryIoc.RequestInfo preRequestInfo, IScope scope)
+        public IEnumerable<object> ResolveMany(Type serviceType, 
+            object serviceKey = null, Type requiredServiceType = null, object compositeParentKey = null, 
+            Type compositeParentRequiredType = null, RequestInfo preResolveParent = null, IScope scope = null)
         {
             serviceType = requiredServiceType ?? serviceType;
+            preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
             var manyGenerated = Enumerable.Empty<KV>();
             ResolveManyGenerated(ref manyGenerated, serviceType);
@@ -469,7 +478,7 @@ namespace DryIocZero
         /// by specifying the same parameters as for <see cref="ResolveNonKeyedServiceFast"/> should return the same result.
         /// </remarks>
         object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, 
-            DryIoc.RequestInfo preResolveParent, IScope scope);
+            RequestInfo preResolveParent, IScope scope);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
@@ -479,11 +488,11 @@ namespace DryIocZero
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
         /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
         /// <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
-        /// <param name="preResolveParent">Dependency resolution path info.</param>
+        /// <param name="preResolveParent">(optional) Dependency resolution path info prior to resolve.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
         IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, Type compositeParentRequiredType, 
-            DryIoc.RequestInfo preResolveParent, IScope scope);
+            RequestInfo preResolveParent, IScope scope);
     }
 
     /// <summary>Provides access to scopes.</summary>
@@ -1584,9 +1593,73 @@ namespace DryIoc
         private static int CombineHashCodes(int h1, int h2)
         {
             unchecked
+
             {
                 return (h1 << 5) + h1 ^ h2;
             }
         }
+    }
+
+    /// <summary>Used to represent multiple default service keys. 
+    /// Exposes <see cref="RegistrationOrder"/> to determine order of service added.</summary>
+    public sealed class DefaultKey
+    {
+        /// <summary>Default value.</summary>
+        public static readonly DefaultKey Value = new DefaultKey(0);
+
+        /// <summary>Allows to determine service registration order.</summary>
+        public readonly int RegistrationOrder;
+
+        /// <summary>Create new default key with specified registration order.</summary>
+        /// <param name="registrationOrder"></param> <returns>New default key.</returns>
+        public static DefaultKey Of(int registrationOrder)
+        {
+            if (registrationOrder < _keyPool.Length)
+                return _keyPool[registrationOrder];
+
+            var nextKey = new DefaultKey(registrationOrder);
+            if (registrationOrder == _keyPool.Length)
+                _keyPool = _keyPool.AppendOrUpdate(nextKey);
+            return nextKey;
+        }
+
+        /// <summary>Returns next default key with increased <see cref="RegistrationOrder"/>.</summary>
+        /// <returns>New key.</returns>
+        public DefaultKey Next()
+        {
+            return Of(RegistrationOrder + 1);
+        }
+
+        /// <summary>Compares keys based on registration order.</summary>
+        /// <param name="key">Key to compare with.</param>
+        /// <returns>True if keys have the same order.</returns>
+        public override bool Equals(object key)
+        {
+            var defaultKey = key as DefaultKey;
+            return key == null || defaultKey != null && defaultKey.RegistrationOrder == RegistrationOrder;
+        }
+
+        /// <summary>Returns registration order as hash.</summary> <returns>Hash code.</returns>
+        public override int GetHashCode()
+        {
+            return RegistrationOrder;
+        }
+
+        /// <summary>Prints registration order to string.</summary> <returns>Printed string.</returns>
+        public override string ToString()
+        {
+            return "DefaultKey.Of(" + RegistrationOrder + ")";
+        }
+
+        #region Implementation
+
+        private static DefaultKey[] _keyPool = { Value };
+
+        private DefaultKey(int registrationOrder)
+        {
+            RegistrationOrder = registrationOrder;
+        }
+
+        #endregion
     }
 }

@@ -380,7 +380,9 @@ namespace DryIoc
             return service;
         }
 
-        IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, Type compositeParentRequiredType, 
+        IEnumerable<object> IResolver.ResolveMany(
+            Type serviceType, object serviceKey, Type requiredServiceType, 
+            object compositeParentKey, Type compositeParentRequiredType, 
             RequestInfo preResolveParent, IScope scope)
         {
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
@@ -1750,6 +1752,34 @@ namespace DryIoc
                    || customValueType.IsPrimitive()
                    || customValueType.IsArray && IsSupportedInjectedCustomValueType(customValueType.GetArrayElementTypeOrNull());
         }
+
+        /// <summary>Represents construction of whole request info stack as expression.</summary>
+        /// <param name="container">Required to access container facilities for expression conversion.</param>
+        /// <param name="request">Request info to convert to expression.</param>
+        /// <returns>Returns result expression.</returns>
+        public static Expression RequestInfoToExpression(this IContainer container, RequestInfo request)
+        {
+            if (request.IsEmpty)
+                return Expression.Field(null, _emptyField);
+
+            var serviceKeyExpr = Expression.Convert(
+                container.GetOrAddStateItemExpression(request.ServiceKey),
+                typeof(object));
+
+            var result = Expression.New(typeof(RequestInfo).GetSingleConstructorOrNull(),
+                Expression.Constant(request.ServiceType, typeof(Type)),
+                Expression.Constant(request.RequiredServiceType, typeof(Type)),
+                serviceKeyExpr,
+                Expression.Constant(request.FactoryType, typeof(FactoryType)),
+                Expression.Constant(request.ImplementationType, typeof(Type)),
+
+                // recursion: get parent expression
+                Expression.Constant(request.ReuseLifespan, typeof(int)), container.RequestInfoToExpression(request.Parent)); 
+
+            return result;
+        }
+
+        private static readonly FieldInfo _emptyField = typeof(RequestInfo).GetFieldOrNull("Empty");
     }
 
     /// <summary>Used to represent multiple default service keys. 
@@ -3740,7 +3770,7 @@ namespace DryIoc
                 : Container.ResolutionScopeParamExpr;
 
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
-            var preResolveParentExpr = ToExpression(newPreResolveParent, container);
+            var preResolveParentExpr = container.RequestInfoToExpression(newPreResolveParent);
 
             var resolveCallExpr = Expression.Call(
                 Container.ResolverExpr, "Resolve", ArrayTools.Empty<Type>(),
@@ -3749,32 +3779,6 @@ namespace DryIoc
 
             var resolveExpr = Expression.Convert(resolveCallExpr, serviceType);
             return resolveExpr;
-        }
-
-        private static readonly FieldInfo _emptyField = typeof(RequestInfo).GetFieldOrNull("Empty");
-
-        /// <summary>Represents construction of whole request info stack as expression.</summary>
-        /// <param name="request">Request info to convert to expression.</param>
-        /// <param name="container">Required to access container facilities for expression conversion.</param>
-        /// <returns>Returns result expression.</returns>
-        public static Expression ToExpression(RequestInfo request, IContainer container)
-        {
-            if (request.IsEmpty)
-                return Expression.Field(null, _emptyField);
-
-            var serviceKeyExpr = Expression.Convert(
-                container.GetOrAddStateItemExpression(request.ServiceKey),
-                typeof(object));
-
-            var result = Expression.New(typeof(RequestInfo).GetSingleConstructorOrNull(),
-                Expression.Constant(request.ServiceType, typeof(Type)),
-                Expression.Constant(request.RequiredServiceType, typeof(Type)),
-                serviceKeyExpr,
-                Expression.Constant(request.FactoryType, typeof(FactoryType)),
-                Expression.Constant(request.ImplementationType, typeof(Type)),
-                Expression.Constant(request.ReuseLifespan, typeof(int)),
-                ToExpression(request.Parent, container)); // recursion: parent
-            return result;
         }
     }
 
