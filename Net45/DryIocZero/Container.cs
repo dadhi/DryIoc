@@ -213,12 +213,12 @@ namespace DryIocZero
             serviceType = requiredServiceType ?? serviceType;
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
-            var manyGenerated = Enumerable.Empty<KV>();
-            ResolveManyGenerated(ref manyGenerated, serviceType);
+            var manyGeneratedFactories = Enumerable.Empty<KV>();
+            ResolveManyGenerated(ref manyGeneratedFactories, serviceType);
             if (compositeParentKey != null)
-                manyGenerated = manyGenerated.Where(kv => !compositeParentKey.Equals(kv.Key));
+                manyGeneratedFactories = manyGeneratedFactories.Where(kv => !compositeParentKey.Equals(kv.Key));
 
-            foreach (var generated in manyGenerated)
+            foreach (var generated in manyGeneratedFactories)
                 yield return ((StatelessFactoryDelegate)generated.Value)(this, scope);
 
             var factories = _keyedFactories.Value.GetValueOrDefault(serviceType) as ImTreeMap;

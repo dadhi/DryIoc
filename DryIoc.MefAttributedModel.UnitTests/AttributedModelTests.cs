@@ -1,5 +1,4 @@
 ﻿using System;
-using System.ComponentModel.Composition;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -217,13 +216,26 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.That(b.ToString(), Is.StringContaining("Resolve(DryIoc.MefAttributedModel.UnitTests.CUT.A"));
         }
 
-        [Test, Explicit("Exporting nested open-generic class - not supported from the get go. Requires evaluation.")]
+        [Test]
         public void Can_register_open_generic_returned_by_factory_method_nested_in_open_generic_class()
         {
             GivenAssemblyWithExportedTypes();
             WhenIRegisterAllExportedTypes();
 
-            _container.Resolve<Aaa<A2>>();
+            Assert.IsNotNull(_container.Resolve<Daah.Fooh<A1>>(serviceKey: "a"));
+            Assert.IsNotNull(_container.Resolve<Daah.Fooh<A1>>(serviceKey: "b"));
+        }
+
+        [Test]
+        public void Can_export_and_resolve_composite()
+        {
+            GivenAssemblyWithExportedTypes();
+            WhenIRegisterAllExportedTypes();
+
+            _container = _container.With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+
+            var composite = (CompositeItem<int>)_container.Resolve<IItem<int>>("root");
+            Assert.AreEqual(2, composite.Items.Length);
         }
 
         #region Implementation

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.ComponentModel.Composition;
 using System.Linq;
 using DryIocAttributes;
@@ -412,23 +413,43 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [Export, AllowsDisposableTransient]
     public sealed class Abc { }
 
-    public class Daah<A>
+    public class Daah
     {
-        [Export, AsFactory]
-        public class Fooh<B> where B : A
+        [Export("a")]
+        public class Fooh<A>
         {
-            [Export]
-            public static Aaa<T> GetA<T>() where T : B, new()
+            public Fooh(A a) {}
+        }
+
+        [Export, AsFactory]
+        public class FoohFactory<A>
+        {
+            [Export("b")]
+            public static Fooh<A> Create(A a)
             {
-                return new Aaa<T>();
-            }
+                return new Fooh<A>(a);
+            } 
         }
     }
 
+    [Export]
     public class A1 { }
-    public class A2 : A1 { }
 
-    public class Aaa<T>
+    public interface IItem<T> {}
+
+    [ExportMany]
+    public class IntItem : IItem<int> { }
+
+    [ExportMany]
+    public class Item<B> : IItem<B> { }
+
+    [ExportMany(ContractName = "root")]
+    public class CompositeItem<T> : IItem<T>
     {
+        public IItem<T>[] Items { get; set; }
+        public CompositeItem(IEnumerable<IItem<T>> items)
+        {
+            Items = items.ToArray();
+        }
     }
 }
