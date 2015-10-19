@@ -201,6 +201,19 @@ namespace DryIoc.UnitTests
         {
             public IService MyService { get; set; }
         }
+
+        [Test]
+        public void Cannot_register_delegate_for_open_generic_service_type()
+        {
+            var container = new Container();
+            
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.RegisterDelegate(typeof(OpenGenericFriend<>), resolver => "nah"));
+
+            Assert.AreEqual(Error.RegisteringOpenGenericRequiresFactoryProvider, ex.Error);
+        }
+
+        public class OpenGenericFriend<T> {}
     }
 }
 

@@ -105,7 +105,7 @@ end of exception list
 
     partial class Container
     {
-        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+        [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service, Type serviceType, IScope scope)
         {
 <#
@@ -122,7 +122,7 @@ end of exception list
 #>
         }
 
-        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+        [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, 
             Type requiredServiceType, RequestInfo preRequestParent, IScope scope)
         {
@@ -168,7 +168,9 @@ end of exception list
                 if (innerIndex++ > 0) WriteLine(@"
                 else");
 #>
-                if (Equals(serviceKey, <#= dep.ServiceKey #>) &&
+                if (<#= dep.ServiceKey == "null" 
+                      ? "serviceKey == null" 
+                      : "(serviceKey == null && " + dep.ServiceKey + " is DefaultKey || serviceKey.Equals(" + dep.ServiceKey + "))" #> &&
                     requiredServiceType == <#= dep.RequiredServiceType #> &&
                     Equals(preRequestParent, <#= dep.PreResolveParent #>)) 
                     service = CreateDependency_<#= dep.Index #>(this, scope);
@@ -181,13 +183,13 @@ end of exception list
 #>
         }
 
-        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+        [ExcludeFromCodeCoverage]
         partial void ResolveManyGenerated(ref IEnumerable<KV> services, Type serviceType) 
         {
             services = ResolveManyGenerated(serviceType);
         }
 
-        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+        [ExcludeFromCodeCoverage]
         private IEnumerable<KV> ResolveManyGenerated(Type serviceType)
         {
 <#

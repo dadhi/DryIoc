@@ -2415,10 +2415,7 @@ namespace DryIoc
         public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault)
         {
             var newRules = (Rules)MemberwiseClone();
-            var currentRule = newRules.ItemToExpressionConverter;
-            newRules.ItemToExpressionConverter = currentRule == null
-                ? itemToExpressionOrDefault.ThrowIfNull()
-                : (item, itemType) => itemToExpressionOrDefault(item, itemType) ?? currentRule(item, itemType);
+            newRules.ItemToExpressionConverter = itemToExpressionOrDefault;
             return newRules;
         }
 
@@ -3017,6 +3014,7 @@ namespace DryIoc
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
     /// Its methods are NOT actually called, they just used to reflect service info from call expression.</summary>
     [SuppressMessage("ReSharper", "UnusedTypeParameter", Justification = "Type parameter is used by reflection.")]
+    [ExcludeFromCodeCoverage("The methods of Args are just for using expression tree, to get a reflection info, and not supposed to be called.")]
     public static class Arg
     {
         /// <summary>Specifies required service type of parameter or member. If required type is the same as parameter/member type,
@@ -5891,25 +5889,23 @@ namespace DryIoc
             var factoryMethodResultType = Made.FactoryMethodKnownResultType;
             if (implementationType == null || implementationType.IsAbstract())
             {
-                if (Made.FactoryMethod == null)
-                {
-                    Throw.If(implementationType == null,
-                        Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
-                    Throw.If(implementationType.IsAbstract(),
-                        Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, implementationType);
-                }
+                Throw.If(Made.FactoryMethod == null && implementationType == null,
+                    Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
+                Throw.If(Made.FactoryMethod == null && implementationType.IsAbstract(),
+                    Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, implementationType);
 
                 implementationType = null; // Ensure that we do not have abstract implementation type
 
                 // Using non-abstract factory method result type is safe for conditions and diagnostics
                 if (factoryMethodResultType != null && !factoryMethodResultType.IsAbstract())
                     implementationType = factoryMethodResultType;
+
+                return implementationType;
             }
-            else if (factoryMethodResultType != null && factoryMethodResultType != implementationType)
-            {
+
+            if (factoryMethodResultType != null && factoryMethodResultType != implementationType)
                 implementationType.ThrowIfNotImplementedBy(factoryMethodResultType,
                     Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType);
-            }
 
             return implementationType;
         }
@@ -7365,50 +7361,22 @@ namespace DryIoc
         public readonly int Error;
 
         /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and its message,
-        /// optionally with <paramref name="inner"/> exception.</summary>
+        /// optionally with <paramref name="innerException"/> exception.</summary>
         /// <param name="errorCheck">Type of check</param>
         /// <param name="errorCode">Error code, check <see cref="Error"/> for possible values.</param>
         /// <param name="arg0">(optional) Arguments for formatted message.</param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
-        /// <param name="inner">(optional) Inner exception.</param>
+        /// <param name="innerException">(optional) Inner exception.</param>
         /// <returns>Created exception.</returns>
         public static ContainerException Of(ErrorCheck errorCheck, int errorCode,
             object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
-            Exception inner = null)
+            Exception innerException = null)
         {
-            string message = null;
-            if (errorCode != -1)
-                message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1), Print(arg2), Print(arg3));
-            else
-            {
-                switch (errorCheck) // handle error check when error code is unspecified.
-                {
-                    case ErrorCheck.InvalidCondition:
-                        errorCode = DryIoc.Error.InvalidCondition;
-                        message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg0.GetType()));
-                        break;
-                    case ErrorCheck.IsNull:
-                        errorCode = DryIoc.Error.IsNull;
-                        message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0));
-                        break;
-                    case ErrorCheck.IsNotOfType:
-                        errorCode = DryIoc.Error.IsNotOfType;
-                        message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1));
-                        break;
-                    case ErrorCheck.TypeIsNotOfType:
-                        errorCode = DryIoc.Error.TypeIsNotOfType;
-                        message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1));
-                        break;
-                }
-            }
-
-            return inner == null
-                ? new ContainerException(errorCode, message)
-                : new ContainerException(errorCode, message, inner);
+            var message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1), Print(arg2), Print(arg3));
+            return new ContainerException(errorCode, message, innerException);
         }
 
         /// <summary>Creates exception with message describing cause and context of error.</summary>
-        /// <param name="error"></param>
-        /// <param name="message">Error message.</param>
+        /// <param name="error">Error code.</param> <param name="message">Error message.</param>
         protected ContainerException(int error, string message)
             : base(message)
         {
@@ -7417,8 +7385,7 @@ namespace DryIoc
 
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
-        /// <param name="error"></param>
-        /// <param name="message">Error message.</param>
+        /// <param name="error">Error code.</param> <param name="message">Error message.</param>
         /// <param name="innerException">Underlying system/leading exception.</param>
         protected ContainerException(int error, string message, Exception innerException)
             : base(message, innerException)
@@ -7471,7 +7438,7 @@ namespace DryIoc
             RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType = Of(
                 "Registered factory method return type {1} should be assignable to implementation type {0} but it is not."),
             RegisteringOpenGenericRequiresFactoryProvider = Of(
-                "Unable to register not a factory provider for open-generic service {0}."),
+                "Unable to register not a factory provider (probably delegate factory) for open-generic service {0}."),
             RegisteringOpenGenericImplWithNonGenericService = Of(
                 "Unable to register open-generic implementation {0} with non-generic service {1}."),
             RegisteringOpenGenericServiceWithMissingTypeArgs = Of(
@@ -8489,12 +8456,11 @@ namespace DryIoc
     {
         /// <summary>Portable version of Type.GetGenericArguments.</summary>
         public static readonly Func<Type, Type[]> GetGenericArguments =
-            ExpressionTools.GetMethodDelegateOrNull<Type, Type[]>("GetGenericArguments").ThrowIfNull();
+            ExpressionTools.GetMethodDelegate<Type, Type[]>("GetGenericArguments").ThrowIfNull();
 
         // note: fallback to DefinedTypes (PCL)
         /// <summary>Portable version of Assembly.GetTypes or Assembly.DefinedTypes.</summary>
         public static readonly Func<Assembly, IEnumerable<Type>> GetAssemblyTypes = GetAssemblyTypesMethod();
-        //ExpressionTools.GetMethodDelegateOrNull<Assembly, IEnumerable<Type>>("GetTypes").ThrowIfNull();
 
         private static Func<Assembly, IEnumerable<Type>> GetAssemblyTypesMethod()
         {
@@ -8550,42 +8516,31 @@ namespace DryIoc
                 ArrayTools.Empty<ParameterExpression>()).Compile();
     }
 
+    /// <summary>Custom exclude from test code coverage attribute for portability.</summary>
+    public sealed class ExcludeFromCodeCoverageAttribute : Attribute
+    {
+        /// <summary>Optional reason of why the marked code is excluded from coverage.</summary>
+        public readonly string Reason;
+
+        /// <summary>Creates attribute with optional reason message.</summary> <param name="reason"></param>
+        public ExcludeFromCodeCoverageAttribute(string reason = null)
+        {
+            Reason = reason;
+        }
+    }
+
     /// <summary>Tools for expressions, that are not supported out-of-box.</summary>
     public static class ExpressionTools
     {
-        /// <summary>Extracts method info from method call expression.
-        /// It is allow to use type-safe method declaration instead of string method name.</summary>
-        /// <param name="methodCall">Lambda wrapping method call.</param>
-        /// <returns>Found method info or null if lambda body is not method call.</returns>
-        public static MethodInfo GetCalledMethodOrNull(LambdaExpression methodCall)
-        {
-            var callExpr = methodCall.Body as MethodCallExpression;
-            return callExpr == null ? null : callExpr.Method;
-        }
-
-
-        /// <summary>Extracts member info from property or field getter. Enables type-safe property declarations without using strings.</summary>
-        /// <typeparam name="T">Type of member holder.</typeparam>
-        /// <param name="getter">Expected to contain member access: t => t.MyProperty.</param>
-        /// <returns>Extracted member info or null if getter does not contain member access.</returns>
-        public static MemberInfo GetAccessedMemberOrNull<T>(Expression<Func<T, object>> getter)
-        {
-            var body = getter.Body;
-            var member = body as MemberExpression ?? ((UnaryExpression)body).Operand as MemberExpression;
-            return member == null ? null : member.Member;
-        }
-
         /// <summary>Creates and returns delegate calling method without parameters.</summary>
         /// <typeparam name="TOwner">Method owner type.</typeparam>
         /// <typeparam name="TReturn">Method return type.</typeparam>
         /// <param name="methodName">Method name to find.</param>
         /// <returns>Created delegate or null, if no method with such name is found.</returns>
-        public static Func<TOwner, TReturn> GetMethodDelegateOrNull<TOwner, TReturn>(string methodName)
+        public static Func<TOwner, TReturn> GetMethodDelegate<TOwner, TReturn>(string methodName)
         {
-            var methodInfo = typeof(TOwner).GetMethodOrNull(methodName, ArrayTools.Empty<Type>());
-            if (methodInfo == null) return null;
             var thisExpr = Expression.Parameter(typeof(TOwner), "_");
-            var methodCallExpr = Expression.Call(thisExpr, methodInfo, ArrayTools.Empty<Expression>());
+            var methodCallExpr = Expression.Call(thisExpr, methodName, ArrayTools.Empty<Type>(), ArrayTools.Empty<Expression>());
             var methodExpr = Expression.Lambda<Func<TOwner, TReturn>>(methodCallExpr, thisExpr);
             return methodExpr.Compile();
         }

@@ -444,5 +444,31 @@ namespace DryIoc.UnitTests
         {
             public IResolver R { get; set; }
         }
+
+        [Test]
+        public void In_ArrayTools_Remove_from_null_or_empty_array_should_return_null_or_original_array()
+        {
+            int[] ar = null;
+            Assert.AreSame(ar, ar.RemoveAt(0));
+
+            ar = new int[0];
+            Assert.AreSame(ar, ar.RemoveAt(0));
+        }
+
+        [Test]
+        public void In_ArrayTools_Remove_items_from_array_should_produce_another_array_without_removed_item()
+        {
+            var ar = new[] {2, 1};
+
+            Assert.AreSame(ar, ar.RemoveAt(-1));
+            CollectionAssert.AreEqual(new[] { 1 }, ar.RemoveAt(0));
+            CollectionAssert.AreEqual(new[] { 2 }, ar.RemoveAt(1));
+        }
+
+        [Test]
+        public void Using_ArrayTools_Append_with_mulitple_items_appendee()
+        {
+            var ar = new[] { 2, 1 }.Append(0, -1);
+        }
     }
 }

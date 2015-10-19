@@ -602,6 +602,19 @@ namespace DryIocZero
         private static IScopeContext _default;
     }
 
+    /// <summary>Sugar to allow more simple resolve API</summary>
+    public static class Resolver
+    {
+        /// <summary>Resolves non-keyed service of <typeparamref name="TService"/> type.</summary>
+        /// <typeparam name="TService">Type of service to resolve.</typeparam> <param name="resolver"></param>
+        /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
+        /// <returns>Service object or throws exception.</returns>
+        public static TService Resolve<TService>(this IResolver resolver, bool ifUnresolvedReturnDefault = false)
+        {
+            return (TService)resolver.ResolveNonKeyedServiceFast(typeof(TService), ifUnresolvedReturnDefault);
+        }
+    }
+
     /// <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="Ref.Swap{T}"/>.</summary>
     /// <typeparam name="T">Type of object to wrap.</typeparam>
     public sealed class Ref<T> where T : class
@@ -1418,6 +1431,19 @@ namespace DryIocZero
         {
             if (obj == null) Throw.It(Error.Of(message));
             return obj;
+        }
+    }
+
+    /// <summary>Custom exclude from test code coverage attribute for portability.</summary>
+    public sealed class ExcludeFromCodeCoverageAttribute : Attribute
+    {
+        /// <summary>Optional reason of why the marked code is excluded from coverage.</summary>
+        public readonly string Reason;
+
+        /// <summary>Creates attribute with optional reason message.</summary> <param name="reason"></param>
+        public ExcludeFromCodeCoverageAttribute(string reason = null)
+        {
+            Reason = reason;
         }
     }
 }

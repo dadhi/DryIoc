@@ -39,6 +39,24 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void I_can_remove_rule_to_resolve_not_registered_service()
+        {
+            Rules.UnknownServiceResolver unknownServiceResolver = request =>
+                !request.ServiceType.IsValueType() && !request.ServiceType.IsAbstract()
+                    ? new ReflectionFactory(request.ServiceType)
+                    : null;
+            
+            IContainer container = new Container(Rules.Default.WithUnknownServiceResolvers(unknownServiceResolver));
+            Assert.NotNull(container.Resolve<NotRegisteredService>());
+
+            container = container
+                .With(rules => rules.WithoutUnknownServiceResolver(unknownServiceResolver))
+                .WithoutCache(); // Important to remove cache
+
+            Assert.Null(container.Resolve<NotRegisteredService>(IfUnresolved.ReturnDefault));
+        }
+        
+        [Test]
         public void When_service_registered_with_name_Then_it_could_be_resolved_with_ctor_parameter_ImportAttribute()
         {
             var container = new Container(rules => rules.With(parameters: GetServiceInfoFromImportAttribute));
@@ -150,9 +168,69 @@ namespace DryIoc.UnitTests
             Assert.IsNull(me);
         }
 
+        [Test] 
+        public void AutoFallback_resolution_rule_should_respect_IfUnresolved_policy_in_case_of_multiple_registrations_from_assemblies()
+        {
+            var container = new Container()
+                .WithAutoFallbackResolution(new[] { typeof(Me).GetAssembly() },
+                (reuse, request) => reuse == Reuse.Singleton ? null : reuse);
+
+            var me = container.Resolve<IMe>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNull(me);
+        }
+
+        [Test]
+        public void You_may_specify_condition_to_exclude_unwanted_services_from_AutoFallback_resolution_rule()
+        {
+            var container = new Container()
+                .WithAutoFallbackResolution(new[] { typeof(Me) }, 
+                condition: request => request.Parent.ImplementationType.Name.Contains("Green"));
+
+            container.Register<RedMe>();
+
+            Assert.IsNull(container.Resolve<RedMe>(IfUnresolved.ReturnDefault));
+        }
+
         public interface IMe {}
         internal class Me : IMe {}
         internal class MiniMe : IMe {}
+        internal class GreenMe { public GreenMe(IMe me) {} }
+        internal class RedMe { public RedMe(IMe me) { } }
+
+        [Test]
+        public void I_can_support_for_specific_primitive_value_injection_via_container_rule()
+        {
+            var container = new Container(rules => rules.WithItemToExpressionConverter(
+                (item, type) => type == typeof(ConnectionString)
+                ? Expression.New(type.GetSingleConstructorOrNull(),
+                    Expression.Constant(((ConnectionString)item).Value))
+                : null));
+
+            var s = new ConnectionString("aaa");
+            container.Register(Made.Of(() => new ConStrUser(Arg.Index<ConnectionString>(0)), r => s));
+
+            var user = container.Resolve<ConStrUser>();
+            Assert.AreEqual("aaa", user.S.Value);
+        }
+
+        public class ConnectionString
+        {
+            public string Value;
+            public ConnectionString(string value)
+            {
+                Value = value;
+            }
+        }
+
+        public class ConStrUser 
+        {
+            public ConnectionString S { get; set; }
+            public ConStrUser(ConnectionString s)
+            {
+                S = s;
+            }
+        }
 
         [Test]
         public void Container_should_throw_on_registering_disposable_transient()

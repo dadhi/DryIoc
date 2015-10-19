@@ -32,6 +32,17 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Should_not_throw_in_case_of_service_with_provided_is_not_resolvable_due_not_reigstered_dependency()
+        {
+            var container = new Container();
+            container.Register(typeof(ServiceWithDependencyAndWithMetadata), setup: Setup.With(new Metadata { Assigned = true }));
+
+            var services = container.Resolve<Tuple<ServiceWithDependencyAndWithMetadata, Metadata>[]>();
+
+            Assert.IsEmpty(services);
+        }
+
+        [Test]
         public void I_can_resolve_func_of_transient_service_with_metadata()
         {
             var container = new Container();
@@ -235,6 +246,16 @@ namespace DryIoc.UnitTests
 
     public class ServiceWithMetadata
     {
+
+    }
+
+    public class ServiceWithDependencyAndWithMetadata
+    {
+        public string Dependency { get; set; }
+        public ServiceWithDependencyAndWithMetadata(string dependency)
+        {
+            Dependency = dependency;
+        }
     }
 
     public class Metadata

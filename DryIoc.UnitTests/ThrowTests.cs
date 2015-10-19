@@ -12,7 +12,7 @@ namespace DryIoc.UnitTests
         public void SetupTestException()
         {
             _original = Throw.GetMatchedException;
-            Throw.GetMatchedException = (check, error, arg0, arg1, arg2, arg3, inner) => new InvalidOperationException(error.ToString());
+            Throw.GetMatchedException = (check, error, arg0, arg1, arg2, arg3, inner) => new InvalidOperationException(error.ToString(), inner);
         }
 
         [TearDown]
@@ -71,6 +71,17 @@ namespace DryIoc.UnitTests
             catch { }
 
             Assert.That(loggedError, Is.SameAs(error));
+        }
+
+        [Test]
+        public void Can_wrap_inner_exception()
+        {
+            var innerException = new ArgumentException();
+
+            var ex = Assert.Throws<InvalidOperationException>(() => 
+                Throw.IfThrows<ArgumentException, string>(() => { throw innerException; }, true, 3));
+
+            Assert.AreSame(innerException, ex.InnerException);
         }
     }
 }
