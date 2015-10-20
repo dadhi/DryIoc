@@ -38,7 +38,8 @@ echo:
  -reports:%COVERAGE%^
  -targetdir:%REPORTS%^
  -reporttypes:Html;HtmlSummary;Badges^
- -filters:-*Test*
+ -assemblyfilters:-*Test*^
+ -classfilters:-DryIoc.Arg
 
 rem start %REPORTS%\index.htm
 

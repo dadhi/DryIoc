@@ -3014,7 +3014,6 @@ namespace DryIoc
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
     /// Its methods are NOT actually called, they just used to reflect service info from call expression.</summary>
     [SuppressMessage("ReSharper", "UnusedTypeParameter", Justification = "Type parameter is used by reflection.")]
-    [ExcludeFromCodeCoverage("The methods of Args are just for using expression tree, to get a reflection info, and not supposed to be called.")]
     public static class Arg
     {
         /// <summary>Specifies required service type of parameter or member. If required type is the same as parameter/member type,
@@ -8525,19 +8524,6 @@ namespace DryIoc
             Expression.Lambda<Func<int>>(
                 Expression.Call(_getEnvCurrentManagedThreadIdMethod, ArrayTools.Empty<Expression>()),
                 ArrayTools.Empty<ParameterExpression>()).Compile();
-    }
-
-    /// <summary>Custom exclude from test code coverage attribute for portability.</summary>
-    public sealed class ExcludeFromCodeCoverageAttribute : Attribute
-    {
-        /// <summary>Optional reason of why the marked code is excluded from coverage.</summary>
-        public readonly string Reason;
-
-        /// <summary>Creates attribute with optional reason message.</summary> <param name="reason"></param>
-        public ExcludeFromCodeCoverageAttribute(string reason = null)
-        {
-            Reason = reason;
-        }
     }
 
     /// <summary>Immutable Key-Value pair. It is reference type (could be check for null), 
