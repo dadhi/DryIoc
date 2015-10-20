@@ -96,6 +96,9 @@ namespace System.Reflection
         public bool IsGenericType { get { return _type.IsGenericType; } }
         public bool IsGenericTypeDefinition { get { return _type.IsGenericTypeDefinition; } }
         public bool ContainsGenericParameters { get { return _type.ContainsGenericParameters; } }
+        public Type[] GenericTypeParameters { get { return _type.GetGenericArguments(); } }
+        public Type[] GenericTypeArguments { get { return _type.GetGenericArguments(); } }
+        public Type[] GetGenericParameterConstraints() { return _type.GetGenericParameterConstraints(); }
         public bool IsValueType { get { return _type.IsValueType; } }
         public bool IsPrimitive { get { return _type.IsPrimitive; } }
         public bool IsArray { get { return _type.IsArray; } }
@@ -107,7 +110,6 @@ namespace System.Reflection
         public bool IsEnum { get { return _type.IsEnum; } }
 
         public Type GetElementType() { return _type.GetElementType(); }
-        public Type[] GetGenericParameterConstraints() { return _type.GetGenericParameterConstraints(); }
 
         public bool IsAssignableFrom(TypeInfo typeInfo) { return _type.IsAssignableFrom(typeInfo.AsType()); }
 #pragma warning restore 1591 // "Missing XML-comment"

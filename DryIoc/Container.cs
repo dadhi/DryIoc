@@ -7899,7 +7899,10 @@ namespace DryIoc
         /// <param name="type">Source type.</param> <returns>Array of generic type arguments (closed/concrete types) and parameters (open).</returns>
         public static Type[] GetGenericParamsAndArgs(this Type type)
         {
-            return Portable.GetGenericArguments(type);
+            var typeInfo = type.GetTypeInfo();
+            return typeInfo.IsGenericTypeDefinition
+                ? typeInfo.GenericTypeParameters
+                : typeInfo.GenericTypeArguments;
         }
 
         /// <summary>Returns array of interface and base class constraints for provider generic parameter type.</summary>
@@ -8166,6 +8169,14 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
+        /// <param name="type">Type to get default value of.</param>
+        /// <returns>Default value expression.</returns>
+        public static Expression GetDefaultValueExpression(this Type type)
+        {
+            return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), ArrayTools.Empty<Expression>());
+        }
+
         #region Implementation
 
         private static void SetToNullGenericParametersReferencedInConstraints(Type[] genericParams)
@@ -8213,6 +8224,10 @@ namespace DryIoc
                     SetToNullMatchesFoundInGenericParameters(matchedParams, genericParam.GetGenericParamsAndArgs());
             }
         }
+
+        private static readonly MethodInfo _getDefaultMethod = 
+            typeof(ReflectionTools).GetMethodOrNull("GetDefault", ArrayTools.Empty<Type>());
+        internal static T GetDefault<T>() { return default(T); }
 
         #endregion
     }
@@ -8454,10 +8469,6 @@ namespace DryIoc
     /// <summary>Ports some methods from .Net 4.0/4.5</summary>
     public static partial class Portable
     {
-        /// <summary>Portable version of Type.GetGenericArguments.</summary>
-        public static readonly Func<Type, Type[]> GetGenericArguments =
-            ExpressionTools.GetMethodDelegate<Type, Type[]>("GetGenericArguments").ThrowIfNull();
-
         // note: fallback to DefinedTypes (PCL)
         /// <summary>Portable version of Assembly.GetTypes or Assembly.DefinedTypes.</summary>
         public static readonly Func<Assembly, IEnumerable<Type>> GetAssemblyTypes = GetAssemblyTypesMethod();
@@ -8527,35 +8538,6 @@ namespace DryIoc
         {
             Reason = reason;
         }
-    }
-
-    /// <summary>Tools for expressions, that are not supported out-of-box.</summary>
-    public static class ExpressionTools
-    {
-        /// <summary>Creates and returns delegate calling method without parameters.</summary>
-        /// <typeparam name="TOwner">Method owner type.</typeparam>
-        /// <typeparam name="TReturn">Method return type.</typeparam>
-        /// <param name="methodName">Method name to find.</param>
-        /// <returns>Created delegate or null, if no method with such name is found.</returns>
-        public static Func<TOwner, TReturn> GetMethodDelegate<TOwner, TReturn>(string methodName)
-        {
-            var thisExpr = Expression.Parameter(typeof(TOwner), "_");
-            var methodCallExpr = Expression.Call(thisExpr, methodName, ArrayTools.Empty<Type>(), ArrayTools.Empty<Expression>());
-            var methodExpr = Expression.Lambda<Func<TOwner, TReturn>>(methodCallExpr, thisExpr);
-            return methodExpr.Compile();
-        }
-
-        /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
-        /// <param name="type">Type to get default value of.</param>
-        /// <returns>Default value expression.</returns>
-        public static Expression GetDefaultValueExpression(this Type type)
-        {
-            return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), ArrayTools.Empty<Expression>());
-        }
-
-        private static readonly MethodInfo _getDefaultMethod = typeof(ExpressionTools)
-            .GetMethodOrNull("GetDefault", ArrayTools.Empty<Type>());
-        internal static T GetDefault<T>() { return default(T); }
     }
 
     /// <summary>Immutable Key-Value pair. It is reference type (could be check for null), 

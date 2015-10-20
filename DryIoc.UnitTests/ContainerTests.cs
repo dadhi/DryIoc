@@ -470,5 +470,17 @@ namespace DryIoc.UnitTests
         {
             var ar = new[] { 2, 1 }.Append(0, -1);
         }
+
+        [Test]
+        public void Disposed_container_should_throw_on_attempt_to_register()
+        {
+            var container = new Container();
+            container.Dispose();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.RegisterInstance("a"));
+
+            Assert.AreEqual(Error.ContainerIsDisposed, ex.Error);
+        }
     }
 }
