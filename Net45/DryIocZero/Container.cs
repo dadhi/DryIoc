@@ -29,8 +29,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using DryIoc;
-using DryIocZero;
 
 namespace DryIocZero
 {
@@ -1434,22 +1432,6 @@ namespace DryIocZero
         }
     }
 
-    /// <summary>Custom exclude from test code coverage attribute for portability.</summary>
-    public sealed class ExcludeFromCodeCoverageAttribute : Attribute
-    {
-        /// <summary>Optional reason of why the marked code is excluded from coverage.</summary>
-        public readonly string Reason;
-
-        /// <summary>Creates attribute with optional reason message.</summary> <param name="reason"></param>
-        public ExcludeFromCodeCoverageAttribute(string reason = null)
-        {
-            Reason = reason;
-        }
-    }
-}
-
-namespace DryIoc
-{
     /// <summary>Type of services supported by Container.</summary>
     public enum FactoryType
     {
@@ -1494,15 +1476,26 @@ namespace DryIoc
         /// <summary>Relative number representing reuse lifespan.</summary>
         public readonly int ReuseLifespan;
 
-        /// <summary>Creates info.</summary>
-        /// <param name="serviceType"></param>
-        /// <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param>
-        /// <param name="factoryType"></param>
-        /// <param name="implementationType"></param>
-        /// <param name="reuseLifespan"></param>
-        /// <param name="parent"></param>
-        public RequestInfo(
+        /// <summary>Simplified version of Push with most common properties.</summary>
+        /// <param name="serviceType"></param> <param name="implementationType"></param>
+        /// <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, Type implementationType, int reuseLifespan)
+        {
+            return Push(serviceType, null, null, FactoryType.Service, implementationType, reuseLifespan);
+        }
+
+        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
+        /// <param name="serviceKey"></param> <param name="factoryType"></param>
+        /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
+        /// <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
+            FactoryType factoryType, Type implementationType, int reuseLifespan)
+        {
+            return new RequestInfo(serviceType, requiredServiceType, serviceKey, factoryType, implementationType, reuseLifespan, this);
+        }
+
+        private RequestInfo(
             Type serviceType, Type requiredServiceType, object serviceKey,
             FactoryType factoryType, Type implementationType, int reuseLifespan,
             RequestInfo parent)
@@ -1619,7 +1612,6 @@ namespace DryIoc
         private static int CombineHashCodes(int h1, int h2)
         {
             unchecked
-
             {
                 return (h1 << 5) + h1 ^ h2;
             }
@@ -1687,5 +1679,18 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    /// <summary>Custom exclude from test code coverage attribute for portability.</summary>
+    public sealed class ExcludeFromCodeCoverageAttribute : Attribute
+    {
+        /// <summary>Optional reason of why the marked code is excluded from coverage.</summary>
+        public readonly string Reason;
+
+        /// <summary>Creates attribute with optional reason message.</summary> <param name="reason"></param>
+        public ExcludeFromCodeCoverageAttribute(string reason = null)
+        {
+            Reason = reason;
+        }
     }
 }

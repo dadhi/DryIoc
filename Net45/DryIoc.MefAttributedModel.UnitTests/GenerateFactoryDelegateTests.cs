@@ -145,8 +145,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             ImTreeMap<KV<Type, object>, Expression> resolutionsRoots;
             ImTreeMap<RequestInfo, Expression> resolutionCallDependencies;
-            ImTreeMap<KV<Type, object>, ContainerException> resolutionErrors;
-            container.GenerateResolutionFactoryExpressions(out resolutionsRoots, out resolutionCallDependencies, out resolutionErrors);
+            container.GenerateResolutionFactoryExpressions(out resolutionsRoots, out resolutionCallDependencies);
             
             var rootList = resolutionsRoots.Enumerate().ToArray();
             Assert.AreEqual(3, rootList.Length);

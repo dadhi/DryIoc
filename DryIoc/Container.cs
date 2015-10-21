@@ -1596,6 +1596,19 @@ namespace DryIoc
         #endregion
     }
 
+    /// <summary>Combines resolution exception with registration Service Type and Key</summary>
+    public struct ResolutionErrorInfo
+    {
+        /// <summary>Registration service type.</summary>
+        public Type ServiceType;
+
+        /// <summary>Optional registration service key</summary>
+        public object OptionalServiceKey;
+
+        /// <summary>Exception happened during resolution of corresponding registration.</summary>
+        public ContainerException Error;
+    }
+
     /// <summary>Convenient methods that require container.</summary>
     public static class ContainerTools
     {
@@ -1709,23 +1722,25 @@ namespace DryIoc
         /// <param name="container">for container</param>
         /// <param name="resolutionRoots">result roots</param>
         /// <param name="resolutionCallDependencies">result calls</param>
-        /// <param name="resolutionErrors">result errors when resolving corresponding roots</param>
-        public static void GenerateResolutionFactoryExpressions(
+        /// <param name="forAllRegistrationsInsteadOfRoots">(optional) When set will try to resolve all regitrations.
+        /// The default is resolve only <see cref="Setup.AsResolutionRoot"/> registrations.</param>
+        /// <returns>Errors happened when resolving corresponding registrations.</returns>
+        public static ResolutionErrorInfo[] GenerateResolutionFactoryExpressions(
             this IContainer container,
             out ImTreeMap<KV<Type, object>, Expression> resolutionRoots,
             out ImTreeMap<RequestInfo, Expression> resolutionCallDependencies,
-            out ImTreeMap<KV<Type, object>, ContainerException> resolutionErrors)
+            bool forAllRegistrationsInsteadOfRoots = false)
         {
             var generator = container.With(rules => rules
                 .WithoutEagerCachingSingletonForFasterAccess()
                 .WithDependencyResolutionCallExpressions());
 
-            var rootRegistrations = generator.GetServiceRegistrations()
-                .Where(r => r.Factory.Setup.AsResolutionRoot)
-                .ToArray();
+            var rootRegistrations = generator.GetServiceRegistrations();
+            if (!forAllRegistrationsInsteadOfRoots)
+                rootRegistrations = rootRegistrations.Where(r => r.Factory.Setup.AsResolutionRoot);
 
             resolutionRoots = ImTreeMap<KV<Type, object>, Expression>.Empty;
-            resolutionErrors = ImTreeMap<KV<Type, object>, ContainerException>.Empty;
+            var resolutionErrors = new List<ResolutionErrorInfo>();
             foreach (var r in rootRegistrations)
             {
                 try
@@ -1734,13 +1749,29 @@ namespace DryIoc
                     var factoryExpr = r.Factory.GetExpressionOrDefault(request);
                     resolutionRoots = resolutionRoots.AddOrUpdate(new KV<Type, object>(r.ServiceType, r.OptionalServiceKey), factoryExpr);
                 }
-                catch (ContainerException ex)
+                catch (ContainerException error)
                 {
-                    resolutionErrors = resolutionErrors.AddOrUpdate(new KV<Type, object>(r.ServiceType, r.OptionalServiceKey), ex);
+                    resolutionErrors.Add(new ResolutionErrorInfo { 
+                        ServiceType = r.ServiceType, OptionalServiceKey = r.OptionalServiceKey, Error = error });
                 }
             }
 
             resolutionCallDependencies = generator.Rules.DependencyResolutionCallExpressions.Value;
+            return resolutionErrors.ToArray();
+        }
+
+        /// <summary>May be used to find potential problems in service registration setup.
+        /// Methods tries to get epressions for Roots/All registrations, collects heppened exceptions, and
+        /// returns them to user. Does not create any actual service objects.</summary>
+        /// <param name="container">for container</param>
+        /// <param name="forAllRegistrationsInsteadOfRoots">(optional) When set will try to resolve all regitrations.
+        /// The default is resolve only <see cref="Setup.AsResolutionRoot"/> registrations.</param>
+        /// <returns></returns>
+        public static IEnumerable<ResolutionErrorInfo> VerifyResolutions(this IContainer container, bool forAllRegistrationsInsteadOfRoots = false)
+        {
+            ImTreeMap<KV<Type, object>, Expression> ignoredRoots;
+            ImTreeMap<RequestInfo, Expression> ignoredDeps;
+            return container.GenerateResolutionFactoryExpressions(out ignoredRoots, out ignoredDeps, forAllRegistrationsInsteadOfRoots);
         }
 
         /// <summary>Checks if custom value of the <paramref name="customValueType"/> is supported by DryIoc injection mechanism.</summary>
@@ -1760,26 +1791,34 @@ namespace DryIoc
         public static Expression RequestInfoToExpression(this IContainer container, RequestInfo request)
         {
             if (request.IsEmpty)
-                return Expression.Field(null, _emptyField);
+                return Expression.Field(null, typeof(RequestInfo), "Empty");
 
-            var serviceKeyExpr = Expression.Convert(
-                container.GetOrAddStateItemExpression(request.ServiceKey),
-                typeof(object));
+            // recursively ask for parent expresion until it is empty
+            var parentRequestInfoExpr = container.RequestInfoToExpression(request.Parent);
 
-            var result = Expression.New(typeof(RequestInfo).GetSingleConstructorOrNull(),
-                Expression.Constant(request.ServiceType, typeof(Type)),
-                Expression.Constant(request.RequiredServiceType, typeof(Type)),
-                serviceKeyExpr,
-                Expression.Constant(request.FactoryType, typeof(FactoryType)),
-                Expression.Constant(request.ImplementationType, typeof(Type)),
-
-                // recursion: get parent expression
-                Expression.Constant(request.ReuseLifespan, typeof(int)), container.RequestInfoToExpression(request.Parent)); 
+            Expression result;
+            if (request.RequiredServiceType == null &&
+                request.ServiceKey == null &&
+                request.FactoryType == FactoryType.Service) // try simplified version of push if possible.
+            {
+                result = Expression.Call(parentRequestInfoExpr, "Push", ArrayTools.Empty<Type>(),
+                    Expression.Constant(request.ServiceType, typeof(Type)),
+                    Expression.Constant(request.ImplementationType, typeof(Type)),
+                    Expression.Constant(request.ReuseLifespan, typeof(int)));
+            }
+            else
+            {
+                result = Expression.Call(parentRequestInfoExpr, "Push", ArrayTools.Empty<Type>(),
+                    Expression.Constant(request.ServiceType, typeof(Type)),
+                    Expression.Constant(request.RequiredServiceType, typeof(Type)),
+                    Expression.Convert(container.GetOrAddStateItemExpression(request.ServiceKey), typeof(object)),
+                    Expression.Constant(request.FactoryType, typeof(FactoryType)),
+                    Expression.Constant(request.ImplementationType, typeof(Type)),
+                    Expression.Constant(request.ReuseLifespan, typeof(int))); 
+            }
 
             return result;
         }
-
-        private static readonly FieldInfo _emptyField = typeof(RequestInfo).GetFieldOrNull("Empty");
     }
 
     /// <summary>Used to represent multiple default service keys. 
@@ -4585,12 +4624,9 @@ namespace DryIoc
         {
             return IsEmpty
                 ? RequestInfo.Empty
-                : new RequestInfo(
+                : (_parent.IsEmpty ? PreResolveParent : _parent.ToRequestInfo()).Push(
                     ServiceType, RequiredServiceType, ServiceKey,
-                    FactoryType, ImplementationType, ReuseLifespan,
-                    _parent.IsEmpty
-                        ? PreResolveParent
-                        : _parent.ToRequestInfo());
+                    FactoryType, ImplementationType, ReuseLifespan);
         }
 
         /// <summary>Enumerates all request stack parents. 
@@ -6884,15 +6920,26 @@ namespace DryIoc
         /// <summary>Relative number representing reuse lifespan.</summary>
         public readonly int ReuseLifespan;
 
-        /// <summary>Creates info.</summary>
-        /// <param name="serviceType"></param>
-        /// <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param>
-        /// <param name="factoryType"></param>
-        /// <param name="implementationType"></param>
-        /// <param name="reuseLifespan"></param>
-        /// <param name="parent"></param>
-        public RequestInfo(
+        /// <summary>Simplified version of Push with most common properties.</summary>
+        /// <param name="serviceType"></param> <param name="implementationType"></param>
+        /// <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, Type implementationType, int reuseLifespan)
+        {
+            return Push(serviceType, null, null, FactoryType.Service, implementationType, reuseLifespan);
+        }
+
+        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
+        /// <param name="serviceKey"></param> <param name="factoryType"></param>
+        /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
+        /// <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
+            FactoryType factoryType, Type implementationType, int reuseLifespan)
+        {
+            return new RequestInfo(serviceType, requiredServiceType, serviceKey, factoryType, implementationType, reuseLifespan, this);
+        }
+
+        private RequestInfo(
             Type serviceType, Type requiredServiceType, object serviceKey,
             FactoryType factoryType, Type implementationType, int reuseLifespan,
             RequestInfo parent)

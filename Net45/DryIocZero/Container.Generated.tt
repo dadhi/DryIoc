@@ -40,15 +40,15 @@ var container = GetContainerWithRegistrations();
 
 ImTreeMap<KV<Type, object>, Expression> resolutionRoots;
 ImTreeMap<RequestInfo, Expression> resolutionCallDependencies;
-ImTreeMap<KV<Type, object>, ContainerException> resolutionErrors;
-container.GenerateResolutionFactoryExpressions(out resolutionRoots, out resolutionCallDependencies, out resolutionErrors);
+var errors = container.GenerateResolutionFactoryExpressions(out resolutionRoots, out resolutionCallDependencies);
 
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 var objectToCode = ObjectStringify.WithFullTypeNames;
-Func<object, string> code = x => 
-    x == null ? "null"
+Func<object, string> code = null;
+code = x => x == null ? "null"
     : x is DefaultKey ? "DefaultKey.Of(" + ((DefaultKey)x).RegistrationOrder + ")" 
-    : x is Expression ? exprToCode.ToCode((Expression)x)
+    : x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x))
+    : x is Expression ? exprToCode.ToCode((Expression)x).Replace("DryIoc.RequestInfo.", "RequestInfo.")
     : objectToCode.PlainObjectToCode(x);
 
 var roots = resolutionRoots.Enumerate()
@@ -59,10 +59,8 @@ var deps = resolutionCallDependencies.Enumerate()
     {
         Index = i, ServiceType = code(r.Key.ServiceType), ServiceKey = code(r.Key.ServiceKey), Expression = code(r.Value),
         RequiredServiceType = code(r.Key.RequiredServiceType),
-        PreResolveParent = code(container.RequestInfoToExpression(r.Key.Parent))
+        PreResolveParent = code(r.Key.Parent)
     });
-
-var errors = resolutionErrors.Enumerate().Select(e => e.Value).ToArray();
 #>
 using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
@@ -72,16 +70,16 @@ using DryIoc; // namespace defined in DryIocZero to access shared DryIoc definit
 namespace DryIocZero
 {
 /* 
-Exceptions during resolution:
+Errors during resolution:
 -----------------------------
 <#
     if (errors.Length == 0)
-        WriteLine("No errors - generation was successful.");
-    foreach (var ex in errors)
+        WriteLine("Generation went without errors.");
+    foreach (var e in errors)
     {
 #>
-<#=objectToCode.TypeNameToCode(ex.GetType())#>:
-<#=ex.Message#>
+<#=objectToCode.TypeNameToCode(e.Error.GetType())#>:
+<#=e.Error.Message#>
 
 <#
     }

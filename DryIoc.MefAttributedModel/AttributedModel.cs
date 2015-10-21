@@ -725,14 +725,13 @@ namespace DryIoc.MefAttributedModel
                 requestInfo.FactoryType == FactoryType.Wrapper ? RegistrationType.Wrapper :
                 RegistrationType.Service;
 
-            return new DryIocAttributes.RequestInfo(
+            return ConvertRequestInfo(requestInfo.Parent).Push(
                 requestInfo.ServiceType,
                 requestInfo.RequiredServiceType,
                 requestInfo.ServiceKey,
                 registrationType,
                 requestInfo.ImplementationType,
-                requestInfo.ReuseLifespan,
-                ConvertRequestInfo(requestInfo.Parent));
+                requestInfo.ReuseLifespan);
         }
 
         /// <summary>Compares with another info for equality.</summary>

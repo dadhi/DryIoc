@@ -266,15 +266,26 @@ namespace DryIocAttributes
         /// <summary>Relative number representing reuse lifespan.</summary>
         public readonly int ReuseLifespan;
 
-        /// <summary>Creates info.</summary>
-        /// <param name="serviceType"></param>
-        /// <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param>
-        /// <param name="factoryType"></param>
-        /// <param name="implementationType"></param>
-        /// <param name="reuseLifespan"></param>
-        /// <param name="parent"></param>
-        public RequestInfo(
+        /// <summary>Simplified version of Push with most common properties.</summary>
+        /// <param name="serviceType"></param> <param name="implementationType"></param>
+        /// <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, Type implementationType, int reuseLifespan)
+        {
+            return Push(serviceType, null, null, RegistrationType.Service, implementationType, reuseLifespan);
+        }
+
+        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
+        /// <param name="serviceKey"></param> <param name="factoryType"></param>
+        /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
+        /// <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
+            RegistrationType factoryType, Type implementationType, int reuseLifespan)
+        {
+            return new RequestInfo(serviceType, requiredServiceType, serviceKey, factoryType, implementationType, reuseLifespan, this);
+        }
+
+        private RequestInfo(
             Type serviceType, Type requiredServiceType, object serviceKey,
             RegistrationType factoryType, Type implementationType, int reuseLifespan,
             RequestInfo parent)
@@ -296,12 +307,11 @@ namespace DryIocAttributes
         /// <returns>Requests from the last to first.</returns>
         public IEnumerable<RequestInfo> Enumerate()
         {
-            for (var i = this; i != Empty; i = i.Parent)
+            for (var i = this; !i.IsEmpty; i = i.Parent)
                 yield return i;
         }
 
-        /// <summary>Prints request and its parents chain into string.</summary>
-        /// <returns>Result string.</returns>
+        /// <summary>Prints request with all its parents to string.</summary> <returns>The string.</returns>
         public override string ToString()
         {
             if (IsEmpty)
@@ -331,21 +341,33 @@ namespace DryIocAttributes
             return s.ToString();
         }
 
-        /// <summary>Returns true if request info and passed object are equal, and threir parents recursively are equal.</summary>
+        /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
         /// <param name="obj"></param> <returns></returns>
         public override bool Equals(object obj)
         {
-            var other = obj as RequestInfo;
-            return other != null
-                && other.ServiceType == ServiceType
+            return Equals(obj as RequestInfo);
+        }
+
+        /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
+        /// <param name="other"></param> <returns></returns>
+        public bool Equals(RequestInfo other)
+        {
+            return other != null && EqualsWithoutParent(other)
+                && (Parent == null && other.Parent == null
+                || (Parent != null && Parent.EqualsWithoutParent(other.Parent)));
+        }
+
+        /// <summary>Compares infos regarding properies but not their parents.</summary>
+        /// <param name="other">Info to compare for equality.</param> <returns></returns>
+        public bool EqualsWithoutParent(RequestInfo other)
+        {
+            return other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
                 && other.ServiceKey == ServiceKey
 
                 && other.FactoryType == FactoryType
                 && other.ImplementationType == ImplementationType
-                && other.ReuseLifespan == ReuseLifespan
-
-                && Equals(other.Parent, Parent);
+                && other.ReuseLifespan == ReuseLifespan;
         }
 
         /// <summary>Returns hash code combined from info fields plus its parent.</summary>
