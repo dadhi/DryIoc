@@ -73,6 +73,7 @@
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>Container.Generated.cs</LastGenOutput>
     </Content>
+    <Content Include="YourServiceRegistrations.include.tt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
