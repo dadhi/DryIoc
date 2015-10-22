@@ -255,7 +255,13 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             factory.ThrowIfNull().ThrowIfInvalidRegistration(this, serviceType.ThrowIfNull(), serviceKey, isStaticallyChecked);
-            _registry.Swap(registry => registry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey));
+
+            // Improves performance a bit by attempt to swapping registry while it is still unchanged, 
+            // if attempt fails then fallback to normal Swap with retry. 
+            var registry = _registry.Value;
+            var currentRegistry = registry;
+            if (!_registry.TrySwapIfStillCurrent(currentRegistry, currentRegistry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
+                _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered, serviceKey));
         }
 
         /// <summary>Returns true if there is registered factory with the service type and key.
@@ -1791,7 +1797,7 @@ namespace DryIoc
         public static Expression RequestInfoToExpression(this IContainer container, RequestInfo request)
         {
             if (request.IsEmpty)
-                return Expression.Field(null, typeof(RequestInfo), "Empty");
+                return Expression.Field(null, _requestInfoEmptyField);
 
             // recursively ask for parent expresion until it is empty
             var parentRequestInfoExpr = container.RequestInfoToExpression(request.Parent);
@@ -1819,6 +1825,8 @@ namespace DryIoc
 
             return result;
         }
+
+        private static readonly FieldInfo _requestInfoEmptyField = typeof(RequestInfo).GetFieldOrNull("Empty");
     }
 
     /// <summary>Used to represent multiple default service keys. 
@@ -9021,6 +9029,14 @@ namespace DryIoc
         public T Swap(Func<T, T> getNewValue)
         {
             return Ref.Swap(ref _value, getNewValue);
+        }
+
+        /// <summary>Compares curret Refed value with <paramref name="currentValue"/> and if equal replaces current with <paramref name="newValue"/></summary>
+        /// <param name="currentValue"></param> <param name="newValue"></param>
+        /// <returns>True if current value was replaced with new value, and false if current value is outdated (already changed by other party).</returns>
+        public bool TrySwapIfStillCurrent(T currentValue, T newValue)
+        {
+            return Interlocked.CompareExchange(ref _value, newValue, currentValue) == currentValue;
         }
 
         private T _value;
