@@ -26,21 +26,19 @@ THE SOFTWARE.
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.0.0-rc3build335\lib\net45\DryIoc.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.2.0.0-rc3build335\lib\net45\DryIocAttributes.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0-rc3build335\lib\net45\DryIoc.MefAttributedModel.dll" #>
 <#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
+<#@ import Namespace="System.Collections.Generic" #>
 <#@ import Namespace="DryIoc" #>
-<#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 <#@ include File="YourServiceRegistrations.tt.include" #>
 <#
 var container = GetContainerWithRegistrations();
 
-ImTreeMap<KV<Type, object>, Expression> resolutionRoots;
-ImTreeMap<RequestInfo, Expression> resolutionCallDependencies;
-var errors = container.GenerateResolutionFactoryExpressions(out resolutionRoots, out resolutionCallDependencies);
+KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
+KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
+var errors = container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies, ContainerTools.SetupAsResolutionRoots);
 
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 var objectToCode = ObjectStringify.WithFullTypeNames;
@@ -51,15 +49,13 @@ code = x => x == null ? "null"
     : x is Expression ? exprToCode.ToCode((Expression)x).Replace("DryIoc.RequestInfo.", "RequestInfo.")
     : objectToCode.PlainObjectToCode(x);
 
-var roots = resolutionRoots.Enumerate()
-    .Select((r, i) => new { Index = i, ServiceType = code(r.Key.Key), ServiceKey = code(r.Key.Value), Expression = code(r.Value) });
+var roots = resolutionsRoots.Select((r, i) => 
+    new { Index = i, ServiceType = code(r.Key.ServiceType), ServiceKey = code(r.Key.OptionalServiceKey), Expression = code(r.Value.Body) });
 
-var deps = resolutionCallDependencies.Enumerate()
-    .Select((r, i) => new
-    {
-        Index = i, ServiceType = code(r.Key.ServiceType), ServiceKey = code(r.Key.ServiceKey), Expression = code(r.Value),
-        RequiredServiceType = code(r.Key.RequiredServiceType),
-        PreResolveParent = code(r.Key.Parent)
+var deps = resolutionCallDependencies.Select((r, i) => 
+    new { Index = i, ServiceType = code(r.Key.ServiceType), ServiceKey = code(r.Key.ServiceKey), Expression = code(r.Value),
+          RequiredServiceType = code(r.Key.RequiredServiceType),
+          PreResolveParent = code(r.Key.Parent)
     });
 #>
 using System;
@@ -78,8 +74,8 @@ Errors during resolution:
     foreach (var e in errors)
     {
 #>
-<#=objectToCode.TypeNameToCode(e.Error.GetType())#>:
-<#=e.Error.Message#>
+<#=objectToCode.TypeNameToCode(e.Value.GetType())#>:
+<#=e.Value.Message#>
 
 <#
     }

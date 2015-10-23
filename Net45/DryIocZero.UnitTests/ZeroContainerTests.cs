@@ -13,7 +13,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
             container.Register(typeof(Potato), (r, scope) => new Potato());
 
-            var potato = container.ResolveNonKeyedServiceFast(typeof(Potato), false);
+            var potato = container.Resolve(typeof(Potato), false);
             
             Assert.IsNotNull(potato);
         }
@@ -38,7 +38,7 @@ namespace DryIocZero.UnitTests
             container.Register(typeof(Potato), (r, scope) => new Potato());
             using (var scope = container.OpenScope())
             {
-                var potato = scope.ResolveNonKeyedServiceFast(typeof(Potato), false);
+                var potato = scope.Resolve(typeof(Potato), false);
                 Assert.IsNotNull(potato);
             }
         }
@@ -49,7 +49,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
             container.Register(typeof(Potato), (r, scope) => new Potato());
             container.Dispose();
-            Assert.Throws<ContainerException>(() => container.ResolveNonKeyedServiceFast(typeof(Potato), false));
+            Assert.Throws<ContainerException>(() => container.Resolve(typeof(Potato), false));
         }
 
         [Test]
@@ -57,9 +57,9 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var service = container.ResolveNonKeyedServiceFast(typeof(ISomeDb), false);
+            var service = container.Resolve(typeof(ISomeDb), false);
             Assert.NotNull(service);
-            Assert.AreSame(service, container.ResolveNonKeyedServiceFast(typeof(ISomeDb), false));
+            Assert.AreSame(service, container.Resolve(typeof(ISomeDb), false));
         }
 
         [Test]
@@ -78,7 +78,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<ContainerException>(
-                () => container.ResolveNonKeyedServiceFast(typeof(NotRegistered), false));
+                () => container.Resolve(typeof(NotRegistered), false));
 
             Assert.AreEqual(ex.Error, Error.UnableToResolveDefaultService);
         }
@@ -88,7 +88,7 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var nullService = container.ResolveNonKeyedServiceFast(typeof(NotRegistered), true);
+            var nullService = container.Resolve(typeof(NotRegistered), true);
 
             Assert.IsNull(nullService);
         }

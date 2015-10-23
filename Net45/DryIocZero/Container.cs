@@ -89,7 +89,7 @@ namespace DryIocZero
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
-        public object ResolveNonKeyedServiceFast(Type serviceType, bool ifUnresolvedReturnDefault)
+        public object Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             object service = null;
             if (_defaultFactories.Value.IsEmpty)
@@ -134,8 +134,8 @@ namespace DryIocZero
         /// <param name="scope">Propagated resolution scope.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         /// <remarks>
-        /// This method covers all possible resolution input parameters comparing to <see cref="ResolveNonKeyedServiceFast"/>, and
-        /// by specifying the same parameters as for <see cref="ResolveNonKeyedServiceFast"/> should return the same result.
+        /// This method covers all possible resolution input parameters comparing to <see cref="Resolve(System.Type,bool)"/>, and
+        /// by specifying the same parameters as for <see cref="Resolve(System.Type,bool)"/> should return the same result.
         /// </remarks>
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
@@ -209,7 +209,6 @@ namespace DryIocZero
             Type compositeParentRequiredType = null, RequestInfo preResolveParent = null, IScope scope = null)
         {
             serviceType = requiredServiceType ?? serviceType;
-            preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
             var manyGeneratedFactories = Enumerable.Empty<KV>();
             ResolveManyGenerated(ref manyGeneratedFactories, serviceType);
@@ -456,11 +455,11 @@ namespace DryIocZero
     /// <remarks>Resolve default and keyed is separated because of micro optimization for faster resolution.</remarks>
     public interface IResolver
     {
-        /// <summary>Resolves service from container and returns created service object.</summary>
+        /// <summary>Resolves default (non-keyed) service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
-        object ResolveNonKeyedServiceFast(Type serviceType, bool ifUnresolvedReturnDefault);
+        object Resolve(Type serviceType, bool ifUnresolvedReturnDefault);
 
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
@@ -472,8 +471,8 @@ namespace DryIocZero
         /// <param name="scope">Propagated resolution scope.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         /// <remarks>
-        /// This method covers all possible resolution input parameters comparing to <see cref="ResolveNonKeyedServiceFast"/>, and
-        /// by specifying the same parameters as for <see cref="ResolveNonKeyedServiceFast"/> should return the same result.
+        /// This method covers all possible resolution input parameters comparing to <see cref="Resolve(System.Type,bool)"/>, and
+        /// by specifying the same parameters as for <see cref="Resolve(System.Type,bool)"/> should return the same result.
         /// </remarks>
         object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, 
             RequestInfo preResolveParent, IScope scope);
@@ -609,7 +608,7 @@ namespace DryIocZero
         /// <returns>Service object or throws exception.</returns>
         public static TService Resolve<TService>(this IResolver resolver, bool ifUnresolvedReturnDefault = false)
         {
-            return (TService)resolver.ResolveNonKeyedServiceFast(typeof(TService), ifUnresolvedReturnDefault);
+            return (TService)resolver.Resolve(typeof(TService), ifUnresolvedReturnDefault);
         }
     }
 
@@ -634,13 +633,6 @@ namespace DryIocZero
         public T Swap(Func<T, T> getNewValue)
         {
             return Ref.Swap(ref _value, getNewValue);
-        }
-
-        /// <summary>Simplified version of Swap ignoring old value.</summary>
-        /// <param name="newValue">New value to set</param> <returns>Old value.</returns>
-        public T Swap(T newValue)
-        {
-            return Interlocked.Exchange(ref _value, newValue);
         }
 
         private T _value;

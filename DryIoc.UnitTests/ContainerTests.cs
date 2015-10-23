@@ -1,4 +1,5 @@
-﻿using DryIoc.UnitTests.CUT;
+﻿using System.Linq;
+using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -469,6 +470,7 @@ namespace DryIoc.UnitTests
         public void Using_ArrayTools_Append_with_mulitple_items_appendee()
         {
             var ar = new[] { 2, 1 }.Append(0, -1);
+            CollectionAssert.AreEqual(new[] { 2, 1, 0, -1 }, ar);
         }
 
         [Test]
@@ -482,5 +484,25 @@ namespace DryIoc.UnitTests
 
             Assert.AreEqual(Error.ContainerIsDisposed, ex.Error);
         }
+
+        [Test]
+        public void I_want_Verify_the_registrations_to_find_potential_errors_in_their_resolution()
+        {
+            var container = new Container();
+
+            container.Register<MyService>();
+
+            var errors = container.VerifyResolutions().ToArray();
+            Assert.AreEqual(1, errors.Length);
+            Assert.AreEqual(Error.UnableToResolveUnknownService, errors[0].Value.Error);
+            StringAssert.Contains("MyService",  errors[0].Key.ToString());
+        }
+
+        class MyService
+        {
+            public MyService(RequiredDependency d) {}
+        }
+
+        class RequiredDependency { }
     }
 }

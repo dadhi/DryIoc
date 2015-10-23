@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
@@ -143,15 +144,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 typeof(ExportConditionalObject2),
                 typeof(ExportConditionalObject3));
 
-            ImTreeMap<KV<Type, object>, Expression> resolutionsRoots;
-            ImTreeMap<RequestInfo, Expression> resolutionCallDependencies;
-            container.GenerateResolutionFactoryExpressions(out resolutionsRoots, out resolutionCallDependencies);
-            
-            var rootList = resolutionsRoots.Enumerate().ToArray();
-            Assert.AreEqual(3, rootList.Length);
+            KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
+            KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
+            container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies, ContainerTools.SetupAsResolutionRoots);
 
-            var depList = resolutionCallDependencies.Enumerate().ToArray();
-            Assert.AreEqual(2, depList.Length);
+            Assert.AreEqual(3, resolutionsRoots.Length);
+            Assert.AreEqual(2, resolutionCallDependencies.Length);
         }
 
         public class LazyUser

@@ -302,7 +302,8 @@ namespace DryIoc.UnitTests
                 container.Register(typeof(Closed<>).GetBaseType(), typeof(Closed<>)));
         }
 
-        [Test] public void Resolving_array_of_generic_implementations_should_select_only_matched_types()
+        [Test] 
+        public void Resolving_array_of_generic_implementations_should_select_only_matched_types()
         {
             var container = new Container();
             container.Register(typeof(IBlah<,>), typeof(Blah<,>));

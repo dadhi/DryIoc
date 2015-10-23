@@ -1,5 +1,5 @@
-DryIoc is small, fast, and skillful IoC Container for .NET
-==========================================================
+DryIoc is fast, small, full-featured IoC Container for .NET
+===========================================================
 
 [![Build status](https://ci.appveyor.com/api/projects/status/te0oktwwf7xx5e3k/branch/dev)](https://ci.appveyor.com/project/MaksimVolkau/dryioc-426/branch/dev)
 [![TestCoverage](http://dadhi.bitbucket.org/dryioc-coverage/badge_combined.svg)](http://dadhi.bitbucket.org/dryioc-coverage)
@@ -89,14 +89,14 @@ NuGet: `PM> Install-Package DryIocAttributes.dll`
 
 NuGet: `PM> Install-Package DryIocZero`
 
-Standalone container based upon compile-time generated factories by DryIoc. 
+Slim IoC Container based on service factory delegates __generated at compile-time__ by DryIoc. 
 
+- __Does not depend on DryIoc at run-time__
 - Ensures _zero_ application bootstrapping time associated with IoC registrations.
 - Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically - you can see how DryIoc is creating things.
 - Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
 - Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
 - Allows run-time registrations too. You may register instances and factories at run-time.
-
 
 ## Extensions
 
