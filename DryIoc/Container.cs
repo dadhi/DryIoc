@@ -320,7 +320,8 @@ namespace DryIoc
 
             // Check cache first:
             var registryValue = _registry.Value;
-            var cacheEntry = registryValue.KeyedFactoryDelegateCache.Value.GetValueOrDefault(cacheEntryKey);
+            var cacheRef = registryValue.KeyedFactoryDelegateCache;
+            var cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
             if (cacheEntry != null)
             {
                 var cachedFactoryDelegate = cacheContextKey == null
@@ -356,7 +357,9 @@ namespace DryIoc
                     cacheEntry == null ? null : cacheEntry.Key,
                     cachedContextFactories.AddOrUpdate(cacheContextKey, factoryDelegate));
 
-            registryValue.KeyedFactoryDelegateCache.Swap(cache => cache.AddOrUpdate(cacheEntryKey, cacheEntry));
+            var cacheVal = cacheRef.Value;
+            if (!cacheRef.TrySwapIfStillCurrent(cacheVal, cacheVal.AddOrUpdate(cacheEntryKey, cacheEntry)))
+                cacheRef.Swap(_ => _.AddOrUpdate(cacheEntryKey, cacheEntry));
 
             return service;
         }
@@ -381,7 +384,12 @@ namespace DryIoc
             var service = factoryDelegate(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope);
 
             if (!registryValue.Services.IsEmpty)
-                registryValue.DefaultFactoryDelegateCache.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+            {
+                var cacheRef = registryValue.DefaultFactoryDelegateCache;
+                var cacheVal = cacheRef.Value;
+                if (!cacheRef.TrySwapIfStillCurrent(cacheVal, cacheVal.AddOrUpdate(serviceType, factoryDelegate)))
+                    cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+            }
 
             return service;
         }
@@ -857,7 +865,12 @@ namespace DryIoc
         {
             var registry = _registry.Value;
             if (!registry.Services.IsEmpty)
-                registry.FactoryExpressionCache.Swap(_ => _.AddOrUpdate(factoryID, factoryExpression));
+            {
+                var cacheRef = registry.FactoryExpressionCache;
+                var cacheVal = cacheRef.Value;
+                if (!cacheRef.TrySwapIfStillCurrent(cacheVal, cacheVal.AddOrUpdate(factoryID, factoryExpression)))
+                    cacheRef.Swap(val => val.AddOrUpdate(factoryID, factoryExpression));
+            }
         }
 
         /// <summary>Searches and returns cached factory expression, or null if not found.</summary>
@@ -912,15 +925,15 @@ namespace DryIoc
         public Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
             itemType = itemType ?? (item == null ? typeof(object) : item.GetType());
-            var result = GetPrimitiveOrArrayExprOrDefault(item, itemType);
-            if (result != null)
-                return result;
+            var primitiveExpr = GetPrimitiveOrArrayExprOrDefault(item, itemType);
+            if (primitiveExpr != null)
+                return primitiveExpr;
 
             if (Rules.ItemToExpressionConverter != null)
             {
-                var expression = Rules.ItemToExpressionConverter(item, itemType);
-                if (expression != null)
-                    return expression;
+                var itemExpr = Rules.ItemToExpressionConverter(item, itemType);
+                if (itemExpr != null)
+                    return itemExpr;
             }
 
             Throw.If(throwIfStateRequired, Error.StateIsRequiredToUseItem, item);
@@ -5030,7 +5043,7 @@ namespace DryIoc
         public virtual void ThrowIfInvalidRegistration(IContainer container, Type serviceType, object serviceKey, bool isStaticallyChecked)
         {
             // Return earlier if we are on happy path: case is simple and nothing to check
-            if (isStaticallyChecked && FactoryType != FactoryType.Wrapper && 
+            if (isStaticallyChecked && FactoryType == FactoryType.Service &&
                 (Reuse != null || !(ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable))))
                 return;
 
@@ -5095,7 +5108,6 @@ namespace DryIoc
             request = request.WithResolvedFactory(this);
 
             var reuse = Reuse ?? container.Rules.DefaultReuseInsteadOfTransient;
-
             ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
 
             // Here's lookup for decorators
@@ -6280,11 +6292,6 @@ namespace DryIoc
         /// it stores only result of <paramref name="createValue"/> call.</remarks>
         object GetOrAdd(int id, CreateScopedValue createValue);
 
-        /// <summary>Gets item or null if nothing stored.</summary>
-        /// <param name="id">Id to search for.</param>
-        /// <returns>Stored item or null.</returns>
-        object GetItemOrDefault(int id);
-
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
         /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
         void SetOrAdd(int id, object item);
@@ -6331,14 +6338,6 @@ namespace DryIoc
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
             return _items.GetValueOrDefault(id) ?? TryGetOrAdd(id, createValue);
-        }
-
-        /// <summary>Gets item or null if nothing stored.</summary>
-        /// <param name="id">Id to search for.</param>
-        /// <returns>Stored item or null.</returns>
-        public object GetItemOrDefault(int id)
-        {
-            return _items.GetValueOrDefault(id);
         }
 
         private object TryGetOrAdd(int id, CreateScopedValue createValue)
@@ -6464,14 +6463,6 @@ namespace DryIoc
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
             return (id < _items.Length ? _items[id] : null) ?? TryGetOrAddToArray(id, createValue);
-        }
-
-        /// <summary>Gets item or null if nothing stored.</summary>
-        /// <param name="id">Id to search for.</param>
-        /// <returns>Stored item or null.</returns>
-        public object GetItemOrDefault(int id)
-        {
-            return id < _items.Length ? _items[id] : null;
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -7622,7 +7613,8 @@ namespace DryIoc
             InjectedCustomValueIsOfDifferentType = Of(
                 "Injected value {0} is not assignable to {2}."),
             StateIsRequiredToUseItem = Of(
-                "State is required to use (probably to inject) item {0}."),
+                "State is required to use (probably to inject) item {0}. " + Environment.NewLine + 
+                "To enable item use you may specify container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_DELEGATE))."),
             ArgOfValueIsProvidedButNoArgValues = Of(
                 "Arg.OfValue index is provided but no arg values specified."),
             ArgOfValueIndesIsOutOfProvidedArgValues = Of(
