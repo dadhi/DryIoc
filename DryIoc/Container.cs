@@ -1720,7 +1720,8 @@ namespace DryIoc
         /// <param name="container">For container</param>
         /// <param name="resolutions">Result resolution factory expressions. They could be compiled and used for actual service resolution.</param>
         /// <param name="resolutionCallDependencies">Resolution call dependencies (imlemented via Resolve call): e.g. dependencies wrapped in Lazy{T}.</param>
-        /// <param name="whatRegistrations">(optional) Allow to filter what registration to resolve. By default applies to all registrations.</param>
+        /// <param name="whatRegistrations">(optional) Allow to filter what registration to resolve. By default applies to all registrations.
+        /// You may use <see cref="SetupAsResolutionRoots"/> to generate only for registrations with <see cref="Setup.AsResolutionRoot"/>.</param>
         /// <returns>Errors happened when resolving corresponding registrations.</returns>
         public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] GenerateResolutionExpressions(this IContainer container,
             out KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutions,
@@ -1729,6 +1730,7 @@ namespace DryIoc
         {
             var generatingContainer = container.With(rules => rules
                 .WithoutEagerCachingSingletonForFasterAccess()
+                .WithoutImplicitCheckForReuseMatchingScope()
                 .WithDependencyResolutionCallExpressions());
 
             var registrations = generatingContainer.GetServiceRegistrations();
@@ -3504,10 +3506,11 @@ namespace DryIoc
             Throw.If(reuse is ResolutionScopeReuse, Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
             reuse = reuse ?? Reuse.Singleton;
 
+            var originalInstance = instance;
             var setup = Setup.Default;
             if (preventDisposal)
             {
-                instance = new[] { instance };
+                instance = new[] {instance};
                 setup = _preventDisposableInstanceSetup;
             }
             if (weaklyReferenced)
@@ -3528,7 +3531,7 @@ namespace DryIoc
 
                 // Replace the last factory
                 var factoriesList = factories.ToArray();
-                if (factoriesList.Length != 0) 
+                if (factoriesList.Length != 0)
                     factory = factoriesList[factoriesList.Length - 1].Value as InstanceFactory;
 
                 // Check Keep option here on the higher level: 
@@ -3543,9 +3546,9 @@ namespace DryIoc
 
             var canReuseAlreadyRegisteredFactory = factory != null && factory.Reuse == reuse && factory.Setup == setup;
             if (!canReuseAlreadyRegisteredFactory)
-                factory = new InstanceFactory(instance, reuse, setup);
+                factory = new InstanceFactory(originalInstance, reuse, setup);
             else
-                factory.ReplaceInstance(instance);
+                factory.ReplaceInstance(originalInstance);
 
             // Before even registering new factory (if old one is not exist or could not be reused)
             // we put instance into scope. So the factory created expression will be ignored anyway.
@@ -3553,7 +3556,7 @@ namespace DryIoc
             reuse.GetScopeOrDefault(request)
                 .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
                 .SetOrAdd(reuse.GetScopedItemIdOrSelf(factory.FactoryID, request), instance);
-
+        
             if (!canReuseAlreadyRegisteredFactory)
                 container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
         }
@@ -5035,7 +5038,7 @@ namespace DryIoc
                 if (serviceType.IsGenericDefinition() && FactoryGenerator == null)
                     Throw.It(Error.RegisteringOpenGenericRequiresFactoryProvider, serviceType);
 
-            if (Reuse == null &&
+            if (Reuse == null && 
                 (Setup.AllowDisposableTransient == false && container.Rules.ThrowOnRegisteringDisposableTransient) &&
                 FactoryType != FactoryType.Wrapper &&
                 (ImplementationType.IsAssignableTo(typeof(IDisposable)) || serviceType.IsAssignableTo(typeof(IDisposable))))
