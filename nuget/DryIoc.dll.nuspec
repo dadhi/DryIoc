@@ -17,6 +17,20 @@
             - rc1 breaking: LambdaExpression instead of FactoryExpression{T}.
             - rc1 breaking: Removed compiling factory delegates to Dynamic Assembly and whole complexity - DryIoc perf is fine without it.
         </releaseNotes>
+        <dependencies>
+          <group targetFramework="dotnet">
+            <dependency id="System.Collections" version="4.0.0" />
+            <dependency id="System.Diagnostics.Debug" version="4.0.0" />
+            <dependency id="System.Diagnostics.Tools" version="4.0.0" />
+            <dependency id="System.Linq" version="4.0.0" />
+            <dependency id="System.Linq.Expressions" version="4.0.0" />
+            <dependency id="System.Reflection" version="4.0.0" />
+            <dependency id="System.Reflection.Extensions" version="4.0.0" />
+            <dependency id="System.Runtime" version="4.0.0" />
+            <dependency id="System.Runtime.Extensions" version="4.0.0" />
+            <dependency id="System.Threading" version="4.0.0" />
+          </group>
+        </dependencies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
@@ -36,17 +50,22 @@
         <file src="..\Net45\bin\Release\DryIoc.pdb" target="lib\net45" />
         <file src="..\Net45\bin\Release\DryIoc.xml" target="lib\net45" />
 
-        <!-- PCL: Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <!-- PCL Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\PCL\bin\Release\DryIoc.dll" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL\bin\Release\DryIoc.pdb" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL\bin\Release\DryIoc.xml" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-        <!-- PCL: Profile259	.NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <!-- PCL Profile259	.NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-        <!-- tools -->
+        <!-- dotnet (PCL Profile259) https://oren.codes/2015/07/29/targeting-net-core -->
+        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\dotnet" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\dotnet" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\dotnet" />
+
+      <!-- tools -->
         <file src="..\NuGet\DryIoc.snk" target="tools" />
         <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>
