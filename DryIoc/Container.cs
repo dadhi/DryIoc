@@ -1909,7 +1909,7 @@ namespace DryIoc
         IScopeAccess Scopes { get; }
     }
 
-    /// <summary>Wraps <see cref="IContainer"/> WeakReference with more specialized exceptions on access to GCed or disposed container.</summary>
+    /// <summary>Guards access to <see cref="Container"/> WeakReference target with more DryIoc specific exceptions.</summary>
     public sealed class ContainerWeakRef : IResolverContext
     {
         /// <summary>Provides access to resolver implementation.</summary>
@@ -1925,12 +1925,13 @@ namespace DryIoc
         public ContainerWeakRef(IContainer container) { _ref = new WeakReference(container); }
 
         private readonly WeakReference _ref;
+
         private Container GetTarget()
         {
             var container = _ref.Target as Container;
-            return container.ThrowIfNull(Error.ContainerIsGarbageCollected)
-                // ReSharper disable once PossibleNullReferenceException
-                .ThrowIf(container.IsDisposed, Error.ContainerIsDisposed);
+            return container == null ? Throw.For<Container>(Error.ContainerIsGarbageCollected)
+                : container.IsDisposed ? Throw.For<Container>(Error.ContainerIsDisposed)
+                : container;
         }
     }
 
@@ -2639,9 +2640,9 @@ namespace DryIoc
         public static readonly FactoryMethodSelector ConstructorWithResolvableArguments = request =>
         {
             var implementationType = request.ImplementationType.ThrowIfNull();
-            var ctors = implementationType.GetAllConstructors().ToArrayOrSelf();
+            var ctors = implementationType.GetPublicInstanceConstructors().ToArrayOrSelf();
             if (ctors.Length == 0)
-                return null; // Delegate handling of constructor absence to caller code.
+                return null; // Delegate handling of constructor absence to the Caller code.
             if (ctors.Length == 1)
                 return Of(ctors[0]);
 
@@ -5601,7 +5602,7 @@ namespace DryIoc
 
             if (Made.FactoryMethod == null && container.Rules.FactoryMethod == null)
             {
-                var publicCounstructorCount = _implementationType.GetAllConstructors().Count();
+                var publicCounstructorCount = _implementationType.GetPublicInstanceConstructors().Count();
                 if (publicCounstructorCount != 1)
                     Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, _implementationType, publicCounstructorCount);
             }
@@ -6002,28 +6003,27 @@ namespace DryIoc
         {
             var implType = _implementationType;
             var factoryMethodSelector = Made.FactoryMethod ?? request.Container.Rules.FactoryMethod;
-            if (factoryMethodSelector != null)
+            if (factoryMethodSelector == null)
             {
-                var factoryMethod = factoryMethodSelector(request);
-                if (factoryMethod != null && !(factoryMethod.ConstructorOrMethodOrMember is ConstructorInfo))
-                {
-                    var member = factoryMethod.ConstructorOrMethodOrMember;
-                    var isStaticMember = member.IsStatic();
-
-                    Throw.If(isStaticMember && factoryMethod.FactoryServiceInfo != null,
-                        Error.FactoryObjProvidedButMethodIsStatic, factoryMethod.FactoryServiceInfo, factoryMethod, request);
-
-                    Throw.If(!isStaticMember && factoryMethod.FactoryServiceInfo == null,
-                        Error.FactoryObjIsNullInFactoryMethod, factoryMethod, request);
-                }
-
-                return factoryMethod.ThrowIfNull(Error.UnableToGetConstructorFromSelector, implType);
+                var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
+                Debug.Assert(ctors.Length == 1);
+                return FactoryMethod.Of(ctors[0]);
             }
 
-            var ctors = implType.GetAllConstructors().ToArrayOrSelf();
-            Throw.If(ctors.Length == 0, Error.NoPublicConstructorDefined, implType);
-            Throw.If(ctors.Length > 1, Error.UnableToSelectConstructor, ctors.Length, implType);
-            return FactoryMethod.Of(ctors[0]);
+            var factoryMethod = factoryMethodSelector(request);
+            if (factoryMethod != null && !(factoryMethod.ConstructorOrMethodOrMember is ConstructorInfo))
+            {
+                var member = factoryMethod.ConstructorOrMethodOrMember;
+                var isStaticMember = member.IsStatic();
+
+                Throw.If(isStaticMember && factoryMethod.FactoryServiceInfo != null,
+                    Error.FactoryObjProvidedButMethodIsStatic, factoryMethod.FactoryServiceInfo, factoryMethod, request);
+
+                Throw.If(!isStaticMember && factoryMethod.FactoryServiceInfo == null,
+                    Error.FactoryObjIsNullInFactoryMethod, factoryMethod, request);
+            }
+
+            return factoryMethod.ThrowIfNull(Error.UnableToGetConstructorFromSelector, implType);
         }
 
         private Expression InitPropertiesAndFields(NewExpression newServiceExpr, Request request)
@@ -6353,7 +6353,11 @@ namespace DryIoc
                 item = createValue();
             }
 
-            Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
+            var items = _items;
+            var newItems = items.AddOrUpdate(id, item);
+            // if _items were not changed so far then use them, otherwise (if changed) do ref swap;
+            if (Interlocked.CompareExchange(ref _items, newItems, items) != items)
+                Ref.Swap(ref _items, _ => _.AddOrUpdate(id, item));
             return item;
         }
 
@@ -6533,7 +6537,11 @@ namespace DryIoc
                 item = createValue();
             }
 
-            Ref.Swap(ref _items, items => { items[itemIndex] = item; return items; });
+            var items = _items;
+            items[itemIndex] = item;
+            // if _items were not changed so far then use them, otherwise (if changed) do ref swap;
+            if (Interlocked.CompareExchange(ref _items, items, items) != items)
+                Ref.Swap(ref _items, _ => { _[itemIndex] = item; return _; });
             return item;
         }
 
@@ -7028,7 +7036,7 @@ namespace DryIoc
         public override int GetHashCode()
         {
             var hash = 0;
-            for (var i = this; i != Empty; i = i.Parent)
+            for (var i = this; !i.IsEmpty; i = i.Parent)
             {
                 var currentHash = i.ServiceType.GetHashCode();
                 if (i.RequiredServiceType != null)
@@ -8074,6 +8082,13 @@ namespace DryIoc
             var baseType = typeInfo.BaseType;
             return baseType == null || baseType == typeof(object) ? declared
                 : declared.Concat(baseType.GetDeclaredAndBase(getDeclared));
+        }
+
+        /// <summary>Returns all public instance constructors for the type</summary> 
+        /// <param name="type"></param> <returns></returns>
+        public static IEnumerable<ConstructorInfo> GetPublicInstanceConstructors(this Type type)
+        {
+            return type.GetTypeInfo().DeclaredConstructors.Where(c => c.IsPublic && !c.IsStatic);
         }
 
         /// <summary>Enumerates all constructors from input type.</summary>

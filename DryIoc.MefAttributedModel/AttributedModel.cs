@@ -171,12 +171,12 @@ namespace DryIoc.MefAttributedModel
 
         private static FactoryMethod GetImportingConstructor(Request request)
         {
-            var implementationType = request.ImplementationType;
-            var constructors = implementationType.GetAllConstructors().ToArrayOrSelf();
-            var constructor = constructors.Length == 1 ? constructors[0]
-                : constructors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
-                    .ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implementationType);
-            return FactoryMethod.Of(constructor);
+            var implType = request.ImplementationType;
+            var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
+            var ctor = ctors.Length == 1 ? ctors[0]
+                : ctors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
+                    .ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType);
+            return FactoryMethod.Of(ctor);
         }
 
         private static Func<ParameterInfo, ParameterServiceInfo> GetImportedParameter(Request request)
