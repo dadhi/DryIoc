@@ -18,17 +18,17 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 [v2.0]: https://bitbucket.org/dadhi/dryioc/wiki/Home
 
 * Designed for low-ceremony use, performance, and extensibility.
-* Supports .NET PCL, 3.5, 4.0, 4.5.
+* Supports .NET 3.5+; PCL Profiles 259 and 328, [.NET Core via "dotnet"](https://oren.codes/2015/07/29/targeting-net-core)
 * [Documentation wiki][WikiHome]
 * [Contributing guide](CONTRIBUTING.md)
 * Available at NuGet as [DryIoc.dll] or source [DryIoc] (_in NuGet < 3.0_)
-* __DryIoc v2.0-rc3__ is the latest: `PM> Install-Package DryIoc.dll -Pre`
-    * [What's New](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-versions)
+* __DryIoc v2.0-rc4__ is the latest: `PM> Install-Package DryIoc.dll -Pre`
+    * [release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-versions)
 * __DryIoc v1.4.1__ is stable: `PM> Install-Package DryIoc.dll`
 
 ## Benchmarks
 * [Performance](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
-* [Features](http://featuretests.apphb.com/DependencyInjection.html)
+* [Features (V2)](http://featuretests.apphb.com/DependencyInjection.html)
 
 ## Performance
 * General use-cases optimized for max speed.
@@ -79,7 +79,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 ### __DryIocAttributes__
 
-NuGet: `PM> Install-Package DryIocAttributes.dll`
+NuGet: `PM> Install-Package DryIocAttributes.dll -Pre`
 
 - Extends [MEF](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) attributes to cover DryIoc features: metadata, advanced reuses, context based registration, decorators, etc.
 - Does not depend on DryIoc and may be used by other IoC frameworks. 
@@ -87,7 +87,7 @@ NuGet: `PM> Install-Package DryIocAttributes.dll`
 
 ### DryIocZero
 
-NuGet: `PM> Install-Package DryIocZero`
+NuGet: `PM> Install-Package DryIocZero -Pre`
 
 Slim IoC Container based on service factory delegates __generated at compile-time__ by DryIoc. 
 

@@ -11,11 +11,25 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-            - rc1 breaking: No scope context by default! - ambient scope context should be explicitly specified for Container.
-            - rc1 breaking: No more OpenScopeWithoutContext - use OpenScope without specifying scope context, which is default.
-            - rc1 breaking: No more ReuseRecyclable wrapper - use IfAlreadyRegistered.Replace instead.
-            - rc1 breaking: LambdaExpression instead of FactoryExpression{T}.
-            - rc1 breaking: Removed compiling factory delegates to Dynamic Assembly and whole complexity - DryIoc perf is fine without it.
+            - Support for [PCL](http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx) and [.NET Core](https://oren.codes/2015/07/29/targeting-net-core).
+            - More consistent and complete API.
+            - Diagnose potential resolution problems with `container.VerifyResolutions()`.
+            - Possible compile-time factory delegate generation. Utilized by [DryIocZero](Companions/DryIocZero).
+            - Ambient current scope and `Reuse.InWebRequest` for ASP.NET integration.
+            - Support for static and instance factory methods in addition to constructor. It means support for method parameters injection.
+            - Batch registration from assemblies and type collections with `RegisterMany`.
+            - Service key of arbitrary type. The only requirement for key type is to implement `GetHashCode` and `Equals`.
+            - Resolve as `KeyValuePair` to get service key with service object.
+            - Register with condition for resolution.
+            - Required service type support: e.g. `var serviceObjects = c.Resolve{object[]}(typeof(Service));`.
+            - Optional parameters support.
+            - Fine-grained control over injection of parameters, properties, and fields.
+            - Injection of primitive values.
+            - Control how reused service is stored and disposed via `weaklyReferenced` and `preventDisposal` setups.
+            - Resolve service collection as `IList{T}`, `ICollection{T}`, `IReadOnlyList{T}`, `IReadOnlyCollection{T}`.
+            - Register once, existing registration update, unregister.
+            - Explicit cache management.
+            - __removed:__ Compilation to DynamicAssembly. DryIoc is fast enough without its complexity.
         </releaseNotes>
     </metadata>
     <files>
