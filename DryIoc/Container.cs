@@ -210,8 +210,6 @@ namespace DryIoc
         public static readonly ParameterExpression ResolutionScopeParamExpr =
             Expression.Parameter(typeof(IScope), "scope");
 
-        internal static readonly ParameterExpression[] FactoryDelegateParamsExpr = { StateParamExpr, ResolverContextParamExpr, ResolutionScopeParamExpr };
-
         internal static Expression GetResolutionScopeExpression(Request request)
         {
             if (request.Scope != null)
@@ -254,7 +252,7 @@ namespace DryIoc
         public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered, bool isStaticallyChecked)
         {
             ThrowIfContainerDisposed();
-            factory.ThrowIfNull().ThrowIfInvalidRegistration(this, serviceType.ThrowIfNull(), serviceKey, isStaticallyChecked);
+            ThrowIfInvalidRegistration(factory, serviceType, serviceKey, isStaticallyChecked);
 
             // Improves performance a bit by attempt to swapping registry while it is still unchanged, 
             // if attempt fails then fallback to normal Swap with retry. 
@@ -262,6 +260,93 @@ namespace DryIoc
             var currentRegistry = registry;
             if (!_registry.TrySwapIfStillCurrent(currentRegistry, currentRegistry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
                 _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered, serviceKey));
+        }
+
+        private void ThrowIfInvalidRegistration(Factory factory, Type serviceType, object serviceKey, bool isStaticallyChecked)
+        {
+            if (!isStaticallyChecked)
+            {
+                serviceType.ThrowIfNull();
+                factory.ThrowIfNull();
+            }
+            
+            var setup = factory.Setup;
+            if (setup.FactoryType != FactoryType.Wrapper)
+            {
+                if (factory.Reuse == null && (factory.ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable)) &&
+                    (setup.AllowDisposableTransient == false && Rules.ThrowOnRegisteringDisposableTransient))
+                    Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType,
+                        serviceKey ?? "{no key}", this);
+            }
+            else if (serviceType.IsGeneric() && !((Setup.WrapperSetup)setup).AlwaysWrapsRequiredServiceType)
+            {
+                var typeArgCount = serviceType.GetGenericParamsAndArgs().Length;
+                var typeArgIndex = ((Setup.WrapperSetup)setup).WrappedServiceTypeArgIndex;
+                Throw.If(typeArgCount > 1 && typeArgIndex == -1,
+                    Error.GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex, serviceType);
+                var index = typeArgIndex != -1 ? typeArgIndex : 0;
+                Throw.If(index > typeArgCount - 1,
+                    Error.GenericWrapperTypeArgIndexOutOfBounds, serviceType, index);
+            }
+
+            var reflectionFactory = factory as ReflectionFactory;
+            if (reflectionFactory != null)
+            {
+                if (reflectionFactory.Made.FactoryMethod == null && Rules.FactoryMethod == null)
+                {
+                    var publicCounstructorCount = reflectionFactory.ImplementationType.GetPublicInstanceConstructors().Count();
+                    if (publicCounstructorCount != 1)
+                        Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, reflectionFactory.ImplementationType, publicCounstructorCount);
+                }
+
+                if (!isStaticallyChecked && 
+                    reflectionFactory.ImplementationType != null)
+                {
+                    var implType = reflectionFactory.ImplementationType;
+                    if (!implType.IsGenericDefinition())
+                    {
+                        if (implType.IsOpenGeneric())
+                            Throw.It(Error.RegisteringNotAGenericTypedefImplType,
+                                implType, implType.GetGenericDefinitionOrNull());
+
+                        if (implType != serviceType && serviceType != typeof(object) &&
+                            Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1)
+                            Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
+                    }
+                    else if (implType != serviceType)
+                    {
+                        // Validate that service type able to supply all type parameters to open-generic implementation type.
+                        if (serviceType.IsGenericDefinition())
+                        {
+                            var implTypeParams = implType.GetGenericParamsAndArgs();
+                            var implementedTypes = implType.GetImplementedTypes();
+
+                            var implementedTypeFound = false;
+                            var containsAllTypeParams = false;
+                            for (var i = 0; !containsAllTypeParams && i < implementedTypes.Length; ++i)
+                            {
+                                var implementedType = implementedTypes[i];
+                                implementedTypeFound = implementedType.GetGenericDefinitionOrNull() == serviceType;
+                                containsAllTypeParams = implementedTypeFound &&
+                                    implementedType.ContainsAllGenericTypeParameters(implTypeParams);
+                            }
+
+                            if (!implementedTypeFound)
+                                Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
+
+                            if (!containsAllTypeParams)
+                                Throw.It(Error.RegisteringOpenGenericServiceWithMissingTypeArgs,
+                                    implType, serviceType,
+                                    implementedTypes.Where(t => t.GetGenericDefinitionOrNull() == serviceType));
+                        }
+                        else if (implType.IsGeneric() && serviceType.IsOpenGeneric())
+                            Throw.It(Error.RegisteringNotAGenericTypedefServiceType,
+                                serviceType, serviceType.GetGenericDefinitionOrNull());
+                        else
+                            Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
+                    }
+                }
+            }
         }
 
         /// <summary>Returns true if there is registered factory with the service type and key.
@@ -1096,11 +1181,7 @@ namespace DryIoc
                         var factoriesEntry = entry as FactoriesEntry;
                         if (factoriesEntry != null && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null ||
                             entry is Factory && !DefaultKey.Value.Equals(serviceKey))
-                        {
-                            var openGenericEntry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
-                            if (openGenericEntry != null)
-                                entry = openGenericEntry;
-                        }
+                            entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) ?? entry;
                     }
                 }
             }
@@ -1111,12 +1192,14 @@ namespace DryIoc
             var singleFactory = entry as Factory;
             if (factorySelector != null)
             {
-                var allFactories = singleFactory != null
-                    ? new[] { new KeyValuePair<object, Factory>(DefaultKey.Value, singleFactory) }
-                    : ((FactoriesEntry)entry).Factories.Enumerate()
-                        .Where(f => f.Value.CheckCondition(request))
-                        .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
-                        .ToArray();
+                if (singleFactory != null)
+                    return !singleFactory.CheckCondition(request) ? null
+                        : factorySelector(request, new[] {new KeyValuePair<object, Factory>(DefaultKey.Value, singleFactory) });
+
+                var allFactories = ((FactoriesEntry)entry).Factories.Enumerate()
+                    .Where(f => f.Value.CheckCondition(request))
+                    .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
+                    .ToArray();
                 return factorySelector(request, allFactories);
             }
 
@@ -1138,11 +1221,9 @@ namespace DryIoc
             if (defaultFactories.Length == 1)
             {
                 var defaultFactory = defaultFactories[0];
-
                 // NOTE: For resolution root sets correct default key to be used in delegate cache.
                 if (request.IsResolutionCall)
                     request.ChangeServiceKey(defaultFactory.Key);
-
                 return defaultFactory.Value;
             }
 
@@ -1947,19 +2028,13 @@ namespace DryIoc
     public delegate object FactoryDelegate(object[] state, IResolverContext r, IScope scope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
-    public static partial class FactoryCompiler
+    public static class FactoryCompiler
     {
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
         public static Expression<FactoryDelegate> WrapInFactoryExpression(this Expression expression)
         {
-            // Optimize expression by:
-            // - removing not required Convert from expression root, because CompiledFactory result still be converted at the end.
-            if (expression.NodeType == ExpressionType.Convert)
-                expression = ((UnaryExpression)expression).Operand;
-            if (expression.Type.IsValueType())
-                expression = Expression.Convert(expression, typeof(object));
-            return Expression.Lambda<FactoryDelegate>(expression, Container.FactoryDelegateParamsExpr);
+            return Expression.Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamsExpr);
         }
 
         /// <summary>First wraps the input service creation expression into lambda expression and
@@ -1967,15 +2042,36 @@ namespace DryIoc
         /// By default it is using Expression.Compile but if corresponding rule specified (available on .Net 4.0 and higher),
         /// it will compile to DymanicMethod/Assembly.</summary>
         /// <param name="expression">Service expression (body) to wrap.</param>
-        /// <param name="rules">Specify requirement to compile expression to DynamicAssembly (available on .Net 4.0 and higher).</param>
+        /// <param name="container">To access container state that may be required for compilation.</param>
         /// <returns>Compiled factory delegate to use for service resolution.</returns>
-        public static FactoryDelegate CompileToDelegate(this Expression expression, Rules rules)
+        public static FactoryDelegate CompileToDelegate(this Expression expression, IContainer container)
         {
-            var factoryExpression = expression.WrapInFactoryExpression();
-            var factoryDelegate = factoryExpression.Compile();
-            //System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(factoryDelegate.Method.MethodHandle);
-            return factoryDelegate;
+            expression = OptimizeExpression(expression);
+            if (expression.NodeType == ExpressionType.ArrayIndex)
+            {
+                var arrayIndexExpr = (BinaryExpression)expression;
+                if (arrayIndexExpr.Left.NodeType == ExpressionType.Parameter)
+                {
+                    var index = (int)((ConstantExpression)arrayIndexExpr.Right).Value;
+                    var value = container.ResolutionStateCache[index];
+                    return (state, context, scope) => value;
+                }
+            }
+
+            return Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
         }
+
+        private static Expression OptimizeExpression(Expression expression)
+        {
+            if (expression.NodeType == ExpressionType.Convert)
+                expression = ((UnaryExpression)expression).Operand;
+            else if (expression.Type.IsValueType())
+                expression = Expression.Convert(expression, typeof(object));
+            return expression;
+        }
+
+        private static readonly ParameterExpression[] _factoryDelegateParamsExpr = 
+            { Container.StateParamExpr, Container.ResolverContextParamExpr, Container.ResolutionScopeParamExpr };
     }
 
     /// <summary>Adds to Container support for:
@@ -3483,6 +3579,8 @@ namespace DryIoc
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null)
         {
+            if (serviceType.IsOpenGeneric())
+                Throw.It(Error.RegisteringOpenGenericRequiresFactoryProvider, serviceType);
             Func<IResolver, object> checkedDelegate = r => factoryDelegate(r)
                 .ThrowIfNotOf(serviceType, Error.RegedFactoryDlgResultNotOfServiceType, r);
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
@@ -5036,42 +5134,6 @@ namespace DryIoc
             return true;
         }
 
-        /// <summary>Validates that factory is OK for registered service type.</summary>
-        /// <param name="container">Container to register factory in.</param>
-        /// <param name="serviceType">Service type to register factory for.</param>
-        /// <param name="serviceKey">Service key to register factory with.</param>
-        /// <param name="isStaticallyChecked">Skips service type check. Means that service and implementation are statically checked.</param>
-        public virtual void ThrowIfInvalidRegistration(IContainer container, Type serviceType, object serviceKey, bool isStaticallyChecked)
-        {
-            // Return earlier if we are on happy path: case is simple and nothing to check
-            if (isStaticallyChecked && FactoryType == FactoryType.Service &&
-                (Reuse != null || !(ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable))))
-                return;
-
-            if (!isStaticallyChecked)
-                if (serviceType.IsGenericDefinition() && FactoryGenerator == null)
-                    Throw.It(Error.RegisteringOpenGenericRequiresFactoryProvider, serviceType);
-
-            if (Reuse == null && 
-                (Setup.AllowDisposableTransient == false && container.Rules.ThrowOnRegisteringDisposableTransient) &&
-                FactoryType != FactoryType.Wrapper &&
-                (ImplementationType.IsAssignableTo(typeof(IDisposable)) || serviceType.IsAssignableTo(typeof(IDisposable))))
-                Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer,
-                    serviceType, serviceKey ?? "{no key}", this);
-
-            if (Setup.FactoryType == FactoryType.Wrapper && serviceType.IsGeneric() &&
-                ((Setup.WrapperSetup)Setup).AlwaysWrapsRequiredServiceType == false)
-            {
-                var typeArgIndex = ((Setup.WrapperSetup)Setup).WrappedServiceTypeArgIndex;
-                var typeArgCount = serviceType.GetGenericParamsAndArgs().Length;
-                Throw.If(typeArgCount > 1 && typeArgIndex == -1,
-                    Error.GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex, serviceType);
-                var index = typeArgIndex != -1 ? typeArgIndex : 0;
-                Throw.If(index > typeArgCount - 1,
-                    Error.GenericWrapperTypeArgIndexOutOfBounds, serviceType, index);
-            }
-        }
-
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
         /// If <paramref name="request"/> has <see cref="Request.FuncArgs"/> specified, they could be used in expression.</summary>
         /// <param name="request">Service request.</param>
@@ -5177,7 +5239,7 @@ namespace DryIoc
         public virtual FactoryDelegate GetDelegateOrDefault(Request request)
         {
             var expression = GetExpressionOrDefault(request);
-            return expression == null ? null : expression.CompileToDelegate(request.Container.Rules);
+            return expression == null ? null : expression.CompileToDelegate(request.Container);
         }
 
         /// <summary>Returns nice string representation of factory.</summary>
@@ -5247,7 +5309,7 @@ namespace DryIoc
 
         private Expression CreateSingletonAndGetExpressionOrDefault(Expression serviceExpr, Request request)
         {
-            var factoryDelegate = serviceExpr.CompileToDelegate(request.Container.Rules);
+            var factoryDelegate = serviceExpr.CompileToDelegate(request.Container);
             var scope = request.Scopes.SingletonScope;
             var scopedInstanceId = scope.GetScopedItemIdOrSelf(FactoryID);
 
@@ -5541,71 +5603,6 @@ namespace DryIoc
                 _factoryGenerator = new ClosedGenericFactoryGenerator(this);
 
             _implementationType = ValidateAndNormalizeImplementationType(implementationType);
-        }
-
-        /// <summary>Before registering factory checks that ImplementationType is assignable, Or
-        /// in case of open generics, compatible with <paramref name="serviceType"/>. 
-        /// Then checks that there is defined constructor selector for implementation type with multiple/no constructors.</summary>
-        /// <param name="container">Container to register factory in.</param>
-        /// <param name="serviceType">Service type to register factory with.</param>
-        /// <param name="serviceKey">(ignored)</param>
-        /// <param name="isStaticallyChecked">Skips service type check. Means that service and implementation are statically checked.</param>
-        public override void ThrowIfInvalidRegistration(IContainer container, Type serviceType, object serviceKey, bool isStaticallyChecked)
-        {
-            base.ThrowIfInvalidRegistration(container, serviceType, serviceKey, isStaticallyChecked);
-
-            if (!isStaticallyChecked && _implementationType != null)
-            {
-                var implType = _implementationType;
-                if (!implType.IsGenericDefinition())
-                {
-                    if (implType.IsOpenGeneric())
-                        Throw.It(Error.RegisteringNotAGenericTypedefImplType,
-                            implType, implType.GetGenericDefinitionOrNull());
-
-                    if (implType != serviceType && serviceType != typeof(object) &&
-                        Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1)
-                        Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
-                }
-                else if (implType != serviceType)
-                {
-                    if (serviceType.IsGenericDefinition())
-                    {
-                        var implTypeParams = implType.GetGenericParamsAndArgs();
-                        var implementedTypes = implType.GetImplementedTypes();
-
-                        var implementedTypeFound = false;
-                        var containsAllTypeParams = false;
-                        for (var i = 0; !containsAllTypeParams && i < implementedTypes.Length; ++i)
-                        {
-                            var implementedType = implementedTypes[i];
-                            implementedTypeFound = implementedType.GetGenericDefinitionOrNull() == serviceType;
-                            containsAllTypeParams = implementedTypeFound &&
-                                implementedType.ContainsAllGenericTypeParameters(implTypeParams);
-                        }
-
-                        if (!implementedTypeFound)
-                            Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
-
-                        if (!containsAllTypeParams)
-                            Throw.It(Error.RegisteringOpenGenericServiceWithMissingTypeArgs,
-                                implType, serviceType,
-                                implementedTypes.Where(t => t.GetGenericDefinitionOrNull() == serviceType));
-                    }
-                    else if (implType.IsGeneric() && serviceType.IsOpenGeneric())
-                        Throw.It(Error.RegisteringNotAGenericTypedefServiceType,
-                            serviceType, serviceType.GetGenericDefinitionOrNull());
-                    else
-                        Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
-                }
-            }
-
-            if (Made.FactoryMethod == null && container.Rules.FactoryMethod == null)
-            {
-                var publicCounstructorCount = _implementationType.GetPublicInstanceConstructors().Count();
-                if (publicCounstructorCount != 1)
-                    Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, _implementationType, publicCounstructorCount);
-            }
         }
 
         /// <summary>Add to base rules: do not cache if Made is context based.</summary>
@@ -7500,7 +7497,8 @@ namespace DryIoc
             RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType = Of(
                 "Registered factory method return type {1} should be assignable to implementation type {0} but it is not."),
             RegisteringOpenGenericRequiresFactoryProvider = Of(
-                "Unable to register not a factory provider (probably delegate factory) for open-generic service {0}."),
+                "Unable to register delegate factory for open-generic service {0}." + Environment.NewLine +
+                "You need to specify concrete (closed) service type returned by delegate."),
             RegisteringOpenGenericImplWithNonGenericService = Of(
                 "Unable to register open-generic implementation {0} with non-generic service {1}."),
             RegisteringOpenGenericServiceWithMissingTypeArgs = Of(
