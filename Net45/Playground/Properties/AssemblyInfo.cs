@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 
-[assembly: AssemblyTitle("DryIoc")]
-[assembly: AssemblyDescription("DryIoc is small, fast, capable IoC container.")]
+[assembly: AssemblyTitle("Playground")]
+[assembly: AssemblyDescription("Benchmarks, sandbox for experiments.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc")]
