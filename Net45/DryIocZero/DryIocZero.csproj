@@ -61,13 +61,6 @@
       <Project>{e210b3d9-29c8-46f5-8968-09a0e5857158}</Project>
       <Name>DryIoc.MefAttributedModel.UnitTests.CUT</Name>
     </ProjectReference>
-    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
-      <Project>{9fb3bbb2-30a6-4b67-9af7-ffc152920e49}</Project>
-      <Name>DryIocAttributes</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <None Include="YourServiceRegistrations.tt.include" />

@@ -25,7 +25,7 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.0.0-rc3build335\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.0.0\lib\net45\DryIoc.dll" #>
 <#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
@@ -61,7 +61,6 @@ var deps = resolutionCallDependencies.Select((r, i) =>
 using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;
-using DryIoc; // namespace defined in DryIocZero to access shared DryIoc definitions
 
 namespace DryIocZero
 {
@@ -183,7 +182,7 @@ end of exception list
             foreach (var factory in rootGroup)
             {
 #>
-                yield return new KV(<#= factory.ServiceKey #>, (StatelessFactoryDelegate)Create_<#= factory.Index #>);
+                yield return new KV(<#= factory.ServiceKey #>, (FactoryDelegate)Create_<#= factory.Index #>);
 <#
             }
 #>
@@ -198,6 +197,7 @@ end of exception list
     foreach (var root in roots)
     {
 #>
+		// <#= root.ServiceType #>
         internal static object Create_<#=root.Index#>(IResolverContext r, IScope scope)
         {
             return <#= root.Expression #>;
@@ -210,6 +210,7 @@ end of exception list
     foreach (var dep in deps)
     {
 #>
+		// <#= dep.ServiceType #>
         internal static object CreateDependency_<#=dep.Index#>(IResolverContext r, IScope scope)
         {
             return <#= dep.Expression #>;

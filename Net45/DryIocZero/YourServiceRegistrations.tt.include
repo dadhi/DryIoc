@@ -9,11 +9,13 @@
 // implementation below is just an EXAMPLE!
 //===========================================
 #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.2.0.0-rc3build335\lib\net45\DryIocAttributes.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0-rc3build335\lib\net45\DryIoc.MefAttributedModel.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.2.0.0\lib\net45\DryIocAttributes.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0\lib\net45\DryIoc.MefAttributedModel.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
+
 <#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
+
 <#+
 IContainer GetContainerWithRegistrations()
 {

@@ -105,7 +105,7 @@ namespace DryIocZero
             if (factory == null)
                 ResolveGenerated(ref service, serviceType, scope);
             else
-                service = ((StatelessFactoryDelegate)factory)(this, scope);
+                service = ((FactoryDelegate)factory)(this, scope);
             return service ?? Throw.If(!ifUnresolvedReturnDefault,
                 Error.UnableToResolveDefaultService, serviceType, factories.IsEmpty ? string.Empty : "non-");
         }
@@ -171,7 +171,7 @@ namespace DryIocZero
                 var factories = (ImTreeMap)keyedFactories;
                 var factory = factories.GetValueOrDefault(serviceKey);
                 if (factory != null)
-                    return ((StatelessFactoryDelegate)factory)(this, scope);
+                    return ((FactoryDelegate)factory)(this, scope);
             }
 
             // If not resolved from runtime registration then try resolve generated
@@ -216,14 +216,14 @@ namespace DryIocZero
                 manyGeneratedFactories = manyGeneratedFactories.Where(kv => !compositeParentKey.Equals(kv.Key));
 
             foreach (var generated in manyGeneratedFactories)
-                yield return ((StatelessFactoryDelegate)generated.Value)(this, scope);
+                yield return ((FactoryDelegate)generated.Value)(this, scope);
 
             var factories = _keyedFactories.Value.GetValueOrDefault(serviceType) as ImTreeMap;
             if (factories != null)
             {
                 if (serviceKey != null)
                 {
-                    var factoryDelegate = factories.GetValueOrDefault(serviceKey) as StatelessFactoryDelegate;
+                    var factoryDelegate = factories.GetValueOrDefault(serviceKey) as FactoryDelegate;
                     if (factoryDelegate != null)
                         yield return factoryDelegate(this, scope);
                 }
@@ -231,12 +231,12 @@ namespace DryIocZero
                 {
                     foreach (var resolution in factories.Enumerate())
                         if (compositeParentKey == null || !compositeParentKey.Equals(resolution.Key))
-                            yield return ((StatelessFactoryDelegate)resolution.Value)(this, scope);
+                            yield return ((FactoryDelegate)resolution.Value)(this, scope);
                 }
             }
             else
             {
-                var factoryDelegate = _defaultFactories.Value.GetValueOrDefault(serviceType) as StatelessFactoryDelegate;
+                var factoryDelegate = _defaultFactories.Value.GetValueOrDefault(serviceType) as FactoryDelegate;
                 if (factoryDelegate != null)
                     yield return factoryDelegate(this, scope);
             }
@@ -248,7 +248,7 @@ namespace DryIocZero
 
         /// <summary>Registers factory delegate with corresponding service type.</summary>
         /// <param name="serviceType">Type</param> <param name="factoryDelegate">Delegate</param>
-        public void Register(Type serviceType, StatelessFactoryDelegate factoryDelegate)
+        public void Register(Type serviceType, FactoryDelegate factoryDelegate)
         {
             ThrowIfContainerDisposed();
             _defaultFactories.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
@@ -256,7 +256,7 @@ namespace DryIocZero
 
         /// <summary>Registers factory delegate with corresponding service type and service key.</summary>
         /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param> <param name="factoryDelegate">Delegate</param>
-        public void Register(Type serviceType, object serviceKey, StatelessFactoryDelegate factoryDelegate)
+        public void Register(Type serviceType, object serviceKey, FactoryDelegate factoryDelegate)
         {
             ThrowIfContainerDisposed();
             _keyedFactories.Swap(_ =>
@@ -541,18 +541,18 @@ namespace DryIocZero
     /// <param name="r">Provides access to <see cref="IResolver"/> to enable dynamic dependency resolution inside factory delegate.</param>
     /// <param name="scope">Resolution scope parameter. May be null to enable on demand scope creation inside factory delegate.</param>
     /// <returns>Created service object.</returns>
-    public delegate object StatelessFactoryDelegate(IResolverContext r, IScope scope);
+    public delegate object FactoryDelegate(IResolverContext r, IScope scope);
 
     /// <summary>Provides methods to register default or keyed factory delegates.</summary>
     public interface IFactoryDelegateRegistrator
     {
         /// <summary>Registers factory delegate with corresponding service type.</summary>
         /// <param name="serviceType">Type</param> <param name="factoryDelegate">Delegate</param>
-        void Register(Type serviceType, StatelessFactoryDelegate factoryDelegate);
+        void Register(Type serviceType, FactoryDelegate factoryDelegate);
 
         /// <summary>Registers factory delegate with corresponding service type and service key.</summary>
         /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param> <param name="factoryDelegate">Delegate</param>
-        void Register(Type serviceType, object serviceKey, StatelessFactoryDelegate factoryDelegate);
+        void Register(Type serviceType, object serviceKey, FactoryDelegate factoryDelegate);
     }
 
     /// <summary>Delegate to get new scope from old/existing current scope.</summary>
@@ -1577,7 +1577,7 @@ namespace DryIocZero
         public override int GetHashCode()
         {
             var hash = 0;
-            for (var i = this; i != Empty; i = i.Parent)
+            for (var i = this; !i.IsEmpty; i = i.Parent)
             {
                 var currentHash = i.ServiceType.GetHashCode();
                 if (i.RequiredServiceType != null)
