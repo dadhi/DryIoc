@@ -250,12 +250,13 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             ThrowIfInvalidRegistration(factory, serviceType, serviceKey, isStaticallyChecked);
 
-            // Improves performance a bit by attempt to swapping registry while it is still unchanged, 
+            // Improves performance a bit by attempting to swap registry while it is still unchanged, 
             // if attempt fails then fallback to normal Swap with retry. 
             var registry = _registry.Value;
             var currentRegistry = registry;
             if (!_registry.TrySwapIfStillCurrent(currentRegistry, currentRegistry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
                 _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered, serviceKey));
+            _defaultFactoryDelegateCache = _registry.Value.DefaultFactoryDelegateCache.Value;
         }
 
         private void ThrowIfInvalidRegistration(Factory factory, Type serviceType, object serviceKey, bool isStaticallyChecked)
@@ -371,6 +372,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             _registry.Swap(r => r.Unregister(factoryType, serviceType, serviceKey, condition));
+            _defaultFactoryDelegateCache = _registry.Value.DefaultFactoryDelegateCache.Value;
         }
 
         #endregion
@@ -379,7 +381,7 @@ namespace DryIoc
 
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
-            var factoryDelegate = _registry.Value.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+            var factoryDelegate = _defaultFactoryDelegateCache.GetValueOrDefault(serviceType);
             return factoryDelegate != null 
                 ? factoryDelegate(_containerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
@@ -472,6 +474,7 @@ namespace DryIoc
                 var cacheVal = cacheRef.Value;
                 if (!cacheRef.TrySwapIfStillCurrent(cacheVal, cacheVal.AddOrUpdate(serviceType, factoryDelegate)))
                     cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+                _defaultFactoryDelegateCache = cacheRef.Value; // store shortcut to the cache.
             }
 
             return service;
@@ -1207,6 +1210,8 @@ namespace DryIoc
         private readonly IScope _openedScope;
         private readonly IScopeContext _scopeContext;
 
+        private ImTreeMap<Type, FactoryDelegate> _defaultFactoryDelegateCache;
+
         private sealed class Registry
         {
             public static readonly Registry Empty = new Registry();
@@ -1635,6 +1640,8 @@ namespace DryIoc
             Rules = rules;
 
             _registry = registry;
+            _defaultFactoryDelegateCache = registry.Value.DefaultFactoryDelegateCache.Value;
+
             _disposed = disposed;
 
             _singletonScope = singletonScope;

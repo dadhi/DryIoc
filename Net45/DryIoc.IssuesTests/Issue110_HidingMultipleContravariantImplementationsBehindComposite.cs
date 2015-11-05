@@ -78,6 +78,31 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(3, NotifyStaffWhenCustomerMovedEventHandler.HandleCount);
             Assert.AreEqual(1, CustomerMovedAbroadEventHandler.HandleCount);
         }
+
+        [Test]
+        public void I_can_switch_off_variance_support_in_collection()
+        {
+            var container = new Container(rules => rules
+                .WithResolveIEnumerableAsLazyEnumerable()
+                .WithoutVariantGenericTypesInResolvedCollection());
+
+            container.Register(typeof(IV<>), typeof(V1<>));
+            container.Register(typeof(IV<>), typeof(V2<>));
+
+            var vs = container.Resolve<IV<A>[]>();
+
+            Assert.AreEqual(2, vs.Length);
+        }
+
+        public interface IV<T> { }
+
+        public class V1<T> : IV<T> { }
+
+        public class V2<T> : IV<T> { }
+
+        public class A { }
+
+        public class B : A { }
     }
     public interface IEventRaiser<TEvent>
     {

@@ -259,6 +259,6 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<A>(aas.SingleOrDefault());
         }
 
-        class A { }
-	}
+	    public class A { }
+    }
 }
