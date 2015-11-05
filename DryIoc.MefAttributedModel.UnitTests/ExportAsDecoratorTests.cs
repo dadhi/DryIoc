@@ -108,6 +108,20 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Resolve<IBug>();
         }
 
+        [Test]
+        public void Decorator_RegistrationOrder_can_be_used_to_control_order_of_composition()
+        {
+            var container = new Container();
+            // It's important to note that the outer and inner decorators are provided out of order.
+            // This could happen with MEF since the order that the decorators are added to the container is based upon when they are discovered in the assemblies.
+            container.RegisterExports(typeof(ServiceAReal), typeof(ServiceADecoratorOuter), typeof(ServiceADecoratorInner));
+
+            var svc = container.Resolve<IServiceA>();
+            
+            Assert.That(svc, Is.InstanceOf<ServiceADecoratorOuter>(), "Even though the outer decorator was 'discovered' first, it was registered last because of a higher RegistrationOrder");
+            Assert.AreEqual(3, svc.GetResult(), "Verify that both decorators were found.");
+        }
+
         internal interface IBug { }
         
         [Export(typeof(IBug))]

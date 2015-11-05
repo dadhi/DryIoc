@@ -99,7 +99,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="infos">Registrations to register.</param>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<ExportedRegistrationInfo> infos)
         {
-            foreach (var info in infos)
+            foreach (var info in infos.OrderBy(info => info.Decorator != null ? info.Decorator.RegistrationOrder : 0))
                 RegisterInfo(registrator, info);
         }
 
@@ -422,7 +422,7 @@ namespace DryIoc.MefAttributedModel
             Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
             resultInfo.FactoryType = FactoryType.Decorator;
             var decoratedServiceKeyInfo = ServiceKeyInfo.Of(attribute.ContractName ?? attribute.ContractKey);
-            resultInfo.Decorator = new DecoratorInfo { DecoratedServiceKeyInfo = decoratedServiceKeyInfo };
+            resultInfo.Decorator = new DecoratorInfo { DecoratedServiceKeyInfo = decoratedServiceKeyInfo, RegistrationOrder = attribute.RegistrationOrder };
         }
 
         private static Attribute[] GetAllExportRelatedAttributes(Type type)
@@ -876,6 +876,8 @@ namespace DryIoc.MefAttributedModel
     {
         /// <summary>Decorated service key info. Info wrapper is required for serialization.</summary>
         public ServiceKeyInfo DecoratedServiceKeyInfo;
+        /// <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
+        public int RegistrationOrder;
 
         /// <summary>Converts info to corresponding decorator setup.</summary>
         /// <param name="condition">(optional) <see cref="Setup.Condition"/>.</param>
