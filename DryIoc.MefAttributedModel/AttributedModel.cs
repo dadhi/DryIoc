@@ -705,12 +705,13 @@ namespace DryIoc.MefAttributedModel
                 : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
                     .Evaluate(ConvertRequestInfo(r));
 
-            var lazyMetadata = !HasMetadataAttribute ? null : (Func<object>)(() => GetMetadata(attributes));
+            var metadata = !HasMetadataAttribute ? null 
+                : (Func<object>)(() => GetMetadata(attributes));
 
             if (FactoryType == FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            return Setup.With(lazyMetadata, condition,
+            return Setup.With(metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot, 
                 PreventDisposal, WeaklyReferenced, AllowsDisposableTransient);
         }

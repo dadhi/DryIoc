@@ -201,7 +201,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_can_support_for_specific_primitive_value_injection_via_container_rule()
         {
-            var container = new Container(rules => rules.WithValueToExpressionSerializer(
+            var container = new Container(rules => rules.WithItemToExpressionConverter(
                 (item, type) => type == typeof(ConnectionString)
                 ? Expression.New(type.GetSingleConstructorOrNull(),
                     Expression.Constant(((ConnectionString)item).Value))
@@ -259,22 +259,6 @@ namespace DryIoc.UnitTests
 
             Assert.DoesNotThrow(() => 
             container.Register<AD>());
-        }
-
-        [Test]
-        public void I_can_specify_multiple_flag_setting_even_for_existing_container()
-        {
-            var container = new Container(rules => rules
-                .WithoutThrowOnRegisteringDisposableTransient()
-                .WithoutEagerCachingSingletonForFasterAccess());
-
-            var newContainer = container.With(rules => rules
-                .WithThrowIfStateUsedInFactoryExpression());
-
-            var newRules = newContainer.Rules;
-            Assert.IsTrue(newRules.ThrowIfStateUsedInFactoryExpression);
-            Assert.IsFalse(newRules.EagerCachingSingletonForFasterAccess);
-            Assert.IsFalse(newRules.ThrowOnRegisteringDisposableTransient);
         }
 
         class AD : IDisposable

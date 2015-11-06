@@ -69,18 +69,17 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_inject_non_primitive_value()
+        public void Throws_on_injecting_non_primitive_value()
         {
             var container = new Container();
             container.Register<Service>(serviceKey: "service");
             container.Register<InjectionRulesTests.ClientWithServiceAndStringParam>(
-                made: Parameters.Of
-                    .Name("service", r => r.Container.Resolve<IService>("service", requiredServiceType: typeof(Service)))
-                    .Type<string>(_ => "a"));
+                made: Parameters.Of.Name("service", r => r.Container.Resolve<IService>("service", requiredServiceType: typeof(Service))));
 
-            var x = container.Resolve<InjectionRulesTests.ClientWithServiceAndStringParam>();
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<InjectionRulesTests.ClientWithServiceAndStringParam>());
 
-            Assert.IsNotNull(x.Service);
+            Assert.AreEqual(ex.Error, Error.StateIsRequiredToUseItem);
         }
 
         [Test]
@@ -97,11 +96,9 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Throws_on_injecting_non_primitive_value_into_property_when_corresponding_Rules_is_specified()
+        public void Throws_on_injecting_non_primitive_value_into_property()
         {
-            var container = new Container(rules => rules.WithThrowIfStateUsedInFactoryExpression())
-                .With(rules => rules.WithoutEagerCachingSingletonForFasterAccess());
-
+            var container = new Container();
             container.Register<IService, Service>(serviceKey: "dependency");
             container.Register<InjectionRulesTests.ClientWithServiceAndStringProperty>(
                 made: PropertiesAndFields.Of.Name("Service", r => r.Container.Resolve<IService>("dependency")));
@@ -109,7 +106,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<InjectionRulesTests.ClientWithServiceAndStringProperty>());
 
-            Assert.AreEqual(ex.Error, Error.StateIsRequiredToUseValue);
+            Assert.AreEqual(ex.Error, Error.StateIsRequiredToUseItem);
         }
 
         [Test]

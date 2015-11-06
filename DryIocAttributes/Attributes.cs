@@ -218,7 +218,7 @@ namespace DryIocAttributes
         /// <summary>If <see cref="ContractName"/> specified, it has more priority over <see cref="ContractKey"/>. </summary>
         public string ContractName { get; set; }
 
-        /// <summary>Contract key of decorated type.</summary>
+        /// <summary>Contract key of Decorated type, not for a decorator itself. Used to find the service to apply decorator to.</summary>
         public object ContractKey { get; set; }
 
         /// <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
@@ -360,7 +360,7 @@ namespace DryIocAttributes
                 || (Parent != null && Parent.EqualsWithoutParent(other.Parent)));
         }
 
-        /// <summary>Compares infos regarding properies but not their parents.</summary>
+        /// <summary>Compares with other info taking into account the properties but not the parents and their properties.</summary>
         /// <param name="other">Info to compare for equality.</param> <returns></returns>
         public bool EqualsWithoutParent(RequestInfo other)
         {
@@ -378,7 +378,7 @@ namespace DryIocAttributes
         public override int GetHashCode()
         {
             var hash = 0;
-            for (var i = this; i != Empty; i = i.Parent)
+            for (var i = this; !i.IsEmpty; i = i.Parent)
             {
                 var currentHash = i.ServiceType.GetHashCode();
                 if (i.RequiredServiceType != null)
