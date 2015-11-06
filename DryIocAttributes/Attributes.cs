@@ -220,6 +220,9 @@ namespace DryIocAttributes
 
         /// <summary>Contract key of decorated type.</summary>
         public object ContractKey { get; set; }
+
+        /// <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
+        public int RegistrationOrder { get; set; }
     }
 
     /// <summary>Type of services supported by Container.</summary>

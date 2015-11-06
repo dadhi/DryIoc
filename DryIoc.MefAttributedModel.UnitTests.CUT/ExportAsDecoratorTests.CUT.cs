@@ -150,4 +150,50 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             return _decorated.GetResult() + 1;
         }
     }
+
+    public interface IServiceA
+    {
+        int GetResult();
+    }
+
+    [Export(typeof(IServiceA))]
+    public class ServiceAReal : IServiceA
+    {
+        public int GetResult()
+        {
+            return 1;
+        }
+    }
+
+    [Export(typeof(IServiceA)), AsDecorator(RegistrationOrder = 1)]
+    public class ServiceADecoratorInner : IServiceA
+    {
+        private readonly IServiceA decorated;
+
+        public ServiceADecoratorInner(IServiceA decorated)
+        {
+            this.decorated = decorated;
+        }
+
+        public int GetResult()
+        {
+            return this.decorated.GetResult() + 1;
+        }
+    }
+
+    [Export(typeof(IServiceA)), AsDecorator(RegistrationOrder = 2)]
+    public class ServiceADecoratorOuter : IServiceA
+    {
+        private readonly IServiceA decorated;
+
+        public ServiceADecoratorOuter(IServiceA decorated)
+        {
+            this.decorated = decorated;
+        }
+
+        public int GetResult()
+        {
+            return this.decorated.GetResult() + 1;
+        }
+    }
 }
