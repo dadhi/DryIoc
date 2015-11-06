@@ -24,14 +24,12 @@ namespace Playground
             Console.ReadKey();
         }
 
-        public delegate object Creator(object[] state);
-
         private static object ExpressionVsEmit()
         {
             const int times = 3000;
             const int runTimes = 5000000;
             Func<object[], object> func = null;
-            var funcExpr = CreateATreeExpr();
+            var funcExpr = CreateExpression();
             var state = new object[15];
             state[11] = "x";
             object result = null;
@@ -83,14 +81,17 @@ namespace Playground
             return result;
         }
 
-        private static Expression<Func<object[], object>> CreateATreeExpr()
+        private static Expression<Func<object[], object>> CreateExpression()
         {
             var stateParamExpr = Expression.Parameter(typeof(object[])); 
 
             var funcExpr = Expression.Lambda<Func<object[], object>>(
                 Expression.New(typeof(A).GetConstructors()[0],
                     Expression.New(typeof(B).GetConstructors()[0], ArrayTools.Empty<Expression>()),
-                    Expression.Convert(Expression.ArrayIndex(stateParamExpr, Expression.Constant(11)), typeof(string))),
+                    Expression.Convert(Expression.ArrayIndex(stateParamExpr, Expression.Constant(11)), typeof(string)),
+                    Expression.NewArrayInit(typeof(ID), 
+                        Expression.New(typeof(D1).GetConstructors()[0]),
+                        Expression.New(typeof(D2).GetConstructors()[0]))),
                 stateParamExpr);
 
             return funcExpr;
@@ -116,20 +117,18 @@ namespace Playground
         {
             var method = new DynamicMethod("CreateA", typeof(object), new[] { typeof(object[]) });
             var il = method.GetILGenerator();
-            var sb = new StringBuilder();
 
             var visitor = new EmittingVisitor(il);
             visitor.Visit(expr);
 
             il.Emit(OpCodes.Ret);
 
-            var s = sb.ToString();
             return (Func<object[], object>)method.CreateDelegate(typeof(Func<object[], object>));
         }
 
         public object CreateA(object[] state)
         {
-            return new A(new B(), (string)state[11]);
+            return new A(new B(), (string)state[11], new ID[2] { new D1(), new D2() });
         }
 
         private static string ForeachOfArrayVsCustomEnumerable()
@@ -169,7 +168,7 @@ namespace Playground
 
     public class A
     {
-        public A(B b, string s) { }
+        public A(B b, string s, IEnumerable<ID> ds) { }
     }
 
     public class B
@@ -177,7 +176,11 @@ namespace Playground
         public B() { }
     }
 
-    public class EmittingVisitor : ExpressionVisitor
+    public interface ID { }
+    public class D1 : ID { }
+    public class D2 : ID { }
+
+    public sealed class EmittingVisitor : ExpressionVisitor
     {
         private readonly ILGenerator _il;
 
@@ -186,9 +189,44 @@ namespace Playground
             _il = il;
         }
 
+        protected override Expression VisitNewArray(NewArrayExpression node)
+        {
+            var items = node.Expressions;
+
+            _il.Emit(OpCodes.Ldc_I4, items.Count);  // adding array size on the stack
+            Debug.WriteLine("Ldc_I4 " + items.Count);
+
+            _il.Emit(OpCodes.Newarr, node.Type.GetElementType());    // create array
+            Debug.WriteLine("Newarr " + node.Type.GetElementType());
+
+            _il.Emit(OpCodes.Stloc_0);              // store array ref in local variable for later assigning items to it 
+            Debug.WriteLine("Stloc_0");
+
+            for (var i = 0; i < items.Count; i++)
+            {
+                //if (i != 0) // skip loading array reference from local variable, because it is already on stack
+                _il.Emit(OpCodes.Ldloc_0);
+                Debug.WriteLine("Ldloc_0");
+
+                _il.Emit(OpCodes.Ldc_I4, i);    // push item index on stack
+                Debug.WriteLine("Ldc_I4 " + i);
+
+                Visit(items[i]);                // evaluate and put item value on stack
+
+                _il.Emit(OpCodes.Stelem_Ref);   // store item into array at index
+                Debug.WriteLine("Stelem_Ref");
+            }
+
+            _il.Emit(OpCodes.Ldloc_0);
+            Debug.WriteLine("Ldloc_0");     // load result array back to evaluation stack
+
+            return node;
+        }
+
         protected override Expression VisitParameter(ParameterExpression node)
         {
             _il.Emit(OpCodes.Ldarg_0);
+            Debug.WriteLine("Ldarg_0");
             return node;
         }
 
@@ -198,6 +236,8 @@ namespace Playground
             if (node.NodeType == ExpressionType.ArrayIndex)
             {
                 _il.Emit(OpCodes.Ldelem_Ref);
+                Debug.WriteLine("Ldelem_Ref");
+
             }
             return node;
         }
@@ -208,6 +248,7 @@ namespace Playground
             if (value is int)
             {
                 _il.Emit(OpCodes.Ldc_I4, (int)value);
+                Debug.WriteLine("Ldc_I4 " + value);
             }
             return node;
         }
@@ -215,7 +256,10 @@ namespace Playground
         protected override Expression VisitNew(NewExpression node)
         {
             base.VisitNew(node);
+
             _il.Emit(OpCodes.Newobj, node.Constructor);
+            Debug.WriteLine("Newobj " + node.Constructor.DeclaringType);
+
             return node;
         }
 
@@ -225,6 +269,7 @@ namespace Playground
             if (node.NodeType == ExpressionType.Convert)
             {
                 _il.Emit(OpCodes.Castclass, node.Type);
+                Debug.WriteLine("Castclass " + node.Type);
             }
             return node;
         }
