@@ -195,17 +195,16 @@ namespace Playground
 
             _il.Emit(OpCodes.Ldc_I4, items.Count);  // adding array size on the stack
             Debug.WriteLine("Ldc_I4 " + items.Count);
-
-            _il.Emit(OpCodes.Newarr, node.Type.GetElementType());    // create array
+            _il.Emit(OpCodes.Newarr, node.Type.GetElementType());    // create array of specific item type
             Debug.WriteLine("Newarr " + node.Type.GetElementType());
 
-            _il.Emit(OpCodes.Stloc_0);              // store array ref in local variable for later assigning items to it 
+            var arr = _il.DeclareLocal(node.Type);              // store array ref in local variable for later assigning items to it 
             Debug.WriteLine("Stloc_0");
 
             for (var i = 0; i < items.Count; i++)
             {
                 //if (i != 0) // skip loading array reference from local variable, because it is already on stack
-                _il.Emit(OpCodes.Ldloc_0);
+                _il.Emit(OpCodes.Ldloc, arr);
                 Debug.WriteLine("Ldloc_0");
 
                 _il.Emit(OpCodes.Ldc_I4, i);    // push item index on stack
@@ -217,7 +216,7 @@ namespace Playground
                 Debug.WriteLine("Stelem_Ref");
             }
 
-            _il.Emit(OpCodes.Ldloc_0);
+            _il.Emit(OpCodes.Ldloc, arr);
             Debug.WriteLine("Ldloc_0");     // load result array back to evaluation stack
 
             return node;

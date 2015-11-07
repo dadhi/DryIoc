@@ -222,11 +222,27 @@ namespace DryIocAttributes
         public object ContractKey { get; set; }
 
         /// <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
-        public int RegistrationOrder { get; set; }
-    }
+        public int Order { get; set; }
 
-    /// <summary>Type of services supported by Container.</summary>
-    public enum RegistrationType
+        /// <summary>Creates attribute by providing its optional properties.</summary>
+        /// <param name="contractKey">(optional)</param> <param name="order">(optional)</param>
+        public AsDecoratorAttribute(object contractKey = null, int order = 0)
+        {
+            ContractKey = contractKey;
+            Order = order;
+        }
+
+        /// <summary>Creates attributes with <see cref="ContractName"/> and optional order.</summary>
+        /// <param name="contractName"></param> <param name="order">(optional)</param>
+        public AsDecoratorAttribute(string contractName, int order = 0)
+        {
+            ContractName = contractName;
+            Order = order;
+        }
+}
+
+/// <summary>Type of services supported by Container.</summary>
+public enum RegistrationType
     {
         /// <summary>(default) Defines normal service factory</summary>
         Service,

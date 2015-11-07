@@ -118,7 +118,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var svc = container.Resolve<IServiceA>();
             
-            Assert.That(svc, Is.InstanceOf<ServiceADecoratorOuter>(), "Even though the outer decorator was 'discovered' first, it was registered last because of a higher RegistrationOrder");
+            Assert.That(svc, Is.InstanceOf<ServiceADecoratorOuter>(), "Even though the outer decorator was 'discovered' first, it was registered last because of a higher Order");
             Assert.AreEqual(3, svc.GetResult(), "Verify that both decorators were found.");
         }
 

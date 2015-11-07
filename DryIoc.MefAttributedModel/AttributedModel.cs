@@ -99,7 +99,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="infos">Registrations to register.</param>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<ExportedRegistrationInfo> infos)
         {
-            foreach (var info in infos.OrderBy(info => info.Decorator != null ? info.Decorator.RegistrationOrder : 0))
+            foreach (var info in infos)
                 RegisterInfo(registrator, info);
         }
 
@@ -422,7 +422,7 @@ namespace DryIoc.MefAttributedModel
             Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
             resultInfo.FactoryType = FactoryType.Decorator;
             var decoratedServiceKeyInfo = ServiceKeyInfo.Of(attribute.ContractName ?? attribute.ContractKey);
-            resultInfo.Decorator = new DecoratorInfo { DecoratedServiceKeyInfo = decoratedServiceKeyInfo, RegistrationOrder = attribute.RegistrationOrder };
+            resultInfo.Decorator = new DecoratorInfo { DecoratedServiceKeyInfo = decoratedServiceKeyInfo, Order = attribute.Order };
         }
 
         private static Attribute[] GetAllExportRelatedAttributes(Type type)
@@ -663,7 +663,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Specifies to store reused instance as WeakReference.</summary>
         public bool WeaklyReferenced;
 
-        /// <summary>Allows disposable transient to be resgitered.</summary>
+        /// <summary>Allows disposable transient to be registered.</summary>
         public bool AllowsDisposableTransient;
 
         /// <summary>True if exported type has metadata.</summary>
@@ -878,19 +878,20 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Decorated service key info. Info wrapper is required for serialization.</summary>
         public ServiceKeyInfo DecoratedServiceKeyInfo;
         /// <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
-        public int RegistrationOrder;
+        public int Order;
 
         /// <summary>Converts info to corresponding decorator setup.</summary>
         /// <param name="condition">(optional) <see cref="Setup.Condition"/>.</param>
         /// <returns>Setup.</returns>
         public Setup GetSetup(Func<DryIoc.RequestInfo, bool> condition = null)
         {
-            if (DecoratedServiceKeyInfo == ServiceKeyInfo.Default && condition == null)
+            if (DecoratedServiceKeyInfo == ServiceKeyInfo.Default && condition == null && Order == 0)
                 return Setup.Decorator;
 
             return Setup.DecoratorWith(r =>
                 (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, r.ServiceKey)) &&
-                (condition == null || condition(r)));
+                (condition == null || condition(r)),
+                Order);
         }
 
         /// <summary>Compares this info to other info for equality.</summary> <param name="obj">Other info to compare.</param>

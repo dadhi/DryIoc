@@ -45,7 +45,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportMany, AsDecorator(ContractName = "transact")]
+    [ExportMany, AsDecorator("transact")]
     public class TransactHandlerDecorator : IHandler
     {
         public IHandler Handler { get; set; }
@@ -165,7 +165,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export(typeof(IServiceA)), AsDecorator(RegistrationOrder = 1)]
+    [Export(typeof(IServiceA)), AsDecorator(Order = 1)]
     public class ServiceADecoratorInner : IServiceA
     {
         private readonly IServiceA decorated;
@@ -181,7 +181,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export(typeof(IServiceA)), AsDecorator(RegistrationOrder = 2)]
+    [Export(typeof(IServiceA)), AsDecorator(Order = 2)]
     public class ServiceADecoratorOuter : IServiceA
     {
         private readonly IServiceA decorated;

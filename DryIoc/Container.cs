@@ -1360,10 +1360,33 @@ namespace DryIoc
                             serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factory);
 
                 return factory.FactoryType == FactoryType.Service
-                    ? WithService(factory, serviceType, serviceKey, ifAlreadyRegistered)
+                        ? WithService(factory, serviceType, serviceKey, ifAlreadyRegistered)
                     : factory.FactoryType == FactoryType.Decorator
-                        ? WithDecorators(Decorators.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append))
+                        ? WithDecorators(Decorators.AddOrUpdate(serviceType, new[] { factory }, InsertDecorator))
                         : WithWrappers(Wrappers.AddOrUpdate(serviceType, factory));
+            }
+
+            private static Factory[] InsertDecorator(Factory[] oldDecorators, Factory[] newDecorators)
+            {
+                var newDecorator = newDecorators[0]; // always a single decorator
+                var decorators = new Factory[oldDecorators.Length + 1];
+                var newDecoratorIndex = oldDecorators.Length;
+                var indexShift = 0;
+                for (var i = 0; i < oldDecorators.Length; i++)
+                {
+                    var oldDecorator = oldDecorators[i];
+                    if (indexShift == 0 &&
+                        ((Setup.DecoratorSetup)newDecorator.Setup).Order <
+                        ((Setup.DecoratorSetup)oldDecorator.Setup).Order)
+                    {
+                        newDecoratorIndex = i;
+                        indexShift = 1;
+                    }
+                    decorators[i + indexShift] = oldDecorator;
+                }
+
+                decorators[newDecoratorIndex] = newDecorator;
+                return decorators;
             }
 
             public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
@@ -1813,7 +1836,7 @@ namespace DryIoc
         /// <summary>Generates all resolution root and calls expressions.</summary>
         /// <param name="container">For container</param>
         /// <param name="resolutions">Result resolution factory expressions. They could be compiled and used for actual service resolution.</param>
-        /// <param name="resolutionCallDependencies">Resolution call dependencies (imlemented via Resolve call): e.g. dependencies wrapped in Lazy{T}.</param>
+        /// <param name="resolutionCallDependencies">Resolution call dependencies (implemented via Resolve call): e.g. dependencies wrapped in Lazy{T}.</param>
         /// <param name="whatRegistrations">(optional) Allow to filter what registration to resolve. By default applies to all registrations.
         /// You may use <see cref="SetupAsResolutionRoots"/> to generate only for registrations with <see cref="Setup.AsResolutionRoot"/>.</param>
         /// <returns>Errors happened when resolving corresponding registrations.</returns>
@@ -1854,7 +1877,7 @@ namespace DryIoc
         }
 
         /// <summary>May be used to find potential problems in service registration setup.
-        /// Methods tries to get epressions for Roots/All registrations, collects heppened exceptions, and
+        /// Methods tries to get expressions for Roots/All registrations, collects happened exceptions, and
         /// returns them to user. Does not create any actual service objects.</summary>
         /// <param name="container">for container</param>
         /// <param name="whatRegistrations">(optional) Allow to filter what registration to resolve. By default applies to all registrations.</param>
@@ -1886,7 +1909,7 @@ namespace DryIoc
             if (request.IsEmpty)
                 return Expression.Field(null, _requestInfoEmptyField);
 
-            // recursively ask for parent expresion until it is empty
+            // recursively ask for parent expression until it is empty
             var parentRequestInfoExpr = container.RequestInfoToExpression(request.Parent);
 
             Expression result;
@@ -2539,7 +2562,7 @@ namespace DryIoc
         public IReuse DefaultReuseInsteadOfTransient { get; private set; }
 
         /// <summary>Sets different reuse from Transient when no registration reuse is specified.</summary>
-        /// <param name="defaultReuseInsteadOfTransient">Resue value.</param> <returns>New rules with provided default reuse setup.</returns>
+        /// <param name="defaultReuseInsteadOfTransient">Reuse value.</param> <returns>New rules with provided default reuse setup.</returns>
         public Rules WithDefaultReuseInsteadOfTransient(IReuse defaultReuseInsteadOfTransient)
         {
             var newRules = (Rules)MemberwiseClone();
@@ -4917,19 +4940,21 @@ namespace DryIoc
         public static readonly Setup Decorator = new DecoratorSetup();
 
         /// <summary>Creates setup with optional condition.</summary>
-        /// <param name="condition">(optional)</param> <returns>New setup with condition or <see cref="Setup.Decorator"/>.</returns>
-        public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null)
+        /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
+        /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
+        /// <returns>New setup with condition or <see cref="Setup.Decorator"/>.</returns>
+        public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0)
         {
-            return condition == null ? Decorator : new DecoratorSetup(condition);
+            return condition == null && order == 0 ? Decorator : new DecoratorSetup(condition, order);
         }
 
         private sealed class ServiceSetup : Setup
         {
             public override FactoryType FactoryType { get { return FactoryType.Service; } }
 
-            /// <summary>Evaluates metadata if it spoecified as Func of object, and replaces Func with its result!.
+            /// <summary>Evaluates metadata if it specified as Func of object, and replaces Func with its result!.
             /// Otherwise just returns metadata object.</summary>
-            /// <remarks>Invokation of Func metadata is Not thread-safe. Please take care of that inside the Func.</remarks>
+            /// <remarks>Invocation of Func metadata is Not thread-safe. Please take care of that inside the Func.</remarks>
             public override object Metadata
             {
                 get
@@ -5033,11 +5058,16 @@ namespace DryIoc
             /// <summary>Returns Decorator factory type.</summary>
             public override FactoryType FactoryType { get { return FactoryType.Decorator; } }
 
+            /// <summary>If provided specifies relative decorator position in decorators chain.</summary>
+            public readonly int Order;
+
             /// <summary>Creates decorator setup with optional condition.</summary>
-            /// <param name="condition">(optional)</param>
-            public DecoratorSetup(Func<RequestInfo, bool> condition = null)
+            /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
+            /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
+            public DecoratorSetup(Func<RequestInfo, bool> condition = null, int order = 0)
             {
                 Condition = condition;
+                Order = order;
             }
         }
     }
@@ -5612,7 +5642,7 @@ namespace DryIoc
         {
             return base.IsFactoryExpressionCacheable(request)
                  && (Made == Made.Default
-                // No caching for context dependend Made which is:
+                // No caching for context dependent Made which is:
                 // - We don't know the result returned by factory method - it depends on request
                 // - or even if we do know the result type, some dependency is using custom value which depends on request
                  || (Made.FactoryMethodKnownResultType != null && !Made.HasCustomDependencyValue));
@@ -5849,7 +5879,7 @@ namespace DryIoc
                             if (closedFactoryServiceType == null)
                                 return null;
 
-                            // Copy factory info woth closed factory type
+                            // Copy factory info with closed factory type
                             factoryInfo = ServiceInfo.Of(closedFactoryServiceType)
                                 .WithDetails(factoryInfo.Details, request);
                         }
@@ -5864,7 +5894,7 @@ namespace DryIoc
                     if (closedFactoryImplType == null)
                         return null;
 
-                    // Find corresponding mamber again, now from closed type
+                    // Find corresponding member again, now from closed type
                     var factoryMethodBase = factoryMember as MethodBase;
                     if (factoryMethodBase != null)
                     {
@@ -5897,7 +5927,7 @@ namespace DryIoc
                     }
                 }
 
-                // If factory method is actual method and still open-generic after closing its decalring type, 
+                // If factory method is actual method and still open-generic after closing its declaring type, 
                 // then match remaining method type parameters and make closed method
                 var openFactoryMethod = factoryMember as MethodInfo;
                 if (openFactoryMethod != null && openFactoryMethod.ContainsGenericParameters)
@@ -6207,7 +6237,7 @@ namespace DryIoc
             Interlocked.Exchange(ref _instance, newInstance);
         }
 
-        /// <summary>The method should not be really called. That's why it returns excpetion throwing expression.</summary>
+        /// <summary>The method should not be really called. That's why it returns exception throwing expression.</summary>
         /// <param name="request">Context</param> <returns>Expression throwing exception.</returns>
         public override Expression CreateExpressionOrDefault(Request request)
         {
@@ -7015,7 +7045,7 @@ namespace DryIoc
                 || (Parent != null && Parent.EqualsWithoutParent(other.Parent)));
         }
 
-        /// <summary>Compares infos regarding properies but not their parents.</summary>
+        /// <summary>Compares info's regarding properties but not their parents.</summary>
         /// <param name="other">Info to compare for equality.</param> <returns></returns>
         public bool EqualsWithoutParent(RequestInfo other)
         {
@@ -7256,9 +7286,9 @@ namespace DryIoc
         IContainer With(Func<Rules, Rules> configure = null, IScopeContext scopeContext = null);
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
-        /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with resgitrations: ignore or throw exception.
+        /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with registrations: ignore or throw exception.
         /// Throws exception by default.</param>
-        /// <returns>New container preserving all current container state but prohiting registrations.</returns>
+        /// <returns>New container preserving all current container state but disallowing registrations.</returns>
         IContainer WithNoMoreRegisrationAllowed(bool ignoreInsteadOfThrow = false);
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
@@ -7528,7 +7558,7 @@ namespace DryIoc
             OpenGenericFactoryMethodDeclaringTypeIsNotSupportedOnThisPlatform = Of(
                 "[Specific to this .NET version] Unable to match method or constructor {0} from open-generic declaring type {1} to closed-generic type {2}, " +
                 Environment.NewLine +
-                "Please give thje method an unique name to distinguish it from other overloads."),
+                "Please give the method an unique name to distinguish it from other overloads."),
             CtorIsMissingSomeParameters = Of(
                 "Constructor [{0}] of {1} misses some arguments required for {2} dependency."),
             UnableToSelectConstructor = Of(
@@ -7879,7 +7909,7 @@ namespace DryIoc
             return type.GetTypeInfo().ImplementedInterfaces.ToArrayOrSelf();
         }
 
-        /// <summary>Gets all decalred and base members.</summary>
+        /// <summary>Gets all declared and base members.</summary>
         /// <param name="type">Type to get members from.</param> <returns>All members.</returns>
         public static IEnumerable<MemberInfo> GetAllMembers(this Type type)
         {
@@ -9052,13 +9082,13 @@ namespace DryIoc
             return Interlocked.Exchange(ref _value, newValue);
         }
 
-        /// <summary>Compares curret Refed value with <paramref name="currentValue"/> and if equal replaces current with <paramref name="newValue"/></summary>
+        /// <summary>Compares current Referred value with <paramref name="currentValue"/> and if equal replaces current with <paramref name="newValue"/></summary>
         /// <param name="currentValue"></param> <param name="newValue"></param>
         /// <returns>True if current value was replaced with new value, and false if current value is outdated (already changed by other party).</returns>
         /// <example><c>[!CDATA[
-        /// var val = SomeRef.Value;
-        /// if (!SomeRef.TrySwapIfStillCurrent(val, Update(val))
-        ///     SomeRef.Swap(value => Update(value)); // fallback to normal Swap with delegate allocation
+        /// var value = SomeRef.Value;
+        /// if (!SomeRef.TrySwapIfStillCurrent(value, Update(value))
+        ///     SomeRef.Swap(v => Update(v)); // fallback to normal Swap with delegate allocation
         /// ]]</c></example>
         public bool TrySwapIfStillCurrent(T currentValue, T newValue)
         {
