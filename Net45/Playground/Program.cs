@@ -130,40 +130,6 @@ namespace Playground
         {
             return new A(new B(), (string)state[11], new ID[2] { new D1(), new D2() });
         }
-
-        private static string ForeachOfArrayVsCustomEnumerable()
-        {
-            var array = new[] { "a", "b", "c", "d", "e" };
-            var result  = " ";
-
-            const int times = 5000000;
-
-            var stopwatch = Stopwatch.StartNew();
-            for (var i = 0; i < times; i++)
-            {
-                foreach (var item in array)
-                {
-                    result = item;
-                }
-            }
-            stopwatch.Stop();
-            Console.WriteLine("Array: " + stopwatch.ElapsedMilliseconds);
-
-            var items = Items.Of("a", Items.Of("a", Items.Of("c", Items.Of("d", Items.Of("e", null)))));
-
-            stopwatch = Stopwatch.StartNew();
-            for (var i = 0; i < times; i++)
-            {
-                foreach (var item in items)
-                {
-                    result = item;
-                }
-            }
-            stopwatch.Stop();
-            Console.WriteLine("Array: " + stopwatch.ElapsedMilliseconds);
-
-            return result;
-        }
     }
 
     public class A
@@ -191,33 +157,33 @@ namespace Playground
 
         protected override Expression VisitNewArray(NewArrayExpression node)
         {
-            var items = node.Expressions;
+            var elems = node.Expressions;
+            var arrType = node.Type;
+            var arrVar = _il.DeclareLocal(arrType);
 
-            _il.Emit(OpCodes.Ldc_I4, items.Count);  // adding array size on the stack
-            Debug.WriteLine("Ldc_I4 " + items.Count);
-            _il.Emit(OpCodes.Newarr, node.Type.GetElementType());    // create array of specific item type
-            Debug.WriteLine("Newarr " + node.Type.GetElementType());
-
-            var arr = _il.DeclareLocal(node.Type);              // store array ref in local variable for later assigning items to it 
+            _il.Emit(OpCodes.Ldc_I4, elems.Count);
+            Debug.WriteLine("Ldc_I4 " + elems.Count);
+            _il.Emit(OpCodes.Newarr, arrType.GetElementType());
+            Debug.WriteLine("Newarr " + arrType.GetElementType());
+            _il.Emit(OpCodes.Stloc, arrVar);
             Debug.WriteLine("Stloc_0");
 
-            for (var i = 0; i < items.Count; i++)
+            for (var i = 0; i < elems.Count; i++)
             {
-                //if (i != 0) // skip loading array reference from local variable, because it is already on stack
-                _il.Emit(OpCodes.Ldloc, arr);
+                _il.Emit(OpCodes.Ldloc, arrVar);
                 Debug.WriteLine("Ldloc_0");
 
-                _il.Emit(OpCodes.Ldc_I4, i);    // push item index on stack
+                _il.Emit(OpCodes.Ldc_I4, i); 
                 Debug.WriteLine("Ldc_I4 " + i);
 
-                Visit(items[i]);                // evaluate and put item value on stack
+                Visit(elems[i]);                
 
-                _il.Emit(OpCodes.Stelem_Ref);   // store item into array at index
+                _il.Emit(OpCodes.Stelem_Ref);
                 Debug.WriteLine("Stelem_Ref");
             }
 
-            _il.Emit(OpCodes.Ldloc, arr);
-            Debug.WriteLine("Ldloc_0");     // load result array back to evaluation stack
+            _il.Emit(OpCodes.Ldloc, arrVar);
+            Debug.WriteLine("Ldloc_0");
 
             return node;
         }
@@ -271,71 +237,6 @@ namespace Playground
                 Debug.WriteLine("Castclass " + node.Type);
             }
             return node;
-        }
-    }
-
-    public static class Items
-    {
-        public static Items<T> Of<T>(T item, Items<T> next)
-        {
-            return new Items<T>(item, next);
-        }
-    }
-
-    public sealed class Items<T> : IEnumerable<T>
-    {
-        public readonly T Item;
-        public readonly Items<T> Next;
-        private Enumerator _enumerator;
-
-        public Items(T item, Items<T> next)
-        {
-            Item = item;
-            Next = next;
-            _enumerator = new Enumerator(this);
-        }
-
-        public IEnumerator<T> GetEnumerator()
-        {
-            return _enumerator;
-        }
-
-        private sealed class Enumerator : IEnumerator<T>
-        {
-            private Items<T> _items;
-
-            public T Current
-            {
-                get { return _items.Item; }
-            }
-
-            public Enumerator(Items<T> items)
-            {
-                _items = items;
-            }
-
-            public bool MoveNext()
-            {
-                return (_items = _items.Next) != null;
-            }
-
-            public void Reset()
-            {
-            }
-
-            public void Dispose()
-            {
-            }
-
-            object IEnumerator.Current
-            {
-                get { return Current; }
-            }
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
         }
     }
 }
