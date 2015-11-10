@@ -5,9 +5,9 @@ using System.Linq.Expressions;
 
 namespace Playground
 {
-    public abstract class ExpressionVisitor1
+    public abstract class ExpressionVisitorNet35Classic
     {
-        protected ExpressionVisitor1()
+        protected ExpressionVisitorNet35Classic()
         {
         }
 

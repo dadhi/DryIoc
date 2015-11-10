@@ -97,30 +97,12 @@ namespace Playground
             return funcExpr;
         }
 
-        private static Func<object[], object> GenerateCreateADelegate()
-        {
-            var method = new DynamicMethod("CreateA", typeof(object), new[] { typeof(object[]) });
-            var il = method.GetILGenerator();
-
-            il.Emit(OpCodes.Newobj, typeof(B).GetConstructors()[0]);
-            il.Emit(OpCodes.Ldarg_0);  
-            il.Emit(OpCodes.Ldc_I4, 11);  
-            il.Emit(OpCodes.Ldelem_Ref);
-            il.Emit(OpCodes.Castclass, typeof(string));
-            il.Emit(OpCodes.Newobj, typeof(A).GetConstructors()[0]);
-            il.Emit(OpCodes.Ret);
-
-            return (Func<object[], object>)method.CreateDelegate(typeof(Func<object[], object>));
-        }
-
         private static Func<object[], object> CreateDelegateFromExpression(Expression expr)
         {
             var method = new DynamicMethod("CreateA", typeof(object), new[] { typeof(object[]) });
             var il = method.GetILGenerator();
 
-            var visitor = new EmittingVisitor(il);
-            visitor.Visit(expr);
-
+            EmittingVisitor.TryVisit(expr, il);
             il.Emit(OpCodes.Ret);
 
             return (Func<object[], object>)method.CreateDelegate(typeof(Func<object[], object>));
@@ -134,109 +116,170 @@ namespace Playground
 
     public class A
     {
+        public P Prop { get; set; }
+        public B Bop;
+
         public A(B b, string s, IEnumerable<ID> ds) { }
     }
 
-    public class B
-    {
-        public B() { }
-    }
+    public class B { }
+
+    public class P { public P(B b) { } }
 
     public interface ID { }
     public class D1 : ID { }
-    public class D2 : ID { }
 
-    public sealed class EmittingVisitor : ExpressionVisitor
+    public static class EmittingVisitor
     {
-        private readonly ILGenerator _il;
-
-        public EmittingVisitor(ILGenerator il, StringBuilder log = null)
+        public static bool TryVisit(Expression expr, ILGenerator il)
         {
-            _il = il;
+            if (expr == null)
+                return false;
+
+            switch (expr.NodeType)
+            {
+                case ExpressionType.Convert:
+                    return VisitConvert((UnaryExpression)expr, il);
+                case ExpressionType.ArrayIndex:
+                    return VisitArrayIndex((BinaryExpression)expr, il);
+                case ExpressionType.Constant:
+                    return VisitConstant((ConstantExpression)expr, il);
+                case ExpressionType.Parameter:
+                    return VisitParameter((ParameterExpression)expr, il);
+                case ExpressionType.New:
+                    return VisitNew((NewExpression)expr, il);
+                case ExpressionType.NewArrayInit:
+                    return VisitNewArray((NewArrayExpression)expr, il);
+                case ExpressionType.MemberInit:
+                    return VisitMemberInit((MemberInitExpression)expr, il);
+                default:
+                    // not supported nodes
+                    return false;
+            }
         }
 
-        protected override Expression VisitNewArray(NewArrayExpression node)
+        private static bool VisitBinary(BinaryExpression b, ILGenerator il)
+        {
+            var ok = TryVisit(b.Left, il);
+            if (ok)
+                ok = TryVisit(b.Right, il);
+            // skips TryVisit(b.Conversion) for NodeType.Coalesce (?? operation)
+            return ok;
+        }
+
+        private static bool VisitExpressionList(IList<Expression> eList, ILGenerator state)
+        {
+            var ok = true;
+            for (int i = 0, n = eList.Count; i < n && ok; i++)
+                ok = TryVisit(eList[i], state);
+            return ok;
+        }
+
+        private static bool VisitParameter(ParameterExpression expr, ILGenerator il)
+        {
+            il.Emit(OpCodes.Ldarg_0);
+            Debug.WriteLine("Ldarg_0");
+            return true;
+        }
+
+        private static bool VisitConvert(UnaryExpression node, ILGenerator il)
+        {
+            var ok = TryVisit(node.Operand, il);
+            if (ok)
+            {
+                il.Emit(OpCodes.Castclass, node.Type);
+                Debug.WriteLine("Castclass " + node.Type);
+            }
+            return ok;
+        }
+
+        private static bool VisitConstant(ConstantExpression node, ILGenerator il)
+        {
+            var value = node.Value;
+            var ok = value is int;
+            if (ok)
+            {
+                il.Emit(OpCodes.Ldc_I4, (int)value);
+                Debug.WriteLine("Ldc_I4 " + value);
+            }
+            return ok;
+        }
+
+        private static bool VisitNew(NewExpression node, ILGenerator il)
+        {
+            var ok = VisitExpressionList(node.Arguments, il);
+            if (ok)
+            {
+                il.Emit(OpCodes.Newobj, node.Constructor);
+                Debug.WriteLine("Newobj " + node.Constructor.DeclaringType);
+            }
+            return ok;
+        }
+
+        private static bool VisitNewArray(NewArrayExpression node, ILGenerator il)
         {
             var elems = node.Expressions;
             var arrType = node.Type;
-            var arrVar = _il.DeclareLocal(arrType);
+            var arrVar = il.DeclareLocal(arrType);
 
-            _il.Emit(OpCodes.Ldc_I4, elems.Count);
+            il.Emit(OpCodes.Ldc_I4, elems.Count);
             Debug.WriteLine("Ldc_I4 " + elems.Count);
-            _il.Emit(OpCodes.Newarr, arrType.GetElementType());
+            il.Emit(OpCodes.Newarr, arrType.GetElementType());
             Debug.WriteLine("Newarr " + arrType.GetElementType());
-            _il.Emit(OpCodes.Stloc, arrVar);
+            il.Emit(OpCodes.Stloc, arrVar);
             Debug.WriteLine("Stloc_0");
 
-            for (var i = 0; i < elems.Count; i++)
+            var ok = true;
+            for (int i = 0, n = elems.Count; i < n && ok; i++)
             {
-                _il.Emit(OpCodes.Ldloc, arrVar);
+                il.Emit(OpCodes.Ldloc, arrVar);
                 Debug.WriteLine("Ldloc_0");
 
-                _il.Emit(OpCodes.Ldc_I4, i); 
+                il.Emit(OpCodes.Ldc_I4, i); 
                 Debug.WriteLine("Ldc_I4 " + i);
 
-                Visit(elems[i]);                
+                ok = TryVisit(elems[i], il);
 
-                _il.Emit(OpCodes.Stelem_Ref);
+                il.Emit(OpCodes.Stelem_Ref);
                 Debug.WriteLine("Stelem_Ref");
             }
 
-            _il.Emit(OpCodes.Ldloc, arrVar);
+            il.Emit(OpCodes.Ldloc, arrVar);
             Debug.WriteLine("Ldloc_0");
 
-            return node;
+            return ok;
         }
 
-        protected override Expression VisitParameter(ParameterExpression node)
+        private static bool VisitArrayIndex(BinaryExpression node, ILGenerator il)
         {
-            _il.Emit(OpCodes.Ldarg_0);
-            Debug.WriteLine("Ldarg_0");
-            return node;
-        }
-
-        protected override Expression VisitBinary(BinaryExpression node)
-        {
-            base.VisitBinary(node);
-            if (node.NodeType == ExpressionType.ArrayIndex)
+            var ok = VisitBinary(node, il);
+            if (ok)
             {
-                _il.Emit(OpCodes.Ldelem_Ref);
+                il.Emit(OpCodes.Ldelem_Ref);
                 Debug.WriteLine("Ldelem_Ref");
-
             }
-            return node;
+            return ok;
+        }
+        private static bool VisitMemberInit(MemberInitExpression mi, ILGenerator il)
+        {
+            var ok = VisitNew(mi.NewExpression, il);
+            if (ok)
+                ok = VisitBindingList(mi.Bindings, il);
+            return ok;
         }
 
-        protected override Expression VisitConstant(ConstantExpression node)
+        private static bool VisitBindingList(IList<MemberBinding> bindings, ILGenerator il)
         {
-            var value = node.Value;
-            if (value is int)
+            var ok = true;
+            for (int i = 0, n = bindings.Count; i < n && ok; i++)
             {
-                _il.Emit(OpCodes.Ldc_I4, (int)value);
-                Debug.WriteLine("Ldc_I4 " + value);
+                var binding = bindings[i];
+                ok = binding.BindingType == MemberBindingType.Assignment 
+                     && TryVisit(((MemberAssignment)binding).Expression, il);
             }
-            return node;
-        }
-
-        protected override Expression VisitNew(NewExpression node)
-        {
-            base.VisitNew(node);
-
-            _il.Emit(OpCodes.Newobj, node.Constructor);
-            Debug.WriteLine("Newobj " + node.Constructor.DeclaringType);
-
-            return node;
-        }
-
-        protected override Expression VisitUnary(UnaryExpression node)
-        {
-            base.VisitUnary(node);
-            if (node.NodeType == ExpressionType.Convert)
-            {
-                _il.Emit(OpCodes.Castclass, node.Type);
-                Debug.WriteLine("Castclass " + node.Type);
-            }
-            return node;
+            return ok;
         }
     }
+
+    public class D2 : ID { }
 }
