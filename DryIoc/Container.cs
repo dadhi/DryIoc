@@ -2051,7 +2051,7 @@ namespace DryIoc
     public delegate object FactoryDelegate(object[] state, IResolverContext r, IScope scope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
-    public static class FactoryCompiler
+    public static partial class FactoryCompiler
     {
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
@@ -2059,6 +2059,8 @@ namespace DryIoc
         {
             return Expression.Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamsExpr);
         }
+
+        static partial void CompileToDelegate(Expression expression, ref FactoryDelegate result);
 
         /// <summary>First wraps the input service creation expression into lambda expression and
         /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.
@@ -2070,6 +2072,8 @@ namespace DryIoc
         public static FactoryDelegate CompileToDelegate(this Expression expression, IContainer container)
         {
             expression = OptimizeExpression(expression);
+
+            // Optimization for singleton resolution
             if (expression.NodeType == ExpressionType.ArrayIndex)
             {
                 var arrayIndexExpr = (BinaryExpression)expression;
@@ -2081,7 +2085,15 @@ namespace DryIoc
                 }
             }
 
-            return Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
+            FactoryDelegate factoryDelegate = null;
+            CompileToDelegate(expression, ref factoryDelegate);
+            if (factoryDelegate == null)
+                factoryDelegate = Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
+            else
+            {
+                ;
+            }
+            return factoryDelegate;
         }
 
         private static Expression OptimizeExpression(Expression expression)
