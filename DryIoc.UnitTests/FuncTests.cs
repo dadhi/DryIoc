@@ -359,6 +359,27 @@ namespace DryIoc.UnitTests
             Assert.AreSame(x.A, x.Y.A);
         }
 
+        [Test]
+        public void Func_correctly_handles_IfUnresolvedReturnDefault_for_unregistered_service()
+        {
+            var container = new Container();
+
+            var getX = container.Resolve<Func<X>>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNull(getX);
+        }
+
+        [Test]
+        public void Func_correctly_handles_IfUnresolvedReturnDefault_for_unregistered_dependency()
+        {
+            var container = new Container();
+            container.Register<X>();
+
+            var getX = container.Resolve<Func<X>>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNull(getX);
+        }
+
         internal class X
         {
             public A A { get; private set; }

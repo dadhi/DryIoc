@@ -828,8 +828,15 @@ namespace DryIoc
                                 .ThrowIfNull(Error.UnableToResolveDecorator, decoratorRequest);
 
                             var decoratedArgWasUsed = decoratorRequest.FuncArgs.Key[0];
-                            decoratorExpr = !decoratedArgWasUsed ? decoratorExpr // case of replacing decorator.
-                                : Expression.Lambda(decoratorFuncType, decoratorExpr, decoratorRequest.FuncArgs.Value);
+                            if (decoratedArgWasUsed)
+                            {
+                                // Note: the conversation is required in .NET 3.5 to handle lack of covariance for Func<out T>
+                                // So that Func<Derived> may be used for Func<Base>
+                                if (decoratorExpr.Type != serviceType)
+                                    decoratorExpr = Expression.Convert(decoratorExpr, serviceType);
+
+                                decoratorExpr = Expression.Lambda(decoratorFuncType, decoratorExpr, decoratorRequest.FuncArgs.Value);
+                            }
 
                             CacheFactoryExpression(decorator.FactoryID, decoratorExpr);
                         }
@@ -843,8 +850,8 @@ namespace DryIoc
                             else
                             {
                                 var prevDecorators = ((LambdaExpression)resultDecorator);
-                                var decorateDecorator = Expression.Invoke(decoratorExpr, prevDecorators.Body);
-                                resultDecorator = Expression.Lambda(decorateDecorator, prevDecorators.Parameters[0]);
+                                var decorateDecoratorExpr = Expression.Invoke(decoratorExpr, prevDecorators.Body);
+                                resultDecorator = Expression.Lambda(decorateDecoratorExpr, prevDecorators.Parameters[0]);
                             }
                         }
                     }
@@ -2089,10 +2096,6 @@ namespace DryIoc
             CompileToDelegate(expression, ref factoryDelegate);
             if (factoryDelegate == null)
                 factoryDelegate = Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
-            else
-            {
-                ;
-            }
             return factoryDelegate;
         }
 
@@ -2308,6 +2311,10 @@ namespace DryIoc
             var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
+            // Note: the conversation is required in .NET 3.5 to handle lack of covariance for Func<out T>
+            // So that Func<Derived> may be used for Func<Base>
+            if (serviceExpr.Type != serviceType)
+                serviceExpr = Expression.Convert(serviceExpr, serviceType);
             var factoryExpr = Expression.Lambda(serviceExpr, null);
             var serviceFuncType = typeof(Func<>).MakeGenericType(serviceType);
             var wrapperCtor = wrapperType.GetConstructorOrNull(args: serviceFuncType);
@@ -2330,7 +2337,15 @@ namespace DryIoc
             var serviceRequest = request.Push(serviceType);
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
             var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
-            return serviceExpr == null ? null : Expression.Lambda(funcType, serviceExpr, funcArgExprs);
+            if (serviceExpr == null)
+                return null;
+
+            // Note: the conversation is required in .NET 3.5 to handle lack of covariance for Func<out T>
+            // So that Func<Derived> may be used for Func<Base>
+            if (serviceExpr.Type != serviceType)
+                serviceExpr = Expression.Convert(serviceExpr, serviceType);
+
+            return Expression.Lambda(funcType, serviceExpr, funcArgExprs);
         }
 
         private static Expression GetLambdaExpressionExpressionOrDefault(Request request)

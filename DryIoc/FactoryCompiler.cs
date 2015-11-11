@@ -87,11 +87,6 @@ namespace DryIoc
                         il.Emit(OpCodes.Castclass, convertTargetType);
                         Debug.WriteLine("Castclass " + convertTargetType);
                     }
-                    else if (node.Operand.Type.IsValueType())
-                    {
-                        il.Emit(OpCodes.Box);
-                        Debug.WriteLine("Box // converting value type to object");
-                    }
                     else
                     {
                         ok = false;
@@ -103,7 +98,12 @@ namespace DryIoc
             private static bool VisitConstant(ConstantExpression node, ILGenerator il)
             {
                 var value = node.Value;
-                if (value is int)
+                if (value == null)
+                {
+                    il.Emit(OpCodes.Ldnull);
+                    Debug.WriteLine("Ldnull");
+                }
+                else if (value is int || value.GetType().IsEnum())
                 {
                     il.Emit(OpCodes.Ldc_I4, (int)value);
                     Debug.WriteLine("Ldc_I4 " + value);
@@ -117,6 +117,7 @@ namespace DryIoc
                 {
                     return false;
                 }
+
                 return true;
             }
 
