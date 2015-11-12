@@ -53,6 +53,8 @@ namespace DryIoc
                         return VisitNewArray((NewArrayExpression)expr, il);
                     case ExpressionType.MemberInit:
                         return VisitMemberInit((MemberInitExpression)expr, il);
+                    case ExpressionType.Call:
+                        return VisitMethodCall((MethodCallExpression)expr, il);
                     default:
                         // Note: not supported yet
                         return false;
@@ -250,6 +252,33 @@ namespace DryIoc
                 il.Emit(OpCodes.Ldloc, obj);
                 Debug.WriteLine("Ldloc " + obj);
                 return true;
+            }
+
+            private static bool VisitMethodCall(MethodCallExpression expr, ILGenerator il)
+            {
+                var ok = true;
+                if (expr.Object != null)
+                    ok = TryVisit(expr.Object, il);
+
+                if (expr.Arguments.Count != 0)
+                    ok = VisitExpressionList(expr.Arguments, il);
+
+                if (ok)
+                {
+                    var method = expr.Method;
+                    if (!method.IsStatic() && method.IsVirtual)
+                    {
+                        il.Emit(OpCodes.Callvirt, method);
+                        Debug.WriteLine("Callvirt " + method);
+                    }
+                    else
+                    {
+                        il.Emit(OpCodes.Call, method);
+                        Debug.WriteLine("Call " + method);
+                    }
+                }
+
+                return ok;
             }
         }
     }
