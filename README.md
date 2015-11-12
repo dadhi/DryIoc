@@ -32,12 +32,10 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 ## Performance
 * General use-cases optimized for max speed.
-* Call-stack depth preserved as shallow as possible.
-* Memory footprint preserved as minimal as possible.
+* Memory footprint preserved as small as possible.
 
 ## Code/Library
-* Minimal setup requires single source file: *Container.cs*. 
-* Code written to be readable.
+* No dependencies on the other libraries.
 * Public API is fully documented.
 
 ## Reliability

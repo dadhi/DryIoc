@@ -37,15 +37,18 @@
 
         <!--net35-->
         <file src="..\DryIoc\Container.cs" target="content\net35\DryIoc" />
+        <file src="..\DryIoc\FactoryCompiler.cs" target="content\net35\DryIoc" />
         <file src="..\DryIoc\Ported-net40.cs" target="content\net35\DryIoc" />
         <file src="..\DryIoc\Ported-net45.cs" target="content\net35\DryIoc" />
 
         <!--net40-->
         <file src="..\DryIoc\Container.cs" target="content\net40\DryIoc" />
+        <file src="..\DryIoc\FactoryCompiler.cs" target="content\net40\DryIoc" />
         <file src="..\DryIoc\Ported-net45.cs" target="content\net40\DryIoc" />
 
         <!--net45-->
         <file src="..\DryIoc\Container.cs" target="content\net45\DryIoc" />
+        <file src="..\DryIoc\FactoryCompiler.cs" target="content\net45\DryIoc" />
         <file src="..\Net45\DryIoc\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIoc" />
 
         <!-- PCL: Profile328 .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
