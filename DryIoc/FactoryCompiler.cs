@@ -45,10 +45,21 @@ namespace DryIoc
                         return VisitConstant((ConstantExpression)expr, il);
                     case ExpressionType.Parameter:
                         var paramExpr = (ParameterExpression)expr;
-                        if (paramExpr != Container.StateParamExpr) // Note: Only the state (singletons) is handled
-                            return false;
-                        il.Emit(OpCodes.Ldarg_0); // state is the first argument
-                        Debug.WriteLine("Ldarg_0");
+                        if (paramExpr == Container.StateParamExpr) // Note: Only the state (singletons) is handled
+                        {
+                            il.Emit(OpCodes.Ldarg_0); // state is the first argument
+                            Debug.WriteLine("Ldarg_0 // state");
+                        }
+                        else if (paramExpr == Container.ResolverContextParamExpr)
+                        {
+                            il.Emit(OpCodes.Ldarg_1); // state is the first argument
+                            Debug.WriteLine("Ldarg_1 // resolverContext");
+                        }
+                        else if (paramExpr == Container.ResolutionScopeParamExpr)
+                        {
+                            il.Emit(OpCodes.Ldarg_2); // state is the first argument
+                            Debug.WriteLine("Ldarg_2 // scope");
+                        }
                         return true;
                     case ExpressionType.New:
                         return VisitNew((NewExpression)expr, il);
