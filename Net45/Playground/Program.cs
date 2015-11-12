@@ -1,10 +1,9 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
 using DryIoc;
 
 namespace Playground
@@ -86,12 +85,18 @@ namespace Playground
             var stateParamExpr = Expression.Parameter(typeof(object[])); 
 
             var funcExpr = Expression.Lambda<Func<object[], object>>(
-                Expression.New(typeof(A).GetConstructors()[0],
-                    Expression.New(typeof(B).GetConstructors()[0], ArrayTools.Empty<Expression>()),
-                    Expression.Convert(Expression.ArrayIndex(stateParamExpr, Expression.Constant(11)), typeof(string)),
-                    Expression.NewArrayInit(typeof(ID), 
-                        Expression.New(typeof(D1).GetConstructors()[0]),
-                        Expression.New(typeof(D2).GetConstructors()[0]))),
+                Expression.MemberInit(
+                    Expression.New(typeof(A).GetConstructors()[0],
+                        Expression.New(typeof(B).GetConstructors()[0], ArrayTools.Empty<Expression>()),
+                        Expression.Convert(Expression.ArrayIndex(stateParamExpr, Expression.Constant(11)), typeof(string)),
+                        Expression.NewArrayInit(typeof(ID), 
+                            Expression.New(typeof(D1).GetConstructors()[0]),
+                            Expression.New(typeof(D2).GetConstructors()[0]))),
+                    Expression.Bind(typeof(A).GetProperty("Prop"), 
+                        Expression.New(typeof(P).GetConstructors()[0],
+                            Expression.New(typeof(B).GetConstructors()[0], ArrayTools.Empty<Expression>()))),
+                    Expression.Bind(typeof(A).GetField("Bop"),
+                        Expression.New(typeof(B).GetConstructors()[0], ArrayTools.Empty<Expression>()))),
                 stateParamExpr);
 
             return funcExpr;
@@ -102,7 +107,8 @@ namespace Playground
             var method = new DynamicMethod("CreateA", typeof(object), new[] { typeof(object[]) });
             var il = method.GetILGenerator();
 
-            EmittingVisitor.TryVisit(expr, il);
+            var ok = EmittingVisitor.TryVisit(expr, il);
+
             il.Emit(OpCodes.Ret);
 
             return (Func<object[], object>)method.CreateDelegate(typeof(Func<object[], object>));
@@ -110,7 +116,7 @@ namespace Playground
 
         public object CreateA(object[] state)
         {
-            return new A(new B(), (string)state[11], new ID[2] { new D1(), new D2() });
+            return new A(new B(), (string)state[11], new ID[2] { new D1(), new D2() }) { Prop = new P(new B()), Bop = new B() };
         }
     }
 
@@ -133,9 +139,6 @@ namespace Playground
     {
         public static bool TryVisit(Expression expr, ILGenerator il)
         {
-            if (expr == null)
-                return false;
-
             switch (expr.NodeType)
             {
                 case ExpressionType.Convert:
@@ -145,7 +148,12 @@ namespace Playground
                 case ExpressionType.Constant:
                     return VisitConstant((ConstantExpression)expr, il);
                 case ExpressionType.Parameter:
-                    return VisitParameter((ParameterExpression)expr, il);
+                    //var paramExpr = (ParameterExpression)expr;
+                    //if (paramExpr != Container.StateParamExpr) // Note: For only state (singletons) is handled
+                    //    return false;
+                    il.Emit(OpCodes.Ldarg_0); // state is the first argument
+                    Debug.WriteLine("Ldarg_0");
+                    return true;
                 case ExpressionType.New:
                     return VisitNew((NewExpression)expr, il);
                 case ExpressionType.NewArrayInit:
@@ -175,20 +183,21 @@ namespace Playground
             return ok;
         }
 
-        private static bool VisitParameter(ParameterExpression expr, ILGenerator il)
-        {
-            il.Emit(OpCodes.Ldarg_0);
-            Debug.WriteLine("Ldarg_0");
-            return true;
-        }
-
         private static bool VisitConvert(UnaryExpression node, ILGenerator il)
         {
             var ok = TryVisit(node.Operand, il);
             if (ok)
             {
-                il.Emit(OpCodes.Castclass, node.Type);
-                Debug.WriteLine("Castclass " + node.Type);
+                var convertTargetType = node.Type;
+                if (convertTargetType != typeof(object)) // cast to object is not required
+                {
+                    il.Emit(OpCodes.Castclass, convertTargetType);
+                    Debug.WriteLine("Castclass " + convertTargetType);
+                }
+                else
+                {
+                    ok = false;
+                }
             }
             return ok;
         }
@@ -196,13 +205,27 @@ namespace Playground
         private static bool VisitConstant(ConstantExpression node, ILGenerator il)
         {
             var value = node.Value;
-            var ok = value is int;
-            if (ok)
+            if (value == null)
+            {
+                il.Emit(OpCodes.Ldnull);
+                Debug.WriteLine("Ldnull");
+            }
+            else if (value is int || value.GetType().IsEnum())
             {
                 il.Emit(OpCodes.Ldc_I4, (int)value);
                 Debug.WriteLine("Ldc_I4 " + value);
             }
-            return ok;
+            else if (value is string)
+            {
+                il.Emit(OpCodes.Ldstr, (string)value);
+                Debug.WriteLine("Ldstr " + value);
+            }
+            else
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private static bool VisitNew(NewExpression node, ILGenerator il)
@@ -220,12 +243,15 @@ namespace Playground
         {
             var elems = node.Expressions;
             var arrType = node.Type;
+            var elemType = arrType.GetArrayElementTypeOrNull();
+            var isElemOfValueType = elemType.IsValueType();
+
             var arrVar = il.DeclareLocal(arrType);
 
             il.Emit(OpCodes.Ldc_I4, elems.Count);
             Debug.WriteLine("Ldc_I4 " + elems.Count);
-            il.Emit(OpCodes.Newarr, arrType.GetElementType());
-            Debug.WriteLine("Newarr " + arrType.GetElementType());
+            il.Emit(OpCodes.Newarr, elemType);
+            Debug.WriteLine("Newarr " + elemType);
             il.Emit(OpCodes.Stloc, arrVar);
             Debug.WriteLine("Stloc_0");
 
@@ -233,15 +259,31 @@ namespace Playground
             for (int i = 0, n = elems.Count; i < n && ok; i++)
             {
                 il.Emit(OpCodes.Ldloc, arrVar);
-                Debug.WriteLine("Ldloc_0");
+                Debug.WriteLine("Ldloc array");
 
-                il.Emit(OpCodes.Ldc_I4, i); 
+                il.Emit(OpCodes.Ldc_I4, i);
                 Debug.WriteLine("Ldc_I4 " + i);
 
-                ok = TryVisit(elems[i], il);
+                if (isElemOfValueType)
+                {
+                    il.Emit(OpCodes.Ldelema, elemType); // loading element address for later copying of value into it.
+                    Debug.WriteLine("Ldelema " + elemType);
+                }
 
-                il.Emit(OpCodes.Stelem_Ref);
-                Debug.WriteLine("Stelem_Ref");
+                ok = TryVisit(elems[i], il);
+                if (ok)
+                {
+                    if (isElemOfValueType)
+                    {
+                        il.Emit(OpCodes.Stobj, elemType); // store element of value type by array element address
+                        Debug.WriteLine("Stobj " + elemType);
+                    }
+                    else
+                    {
+                        il.Emit(OpCodes.Stelem_Ref);
+                        Debug.WriteLine("Stelem_Ref");
+                    }
+                }
             }
 
             il.Emit(OpCodes.Ldloc, arrVar);
@@ -260,26 +302,62 @@ namespace Playground
             }
             return ok;
         }
+
         private static bool VisitMemberInit(MemberInitExpression mi, ILGenerator il)
         {
             var ok = VisitNew(mi.NewExpression, il);
-            if (ok)
-                ok = VisitBindingList(mi.Bindings, il);
-            return ok;
-        }
+            if (!ok) return false;
 
-        private static bool VisitBindingList(IList<MemberBinding> bindings, ILGenerator il)
-        {
-            var ok = true;
-            for (int i = 0, n = bindings.Count; i < n && ok; i++)
+            var obj = il.DeclareLocal(mi.Type);
+            il.Emit(OpCodes.Stloc, obj);
+            Debug.WriteLine("Stloc " + obj);
+
+            var bindings = mi.Bindings;
+            for (int i = 0, n = bindings.Count; i < n; i++)
             {
                 var binding = bindings[i];
-                ok = binding.BindingType == MemberBindingType.Assignment 
-                     && TryVisit(((MemberAssignment)binding).Expression, il);
+                if (binding.BindingType != MemberBindingType.Assignment)
+                    return false;
+
+                il.Emit(OpCodes.Ldloc, obj);
+                Debug.WriteLine("Ldloc " + obj);
+
+                ok = TryVisit(((MemberAssignment)binding).Expression, il);
+                if (!ok) return false;
+
+                var prop = binding.Member as PropertyInfo;
+                if (prop != null)
+                {
+                    var setMethod = prop.GetSetMethodOrNull();
+                    if (setMethod == null)
+                        return false;
+
+                    if (setMethod.IsVirtual)
+                    {
+                        il.Emit(OpCodes.Callvirt, setMethod);
+                        Debug.WriteLine("Callvirt " + setMethod);
+                    }
+                    else
+                    {
+                        il.Emit(OpCodes.Call, setMethod);
+                        Debug.WriteLine("Call " + setMethod);
+                    }
+                }
+                else
+                {
+                    var field = binding.Member as FieldInfo;
+                    if (field == null)
+                        return false;
+
+                    il.Emit(OpCodes.Stfld, field);
+                    Debug.WriteLine("Stfld " + field);
+                }
             }
-            return ok;
+
+            il.Emit(OpCodes.Ldloc, obj);
+            Debug.WriteLine("Ldloc " + obj);
+            return true;
         }
     }
-
     public class D2 : ID { }
 }
