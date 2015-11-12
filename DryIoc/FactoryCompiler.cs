@@ -28,6 +28,9 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Supports emitting of selected expressions, e.g. lambda are not supported yet.
+        /// When emitter find not supported expression it will return false from <see cref="TryVisit"/>, so I could fallback
+        /// to normal and slow Expression.Compile.</summary>
         private static class EmittingVisitor
         {
             public static bool TryVisit(Expression expr, ILGenerator il)
@@ -55,6 +58,8 @@ namespace DryIoc
                         return VisitMemberInit((MemberInitExpression)expr, il);
                     case ExpressionType.Call:
                         return VisitMethodCall((MethodCallExpression)expr, il);
+                    case ExpressionType.MemberAccess:
+                        return VisitMemberAccess((MemberExpression)expr, il);
                     default:
                         // Note: not supported yet
                         return false;
@@ -226,17 +231,7 @@ namespace DryIoc
                         var setMethod = prop.GetSetMethodOrNull();
                         if (setMethod == null)
                             return false;
-
-                        if (setMethod.IsVirtual)
-                        {
-                            il.Emit(OpCodes.Callvirt, setMethod);
-                            Debug.WriteLine("Callvirt " + setMethod);
-                        }
-                        else
-                        {
-                            il.Emit(OpCodes.Call, setMethod);
-                            Debug.WriteLine("Call " + setMethod);
-                        }
+                        EmitMethodCall(setMethod, il);
                     }
                     else
                     {
@@ -260,25 +255,64 @@ namespace DryIoc
                 if (expr.Object != null)
                     ok = TryVisit(expr.Object, il);
 
-                if (expr.Arguments.Count != 0)
+                if (ok && expr.Arguments.Count != 0)
                     ok = VisitExpressionList(expr.Arguments, il);
 
                 if (ok)
+                    EmitMethodCall(expr.Method, il);
+
+                return ok;
+            }
+
+            private static bool VisitMemberAccess(MemberExpression expr, ILGenerator il)
+            {
+                if (expr.Expression != null)
                 {
-                    var method = expr.Method;
-                    if (!method.IsStatic() && method.IsVirtual)
+                    var ok = TryVisit(expr.Expression, il);
+                    if (!ok) return false;
+                }
+
+                var field = expr.Member as FieldInfo;
+                if (field != null)
+                {
+                    if (field.IsStatic())
                     {
-                        il.Emit(OpCodes.Callvirt, method);
-                        Debug.WriteLine("Callvirt " + method);
+                        il.Emit(OpCodes.Ldsfld, field);
+                        Debug.WriteLine("Ldsfld " + field);
                     }
                     else
                     {
-                        il.Emit(OpCodes.Call, method);
-                        Debug.WriteLine("Call " + method);
+                        il.Emit(OpCodes.Ldfld, field);
+                        Debug.WriteLine("Ldfld " + field);
                     }
+
+                    return true;
                 }
 
-                return ok;
+                var property = expr.Member as PropertyInfo;
+                if (property != null)
+                {
+                    var getMethod = property.GetGetMethod();
+                    if (getMethod == null)
+                        return false;
+                    EmitMethodCall(getMethod, il);
+                }
+
+                return true;
+            }
+
+            private static void EmitMethodCall(MethodInfo method, ILGenerator il)
+            {
+                if (method.IsVirtual)
+                {
+                    il.Emit(OpCodes.Callvirt, method);
+                    Debug.WriteLine("Callvirt " + method);
+                }
+                else
+                {
+                    il.Emit(OpCodes.Call, method);
+                    Debug.WriteLine("Call " + method);
+                }
             }
         }
     }
