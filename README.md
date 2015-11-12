@@ -64,7 +64,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 * Creating concrete object without registering it in Container but with injecting its parameters, properties, and fields.
 * Metadata object associating with registration.
 * Generic wrappers:
-    * Service collections: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and as `I(ReadOnly)Collection|List`.
+    * Service collections: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and  `I(ReadOnly)Collection|List<T>`.
     * Other: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>` or `Tuple<TMetadata, T>`, `KeyValuePair<TKey, T>`, and user-defined wrappers.
     * [Currying](http://en.wikipedia.org/wiki/Currying) over constructor (or factory method) arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
     * Nested wrappers: e.g. `Tuple<SomeMetadata, Func<ISomeService>>[]`.
