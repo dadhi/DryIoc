@@ -89,7 +89,7 @@ NuGet: `PM> Install-Package DryIocZero -Pre`
 
 Slim IoC Container based on service factory delegates __generated at compile-time__ by DryIoc. 
 
-- __Does not depend on DryIoc at run-time__
+- __Does not depend on DryIoc at run-time.__
 - Ensures _zero_ application bootstrapping time associated with IoC registrations.
 - Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically - you can see how DryIoc is creating things.
 - Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
