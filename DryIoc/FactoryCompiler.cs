@@ -42,7 +42,7 @@ namespace DryIoc
                         return VisitConstant((ConstantExpression)expr, il);
                     case ExpressionType.Parameter:
                         var paramExpr = (ParameterExpression)expr;
-                        if (paramExpr != Container.StateParamExpr) // Note: For only state (singletons) is handled
+                        if (paramExpr != Container.StateParamExpr) // Note: Only the state (singletons) is handled
                             return false;
                         il.Emit(OpCodes.Ldarg_0); // state is the first argument
                         Debug.WriteLine("Ldarg_0");
@@ -51,10 +51,10 @@ namespace DryIoc
                         return VisitNew((NewExpression)expr, il);
                     case ExpressionType.NewArrayInit:
                         return VisitNewArray((NewArrayExpression)expr, il);
-                    //case ExpressionType.MemberInit:
-                    //    return VisitMemberInit((MemberInitExpression)expr, il);
+                    case ExpressionType.MemberInit:
+                        return VisitMemberInit((MemberInitExpression)expr, il);
                     default:
-                        // not supported nodes
+                        // Note: not supported yet
                         return false;
                 }
             }
@@ -153,7 +153,7 @@ namespace DryIoc
                 {
                     il.Emit(OpCodes.Ldloc, arrVar);
                     Debug.WriteLine("Ldloc array");
-                    
+
                     il.Emit(OpCodes.Ldc_I4, i);
                     Debug.WriteLine("Ldc_I4 " + i);
 
@@ -199,21 +199,57 @@ namespace DryIoc
             private static bool VisitMemberInit(MemberInitExpression mi, ILGenerator il)
             {
                 var ok = VisitNew(mi.NewExpression, il);
-                if (ok)
-                    ok = VisitBindingList(mi.Bindings, il);
-                return ok;
-            }
+                if (!ok) return false;
 
-            private static bool VisitBindingList(IList<MemberBinding> bindings, ILGenerator il)
-            {
-                var ok = true;
-                for (int i = 0, n = bindings.Count; i < n && ok; i++)
+                var obj = il.DeclareLocal(mi.Type);
+                il.Emit(OpCodes.Stloc, obj);
+                Debug.WriteLine("Stloc " + obj);
+
+                var bindings = mi.Bindings;
+                for (int i = 0, n = bindings.Count; i < n; i++)
                 {
                     var binding = bindings[i];
-                    ok = binding.BindingType == MemberBindingType.Assignment
-                         && TryVisit(((MemberAssignment)binding).Expression, il);
+                    if (binding.BindingType != MemberBindingType.Assignment)
+                        return false;
+
+                    il.Emit(OpCodes.Ldloc, obj);
+                    Debug.WriteLine("Ldloc " + obj);
+
+                    ok = TryVisit(((MemberAssignment)binding).Expression, il);
+                    if (!ok) return false;
+
+                    var prop = binding.Member as PropertyInfo;
+                    if (prop != null)
+                    {
+                        var setMethod = prop.GetSetMethodOrNull();
+                        if (setMethod == null)
+                            return false;
+
+                        if (setMethod.IsVirtual)
+                        {
+                            il.Emit(OpCodes.Callvirt, setMethod);
+                            Debug.WriteLine("Callvirt " + setMethod);
+                        }
+                        else
+                        {
+                            il.Emit(OpCodes.Call, setMethod);
+                            Debug.WriteLine("Call " + setMethod);
+                        }
+                    }
+                    else
+                    {
+                        var field = binding.Member as FieldInfo;
+                        if (field == null)
+                            return false;
+
+                        il.Emit(OpCodes.Stfld, field);
+                        Debug.WriteLine("Stfld " + field);
+                    }
                 }
-                return ok;
+
+                il.Emit(OpCodes.Ldloc, obj);
+                Debug.WriteLine("Ldloc " + obj);
+                return true;
             }
         }
     }
