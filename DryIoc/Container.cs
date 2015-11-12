@@ -383,7 +383,9 @@ namespace DryIoc
 
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
-            return _registry.Value.ResolveServiceFromCache(serviceType, _containerWeakRef)
+            var registry = _registry.Value;
+            var factoryDelegate = registry.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+            return (factoryDelegate == null ? null : factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, null))
                 ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
@@ -1701,12 +1703,6 @@ namespace DryIoc
                     DefaultFactoryDelegateCache, KeyedFactoryDelegateCache, FactoryExpressionCache, ResolutionStateCache,
                     isChangePermitted);
             }
-
-            public object ResolveServiceFromCache(Type serviceType, IResolverContext resolverContext)
-            {
-                var factoryDelegate = DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-                return factoryDelegate == null ? null : factoryDelegate(ResolutionStateCache.Value, resolverContext, null);
-            }
         }
 
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope, IScopeContext scopeContext,
@@ -2081,22 +2077,20 @@ namespace DryIoc
             expression = OptimizeExpression(expression);
 
             // Optimization for singleton resolution
-            if (expression.NodeType == ExpressionType.ArrayIndex)
-            {
-                var arrayIndexExpr = (BinaryExpression)expression;
-                if (arrayIndexExpr.Left.NodeType == ExpressionType.Parameter)
-                {
-                    var index = (int)((ConstantExpression)arrayIndexExpr.Right).Value;
-                    var value = container.ResolutionStateCache[index];
-                    return (state, context, scope) => value;
-                }
-            }
+            //if (expression.NodeType == ExpressionType.ArrayIndex)
+            //{
+            //    var arrayIndexExpr = (BinaryExpression)expression;
+            //    if (arrayIndexExpr.Left.NodeType == ExpressionType.Parameter)
+            //    {
+            //        var index = (int)((ConstantExpression)arrayIndexExpr.Right).Value;
+            //        var value = container.ResolutionStateCache[index];
+            //        return (state, context, scope) => value;
+            //    }
+            //}
 
             FactoryDelegate factoryDelegate = null;
             CompileToDelegate(expression, ref factoryDelegate);
-            if (factoryDelegate == null)
-                factoryDelegate = Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
-            return factoryDelegate;
+            return factoryDelegate ?? Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
         }
 
         private static Expression OptimizeExpression(Expression expression)
@@ -3707,10 +3701,10 @@ namespace DryIoc
             }
 
             var canReuseAlreadyRegisteredFactory = factory != null && factory.Reuse == reuse && factory.Setup == setup;
-            if (!canReuseAlreadyRegisteredFactory)
-                factory = new InstanceFactory(originalInstance, reuse, setup);
-            else
+            if (canReuseAlreadyRegisteredFactory)
                 factory.ReplaceInstance(originalInstance);
+            else
+                factory = new InstanceFactory(originalInstance, reuse, setup);
 
             // Before even registering new factory (if old one is not exist or could not be reused)
             // we put instance into scope. So the factory created expression will be ignored anyway.
@@ -5248,8 +5242,8 @@ namespace DryIoc
             if (serviceExpr != null && reuse != null && !isReplacingDecorator)
             {
                 // The singleton optimization: eagerly create singleton and put it into state for fast access.
-                if (reuse is SingletonReuse &&
-                    FactoryType == FactoryType.Service &&
+                if (reuse is SingletonReuse && FactoryType == FactoryType.Service &&
+                    !(this is InstanceFactory) &&
                     request.Ancestor(r => r.ServiceType.IsFunc()).IsEmpty &&
                     container.Rules.EagerCachingSingletonForFasterAccess)
                     serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
@@ -5334,9 +5328,13 @@ namespace DryIoc
             var scopedInstanceIdExpr = Expression.Constant(scopedInstanceId);
 
             if (Setup.PreventDisposal == false && Setup.WeaklyReferenced == false)
-                return Expression.Convert(
-                    Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(), scopedInstanceIdExpr,
-                        Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>())), serviceType);
+            {
+                if (serviceExpr.Type.IsValueType())
+                    serviceExpr = Expression.Convert(serviceExpr, typeof(object));
+                var getFromScope = Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(), scopedInstanceIdExpr,
+                    Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
+                return Expression.Convert(getFromScope, serviceType);
+            }
 
             if (Setup.PreventDisposal)
                 serviceExpr = Expression.NewArrayInit(typeof(object), serviceExpr);

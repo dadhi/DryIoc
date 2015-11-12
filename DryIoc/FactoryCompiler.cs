@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
@@ -14,10 +15,9 @@ namespace DryIoc
         {
             var method = new DynamicMethod("_dryioc_get_",
                 MethodAttributes.Public | MethodAttributes.Static, CallingConventions.Standard,
-                typeof(object), 
-                new[] { typeof(object[]), typeof(IResolverContext), typeof(IScope) },
-                typeof(Container),
-                skipVisibility: true);
+                typeof(object), _factoryDelegateArgTypes,
+                typeof(Container), skipVisibility: true);
+
             var il = method.GetILGenerator();
 
             var emitted = EmittingVisitor.TryVisit(expression, il);
@@ -27,6 +27,8 @@ namespace DryIoc
                 result = (FactoryDelegate)method.CreateDelegate(typeof(FactoryDelegate));
             }
         }
+
+        private static readonly Type[] _factoryDelegateArgTypes = new[] { typeof(object[]), typeof(IResolverContext), typeof(IScope) };
 
         /// <summary>Supports emitting of selected expressions, e.g. lambda are not supported yet.
         /// When emitter find not supported expression it will return false from <see cref="TryVisit"/>, so I could fallback
