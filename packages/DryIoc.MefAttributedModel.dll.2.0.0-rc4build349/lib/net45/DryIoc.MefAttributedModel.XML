@@ -163,7 +163,7 @@
             <summary>Specifies to store reused instance as WeakReference.</summary>
         </member>
         <member name="F:DryIoc.MefAttributedModel.ExportedRegistrationInfo.AllowsDisposableTransient">
-            <summary>Allows disposable transient to be resgitered.</summary>
+            <summary>Allows disposable transient to be registered.</summary>
         </member>
         <member name="F:DryIoc.MefAttributedModel.ExportedRegistrationInfo.HasMetadataAttribute">
             <summary>True if exported type has metadata.</summary>
@@ -257,6 +257,9 @@
         </member>
         <member name="F:DryIoc.MefAttributedModel.DecoratorInfo.DecoratedServiceKeyInfo">
             <summary>Decorated service key info. Info wrapper is required for serialization.</summary>
+        </member>
+        <member name="F:DryIoc.MefAttributedModel.DecoratorInfo.Order">
+            <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
         </member>
         <member name="M:DryIoc.MefAttributedModel.DecoratorInfo.GetSetup(System.Func{DryIoc.RequestInfo,System.Boolean})">
             <summary>Converts info to corresponding decorator setup.</summary>

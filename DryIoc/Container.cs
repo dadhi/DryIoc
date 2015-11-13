@@ -2075,19 +2075,6 @@ namespace DryIoc
         public static FactoryDelegate CompileToDelegate(this Expression expression, IContainer container)
         {
             expression = OptimizeExpression(expression);
-
-            // Optimization for singleton resolution
-            //if (expression.NodeType == ExpressionType.ArrayIndex)
-            //{
-            //    var arrayIndexExpr = (BinaryExpression)expression;
-            //    if (arrayIndexExpr.Left.NodeType == ExpressionType.Parameter)
-            //    {
-            //        var index = (int)((ConstantExpression)arrayIndexExpr.Right).Value;
-            //        var value = container.ResolutionStateCache[index];
-            //        return (state, context, scope) => value;
-            //    }
-            //}
-
             FactoryDelegate factoryDelegate = null;
             CompileToDelegate(expression, ref factoryDelegate);
             return factoryDelegate ?? Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();

@@ -36,6 +36,10 @@
     <DocumentationFile>..\bin\Release\DryIocZero.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="DryIoc.MefAttributedModel.UnitTests.CUT, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
@@ -57,12 +61,7 @@
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">
-      <Project>{e210b3d9-29c8-46f5-8968-09a0e5857158}</Project>
-      <Name>DryIoc.MefAttributedModel.UnitTests.CUT</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
+    <None Include="packages.config" />
     <None Include="YourServiceRegistrations.tt.include" />
   </ItemGroup>
   <ItemGroup>

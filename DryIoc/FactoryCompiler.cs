@@ -13,7 +13,7 @@ namespace DryIoc
         [SuppressMessage("ReSharper", "RedundantAssignment", Justification = "Result is write only by design")]
         static partial void CompileToDelegate(Expression expression, ref FactoryDelegate result)
         {
-            var method = new DynamicMethod("_dryioc_get_",
+            var method = new DynamicMethod(string.Empty,
                 MethodAttributes.Public | MethodAttributes.Static, CallingConventions.Standard,
                 typeof(object), _factoryDelegateArgTypes,
                 typeof(Container), skipVisibility: true);
