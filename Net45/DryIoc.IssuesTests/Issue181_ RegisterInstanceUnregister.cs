@@ -25,33 +25,6 @@ namespace DryIoc.IssuesTests
             printer = container.Resolve<IPrinter>(typeof(Printer));
             Assert.AreEqual("2", printer.Print()); // prints '1', I would expect this to print '2'
         }
-
-        [Test, Ignore]
-        public void Test_with_Unregister()
-        {
-            var container = new Container();
-
-            container.Register(typeof(Printer));
-
-            var test = new Test { N = 1 };
-            container.RegisterInstance<ITest>(test);
-            var printer = container.Resolve<IPrinter>(typeof(Printer));
-            Assert.AreEqual("1", printer.Print()); // prints '1' as expected
-
-            container.Unregister(typeof(ITest));
-
-            Assert.Throws<ContainerException>(() => 
-                container.Resolve<ITest>());
-
-            printer = container.Resolve<IPrinter>(typeof(Printer));
-            printer.Print(); // prints '1', I would expect this to throw
-
-            test = new Test { N = 2 };
-            container.RegisterInstance<ITest>(test, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-            printer = container.Resolve<IPrinter>(typeof(Printer));
-            Assert.AreEqual("2", printer.Print()); // prints '1', I would expect this to print '2'
-        }
-
         private class Printer : IPrinter
         {
             private readonly ITest _test;
