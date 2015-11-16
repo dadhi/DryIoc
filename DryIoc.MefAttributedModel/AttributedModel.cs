@@ -407,8 +407,8 @@ namespace DryIoc.MefAttributedModel
         private static void PopulateWrapperInfoFromAttribute(ExportedRegistrationInfo resultInfo, AsWrapperAttribute attribute,
             Type implementationType)
         {
-            Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
-            resultInfo.FactoryType = FactoryType.Wrapper;
+            Throw.If(resultInfo.FactoryType != DryIoc.FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
+            resultInfo.FactoryType = DryIoc.FactoryType.Wrapper;
             resultInfo.Wrapper = new WrapperInfo
             {
                 WrappedServiceTypeArgIndex = attribute.WrappedServiceTypeArgIndex,
@@ -419,8 +419,8 @@ namespace DryIoc.MefAttributedModel
         private static void PopulateDecoratorInfoFromAttribute(ExportedRegistrationInfo resultInfo, AsDecoratorAttribute attribute,
             Type implementationType)
         {
-            Throw.If(resultInfo.FactoryType != FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
-            resultInfo.FactoryType = FactoryType.Decorator;
+            Throw.If(resultInfo.FactoryType != DryIoc.FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
+            resultInfo.FactoryType = DryIoc.FactoryType.Decorator;
             var decoratedServiceKeyInfo = ServiceKeyInfo.Of(attribute.ContractName ?? attribute.ContractKey);
             resultInfo.Decorator = new DecoratorInfo { DecoratedServiceKeyInfo = decoratedServiceKeyInfo, Order = attribute.Order };
         }
@@ -670,7 +670,7 @@ namespace DryIoc.MefAttributedModel
         public bool HasMetadataAttribute;
 
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
-        public FactoryType FactoryType;
+        public DryIoc.FactoryType FactoryType;
 
         /// <summary>Not null if exported with <see cref="AsDecoratorAttribute"/>, contains info about decorator.</summary>
         public DecoratorInfo Decorator;
@@ -698,7 +698,7 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Created factory setup.</returns>
         public Setup GetSetup(Attribute[] attributes = null)
         {
-            if (FactoryType == FactoryType.Wrapper)
+            if (FactoryType == DryIoc.FactoryType.Wrapper)
                 return Wrapper == null ? Setup.Wrapper : Wrapper.GetSetup();
 
             var condition = ConditionType == null ? (Func<DryIoc.RequestInfo, bool>)null
@@ -708,7 +708,7 @@ namespace DryIoc.MefAttributedModel
             var metadata = !HasMetadataAttribute ? null 
                 : (Func<object>)(() => GetMetadata(attributes));
 
-            if (FactoryType == FactoryType.Decorator)
+            if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
             return Setup.With(metadata, condition,
@@ -716,23 +716,24 @@ namespace DryIoc.MefAttributedModel
                 PreventDisposal, WeaklyReferenced, AllowsDisposableTransient);
         }
 
-        private static DryIocAttributes.RequestInfo ConvertRequestInfo(DryIoc.RequestInfo requestInfo)
+        private static DryIocAttributes.RequestInfo ConvertRequestInfo(DryIoc.RequestInfo source)
         {
-            if (requestInfo.IsEmpty)
+            if (source.IsEmpty)
                 return RequestInfo.Empty;
 
             var registrationType = 
-                requestInfo.FactoryType == FactoryType.Decorator ? RegistrationType.Decorator : 
-                requestInfo.FactoryType == FactoryType.Wrapper ? RegistrationType.Wrapper :
-                RegistrationType.Service;
+                source.FactoryType == DryIoc.FactoryType.Decorator ? DryIocAttributes.FactoryType.Decorator : 
+                source.FactoryType == DryIoc.FactoryType.Wrapper ? DryIocAttributes.FactoryType.Wrapper :
+                DryIocAttributes.FactoryType.Service;
 
-            return ConvertRequestInfo(requestInfo.Parent).Push(
-                requestInfo.ServiceType,
-                requestInfo.RequiredServiceType,
-                requestInfo.ServiceKey,
+            return ConvertRequestInfo(source.ParentOrWrapper).Push(
+                source.ServiceType,
+                source.RequiredServiceType,
+                source.ServiceKey,
+                source.FactoryID,
                 registrationType,
-                requestInfo.ImplementationType,
-                requestInfo.ReuseLifespan);
+                source.ImplementationType,
+                source.ReuseLifespan);
         }
 
         /// <summary>Compares with another info for equality.</summary>
@@ -764,7 +765,7 @@ namespace DryIoc.MefAttributedModel
         "); code.Append(@"},
     Reuse = ").AppendEnum(typeof(ReuseType), Reuse).Append(@",
     HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
-    FactoryType = ").AppendEnum(typeof(FactoryType), FactoryType);
+    FactoryType = ").AppendEnum(typeof(DryIoc.FactoryType), FactoryType);
             if (Wrapper != null) code.Append(@",
     Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ")
                 .Append(Wrapper.WrappedServiceTypeArgIndex).Append(@" }");

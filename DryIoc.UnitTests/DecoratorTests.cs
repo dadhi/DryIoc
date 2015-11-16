@@ -328,17 +328,23 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_registering_one_decorator_as_delegate_and_another_as_service_Then_registered_with_delegate_takes_precedence()
+        public void When_registering_one_decorator_as_delegate_and_another_as_service_Then_delegate_will_be_applied_last()
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
             container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
+            container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.Decorator);
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
 
-            Assert.That(operation, Is.InstanceOf<RetryOperationDecorator>());
-            Assert.That(((RetryOperationDecorator)operation).Decorated, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
+
+            var decorated1 = ((MeasureExecutionTimeOperationDecorator)operation).Decorated;
+            Assert.IsInstanceOf<RetryOperationDecorator>(decorated1);
+
+            var decorated2 = ((RetryOperationDecorator)decorated1).Decorated;
+            Assert.IsInstanceOf<AsyncOperationDecorator>(decorated2);
         }
 
         [Test]
@@ -429,7 +435,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void May_next_func_decorator_inside_other_deocrator()
+        public void May_next_func_decorator_inside_other_decorator()
         {
             var container = new Container();
 
@@ -448,6 +454,27 @@ namespace DryIoc.UnitTests
             var decorated = getOp();
             Assert.IsInstanceOf<SomeOperation>(decorated);
             Assert.AreSame(decorated, getOp());
+        }
+
+        [Test]
+        public void Removing_decorator_before_chaining_it_with_lazy_decorator()
+        {
+            var container = new Container();
+
+            container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
+            container.Register<IOperation, LazyDecorator>(setup: Setup.Decorator);
+            container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.Decorator);
+
+            var op = container.Resolve<IOperation>();
+            op = ((AsyncOperationDecorator)op).Decorated();
+            Assert.IsInstanceOf<LazyDecorator>(op);
+
+            container.Unregister<IOperation>(factoryType: FactoryType.Decorator,
+                condition: factory => factory.ImplementationType == typeof(LazyDecorator));
+
+            op = ((LazyDecorator)op).Decorated.Value;
+            Assert.IsInstanceOf<RetryOperationDecorator>(op);
         }
     }
 

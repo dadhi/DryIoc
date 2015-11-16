@@ -242,7 +242,7 @@ namespace DryIocAttributes
 }
 
 /// <summary>Type of services supported by Container.</summary>
-public enum RegistrationType
+public enum FactoryType
     {
         /// <summary>(default) Defines normal service factory</summary>
         Service,
@@ -256,16 +256,36 @@ public enum RegistrationType
     public sealed class RequestInfo
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, RegistrationType.Service, null, 0, null);
+        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, -1, DryIocAttributes.FactoryType.Service, null, 0, null);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty { get { return ServiceType == null; } }
 
         /// <summary>Returns true if request is the first in a chain.</summary>
-        public bool IsResolutionRoot { get { return !IsEmpty && Parent.IsEmpty; } }
+        public bool IsResolutionRoot { get { return !IsEmpty && ParentOrWrapper.IsEmpty; } }
 
         /// <summary>Parent request or null for root resolution request.</summary>
-        public readonly RequestInfo Parent;
+        public readonly RequestInfo ParentOrWrapper;
+
+        /// <summary>Returns service parent skipping wrapper if any. To get immediate parent us <see cref="ParentOrWrapper"/>.</summary>
+        public RequestInfo Parent
+        {
+            get
+            {
+                return IsEmpty ? Empty : ParentOrWrapper.FirstOrEmpty(p => p.FactoryType != FactoryType.Wrapper);
+            }
+        }
+
+        /// <summary>Gets first request info starting with itself which satisfies the condition, or empty otherwise.</summary>
+        /// <param name="condition">Condition to stop on. Should not be null.</param>
+        /// <returns>Request info of found parent.</returns>
+        public RequestInfo FirstOrEmpty(Func<RequestInfo, bool> condition)
+        {
+            var r = this;
+            while (!r.IsEmpty && !condition(r))
+                r = r.ParentOrWrapper;
+            return r;
+        }
 
         /// <summary>Asked service type.</summary>
         public readonly Type ServiceType;
@@ -276,8 +296,11 @@ public enum RegistrationType
         /// <summary>Optional service key.</summary>
         public readonly object ServiceKey;
 
+        /// <summary>Resolved factory ID, used to identify applied decorator.</summary>
+        public readonly int FactoryID;
+
         /// <summary>False for Decorators and Wrappers.</summary>
-        public readonly RegistrationType FactoryType;
+        public readonly FactoryType FactoryType;
 
         /// <summary>Implementation type.</summary>
         public readonly Type ImplementationType;
@@ -286,30 +309,31 @@ public enum RegistrationType
         public readonly int ReuseLifespan;
 
         /// <summary>Simplified version of Push with most common properties.</summary>
-        /// <param name="serviceType"></param> <param name="implementationType"></param>
+        /// <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
         /// <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
-        public RequestInfo Push(Type serviceType, Type implementationType, int reuseLifespan)
+        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, int reuseLifespan)
         {
-            return Push(serviceType, null, null, RegistrationType.Service, implementationType, reuseLifespan);
+            return Push(serviceType, null, null, factoryID, FactoryType.Service, implementationType, reuseLifespan);
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="factoryType"></param>
+        /// <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
         /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
-            RegistrationType factoryType, Type implementationType, int reuseLifespan)
+            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan)
         {
-            return new RequestInfo(serviceType, requiredServiceType, serviceKey, factoryType, implementationType, reuseLifespan, this);
+            return new RequestInfo(serviceType, requiredServiceType, serviceKey,
+                factoryID, factoryType, implementationType, reuseLifespan, this);
         }
 
         private RequestInfo(
             Type serviceType, Type requiredServiceType, object serviceKey,
-            RegistrationType factoryType, Type implementationType, int reuseLifespan,
-            RequestInfo parent)
+            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan,
+            RequestInfo parentOrWrapper)
         {
-            Parent = parent;
+            ParentOrWrapper = parentOrWrapper;
 
             // Service info:
             ServiceType = serviceType;
@@ -317,6 +341,7 @@ public enum RegistrationType
             ServiceKey = serviceKey;
 
             // Implementation info:
+            FactoryID = factoryID;
             FactoryType = factoryType;
             ImplementationType = implementationType;
             ReuseLifespan = reuseLifespan;
@@ -326,7 +351,7 @@ public enum RegistrationType
         /// <returns>Requests from the last to first.</returns>
         public IEnumerable<RequestInfo> Enumerate()
         {
-            for (var i = this; !i.IsEmpty; i = i.Parent)
+            for (var i = this; !i.IsEmpty; i = i.ParentOrWrapper)
                 yield return i;
         }
 
@@ -334,11 +359,11 @@ public enum RegistrationType
         public override string ToString()
         {
             if (IsEmpty)
-                return "{{empty}}";
+                return "{empty}";
 
             var s = new StringBuilder();
 
-            if (FactoryType != RegistrationType.Service)
+            if (FactoryType != FactoryType.Service)
                 s.Append(FactoryType.ToString().ToLower()).Append(' ');
             if (ImplementationType != null && ImplementationType != ServiceType)
                 s.Append(ImplementationType).Append(": ");
@@ -354,8 +379,8 @@ public enum RegistrationType
             if (ReuseLifespan != 0)
                 s.Append(" with ReuseLifespan=").Append(ReuseLifespan);
 
-            if (!Parent.IsEmpty)
-                s.AppendLine().Append("  in ").Append(Parent);
+            if (!ParentOrWrapper.IsEmpty)
+                s.AppendLine().Append("  in ").Append(ParentOrWrapper);
 
             return s.ToString();
         }
@@ -372,8 +397,8 @@ public enum RegistrationType
         public bool Equals(RequestInfo other)
         {
             return other != null && EqualsWithoutParent(other)
-                && (Parent == null && other.Parent == null
-                || (Parent != null && Parent.EqualsWithoutParent(other.Parent)));
+                && (ParentOrWrapper == null && other.ParentOrWrapper == null
+                || (ParentOrWrapper != null && ParentOrWrapper.EqualsWithoutParent(other.ParentOrWrapper)));
         }
 
         /// <summary>Compares with other info taking into account the properties but not the parents and their properties.</summary>
@@ -394,7 +419,7 @@ public enum RegistrationType
         public override int GetHashCode()
         {
             var hash = 0;
-            for (var i = this; !i.IsEmpty; i = i.Parent)
+            for (var i = this; !i.IsEmpty; i = i.ParentOrWrapper)
             {
                 var currentHash = i.ServiceType.GetHashCode();
                 if (i.RequiredServiceType != null)
@@ -403,7 +428,7 @@ public enum RegistrationType
                 if (i.ServiceKey != null)
                     currentHash = CombineHashCodes(currentHash, i.ServiceKey.GetHashCode());
 
-                if (i.FactoryType != RegistrationType.Service)
+                if (i.FactoryType != FactoryType.Service)
                     currentHash = CombineHashCodes(currentHash, i.FactoryType.GetHashCode());
 
                 if (i.ImplementationType != null && i.ImplementationType != i.ServiceType)
