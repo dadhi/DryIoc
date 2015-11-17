@@ -385,8 +385,9 @@ namespace DryIoc
         {
             var registry = _registry.Value;
             var factoryDelegate = registry.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-            return (factoryDelegate == null ? null : factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, null))
-                ?? ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
+            return factoryDelegate != null 
+                ? factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, null) 
+                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
         object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent, IScope scope)
