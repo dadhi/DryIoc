@@ -40,7 +40,8 @@ namespace DryIoc
                 switch (expr.NodeType)
                 {
                     case ExpressionType.Convert:
-                        return VisitConvertAndUseStateVarIfDeclared(expr, il, ref vars);
+                        return VisitConvert((UnaryExpression)expr, il, ref vars);
+                        //return VisitConvertAndUseStateVarIfDeclared(expr, il, ref vars);
                     case ExpressionType.ArrayIndex:
                         return VisitArrayIndex((BinaryExpression)expr, il, ref vars);
                     case ExpressionType.Constant:
