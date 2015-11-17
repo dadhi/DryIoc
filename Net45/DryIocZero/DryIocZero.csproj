@@ -36,10 +36,6 @@
     <DocumentationFile>..\bin\Release\DryIocZero.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="DryIoc.MefAttributedModel.UnitTests.CUT, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
@@ -69,6 +65,12 @@
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>Container.Generated.cs</LastGenOutput>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">
+      <Project>{e210b3d9-29c8-46f5-8968-09a0e5857158}</Project>
+      <Name>DryIoc.MefAttributedModel.UnitTests.CUT</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />

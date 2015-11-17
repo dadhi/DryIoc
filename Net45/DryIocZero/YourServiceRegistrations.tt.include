@@ -22,17 +22,17 @@ IContainer GetContainerWithRegistrations()
 {
     var container = new Container().WithMefAttributedModel();
 
+	// EXAMPLE: Replace with your assemblies and types. 
     var types = typeof(IDecoratedResult).Assembly.GetLoadedTypes();
 
     container.RegisterExports(types);
-    
     return container;
 }
 
 // Specify what resolution roots should be generated
 bool IsResolutionRoot(ServiceRegistrationInfo info) 
 {
-	// As an EXAMPLE I am selecting the roots Setup.With(asResolutionRoot: true) 
+	// EXAMPLE: I am selecting the roots registered with Setup.With(asResolutionRoot: true) or AsResolutionRootAttribute
 	return ContainerTools.SetupAsResolutionRoots(info);
 }
 #>
