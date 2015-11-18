@@ -183,7 +183,7 @@ namespace DryIocZero
 
         partial void ResolveManyGenerated(ref IEnumerable<KV> services, Type serviceType);
 
-        /// <summary>Resolves meny generated only services. Ignores runtime registrations.</summary>
+        /// <summary>Resolves many generated only services. Ignores runtime registrations.</summary>
         /// <param name="serviceType">Service type.</param>
         /// <returns>Collection of service key - service pairs.</returns>
         public IEnumerable<KV> ResolveManyGeneratedOrGetEmpty(Type serviceType)
@@ -1439,16 +1439,36 @@ namespace DryIocZero
     public sealed class RequestInfo
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, FactoryType.Service, null, 0, null);
+        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, -1, FactoryType.Service, null, 0, null);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty { get { return ServiceType == null; } }
 
         /// <summary>Returns true if request is the first in a chain.</summary>
-        public bool IsResolutionRoot { get { return !IsEmpty && Parent.IsEmpty; } }
+        public bool IsResolutionRoot { get { return !IsEmpty && ParentOrWrapper.IsEmpty; } }
 
         /// <summary>Parent request or null for root resolution request.</summary>
-        public readonly RequestInfo Parent;
+        public readonly RequestInfo ParentOrWrapper;
+
+        /// <summary>Returns service parent skipping wrapper if any. To get immediate parent us <see cref="ParentOrWrapper"/>.</summary>
+        public RequestInfo Parent
+        {
+            get
+            {
+                return IsEmpty ? Empty : ParentOrWrapper.FirstOrEmpty(p => p.FactoryType != FactoryType.Wrapper);
+            }
+        }
+
+        /// <summary>Gets first request info starting with itself which satisfies the condition, or empty otherwise.</summary>
+        /// <param name="condition">Condition to stop on. Should not be null.</param>
+        /// <returns>Request info of found parent.</returns>
+        public RequestInfo FirstOrEmpty(Func<RequestInfo, bool> condition)
+        {
+            var r = this;
+            while (!r.IsEmpty && !condition(r))
+                r = r.ParentOrWrapper;
+            return r;
+        }
 
         /// <summary>Asked service type.</summary>
         public readonly Type ServiceType;
@@ -1458,6 +1478,9 @@ namespace DryIocZero
 
         /// <summary>Optional service key.</summary>
         public readonly object ServiceKey;
+
+        /// <summary>Resolved factory ID, used to identify applied decorator.</summary>
+        public readonly int FactoryID;
 
         /// <summary>False for Decorators and Wrappers.</summary>
         public readonly FactoryType FactoryType;
@@ -1469,30 +1492,31 @@ namespace DryIocZero
         public readonly int ReuseLifespan;
 
         /// <summary>Simplified version of Push with most common properties.</summary>
-        /// <param name="serviceType"></param> <param name="implementationType"></param>
+        /// <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
         /// <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
-        public RequestInfo Push(Type serviceType, Type implementationType, int reuseLifespan)
+        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, int reuseLifespan)
         {
-            return Push(serviceType, null, null, FactoryType.Service, implementationType, reuseLifespan);
+            return Push(serviceType, null, null, factoryID, FactoryType.Service, implementationType, reuseLifespan);
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="factoryType"></param>
+        /// <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
         /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
-            FactoryType factoryType, Type implementationType, int reuseLifespan)
+            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan)
         {
-            return new RequestInfo(serviceType, requiredServiceType, serviceKey, factoryType, implementationType, reuseLifespan, this);
+            return new RequestInfo(serviceType, requiredServiceType, serviceKey,
+                factoryID, factoryType, implementationType, reuseLifespan, this);
         }
 
         private RequestInfo(
             Type serviceType, Type requiredServiceType, object serviceKey,
-            FactoryType factoryType, Type implementationType, int reuseLifespan,
-            RequestInfo parent)
+            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan,
+            RequestInfo parentOrWrapper)
         {
-            Parent = parent;
+            ParentOrWrapper = parentOrWrapper;
 
             // Service info:
             ServiceType = serviceType;
@@ -1500,6 +1524,7 @@ namespace DryIocZero
             ServiceKey = serviceKey;
 
             // Implementation info:
+            FactoryID = factoryID;
             FactoryType = factoryType;
             ImplementationType = implementationType;
             ReuseLifespan = reuseLifespan;
@@ -1509,7 +1534,7 @@ namespace DryIocZero
         /// <returns>Requests from the last to first.</returns>
         public IEnumerable<RequestInfo> Enumerate()
         {
-            for (var i = this; !i.IsEmpty; i = i.Parent)
+            for (var i = this; !i.IsEmpty; i = i.ParentOrWrapper)
                 yield return i;
         }
 
@@ -1517,7 +1542,7 @@ namespace DryIocZero
         public override string ToString()
         {
             if (IsEmpty)
-                return "{{empty}}";
+                return "{empty}";
 
             var s = new StringBuilder();
 
@@ -1537,8 +1562,8 @@ namespace DryIocZero
             if (ReuseLifespan != 0)
                 s.Append(" with ReuseLifespan=").Append(ReuseLifespan);
 
-            if (!Parent.IsEmpty)
-                s.AppendLine().Append("  in ").Append(Parent);
+            if (!ParentOrWrapper.IsEmpty)
+                s.AppendLine().Append("  in ").Append(ParentOrWrapper);
 
             return s.ToString();
         }
@@ -1555,11 +1580,11 @@ namespace DryIocZero
         public bool Equals(RequestInfo other)
         {
             return other != null && EqualsWithoutParent(other)
-                && (Parent == null && other.Parent == null
-                || (Parent != null && Parent.EqualsWithoutParent(other.Parent)));
+                && (ParentOrWrapper == null && other.ParentOrWrapper == null
+                || (ParentOrWrapper != null && ParentOrWrapper.EqualsWithoutParent(other.ParentOrWrapper)));
         }
 
-        /// <summary>Compares infos regarding properies but not their parents.</summary>
+        /// <summary>Compares with other info taking into account the properties but not the parents and their properties.</summary>
         /// <param name="other">Info to compare for equality.</param> <returns></returns>
         public bool EqualsWithoutParent(RequestInfo other)
         {
@@ -1577,7 +1602,7 @@ namespace DryIocZero
         public override int GetHashCode()
         {
             var hash = 0;
-            for (var i = this; !i.IsEmpty; i = i.Parent)
+            for (var i = this; !i.IsEmpty; i = i.ParentOrWrapper)
             {
                 var currentHash = i.ServiceType.GetHashCode();
                 if (i.RequiredServiceType != null)
