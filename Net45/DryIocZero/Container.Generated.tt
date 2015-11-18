@@ -25,15 +25,15 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.0.0-rc4build349\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.0.0\lib\net45\DryIoc.dll" #>
 <#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Collections.Generic" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
-<#@ include File="YourServiceRegistrations.tt.include" #>
-<#
+<#@ include File="YourServiceRegistrations.tt.include" #><#
+
 var container = GetContainerWithRegistrations();
 
 KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
@@ -58,6 +58,9 @@ var deps = resolutionCallDependencies.Select((r, i) =>
           PreResolveParent = code(r.Key.Parent)
     });
 #>
+//========================================================================================================
+// NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
+//========================================================================================================
 using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;

@@ -8,24 +8,27 @@
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIocZero provides container to work on top of compile-time generated factory delegates, therefore decreasing application startup cost.</description>
+        <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
         <releaseNotes>
-            - Ensures "zero" application bootstrapping time associated with IoC registrations.
-            - Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically - you can see how DryIoc is creating things.
-            - Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
-            - Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
-            - Allows run-time registrations too. You may register instances and factories at run-time.
+          - Ensures "zero" application bootstrapping time associated with IoC registrations.
+          - Does not depend on DryIoc at run-time.
+          - Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically - you can see how DryIoc is creating things.
+          - Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
+          - Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
+          - Allows run-time registrations too. You may register instances and factories at run-time.
         </releaseNotes>
         <dependencies>
-            <dependency id="DryIoc.dll" version="(1.5,3.0.0)" />
-            <dependency id="DryIoc.MefAttributedModel.dll" version="(1.5,3.0.0)" />
-            <dependency id="ExpressionToCodeLib" version="[1.5.4,2.0.0)" />
+            <dependency id="DryIoc.dll" version="2.0.0" />
+            <dependency id="DryIoc.MefAttributedModel.dll" version="2.0.0" />
+            <dependency id="ExpressionToCodeLib" version="1.5.4" />
         </dependencies>
         <frameworkAssemblies>
             <frameworkAssembly assemblyName="System.ComponentModel.Composition" />
         </frameworkAssemblies>
-        <references /> <!-- Dependencies required only in Compile-time. -->
+        <references>
+            <!-- No references should be added to the project, the dependencies are used only by Container.Generated.tt at compile-time -->
+        </references>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
