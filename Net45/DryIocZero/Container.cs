@@ -258,6 +258,11 @@ namespace DryIocZero
         /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param> <param name="factoryDelegate">Delegate</param>
         public void Register(Type serviceType, object serviceKey, FactoryDelegate factoryDelegate)
         {
+            if (serviceKey == null)
+            {
+                Register(serviceType, factoryDelegate);
+                return;
+            }
             ThrowIfContainerDisposed();
             _keyedFactories.Swap(_ =>
             {
@@ -593,10 +598,46 @@ namespace DryIocZero
                 return _default;
             }
         }
-
         static partial void GetDefaultScopeContext(ref IScopeContext resultContext);
 
         private static IScopeContext _default;
+    }
+    
+    /// <summary>Convenience extensions for registrations on top of delegate registrator.</summary>
+    public static class Registrator
+    {
+        /// <summary>Registers user provided delegate to create the service</summary>
+        /// <param name="registrator">Registrator to register with.</param>
+        /// <param name="serviceType">Service type.</param>
+        /// <param name="factoryDelegate">Delegate to produce service instance.</param>
+        /// <param name="serviceKey">(optional) Service key.</param>
+        public static void RegisterDelegate<TService>(this IFactoryDelegateRegistrator registrator,
+            Type serviceType, Func<IResolver, TService> factoryDelegate, object serviceKey = null)
+        {
+            registrator.Register(typeof(TService), serviceKey, (context, scope) => factoryDelegate(context.Resolver));
+        }
+
+
+        /// <summary>Registers user provided delegate to create the service</summary>
+        /// <typeparam name="TService">Service type.</typeparam>
+        ///  <param name="registrator">Registrator to register with.</param>
+        /// <param name="factoryDelegate">Delegate to produce service instance.</param>
+        /// <param name="serviceKey">(optional) Service key.</param>
+        public static void RegisterDelegate<TService>(this IFactoryDelegateRegistrator registrator, 
+            Func<IResolver, TService> factoryDelegate, object serviceKey = null)
+        {
+            registrator.RegisterDelegate(typeof(TService), factoryDelegate, serviceKey);
+        }
+
+        /// <summary>Registers passed service instance.</summary>
+        /// <typeparam name="TService">Service type, may be different from instance type.</typeparam>
+        /// <param name="registrator">Registrator to register with.</param>
+        /// <param name="instance">Externally managed service instance.</param>
+        /// <param name="serviceKey">(optional) Service key.</param>
+        public static void RegisterInstance<TService>(this IFactoryDelegateRegistrator registrator, TService instance, object serviceKey = null)
+        {
+            registrator.Register(typeof(TService), serviceKey, (context, scope) => instance);
+        }
     }
 
     /// <summary>Sugar to allow more simple resolve API</summary>

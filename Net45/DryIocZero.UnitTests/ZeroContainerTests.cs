@@ -11,7 +11,7 @@ namespace DryIocZero.UnitTests
         public void Can_Register_default_delegate()
         {
             var container = new Container();
-            container.Register(typeof(Potato), (r, scope) => new Potato());
+            container.RegisterDelegate(r => new Potato());
 
             var potato = container.Resolve(typeof(Potato), false);
             
@@ -22,11 +22,23 @@ namespace DryIocZero.UnitTests
         public void Can_Register_keyed_delegate()
         {
             var container = new Container();
-            container.Register(typeof(Potato), "mashed", (r, scope) => new Potato());
+            container.RegisterDelegate(r => new Potato(), "mashed");
 
             var potato = container.Resolve(typeof(Potato), "mashed");
 
             Assert.IsNotNull(potato);
+        }
+
+        [Test]
+        public void Can_Register_Instance()
+        {
+            var container = new Container();
+            var potato = new Potato();
+            container.RegisterInstance(potato);
+
+            var resolvedPotato = container.Resolve(typeof(Potato), false);
+
+            Assert.AreSame(potato, resolvedPotato);
         }
 
         internal class Potato {}
