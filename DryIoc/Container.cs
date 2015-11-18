@@ -385,8 +385,8 @@ namespace DryIoc
         {
             var registry = _registry.Value;
             var factoryDelegate = registry.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-            return factoryDelegate != null 
-                ? factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, null) 
+            return factoryDelegate != null
+                ? factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
@@ -2034,18 +2034,21 @@ namespace DryIoc
         /// <summary>Container access.</summary>
         public IContainer Container { get { return GetTarget(); } }
 
+        /// <summary>Returns target container when it is not null and not disposed. Otherwise throws exception.</summary>
+        /// <returns>Target container.</returns>
+        public Container GetTarget()
+        {
+            var container = _ref.Target as Container;
+            return container != null && !container.IsDisposed ? container
+                : container == null
+                    ? Throw.For<Container>(Error.ContainerIsGarbageCollected)
+                    : Throw.For<Container>(Error.ContainerIsDisposed);
+        }
+
         /// <summary>Creates weak reference wrapper over passed container object.</summary> <param name="container">Object to wrap.</param>
         public ContainerWeakRef(IContainer container) { _ref = new WeakReference(container); }
 
         private readonly WeakReference _ref;
-
-        private Container GetTarget()
-        {
-            var container = _ref.Target as Container;
-            return container == null ? Throw.For<Container>(Error.ContainerIsGarbageCollected)
-                : container.IsDisposed ? Throw.For<Container>(Error.ContainerIsDisposed)
-                : container;
-        }
     }
 
     /// <summary>The delegate type which is actually used to create service instance by container.

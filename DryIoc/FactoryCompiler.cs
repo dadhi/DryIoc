@@ -13,14 +13,13 @@ namespace DryIoc
         static partial void CompileToDelegate(Expression expression, ref FactoryDelegate result)
         {
             var method = new DynamicMethod(string.Empty,
-                MethodAttributes.Public | MethodAttributes.Static, CallingConventions.Standard,
+                //MethodAttributes.Public | MethodAttributes.Static, CallingConventions.Standard,
                 typeof(object), _factoryDelegateArgTypes,
-                typeof(Container), skipVisibility: true);
+                typeof(Container).Module, skipVisibility: true);
 
             var il = method.GetILGenerator();
 
-            var vars = ImTreeMap<int, LocalBuilder>.Empty;
-            var emitted = EmittingVisitor.TryVisit(expression, il, ref vars);
+            var emitted = EmittingVisitor.TryVisit(expression, il);
             if (emitted)
             {
                 il.Emit(OpCodes.Ret);
@@ -35,29 +34,28 @@ namespace DryIoc
         /// to normal and slow Expression.Compile.</summary>
         private static class EmittingVisitor
         {
-            public static bool TryVisit(Expression expr, ILGenerator il, ref ImTreeMap<int, LocalBuilder> vars)
+            public static bool TryVisit(Expression expr, ILGenerator il)
             {
                 switch (expr.NodeType)
                 {
                     case ExpressionType.Convert:
-                        return VisitConvert((UnaryExpression)expr, il, ref vars);
-                        //return VisitConvertAndUseStateVarIfDeclared(expr, il, ref vars);
+                        return VisitConvert((UnaryExpression)expr, il);
                     case ExpressionType.ArrayIndex:
-                        return VisitArrayIndex((BinaryExpression)expr, il, ref vars);
+                        return VisitArrayIndex((BinaryExpression)expr, il);
                     case ExpressionType.Constant:
                         return VisitConstant((ConstantExpression)expr, il);
                     case ExpressionType.Parameter:
                         return VisitFactoryDelegateParameters(expr, il);
                     case ExpressionType.New:
-                        return VisitNew((NewExpression)expr, il, ref vars);
+                        return VisitNew((NewExpression)expr, il);
                     case ExpressionType.NewArrayInit:
-                        return VisitNewArray((NewArrayExpression)expr, il, ref vars);
+                        return VisitNewArray((NewArrayExpression)expr, il);
                     case ExpressionType.MemberInit:
-                        return VisitMemberInit((MemberInitExpression)expr, il, ref vars);
+                        return VisitMemberInit((MemberInitExpression)expr, il);
                     case ExpressionType.Call:
-                        return VisitMethodCall((MethodCallExpression)expr, il, ref vars);
+                        return VisitMethodCall((MethodCallExpression)expr, il);
                     case ExpressionType.MemberAccess:
-                        return VisitMemberAccess((MemberExpression)expr, il, ref vars);
+                        return VisitMemberAccess((MemberExpression)expr, il);
                     default:
                         // Not supported yet: nested lambdas (Invoke)
                         return false;
@@ -76,58 +74,26 @@ namespace DryIoc
                 return true;
             }
 
-            private static bool VisitConvertAndUseStateVarIfDeclared(Expression expr, ILGenerator il, ref ImTreeMap<int, LocalBuilder> vars)
+            private static bool VisitBinary(BinaryExpression b, ILGenerator il)
             {
-                var convertExpr = (UnaryExpression)expr;
-                var stateItemIndex = -1;
-                if (convertExpr.Operand.NodeType == ExpressionType.ArrayIndex)
-                {
-                    var operandExpr = (BinaryExpression)convertExpr.Operand;
-                    if (operandExpr.Left == Container.StateParamExpr)
-                        stateItemIndex = (int)((ConstantExpression)operandExpr.Right).Value;
-                }
-
-                if (stateItemIndex != -1)
-                {
-                    var itemVar = vars.GetValueOrDefault(stateItemIndex);
-                    if (itemVar != null)
-                    {
-                        il.Emit(OpCodes.Ldloc, itemVar);
-                        return true;
-                    }
-                }
-
-                var ok = VisitConvert(convertExpr, il, ref vars);
-                if (ok && stateItemIndex != -1)
-                {
-                    var itemVar = il.DeclareLocal(convertExpr.Type);
-                    vars = vars.AddOrUpdate(stateItemIndex, itemVar);
-                    il.Emit(OpCodes.Stloc, itemVar);
-                    il.Emit(OpCodes.Ldloc, itemVar);
-                }
-                return ok;
-            }
-
-            private static bool VisitBinary(BinaryExpression b, ILGenerator il, ref ImTreeMap<int, LocalBuilder> vars)
-            {
-                var ok = TryVisit(b.Left, il, ref vars);
+                var ok = TryVisit(b.Left, il);
                 if (ok)
-                    ok = TryVisit(b.Right, il, ref vars);
+                    ok = TryVisit(b.Right, il);
                 // skips TryVisit(b.Conversion) for NodeType.Coalesce (?? operation)
                 return ok;
             }
 
-            private static bool VisitExpressionList(IList<Expression> eList, ILGenerator state, ref ImTreeMap<int, LocalBuilder> vars)
+            private static bool VisitExpressionList(IList<Expression> eList, ILGenerator state)
             {
                 var ok = true;
                 for (int i = 0, n = eList.Count; i < n && ok; i++)
-                    ok = TryVisit(eList[i], state, ref vars);
+                    ok = TryVisit(eList[i], state);
                 return ok;
             }
 
-            private static bool VisitConvert(UnaryExpression node, ILGenerator il, ref ImTreeMap<int, LocalBuilder> vars)
+            private static bool VisitConvert(UnaryExpression node, ILGenerator il)
             {
-                var ok = TryVisit(node.Operand, il, ref vars);
+                var ok = TryVisit(node.Operand, il);
                 if (ok)
                 {
                     var convertTargetType = node.Type;
@@ -152,15 +118,15 @@ namespace DryIoc
                 return true;
             }
 
-            private static bool VisitNew(NewExpression node, ILGenerator il, ref ImTreeMap<int, LocalBuilder> vars)
+            private static bool VisitNew(NewExpression node, ILGenerator il)
             {
-                var ok = VisitExpressionList(node.Arguments, il, ref vars);
+                var ok = VisitExpressionList(node.Arguments, il);
                 if (ok)
                     il.Emit(OpCodes.Newobj, node.Constructor);
                 return ok;
             }
 
-            private static bool VisitNewArray(NewArrayExpression node, ILGenerator il, ref ImTreeMap<int, LocalBuilder> vars)
+            private static bool VisitNewArray(NewArrayExpression node, ILGenerator il)
             {
                 var elems = node.Expressions;
                 var arrType = node.Type;
@@ -183,7 +149,7 @@ namespace DryIoc
                     if (isElemOfValueType)
                         il.Emit(OpCodes.Ldelema, elemType);
 
-                    ok = TryVisit(elems[i], il, ref vars);
+                    ok = TryVisit(elems[i], il);
                     if (ok)
                     {
                         if (isElemOfValueType)
@@ -197,17 +163,17 @@ namespace DryIoc
                 return ok;
             }
 
-            private static bool VisitArrayIndex(BinaryExpression node, ILGenerator il, ref ImTreeMap<int, LocalBuilder> vars)
+            private static bool VisitArrayIndex(BinaryExpression node, ILGenerator il)
             {
-                var ok = VisitBinary(node, il, ref vars);
+                var ok = VisitBinary(node, il);
                 if (ok)
                     il.Emit(OpCodes.Ldelem_Ref);
                 return ok;
             }
 
-            private static bool VisitMemberInit(MemberInitExpression mi, ILGenerator il, ref ImTreeMap<int, LocalBuilder> vars)
+            private static bool VisitMemberInit(MemberInitExpression mi, ILGenerator il)
             {
-                var ok = VisitNew(mi.NewExpression, il, ref vars);
+                var ok = VisitNew(mi.NewExpression, il);
                 if (!ok) return false;
 
                 var obj = il.DeclareLocal(mi.Type);
@@ -221,7 +187,7 @@ namespace DryIoc
                         return false;
                     il.Emit(OpCodes.Ldloc, obj);
 
-                    ok = TryVisit(((MemberAssignment)binding).Expression, il, ref vars);
+                    ok = TryVisit(((MemberAssignment)binding).Expression, il);
                     if (!ok) return false;
 
                     var prop = binding.Member as PropertyInfo;
@@ -245,14 +211,14 @@ namespace DryIoc
                 return true;
             }
 
-            private static bool VisitMethodCall(MethodCallExpression expr, ILGenerator il, ref ImTreeMap<int, LocalBuilder> vars)
+            private static bool VisitMethodCall(MethodCallExpression expr, ILGenerator il)
             {
                 var ok = true;
                 if (expr.Object != null)
-                    ok = TryVisit(expr.Object, il, ref vars);
+                    ok = TryVisit(expr.Object, il);
 
                 if (ok && expr.Arguments.Count != 0)
-                    ok = VisitExpressionList(expr.Arguments, il, ref vars);
+                    ok = VisitExpressionList(expr.Arguments, il);
 
                 if (ok)
                     EmitMethodCall(expr.Method, il);
@@ -260,11 +226,11 @@ namespace DryIoc
                 return ok;
             }
 
-            private static bool VisitMemberAccess(MemberExpression expr, ILGenerator il, ref ImTreeMap<int, LocalBuilder> vars)
+            private static bool VisitMemberAccess(MemberExpression expr, ILGenerator il)
             {
                 if (expr.Expression != null)
                 {
-                    var ok = TryVisit(expr.Expression, il, ref vars);
+                    var ok = TryVisit(expr.Expression, il);
                     if (!ok) return false;
                 }
 
