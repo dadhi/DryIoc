@@ -12,10 +12,17 @@
         <description>Superset of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features.</description>
         <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>Supports all DryIoc V2 features.</releaseNotes>
-        <dependencies></dependencies>
-        <frameworkAssemblies>
-            <frameworkAssembly assemblyName="System.ComponentModel.Composition" targetFramework="net40" />
-        </frameworkAssemblies>
+      <dependencies>
+        <group targetFramework="dotnet">
+          <dependency id="System.Diagnostics.Debug" version="4.0.0" />
+          <dependency id="System.Runtime" version="4.0.0" />
+          <dependency id="System.Runtime.Extensions" version="4.0.0" />
+          <dependency id="System.ComponentModel.Composition" version="4.0.0" />
+        </group>
+      </dependencies>
+      <frameworkAssemblies>
+        <frameworkAssembly assemblyName="System.ComponentModel.Composition" targetFramework="net40" />
+      </frameworkAssemblies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
@@ -44,6 +51,11 @@
         <file src="..\PCL-Net45\bin\Release\DryIocAttributes.dll" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL-Net45\bin\Release\DryIocAttributes.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL-Net45\bin\Release\DryIocAttributes.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+
+        <!-- Core CLR dotnet (PCL Profile259) https://oren.codes/2015/07/29/targeting-net-core -->
+        <file src="..\PCL-Net45\bin\Release\DryIocAttributes.dll" target="lib\dotnet" />
+        <file src="..\PCL-Net45\bin\Release\DryIocAttributes.pdb" target="lib\dotnet" />
+        <file src="..\PCL-Net45\bin\Release\DryIocAttributes.xml" target="lib\dotnet" />
 
         <!-- tools -->
         <file src="..\NuGet\DryIoc.snk" target="tools" />
