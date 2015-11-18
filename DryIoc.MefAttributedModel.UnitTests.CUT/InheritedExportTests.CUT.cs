@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.Composition;
+using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
@@ -19,7 +20,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     public interface IMultiExported { }
 
     [Export("a")]
-    [ExportAll(ContractName = "c")]
+    [ExportMany(ContractName = "c"), AsResolutionRoot]
     [Export("b")]
     public class MultiExported : IMultiExported { }
 }

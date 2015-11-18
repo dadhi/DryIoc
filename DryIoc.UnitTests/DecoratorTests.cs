@@ -11,7 +11,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: Setup.Decorator);
 
             var decorator = container.Resolve<IOperation>();
 
@@ -23,8 +23,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: DecoratorSetup.With());
-            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: Setup.Decorator);
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
 
             var decorator = (RetryOperationDecorator)container.Resolve<IOperation>();
 
@@ -36,8 +36,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, AnotherOperation>(named: "Another");
-            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, AnotherOperation>(serviceKey: "Another");
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
 
             var decorator = (RetryOperationDecorator)container.Resolve<IOperation>("Another");
 
@@ -48,9 +48,9 @@ namespace DryIoc.UnitTests
         public void Should_NOT_cache_decorator_so_it_could_decorated_another_service()
         {
             var container = new Container();
-            container.Register<IOperation, SomeOperation>(named: "Some");
-            container.Register<IOperation, AnotherOperation>(named: "Another");
-            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, SomeOperation>(serviceKey: "Some");
+            container.Register<IOperation, AnotherOperation>(serviceKey: "Another");
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
 
             var some = (RetryOperationDecorator)container.Resolve<IOperation>("Some");
             var another = (RetryOperationDecorator)container.Resolve<IOperation>("Another");
@@ -64,7 +64,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>));
-            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: DecoratorSetup.With());
+            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: Setup.Decorator);
 
             var decorator = container.Resolve<IOperation<string>>();
 
@@ -76,7 +76,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation<int>, SomeOperation<int>>();
-            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: DecoratorSetup.With());
+            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation<int>>();
 
@@ -88,8 +88,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>));
-            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: DecoratorSetup.With());
-            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: DecoratorSetup.With());
+            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: Setup.Decorator);
+            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: Setup.Decorator);
 
             var decorator = (RetryOperationDecorator<int>)container.Resolve<IOperation<int>>();
 
@@ -101,8 +101,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>));
-            container.Register(typeof(IOperation<int>), typeof(MeasureExecutionTimeOperationDecorator<int>), setup: DecoratorSetup.With());
-            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: DecoratorSetup.With());
+            container.Register(typeof(IOperation<int>), typeof(MeasureExecutionTimeOperationDecorator<int>), setup: Setup.Decorator);
+            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: Setup.Decorator);
 
             var decorator = (RetryOperationDecorator<int>)container.Resolve<IOperation<int>>();
 
@@ -114,8 +114,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>));
-            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: DecoratorSetup.With());
-            container.Register(typeof(IOperation<int>), typeof(MeasureExecutionTimeOperationDecorator<int>), setup: DecoratorSetup.With());
+            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: Setup.Decorator);
+            container.Register(typeof(IOperation<int>), typeof(MeasureExecutionTimeOperationDecorator<int>), setup: Setup.Decorator);
 
             var decorator = (MeasureExecutionTimeOperationDecorator<int>)container.Resolve<IOperation<int>>();
 
@@ -128,7 +128,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
             container.Register<IOperation, AnotherOperation>();
-            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
 
             var ops = container.Resolve<IOperation[]>();
 
@@ -144,7 +144,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
             container.Register<IOperation, AnotherOperation>();
-            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
 
             var ops = container.Resolve<Lazy<IOperation>[]>();
 
@@ -159,7 +159,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, AnotherOperation>(setup: DecoratorSetup.With());
+            container.Register<IOperation, AnotherOperation>(setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
             //var operationExpr = container.Resolve<Container.DebugExpression<IOperation>>();
@@ -168,15 +168,55 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Replacing_decorator_reuse_may_different_from_decorated_service()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.Register<IOperation, AnotherOperation>(setup: Setup.Decorator);
+
+            var first = container.Resolve<IOperation>();
+            var second = container.Resolve<IOperation>();
+
+            Assert.That(first, Is.InstanceOf<AnotherOperation>());
+            Assert.That(first, Is.Not.SameAs(second));
+        }
+
+        [Test]
+        public void Replacing_decorator_may_be_non_transient()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.Register<IOperation, AnotherOperation>(Reuse.Singleton, setup: Setup.Decorator);
+
+            var first = container.Resolve<IOperation>();
+            var second = container.Resolve<IOperation>();
+
+            Assert.That(first, Is.InstanceOf<AnotherOperation>());
+            Assert.That(first, Is.SameAs(second));
+        }
+
+        [Test]
+        public void Normal_decorator_may_be_non_transient()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, RetryOperationDecorator>(Reuse.Singleton, setup: Setup.Decorator);
+
+            var operation = container.Resolve<IOperation>();
+
+            Assert.That(operation, Is.InstanceOf<RetryOperationDecorator>());
+            Assert.That(((RetryOperationDecorator)operation).Decorated, Is.InstanceOf<SomeOperation>());
+        }
+
+        [Test]
         public void Should_support_decorator_of_decorator_without_decorated_service_argument_in_constructor()
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, AnotherOperation>(setup: DecoratorSetup.With());
-            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, AnotherOperation>(setup: Setup.Decorator);
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
-            //var operationExpr = container.Resolve<DebugExpression<IOperation>>();
 
             Assert.That(operation, Is.InstanceOf<RetryOperationDecorator>());
             Assert.That(((RetryOperationDecorator)operation).Decorated, Is.InstanceOf<AnotherOperation>());
@@ -187,7 +227,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, LazyDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, LazyDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
 
@@ -198,8 +238,8 @@ namespace DryIoc.UnitTests
         public void Should_support_decorating_of_Lazy_named_service()
         {
             var container = new Container();
-            container.Register<IOperation, SomeOperation>(named: "some");
-            container.Register<IOperation, LazyDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, SomeOperation>(serviceKey: "some");
+            container.Register<IOperation, LazyDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>("some");
 
@@ -211,7 +251,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<Func<IOperation>>();
 
@@ -222,9 +262,10 @@ namespace DryIoc.UnitTests
         public void Should_propagate_metadata_to_Meta_wrapper()
         {
             var container = new Container();
-            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: ServiceSetup.WithMetadata("blah"));
-            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: DecoratorSetup.With());
-            container.RegisterAll(typeof(OperationUser<>));
+            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.With(metadataOrFuncOfMetadata: "blah"));
+            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.With(metadataOrFuncOfMetadata: "blah"));
+            container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: Setup.Decorator);
+            container.RegisterMany(new[] { typeof(OperationUser<>) });
 
             var user = container.Resolve<OperationUser<object>>();
 
@@ -237,8 +278,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.RegisterInstance<Func<IOperation, IOperation>>(
-                op => new MeasureExecutionTimeOperationDecorator(op), DecoratorSetup.With());
+            container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
+
+            container.RegisterDelegateDecorator<IOperation>(_ => op => new MeasureExecutionTimeOperationDecorator(op));
 
             var operation = container.Resolve<IOperation>();
 
@@ -251,9 +293,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
             container.Register<IMeasurer, Measurer>();
-            container.RegisterDelegate<Func<IOperation, IOperation>>(
-                r => (service => MeasureExecutionTimeOperationDecorator.MeasureWith(service, r.Resolve<IMeasurer>())),
-                setup: DecoratorSetup.With());
+            container.RegisterDelegateDecorator<IOperation>(r => 
+                op => MeasureExecutionTimeOperationDecorator.MeasureWith(op, r.Resolve<IMeasurer>()));
 
             var operation = container.Resolve<IOperation>();
 
@@ -265,7 +306,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.RegisterDelegate<IOperation>(_ => new SomeOperation());
-            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
 
@@ -277,8 +318,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.RegisterInstance<Func<IOperation, IOperation>>(op => new RetryOperationDecorator(op), DecoratorSetup.With());
-            container.RegisterInstance<Func<IOperation, IOperation>>(op => new MeasureExecutionTimeOperationDecorator(op), DecoratorSetup.With());
+            container.RegisterDelegateDecorator<IOperation>(r => op => new RetryOperationDecorator(op));
+            container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
 
             var operation = container.Resolve<IOperation>();
 
@@ -287,18 +328,23 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_registering_one_decorator_as_delegate_and_another_as_service_Then_registered_with_delegate_takes_precedence()
+        public void When_registering_one_decorator_as_delegate_and_another_as_service_Then_delegate_will_be_applied_last()
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.With());
-            container.RegisterInstance<Func<IOperation, IOperation>>(
-                op => new MeasureExecutionTimeOperationDecorator(op), DecoratorSetup.With());
+            container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
+            container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.Decorator);
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
 
-            Assert.That(operation, Is.InstanceOf<RetryOperationDecorator>());
-            Assert.That(((RetryOperationDecorator)operation).Decorated, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
+
+            var decorated1 = ((MeasureExecutionTimeOperationDecorator)operation).Decorated;
+            Assert.IsInstanceOf<RetryOperationDecorator>(decorated1);
+
+            var decorated2 = ((RetryOperationDecorator)decorated1).Decorated;
+            Assert.IsInstanceOf<AsyncOperationDecorator>(decorated2);
         }
 
         [Test]
@@ -306,7 +352,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, ParameterizedOperation>();
-            container.Register<IOperation, RetryOperationDecorator>(setup: DecoratorSetup.Default);
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<Func<object, IOperation>>();
 
@@ -318,7 +364,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, ParameterizedOperation>();
-            container.Register<IOperation, AnotherOperation>(setup: DecoratorSetup.Default);
+            container.Register<IOperation, AnotherOperation>(setup: Setup.Decorator);
 
             var operation = container.Resolve<Func<object, IOperation>>();
 
@@ -330,8 +376,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.RegisterDelegate<IOperation>(_ => new SomeOperation());
-            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: DecoratorSetup.With());
-            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: Setup.Decorator);
+            container.Register<IOperation, MeasureExecutionTimeOperationDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
 
@@ -343,11 +389,11 @@ namespace DryIoc.UnitTests
         public void Should_support_multiple_decorator_in_object_graph()
         {
             var container = new Container();
-            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: ServiceSetup.WithMetadata("some"));
-            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: DecoratorSetup.With());
+            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.With(metadataOrFuncOfMetadata: "some"));
+            container.Register(typeof(IOperation<>), typeof(RetryOperationDecorator<>), setup: Setup.Decorator);
 
             container.Register<IOperationUser<int>, OperationUser<int>>();
-            container.Register(typeof(IOperationUser<>), typeof(LogUserOps<>), setup: DecoratorSetup.With());
+            container.Register(typeof(IOperationUser<>), typeof(LogUserOps<>), setup: Setup.Decorator);
 
             var user = container.Resolve<IOperationUser<int>>();
             Assert.That(user, Is.InstanceOf<LogUserOps<int>>());
@@ -363,7 +409,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, ParameterizedOperation>();
-            container.Register<IOperation, FuncWithArgDecorator>(setup: DecoratorSetup.With());
+            container.Register<IOperation, FuncWithArgDecorator>(setup: Setup.Decorator);
 
             var func = container.Resolve<Func<object, IOperation>>();
             var operation = func("hey");
@@ -371,6 +417,64 @@ namespace DryIoc.UnitTests
 
             var decoratedFunc = ((FuncWithArgDecorator)operation).DecoratedFunc("hey");
             Assert.That(decoratedFunc, Is.InstanceOf<ParameterizedOperation>());
+        }
+
+        [Test]
+        public void May_decorate_func_of_service()
+        {
+            var container = new Container();
+
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.Decorator);
+
+            var a = container.Resolve<IOperation>();
+            Assert.IsInstanceOf<AsyncOperationDecorator>(a);
+
+            var decorated = ((AsyncOperationDecorator)a).Decorated();
+            Assert.IsInstanceOf<SomeOperation>(decorated);
+        }
+
+        [Test]
+        public void May_next_func_decorator_inside_other_decorator()
+        {
+            var container = new Container();
+
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.Register<IOperation, AsyncOperationDecorator>(Reuse.Singleton, setup: Setup.Decorator);
+            container.Register<IOperation, RetryOperationDecorator>(Reuse.Singleton, setup: Setup.Decorator);
+
+            var a = container.Resolve<IOperation>();
+            Assert.IsInstanceOf<RetryOperationDecorator>(a);
+
+            var nestedDecorator = ((RetryOperationDecorator)a).Decorated;
+            Assert.IsInstanceOf<AsyncOperationDecorator>(nestedDecorator);
+
+            var getOp = ((AsyncOperationDecorator)nestedDecorator).Decorated;
+
+            var decorated = getOp();
+            Assert.IsInstanceOf<SomeOperation>(decorated);
+            Assert.AreSame(decorated, getOp());
+        }
+
+        [Test]
+        public void Removing_decorator_before_chaining_it_with_lazy_decorator()
+        {
+            var container = new Container();
+
+            container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
+            container.Register<IOperation, LazyDecorator>(setup: Setup.Decorator);
+            container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.Decorator);
+
+            var op = container.Resolve<IOperation>();
+            op = ((AsyncOperationDecorator)op).Decorated();
+            Assert.IsInstanceOf<LazyDecorator>(op);
+
+            container.Unregister<IOperation>(factoryType: FactoryType.Decorator,
+                condition: factory => factory.ImplementationType == typeof(LazyDecorator));
+
+            op = ((LazyDecorator)op).Decorated.Value;
+            Assert.IsInstanceOf<RetryOperationDecorator>(op);
         }
     }
 
@@ -456,6 +560,16 @@ namespace DryIoc.UnitTests
         public RetryOperationDecorator(IOperation operation)
         {
             Decorated = operation;
+        }
+    }
+
+    public class AsyncOperationDecorator : IOperation
+    {
+        public readonly Func<IOperation> Decorated;
+
+        public AsyncOperationDecorator(Func<IOperation> a)
+        {
+            Decorated = a;
         }
     }
 

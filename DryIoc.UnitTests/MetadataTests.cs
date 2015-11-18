@@ -12,7 +12,7 @@ namespace DryIoc.UnitTests
         public void I_can_resolve_transient_service_with_metadata()
         {
             var container = new Container();
-            container.Register(typeof(ServiceWithMetadata), setup: ServiceSetup.WithMetadata(new Metadata { Assigned = true }));
+            container.Register(typeof(ServiceWithMetadata), setup: Setup.With(metadataOrFuncOfMetadata: new Metadata { Assigned = true }));
 
             var service = container.Resolve<Meta<ServiceWithMetadata, Metadata>>();
 
@@ -20,10 +20,33 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_resolve_metadata_as_Tuple()
+        {
+            var container = new Container();
+            container.Register(typeof(ServiceWithMetadata), setup: Setup.With(metadataOrFuncOfMetadata: new Metadata { Assigned = true }));
+
+            var service = container.Resolve<Tuple<ServiceWithMetadata, Metadata>>();
+
+            Assert.That(service.Item1, Is.InstanceOf<ServiceWithMetadata>());
+            Assert.That(service.Item2.Assigned, Is.True);
+        }
+
+        [Test]
+        public void Should_not_throw_in_case_of_service_with_provided_is_not_resolvable_due_not_reigstered_dependency()
+        {
+            var container = new Container();
+            container.Register(typeof(ServiceWithDependencyAndWithMetadata), setup: Setup.With(new Metadata { Assigned = true }));
+
+            var services = container.Resolve<Tuple<ServiceWithDependencyAndWithMetadata, Metadata>[]>();
+
+            Assert.IsEmpty(services);
+        }
+
+        [Test]
         public void I_can_resolve_func_of_transient_service_with_metadata()
         {
             var container = new Container();
-            container.Register(typeof(ServiceWithMetadata), setup: ServiceSetup.WithMetadata(new Metadata { Assigned = true }));
+            container.Register(typeof(ServiceWithMetadata), setup: Setup.With(metadataOrFuncOfMetadata: new Metadata { Assigned = true }));
 
             var func = container.Resolve<Meta<Func<ServiceWithMetadata>, Metadata>>();
 
@@ -35,7 +58,7 @@ namespace DryIoc.UnitTests
         public void I_can_resolve_array_of_func_of_transient_service_with_metadata()
         {
             var container = new Container();
-            container.Register(typeof(ServiceWithMetadata), setup: ServiceSetup.WithMetadata(new Metadata { Assigned = true }));
+            container.Register(typeof(ServiceWithMetadata), setup: Setup.With(metadataOrFuncOfMetadata: new Metadata { Assigned = true }));
 
             var funcs = container.Resolve<Meta<Func<ServiceWithMetadata>, Metadata>[]>();
 
@@ -48,8 +71,8 @@ namespace DryIoc.UnitTests
         public void I_can_resolve_array_of_func_of_transient_services_with_metadata()
         {
             var container = new Container();
-            container.Register(typeof(IService), typeof(Service), setup: ServiceSetup.WithMetadata("One"));
-            container.Register(typeof(IService), typeof(AnotherService), setup: ServiceSetup.WithMetadata("Another"));
+            container.Register(typeof(IService), typeof(Service), setup: Setup.With(metadataOrFuncOfMetadata: "One"));
+            container.Register(typeof(IService), typeof(AnotherService), setup: Setup.With(metadataOrFuncOfMetadata: "Another"));
 
             var funcs = container.Resolve<Meta<Func<IService>, string>[]>();
             Assert.That(funcs.Length, Is.EqualTo(2));
@@ -62,7 +85,7 @@ namespace DryIoc.UnitTests
         public void I_can_resolve_singleton_service_with_metadata()
         {
             var container = new Container();
-            container.Register<ServiceWithMetadata>(Reuse.Singleton, setup: ServiceSetup.WithMetadata(new Metadata { Assigned = true }));
+            container.Register<ServiceWithMetadata>(Reuse.Singleton, setup: Setup.With(metadataOrFuncOfMetadata: new Metadata { Assigned = true }));
 
             var meta = container.Resolve<Meta<Func<ServiceWithMetadata>, Metadata>>();
             Assert.That(meta.Metadata.Assigned, Is.True);
@@ -75,7 +98,7 @@ namespace DryIoc.UnitTests
         public void I_can_resolve_lazy_service_with_metadata()
         {
             var container = new Container();
-            container.Register<ServiceWithMetadata>(Reuse.Singleton, setup: ServiceSetup.WithMetadata(new Metadata { Assigned = true }));
+            container.Register<ServiceWithMetadata>(Reuse.Singleton, setup: Setup.With(metadataOrFuncOfMetadata: new Metadata { Assigned = true }));
 
             var meta = container.Resolve<Meta<Lazy<ServiceWithMetadata>, Metadata>>();
 
@@ -87,7 +110,7 @@ namespace DryIoc.UnitTests
         public void I_can_resolve_array_of_lazy_with_metadata()
         {
             var container = new Container();
-            container.Register<ServiceWithMetadata>(Reuse.Singleton, setup: ServiceSetup.WithMetadata(new Metadata { Assigned = true }));
+            container.Register<ServiceWithMetadata>(Reuse.Singleton, setup: Setup.With(metadataOrFuncOfMetadata: new Metadata { Assigned = true }));
 
             // Then
             var metas = container.Resolve<Meta<Lazy<ServiceWithMetadata>, Metadata>[]>();
@@ -101,7 +124,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             ServiceWithInstanceCount.InstanceCount = 0;
-            container.Register<ServiceWithInstanceCount>(Reuse.Singleton, setup: ServiceSetup.WithMetadata("hey"));
+            container.Register<ServiceWithInstanceCount>(Reuse.Singleton, setup: Setup.With(metadataOrFuncOfMetadata: "hey"));
 
             container.Resolve<Meta<Lazy<ServiceWithInstanceCount>, string>>();
 
@@ -112,7 +135,7 @@ namespace DryIoc.UnitTests
         public void I_can_resolve_open_generic_with_meta_array_dependency()
         {
             var container = new Container();
-            container.Register(typeof(ServiceWithMetadata), setup: ServiceSetup.WithMetadata(new Metadata { Assigned = true }));
+            container.Register(typeof(ServiceWithMetadata), setup: Setup.With(metadataOrFuncOfMetadata: new Metadata { Assigned = true }));
             container.Register(typeof(MetadataDrivenFactory<,>));
 
             var factory = container.Resolve<MetadataDrivenFactory<ServiceWithMetadata, Metadata>>();
@@ -126,7 +149,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(ServiceWithDependencyOnOpenGenericWithMetaFactoryMany));
-            container.Register(typeof(ServiceWithMetadata), setup: ServiceSetup.WithMetadata(new Metadata { Assigned = true }));
+            container.Register(typeof(ServiceWithMetadata), setup: Setup.With(metadataOrFuncOfMetadata: new Metadata { Assigned = true }));
             container.Register(typeof(MetadataDrivenFactory<,>));
 
             var service = container.Resolve<ServiceWithDependencyOnOpenGenericWithMetaFactoryMany>();
@@ -151,7 +174,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(IService), typeof(Service), named: "oh my!");
+            container.Register(typeof(IService), typeof(Service), serviceKey: "oh my!");
 
             Assert.Throws<ContainerException>(
                 () => container.Resolve<Meta<IService, Metadata>>());
@@ -162,7 +185,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(IService), typeof(Service), setup: ServiceSetup.WithMetadata("xx"));
+            container.Register(typeof(IService), typeof(Service), setup: Setup.With(metadataOrFuncOfMetadata: "xx"));
             container.Register(typeof(IService), typeof(Service));
 
             var services = container.Resolve<Meta<IService, string>[]>();
@@ -175,7 +198,7 @@ namespace DryIoc.UnitTests
         public void Should_resolve_open_generic_with_metadata()
         {
             var container = new Container();
-            container.Register(typeof(IService<>), typeof(Service<>), setup: ServiceSetup.WithMetadata("ho"));
+            container.Register(typeof(IService<>), typeof(Service<>), setup: Setup.With(metadataOrFuncOfMetadata: "ho"));
 
             var service = container.Resolve<Meta<IService<int>, string>>();
 
@@ -186,7 +209,7 @@ namespace DryIoc.UnitTests
         public void Should_NOT_resolve_meta_with_name_if_no_such_name_registered()
         {
             var container = new Container();
-            container.RegisterAll(typeof(Service<>), setup: ServiceSetup.WithMetadata(3));
+            container.RegisterMany(new[] { typeof(Service<>) }, setup: Setup.With(metadataOrFuncOfMetadata: 3));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Meta<IService<object>, int>>("no-no-name"));
@@ -197,7 +220,7 @@ namespace DryIoc.UnitTests
         public void Should_resolve_any_named_service_with_corresponding_metadata_If_name_is_not_specified_in_resolve()
         {
             var container = new Container();
-            container.RegisterAll(typeof(Service<>), setup: ServiceSetup.WithMetadata(3), named: "some");
+            container.RegisterMany(new[] { typeof(Service<>) }, setup: Setup.With(metadataOrFuncOfMetadata: 3), serviceKey: "some");
 
             var meta = container.Resolve<Meta<IService<string>, int>>();
 
@@ -209,7 +232,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<IService, Service>(named: "n", setup: ServiceSetup.WithMetadata("m"));
+            container.Register<IService, Service>(serviceKey: "n", setup: Setup.With(metadataOrFuncOfMetadata: "m"));
             container.Register<IService, Service>();
 
             var services = container.Resolve<Meta<IService, string>[]>();
@@ -223,6 +246,16 @@ namespace DryIoc.UnitTests
 
     public class ServiceWithMetadata
     {
+
+    }
+
+    public class ServiceWithDependencyAndWithMetadata
+    {
+        public string Dependency { get; set; }
+        public ServiceWithDependencyAndWithMetadata(string dependency)
+        {
+            Dependency = dependency;
+        }
     }
 
     public class Metadata

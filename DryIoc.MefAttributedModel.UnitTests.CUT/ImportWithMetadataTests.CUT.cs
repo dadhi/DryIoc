@@ -1,36 +1,27 @@
 ﻿using System;
+using System.ComponentModel.Composition;
+using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
     public enum FooMetadata { Hey, Blah, NotFound }
 
-    [ExportAll, ExportWithMetadata(FooMetadata.Hey)]
+    [ExportMany, WithMetadata(FooMetadata.Hey)]
     public class FooHey : IFooService
     {
     }
 
-    [ExportAll, ExportWithMetadata(FooMetadata.Blah)]
+    [ExportMany, WithMetadata(FooMetadata.Blah)]
     public class FooBlah : IFooService
     {
     }
 
-    [ExportAll]
-    public class FooConsumer
-    {
-        public Lazy<IFooService> Foo { get; set; }
-
-        public FooConsumer([ImportWithMetadata(FooMetadata.Blah)] Lazy<IFooService> foo)
-        {
-            Foo = foo;
-        }
-    }
-
-    [ExportAll]
+    [ExportMany]
     public class FooConsumerNotFound
     {
         public IFooService Foo { get; set; }
 
-        public FooConsumerNotFound([ImportWithMetadata(FooMetadata.NotFound)]IFooService foo)
+        public FooConsumerNotFound([Import,WithMetadata(FooMetadata.NotFound)]IFooService foo)
         {
             Foo = foo;
         }

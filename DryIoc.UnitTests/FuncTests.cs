@@ -175,7 +175,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_constructor_with_two_parameters_of_same_type_When_resolving_Func_of_one_parameter_Then_first_constructor_parameter_will_become_Func_parameter()
+        public void Constructor_will_use_func_argument_only_once_for_first_ctor_parameter()
         {
             var container = new Container();
             container.Register(typeof(ServiceWithTwoDepenedenciesOfTheSameType));
@@ -298,42 +298,156 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_func_with_parameters_using_constructor_that_misses_some_of_func_parameters_should_Throw()
+        public void Resolving_func_with_some_unused_args_should_not_throw()
         {
             var container = new Container();
             container.Register<ServiceWithDependency>();
             container.Register<IDependency, Dependency>();
 
-            Assert.Throws<ContainerException>(() => 
-                container.Resolve<Func<string, ServiceWithDependency>>());
+            var func = container.Resolve<Func<string, ServiceWithDependency>>();
+
+            Assert.That(func(null), Is.InstanceOf<ServiceWithDependency>());
         }
 
         [Test]
-        public void Resolving_Func_of_delegate_factory_should_Throw()
+        public void Resolving_Func_of_delegate_factory_should_not_throw_The_func_argument_will_not_be_used()
         {
             var container = new Container();
-            container.RegisterDelegate(resolver => new Service());
+            container.RegisterDelegate(r => new Service());
 
-            Assert.Throws<ContainerException>(() => 
-                container.Resolve<Func<int, Service>>());
+            var func = container.Resolve<Func<int, Service>>();
+
+            Assert.That(func(0), Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void One_func_argument_should_be_used_only_once_for_one_parameter()
+        {
+            var container = new Container();
+            container.Register<FullNameService>();
+
+            var func = container.Resolve<Func<string, string, FullNameService>>();
+            var service = func("Oh", "Yeah");
+
+            Assert.That(service.FullName, Is.EqualTo("Oh Yeah"));
+        }
+
+        [Test]
+        public void Can_resolve_subdependency_with_func_argument()
+        {
+            var container = new Container();
+            container.Register<ClassWithDepAndSubDep>();
+            container.Register<DepWithSubDep>();
+
+            var func = container.Resolve<Func<string, ClassWithDepAndSubDep>>();
+            var service = func("Hey");
+
+            Assert.That(service.Dep.Message, Is.EqualTo("Hey"));
+        }
+
+        [Test]
+        public void Can_reuse_func_argument_for_dependency_and_subdependency()
+        {
+            var container = new Container();
+            container.Register<X>();
+            container.Register<Y>();
+
+            var getX = container.Resolve<Func<A, X>>();
+            var a = new A();
+            var x = getX(a);
+
+            Assert.AreSame(x.A, x.Y.A);
+        }
+
+        [Test]
+        public void Func_correctly_handles_IfUnresolvedReturnDefault_for_unregistered_service()
+        {
+            var container = new Container();
+
+            var getX = container.Resolve<Func<X>>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNull(getX);
+        }
+
+        [Test]
+        public void Func_correctly_handles_IfUnresolvedReturnDefault_for_unregistered_dependency()
+        {
+            var container = new Container();
+            container.Register<X>();
+
+            var getX = container.Resolve<Func<X>>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNull(getX);
+        }
+
+        internal class X
+        {
+            public A A { get; private set; }
+            public Y Y { get; private set; }
+
+            public X(A a, Y y)
+            {
+                A = a;
+                Y = y;
+            }
+        }
+
+        internal class A { }
+
+        internal class Y 
+        {
+            public A A { get; private set; }
+            public Y(A a)
+            {
+                A = a;
+            }
+        }
+
+        internal class ClassWithDepAndSubDep
+        {
+            public DepWithSubDep Dep { get; private set; }
+            public ClassWithDepAndSubDep(DepWithSubDep dep)
+            {
+                Dep = dep;
+            }
+        }
+
+        internal class DepWithSubDep
+        {
+            public string Message { get; private set; }
+            public DepWithSubDep(string message)
+            {
+                Message = message;
+            }
+        }
+
+        public class TwoCtors
+        {
+            public string Message { get; set; }
+
+            public TwoCtors()
+                : this("Hey!")
+            {
+            }
+
+            public TwoCtors(string message)
+            {
+                Message = message;
+            }
+        }
+
+        public class FullNameService
+        {
+            public string FullName { get { return _name + " " + _surname; } }
+
+            public FullNameService(string name, string surname)
+            {
+                _name = name;
+                _surname = surname;
+            }
+
+            private readonly string _name;
+            private readonly string _surname;
         }
     }
-
-    #region CUT
-
-    public class TwoCtors
-    {
-        public string Message { get; set; }
-
-        public TwoCtors() : this("Hey!")
-        {
-        }
-
-        public TwoCtors(string message)
-        {
-            Message = message;
-        }
-    }
-
-    #endregion
 }

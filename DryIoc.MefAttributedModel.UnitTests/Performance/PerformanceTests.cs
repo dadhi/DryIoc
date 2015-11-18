@@ -6,13 +6,13 @@ using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests.Performance
 {
-	[TestFixture][Ignore]
+	[TestFixture][Explicit("Not really a unit test")]
 	public class PerformanceTests
 	{
 		[Test]
 		public void RegistrationPerformanceTest()
 		{
-			var currentAssembly = typeof(TransientService).Assembly;
+			var currentAssembly = typeof(TransientService).GetAssembly();
 
 			const int times = 1000;
 
@@ -21,7 +21,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.Performance
 			for (int i = 0; i < times; i++)
 			{
 				var container = new Container();
-				container.RegisterExports(currentAssembly);
+				container.RegisterExports(new [] { currentAssembly });
 			}
 
 			stopwatch.Stop();
@@ -47,7 +47,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.Performance
 			var getCustomAttributes = Stopwatch.StartNew();
 			for (int i = 0; i < times; i++)
 			{
-				testType.GetCustomAttributes(attrType, false);
+				testType.GetAttributes(attrType);
 			}
 
 			getCustomAttributes.Stop();

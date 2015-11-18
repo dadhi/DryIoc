@@ -1,4 +1,5 @@
-﻿using DryIoc.UnitTests.CUT;
+﻿using System.Linq;
+using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -22,7 +23,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: "another");
+            container.Register<IService, AnotherService>(serviceKey: "another");
 
             var service = container.Resolve<IService>();
 
@@ -34,7 +35,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.Register<IService, AnotherService>(named: "another");
+            container.Register<IService, AnotherService>(serviceKey: "another");
 
             var service = container.Resolve<IService>("another");
 
@@ -42,14 +43,16 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_two_named_registerations_Resolving_without_name_should_throw()
+        public void Given_two_named_registrations_Resolving_without_name_should_throw()
         {
             var container = new Container();
-            container.Register<IService, Service>(named: "some");
-            container.Register<IService, Service>(named: "another");
+            container.Register<IService, Service>(serviceKey: "some");
+            container.Register<IService, Service>(serviceKey: "another");
 
-            Assert.Throws<ContainerException>(() =>
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
+
+            Assert.AreEqual(ex.Error, Error.UnableToResolveFromRegisteredServices);
         }
 
         [Test]
@@ -65,7 +68,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_non_registered_service_should_throw()
+        public void Resolving_non_registered_service_should_Throw()
         {
             var container = new Container();
 
@@ -74,7 +77,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Registering_with_interface_for_service_implementation_should_throw()
+        public void Registering_with_interface_for_service_implementation_should_Throw()
         {
             var container = new Container();
 
@@ -83,13 +86,12 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_no_constructor_selector_specified_in_registration_Resolving_implementation_with_multiple_constructors_should_throw()
+        public void Registering_impl_type_without_public_constructor_and_without_constructor_selector_should_throw()
         {
             var container = new Container();
-            container.Register<ServiceWithMultipleCostructors>();
 
             Assert.Throws<ContainerException>(() =>
-                container.Resolve<ServiceWithMultipleCostructors>());
+               container.Register(typeof(ServiceWithoutPublicConstructor)));
         }
 
         [Test]
@@ -180,7 +182,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void IsRegistered_for_registered_service_should_return_true ()
+        public void IsRegistered_for_registered_service_should_return_true()
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
@@ -201,14 +203,13 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_open_generic_is_registered_IsRegistered_for_closed_generic_should_return_true()
+        public void IsRegistered_Should_return_false_for_concrete_generic_In_case_of_only_open_generic_registered_()
         {
             var container = new Container();
             container.Register(typeof(ServiceWithTwoGenericParameters<,>));
 
-            var registered = container.IsRegistered<ServiceWithTwoGenericParameters<int, string>>();
-
-            Assert.That(registered, Is.True);
+            Assert.IsFalse(container.IsRegistered<ServiceWithTwoGenericParameters<int, string>>());
+            Assert.IsTrue(container.IsRegistered(typeof(ServiceWithTwoGenericParameters<,>)));
         }
 
         [Test]
@@ -225,37 +226,30 @@ namespace DryIoc.UnitTests
         public void Registering_service_with_duplicate_name_should_throw()
         {
             var container = new Container();
-            container.Register(typeof(IService), typeof(Service), named: "blah");
+            container.Register(typeof(IService), typeof(Service), serviceKey: "blah");
 
-            Assert.Throws<ContainerException>(
-                () => container.Register(typeof(IService), typeof(AnotherService), named: "blah"));
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Register(typeof(IService), typeof(AnotherService), serviceKey: "blah"));
+
+            Assert.That(ex.Message, Is.StringContaining("with duplicate key [blah]"));
         }
 
         [Test]
         public void Given_multiple_defaults_registered_Resolving_one_should_throw()
         {
-            var container = new Container(ContainerSetup.Minimal);
+            var container = new Container();
 
             container.Register(typeof(IService), typeof(Service));
             container.Register(typeof(IService), typeof(AnotherService));
 
-            Assert.Throws<ContainerException>(() =>
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve(typeof(IService)));
+
+            Assert.AreEqual(Error.ExpectedSingleDefaultFactory, ex.Error);
         }
 
         [Test]
-        public void Resolving_service_without_public_constructor_should_throw()
-        {
-            var container = new Container();
-
-            container.Register(typeof(ServiceWithoutPublicConstructor));
-
-            Assert.Throws<ContainerException>(
-                () => container.Resolve<ServiceWithoutPublicConstructor>());
-        }
-
-        [Test]
-        public void Possible_to_register_and_resolve_object_as_service_type()
+        public void Possible_to_register_and_resolve_with_object_service_type()
         {
             var container = new Container();
             container.Register<object, Service>();
@@ -270,9 +264,245 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var service = container.Resolve<IService>(IfUnresolved.ReturnNull);
+            var service = container.Resolve<IService>(IfUnresolved.ReturnDefault);
 
             Assert.Null(service);
         }
+
+        [Test]
+        public void Register_once_for_default_service()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+
+            var service = container.Resolve<IService>();
+
+            Assert.That(service, Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        public void Register_once_for_default_service_Should_not_be_affected_by_already_registered_named_services()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(serviceKey: "a");
+            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+
+            var service = container.Resolve<IService>();
+
+            Assert.That(service, Is.InstanceOf<AnotherService>());
+        }
+
+        [Test]
+        public void Register_once_for_default_service_when_couple_of_defaults_were_already_registered()
+        {
+            var container = new Container();
+            container.Register<IService, Service>();
+            container.Register<IService, AnotherService>();
+            container.Register<IService, OneService>(ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<IService>());
+
+            Assert.AreEqual(Error.ExpectedSingleDefaultFactory, ex.Error);
+        }
+
+        [Test]
+        public void Register_once_for_named_service()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(serviceKey: "a");
+            container.Register<IService, AnotherService>(serviceKey: "a", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+
+            var service = container.Resolve<IService>("a");
+
+            Assert.That(service, Is.InstanceOf<Service>());
+        }
+
+        [Test]
+        [Description("https://bitbucket.org/dadhi/dryioc/issue/73/remove-reused-instance-when-unregister")]
+        public void Unregister_singleton_without_swappable()
+        {
+            var container = new Container();
+
+            container.Register<IContext, Context1>(Reuse.Singleton);
+
+            var context = container.Resolve<IContext>();
+            Assert.NotNull(context);
+            Assert.AreSame(context, container.Resolve<IContext>());
+
+            // Removes service instance from Singleton scope by setting it to null.
+            container.RegisterInstance<IContext>(null, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            // Removes service registration.
+            container.Unregister<IContext>();
+
+            var ex = Assert.Throws<ContainerException>(() => container.Resolve<IContext>());
+            Assert.AreEqual(Error.UnableToResolveUnknownService, ex.Error);
+        }
+
+        [Test]
+        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        public void ReRegister_singleton_without_recycleable()
+        {
+            var container = new Container();
+            // before request
+            container.Register<IContext, Context1>(Reuse.Singleton);
+
+            var r1 = container.Resolve<IContext>();
+            r1.Data = "before";
+
+            container.Register<IContext, Context2>(Reuse.Singleton,
+                ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            var r2 = container.Resolve<IContext>();
+            var r3 = container.Resolve<IContext>();
+            Assert.AreNotEqual(r1, r2);
+            Assert.AreEqual(r2, r3);
+            Assert.AreEqual(null, r2.Data);
+        }
+
+        [Test]
+        public void ReRegister_transient_with_key()
+        {
+            var c = new Container();
+            c.Register<ILogger, Logger1>(serviceKey: "a");
+            Assert.IsInstanceOf<Logger1>(c.Resolve<ILogger>("a"));
+
+            c.Register<ILogger, Logger2>(serviceKey: "a", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            Assert.IsInstanceOf<Logger2>(c.Resolve<ILogger>("a"));
+        }
+
+        [Test]
+        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        public void ReRegister_dependency_of_transient()
+        {
+            var c = new Container();
+            c.Register<ILogger, Logger1>(setup: Setup.With(openResolutionScope: true));
+            
+            c.Register<UseLogger1>();
+            var user = c.Resolve<UseLogger1>();
+            Assert.IsInstanceOf<Logger1>(user.Logger);
+
+            c.Register<ILogger, Logger2>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            user = c.Resolve<UseLogger1>();
+            Assert.IsInstanceOf<Logger2>(user.Logger);
+        }
+
+        [Test]
+        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        public void ReRegister_dependency_of_singleton_without_recyclable()
+        {
+            var c = new Container();
+
+            // If we know that Logger could be changed/re-registered, then register it as dynamic dependency
+            c.Register<ILogger, Logger1>(setup: Setup.With(openResolutionScope: true));
+            c.Register<UseLogger1>(Reuse.Singleton);
+            var user1 = c.Resolve<UseLogger1>();
+
+            c.Register<ILogger, Logger2>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            // It is a already resolved singleton,
+            // so it should not be affected by new ILogger registration.
+            
+            var user12 = c.Resolve<UseLogger1>();
+            Assert.AreSame(user1, user12);
+            Assert.IsInstanceOf<Logger1>(user12.Logger);
+
+            // To change that, you you need reregister the singleton to re-create it with new ILogger.
+            c.Register<UseLogger1>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            var u13 = c.Resolve<UseLogger1>();
+            Assert.AreNotSame(user12, u13);
+            Assert.IsInstanceOf<Logger2>(u13.Logger);
+
+            c.Register<UseLogger2>(Reuse.Singleton); // uses ILogger
+            c.Resolve<UseLogger2>();
+        }
+
+        [Test]
+        public void IResolver_will_be_injected_as_property_even_if_not_registered()
+        {
+            var container = new Container();
+            container.Register<Beh>(made: PropertiesAndFields.Auto);
+
+            var resolver = container.Resolve<Beh>().R;
+
+            Assert.NotNull(resolver);
+        }
+
+        [Test]
+        public void Should_Throw_if_implementation_is_not_assignable_to_service_type()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.Register(typeof(IService), typeof(Beh)));
+
+            Assert.AreEqual(Error.RegisterImplementationNotAssignableToServiceType, ex.Error);
+        }
+
+        public class Beh
+        {
+            public IResolver R { get; set; }
+        }
+
+        [Test]
+        public void In_ArrayTools_Remove_from_null_or_empty_array_should_return_null_or_original_array()
+        {
+            int[] ar = null;
+            Assert.AreSame(ar, ar.RemoveAt(0));
+
+            ar = new int[0];
+            Assert.AreSame(ar, ar.RemoveAt(0));
+        }
+
+        [Test]
+        public void In_ArrayTools_Remove_items_from_array_should_produce_another_array_without_removed_item()
+        {
+            var ar = new[] {2, 1};
+
+            Assert.AreSame(ar, ar.RemoveAt(-1));
+            CollectionAssert.AreEqual(new[] { 1 }, ar.RemoveAt(0));
+            CollectionAssert.AreEqual(new[] { 2 }, ar.RemoveAt(1));
+        }
+
+        [Test]
+        public void Using_ArrayTools_Append_with_mulitple_items_appendee()
+        {
+            var ar = new[] { 2, 1 }.Append(0, -1);
+            CollectionAssert.AreEqual(new[] { 2, 1, 0, -1 }, ar);
+        }
+
+        [Test]
+        public void Disposed_container_should_throw_on_attempt_to_register()
+        {
+            var container = new Container();
+            container.Dispose();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.RegisterInstance("a"));
+
+            Assert.AreEqual(Error.ContainerIsDisposed, ex.Error);
+        }
+
+        [Test]
+        public void I_want_Verify_the_registrations_to_find_potential_errors_in_their_resolution()
+        {
+            var container = new Container();
+
+            container.Register<MyService>();
+
+            var errors = container.VerifyResolutions().ToArray();
+            Assert.AreEqual(1, errors.Length);
+            Assert.AreEqual(Error.UnableToResolveUnknownService, errors[0].Value.Error);
+            StringAssert.Contains("MyService",  errors[0].Key.ToString());
+        }
+
+        class MyService
+        {
+            public MyService(RequiredDependency d) {}
+        }
+
+        class RequiredDependency { }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
+using DryIocAttributes;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
@@ -9,17 +10,15 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         [Test]
         public void Can_register_service_with_constants_alone()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(new[]
             {
-                new TypeExportInfo
+                new ExportedRegistrationInfo
                 {
-                    Type = typeof(AnotherService),
-                    Exports = new[] { 
-                        new ExportInfo { ServiceType = typeof(IService), ServiceName = "another" }
-                    },
-                    IsSingleton = true,
-                    MetadataAttributeIndex = -1,
+                    ImplementationType = typeof(AnotherService),
+                    Exports = new[] { new ExportInfo(typeof(IService), "another") },
+                    Reuse = ReuseType.Singleton,
+                    HasMetadataAttribute = false,
                 }
             });
 
@@ -31,35 +30,33 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         [Test]
         public void Can_register_decorator_and_wrapper_with_constants_alone()
         {
-            var container = new Container(AttributedModel.DefaultSetup);
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(new[]
             {
-                new TypeExportInfo
+                new ExportedRegistrationInfo
                 {
-                    Type = typeof(Service),
-                    Exports = new[] {
-                        new ExportInfo { ServiceType = typeof(IService), ServiceName = "some" } },
-                    IsSingleton = true,
-                    MetadataAttributeIndex = -1
+                    ImplementationType = typeof(Service),
+                    Exports = new[] { new ExportInfo(typeof(IService), "some") },
+                    Reuse = ReuseType.Singleton,
+                    HasMetadataAttribute = false
                 },
 
-                new TypeExportInfo
+                new ExportedRegistrationInfo
                 {
-                    Type = typeof(AnotherService),
-                    Exports = new[] {
-                        new ExportInfo { ServiceType = typeof(IService), ServiceName = null } },
-                    IsSingleton = false,
-                    MetadataAttributeIndex = -1,
+                    ImplementationType = typeof(AnotherService),
+                    Exports = new[] { new ExportInfo(typeof(IService), null) },
+                    Reuse = ReuseType.Transient,
+                    HasMetadataAttribute = false,
                     FactoryType = FactoryType.Decorator,
                 },
 
-                new TypeExportInfo
+                new ExportedRegistrationInfo
                 {
-                    Type = typeof(Wrap<>),
-                    Exports = new[] {
-                        new ExportInfo { ServiceType = typeof(Wrap<>), ServiceName = null } }, IsSingleton = false,
-                    MetadataAttributeIndex = -1,
-                    FactoryType = FactoryType.GenericWrapper
+                    ImplementationType = typeof(Wrap<>),
+                    Exports = new[] { new ExportInfo(typeof(Wrap<>), null) }, 
+                    Reuse = ReuseType.Transient,
+                    HasMetadataAttribute = false,
+                    FactoryType = FactoryType.Wrapper
                 },
             });
 
@@ -67,16 +64,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 
             Assert.That(wrapped.Value, Is.InstanceOf<AnotherService>());
         }
-
-        //[Test]
-        //public void Can_use_compile_time_generated_registrations()
-        //{
-        //    var container = new Container(AttributedRegistrator.DefaultSetup);
-        //    container.RegisterExported(CompileTimeGeneratedRegistrator.Registrations);
-
-        //    Assert.DoesNotThrow(() =>
-        //        container.Resolve<Meta<Func<IServiceWithMetadata>, IViewMetadata>[]>());
-        //}
     }
 
     public class Wrap<T>

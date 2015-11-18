@@ -35,23 +35,24 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AttributedRegistrationTests.CUT.cs" />
+    <Compile Include="AttributedModelTests.CUT.cs" />
+    <Compile Include="CodeGenerationTests.CUT.cs" />
+    <Compile Include="CustomInjectionRulesTests.CUT.cs" />
     <Compile Include="ExportAsDecoratorTests.CUT.cs" />
     <Compile Include="ExportAsGenericWrapperTests.CUT.cs" />
-    <Compile Include="ExportOnceTests.CUT.cs" />
+    <Compile Include="ExportFactoryTests.CUT.cs" />
+    <Compile Include="ExportImportWithKeyTests.CUT.cs" />
+    <Compile Include="ExportManyTests.CUT.cs" />
+    <Compile Include="ImportExternalTests.CUT.cs" />
     <Compile Include="ImportWithMetadataTests.CUT.cs" />
     <Compile Include="InheritedExportTests.CUT.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
-      <Project>{13516F3C-E48D-43DC-89D4-5FE00DE3C7D2}</Project>
-      <Name>DryIoc.MefAttributedModel</Name>
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
+      <Project>{3bbd5ccf-d87c-4650-b039-334767a7cedd}</Project>
+      <Name>DryIocAttributes</Name>
       <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
-      <Name>DryIoc</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

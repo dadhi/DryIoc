@@ -87,10 +87,11 @@ _TeamCity*
 # DotCover is a Code Coverage Tool
 *.dotCover
 
+# OpenCover
+OpenCover/*
+
 # NCrunch
-*.ncrunch*
-*.crunch*.cache
-.*crunch*.local.xml
+*[_.][N][C]runch*
 
 # Installshield output folder
 [Ee]xpress/
@@ -116,11 +117,8 @@ publish/
 ## TODO: If you have NuGet Package Restore enabled, uncomment the next line
 # packages/
 *.nupkg
-apikey[.-]*
+apikey[-.]*
 # nuget/**/DryIoc/*
-
-# OpenCover
-OpenCover/coverage.xml
 
 # Windows Azure Build Output
 csx

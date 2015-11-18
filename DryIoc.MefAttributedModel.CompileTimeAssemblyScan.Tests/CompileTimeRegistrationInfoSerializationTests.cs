@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
+using ProtoBuf;
 using ProtoBuf.Meta;
 
 namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
@@ -38,8 +39,8 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         public void Given_scnanned_assembly_When_serialize_data_Then_deserialize_will_return_the_same_data()
         {
             // Given
-            var assembly = typeof(TransientService).Assembly;
-            var services = AttributedModel.DiscoverExportsInAssemblies(new[] { assembly }).ToArray();
+            var assembly = typeof(TransientService).GetAssembly();
+            var services = AttributedModel.Scan(new[] { assembly }).ToArray();
 
             // When
             if (File.Exists(DATA_FILE))
@@ -51,9 +52,9 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 
             // Then
             var loadedModel = CreateModel();
-            TypeExportInfo[] infos;
+            ExportedRegistrationInfo[] infos;
             using (var file = File.OpenRead(DATA_FILE))
-                infos = (TypeExportInfo[])loadedModel.Deserialize(file, null, typeof(TypeExportInfo[]));
+                infos = (ExportedRegistrationInfo[])loadedModel.Deserialize(file, null, typeof(ExportedRegistrationInfo[]));
 
             Assert.That(services, Is.EqualTo(infos));
         }
@@ -62,8 +63,8 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         public void Given_deserialized_data_When_registering_scanned_data_into_container_Then_metadata_should_correctly_registered_too()
         {
             // Given
-            var assembly = typeof(TransientService).Assembly;
-            var services = AttributedModel.DiscoverExportsInAssemblies(new[] { assembly }).ToArray();
+            var assembly = typeof(TransientService).GetAssembly();
+            var services = AttributedModel.Scan(new[] { assembly }).ToArray();
 
             if (File.Exists(DATA_FILE))
                 File.Delete(DATA_FILE);
@@ -73,12 +74,12 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 model.Serialize(file, services);
 
             var loadedModel = CreateModel();
-            TypeExportInfo[] infos;
+            ExportedRegistrationInfo[] infos;
             using (var file = File.OpenRead(DATA_FILE))
-                infos = (TypeExportInfo[])loadedModel.Deserialize(file, null, typeof(TypeExportInfo[]));
+                infos = (ExportedRegistrationInfo[])loadedModel.Deserialize(file, null, typeof(ExportedRegistrationInfo[]));
 
             // When
-            var container = new Container();
+            var container = new Container().WithMefAttributedModel();
             container.RegisterExports(infos);
 
             // Then
@@ -89,9 +90,10 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         private static RuntimeTypeModel CreateModel()
         {
             var model = TypeModel.Create();
-            model.Add<TypeExportInfo>();
+            model.Add(typeof(ServiceKeyInfo), false).SetSurrogate(typeof(ServiceKeyInfoSurrogate));
+            model.Add<ExportedRegistrationInfo>();
             model.Add<ExportInfo>();
-            model.Add<GenericWrapperInfo>();
+            model.Add<WrapperInfo>();
             model.Add<DecoratorInfo>();
             return model;
         }
@@ -103,6 +105,51 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         {
             var publicFields = typeof(T).GetFields().Select(x => x.Name).ToArray();
             return model.Add(typeof(T), false).Add(publicFields);
+        }
+    }
+
+    [ProtoContract]
+    public sealed class ServiceKeyInfoSurrogate
+    {
+        [ProtoMember(1)] public string KeyAsString;
+        [ProtoMember(2)] public int? KeyAsInt;
+        [ProtoMember(3)] public ServiceKey? KeyAsServiceKey;
+        [ProtoMember(4)] public BlahFooh? KeyAsBlahFooh;
+        // NOTE: add your types here
+
+        public static implicit operator ServiceKeyInfoSurrogate(ServiceKeyInfo info)
+        {
+            if (info == null)
+                return null;
+
+            var surrogate = new ServiceKeyInfoSurrogate();
+            var key = info.Key;
+            if (key is ServiceKey)
+                surrogate.KeyAsServiceKey = (ServiceKey)key;
+            if (key is BlahFooh)
+                surrogate.KeyAsBlahFooh = (BlahFooh)key;
+            if (key is int)
+                surrogate.KeyAsInt = (int?)key;
+            if (key is string)
+                surrogate.KeyAsString = (string)key;
+            return surrogate;
+        }
+
+        public static implicit operator ServiceKeyInfo(ServiceKeyInfoSurrogate surrogate)
+        {
+            if (surrogate == null)
+                return null;
+
+            var info = new ServiceKeyInfo();
+            if (surrogate.KeyAsServiceKey != null)
+                info.Key = surrogate.KeyAsServiceKey;
+            if (surrogate.KeyAsBlahFooh != null)
+                info.Key = surrogate.KeyAsBlahFooh;
+            if (surrogate.KeyAsInt != null)
+                info.Key = surrogate.KeyAsInt;
+            if (surrogate.KeyAsString != null)
+                info.Key = surrogate.KeyAsString;
+            return info;
         }
     }
 }

@@ -9,35 +9,52 @@ namespace DryIoc.UnitTests
         [Test]
         public void GetImplementedTypes_should_work_for_open_generic_types()
         {
-            var types = typeof(Fuzz<>).GetImplementedTypes()
-                .Select(t => t.ContainsGenericParameters ? t.GetGenericTypeDefinition() : t);
+            var types = typeof(Fuzz<>).GetImplementedTypes().Select(t => t.GetGenericDefinitionOrNull() ?? t);
 
             CollectionAssert.AreEqual(new[] { typeof(IBuzz), typeof(IFuzz<>), typeof(IFuzz), typeof(Buzz) }, types);
         }
 
         [Test]
-        public void GetImplementedTypes_should_work_for_class_nested_in_open_generic_types()
+        public void GetImplementedTypes_should_work_for_class_nested_in_open_generic_type_with_include_SourceType_option()
         {
-            var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes(TypeTools.IncludeTypeItself.AsFirst)
-                .Select(t => t.ContainsGenericParameters ? t.GetGenericTypeDefinition() : t);
+            var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes(ReflectionTools.AsImplementedType.SourceType)
+                .Select(t => t.GetGenericDefinitionOrNull() ?? t);
 
             CollectionAssert.AreEqual(new[] { typeof(Fuzz<>.NestedClazz), typeof(IFuzz<>), typeof(IFuzz) }, types);
         }
 
         [Test]
+        public void GetImplementedTypes_should_work_for_class_nested_in_open_generic_type_with_include_ObjectType_option()
+        {
+            var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes(ReflectionTools.AsImplementedType.ObjectType)
+                .Select(t => t.GetGenericDefinitionOrNull() ?? t);
+
+            CollectionAssert.AreEqual(new[] { typeof(IFuzz<>), typeof(IFuzz), typeof(object) }, types);
+        }
+
+        [Test]
+        public void GetImplementedTypes_should_work_for_class_nested_in_open_generic_type_with_both_SourceType_ObjectType_options()
+        {
+            var types = typeof(Fuzz<>.NestedClazz).GetImplementedTypes(ReflectionTools.AsImplementedType.ObjectType | ReflectionTools.AsImplementedType.SourceType)
+                .Select(t => t.GetGenericDefinitionOrNull() ?? t);
+
+            CollectionAssert.AreEqual(new[] { typeof(Fuzz<>.NestedClazz), typeof(IFuzz<>), typeof(IFuzz), typeof(object) }, types);
+        }
+
+        [Test]
         public void Should_return_A_implementors()
         {
-            var types = typeof(A).GetImplementedTypes();
+            var types = typeof(A).GetImplementedTypes(ReflectionTools.AsImplementedType.ObjectType);
 
-            Assert.That(types, Is.EqualTo(new[] { typeof(IB), typeof(IA), typeof(B), typeof(C) }));
+            Assert.That(types, Is.EqualTo(new[] { typeof(IB), typeof(IA), typeof(B), typeof(C), typeof(object) }));
         }
 
         [Test]
         public void Should_return_B_implementors()
         {
-            var types = typeof(B).GetImplementedTypes();
+            var types = typeof(B).GetImplementedTypes(ReflectionTools.AsImplementedType.ObjectType);
 
-            Assert.That(types, Is.EqualTo(new[] { typeof(IB), typeof(C) }));
+            Assert.That(types, Is.EqualTo(new[] { typeof(IB), typeof(C), typeof(object) }));
         }
     }
 

@@ -1,161 +1,174 @@
-using System;
-using System.Collections.Generic;
 using NUnit.Framework;
+// ReSharper disable MemberHidesStaticFromOuterClass
 
 namespace DryIoc.UnitTests
 {
     [TestFixture]
     public class ContextDependentResolutionTests
     {
-        [Test]
-        public void I_should_be_able_to_resolve_context_dependent_type()
+        public static class LogFactory
         {
-            var container = new Container();
-            container.Register(typeof(Client));
-
-            var factories = new Dictionary<Type, Factory>();
-            container.Register<ILogger>(new FactoryProvider((request, _) =>
+            public static ILogger GetLog<T>()
             {
-                var parent = request.GetNonWrapperParentOrDefault();
-                parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
-                var typeArg = parent.ImplementationType ?? parent.ServiceType;
-                return factories.GetOrAdd(typeArg, t => new ReflectionFactory(typeof(Logger<>).MakeGenericType(t)));
-            }));
-
-            var client = container.Resolve<Client>();
-            var log = client.Logger.Log("hello");
-
-            StringAssert.Contains(typeof(Client).ToString(), log);
+                return new Logger<T>();
+            }
         }
 
         [Test]
-        public void I_should_be_able_to_resolve_context_dependent_type_as_singleton()
+        public void Can_use_FactoryMethod_to_register_ILogger_with_generic_implementation_dependent_on_parent()
+        {
+            var c = new Container();
+            c.Register<User1>();
+            c.Register<User2>();
+
+            c.Register<ILogger>(made: Made.Of(r => FactoryMethod.Of(
+                typeof(LogFactory).GetMethodOrNull("GetLog").MakeGenericMethod(r.Parent.ImplementationType))));
+
+            Assert.That(c.Resolve<User2>().Logger, Is.InstanceOf<Logger<User2>>());
+            Assert.That(c.Resolve<User1>().Logger, Is.InstanceOf<Logger<User1>>());
+        }
+
+        [Test]
+        public void Can_select_what_factory_to_use_as_dependency_and_what_as_resolution_root()
         {
             var container = new Container();
-            container.Register(typeof(Client));
-            container.Register(typeof(ClientOfClient));
+            container.Register<IX, A>(setup: Setup.With(condition: request => !request.IsEmpty));
+            container.Register<IX, B>(setup: Setup.With(condition: request => request.IsEmpty));
+            container.Register<Y>();
 
-            var factories = new Dictionary<Type, Factory>();
-            container.Register<ILogger>(new FactoryProvider((request, _) =>
+            var y = container.Resolve<Y>();
+
+            Assert.IsInstanceOf<A>(y.X);
+        }
+
+        [Test]
+        public void Can_use_different_imlementations_based_on_context_using_condition()
+        {
+            var container = new Container();
+
+            container.Register<ImportConditionObject1>();
+            container.Register<ImportConditionObject2>();
+            container.Register<ImportConditionObject3>();
+
+            container.Register<IExportConditionInterface, ExportConditionalObject>(
+                setup: Setup.With(condition: r => r.Parent.ImplementationType == typeof(ImportConditionObject1)));
+
+            container.Register<IExportConditionInterface, ExportConditionalObject2>(
+                setup: Setup.With(condition: r => r.Parent.ImplementationType == typeof(ImportConditionObject2)));
+
+            container.Register<IExportConditionInterface, ExportConditionalObject3>(
+                setup: Setup.With(condition: r => r.Parent.ImplementationType == typeof(ImportConditionObject3)));
+
+            Assert.IsInstanceOf<ExportConditionalObject>(container.Resolve<ImportConditionObject1>().ExportConditionInterface);
+            Assert.IsInstanceOf<ExportConditionalObject2>(container.Resolve<ImportConditionObject2>().ExportConditionInterface);
+            Assert.IsInstanceOf<ExportConditionalObject3>(container.Resolve<ImportConditionObject3>().ExportConditionInterface);
+        }
+
+        #region CUT
+
+        public interface IExportConditionInterface {}
+        public class ExportConditionalObject : IExportConditionInterface {}
+        public class ExportConditionalObject2 : IExportConditionInterface {}
+        public class ExportConditionalObject3 : IExportConditionInterface {}
+        public class ImportConditionObject1
+        {
+            public IExportConditionInterface ExportConditionInterface { get; set; }
+            public ImportConditionObject1(IExportConditionInterface exportConditionInterface)
             {
-                var parent = request.GetNonWrapperParentOrDefault();
-                parent = parent.ThrowIfNull("{0} should be resolved only as dependency in other service.", request.ServiceType);
-                var genericArg = parent.ImplementationType ?? parent.ServiceType;
-                return factories.GetOrAdd(genericArg, t => new ReflectionFactory(typeof(Logger<>).MakeGenericType(t), Reuse.Singleton));
-            }));
-
-            var client = container.Resolve<Client>();
-            var clientOfClient = container.Resolve<ClientOfClient>();
-
-            Assert.That(client.Logger, Is.SameAs(clientOfClient.Client.Logger));
+                ExportConditionInterface = exportConditionInterface;
+            }
         }
 
-        [Test]
-        public void I_can_resolve_service_based_on_client_implementation_type()
+        public class ImportConditionObject2
         {
-            var container = new Container();
-            container.Register<User1>();
-            container.Register<User2>();
-
-            var factories = new Dictionary<Type, Factory>();
-            container.Register<ILogger>(
-                new FactoryProvider((request, _) =>
-                {
-                    var implType = typeof(PlainLogger);
-                    var parent = request.GetNonWrapperParentOrDefault();
-                    if (parent != null && parent.ImplementationType == typeof(User2))
-                        implType = typeof(FastLogger);
-                    return factories.GetOrAdd(implType, t => new ReflectionFactory(t));
-                }));
-
-            var user2 = container.Resolve<User2>();
-            Assert.That(user2.Logger, Is.InstanceOf<FastLogger>());
-
-            var user1 = container.Resolve<User1>();
-            Assert.That(user1.Logger, Is.InstanceOf<PlainLogger>());
+            public IExportConditionInterface ExportConditionInterface { get; set; }
+            public ImportConditionObject2(IExportConditionInterface exportConditionInterface)
+            {
+                ExportConditionInterface = exportConditionInterface;
+            }
         }
 
-        [Test]
-        public void If_FactoryProvider_is_returns_null_factory_it_should_Throw_Unable_to_resolve()
+        public class ImportConditionObject3
         {
-            var container = new Container();
-            container.Register<object>(new FactoryProvider((request, registry) => null));
-
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<object>());
+            public IExportConditionInterface ExportConditionInterface { get; set; }
+            public ImportConditionObject3(IExportConditionInterface exportConditionInterface)
+            {
+                ExportConditionInterface = exportConditionInterface;
+            }
         }
-    }
 
-    #region CUT
-
-    public interface ILogger
-    {
-        string Log(string message);
-    }
-
-    public class Logger<T> : ILogger
-    {
-        public string Log(string message)
+        internal interface IX { }
+        internal class A : IX { }
+        internal class B : IX { }
+        internal class Y
         {
-            return typeof(T) + ": " + message;
+            public IX X;
+            public Y(IX x) { X = x; }
         }
-    }
 
-    public class PlainLogger : ILogger
-    {
-        public string Log(string message)
+        public interface ILogger
         {
-            return message;
+            string Log(string message);
         }
-    }
 
-    public class FastLogger : ILogger
-    {
-        public string Log(string message)
+        public class Logger<T> : ILogger
         {
-            return message;
+            public string Log(string message)
+            {
+                return typeof(T) + ": " + message;
+            }
         }
-    }
 
-    public class Client
-    {
-        public ILogger Logger { get; set; }
-
-        public Client(ILogger logger)
+        public class Client
         {
-            Logger = logger;
+            public ILogger Logger { get; set; }
+
+            public Client(ILogger logger)
+            {
+                Logger = logger;
+            }
         }
-    }
 
-    public class ClientOfClient
-    {
-        public Client Client { get; set; }
-
-        public ClientOfClient(Client client)
+        public class ClientOfClient
         {
-            Client = client;
+            public Client Client { get; set; }
+
+            public ClientOfClient(Client client)
+            {
+                Client = client;
+            }
         }
-    }
 
-    public class User1
-    {
-        public ILogger Logger { get; set; }
-
-        public User1(ILogger logger)
+        public class User1
         {
-            Logger = logger;
+            public ILogger Logger { get; private set; }
+
+            public User1(ILogger logger)
+            {
+                Logger = logger;
+            }
         }
-    }
 
-    public class User2
-    {
-        public ILogger Logger { get; set; }
-
-        public User2(ILogger logger)
+        public class User2
         {
-            Logger = logger;
-        }
-    }
+            public ILogger Logger { get; set; }
 
-    #endregion
+            public User2(ILogger logger)
+            {
+                Logger = logger;
+            }
+        }
+
+        public class StrUser
+        {
+            public string Dependency { get; private set; }
+
+            public StrUser(string dependency)
+            {
+                Dependency = dependency;
+            }
+        }
+
+        #endregion
+    }
 }

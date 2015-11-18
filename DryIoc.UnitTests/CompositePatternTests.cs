@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
 			var container = new Container();
 			container.Register(typeof(IShape), typeof(Circle));
 			container.Register(typeof(IShape), typeof(Square));
-			container.Register(typeof(IShape), typeof(PolygonOfEnumerable), named: "composite");
+			container.Register(typeof(IShape), typeof(PolygonOfEnumerable), serviceKey: "composite");
 
 			var composite = (PolygonOfEnumerable)container.Resolve<IShape>("composite");
 
@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register(typeof(IShape), typeof(Circle));
             container.Register(typeof(IShape), typeof(Square));
-            container.Register(typeof(IShape), typeof(PolygonOfArray), named: "composite");
+            container.Register(typeof(IShape), typeof(PolygonOfArray), serviceKey: "composite");
 
             var composite = (PolygonOfArray)container.Resolve<IShape>("composite");
 
@@ -51,8 +51,8 @@ namespace DryIoc.UnitTests
         public void I_should_be_able_to_resolve_default_composite_without_exception()
         {
             var container = new Container();
-            container.Register(typeof(IShape), typeof(Circle), named: "circle");
-            container.Register(typeof(IShape), typeof(Square), named: "square");
+            container.Register(typeof(IShape), typeof(Circle), serviceKey: "circle");
+            container.Register(typeof(IShape), typeof(Square), serviceKey: "square");
             container.Register(typeof(IShape), typeof(PolygonOfArray));
 
             var composite = (PolygonOfArray)container.Resolve<IShape>();
@@ -79,12 +79,12 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register(typeof(IShape), typeof(Circle));
             container.Register(typeof(IShape), typeof(Square));
-            container.Register(typeof(IShape), typeof(PolygonOfMany), named: "composite");
+            container.Register(typeof(IShape), typeof(PolygonOfMany), serviceKey: "composite");
 
             var polygon = (PolygonOfMany)container.Resolve<IShape>("composite");
             Assert.That(polygon.Shapes.Count(), Is.EqualTo(2));
 
-            var shapes = container.Resolve<Many<IShape>>().Items;
+            var shapes = container.Resolve<LazyEnumerable<IShape>>().Items;
             Assert.That(shapes.Count(), Is.EqualTo(3));
         }
 
@@ -116,9 +116,9 @@ namespace DryIoc.UnitTests
         {
             public IEnumerable<IShape> Shapes { get; set; }
 
-            public PolygonOfMany(Many<IShape> shapes)
+            public PolygonOfMany(LazyEnumerable<IShape> shapes)
             {
-                Shapes = shapes.Items;
+                Shapes = shapes;
             }
         }
 

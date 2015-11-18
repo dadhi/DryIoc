@@ -78,7 +78,7 @@ namespace DryIoc.Playground
 
         public IEnumerator<HashTree2<K, V>> GetEnumerator()
         {
-            return _tree.TraverseInOrder().Select(t => new HashTree2<K, V>(t)).GetEnumerator();
+            return _tree.Enumerate().Select(t => new HashTree2<K, V>(t)).GetEnumerator();
         }
 
         private readonly IntTree<KVStack> _tree;
@@ -164,7 +164,7 @@ namespace DryIoc.Playground
 
         public IEnumerator<HashTree3<K, V>> GetEnumerator()
         {
-            return _tree.TraverseInOrder().Select(t => new HashTree3<K, V>(t)).GetEnumerator();
+            return _tree.Enumerate().Select(t => new HashTree3<K, V>(t)).GetEnumerator();
         }
 
         private readonly IntTree<KV> _tree;

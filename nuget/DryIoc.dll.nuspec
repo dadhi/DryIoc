@@ -2,17 +2,49 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.dll</id>
-        <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
+        <version>0.0.0</version><!-- overridden by "NuGet pack -Version" flag -->
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIoc is small, fast, capable IoC container for .NET</description>
+        <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          fixed: #70: .Net 4.0 related: Unable to resolve types from unsigned assembly if compiling to dynamic assembly is turned On (it is by default)
+            - Support for [PCL](http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx) and [.NET Core](https://oren.codes/2015/07/29/targeting-net-core).
+            - More consistent and complete API.
+            - Diagnose potential resolution problems with `container.VerifyResolutions()`.
+            - Possible compile-time factory delegate generation. Utilized by [DryIocZero](Companions/DryIocZero).
+            - Ambient current scope and `Reuse.InWebRequest` for ASP.NET integration.
+            - Support for static and instance factory methods in addition to constructor. It means support for method parameters injection.
+            - Batch registration from assemblies and type collections with `RegisterMany`.
+            - Service key of arbitrary type. The only requirement for key type is to implement `GetHashCode` and `Equals`.
+            - Resolve as `KeyValuePair` to get service key with service object.
+            - Register with condition for resolution.
+            - Required service type support: e.g. `var serviceObjects = c.Resolve{object[]}(typeof(Service));`.
+            - Optional parameters support.
+            - Fine-grained control over injection of parameters, properties, and fields.
+            - Injection of primitive values.
+            - Control how reused service is stored and disposed via `weaklyReferenced` and `preventDisposal` setups.
+            - Resolve service collection as `IList{T}`, `ICollection{T}`, `IReadOnlyList{T}`, `IReadOnlyCollection{T}`.  
+            - Register once, existing registration update, unregister.
+            - Explicit cache management.
+            - __removed:__ Compilation to DynamicAssembly. DryIoc is fast enough without its complexity. 
         </releaseNotes>
+        <dependencies>
+          <group targetFramework="dotnet">
+            <dependency id="System.Collections" version="4.0.0" />
+            <dependency id="System.Diagnostics.Debug" version="4.0.0" />
+            <dependency id="System.Diagnostics.Tools" version="4.0.0" />
+            <dependency id="System.Linq" version="4.0.0" />
+            <dependency id="System.Linq.Expressions" version="4.0.0" />
+            <dependency id="System.Reflection" version="4.0.0" />
+            <dependency id="System.Reflection.Extensions" version="4.0.0" />
+            <dependency id="System.Runtime" version="4.0.0" />
+            <dependency id="System.Runtime.Extensions" version="4.0.0" />
+            <dependency id="System.Threading" version="4.0.0" />
+          </group>
+        </dependencies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
@@ -20,13 +52,34 @@
         <!-- net35 -->
         <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />
         <file src="..\bin\Release\DryIoc.pdb" target="lib\net35" />
-        
+        <file src="..\bin\Release\DryIoc.xml" target="lib\net35" />
+
         <!-- net40 -->
         <file src="..\Net40\bin\Release\DryIoc.dll" target="lib\net40" />
         <file src="..\Net40\bin\Release\DryIoc.pdb" target="lib\net40" />
-        <file src="..\Net40\DryIoc\InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs" target="content\net40\Properties" />
-        
-        <!-- tools -->
+        <file src="..\Net40\bin\Release\DryIoc.xml" target="lib\net40" />
+
+        <!-- net45 -->
+        <file src="..\Net45\bin\Release\DryIoc.dll" target="lib\net45" />
+        <file src="..\Net45\bin\Release\DryIoc.pdb" target="lib\net45" />
+        <file src="..\Net45\bin\Release\DryIoc.xml" target="lib\net45" />
+
+        <!-- PCL Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <file src="..\PCL\bin\Release\DryIoc.dll" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <file src="..\PCL\bin\Release\DryIoc.pdb" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <file src="..\PCL\bin\Release\DryIoc.xml" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+
+        <!-- PCL Profile259	.NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+
+        <!-- dotnet (PCL Profile259) https://oren.codes/2015/07/29/targeting-net-core -->
+        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\dotnet" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\dotnet" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\dotnet" />
+
+      <!-- tools -->
         <file src="..\NuGet\DryIoc.snk" target="tools" />
         <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>

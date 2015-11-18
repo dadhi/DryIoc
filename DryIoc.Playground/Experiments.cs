@@ -11,7 +11,7 @@ using NUnit.Framework;
 namespace DryIoc.Playground
 {
     [TestFixture]
-    [Ignore]
+    [Explicit]
     public class Experiments
     {
         [Test]
@@ -119,8 +119,7 @@ namespace DryIoc.Playground
 
         public class MyClass<T> : Base<T>, IFace<T>, IFace { }
 
-        [Test]
-        [Ignore]
+        //[Test]
         public void Func_vs_Expr_vs_Delegate()
         {
             const int times = 1000 * 1000;
@@ -129,6 +128,25 @@ namespace DryIoc.Playground
             var delgTime = Measure(times, GetCtorDelg());
             var bodyTime = Measure(times, GetExprBody());
             var exprTime = Measure(times, GetExpr());
+
+            Console.WriteLine("Func: " + funcTime);
+            Console.WriteLine("Delg: " + delgTime);
+            Console.WriteLine("Expr: " + exprTime);
+            Console.WriteLine("Body: " + bodyTime);
+
+            Assert.GreaterOrEqual(funcTime, delgTime);
+            Assert.GreaterOrEqual(exprTime, bodyTime);
+        }
+
+        //[Test]
+        public void Create_Func_vs_Expr_vs_Delegate()
+        {
+            const int times = 1000;
+
+            var funcTime = Measure(times, () => () => new Fuh(new Bar()));
+            var delgTime = Measure(times, () => GetCtorDelg());
+            var bodyTime = Measure(times, () => GetExprBody());
+            var exprTime = Measure(times, () => GetExpr());
 
             Console.WriteLine("Func: " + funcTime);
             Console.WriteLine("Delg: " + delgTime);
@@ -241,6 +259,18 @@ namespace DryIoc.Playground
             for (int i = 0; i < times; i++)
             {
                 ignored = factory();
+            }
+            stopwatch.Stop();
+            return stopwatch.ElapsedMilliseconds;
+        }
+
+        private long Measure(int times, Func<Func<object>> createFactory)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            object ignored = null;
+            for (int i = 0; i < times; i++)
+            {
+                ignored = createFactory()();
             }
             stopwatch.Stop();
             return stopwatch.ElapsedMilliseconds;

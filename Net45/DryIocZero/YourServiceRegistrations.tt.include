@@ -1,0 +1,40 @@
+﻿<#
+//===========================================
+// The code is provided by YOU:
+// You may configure container,
+// Register your services,
+// And return container ready for generation.
+//
+// GetContainerWithRegistrations  
+// implementation below is just an EXAMPLE!
+//===========================================
+#>
+<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.2.0.0\lib\net45\DryIocAttributes.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.0.0\lib\net45\DryIoc.MefAttributedModel.dll" #>
+<#@ import Namespace="DryIoc.MefAttributedModel" #>
+
+<#/* EXAMPLE: I am referencing assembly and namespace with my services to register. Replace it with yours */#>
+<#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
+<#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
+
+<#+
+// Specify your container and registrations
+IContainer GetContainerWithRegistrations()
+{
+    var container = new Container().WithMefAttributedModel();
+
+	// EXAMPLE: Replace with your assemblies and types. 
+    var types = typeof(IDecoratedResult).Assembly.GetLoadedTypes();
+
+    container.RegisterExports(types);
+    return container;
+}
+
+// Specify what resolution roots should be generated
+bool IsResolutionRoot(ServiceRegistrationInfo info) 
+{
+	// EXAMPLE: I am selecting the roots registered with Setup.With(asResolutionRoot: true) or AsResolutionRootAttribute.
+	// You can apply any custom filter against input ServiceRegistrationInfo.
+	return ContainerTools.SetupAsResolutionRoots(info);
+}
+#>

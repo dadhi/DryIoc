@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
-            container.Register(typeof(IService), typeof(AnotherService), named: "another");
+            container.Register(typeof(IService), typeof(AnotherService), serviceKey: "another");
 
             var services = container.Resolve<Func<IService>[]>();
 
@@ -37,7 +37,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service), Reuse.Singleton);
-            container.Register(typeof(IService), typeof(AnotherService), named: "another");
+            container.Register(typeof(IService), typeof(AnotherService), serviceKey: "another");
 
             var services = container.Resolve<IService[]>();
 
@@ -60,7 +60,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
-            container.Register(typeof(IService), typeof(AnotherService), named: "AnotherService");
+            container.Register(typeof(IService), typeof(AnotherService), serviceKey: "AnotherService");
 
             var services = container.Resolve<IEnumerable<IService>>();
 
@@ -111,7 +111,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IDependency), typeof(Dependency));
-            container.Register(typeof(IDependency), typeof(Dependency), named: "Foo2");
+            container.Register(typeof(IDependency), typeof(Dependency), serviceKey: "Foo2");
             container.Register(typeof(IService), typeof(ServiceWithEnumerableDependencies));
 
             var service = (ServiceWithEnumerableDependencies)container.Resolve<IService>();
@@ -120,26 +120,38 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_array_of_not_registered_services_should_throw()
+        public void Resolving_array_of_not_registered_services_should_return_empty_array()
         {
             var container = new Container();
 
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<IService[]>());
+            var services = container.Resolve<IService[]>();
+
+            Assert.That(services.Length, Is.EqualTo(0));
         }
 
         [Test]
-        public void When_enumerable_is_reresolved_after_registering_another_service_Then_enumerable_should_NOT_contain_that_service()
+        public void When_enumerable_is_injected_it_will_Not_change_after_registering_of_new_service()
         {
             var container = new Container();
+            container.Register<ServiceAggregator>();
+
             container.Register(typeof(IService), typeof(Service));
-            var servicesBefore = container.Resolve<IService[]>();
-            Assert.That(servicesBefore.Length, Is.EqualTo(1));
+            var servicesBefore = container.Resolve<ServiceAggregator>().Services;
+            Assert.AreEqual(1, servicesBefore.Count());
 
-            container.Register(typeof(IService), typeof(AnotherService), named: "another");
+            container.Register(typeof(IService), typeof(AnotherService), serviceKey: "another");
 
-            var servicesAfter = container.Resolve<IService[]>();
-            Assert.That(servicesAfter.Length, Is.EqualTo(1));
+            var servicesAfter = container.Resolve<ServiceAggregator>().Services;
+            Assert.AreEqual(1, servicesAfter.Count());
+        }
+
+        internal class ServiceAggregator
+        {
+            public IEnumerable<IService> Services { get; private set; }
+            public ServiceAggregator(IEnumerable<IService> services)
+            {
+                Services = services;
+            }
         }
 
         [Test]
@@ -162,8 +174,8 @@ namespace DryIoc.UnitTests
         public void I_should_be_able_to_resolve_Lazy_of_Func_of_IEnumerable()
         {
             var container = new Container();
-            container.Register(typeof(IService), typeof(Service), named: "blah");
-            container.Register(typeof(IService), typeof(Service), named: "crew");
+            container.Register(typeof(IService), typeof(Service), serviceKey: "blah");
+            container.Register(typeof(IService), typeof(Service), serviceKey: "crew");
 
             var result = container.Resolve<Lazy<Func<IEnumerable<IService>>>>();
 
@@ -172,13 +184,45 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void If_some_item_is_not_resolved_then_it_would_throw()
+        public void If_some_item_is_not_resolved_then_it_will_return_empty_collection()
         {
             var container = new Container();
-            container.Register<Service>(setup: ServiceSetup.WithMetadata(1));
+            container.Register<Service>(setup: Setup.With(metadataOrFuncOfMetadata: 1));
 
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<IEnumerable<Meta<Service, bool>>>());
+            var items = container.Resolve<IEnumerable<Meta<Service, bool>>>();
+
+            Assert.That(items.Count(), Is.EqualTo(0));
         }
+
+        [Test]
+        public void Resove_func_of_default_service_then_array_of_default_and_named_service_should_Succeed()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(serviceKey: 1);
+            container.Register<IService, Service>();
+
+            container.Resolve<Func<IService>>();
+            var funcs = container.Resolve<Func<IService>[]>();
+
+            Assert.That(funcs.Length, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Resolve_generic_wrappers()
+        {
+            var container = new Container();
+            container.Register<ICmd, X>();
+            container.Register<ICmd, Y>();
+            container.Register(typeof(MenuItem<>), setup: Setup.Wrapper);
+
+            var items = container.Resolve<MenuItem<ICmd>[]>();
+
+            Assert.AreEqual(2, items.Length);
+        }
+
+        public interface ICmd { }
+        public class X : ICmd { }
+        public class Y : ICmd { }
+        public class MenuItem<T> where T : ICmd { }
     }
 }

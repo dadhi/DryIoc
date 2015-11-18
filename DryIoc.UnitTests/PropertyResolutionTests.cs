@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -16,7 +17,7 @@ namespace DryIoc.UnitTests
             var holder = container.Resolve<PropertyHolder>();
             var dependency = holder.Dependency = new Dependency();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.That(holder.Dependency, Is.EqualTo(dependency));
         }
@@ -29,7 +30,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IDependency), typeof(Dependency));
             var holder = container.Resolve<PropertyHolder>();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.IsInstanceOf<Dependency>(holder.Dependency);
         }
@@ -42,20 +43,20 @@ namespace DryIoc.UnitTests
             container.Register<IDependency, Dependency>();
             var holder = container.Resolve<FieldHolder>();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.IsInstanceOf<Dependency>(holder.Dependency);
         }
 
         [Test]
-        public void Resolving_property_with_nonpublic_set_should_NOT_throw_and_should_preserve_original_property_value()
+        public void Resolving_property_with_nonpublic_setter_should_NOT_throw_and_should_preserve_original_property_value()
         {
             var container = new Container();
             container.Register(typeof(PropertyHolder));
             container.Register(typeof(IBar), typeof(Bar));
             var holder = container.Resolve<PropertyHolder>();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.IsNull(holder.Bar);
         }
@@ -68,7 +69,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IBar), typeof(Bar));
             var holder = container.Resolve<PropertyHolder>();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.IsNull(holder.BarWithoutSet);
         }
@@ -82,7 +83,7 @@ namespace DryIoc.UnitTests
             var holder = container.Resolve<FieldHolder>();
             var bar = container.Resolve<IBar>();
 
-            container.ResolvePropertiesAndFields(holder);
+            container.InjectPropertiesAndFields(holder);
 
             Assert.That(holder.Bar, Is.Not.EqualTo(bar));
         }
@@ -90,18 +91,11 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_property_marked_with_Import()
         {
-            var container = new Container();
+            var container = new Container(Rules.Default.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
+
             container.Register<FunnyChicken>();
             container.Register<Guts>();
             container.Register<Brain>();
-
-            container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(
-                    (out object resultKey, MemberInfo propertyOrField, Request request, IRegistry _) =>
-                    {
-                        resultKey = null;
-                        return propertyOrField.GetCustomAttributes(typeof(ImportAttribute), false).Length != 0;
-                    });
 
             var chicken = container.Resolve<FunnyChicken>();
 
@@ -111,13 +105,11 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_field_marked_with_Import()
         {
-            var container = new Container();
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
+
             container.Register<FunnyChicken>();
             container.Register<Guts>();
             container.Register<Brain>();
-
-            container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
 
             var chicken = container.Resolve<FunnyChicken>();
 
@@ -127,11 +119,9 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_not_throw_on_resolving_readonly_field_marked_with_Import()
         {
-            var container = new Container();
-            container.Register<FunnyDuckling>();
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
-            container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
+            container.Register<FunnyDuckling>();
 
             Assert.DoesNotThrow(() =>
                 container.Resolve<FunnyDuckling>());
@@ -140,12 +130,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_Func_of_field_marked_with_Import()
         {
-            var container = new Container();
+            var container = new Container(rules => rules.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
+
             container.Register<FunkyChicken>();
             container.Register<Guts>();
-
-            container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
 
             var chicken = container.Resolve<FunkyChicken>();
 
@@ -155,51 +143,41 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_named_Lazy_of_property_marked_with_Import()
         {
-            var container = new Container();
-            container.Register<LazyChicken>();
-            container.Register<Guts>(named: "lazy-me");
+            var container = new Container(r => r.With(propertiesAndFields: SelectPropertiesAndFieldsWithImportAttribute));
 
-            container.ResolutionRules.PropertiesAndFields =
-                container.ResolutionRules.PropertiesAndFields.Append(TryGetPropertyOrFieldServiceKey);
+            container.Register<LazyChicken>();
+            container.Register<Guts>(serviceKey: "lazy-me");
 
             var chicken = container.Resolve<LazyChicken>();
 
             Assert.That(chicken.SomeGuts, Is.Not.Null);
         }
 
-        public static bool TryGetPropertyOrFieldServiceKey(out object key, MemberInfo member, Request _, IRegistry registry)
-        {
-            key = null;
-            var attributes = member.GetCustomAttributes(false);
-            if (attributes.Length == 0)
-                return false;
+        public static readonly PropertiesAndFieldsSelector SelectPropertiesAndFieldsWithImportAttribute =
+            PropertiesAndFields.All(withInfo: GetImportedPropertiesAndFields);
 
-            var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
-            key = import == null ? null : import.ContractName;
-            return import != null;
-        }
-
-        private static TAttribute GetSingleAttributeOrDefault<TAttribute>(object[] attributes) where TAttribute : Attribute
+        private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFields(MemberInfo m, Request req)
         {
-            TAttribute attr = null;
-            for (var i = 0; i < attributes.Length && attr == null; i++)
-                attr = attributes[i] as TAttribute;
-            return attr;
+            var import = (ImportAttribute)m.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
+            return import == null ? null : PropertyOrFieldServiceInfo.Of(m)
+                .WithDetails(ServiceDetails.Of(import.ContractType, import.ContractName), req);
         }
     }
 
     #region CUT
 
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
     public class ImportAttribute : Attribute
     {
         public ImportAttribute() { }
 
-        public ImportAttribute(string contractName)
+        public ImportAttribute(string contractName, Type contractType = null)
         {
             ContractName = contractName;
+            ContractType = contractType;
         }
 
+        public Type ContractType { get; set; }
         public string ContractName { get; set; }
     }
 
@@ -207,7 +185,9 @@ namespace DryIoc.UnitTests
     {
         public IDependency Dependency { get; set; }
 
+// ReSharper disable UnusedAutoPropertyAccessor.Local
         public IBar Bar { get; private set; }
+// ReSharper restore UnusedAutoPropertyAccessor.Local
 
         public IBar BarWithoutSet
         {
@@ -227,17 +207,25 @@ namespace DryIoc.UnitTests
         [Import]
         public Guts SomeGuts { get; set; }
 
-        [Import] public Brain SomeBrain;
+        [Import]
+        public Brain SomeBrain;
     }
 
     public class FunnyDuckling
     {
-        [Import] public readonly Brain Brains;
+        [Import]
+        public readonly Brain Brains;
+
+        public FunnyDuckling()
+        {
+            Brains = null;
+        }
     }
 
     public class FunkyChicken
     {
-        [Import] public Func<Guts> SomeGuts;
+        [Import]
+        public Func<Guts> SomeGuts;
     }
 
     public class LazyChicken

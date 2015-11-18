@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -10,7 +11,8 @@ namespace DryIoc.UnitTests
 		[Test]
 		public void GetCSharpTypeName_should_return_correct_open_generic_type_name()
 		{
-			var name = typeof(OpenGenericServiceWithTwoParameters<,>).Print(t => t.Name);
+			var name = new StringBuilder().Print(typeof(
+                OpenGenericServiceWithTwoParameters<,>), t => t.Name).ToString();
 
             Assert.That(name, Is.EqualTo("OpenGenericServiceWithTwoParameters<,>"));
 		}
@@ -18,12 +20,16 @@ namespace DryIoc.UnitTests
 		[Test]
 		public void GetCSharpTypeName_should_return_correct_closed_generic_type_name()
 		{
-			var name = typeof(OpenGenericServiceWithTwoParameters<Lazy<IEnumerable<bool>>, Func<bool, TypeCSharpNameFormattingTests, string>>).Print();
+			var name = new StringBuilder().Print(typeof(
+                OpenGenericServiceWithTwoParameters<
+                    Lazy<IEnumerable<bool>>, 
+                    Func<bool, TypeCSharpNameFormattingTests, string>>))
+                .ToString();
 
             Assert.That(name, Is.EqualTo(
                 "DryIoc.UnitTests.OpenGenericServiceWithTwoParameters<" + 
-                    "System.Lazy<System.Collections.Generic.IEnumerable<System.Boolean>>, " + 
-                    "System.Func<System.Boolean, DryIoc.UnitTests.TypeCSharpNameFormattingTests, System.String>" + 
+                    "Lazy<IEnumerable<Boolean>>, " + 
+                    "Func<Boolean, DryIoc.UnitTests.TypeCSharpNameFormattingTests, String>" + 
                     ">"));
 		}
 	}

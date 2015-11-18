@@ -1,0 +1,235 @@
+﻿/*
+The MIT License (MIT)
+
+Copyright (c) 2013 Maksim Volkau
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+<#@ template debug="false" hostspecific="true" language="C#" #>
+<#@ output extension=".cs" #>
+<#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
+<#@ assembly Name="System.Core" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.0.0\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
+<#@ import Namespace="System.Linq" #>
+<#@ import Namespace="System.Linq.Expressions" #>
+<#@ import Namespace="System.Collections.Generic" #>
+<#@ import Namespace="DryIoc" #>
+<#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
+<#@ include File="YourServiceRegistrations.tt.include" #><#
+
+var container = GetContainerWithRegistrations();
+
+KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
+KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
+var errors = container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies, IsResolutionRoot);
+
+var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
+var objectToCode = ObjectStringify.WithFullTypeNames;
+Func<object, string> code = null;
+code = x => x == null ? "null"
+    : x is DefaultKey ? "DefaultKey.Of(" + ((DefaultKey)x).RegistrationOrder + ")" 
+    : x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x))
+    : x is Expression ? exprToCode.ToCode((Expression)x).Replace("DryIoc.RequestInfo.", "RequestInfo.")
+    : objectToCode.PlainObjectToCode(x);
+
+var roots = resolutionsRoots.Select((r, i) => 
+    new { Index = i, ServiceType = code(r.Key.ServiceType), ServiceKey = code(r.Key.OptionalServiceKey), Expression = code(r.Value.Body) });
+
+var deps = resolutionCallDependencies.Select((r, i) => 
+    new { Index = i, ServiceType = code(r.Key.ServiceType), ServiceKey = code(r.Key.ServiceKey), Expression = code(r.Value),
+          RequiredServiceType = code(r.Key.RequiredServiceType),
+          PreResolveParent = code(r.Key.Parent)
+    });
+#>
+//========================================================================================================
+// NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
+//========================================================================================================
+using System;
+using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
+using System.Collections.Generic;
+
+namespace DryIocZero
+{
+/* 
+Errors during resolution:
+-----------------------------
+<#
+    if (errors.Length == 0)
+        WriteLine("Generation went without errors.");
+    foreach (var e in errors)
+    {
+#>
+<#=objectToCode.TypeNameToCode(e.Value.GetType())#>:
+<#=e.Value.Message#>
+
+<#
+    }
+#>
+-----------------------------
+end of exception list
+*/
+
+    partial class Container
+    {
+        [ExcludeFromCodeCoverage]
+        partial void ResolveGenerated(ref object service, Type serviceType, IScope scope)
+        {
+<#
+        var index = 0;
+        foreach (var factory in roots.Where(f => f.ServiceKey == "null"))
+        {
+            if (index++ > 0) WriteLine(@"
+            else");
+#>
+            if (serviceType == <#= factory.ServiceType #>)
+                service = Create_<#= factory.Index #>(this, scope);
+<#
+        }
+#>
+        }
+
+        [ExcludeFromCodeCoverage]
+        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, 
+            Type requiredServiceType, RequestInfo preRequestParent, IScope scope)
+        {
+<#
+        index = 0;
+        foreach (var rootGroup in roots.Where(f => f.ServiceKey != "null").GroupBy(f => f.ServiceType))
+        {
+            if (index++ > 0) WriteLine(@"
+            else");
+#>
+            if (serviceType == <#= rootGroup.Key #>) 
+            {
+<#
+            var innerIndex = 0;
+            foreach (var root in rootGroup)
+            {
+                if (innerIndex++ > 0) WriteLine(@"
+                else");
+#>
+                if (<#= root.ServiceKey #>.Equals(serviceKey))
+                    service = Create_<#= root.Index #>(this, scope);
+<#
+            }
+
+#>
+            }
+<#
+        }
+#>
+<#
+        index = 0;
+        foreach (var depGroup in deps.GroupBy(x => x.ServiceType))
+        {
+            if (index++ > 0) WriteLine(@"
+            else");
+#>
+            if (serviceType == <#= depGroup.Key #>) 
+            {
+<#
+            var innerIndex = 0;
+            foreach (var dep in depGroup)
+            {
+                if (innerIndex++ > 0) WriteLine(@"
+                else");
+#>
+                if (<#= dep.ServiceKey == "null" 
+                      ? "serviceKey == null" 
+                      : "(serviceKey == null && " + dep.ServiceKey + " is DefaultKey || serviceKey.Equals(" + dep.ServiceKey + "))" #> &&
+                    requiredServiceType == <#= dep.RequiredServiceType #> &&
+                    Equals(preRequestParent, <#= dep.PreResolveParent #>)) 
+                    service = CreateDependency_<#= dep.Index #>(this, scope);
+<#
+            }
+#>
+            }
+<#
+        }
+#>
+        }
+
+        [ExcludeFromCodeCoverage]
+        partial void ResolveManyGenerated(ref IEnumerable<KV> services, Type serviceType) 
+        {
+            services = ResolveManyGenerated(serviceType);
+        }
+
+        [ExcludeFromCodeCoverage]
+        private IEnumerable<KV> ResolveManyGenerated(Type serviceType)
+        {
+<#
+		if (!roots.Any())
+		{
+#>
+			yield break;
+<#
+		}
+		else 
+		{
+			foreach (var rootGroup in roots.GroupBy(f => f.ServiceType))
+			{
+#>
+			if (serviceType == <#= rootGroup.Key #>)
+			{
+<#
+				foreach (var factory in rootGroup)
+				{
+#>
+				yield return new KV(<#= factory.ServiceKey #>, (FactoryDelegate)Create_<#= factory.Index #>);
+<#
+				}
+#>
+			}
+
+<#
+		}
+		}
+#>
+		}
+
+<#
+    foreach (var root in roots)
+    {
+#>
+		// <#= root.ServiceType #>
+        internal static object Create_<#=root.Index#>(IResolverContext r, IScope scope)
+        {
+            return <#= root.Expression #>;
+        }
+
+<#        
+    }
+#>
+<#
+    foreach (var dep in deps)
+    {
+#>
+		// <#= dep.ServiceType #>
+        internal static object CreateDependency_<#=dep.Index#>(IResolverContext r, IScope scope)
+        {
+            return <#= dep.Expression #>;
+        }
+
+<#        
+    }
+#>
+	}
+}

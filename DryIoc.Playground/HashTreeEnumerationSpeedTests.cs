@@ -43,7 +43,7 @@ namespace DryIoc.Playground
             timer = Stopwatch.StartNew();
             for (int t = 0; t < times; t++)
             {
-                foreach (var i in tree.TraverseInOrder())
+                foreach (var i in tree.Enumerate())
                 {
                     result = i.Value;
                 }

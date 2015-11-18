@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel.Composition;
+using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
@@ -25,7 +26,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         TService Create();
     }
 
-    [ExportAll, ExportAsGenericWrapper]
+    [ExportMany, AsWrapper]
     public class DryFactory<TService> : IFactory<TService>
     {
         public DryFactory(Func<TService> create)
@@ -46,7 +47,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public FactoryWithArgsConsumer(IFactory<string, Two>[] twos, string message)
         {
-            Two = twos.ThrowIf(twos.Length == 0)[0].Create(message);
+            Two = twos[0].Create(message);
         }
 
         public Two Two { get; set; }
@@ -68,7 +69,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         TService Create(TArg0 arg0);
     }
 
-    [ExportAll, ExportAsGenericWrapper(1)]
+    [ExportMany, AsWrapper(1)]
     public class DryFactory<TArg0, TService> : IFactory<TArg0, TService>
     {
         public DryFactory(Func<TArg0, TService> create)

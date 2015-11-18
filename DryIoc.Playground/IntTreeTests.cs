@@ -6,10 +6,11 @@ using NUnit.Framework;
 namespace DryIoc.Playground
 {
     [TestFixture]
+    [Explicit]
     public class IntTreeTests
     {
         [Test]
-        public void CanGetSuccessfully()
+        public void Can_get()
         {
             var t = IntTree<int>.Empty
                 .AddOrUpdate(1, 11)
@@ -116,7 +117,7 @@ namespace DryIoc.Playground
             var items = Enumerable.Range(0, 10).ToArray();
             var tree = items.Aggregate(IntTree<int>.Empty, (t, i) => t.AddOrUpdate(i, i));
 
-            var enumerated = tree.TraverseInOrder().Select(t => t.Value).ToArray();
+            var enumerated = tree.Enumerate().Select(t => t.Value).ToArray();
 
             CollectionAssert.AreEqual(items, enumerated);
         }
@@ -139,11 +140,11 @@ namespace DryIoc.Playground
         {
             var tree = IntTree<KeyValuePair<Type, string>[]>.Empty;
 
-            var key = typeof(IntTreeTests);
+            var key = typeof(ImTreeArrayTests);
             var keyHash = key.GetHashCode();
             var value = "test";
 
-            IntTree<KeyValuePair<Type, string>[]>.UpdateValue updateValue = (old, added) =>
+            UpdateMethod<KeyValuePair<Type, string>[]> updateValue = (old, added) =>
             {
                 var newItem = added[0];
                 var oldItemCount = old.Length;
@@ -194,9 +195,9 @@ namespace DryIoc.Playground
         [Test]
         public void Tree_should_support_arbitrary_keys_by_using_their_hash_code()
         {
-            var tree = DryIoc.HashTree<Type, string>.Empty;
+            var tree = ImTreeMap<Type, string>.Empty;
 
-            var key = typeof(IntTreeTests);
+            var key = typeof(ImTreeArrayTests);
             var value = "test";
 
             tree = tree.AddOrUpdate(key, value);
@@ -211,7 +212,7 @@ namespace DryIoc.Playground
             var key1 = new HashConflictingKey<string>("a");
             var key2 = new HashConflictingKey<string>("b");
             var key3 = new HashConflictingKey<string>("c");
-            var tree = DryIoc.HashTree<HashConflictingKey<string>, int>.Empty
+            var tree = DryIoc.ImTreeMap<HashConflictingKey<string>, int>.Empty
                 .AddOrUpdate(key1, 1)
                 .AddOrUpdate(key2, 2)
                 .AddOrUpdate(key3, 3);
@@ -229,26 +230,6 @@ namespace DryIoc.Playground
             {
                 Bla = bla;
             }
-        }
-    }
-
-    public class HashConflictingKey<T>
-    {
-        public T Key;
-
-        public HashConflictingKey(T key)
-        {
-            Key = key;
-        }
-
-        public override int GetHashCode()
-        {
-            return 1;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return Equals(Key, ((HashConflictingKey<T>)obj).Key);
         }
     }
 }

@@ -36,8 +36,14 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\AttributedRegistrationTests.CUT.cs">
-      <Link>AttributedRegistrationTests.CUT.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\AttributedModelTests.CUT.cs">
+      <Link>AttributedModelTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\CodeGenerationTests.CUT.cs">
+      <Link>CodeGenerationTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\CustomInjectionRulesTests.CUT.cs">
+      <Link>CustomInjectionRulesTests.CUT.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsDecoratorTests.CUT.cs">
       <Link>ExportAsDecoratorTests.CUT.cs</Link>
@@ -45,8 +51,17 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsGenericWrapperTests.CUT.cs">
       <Link>ExportAsGenericWrapperTests.CUT.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportOnceTests.CUT.cs">
-      <Link>ExportOnceTests.CUT.cs</Link>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportFactoryTests.CUT.cs">
+      <Link>ExportFactoryTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportImportWithKeyTests.CUT.cs">
+      <Link>ExportImportWithKeyTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportManyTests.CUT.cs">
+      <Link>ExportManyTests.CUT.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportExternalTests.CUT.cs">
+      <Link>ImportExternalTests.CUT.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportWithMetadataTests.CUT.cs">
       <Link>ImportWithMetadataTests.CUT.cs</Link>
@@ -57,14 +72,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
-      <Project>{4F120D18-ABE6-4C79-B49F-8099F01E2F7F}</Project>
-      <Name>DryIoc.MefAttributedModel</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{FED12E6E-8C44-4FB2-98BB-3A82CCFD20A2}</Project>
-      <Name>DryIoc</Name>
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
+      <Project>{6dcb5ccd-ada2-4c6a-a864-cc396bf718ad}</Project>
+      <Name>DryIocAttributes</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>

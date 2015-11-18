@@ -29,6 +29,9 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DocumentationFile>..\bin\Release\DryIoc.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -38,14 +41,15 @@
     <Compile Include="..\..\DryIoc\Container.cs">
       <Link>Container.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc\FactoryCompiler.cs">
+      <Link>FactoryCompiler.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc\Ported-net45.cs">
+      <Link>Ported-net45.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc\Properties\Version.cs">
-      <Link>Properties\Version.cs</Link>
-    </Compile>
-    <Compile Include="FactoryCompiler.cs" />
-    <Compile Include="InternalsVisibleToDryIocFactoryCompilerDynamicAssembly.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

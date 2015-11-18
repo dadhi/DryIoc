@@ -6,19 +6,19 @@ namespace DryIoc.UnitTests
     [TestFixture]
     public class ThrowTests
     {
-        private Func<string, Exception> _original;
+        private Throw.GetMatchedExceptionHandler _original;
 
         [SetUp]
         public void SetupTestException()
         {
-            _original = Throw.GetException;
-            Throw.GetException = s => new InvalidOperationException(s);
+            _original = Throw.GetMatchedException;
+            Throw.GetMatchedException = (check, error, arg0, arg1, arg2, arg3, inner) => new InvalidOperationException(error.ToString(), inner);
         }
 
         [TearDown]
         public void TearDownTestException()
         {
-            Throw.GetException = _original;
+            Throw.GetMatchedException = _original;
         }
 
         [Test]
@@ -29,7 +29,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<InvalidOperationException>(() =>
                 arg.ThrowIfNull());
 
-            Assert.That(ex.Message, Is.StringContaining("null"));
+            Assert.That(ex.Message, Is.StringContaining("-1"));
         }
 
         [Test]
@@ -38,9 +38,9 @@ namespace DryIoc.UnitTests
             string arg = null;
 
             var ex = Assert.Throws<InvalidOperationException>(() =>
-                arg.ThrowIf(arg == null));
+                arg.ThrowIf(arg == null, 3));
 
-            Assert.That(ex.Message, Is.StringContaining("Argument of type System.String"));
+            Assert.That(ex.Message, Is.EqualTo("3"));
         }
 
         [Test]
@@ -49,9 +49,9 @@ namespace DryIoc.UnitTests
             string arg = null;
 
             var ex = Assert.Throws<InvalidOperationException>(() =>
-                Throw.If(arg == null, "Argument is null"));
+                Throw.If(arg == null, 5));
 
-            Assert.That(ex.Message, Is.EqualTo("Argument is null"));
+            Assert.AreEqual(ex.Message, "5");
         }
 
         [Test]
@@ -61,15 +61,27 @@ namespace DryIoc.UnitTests
             Exception loggedError = null;
             Action<Exception> logError = ex => { loggedError = ex; };
 
-            Throw.GetException = message =>
+            Throw.GetMatchedException = (check, e, arg0, arg1, arg2, arg3, inner) =>
             {
                 logError(error);
                 return error;
             };
 
-            try { Throw.If(true, "Error!"); } catch {}
- 
+            try { Throw.If(true, 4); }
+            catch { }
+
             Assert.That(loggedError, Is.SameAs(error));
+        }
+
+        [Test]
+        public void Can_wrap_inner_exception()
+        {
+            var innerException = new ArgumentException();
+
+            var ex = Assert.Throws<InvalidOperationException>(() => 
+                Throw.IfThrows<ArgumentException, string>(() => { throw innerException; }, true, 3));
+
+            Assert.AreSame(innerException, ex.InnerException);
         }
     }
 }

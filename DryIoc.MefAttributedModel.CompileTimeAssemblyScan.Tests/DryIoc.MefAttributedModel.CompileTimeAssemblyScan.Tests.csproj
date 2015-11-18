@@ -33,10 +33,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="nunit.framework, Version=2.6.3.13283, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
-      <Private>False</Private>
+    <Reference Include="nunit.framework, Version=2.6.4.14350, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
+      <HintPath>..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="protobuf-net, Version=2.0.0.668, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -46,9 +45,9 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="CompileTimeGeneratedRegistrator.cs">
-      <DependentUpon>CompileTimeGeneratedRegistrator.tt</DependentUpon>
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
+      <DependentUpon>CompileTimeGeneratedRegistrator.tt</DependentUpon>
     </Content>
     <Compile Include="CompileTimeRegistrationInfoSerializationTests.cs" />
     <Compile Include="CompileTimeRegistrationTests.cs" />
@@ -70,6 +69,11 @@
     <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
       <Project>{13516F3C-E48D-43DC-89D4-5FE00DE3C7D2}</Project>
       <Name>DryIoc.MefAttributedModel</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
+      <Project>{3bbd5ccf-d87c-4650-b039-334767a7cedd}</Project>
+      <Name>DryIocAttributes</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">

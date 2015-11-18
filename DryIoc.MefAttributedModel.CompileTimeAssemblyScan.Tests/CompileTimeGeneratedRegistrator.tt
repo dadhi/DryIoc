@@ -1,9 +1,11 @@
 ﻿<#@ template debug="false" hostspecific="false" language="C#" #>
 <#@ output extension=".cs" #>
 <#@ assembly Name="System.Core" #>
+
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.dll" #>
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.MefAttributedModel.dll" #>
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
+<#@ import Namespace="System.Text" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
@@ -11,15 +13,15 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 {
     public static class CompileTimeGeneratedRegistrator
     {
-        public static readonly TypeExportInfo[] Registrations =
+        public static readonly RegistrationInfo[] Registrations =
         {
 <#
         var assembly = typeof(TransientService).Assembly;
-        var infos = AttributedModel.DiscoverExportsInAssemblies(new [] { assembly });
+        var infos = AttributedModel.Scan(new [] { assembly });
         foreach (var info in infos)
         {
 #>
-<#= info.ToCode() #>, 
+<#= info.ToCode().ToString() #>, 
 <#
         }
 #>
