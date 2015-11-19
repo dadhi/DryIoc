@@ -27,9 +27,8 @@ call Clean -nopause
 call :Check
 
 call Build -nopause
-call :Check
+rem call :Check
 
-rem call RunTests -nopause
 call RunTestsWithCoverage -nopause
 call :Check
 
