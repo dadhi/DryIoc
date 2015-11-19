@@ -1,7 +1,7 @@
 DryIoc is fast, small, full-featured IoC Container for .NET
 ===========================================================
 
-[![Build status](https://ci.appveyor.com/api/projects/status/te0oktwwf7xx5e3k/branch/dev)](https://ci.appveyor.com/project/MaksimVolkau/dryioc-426/branch/dev)
+[![Build status](https://ci.appveyor.com/api/projects/status/jfq01d9wcs4vcwpf/branch/default)](https://ci.appveyor.com/project/MaksimVolkau/dryioc/branch/default)
 [![TestCoverage](http://dadhi.bitbucket.org/dryioc-coverage/badge_combined.svg)](http://dadhi.bitbucket.org/dryioc-coverage)
 [![FollowInTwitter](https://img.shields.io/badge/Follow-%40DryIoc-blue.svg)](https://twitter.com/DryIoc) 
 [![SOQnA](https://img.shields.io/badge/StackOverflow-QnA-green.svg)](http://stackoverflow.com/questions/tagged/dryioc)
@@ -15,35 +15,40 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 [WikiHome]: https://bitbucket.org/dadhi/dryioc/wiki/Home
 [MefAttributedModel]: https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel
 [PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
-[v2.0]: https://bitbucket.org/dadhi/dryioc/wiki/Home
 
 * Designed for low-ceremony use, performance, and extensibility.
-* Supports .NET 3.5+; PCL Profiles 259 and 328, [.NET Core via "dotnet"](https://oren.codes/2015/07/29/targeting-net-core)
-* [Documentation wiki][WikiHome]
-* [Contributing guide](CONTRIBUTING.md)
-* Available at NuGet as [DryIoc.dll] or source [DryIoc] (_in NuGet < 3.0_)
-* __DryIoc v2.0-rc4__ is the latest: `PM> Install-Package DryIoc.dll -Pre`
-    * [release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-versions)
-* __DryIoc v1.4.1__ is stable: `PM> Install-Package DryIoc.dll`
+* Supports .NET 3.5+; PCL Profiles 259 and 328, [.NET Core via "dotnet" moniker](https://oren.codes/2015/07/29/targeting-net-core)
+* [Documented][WikiHome] and [open for contributions](CONTRIBUTING.md)
+* Available at NuGet as a [DryIoc.dll] or code [DryIoc] (_in NuGet < 3.0_) 
+    * `PM> Install-Package DryIoc.dll`
+    * as code `PM> Install-Package DryIoc`
+* __DryIoc v2.0__ is the latest stable version
+    * [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-versions)
+    * [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
+
 
 ## Benchmarks
 * [Performance](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
-* [Features (V2)](http://featuretests.apphb.com/DependencyInjection.html)
+* [Features](http://featuretests.apphb.com/DependencyInjection.html)
+
 
 ## Performance
 * General use-cases optimized for max speed.
 * Memory footprint preserved as small as possible.
 
+
 ## Code/Library
 * No dependencies on the other libraries.
 * Public API is fully documented.
 
+
 ## Reliability
 * Unit-test suit with ~700 tests.
 * Thread-safe and lock-free: registrations and resolutions could be made in parallel without corrupting container state. 
-* Detects recursive dependencies - cycles in object graph.
+* Detects recursive dependencies aka cycles in object graph.
 * Throws exceptions as early as possible. Exception provides meaningful information about problem and context.
-* Resolve as `LambdaExpression` to be clear about service creation expression.
+* Provides diagnostics for potential resolution problems via `container.VerifyResolutions()`.
+
 
 ## Features
 
@@ -80,14 +85,14 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 NuGet: `PM> Install-Package DryIocAttributes.dll -Pre`
 
 - Extends [MEF](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) attributes to cover DryIoc features: metadata, advanced reuses, context based registration, decorators, etc.
-- Does not depend on DryIoc and may be used by other IoC frameworks. 
+- Does not depend on DryIoc and may be used by other IoC libraries. 
 
 
 ### DryIocZero
 
 NuGet: `PM> Install-Package DryIocZero -Pre`
 
-Slim IoC Container based on service factory delegates __generated at compile-time__ by DryIoc. 
+Slim IoC Container based on service factory delegates __generated at compile-time__ by DryIoc.
 
 - __Does not depend on DryIoc at run-time.__
 - Ensures _zero_ application bootstrapping time associated with IoC registrations.

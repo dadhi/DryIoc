@@ -8,11 +8,11 @@
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIoc.MefAttributedModel is extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
+        <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-            - rc1 breaking - Attributes are moved to separate DryIocAttributes package
-            - Supports all DryIoc V2 features.
+          - Supports all DryIoc V2 features.
+          - Attributes are moved to separate DryIocAttributes package
         </releaseNotes>
         <dependencies>
             <group>
