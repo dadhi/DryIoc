@@ -33,8 +33,8 @@ rem call RunTests -nopause
 call RunTestsWithCoverage -nopause
 call :Check
 
-call NuGetPack -nopause
-call :Check
+rem call NuGetPack -nopause
+rem call :Check
 
 if defined PUBLISH (
 	call NuGetPublish -nopause
