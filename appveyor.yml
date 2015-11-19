@@ -1,4 +1,4 @@
-version: 2.0.0
+version: 2.0.0-{branch}-{build}
 os: Windows Server 2012
 test: off
 
