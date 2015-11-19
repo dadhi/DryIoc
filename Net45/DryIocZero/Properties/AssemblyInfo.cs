@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 
 [assembly: AssemblyTitle("DryIocZero")]
-[assembly: AssemblyDescription("DryIocZero provides container to work on top of compile-time generated factory delegates, therefore decreasing application startup cost.")]
+[assembly: AssemblyDescription("Slim IoC Container based on service factory delegates generated at compile-time by DryIoc")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIocZero")]

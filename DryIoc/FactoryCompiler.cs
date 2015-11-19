@@ -13,7 +13,6 @@ namespace DryIoc
         static partial void CompileToDelegate(Expression expression, ref FactoryDelegate result)
         {
             var method = new DynamicMethod(string.Empty,
-                //MethodAttributes.Public | MethodAttributes.Static, CallingConventions.Standard,
                 typeof(object), _factoryDelegateArgTypes,
                 typeof(Container).Module, skipVisibility: true);
 

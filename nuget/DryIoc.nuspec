@@ -12,12 +12,14 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
             - Support for [PCL](http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx) and [.NET Core](https://oren.codes/2015/07/29/targeting-net-core).
-            - More consistent and complete API.
-            - Diagnose potential resolution problems with `container.VerifyResolutions()`.
-            - Possible compile-time factory delegate generation. Utilized by [DryIocZero](Companions/DryIocZero).
+            - More consistent and complete API surface.
+            - Diagnostics of potential resolution problems with `container.VerifyResolutions()`.
+            - Improved registration and first resolution time.
+            - Support of really large object graphs.
+            - Possibility of compile-time factory delegate generation. Utilized by [DryIocZero](Companions/DryIocZero).
             - Ambient current scope and `Reuse.InWebRequest` for ASP.NET integration.
-            - Support for static and instance factory methods in addition to constructor. It means support for method parameters injection.
-            - Batch registration from assemblies and type collections with `RegisterMany`.
+            - Support for static and instance factory methods in addition to constructor, including support for method parameters injection.
+            - Powerful open-generics support including variance, constraints, open-generic factory methods in open-generic classes.
             - Service key of arbitrary type. The only requirement for key type is to implement `GetHashCode` and `Equals`.
             - Resolve as `KeyValuePair` to get service key with service object.
             - Register with condition for resolution.
@@ -28,7 +30,6 @@
             - Control how reused service is stored and disposed via `weaklyReferenced` and `preventDisposal` setups.
             - Resolve service collection as `IList{T}`, `ICollection{T}`, `IReadOnlyList{T}`, `IReadOnlyCollection{T}`.
             - Register once, existing registration update, unregister.
-            - Explicit cache management.
             - __removed:__ Compilation to DynamicAssembly. DryIoc is fast enough without its complexity.
         </releaseNotes>
     </metadata>
