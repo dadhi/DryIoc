@@ -1,6 +1,10 @@
-version: 2.0.0-{branch}-{build}
+version: 2.0.0.{build}
 os: Windows Server 2012
 test: off
+
+environment:
+  COVERALLS_REPO_TOKEN:
+    secure: +9KpQEetcFiHf3hSU9r3RnPyCB6QmO3YSSIlIBPAD/PyLnX/I7d41MQ0tht0SN9D
 
 build_script:
   - .\BuildScripts\_main.bat -nopause
@@ -8,6 +12,6 @@ build_script:
 assembly_info:
   patch: true
   file: AssemblyInfo.*
-  assembly_version: "{version}"
-  assembly_file_version: "{version}"
-  assembly_informational_version: "{version}"
+  assembly_version: "2.0.0"
+  assembly_file_version: "2.0.0"
+  assembly_informational_version: "2.0.0"

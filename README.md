@@ -19,7 +19,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 * Designed for low-ceremony use, performance, and extensibility.
 * Supports .NET 3.5+; PCL Profiles 259 and 328, [.NET Core via "dotnet" moniker](https://oren.codes/2015/07/29/targeting-net-core)
 * [Documented][WikiHome] and [open for contributions](CONTRIBUTING.md)
-* Available at NuGet as a [DryIoc.dll] or code [DryIoc] (_in NuGet < 3.0_) 
+* Available at NuGet as [DryIoc.dll] or as code [DryIoc] (_in NuGet < 3.0_) 
     * `PM> Install-Package DryIoc.dll`
     * as code `PM> Install-Package DryIoc`
 * __DryIoc v2.0__ is the latest stable version
@@ -55,7 +55,9 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 * Register interface/type mapping, additionally supported: registering service once, registration update, removing registration. 
 * Register user-defined delegate factory and register existing instance.
 * Register from assembly(ies) implementation types with automatically determined service types.
-* Register with arbitrary key and condition, multiple default registrations.
+* Register with service key of arbitrary type, or register multiple non-keyed services.
+* Register with resolution condition.
+* Register with associated metadata object of arbitrary type.
 * Resolve and ResolveMany. 
 * Unknown service resolution with `Rules.WithUnknownServiceResolvers()`. 
 * Instance lifetime control or *Reuse* in DryIoc terms:
@@ -64,25 +66,23 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     * Control reused objects behavior with `preventDisposal` and `weaklyReferenced`.
 * Open-generics without special syntax.
 * Constructor, property and field injection.
-* Static or instance factory methods in addition to constructor. Factory methods support parameter injection same as constructors.
-* Injecting properties/fields into existing object.
+* Static or instance factory methods in addition to constructor. Factory methods support parameter injection the same way as constructors.
+* Injecting properties and fields into existing object.
 * Creating concrete object without registering it in Container but with injecting its parameters, properties, and fields.
-* Metadata object associating with registration.
 * Generic wrappers:
     * Service collections: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and  `I(ReadOnly)Collection|List<T>`.
     * Other: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>` or `Tuple<TMetadata, T>`, `KeyValuePair<TKey, T>`, and user-defined wrappers.
     * [Currying](http://en.wikipedia.org/wiki/Currying) over constructor (or factory method) arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
     * Nested wrappers: e.g. `Tuple<SomeMetadata, Func<ISomeService>>[]`.
-* [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern): Composite itself is excluded from result collection.
-* [Decorator Pattern](http://en.wikipedia.org/wiki/Decorator_pattern). 
-* Context-based resolution.
+* Resolve [Composites](http://en.wikipedia.org/wiki/Composite_pattern): Composite itself is excluded from result collection.
+* Specify [Decorators](http://en.wikipedia.org/wiki/Decorator_pattern). 
 
 
 ## Companions
 
 ### __DryIocAttributes__
 
-NuGet: `PM> Install-Package DryIocAttributes.dll -Pre`
+NuGet: `PM> Install-Package DryIocAttributes.dll`
 
 - Extends [MEF](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) attributes to cover DryIoc features: metadata, advanced reuses, context based registration, decorators, etc.
 - Does not depend on DryIoc and may be used by other IoC libraries. 
@@ -90,7 +90,7 @@ NuGet: `PM> Install-Package DryIocAttributes.dll -Pre`
 
 ### DryIocZero
 
-NuGet: `PM> Install-Package DryIocZero -Pre`
+NuGet: `PM> Install-Package DryIocZero`
 
 Slim IoC Container based on service factory delegates __generated at compile-time__ by DryIoc.
 
