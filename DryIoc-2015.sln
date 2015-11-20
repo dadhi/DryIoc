@@ -101,7 +101,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildScripts", "BuildScript
 		BuildScripts\Build.bat = BuildScripts\Build.bat
 		BuildScripts\Clean.bat = BuildScripts\Clean.bat
 		BuildScripts\NuGetPack.bat = BuildScripts\NuGetPack.bat
-		BuildScripts\RunTests.bat = BuildScripts\RunTests.bat
 		BuildScripts\RunTestsWithCoverage.bat = BuildScripts\RunTestsWithCoverage.bat
 	EndProjectSection
 EndProject

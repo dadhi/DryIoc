@@ -12,21 +12,6 @@ build_script:
 assembly_info:
   patch: true
   file: AssemblyInfo.*
-  assembly_version: "{version}"
-  assembly_file_version: "{version}"
+  assembly_version: "2.0.0"
+  assembly_file_version: "2.0.0"
   assembly_informational_version: "2.0.0"
-
-artifacts:
-  - path: bin\NuGetPackages\*.nupkg
-
-nuget:
-  account_feed: true
-  project_feed: true
-
-deploy:
-  provider: NuGet
-  # server: https://staging.nuget.org
-  api_key: 
-    secure: JPBrgilXGK52uuHgtpM8XDNO6C7RYfYRef6hfadvyVQh/mBKDBhdTw+2tWoA+gXg 
-  skip_symbols: true # skip symbols for preview packages
-  artifact: /.*\.nupkg/
