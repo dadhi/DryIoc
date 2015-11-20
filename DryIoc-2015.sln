@@ -159,6 +159,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{0BED39
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground", "Net45\Playground\Playground.csproj", "{7F524A24-95CA-49FB-92B9-9471964FC405}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.WebApi.Owin.Sample", "Extensions\DryIoc.WebApi.Owin.Sample\DryIoc.WebApi.Owin.Sample.csproj", "{FFBA94E2-8293-4F38-B687-72E4A64D64CD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -361,6 +363,10 @@ Global
 		{7F524A24-95CA-49FB-92B9-9471964FC405}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7F524A24-95CA-49FB-92B9-9471964FC405}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7F524A24-95CA-49FB-92B9-9471964FC405}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FFBA94E2-8293-4F38-B687-72E4A64D64CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FFBA94E2-8293-4F38-B687-72E4A64D64CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FFBA94E2-8293-4F38-B687-72E4A64D64CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FFBA94E2-8293-4F38-B687-72E4A64D64CD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -406,5 +412,6 @@ Global
 		{6DCB5CCD-ADA2-4C6A-A864-CC396BF718AD} = {84205448-1773-45D6-8D42-548A7997A7E1}
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
 		{7F524A24-95CA-49FB-92B9-9471964FC405} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
+		{FFBA94E2-8293-4F38-B687-72E4A64D64CD} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 	EndGlobalSection
 EndGlobal
