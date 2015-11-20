@@ -9,6 +9,9 @@ environment:
 build_script:
   - .\BuildScripts\_main.bat -nopause
 
+skip_commits:
+  message: /skip build.*/
+
 assembly_info:
   patch: true
   file: AssemblyInfo.*

@@ -110,6 +110,7 @@
     <Compile Include="Issue69_RecognizeGenericParameterConstraints.cs" />
     <Compile Include="Issue81_SupportForOptionalParametersInConstructor.cs" />
     <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
+    <Compile Include="Issues184_ReuseInNamedChildrenOfNamedScopes.cs" />
     <Compile Include="Issue_HandleVariance.cs" />
     <Compile Include="Issue_InjectPrimitiveValueBasedOnRequest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
