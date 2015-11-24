@@ -1,0 +1,1 @@
+dnu pack --configuration Release

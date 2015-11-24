@@ -11,12 +11,12 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          - Support for [PCL](http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx) and [.NET Core](https://oren.codes/2015/07/29/targeting-net-core).
+          - Support for PCL 328 and 259 profiles, and .NET Core via dotnet moniker.
           - More consistent and complete API surface.
           - Diagnostics of potential resolution problems with `container.VerifyResolutions()`.
           - Improved registration and first resolution time.
           - Support of really large object graphs.
-          - Possibility of compile-time factory delegate generation. Utilized by [DryIocZero](Companions/DryIocZero).
+          - Possibility of compile-time factory delegate generation. Utilized by DryIocZero.
           - Ambient current scope and `Reuse.InWebRequest` for ASP.NET integration.
           - Support for static and instance factory methods in addition to constructor, including support for method parameters injection.
           - Powerful open-generics support including variance, constraints, open-generic factory methods in open-generic classes.
@@ -30,7 +30,7 @@
           - Control how reused service is stored and disposed via `weaklyReferenced` and `preventDisposal` setups.
           - Resolve service collection as `IList{T}`, `ICollection{T}`, `IReadOnlyList{T}`, `IReadOnlyCollection{T}`.
           - Register once, existing registration update, unregister.
-          - __removed:__ Compilation to DynamicAssembly. DryIoc is fast enough without its complexity.
+          - removed: Compilation to DynamicAssembly. DryIoc is fast enough without its complexity.
         </releaseNotes>
         <dependencies>
           <group targetFramework="dotnet">
