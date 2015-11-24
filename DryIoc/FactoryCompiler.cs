@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -9,7 +8,6 @@ namespace DryIoc
 {
     public static partial class FactoryCompiler
     {
-        [SuppressMessage("ReSharper", "RedundantAssignment", Justification = "Result is write only by design")]
         static partial void CompileToDelegate(Expression expression, ref FactoryDelegate result)
         {
             var method = new DynamicMethod(string.Empty,
@@ -26,7 +24,7 @@ namespace DryIoc
             }
         }
 
-        private static readonly Type[] _factoryDelegateArgTypes = new[] { typeof(object[]), typeof(IResolverContext), typeof(IScope) };
+        private static readonly Type[] _factoryDelegateArgTypes = { typeof(object[]), typeof(IResolverContext), typeof(IScope) };
 
         /// <summary>Supports emitting of selected expressions, e.g. lambda are not supported yet.
         /// When emitter find not supported expression it will return false from <see cref="TryVisit"/>, so I could fallback
@@ -109,7 +107,7 @@ namespace DryIoc
                 if (value == null)
                     il.Emit(OpCodes.Ldnull);
                 else if (value is int || value.GetType().IsEnum())
-                    il.Emit(OpCodes.Ldc_I4, (int)value);
+                    EmitLoadConstantInt(il, (int)value);
                 else if (value is string)
                     il.Emit(OpCodes.Ldstr, (string)value);
                 else
@@ -134,7 +132,7 @@ namespace DryIoc
 
                 var arrVar = il.DeclareLocal(arrType);
 
-                il.Emit(OpCodes.Ldc_I4, elems.Count);
+                EmitLoadConstantInt(il, elems.Count);
                 il.Emit(OpCodes.Newarr, elemType);
                 il.Emit(OpCodes.Stloc, arrVar);
 
@@ -142,7 +140,7 @@ namespace DryIoc
                 for (int i = 0, n = elems.Count; i < n && ok; i++)
                 {
                     il.Emit(OpCodes.Ldloc, arrVar);
-                    il.Emit(OpCodes.Ldc_I4, i);
+                    EmitLoadConstantInt(il, i);
 
                     // loading element address for later copying of value into it.
                     if (isElemOfValueType)
@@ -255,6 +253,43 @@ namespace DryIoc
             private static void EmitMethodCall(MethodInfo method, ILGenerator il)
             {
                 il.Emit(method.IsVirtual ? OpCodes.Callvirt : OpCodes.Call, method);
+            }
+
+            private static void EmitLoadConstantInt(ILGenerator il, int i)
+            {
+                switch (i)
+                {
+                    case 0:
+                        il.Emit(OpCodes.Ldc_I4_0);
+                        break;
+                    case 1:
+                        il.Emit(OpCodes.Ldc_I4_1);
+                        break;
+                    case 2:
+                        il.Emit(OpCodes.Ldc_I4_2);
+                        break;
+                    case 3:
+                        il.Emit(OpCodes.Ldc_I4_3);
+                        break;
+                    case 4:
+                        il.Emit(OpCodes.Ldc_I4_4);
+                        break;
+                    case 5:
+                        il.Emit(OpCodes.Ldc_I4_5);
+                        break;
+                    case 6:
+                        il.Emit(OpCodes.Ldc_I4_6);
+                        break;
+                    case 7:
+                        il.Emit(OpCodes.Ldc_I4_7);
+                        break;
+                    case 8:
+                        il.Emit(OpCodes.Ldc_I4_8);
+                        break;
+                    default:
+                        il.Emit(OpCodes.Ldc_I4, i);
+                        break;
+                }
             }
         }
     }

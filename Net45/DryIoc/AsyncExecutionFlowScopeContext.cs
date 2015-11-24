@@ -26,12 +26,11 @@ namespace DryIoc
 {
     using System;
     using System.Runtime.Remoting.Messaging;
-    using System.Diagnostics.CodeAnalysis;
     using System.Threading;
 
     static partial class ScopeContext
     {
-        [SuppressMessage("ReSharper", "RedundantAssignment", Justification = "ref is the only way for partial methods.")]
+        // ReSharper disable once RedundantAssignment
         static partial void GetDefaultScopeContext(ref IScopeContext resultContext)
         {
             resultContext = new AsyncExecutionFlowScopeContext();

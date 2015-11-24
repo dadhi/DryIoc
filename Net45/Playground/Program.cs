@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
-using DryIoc;
+using System.Threading;
 
 namespace Playground
 {
@@ -12,15 +12,15 @@ namespace Playground
     {
         static void Main()
         {
-            //var createA = GenerateCreateADelegate();
-            //var state = new object[15];
-            //state[11] = "x";
-            //var a = createA(state);
-            //Console.WriteLine(a);
-
-            ExpressionVsEmit();
-
+            var result = ExpressionVsEmit();
+            Console.WriteLine("Ignored result: " + result);
             Console.ReadKey();
+        }
+
+        /// <summary>Result delegate to be created by <see cref="CreateExpression"/></summary>
+        public object CreateA(object[] state)
+        {
+            return new A(new B(), (string)state[11], new ID[2] { new D1(), new D2() }) { Prop = new P(new B()), Bop = new B() };
         }
 
         private static object ExpressionVsEmit()
@@ -33,13 +33,15 @@ namespace Playground
             state[11] = "x";
             object result = null;
 
+            Thread.CurrentThread.Priority = ThreadPriority.Highest;
+
             var stopwatch = Stopwatch.StartNew();
             for (var i = 0; i < times; i++)
             {
                 func = funcExpr.Compile();
             }
             stopwatch.Stop();
-            Console.WriteLine("Expression Compile: " + stopwatch.ElapsedMilliseconds);
+            Console.WriteLine("Compile Expression " + times + " times: " + stopwatch.ElapsedMilliseconds);
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -51,7 +53,7 @@ namespace Playground
                 result = func(state);
             }
             stopwatch.Stop();
-            Console.WriteLine("Expression Compiled Run: " + stopwatch.ElapsedMilliseconds);
+            Console.WriteLine("Invoke Compiled Expression " + runTimes + " times: " + stopwatch.ElapsedMilliseconds);
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -60,10 +62,10 @@ namespace Playground
             stopwatch = Stopwatch.StartNew();
             for (var i = 0; i < times; i++)
             {
-                func = CreateDelegateFromExpression(funcExpr.Body);
+                func = EmitDelegateFromExpression(funcExpr.Body);
             }
             stopwatch.Stop();
-            Console.WriteLine("Expression Emit: " + stopwatch.ElapsedMilliseconds);
+            Console.WriteLine("Emit from Expression " + times + " times: " + stopwatch.ElapsedMilliseconds);
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -75,7 +77,7 @@ namespace Playground
                 result = func(state);
             }
             stopwatch.Stop();
-            Console.WriteLine("Expression Emit Run: " + stopwatch.ElapsedMilliseconds);
+            Console.WriteLine("Run Emitted Expression: " + runTimes + " times: " + stopwatch.ElapsedMilliseconds);
 
             return result;
         }
@@ -87,22 +89,22 @@ namespace Playground
             var funcExpr = Expression.Lambda<Func<object[], object>>(
                 Expression.MemberInit(
                     Expression.New(typeof(A).GetConstructors()[0],
-                        Expression.New(typeof(B).GetConstructors()[0], ArrayTools.Empty<Expression>()),
+                        Expression.New(typeof(B).GetConstructors()[0]),
                         Expression.Convert(Expression.ArrayIndex(stateParamExpr, Expression.Constant(11)), typeof(string)),
                         Expression.NewArrayInit(typeof(ID), 
                             Expression.New(typeof(D1).GetConstructors()[0]),
                             Expression.New(typeof(D2).GetConstructors()[0]))),
                     Expression.Bind(typeof(A).GetProperty("Prop"), 
                         Expression.New(typeof(P).GetConstructors()[0],
-                            Expression.New(typeof(B).GetConstructors()[0], ArrayTools.Empty<Expression>()))),
+                            Expression.New(typeof(B).GetConstructors()[0]))),
                     Expression.Bind(typeof(A).GetField("Bop"),
-                        Expression.New(typeof(B).GetConstructors()[0], ArrayTools.Empty<Expression>()))),
+                        Expression.New(typeof(B).GetConstructors()[0]))),
                 stateParamExpr);
 
             return funcExpr;
         }
 
-        private static Func<object[], object> CreateDelegateFromExpression(Expression expr)
+        private static Func<object[], object> EmitDelegateFromExpression(Expression expr)
         {
             var method = new DynamicMethod("CreateA", typeof(object), new[] { typeof(object[]) });
             var il = method.GetILGenerator();
@@ -112,11 +114,6 @@ namespace Playground
             il.Emit(OpCodes.Ret);
 
             return (Func<object[], object>)method.CreateDelegate(typeof(Func<object[], object>));
-        }
-
-        public object CreateA(object[] state)
-        {
-            return new A(new B(), (string)state[11], new ID[2] { new D1(), new D2() }) { Prop = new P(new B()), Bop = new B() };
         }
     }
 
@@ -148,9 +145,6 @@ namespace Playground
                 case ExpressionType.Constant:
                     return VisitConstant((ConstantExpression)expr, il);
                 case ExpressionType.Parameter:
-                    //var paramExpr = (ParameterExpression)expr;
-                    //if (paramExpr != Container.StateParamExpr) // Note: For only state (singletons) is handled
-                    //    return false;
                     il.Emit(OpCodes.Ldarg_0); // state is the first argument
                     Debug.WriteLine("Ldarg_0");
                     return true;
@@ -210,9 +204,9 @@ namespace Playground
                 il.Emit(OpCodes.Ldnull);
                 Debug.WriteLine("Ldnull");
             }
-            else if (value is int || value.GetType().IsEnum())
+            else if (value is int || value.GetType().IsEnum)
             {
-                il.Emit(OpCodes.Ldc_I4, (int)value);
+                EmitLoadConstantInt(il, (int)value);
                 Debug.WriteLine("Ldc_I4 " + value);
             }
             else if (value is string)
@@ -243,13 +237,13 @@ namespace Playground
         {
             var elems = node.Expressions;
             var arrType = node.Type;
-            var elemType = arrType.GetArrayElementTypeOrNull();
-            var isElemOfValueType = elemType.IsValueType();
+            var elemType = arrType.GetElementType();
+            var isElemOfValueType = elemType.IsValueType;
 
             var arrVar = il.DeclareLocal(arrType);
 
-            il.Emit(OpCodes.Ldc_I4, elems.Count);
-            Debug.WriteLine("Ldc_I4 " + elems.Count);
+            EmitLoadConstantInt(il, elems.Count);
+
             il.Emit(OpCodes.Newarr, elemType);
             Debug.WriteLine("Newarr " + elemType);
             il.Emit(OpCodes.Stloc, arrVar);
@@ -261,8 +255,7 @@ namespace Playground
                 il.Emit(OpCodes.Ldloc, arrVar);
                 Debug.WriteLine("Ldloc array");
 
-                il.Emit(OpCodes.Ldc_I4, i);
-                Debug.WriteLine("Ldc_I4 " + i);
+                EmitLoadConstantInt(il, i);
 
                 if (isElemOfValueType)
                 {
@@ -328,7 +321,7 @@ namespace Playground
                 var prop = binding.Member as PropertyInfo;
                 if (prop != null)
                 {
-                    var setMethod = prop.GetSetMethodOrNull();
+                    var setMethod = prop.GetSetMethod();
                     if (setMethod == null)
                         return false;
 
@@ -357,6 +350,43 @@ namespace Playground
             il.Emit(OpCodes.Ldloc, obj);
             Debug.WriteLine("Ldloc " + obj);
             return true;
+        }
+
+        private static void EmitLoadConstantInt(ILGenerator il, int i)
+        {
+            switch (i)
+            {
+                case 0:
+                    il.Emit(OpCodes.Ldc_I4_0);
+                    break;
+                case 1:
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    break;
+                case 2:
+                    il.Emit(OpCodes.Ldc_I4_2);
+                    break;
+                case 3:
+                    il.Emit(OpCodes.Ldc_I4_3);
+                    break;
+                case 4:
+                    il.Emit(OpCodes.Ldc_I4_4);
+                    break;
+                case 5:
+                    il.Emit(OpCodes.Ldc_I4_5);
+                    break;
+                case 6:
+                    il.Emit(OpCodes.Ldc_I4_6);
+                    break;
+                case 7:
+                    il.Emit(OpCodes.Ldc_I4_7);
+                    break;
+                case 8:
+                    il.Emit(OpCodes.Ldc_I4_8);
+                    break;
+                default:
+                    il.Emit(OpCodes.Ldc_I4, i);
+                    break;
+            }
         }
     }
     public class D2 : ID { }

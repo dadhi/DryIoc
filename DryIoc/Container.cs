@@ -27,12 +27,12 @@ namespace DryIoc
     using System;
     using System.Collections;
     using System.Collections.Generic;
-    using System.Diagnostics;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
     using System.Text;
     using System.Threading;
+    using System.Diagnostics.CodeAnalysis;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IContainer, IScopeAccess
@@ -2097,6 +2097,7 @@ namespace DryIoc
 
             FactoryDelegate factoryDelegate = null;
             CompileToDelegate(expression, ref factoryDelegate);
+            // ReSharper disable once ConstantNullCoalescingCondition
             return factoryDelegate ?? Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
         }
 
@@ -6057,7 +6058,6 @@ namespace DryIoc
             if (factoryMethodSelector == null)
             {
                 var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
-                Debug.Assert(ctors.Length == 1);
                 return FactoryMethod.Of(ctors[0]);
             }
 
@@ -7201,7 +7201,6 @@ namespace DryIoc
     }
 
     /// <summary>Define registered service structure.</summary>
-    [DebuggerDisplay("#{FactoryRegistrationOrder}, {ServiceType}, {OptionalServiceKey}, {Factory}")]
     public struct ServiceRegistrationInfo
     {
         /// <summary>Required service type.</summary>
@@ -7492,6 +7491,7 @@ namespace DryIoc
 
     /// <summary>Exception that container throws in case of error. Dedicated exception type simplifies
     /// filtering or catching container relevant exceptions from client code.</summary>
+    [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable", Justification = "Not available in PCL.")]
     public class ContainerException : InvalidOperationException
     {
         /// <summary>Error code of exception, possible values are listed in <see cref="Error"/> class.</summary>

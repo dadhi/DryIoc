@@ -48,7 +48,7 @@ namespace DryIoc.WebApi.Owin
     }
 
     /// <summary>Inserts <see cref="DryIocDependencyScope"/>from OWIN context to Request properties.</summary>
-    public sealed class SetRequestDependencyScopeHandler : DelegatingHandler
+    internal sealed class SetRequestDependencyScopeHandler : DelegatingHandler
     {
         /// <summary>Inserts <see cref="DryIocDependencyScope"/>from OWIN context to Request properties.</summary>
         /// <param name="request">Target request</param> <param name="cancellationToken"></param>
