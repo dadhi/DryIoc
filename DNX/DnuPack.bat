@@ -1,1 +1,2 @@
-dnu pack --configuration Release
+call dnu pack DryIoc --configuration Release
+rem pause
