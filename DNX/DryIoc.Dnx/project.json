@@ -1,0 +1,30 @@
+﻿{
+    "version": "2.0.0-rc1",
+    "description": "DryIoc is fast, small, full-featured IoC Container for .NET",
+    "authors": [ "Maksim Volkau" ],
+    "copyright": "Copyright \u00a9 2013 Maksim Volkau",
+    "tags": [ "IoC", "Container", "Inversion-of-Control", "DI", "Dependency-Injection", "DRY", "Service-Locator", "Abstract-Factory" ],
+    "projectUrl": "https://bitbucket.org/dadhi/dryioc",
+    "licenseUrl": "http://opensource.org/licenses/MIT",
+    "releaseNotes": "RC1 based on CoreFx rc1 final \r\nhttps://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-v20-2015-11-19",
+    "compilationOptions": {
+        "warningsAsErrors": true
+    },
+    "frameworks": {
+        "net451": { },
+        "dotnet5.4": {
+            "compilationOptions": { "define": ["COREFX1_4"] },
+            "dependencies": {
+                "System.Collections": "4.0.11-*",
+                "System.Linq": "4.0.1-*",
+                "System.Linq.Expressions": "4.0.11-*",
+                "System.Runtime": "4.0.21-*",
+                "System.Runtime.Extensions": "4.0.11-*",
+                "System.Threading": "4.0.11-*",
+                "System.Reflection": "4.1.0-*",
+                "System.Reflection.Extensions": "4.0.0",
+                "System.Diagnostics.Tools": "4.0.0"
+            }
+        }
+    },
+}

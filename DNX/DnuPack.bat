@@ -1,2 +1,2 @@
-call dnu pack DryIoc --configuration Release
-rem pause
+call dnu pack DryIoc.Dnx --configuration Release
+pause
