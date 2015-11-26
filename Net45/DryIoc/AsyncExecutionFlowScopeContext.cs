@@ -42,7 +42,7 @@ namespace DryIoc
         /// <summary>Statically known name of root scope in this context.</summary>
         public static readonly string ScopeContextName = typeof(AsyncExecutionFlowScopeContext).FullName;
 
-#if COREFX1_4
+#if COREFX
         private static readonly AsyncLocal<IScope> _ambientScope = new AsyncLocal<IScope>();
 #else
         [Serializable]
@@ -63,7 +63,7 @@ namespace DryIoc
         /// <returns>Current scope or null.</returns>
         public IScope GetCurrentOrDefault()
         {
-#if COREFX1_4
+#if COREFX
             return _ambientScope.Value;
 #else
             var scopeEntry = (ScopeEntry<IScope>)System.Runtime.Remoting.Messaging.CallContext.LogicalGetData(_scopeEntryKey);
@@ -80,7 +80,7 @@ namespace DryIoc
         {
             var oldScope = GetCurrentOrDefault();
             var newScope = changeCurrentScope(oldScope);
-#if COREFX1_4
+#if COREFX
             _ambientScope.Value = newScope;
 #else
             var scopeEntry = newScope == null ? null : new ScopeEntry<IScope>(newScope);

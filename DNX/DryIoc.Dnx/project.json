@@ -16,12 +16,12 @@
     "compileFiles": [
         "..\\..\\DryIoc\\Container.cs",
         "..\\..\\Net45\\DryIoc\\AsyncExecutionFlowScopeContext.cs"
-    ], 
+    ],
 
     "frameworks": {
-        "net451": { },
+        "dnx451": { },
         "dotnet5.4": {
-            "compilationOptions": { "define": [ "COREFX1_4" ] },
+            "compilationOptions": { "define": [ "COREFX" ] },
             "dependencies": {
                 "System.Collections": "4.0.11-*",
                 "System.Linq": "4.0.1-*",

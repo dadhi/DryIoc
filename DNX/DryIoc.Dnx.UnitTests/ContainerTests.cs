@@ -320,7 +320,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Description("https://bitbucket.org/dadhi/dryioc/issue/73/remove-reused-instance-when-unregister")]
+        //[Description("https://bitbucket.org/dadhi/dryioc/issue/73/remove-reused-instance-when-unregister")]
         public void Unregister_singleton_without_swappable()
         {
             var container = new Container();
@@ -328,7 +328,7 @@ namespace DryIoc.UnitTests
             container.Register<IContext, Context1>(Reuse.Singleton);
 
             var context = container.Resolve<IContext>();
-            Assert.NotNull(context);
+            Assert.IsNotNull(context);
             Assert.AreSame(context, container.Resolve<IContext>());
 
             // Removes service instance from Singleton scope by setting it to null.
@@ -342,7 +342,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        //[Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_singleton_without_recycleable()
         {
             var container = new Container();
@@ -374,7 +374,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        //[Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_dependency_of_transient()
         {
             var c = new Container();
@@ -390,7 +390,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        //[Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_dependency_of_singleton_without_recyclable()
         {
             var c = new Container();
@@ -427,7 +427,7 @@ namespace DryIoc.UnitTests
 
             var resolver = container.Resolve<Beh>().R;
 
-            Assert.NotNull(resolver);
+            Assert.IsNotNull(resolver);
         }
 
         [Test]
@@ -495,7 +495,6 @@ namespace DryIoc.UnitTests
             var errors = container.VerifyResolutions().ToArray();
             Assert.AreEqual(1, errors.Length);
             Assert.AreEqual(Error.UnableToResolveUnknownService, errors[0].Value.Error);
-            StringAssert.Contains("MyService",  errors[0].Key.ToString());
         }
 
         class MyService
