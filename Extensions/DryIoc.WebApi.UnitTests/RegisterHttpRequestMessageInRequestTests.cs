@@ -23,14 +23,9 @@ namespace DryIoc.WebApi.UnitTests
         {
             // Create container with AsyncExecutionFlowScopeContext which works across async/await boundaries.
             // In case of MVC it may be changed to HttpContextScopeContext.
-            // If not specified container will use ThreadScopeContext.
-            var container = new Container( 
-                scopeContext: new AsyncExecutionFlowScopeContext());
+            var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
 
             container.Register<A>();
-
-            // Register Null request in parent container in order to swap to actual request in current scope.
-            // When resolving A container will find registered request dependency and cache access to it for fast performance.
 
             const int parallelRequestCount = 20;
             var tasks = new Task[parallelRequestCount];
@@ -41,8 +36,6 @@ namespace DryIoc.WebApi.UnitTests
                     var message = new TestRequestMessage();
                     using (var scope = container.OpenScope())
                     {
-                        // Resolve request as early registered ReuseSwapable.
-                        // and swap its current value (null) with your request.
                         // It will replace request instance inside current scope, keep all resolution cache, etc intact. It is fast.
                         scope.RegisterInstance(message, Reuse.InCurrentScope, IfAlreadyRegistered.Replace);
 

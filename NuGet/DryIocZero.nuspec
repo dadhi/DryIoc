@@ -11,6 +11,10 @@
         <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
         <releaseNotes>
+          v2.0.1
+          - fixed: #200 Multiple instances for Singleton created when Container is shared among multiple threads
+
+          v2.0.0
           - Ensures "zero" application bootstrapping time associated with IoC registrations.
           - Does not depend on DryIoc at run-time.
           - Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically - you can see how DryIoc is creating things.

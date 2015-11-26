@@ -6501,12 +6501,21 @@ namespace DryIoc
             if (index != null)
                 return (int)index;
 
-            var newIndex = Interlocked.Increment(ref _lastItemIndex);
-            if (newIndex >= _items.Length)
-                EnsureIndexExist(newIndex);
+            Ref.Swap(ref _factoryIdToIndexMap, map =>
+            {
+                index = map.GetValueOrDefault(externalId);
+                if (index != null)
+                    return map;
 
-            Ref.Swap(ref _factoryIdToIndexMap, idToIndex => idToIndex.AddOrUpdate(externalId, newIndex));
-            return newIndex;
+                var newIndex = Interlocked.Increment(ref _lastItemIndex);
+                if (newIndex >= _items.Length)
+                    EnsureIndexExist(newIndex);
+
+                index = newIndex;
+                return map.AddOrUpdate(externalId, index);
+            });
+
+            return (int)index;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -6539,12 +6548,6 @@ namespace DryIoc
                     Scope.DisposeItem(_items[(int)idToIndex.Value]);
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
             _items = ArrayTools.Empty<object>();
-        }
-
-        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
-        public override string ToString()
-        {
-            return "{SingletonScope}";
         }
 
         #region Implementation
@@ -6582,17 +6585,19 @@ namespace DryIoc
             object item;
             lock (_itemCreationLocker)
             {
-                item = _items[itemIndex];
+                var items = _items;
+                item = items[itemIndex];
                 if (item != null)
                     return item;
-                item = createValue();
-            }
 
-            var items = _items;
-            items[itemIndex] = item;
-            // if _items were not changed so far then use them, otherwise (if changed) do ref swap;
-            if (Interlocked.CompareExchange(ref _items, items, items) != items)
-                Ref.Swap(ref _items, _ => { _[itemIndex] = item; return _; });
+                item = createValue();
+
+                // Assign item to items, then check that items reference is still valid.
+                // If not, and items where swapped in between then try to update new collection until succeed.
+                items[itemIndex] = item;
+                if (items != _items)
+                    Ref.Swap(ref _items, its => { its[itemIndex] = item; return its; });
+            }
             return item;
         }
 

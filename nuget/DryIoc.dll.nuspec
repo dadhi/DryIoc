@@ -11,6 +11,10 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.0.1
+          - fixed: #200 Multiple instances for Singleton created when Container is shared among multiple threads
+
+          v2.0.0
           - Support for PCL 328 and 259 profiles, and .NET Core via dotnet moniker.
           - More consistent and complete API surface.
           - Diagnostics of potential resolution problems with `container.VerifyResolutions()`.
