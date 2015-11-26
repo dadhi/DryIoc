@@ -238,7 +238,7 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<MyService>();
 
             var provider = service.ConnectionProvider as ConnectionNamingConnectionStringProvider;
-            Assert.NotNull(provider);
+            Assert.IsNotNull(provider);
             Assert.AreEqual("Me.MyService", provider.TargetName);
         }
 
@@ -263,7 +263,7 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<MyService>();
 
             var provider = service.ConnectionProvider as ConnectionNamingConnectionStringProvider;
-            Assert.NotNull(provider);
+            Assert.IsNotNull(provider);
             Assert.AreEqual("Me.MyService", provider.TargetName);
         }
 

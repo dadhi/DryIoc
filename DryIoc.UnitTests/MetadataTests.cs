@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
 
             var services = container.Resolve<Tuple<ServiceWithDependencyAndWithMetadata, Metadata>[]>();
 
-            Assert.IsEmpty(services);
+            Assert.AreEqual(0, services.Length);
         }
 
         [Test]
@@ -213,7 +213,7 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Meta<IService<object>, int>>("no-no-name"));
-            Assert.That(ex.Message, Is.StringStarting("Unable to resolve"));
+            Assert.That(ex.Message, Is.StringContaining("Unable to resolve"));
         }
 
         [Test]

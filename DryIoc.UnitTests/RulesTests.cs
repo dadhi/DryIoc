@@ -47,13 +47,13 @@ namespace DryIoc.UnitTests
                     : null;
             
             IContainer container = new Container(Rules.Default.WithUnknownServiceResolvers(unknownServiceResolver));
-            Assert.NotNull(container.Resolve<NotRegisteredService>());
+            Assert.IsNotNull(container.Resolve<NotRegisteredService>());
 
             container = container
                 .With(rules => rules.WithoutUnknownServiceResolver(unknownServiceResolver))
                 .WithoutCache(); // Important to remove cache
 
-            Assert.Null(container.Resolve<NotRegisteredService>(IfUnresolved.ReturnDefault));
+            Assert.IsNull(container.Resolve<NotRegisteredService>(IfUnresolved.ReturnDefault));
         }
         
         [Test]

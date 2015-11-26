@@ -220,7 +220,7 @@ namespace DryIoc.UnitTests
 
         public class Child { }
 
-	    [Test, Explicit]
+	    [Explicit]
         public void When_container_is_disposed_lazy_enumerable_will_stop_working()
 	    {
             var container = new Container();

@@ -72,7 +72,7 @@ namespace DryIoc.UnitTests
 
             container.Register(Made.Of(() => Burger.Create()));
 
-            Assert.NotNull(container.Resolve<Burger>());
+            Assert.IsNotNull(container.Resolve<Burger>());
         }
 
         [Test]

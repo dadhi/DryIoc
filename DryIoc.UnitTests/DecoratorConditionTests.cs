@@ -14,8 +14,8 @@ namespace DryIoc.UnitTests
             container.Register<IHandler, LoggingHandlerDecorator>(
                 setup: Setup.DecoratorWith(request => Equals(request.ServiceKey, "slow")));
 
-            Assert.That(container.Resolve<IHandler>("fast"), Is.InstanceOf<FastHandler>());
-            Assert.That(container.Resolve<IHandler>("slow"), Is.InstanceOf<LoggingHandlerDecorator>());
+            Assert.IsInstanceOf<FastHandler>(container.Resolve<IHandler>("fast"));
+            Assert.IsInstanceOf<LoggingHandlerDecorator>(container.Resolve<IHandler>("slow"));
         }
     }
 

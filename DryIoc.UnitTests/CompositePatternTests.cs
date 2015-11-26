@@ -18,7 +18,7 @@ namespace DryIoc.UnitTests
 
 			var composite = (PolygonOfEnumerable)container.Resolve<IShape>("composite");
 
-            Assert.That(composite.Shapes.Count(), Is.EqualTo(2));
+            Assert.AreEqual(2, composite.Shapes.Count());
 		}
 
         [Test]
@@ -31,7 +31,7 @@ namespace DryIoc.UnitTests
 
             var shapes = container.Resolve<IEnumerable<Func<IShape>>>();
 
-            Assert.That(shapes.Count(), Is.EqualTo(3));
+            Assert.AreEqual(3, shapes.Count());
         }
 
         [Test]
@@ -44,7 +44,7 @@ namespace DryIoc.UnitTests
 
             var composite = (PolygonOfArray)container.Resolve<IShape>("composite");
 
-            Assert.That(composite.Shapes.Count(), Is.EqualTo(2));
+            Assert.AreEqual(2, composite.Shapes.Count());
         }
 
         [Test]
@@ -57,7 +57,7 @@ namespace DryIoc.UnitTests
 
             var composite = (PolygonOfArray)container.Resolve<IShape>();
 
-            Assert.That(composite.Shapes.Count(), Is.EqualTo(2));
+            Assert.AreEqual(2, composite.Shapes.Count());
         }
 
 		[Test]
@@ -70,7 +70,7 @@ namespace DryIoc.UnitTests
 
 			var shapes = container.Resolve<IShape[]>();
 
-			Assert.That(shapes.Count(), Is.EqualTo(3));
+			Assert.AreEqual(3, shapes.Count());
 		}
 
         [Test]
@@ -82,10 +82,10 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IShape), typeof(PolygonOfMany), serviceKey: "composite");
 
             var polygon = (PolygonOfMany)container.Resolve<IShape>("composite");
-            Assert.That(polygon.Shapes.Count(), Is.EqualTo(2));
+            Assert.AreEqual(2, polygon.Shapes.Count());
 
             var shapes = container.Resolve<LazyEnumerable<IShape>>().Items;
-            Assert.That(shapes.Count(), Is.EqualTo(3));
+            Assert.AreEqual(3, shapes.Count());
         }
 
 		#region Composite pattern CUT

@@ -118,7 +118,7 @@ namespace DryIoc.UnitTests
             Assert.That(me.Self.Value, Is.InstanceOf<Me>());
         }
 
-        [Test, Explicit]
+        [Explicit]
         public void When_container_is_disposed_lazy_will_stop_working()
         {
             var container = new Container();

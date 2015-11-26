@@ -136,7 +136,7 @@ namespace DryIoc.UnitTests
 
             container.RegisterMany(new[] { GetType().GetAssembly() }, (r, serviceTypes, implType) =>
             {
-                Assert.False(implType.FullName.Contains("_DisplayClass"));
+                Assert.IsFalse(implType.FullName.Contains("_DisplayClass"));
             });
         }
 
@@ -171,7 +171,7 @@ namespace DryIoc.UnitTests
             });
 
             var registrations = container.GetServiceRegistrations().Select(r => r.ServiceType).ToArray();
-            CollectionAssert.Contains(registrations, typeof(RegisterManyTests));
+            Assert.IsTrue(registrations.Contains(typeof(RegisterManyTests)));
         }
 
         [Test]

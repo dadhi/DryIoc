@@ -6,12 +6,11 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests.Memory
 {
     [TestFixture]
-    [Explicit(@"
-        Tests are passing, verified on .NET 3.5, 4.0. 
-        If tests are passes at least once, then it is enough to prove that Container is GC collected.")]
     public class NoMemoryLeaksTests
     {
-        [Test]
+        [Explicit(@"
+        Tests are passing, verified on .NET 3.5, 4.0. 
+        If tests are passes at least once, then it is enough to prove that Container is GC collected.")]
         public void Registration_with_resolver_as_param_should_NOT_hold_reference_to_container_when_it_is_GCed()
         {
             var container = new Container();
@@ -30,7 +29,9 @@ namespace DryIoc.UnitTests.Memory
             Assert.That(containerWeakRef.IsAlive, Is.False);
         }
 
-        [Test]
+        [Explicit(@"
+        Tests are passing, verified on .NET 3.5, 4.0. 
+        If tests are passes at least once, then it is enough to prove that Container is GC collected.")]
         public void Resolved_wrapper_should_NOT_hold_reference_to_container()
         {
             var container = new Container();
@@ -49,7 +50,9 @@ namespace DryIoc.UnitTests.Memory
             Assert.That(containerWeakRef.IsAlive, Is.False);
         }
 
-        [Test]
+        [Explicit(@"
+        Tests are passing, verified on .NET 3.5, 4.0. 
+        If tests are passes at least once, then it is enough to prove that Container is GC collected.")]
         public void When_request_is_saved_outside_and_container_disposed_Then_no_reference_to_Container_should_be_hold()
         {
             var container = new Container();
@@ -73,7 +76,9 @@ namespace DryIoc.UnitTests.Memory
             Assert.That(containerWeakRef.IsAlive, Is.False);
         }
 
-        [Test]
+        [Explicit(@"
+        Tests are passing, verified on .NET 3.5, 4.0. 
+        If tests are passes at least once, then it is enough to prove that Container is GC collected.")]
         public void After_disposing_container_there_should_be_No_reference_to_registered_instance()
         {
             var container = new Container();
@@ -89,7 +94,9 @@ namespace DryIoc.UnitTests.Memory
             Assert.That(serviceRef.IsAlive, Is.False);
         }
 
-        [Test]
+        [Explicit(@"
+        Tests are passing, verified on .NET 3.5, 4.0. 
+        If tests are passes at least once, then it is enough to prove that Container is GC collected.")]
         public void After_disposing_container_there_should_be_No_reference_to_registered_instance_if_it_was_resolved_already()
         {
             var container = new Container();
@@ -106,7 +113,9 @@ namespace DryIoc.UnitTests.Memory
             Assert.That(serviceRef.IsAlive, Is.False);
         }
 
-        [Test]
+        [Explicit(@"
+        Tests are passing, verified on .NET 3.5, 4.0. 
+        If tests are passes at least once, then it is enough to prove that Container is GC collected.")]
         public void After_disposing_container_there_should_be_No_reference_to_registered_delegate_if_it_was_resolved_already()
         {
             var container = new Container();

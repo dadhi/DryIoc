@@ -14,10 +14,10 @@ namespace DryIoc.UnitTests
 
             var child = parent.CreateFacade();
             child.Register(typeof(IJuice), typeof(FruitJuice));
-
+            
             var juice = child.Resolve<IJuice>();
 
-            Assert.That(juice, Is.InstanceOf<FruitJuice>());
+            Assert.IsInstanceOf<FruitJuice>(juice);
         }
 
         [Test]
@@ -31,7 +31,7 @@ namespace DryIoc.UnitTests
 
             var juice = child.Resolve<Func<IJuice>>();
 
-            Assert.That(juice, Is.InstanceOf<Func<IJuice>>());
+            Assert.IsInstanceOf<Func<IJuice>>(juice);
         }
 
         [Test]
@@ -46,7 +46,7 @@ namespace DryIoc.UnitTests
             var fst = child.Resolve<IJuice>();
             var snd = child.Resolve<IJuice>();
 
-            Assert.That(fst.Fruit, Is.SameAs(snd.Fruit));
+            Assert.AreSame(fst.Fruit, snd.Fruit);
         }
 
         [Test]
@@ -64,7 +64,8 @@ namespace DryIoc.UnitTests
                 Assert.IsInstanceOf<Mango>(juice.Fruit);
             }
 
-            Assert.That(() => child.Resolve<IJuice>(), Throws.InstanceOf<ContainerException>());
+            Assert.Throws<ContainerException>(() => 
+            child.Resolve<IJuice>());
         }
 
         [Test]
@@ -77,8 +78,8 @@ namespace DryIoc.UnitTests
             var childContainer = container.CreateFacade();
             childContainer.Register<IFruit, Orange>();
 
-            Assert.That(container.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
-            Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Orange>());
+            Assert.IsInstanceOf<Melon>(container.Resolve<FruitJuice>().Fruit);
+            Assert.IsInstanceOf<Orange>(childContainer.Resolve<FruitJuice>().Fruit);
         }
 
         [Test]
@@ -114,7 +115,7 @@ namespace DryIoc.UnitTests
                 .WithFallbackContainer(parent)
                 .WithFallbackContainer(anotherParent));
 
-            Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
+            Assert.IsInstanceOf<Melon>(childContainer.Resolve<FruitJuice>().Fruit);
         }
 
         [Test]
@@ -129,8 +130,8 @@ namespace DryIoc.UnitTests
 
             var childContainer = container.With(rules => rules.WithFallbackContainer(parent));
 
-            Assert.That(parent.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
-            Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Orange>());
+            Assert.IsInstanceOf<Melon>(parent.Resolve<FruitJuice>().Fruit);
+            Assert.IsInstanceOf<Orange>(childContainer.Resolve<FruitJuice>().Fruit);
 
             Assert.Throws<ContainerException>(() => 
                 container.Resolve<FruitJuice>());
@@ -148,8 +149,8 @@ namespace DryIoc.UnitTests
 
             var childContainer = container.With(rules => rules.WithFallbackContainer(parent));
 
-            Assert.That(parent.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Melon>());
-            Assert.That(childContainer.Resolve<FruitJuice>().Fruit, Is.InstanceOf<Orange>());
+            Assert.IsInstanceOf<Melon>(parent.Resolve<FruitJuice>().Fruit);
+            Assert.IsInstanceOf<Orange>(childContainer.Resolve<FruitJuice>().Fruit);
 
             var detachedChild = childContainer.With(rules => rules.WithoutFallbackContainer(parent));
 
@@ -176,15 +177,15 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IFruit, Melon>();
             var melon = container.Resolve<IFruit>();
-            Assert.That(melon, Is.InstanceOf<Melon>());
+            Assert.IsInstanceOf<Melon>(melon);
 
             var withRegistrationsCopy = container.WithRegistrationsCopy().WithoutCache();
             withRegistrationsCopy.Register<IFruit, Orange>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             var orange = withRegistrationsCopy.Resolve<IFruit>();
-            Assert.That(orange, Is.InstanceOf<Orange>());
+            Assert.IsInstanceOf<Orange>(orange);
         }
 
-        [Test(Description = "Issue 107")]
+        [Test] // #107
         public void Reusing_singletons_from_parent_and_not_disposing_them_in_scoped_container()
         {
             var container = new Container();

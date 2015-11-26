@@ -85,7 +85,7 @@ namespace DryIoc.UnitTests
 
             container.InjectPropertiesAndFields(holder);
 
-            Assert.That(holder.Bar, Is.Not.EqualTo(bar));
+            Assert.AreNotEqual(bar, holder.Bar);
         }
 
         [Test]

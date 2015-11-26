@@ -8,6 +8,9 @@
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
 
+    "compile": [ "..\\..\\DryIoc.UnitTests\\*.cs" ],
+    "exclude": [ "..\\..\\DryIoc.UnitTests\\ThrowTests.cs" ],
+
     "commands": {
         "test": "xunit.runner.dnx"
     },

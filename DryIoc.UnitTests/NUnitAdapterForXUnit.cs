@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace NUnit.Framework
 {
@@ -7,8 +9,21 @@ namespace NUnit.Framework
 
     public class TestAttribute : Xunit.FactAttribute {}
 
+    public class ExplicitAttribute : Xunit.FactAttribute
+    {
+        public ExplicitAttribute(string reason = null)
+        {
+            Skip = "Explicit: " + reason;
+        }
+    }
+
     public static class Assert
     {
+        public static void That(object @object, Action<object> assert)
+        {
+            assert(@object);
+        }
+
         public static void IsTrue(bool condition, string message = null)
         {
             Xunit.Assert.True(condition, message);
@@ -19,14 +34,14 @@ namespace NUnit.Framework
             Xunit.Assert.False(condition, message);
         }
 
-        public static void AreEqual<T>(T expected, T actual, string message = null)
+        public static void AreEqual(object expected, object actual, string message = null)
         {
-            Xunit.Assert.Equal<T>(expected, actual);
+            Xunit.Assert.Equal(expected, actual);
         }
 
-        public static void AreNotEqual<T>(T expected, T actual, string message = null)
+        public static void AreNotEqual(object expected, object actual, string message = null)
         {
-            Xunit.Assert.NotEqual<T>(expected, actual);
+            Xunit.Assert.NotEqual(expected, actual);
         }
 
         public static void AreSame(object expected, object actual, string message = null)
@@ -51,7 +66,7 @@ namespace NUnit.Framework
 
         public static void IsInstanceOf<T>(object @object, string message = null)
         {
-            Xunit.Assert.IsType(typeof(T), @object);
+            Xunit.Assert.IsAssignableFrom(typeof(T), @object);
         }
 
         public static T Throws<T>(Action action) where T : Exception
@@ -89,6 +104,69 @@ namespace NUnit.Framework
         }
     }
 
+    public static class Is
+    {
+        public static Action<object> Null
+        {
+            get { return o => Assert.IsNull(o); }
+        }
+
+        public static Action<object> True
+        {
+            get { return o => Assert.IsTrue((bool)o); }
+        }
+
+        public static Action<object> False
+        {
+            get { return o => Assert.IsFalse((bool)o); }
+        }
+
+        public static Action<object> InstanceOf<T>()
+        {
+            return o => Assert.IsInstanceOf<T>(o);
+        }
+
+        public static Action<object> EqualTo(object other)
+        {
+            return o => Assert.AreEqual(other, o);
+        }
+
+        public static Action<object> SameAs(object other)
+        {
+            return o => Assert.AreSame(other, o);
+        }
+
+        public static Action<object> StringContaining(string substring)
+        {
+            return o => Assert.IsTrue(o.ToString().Contains(substring));
+        }
+        public static Action<object> StringStarting(string substring)
+        {
+            return o => Assert.AreEqual(0, o.ToString().IndexOf(substring, StringComparison.Ordinal));
+        }
+
+        public static class Not
+        {
+            public static Action<object> Null
+            {
+                get { return o => Assert.IsNotNull(o); }
+            }
+
+            public static Action<object> SameAs(object other)
+            {
+                return o => Assert.AreNotSame(o, other);
+            }
+        }
+    }
+
+    public static class StringAssert
+    {
+        public static void Contains(string substring, string source)
+        {
+            Assert.IsTrue(source.Contains(substring));
+        }
+    }
+
     public static class CollectionAssert
     {
         public static void AreEqual(IEnumerable aa, IEnumerable bb)
@@ -107,6 +185,15 @@ namespace NUnit.Framework
                 }
                 Assert.AreEqual(a.Current, b.Current);
             }
+        }
+
+        public static void AreEquivalent<T>(IEnumerable<T> aa, IEnumerable<T> bb)
+        {
+            foreach (var a in aa)
+                Assert.IsTrue(bb.Contains(a));
+
+            foreach (var b in bb)
+                Assert.IsTrue(aa.Contains(b));
         }
     }
 }
