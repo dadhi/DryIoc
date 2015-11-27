@@ -100,6 +100,7 @@
     <Compile Include="Issue169_FalseAlarmCheckingScopeLifetimeConsistencyForFuncWrapper.cs" />
     <Compile Include="Issue178_FallbackContainerDisposesInstanceRegisteredInParent.cs" />
     <Compile Include="Issue181_ RegisterInstanceUnregister.cs" />
+    <Compile Include="Issue200_MultipleInstancesForSingletonCreatedWhenContainerIsSharedAmongMultipleThreads.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
@@ -110,6 +111,7 @@
     <Compile Include="Issue69_RecognizeGenericParameterConstraints.cs" />
     <Compile Include="Issue81_SupportForOptionalParametersInConstructor.cs" />
     <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
+    <Compile Include="Issues184_ReuseInNamedChildrenOfNamedScopes.cs" />
     <Compile Include="Issue_HandleVariance.cs" />
     <Compile Include="Issue_InjectPrimitiveValueBasedOnRequest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

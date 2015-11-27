@@ -20,6 +20,9 @@ $RECYCLE.BIN/
 *.suo
 *.user
 *.sln.docstates
+*.lock.json
+.vs/
+.vscode/
 
 # Build results
 

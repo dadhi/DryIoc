@@ -102,8 +102,8 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<IEnumerable<KeyValuePair<object, IService>>>().ToArray();
 
             Assert.That(pairs.Length, Is.EqualTo(2));
-            Assert.That(pairs[0].Key, Is.EqualTo(DefaultKey.Value));
-            Assert.That(pairs[1].Key, Is.EqualTo("Yeah!"));
+            CollectionAssert.AreEquivalent(new object[] { DefaultKey.Value, "Yeah!" },
+                pairs.Select(p => p.Key));
         }
 
         [Test]
@@ -157,7 +157,9 @@ namespace DryIoc.UnitTests
             var pairs = container.Resolve<KeyValuePair<object, Func<IService>>[]>();
 
             Assert.That(pairs.Length, Is.EqualTo(3));
-            CollectionAssert.AreEquivalent(new object[] { DefaultKey.Value, "another", EnumKey.Some }, pairs.Select(p => p.Key));
+            Assert.IsTrue(pairs.Any(p => Equals(p.Key, DefaultKey.Value)));
+            Assert.IsTrue(pairs.Any(p => Equals(p.Key, "another")));
+            Assert.IsTrue(pairs.Any(p => Equals(p.Key, EnumKey.Some)));
         }
     }
 }

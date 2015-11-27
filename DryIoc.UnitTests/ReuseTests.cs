@@ -93,7 +93,8 @@ namespace DryIoc.UnitTests
 
             var consumer = container.Resolve<Consumer>();
 
-            Assert.That(consumer.Log, Is.Not.Null.And.SameAs(consumer.Account.Log));
+            Assert.That(consumer.Log, Is.Not.Null);
+            Assert.That(consumer.Log, Is.SameAs(consumer.Account.Log));
         }
 
         [Test]
@@ -107,7 +108,8 @@ namespace DryIoc.UnitTests
             var consumer = container.Resolve<Consumer>();
             var account = container.Resolve<Account>();
 
-            Assert.That(consumer.Log, Is.Not.Null.And.Not.SameAs(account.Log));
+            Assert.That(consumer.Log, Is.Not.Null);
+            Assert.That(consumer.Log, Is.Not.SameAs(account.Log));
         }
 
         [Test]
@@ -136,7 +138,7 @@ namespace DryIoc.UnitTests
 
             var user = container.Resolve<AccountUser>();
 
-            Assert.NotNull(user.Account.Log);
+            Assert.IsNotNull(user.Account.Log);
         }
 
         [Test]
@@ -150,7 +152,7 @@ namespace DryIoc.UnitTests
 
             var user = container.Resolve<AccountUser>();
 
-            Assert.NotNull(user.Account.Log);
+            Assert.IsNotNull(user.Account.Log);
         }
 
         [Test]
@@ -164,7 +166,7 @@ namespace DryIoc.UnitTests
 
             var user = container.Resolve<AccountUser>();
 
-            Assert.NotNull(user.Account.Log);
+            Assert.IsNotNull(user.Account.Log);
             ((IDisposable)user.Account).Dispose();
 
             Assert.IsTrue(((DisposableLog)user.Account.Log).IsDisposed);

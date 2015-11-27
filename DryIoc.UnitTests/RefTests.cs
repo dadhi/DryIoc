@@ -4,10 +4,10 @@ using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
-    [TestFixture][Explicit("Multi-threaded non deterministic test")]
+    [TestFixture]
     public class RefTests
     {
-        [Test]
+        [Explicit("Multi-threaded non deterministic test")]
         public void Consistently_updated_by_multiple_threads()
         {
             const int itemCount = 10;

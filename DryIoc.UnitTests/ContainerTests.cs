@@ -15,7 +15,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve(typeof(IService));
 
-            Assert.That(service, Is.InstanceOf<Service>());
+            Assert.IsInstanceOf<Service>(service);
         }
 
         [Test]
@@ -27,7 +27,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service, Is.InstanceOf<Service>());
+            Assert.IsInstanceOf<Service>(service);
         }
 
         [Test]
@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>("another");
 
-            Assert.That(service, Is.InstanceOf<AnotherService>());
+            Assert.IsInstanceOf<AnotherService>(service);
         }
 
         [Test]
@@ -103,7 +103,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<ServiceWithDependency>();
 
-            Assert.That(service.Dependency, Is.Not.Null);
+            Assert.IsNotNull(service.Dependency);
         }
 
         [Test]
@@ -137,7 +137,7 @@ namespace DryIoc.UnitTests
             var one = container.Resolve<ServiceWithSingletonDependency>();
             var another = container.Resolve<ServiceWithSingletonDependency>();
 
-            Assert.That(one.Singleton, Is.SameAs(another.Singleton));
+            Assert.AreSame(one.Singleton, another.Singleton);
         }
 
         [Test]
@@ -150,7 +150,7 @@ namespace DryIoc.UnitTests
             var one = container.Resolve<ServiceWithGenericDependency<IDependency>>();
             var another = container.Resolve<ServiceWithGenericDependency<IDependency>>();
 
-            Assert.That(one.Dependency, Is.SameAs(another.Dependency));
+            Assert.AreSame(one.Dependency, another.Dependency);
         }
 
         [Test]
@@ -164,7 +164,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<ServiceWithTwoParametersBothDependentOnSameService>();
 
-            Assert.That(service.One.Dependency, Is.SameAs(service.Another.Dependency));
+            Assert.AreSame(service.One.Dependency, service.Another.Dependency);
         }
 
         [Test]
@@ -178,7 +178,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<ServiceWithTwoDependenciesWithLazySingletonDependency>();
 
-            Assert.That(service.One.LazyOne.Value, Is.SameAs(service.Another.LazyOne.Value));
+            Assert.AreSame(service.One.LazyOne.Value, service.Another.LazyOne.Value);
         }
 
         [Test]
@@ -189,7 +189,7 @@ namespace DryIoc.UnitTests
 
             var isRegistered = container.IsRegistered(typeof(IService));
 
-            Assert.That(isRegistered, Is.True);
+            Assert.IsTrue(isRegistered);
         }
 
         [Test]
@@ -199,7 +199,7 @@ namespace DryIoc.UnitTests
 
             var isRegistered = container.IsRegistered(typeof(IService));
 
-            Assert.That(isRegistered, Is.False);
+            Assert.IsFalse(isRegistered);
         }
 
         [Test]
@@ -231,7 +231,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Register(typeof(IService), typeof(AnotherService), serviceKey: "blah"));
 
-            Assert.That(ex.Message, Is.StringContaining("with duplicate key [blah]"));
+            Assert.AreEqual(Error.UnableToRegisterDuplicateKey, ex.Error);
         }
 
         [Test]
@@ -256,7 +256,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<object>();
 
-            Assert.That(service, Is.InstanceOf<Service>());
+            Assert.IsInstanceOf<Service>(service);
         }
 
         [Test]
@@ -266,7 +266,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>(IfUnresolved.ReturnDefault);
 
-            Assert.Null(service);
+            Assert.IsNull(service);
         }
 
         [Test]
@@ -278,7 +278,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service, Is.InstanceOf<Service>());
+            Assert.IsInstanceOf<Service>(service);
         }
 
         [Test]
@@ -290,7 +290,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service, Is.InstanceOf<AnotherService>());
+            Assert.IsInstanceOf<AnotherService>(service);
         }
 
         [Test]
@@ -316,11 +316,11 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>("a");
 
-            Assert.That(service, Is.InstanceOf<Service>());
+            Assert.IsInstanceOf<Service>(service);
         }
 
         [Test]
-        [Description("https://bitbucket.org/dadhi/dryioc/issue/73/remove-reused-instance-when-unregister")]
+        //[Description("https://bitbucket.org/dadhi/dryioc/issue/73/remove-reused-instance-when-unregister")]
         public void Unregister_singleton_without_swappable()
         {
             var container = new Container();
@@ -328,7 +328,7 @@ namespace DryIoc.UnitTests
             container.Register<IContext, Context1>(Reuse.Singleton);
 
             var context = container.Resolve<IContext>();
-            Assert.NotNull(context);
+            Assert.IsNotNull(context);
             Assert.AreSame(context, container.Resolve<IContext>());
 
             // Removes service instance from Singleton scope by setting it to null.
@@ -342,7 +342,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        //[Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_singleton_without_recycleable()
         {
             var container = new Container();
@@ -374,7 +374,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        //[Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_dependency_of_transient()
         {
             var c = new Container();
@@ -390,7 +390,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Description("https://github.com/ashmind/net-feature-tests/issues/23")]
+        //[Description("https://github.com/ashmind/net-feature-tests/issues/23")]
         public void ReRegister_dependency_of_singleton_without_recyclable()
         {
             var c = new Container();
@@ -427,7 +427,7 @@ namespace DryIoc.UnitTests
 
             var resolver = container.Resolve<Beh>().R;
 
-            Assert.NotNull(resolver);
+            Assert.IsNotNull(resolver);
         }
 
         [Test]
@@ -495,7 +495,6 @@ namespace DryIoc.UnitTests
             var errors = container.VerifyResolutions().ToArray();
             Assert.AreEqual(1, errors.Length);
             Assert.AreEqual(Error.UnableToResolveUnknownService, errors[0].Value.Error);
-            StringAssert.Contains("MyService",  errors[0].Key.ToString());
         }
 
         class MyService

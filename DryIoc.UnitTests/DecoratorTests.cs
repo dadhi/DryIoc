@@ -15,7 +15,7 @@ namespace DryIoc.UnitTests
 
             var decorator = container.Resolve<IOperation>();
 
-            Assert.That(decorator, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(decorator);
         }
 
         [Test]
@@ -28,7 +28,7 @@ namespace DryIoc.UnitTests
 
             var decorator = (RetryOperationDecorator)container.Resolve<IOperation>();
 
-            Assert.That(decorator.Decorated, Is.InstanceOf<MeasureExecutionTimeOperationDecorator>());
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(decorator.Decorated);
         }
 
         [Test]
@@ -41,7 +41,7 @@ namespace DryIoc.UnitTests
 
             var decorator = (RetryOperationDecorator)container.Resolve<IOperation>("Another");
 
-            Assert.That(decorator.Decorated, Is.InstanceOf<AnotherOperation>());
+            Assert.IsInstanceOf<AnotherOperation>(decorator.Decorated);
         }
 
         [Test]

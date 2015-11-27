@@ -14,7 +14,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<SomeService>();
 
-            Assert.That(service.Message, Is.EqualTo("static"));
+            Assert.AreEqual("static", service.Message);
         }
 
         [Test]
@@ -25,7 +25,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service.Message, Is.EqualTo("static"));
+            Assert.AreEqual("static", service.Message);
         }
 
         [Test]
@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service.Message, Is.EqualTo("static"));
+            Assert.AreEqual("static", service.Message);
         }
 
         [Test]
@@ -47,7 +47,7 @@ namespace DryIoc.UnitTests
 
             var a = container.Resolve<IA>();
 
-            Assert.NotNull(a);
+            Assert.IsNotNull(a);
         }
 
         interface IA { }
@@ -72,7 +72,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service.Message, Is.EqualTo("instance"));
+            Assert.AreEqual("instance", service.Message);
         }
 
         [Test]
@@ -87,7 +87,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service.Message, Is.EqualTo("parameter"));
+            Assert.AreEqual("parameter", service.Message);
         }
 
         [Test]
@@ -100,7 +100,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service.Message, Is.EqualTo("parameter"));
+            Assert.AreEqual("parameter", service.Message);
         }
 
         [Test]
@@ -117,7 +117,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service.Message, Is.EqualTo("parameter"));
+            Assert.AreEqual("parameter", service.Message);
         }
 
         [Test]
@@ -134,7 +134,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>();
 
-            Assert.That(service.Message, Is.EqualTo("XXX"));
+            Assert.AreEqual("XXX", service.Message);
         }
 
         [Test]
@@ -150,8 +150,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
 
-            Assert.AreEqual(ex.Error, Error.UnableToResolveUnknownService);
-            Assert.That(ex.Message, Is.StringContaining("Unable to resolve"));
+            Assert.AreEqual(Error.UnableToResolveUnknownService, ex.Error);
         }
 
         [Test]
@@ -163,8 +162,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<IService>());
 
-            Assert.AreEqual(ex.Error, Error.FactoryObjIsNullInFactoryMethod);
-            Assert.That(ex.Message, Is.StringContaining("Unable to use null factory object with factory method"));
+            Assert.AreEqual(Error.FactoryObjIsNullInFactoryMethod, ex.Error);
         }
 
         [Test]
@@ -177,7 +175,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<IService>(IfUnresolved.ReturnDefault);
 
-            Assert.That(service, Is.Null);
+            Assert.IsNull(service);
         }
 
         [Test]
@@ -199,7 +197,7 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<WithStaticCtor>();
 
-            Assert.NotNull(service);
+            Assert.IsNotNull(service);
         }
 
         #region CUT

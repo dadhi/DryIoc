@@ -47,7 +47,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        [Test, Explicit]
+        [Explicit]
         public void Can_store_reused_object_as_weak_reference()
         {
             var container = new Container();
@@ -90,7 +90,7 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(service.IsDisposed);
         }
 
-        [Test, Explicit]
+        [Explicit]
         public void Can_nest_Disposable_into_Weak_Referenced_wrapper()
         {
             var container = new Container();
@@ -151,7 +151,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        [Test, Explicit]
+        [Explicit]
         public void Can_resolve_as_swapable_and_swap_based_on_current_value()
         {
             var container = new Container();

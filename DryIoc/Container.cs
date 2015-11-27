@@ -27,13 +27,12 @@ namespace DryIoc
     using System;
     using System.Collections;
     using System.Collections.Generic;
-    using System.Diagnostics;
-    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
     using System.Text;
     using System.Threading;
+    using System.Diagnostics.CodeAnalysis;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IContainer, IScopeAccess
@@ -2098,6 +2097,7 @@ namespace DryIoc
 
             FactoryDelegate factoryDelegate = null;
             CompileToDelegate(expression, ref factoryDelegate);
+            // ReSharper disable once ConstantNullCoalescingCondition
             return factoryDelegate ?? Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
         }
 
@@ -3216,7 +3216,6 @@ namespace DryIoc
 
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
     /// Its methods are NOT actually called, they just used to reflect service info from call expression.</summary>
-    [SuppressMessage("ReSharper", "UnusedTypeParameter", Justification = "Type parameter is used by reflection.")]
     public static class Arg
     {
         /// <summary>Specifies required service type of parameter or member. If required type is the same as parameter/member type,
@@ -6059,7 +6058,6 @@ namespace DryIoc
             if (factoryMethodSelector == null)
             {
                 var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
-                Debug.Assert(ctors.Length == 1);
                 return FactoryMethod.Of(ctors[0]);
             }
 
@@ -6503,12 +6501,21 @@ namespace DryIoc
             if (index != null)
                 return (int)index;
 
-            var newIndex = Interlocked.Increment(ref _lastItemIndex);
-            if (newIndex >= _items.Length)
-                EnsureIndexExist(newIndex);
+            Ref.Swap(ref _factoryIdToIndexMap, map =>
+            {
+                index = map.GetValueOrDefault(externalId);
+                if (index != null)
+                    return map;
 
-            Ref.Swap(ref _factoryIdToIndexMap, idToIndex => idToIndex.AddOrUpdate(externalId, newIndex));
-            return newIndex;
+                var newIndex = Interlocked.Increment(ref _lastItemIndex);
+                if (newIndex >= _items.Length)
+                    EnsureIndexExist(newIndex);
+
+                index = newIndex;
+                return map.AddOrUpdate(externalId, index);
+            });
+
+            return (int)index;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -6541,12 +6548,6 @@ namespace DryIoc
                     Scope.DisposeItem(_items[(int)idToIndex.Value]);
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
             _items = ArrayTools.Empty<object>();
-        }
-
-        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
-        public override string ToString()
-        {
-            return "{SingletonScope}";
         }
 
         #region Implementation
@@ -6584,17 +6585,19 @@ namespace DryIoc
             object item;
             lock (_itemCreationLocker)
             {
-                item = _items[itemIndex];
+                var items = _items;
+                item = items[itemIndex];
                 if (item != null)
                     return item;
-                item = createValue();
-            }
 
-            var items = _items;
-            items[itemIndex] = item;
-            // if _items were not changed so far then use them, otherwise (if changed) do ref swap;
-            if (Interlocked.CompareExchange(ref _items, items, items) != items)
-                Ref.Swap(ref _items, _ => { _[itemIndex] = item; return _; });
+                item = createValue();
+
+                // Assign item to items, then check that items reference is still valid.
+                // If not, and items where swapped in between then try to update new collection until succeed.
+                items[itemIndex] = item;
+                if (items != _items)
+                    Ref.Swap(ref _items, its => { its[itemIndex] = item; return its; });
+            }
             return item;
         }
 
@@ -7203,7 +7206,6 @@ namespace DryIoc
     }
 
     /// <summary>Define registered service structure.</summary>
-    [DebuggerDisplay("#{FactoryRegistrationOrder}, {ServiceType}, {OptionalServiceKey}, {Factory}")]
     public struct ServiceRegistrationInfo
     {
         /// <summary>Required service type.</summary>

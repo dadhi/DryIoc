@@ -23,7 +23,7 @@ namespace DryIoc.UnitTests
 
             var services = container.Resolve<Service[]>(IfUnresolved.ReturnDefault);
 
-            CollectionAssert.IsEmpty(services);
+            Assert.AreEqual(0, services.Length);
         }
 
         [Test]
@@ -37,9 +37,8 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Client>());
 
-            Assert.That(ex.Message, Is
-                .StringContaining("Unable to resolve").And
-                .StringContaining("parameter \"service\""));
+            Assert.That(ex.Message, Is.StringContaining("Unable to resolve"));
+            Assert.That(ex.Message, Is.StringContaining("parameter \"service\""));
         }
 
         [Test]

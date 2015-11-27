@@ -100,7 +100,9 @@ namespace DryIoc.UnitTests
 
             var func = container.Resolve<Func<IService>>();
 
-            Assert.That(func(), Is.Not.Null.And.Not.SameAs(func()));
+            var service = func();
+            Assert.IsNotNull(service);
+            Assert.That(service, Is.Not.SameAs(func()));
         }
 
         [Test]
@@ -111,7 +113,9 @@ namespace DryIoc.UnitTests
 
             var service = container.Resolve<Lazy<IService>>();
 
-            Assert.That(service.Value, Is.Not.Null.And.SameAs(service.Value));
+            var value = service.Value;
+            Assert.IsNotNull(value);
+            Assert.That(value, Is.SameAs(service.Value));
         }
 
         [Test]

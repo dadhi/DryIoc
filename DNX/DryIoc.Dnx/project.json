@@ -1,0 +1,40 @@
+﻿{
+    "version": "2.0.0-rc1",
+    "title": "DryIoc.Dnx",
+    "description": "DryIoc targeting DNX (Asp.NET 5 / CoreFX)",
+    "authors": [ "Maksim Volkau" ],
+    "owners": [ "Maksim Volkau" ],
+    "copyright": "Copyright © 2015 Maksim Volkau",
+    "tags": [ "IoC", "Container", "Inversion-of-Control", "DI", "Dependency-Injection", "DRY", "Service-Locator", "Abstract-Factory" ],
+    "projectUrl": "https://bitbucket.org/dadhi/dryioc",
+    "licenseUrl": "http://opensource.org/licenses/MIT",
+    "requireLicenseAcceptance": false,
+    "releaseNotes": "Based on dotnet/CoreFX rc1-final \r\n https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-v20-2015-11-19",
+
+    "compilationOptions": {
+        "warningsAsErrors": true
+    },
+
+    "compileFiles": [
+        "..\\..\\DryIoc\\Container.cs",
+        "..\\..\\Net45\\DryIoc\\AsyncExecutionFlowScopeContext.cs"
+    ],
+
+    "frameworks": {
+        "dnx451": { },
+        "dotnet5.4": {
+            "compilationOptions": { "define": [ "COREFX" ] },
+            "dependencies": {
+                "System.Collections": "4.0.11-*",
+                "System.Linq": "4.0.1-*",
+                "System.Linq.Expressions": "4.0.11-*",
+                "System.Runtime": "4.0.21-*",
+                "System.Runtime.Extensions": "4.0.11-*",
+                "System.Threading": "4.0.11-*",
+                "System.Reflection": "4.1.0-*",
+                "System.Reflection.Extensions": "4.0.0",
+                "System.Diagnostics.Tools": "4.0.0"
+            }
+        }
+    }
+}
