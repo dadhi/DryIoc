@@ -27,15 +27,6 @@ namespace DryIoc
     using System;
     using System.Threading;
 
-    static partial class ScopeContext
-    {
-        // ReSharper disable once RedundantAssignment
-        static partial void GetDefaultScopeContext(ref IScopeContext resultContext)
-        {
-            resultContext = new AsyncExecutionFlowScopeContext();
-        }
-    }
-
     /// <summary>Stores scopes propagating through async-await boundaries.</summary>
     public sealed class AsyncExecutionFlowScopeContext : IScopeContext, IDisposable
     {

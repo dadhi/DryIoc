@@ -1,0 +1,32 @@
+﻿{
+    "version": "1.0.0-rc1",
+    "title": "DryIoc.Dnx.DependencyInjection",
+    "description": "DryIoc Adapter for Microsoft.Extensions.DependencyInjection (Asp.NET 5)",
+    "authors": [ "Maksim Volkau" ],
+    "owners": [ "Maksim Volkau" ],
+    "copyright": "Copyright © 2015 Maksim Volkau",
+    "tags": [ "DryIoc", "DNX", "Dependency Injection", "DI", "IoC", "Asp", "vNext" ],
+    "projectUrl": "https://bitbucket.org/dadhi/dryioc",
+    "licenseUrl": "http://opensource.org/licenses/MIT",
+    "requireLicenseAcceptance": false,
+    "releaseNotes": "Based on rc1-final",
+
+    "compilationOptions": {
+        "warningsAsErrors": true
+    },
+
+    "dependencies": {
+        "DryIoc.Dnx": { "target": "project" }, 
+        "Microsoft.Extensions.DependencyInjection.Abstractions": "1.0.0-rc1-final"
+    },
+
+    "frameworks": {
+        "dnx451": { },
+        "dotnet5.4": {
+            "compilationOptions": { "define": [ "COREFX" ] },
+            "dependencies": {
+                "System.Runtime": "4.0.21-*"
+            }
+        }
+    }
+}
