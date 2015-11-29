@@ -7,3 +7,6 @@ build_script:
 
 skip_commits:
   message: /skip build.*/
+
+artifacts:
+  - path: bin\NuGetPackages\*.nupkg
