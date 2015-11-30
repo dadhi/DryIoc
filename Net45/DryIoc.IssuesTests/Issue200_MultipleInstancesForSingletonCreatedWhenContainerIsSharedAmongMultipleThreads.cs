@@ -13,19 +13,25 @@ namespace DryIoc.IssuesTests
             container.Register<U>();
             container.Register<S>(Reuse.Singleton);
 
-            const int workerCount = 10;
+            const int workerCount = 4;
+            const int repeatTimes = 5;
 
-            var tasks = new Task<U>[workerCount];
-            for (var i = 0; i < workerCount; i++)
+            for (var i = 0; i < repeatTimes; i++)
             {
-                tasks[i] = Task.Run(() => container.Resolve<U>());
-            }
+                var tasks = new Task<U>[workerCount];
+                for (var j = 0; j < workerCount; j++)
+                {
+                    tasks[j] = Task.Run(async () =>
+                    {
+                        await Task.Delay(5);
+                        return container.Resolve<U>();
+                    });
+                }
 
-            Task.WaitAll(tasks);
+                Task.WaitAll(tasks);
 
-            for (var i = 1; i < tasks.Length; i++)
-            {
-                Assert.AreSame(tasks[i].Result.S, tasks[i - 1].Result.S);
+                for (var j = 1; j < tasks.Length; j++)
+                    Assert.AreSame(tasks[j].Result.S, tasks[j - 1].Result.S);
             }
         }
 
