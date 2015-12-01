@@ -3713,15 +3713,13 @@ namespace DryIoc
             else
                 factory = new InstanceFactory(originalInstance, reuse, setup);
 
-            // Before even registering new factory (if old one is not exist or could not be reused)
-            // we put instance into scope. So the factory created expression will be ignored anyway.
+            if (!canReuseAlreadyRegisteredFactory)
+                container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
+
             var request = container.EmptyRequest.Push(serviceType, serviceKey);
             reuse.GetScopeOrDefault(request)
                 .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
                 .SetOrAdd(reuse.GetScopedItemIdOrSelf(factory.FactoryID, request), instance);
-        
-            if (!canReuseAlreadyRegisteredFactory)
-                container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
         }
 
         private static readonly Setup _weaklyReferencedInstanceSetup = Setup.With(weaklyReferenced: true);
