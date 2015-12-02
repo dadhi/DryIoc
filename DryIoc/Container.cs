@@ -3427,9 +3427,12 @@ namespace DryIoc
         /// <summary>List of types excluded by default from RegisterMany convention.</summary>
         public static readonly string[] ExcludedGeneralPurposeServiceTypes =
         {
+            "System.ValueType",
             "System.Runtime.Serialization.ISerializable",
             "System.ICloneable",
+            "System.IEquatable",
             "System.Collections.IStructuralEquatable",
+            typeof(IComparable).FullName,
             typeof(IDisposable).FullName,
             typeof(IList).FullName,
             typeof(ICollection).FullName,
@@ -3445,20 +3448,16 @@ namespace DryIoc
         public static Type[] GetImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false)
         {
             var serviceTypes = type.GetImplementedTypes(ReflectionTools.AsImplementedType.SourceType);
-            var selectedServiceTypes = nonPublicServiceTypes
-                ? serviceTypes
-                : serviceTypes.Where(ReflectionTools.IsPublicOrNestedPublic);
 
-            selectedServiceTypes = selectedServiceTypes
-                .Where(t => ExcludedGeneralPurposeServiceTypes.IndexOf(t.FullName) == -1);
+            var selectedServiceTypes = serviceTypes.Where(t =>
+                (nonPublicServiceTypes || t.IsPublicOrNestedPublic()) &&
+                // using Namespace+Name instead of FullName because later is null for generic type definitions
+                ExcludedGeneralPurposeServiceTypes.IndexOf((t.Namespace + "." + t.Name).Split('`')[0]) == -1);
 
             if (type.IsGenericDefinition())
-            {
-                var implTypeArgs = type.GetGenericParamsAndArgs();
                 selectedServiceTypes = selectedServiceTypes
-                    .Where(t => t.ContainsAllGenericTypeParameters(implTypeArgs))
+                    .Where(t => t.ContainsAllGenericTypeParameters(type.GetGenericParamsAndArgs()))
                     .Select(t => t.GetGenericDefinitionOrNull());
-            }
 
             return selectedServiceTypes.ToArrayOrSelf();
         }
