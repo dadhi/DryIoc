@@ -41,23 +41,21 @@ namespace DryIoc.WebApi
     public static class DryIocWebApi
     {
         /// <summary>Configures container to work with ASP.NET WepAPI by: 
-        /// setting container scope context to <see cref="AsyncExecutionFlowScopeContext"/>,
+        /// setting container scope context to <see cref="AsyncExecutionFlowScopeContext"/> (if scope context is not set already),
         /// registering HTTP controllers, setting filter provider and dependency resolver.</summary>
         /// <param name="container">Original container.</param> <param name="config">Http configuration.</param>
         /// <param name="controllerAssemblies">(optional) Assemblies to look for controllers, default is ExecutingAssembly.</param>
-        /// <param name="scopeContext">(optional) Specific scope context to use, if not specified using
-        /// <see cref="AsyncExecutionFlowScopeContext"/> as default in NET 4.5. scope context.</param>
+        /// <param name="scopeContext">(optional) Specific scope context to use, by default method sets
+        /// <see cref="AsyncExecutionFlowScopeContext"/>, only if container does not have context specified already.</param>
         /// <returns>New container.</returns>
         public static IContainer WithWebApi(this IContainer container, HttpConfiguration config,
             IEnumerable<Assembly> controllerAssemblies = null, IScopeContext scopeContext = null)
         {
             container.ThrowIfNull();
 
-            if (scopeContext == null && !(container.ScopeContext is AsyncExecutionFlowScopeContext))
-                scopeContext = new AsyncExecutionFlowScopeContext();
-            if (scopeContext != null)
-                container = container.With(scopeContext: scopeContext);
-
+            if (container.ScopeContext == null)
+                container = container.With(scopeContext: scopeContext ?? new AsyncExecutionFlowScopeContext());
+                
             container.RegisterWebApiControllers(config, controllerAssemblies);
 
             container.SetFilterProvider(config.Services);

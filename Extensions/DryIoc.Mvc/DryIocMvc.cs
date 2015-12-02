@@ -59,17 +59,16 @@ namespace DryIoc.Mvc
         /// and at last sets container as <see cref="DependencyResolver"/>.</summary>
         /// <param name="container">Original container.</param>
         /// <param name="controllerAssemblies">(optional) By default uses <see cref="GetReferencedAssemblies"/>.</param>
-        /// <param name="scopeContext">Specific scope context to use, by default MVC uses <see cref="HttpContextScopeContext"/>.</param>
+        /// <param name="scopeContext">(optional) Specific scope context to use, by default MVC uses <see cref="HttpContextScopeContext"/> 
+        /// (if container does not have its own context specified).</param>
         /// <returns>New container with applied Web context.</returns>
         public static IContainer WithMvc(this IContainer container, 
             IEnumerable<Assembly> controllerAssemblies = null, IScopeContext scopeContext = null)
         {
             container.ThrowIfNull();
 
-            if (scopeContext == null && !(container.ScopeContext is HttpContextScopeContext))
-                scopeContext = new HttpContextScopeContext();
-            if (scopeContext != null)
-                container = container.With(scopeContext: scopeContext);
+            if (container.ScopeContext == null)
+                container = container.With(scopeContext: scopeContext ?? new HttpContextScopeContext());
 
             container.RegisterMvcControllers(controllerAssemblies);
 

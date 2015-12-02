@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
@@ -156,7 +157,39 @@ namespace DryIoc.WebApi.UnitTests
             }
         }
 
+        [Test]
+        public void When_custom_scope_context_is_specified_then_it_should_be_preserved()
+        {
+            var config = new HttpConfiguration();
+            var container = new Container(scopeContext: new DummyContext())
+                .WithWebApi(config);
+
+            Assert.IsInstanceOf<DummyContext>(container.ScopeContext);
+        }
+
         public class Blah {}
+
         public class Fooh {}
+
+        public class DummyContext : IScopeContext
+        {
+            public string RootScopeName
+            {
+                get { return string.Empty; }
+            }
+
+            public void Dispose() { }
+
+            public IScope GetCurrentOrDefault()
+            {
+                return new Scope();
+            }
+
+            public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
+            {
+                return setCurrentScope(new Scope());
+            }
+        }
     }
+
 }

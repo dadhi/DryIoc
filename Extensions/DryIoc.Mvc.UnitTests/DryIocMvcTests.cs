@@ -47,6 +47,15 @@ namespace DryIoc.Mvc.UnitTests
             filterProvider.GetFilters(Substitute.For<ControllerContext>(), Substitute.For<ActionDescriptor>());
         }
 
+        [Test]
+        public void When_custom_scope_context_is_specified_then_it_should_be_preserved()
+        {
+            var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext())
+                .WithMvc(new[] { typeof(DryIocMvcTests).Assembly });
+
+            Assert.IsInstanceOf<AsyncExecutionFlowScopeContext>(container.ScopeContext);
+        }
+
         public class Blah { }
         public class Fooh { }
     }

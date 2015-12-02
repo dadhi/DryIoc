@@ -37,6 +37,7 @@ namespace DryIoc.Owin
         public static readonly string ScopedContainerKeyInContext = typeof(DryIocOwin).FullName;
 
         /// <summary>Inserts scoped container into pipeline and stores scoped container in context.
+        /// 
         /// Optionally registers instances in scope with provided action.</summary>
         /// <param name="app">App builder</param> <param name="container">Container</param>
         /// <param name="registerInScope">(optional) Action for registering something in scope before setting scope into context.</param>
@@ -47,8 +48,8 @@ namespace DryIoc.Owin
             Action<IContainer> registerInScope = null,
             IScopeContext scopeContext = null)
         {
-            if (scopeContext != null)
-                container = container.With(scopeContext: scopeContext);
+            if (container.ScopeContext == null)
+                container = container.With(scopeContext: scopeContext ?? new AsyncExecutionFlowScopeContext());
             
             app.Use(async (context, next) =>
             {
