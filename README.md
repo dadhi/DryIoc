@@ -17,11 +17,12 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 [PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
 
 * Designed for low-ceremony use, performance, and extensibility.
-* Supports .NET 3.5+; PCL Profiles 259 and 328, [.NET Core via "dotnet" moniker](https://oren.codes/2015/07/29/targeting-net-core)
+* Supports .NET 3.5+; PCL Profiles 259 and 328, [.NET Core](https://oren.codes/2015/07/29/targeting-net-core) and [DNX](https://github.com/aspnet/dnx)
 * [Documented][WikiHome] and [open for contributions](CONTRIBUTING.md)
 * Available at NuGet as [DryIoc.dll] or as code [DryIoc] (_in NuGet < 3.0_) 
     * `PM> Install-Package DryIoc.dll`
-    * as code `PM> Install-Package DryIoc`
+    * get code `PM> Install-Package DryIoc`
+    * for DNX `PM> Install-Package DryIoc.Dnx`
 * __DryIoc v2.0.2__ is the latest stable version
     * [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     * [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
@@ -106,4 +107,5 @@ Slim IoC Container based on service factory delegates __generated at compile-tim
 - [MefAttributedModel](https://bitbucket.org/dadhi/dryioc/wiki/Extensions/MefAttributedModel) for [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx). Enables automatic types discovery and wiring.
 - [Common Service Locator](https://commonservicelocator.codeplex.com/)
 - ASP.NET: [DryIoc.Web](), [DryIoc.Mvc](), [DryIoc.WepApi]() 
+- ASP.NET 5 (vNext) DI adapter: [DryIoc.Dnx.DependencyInjection]()
 - OWIN: [DryIoc.Owin](), [DryIoc.Mvc.Owin](), [DryIoc.WebApi.Owin]()
