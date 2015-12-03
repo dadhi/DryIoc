@@ -256,8 +256,10 @@ namespace DryIoc
             // Improves performance a bit by attempt to swapping registry while it is still unchanged, 
             // if attempt fails then fallback to normal Swap with retry. 
             var registry = _registry.Value;
-            var currentRegistry = registry;
-            if (!_registry.TrySwapIfStillCurrent(currentRegistry, currentRegistry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
+            var current = registry;
+            if (ifAlreadyRegistered == IfAlreadyRegistered.AppendNotKeyed)
+                ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
+            if (!_registry.TrySwapIfStillCurrent(current, current.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
                 _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered, serviceKey));
         }
 
@@ -2698,6 +2700,21 @@ namespace DryIoc
         {
             var newRules = (Rules)MemberwiseClone();
             newRules._settings ^= Settings.VariantGenericTypesInResolvedCollection;
+            return newRules;
+        }
+
+        /// <summary>Default setting for container. 
+        /// Applied to all registrations if setting is not specified 
+        /// (or default <see cref="IfAlreadyRegistered.AppendNotKeyed"/>) in the registration.
+        /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection regitrations.</summary>
+        public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; private set; }
+
+        /// <summary>Specifies <see cref="DefaultIfAlreadyRegistered"/>.</summary>
+        /// <param name="rule">New setting.</param> <returns>New rules.</returns>
+        public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.DefaultIfAlreadyRegistered = rule;
             return newRules;
         }
 
