@@ -159,7 +159,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Without_singletons_should_work_with()
+        public void Without_singletons_should_work()
         {
             var container = new Container();
             container.Register<Melon>(Reuse.Singleton);
