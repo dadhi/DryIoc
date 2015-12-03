@@ -3908,6 +3908,20 @@ namespace DryIoc
                 : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
         }
 
+        /// <summary>Returns all registered services as objects, including all keyed and default registrations.</summary>
+        /// <param name="resolver">Usually <see cref="Container"/> object.</param>
+        /// <param name="serviceType">Type of item to resolve.</param>
+        /// <param name="behavior">(optional) Specifies new registered services awareness. Aware by default.</param>
+        /// <param name="serviceKey">(optional) Service key.</param>
+        /// <returns>Result collection of services.</returns>
+        /// <returns></returns>
+        public static IEnumerable<object> ResolveMany(this IResolver resolver, Type serviceType,
+            ResolveManyBehavior behavior = ResolveManyBehavior.AsLazyEnumerable,
+            object serviceKey = null)
+        {
+            return resolver.ResolveMany<object>(serviceType, behavior, serviceKey);
+        }
+
         internal static Expression CreateResolutionExpression(Request request, bool openResolutionScope = false)
         {
             var container = request.Container;

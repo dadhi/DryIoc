@@ -104,7 +104,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(serviceKey: 1);
             container.Register<IService, AnotherService>(serviceKey: '1');
 
-            IEnumerable<object> result = container.ResolveMany<object>(typeof(IService));
+            var result = container.ResolveMany(typeof(IService));
             var items = result.ToArray();
 
             Assert.That(items.Length, Is.EqualTo(2));
@@ -119,7 +119,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(serviceKey: 1);
             container.Register<IService, AnotherService>(serviceKey: '1');
 
-            var items = container.ResolveMany<object>(typeof(IService), ResolveManyBehavior.AsFixedArray).ToArray();
+            var items = container.ResolveMany(typeof(IService), ResolveManyBehavior.AsFixedArray).ToArray();
 
             Assert.That(items.Length, Is.EqualTo(2));
             Assert.That(items[0], Is.InstanceOf<Service>());
