@@ -11,6 +11,10 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.1.0
+          - added: #205: Add customizable IfAlreadyRegistered default value per container
+          - added: #204: Add ResolveMany of objects wout need to specify ResolveMany{Object}
+          - fixed: #203: RegisterMany should exclude ValueType and general purpose service types IEquatable, IComparable
           v2.0.2
           - fixed: #201: Mutithreading issue when RegisterInstance() is used within OpenScope()
           v2.0.1

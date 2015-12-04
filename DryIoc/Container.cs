@@ -384,8 +384,7 @@ namespace DryIoc
 
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
-            var registry = _registry.Value;
-            var factoryDelegate = registry.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+            var factoryDelegate = _registry.Value.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
                 ? factoryDelegate(_singletonScope.Items, _containerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
@@ -990,7 +989,6 @@ namespace DryIoc
         /// <returns>Index of found or added item.</returns>
         public int GetOrAddStateItem(object item)
         {
-            // todo: Wrap in array to prevent disposal
             return _singletonScope.GetOrAdd(item);
         }
 
@@ -5901,7 +5899,7 @@ namespace DryIoc
                         // Replace factory info with close factory service type
                         if (isFactoryServiceTypeClosed)
                         {
-                            factoryServiceType = factoryServiceType.GetGenericTypeDefinition();
+                            factoryServiceType = factoryServiceType.GetGenericTypeDefinition().ThrowIfNull();
                             var closedFactoryServiceType = Throw.IfThrows<ArgumentException, Type>(
                                 () => factoryServiceType.MakeGenericType(resultFactoryServiceTypeArgs),
                                 request.IfUnresolved == IfUnresolved.Throw,
