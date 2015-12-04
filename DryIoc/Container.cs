@@ -94,7 +94,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            var newSingletons = new Scope();
+            var newSingletons = new SingletonScope();
             return new Container(Rules, registryWithoutCache, newSingletons, _scopeContext, _openedScope, _disposed);
         }
 
@@ -256,8 +256,10 @@ namespace DryIoc
             // Improves performance a bit by attempt to swapping registry while it is still unchanged, 
             // if attempt fails then fallback to normal Swap with retry. 
             var registry = _registry.Value;
-            var currentRegistry = registry;
-            if (!_registry.TrySwapIfStillCurrent(currentRegistry, currentRegistry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
+            var current = registry;
+            if (ifAlreadyRegistered == IfAlreadyRegistered.AppendNotKeyed)
+                ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
+            if (!_registry.TrySwapIfStillCurrent(current, current.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
                 _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered, serviceKey));
         }
 
@@ -382,10 +384,9 @@ namespace DryIoc
 
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
-            var registry = _registry.Value;
-            var factoryDelegate = registry.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+            var factoryDelegate = _registry.Value.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
-                ? factoryDelegate(registry.ResolutionStateCache.Value, _containerWeakRef, null)
+                ? factoryDelegate(_singletonScope.Items, _containerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
@@ -416,7 +417,7 @@ namespace DryIoc
                     : (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
 
                 if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope);
+                    return cachedFactoryDelegate(_singletonScope.Items, _containerWeakRef, scope);
             }
 
             // Cache is missed, so get the factory and put it into cache:
@@ -428,7 +429,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var service = factoryDelegate(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope);
+            var service = factoryDelegate(_singletonScope.Items, _containerWeakRef, scope);
 
             if (registryValue.Services.IsEmpty)
                 return service;
@@ -468,7 +469,7 @@ namespace DryIoc
                 return null;
 
             var registryValue = _registry.Value;
-            var service = factoryDelegate(registryValue.ResolutionStateCache.Value, _containerWeakRef, scope);
+            var service = factoryDelegate(_singletonScope.Items, _containerWeakRef, scope);
 
             if (!registryValue.Services.IsEmpty)
             {
@@ -980,38 +981,15 @@ namespace DryIoc
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
         public object[] ResolutionStateCache
         {
-            get { return _registry.Value.ResolutionStateCache.Value; }
+            get { return _singletonScope.Items; }
         }
 
-        /// <summary>Adds item if it is not already added to state, returns added or existing item index.</summary>
+        /// <summary>Adds item if it is not already added to singleton state, returns added or existing item index.</summary>
         /// <param name="item">Item to find in existing items with <see cref="object.Equals(object, object)"/> or add if not found.</param>
         /// <returns>Index of found or added item.</returns>
         public int GetOrAddStateItem(object item)
         {
-            var index = -1;
-            _registry.Value.ResolutionStateCache.Swap(state =>
-            {
-                for (var i = 0; i < state.Length; ++i)
-                {
-                    var it = state[i];
-                    if (it == null || ReferenceEquals(it, item) || Equals(it, item))
-                    {
-                        if (it == null)
-                            state[i] = item;
-                        index = i;
-                        return state;
-                    }
-                }
-
-                var size = state.Length;
-                var newState = new object[size + 32];
-                Array.Copy(state, 0, newState, 0, size);
-
-                index = size;
-                newState[index] = item;
-                return newState;
-            });
-            return index;
+            return _singletonScope.GetOrAdd(item);
         }
 
         /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings), 
@@ -1034,7 +1012,9 @@ namespace DryIoc
             }
 
             Throw.If(throwIfStateRequired, Error.StateIsRequiredToUseItem, item);
+
             var itemIndex = GetOrAddStateItem(item);
+
             var indexExpr = Expression.Constant(itemIndex, typeof(int));
             var getItemByIndexExpr = Expression.ArrayIndex(StateParamExpr, indexExpr);
             return Expression.Convert(getItemByIndexExpr, itemType);
@@ -1256,7 +1236,7 @@ namespace DryIoc
         private readonly ContainerWeakRef _containerWeakRef;
         private readonly Request _emptyRequest;
 
-        private readonly IScope _singletonScope;
+        private readonly SingletonScope _singletonScope;
         private readonly IScope _openedScope;
         private readonly IScopeContext _scopeContext;
 
@@ -1279,7 +1259,6 @@ namespace DryIoc
             public readonly Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> KeyedFactoryDelegateCache;
 
             public readonly Ref<ImTreeMapIntToObj> FactoryExpressionCache;
-            public readonly Ref<object[]> ResolutionStateCache;
 
             private enum IsChangePermitted { Permitted, Error, Ignored }
             private readonly IsChangePermitted _isChangePermitted;
@@ -1289,7 +1268,7 @@ namespace DryIoc
                 return new Registry(Services, Decorators, Wrappers,
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
-                    Ref.Of(ImTreeMapIntToObj.Empty), Ref.Of(ArrayTools.Empty<object>()), _isChangePermitted);
+                    Ref.Of(ImTreeMapIntToObj.Empty), _isChangePermitted);
             }
 
             private Registry(ImTreeMap<Type, Factory> wrapperFactories = null)
@@ -1299,7 +1278,6 @@ namespace DryIoc
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
                     Ref.Of(ImTreeMapIntToObj.Empty),
-                    Ref.Of(ArrayTools.Empty<object>()),
                     IsChangePermitted.Permitted)
             { }
 
@@ -1310,7 +1288,6 @@ namespace DryIoc
                 Ref<ImTreeMap<Type, FactoryDelegate>> defaultFactoryDelegateCache,
                 Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> keyedFactoryDelegateCache,
                 Ref<ImTreeMapIntToObj> factoryExpressionCache,
-                Ref<object[]> resolutionStateCache,
                 IsChangePermitted isChangePermitted)
             {
                 Services = services;
@@ -1319,7 +1296,6 @@ namespace DryIoc
                 DefaultFactoryDelegateCache = defaultFactoryDelegateCache;
                 KeyedFactoryDelegateCache = keyedFactoryDelegateCache;
                 FactoryExpressionCache = factoryExpressionCache;
-                ResolutionStateCache = resolutionStateCache;
                 _isChangePermitted = isChangePermitted;
             }
 
@@ -1328,7 +1304,7 @@ namespace DryIoc
                 return services == Services ? this :
                     new Registry(services, Decorators, Wrappers,
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef(), _isChangePermitted);
+                        FactoryExpressionCache.NewRef(), _isChangePermitted);
             }
 
             private Registry WithDecorators(ImTreeMap<Type, Factory[]> decorators)
@@ -1336,7 +1312,7 @@ namespace DryIoc
                 return decorators == Decorators ? this :
                     new Registry(Services, decorators, Wrappers,
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef(), _isChangePermitted);
+                        FactoryExpressionCache.NewRef(),  _isChangePermitted);
             }
 
             private Registry WithWrappers(ImTreeMap<Type, Factory> wrappers)
@@ -1344,7 +1320,7 @@ namespace DryIoc
                 return wrappers == Wrappers ? this :
                     new Registry(Services, Decorators, wrappers,
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef(), _isChangePermitted);
+                        FactoryExpressionCache.NewRef(), _isChangePermitted);
             }
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
@@ -1535,7 +1511,7 @@ namespace DryIoc
                 {
                     registry = new Registry(services, Decorators, Wrappers,
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), ResolutionStateCache.NewRef(), _isChangePermitted);
+                        FactoryExpressionCache.NewRef(), _isChangePermitted);
 
                     if (replacedFactory != null && !canReuseReplacedInstanceFactory)
                         registry = WithoutFactoryCache(registry, replacedFactory, serviceType, serviceKey);
@@ -1703,12 +1679,12 @@ namespace DryIoc
             {
                 var isChangePermitted = ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error;
                 return new Registry(Services, Decorators, Wrappers,
-                    DefaultFactoryDelegateCache, KeyedFactoryDelegateCache, FactoryExpressionCache, ResolutionStateCache,
+                    DefaultFactoryDelegateCache, KeyedFactoryDelegateCache, FactoryExpressionCache,
                     isChangePermitted);
             }
         }
 
-        private Container(Rules rules, Ref<Registry> registry, IScope singletonScope, IScopeContext scopeContext,
+        private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope, IScopeContext scopeContext,
             IScope openedScope = null, int disposed = 0)
         {
             Rules = rules;
@@ -2722,6 +2698,21 @@ namespace DryIoc
         {
             var newRules = (Rules)MemberwiseClone();
             newRules._settings ^= Settings.VariantGenericTypesInResolvedCollection;
+            return newRules;
+        }
+
+        /// <summary>Default setting for container. 
+        /// Applied to all registrations if setting is not specified 
+        /// (or default <see cref="IfAlreadyRegistered.AppendNotKeyed"/>) in the registration.
+        /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection regitrations.</summary>
+        public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; private set; }
+
+        /// <summary>Specifies <see cref="DefaultIfAlreadyRegistered"/>.</summary>
+        /// <param name="rule">New setting.</param> <returns>New rules.</returns>
+        public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.DefaultIfAlreadyRegistered = rule;
             return newRules;
         }
 
@@ -3930,6 +3921,20 @@ namespace DryIoc
             return behavior == ResolveManyBehavior.AsLazyEnumerable
                 ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, null, null, null, null).Cast<TService>()
                 : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
+        }
+
+        /// <summary>Returns all registered services as objects, including all keyed and default registrations.</summary>
+        /// <param name="resolver">Usually <see cref="Container"/> object.</param>
+        /// <param name="serviceType">Type of item to resolve.</param>
+        /// <param name="behavior">(optional) Specifies new registered services awareness. Aware by default.</param>
+        /// <param name="serviceKey">(optional) Service key.</param>
+        /// <returns>Result collection of services.</returns>
+        /// <returns></returns>
+        public static IEnumerable<object> ResolveMany(this IResolver resolver, Type serviceType,
+            ResolveManyBehavior behavior = ResolveManyBehavior.AsLazyEnumerable,
+            object serviceKey = null)
+        {
+            return resolver.ResolveMany<object>(serviceType, behavior, serviceKey);
         }
 
         internal static Expression CreateResolutionExpression(Request request, bool openResolutionScope = false)
@@ -5362,8 +5367,8 @@ namespace DryIoc
         private Expression CreateSingletonAndGetExpressionOrDefault(Expression serviceExpr, Request request)
         {
             var factoryDelegate = serviceExpr.CompileToDelegate(request.Container);
-            var scope = request.Scopes.SingletonScope;
-            var scopedInstanceId = scope.GetScopedItemIdOrSelf(FactoryID);
+            var singletonScope = request.Scopes.SingletonScope;
+            var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
 
             if (Setup.PreventDisposal)
             {
@@ -5378,14 +5383,15 @@ namespace DryIoc
             }
 
             var serviceType = serviceExpr.Type;
-            if (Setup.PreventDisposal == false && Setup.WeaklyReferenced == false)
-                return request.Container.GetOrAddStateItemExpression(
-                    scope.GetOrAdd(scopedInstanceId,
-                        () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope)),
+            if (!Setup.PreventDisposal && !Setup.WeaklyReferenced)
+            {
+                singletonScope.GetOrAdd(singletonId, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope));
+                return Expression.Convert(
+                    Expression.ArrayIndex(Container.StateParamExpr, Expression.Constant(singletonId, typeof(int))), 
                     serviceType);
+            }
 
-            var wrappedService = scope.GetOrAdd(scopedInstanceId,
-                () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, null));
+            var wrappedService = singletonScope.GetOrAdd(singletonId, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, null));
 
             if (Setup.WeaklyReferenced)
                 wrappedService = ((WeakReference)wrappedService).Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed);
@@ -5893,7 +5899,7 @@ namespace DryIoc
                         // Replace factory info with close factory service type
                         if (isFactoryServiceTypeClosed)
                         {
-                            factoryServiceType = factoryServiceType.GetGenericTypeDefinition();
+                            factoryServiceType = factoryServiceType.GetGenericTypeDefinition().ThrowIfNull();
                             var closedFactoryServiceType = Throw.IfThrows<ArgumentException, Type>(
                                 () => factoryServiceType.MakeGenericType(resultFactoryServiceTypeArgs),
                                 request.IfUnresolved == IfUnresolved.Throw,
@@ -6480,13 +6486,16 @@ namespace DryIoc
         /// <summary>Optional name object associated with scope.</summary>
         public object Name { get { return null; } }
 
+        /// <summary>Exposes singleton items collection for faster read.</summary>
+        internal object[] Items;
+
         /// <summary>Creates scope.</summary>
         public SingletonScope()
         {
-            _items = new object[0];
+            Items = new object[0];
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
             _lastItemIndex = -1;
-            _itemCreationLocker = new object();
+            _itemsLocker = new object();
         }
 
         /// <summary>Adds mapping between provide id and index for new stored item. Returns index.</summary>
@@ -6503,16 +6512,19 @@ namespace DryIoc
                 index = map.GetValueOrDefault(externalId);
                 if (index != null)
                     return map;
-
-                var newIndex = Interlocked.Increment(ref _lastItemIndex);
-                if (newIndex >= _items.Length)
-                    EnsureIndexExist(newIndex);
-
-                index = newIndex;
+                index = GetNewIndex();
                 return map.AddOrUpdate(externalId, index);
             });
 
             return (int)index;
+        }
+
+        private int GetNewIndex()
+        {
+            var newIndex = Interlocked.Increment(ref _lastItemIndex);
+            if (newIndex >= Items.Length)
+                ExtendItemsUpTo(newIndex);
+            return newIndex;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -6523,7 +6535,8 @@ namespace DryIoc
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
-            return (id < _items.Length ? _items[id] : null) ?? TryGetOrAddToArray(id, createValue);
+            var items = Items;
+            return (id < items.Length ? items[id] : null) ?? TryGetOrAddToArray(id, createValue);
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -6531,7 +6544,31 @@ namespace DryIoc
         public void SetOrAdd(int id, object item)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            Ref.Swap(ref _items, items => { items[id] = item; return items; });
+            lock (_itemsLocker)
+                Items[id] = item;
+        }
+
+        /// <summary>Adds external non-service item into singleton collection. 
+        /// The item may not have corresponding external item ID.</summary>
+        /// <param name="item">External item to add, this may be metadata, service key, etc.</param>
+        /// <returns>Index of added or already added item.</returns>
+        internal int GetOrAdd(object item)
+        {
+            var index = Array.IndexOf(Items, item);
+            if (index != -1)
+                return index;
+
+            lock (_itemsLocker)
+            {
+                index = Array.IndexOf(Items, item);
+                if (index == -1)
+                {
+                    index = GetNewIndex();
+                    Items[index] = item;
+                }
+            }
+
+            return index;
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
@@ -6542,59 +6579,50 @@ namespace DryIoc
             var factoryIdToIndexMap = _factoryIdToIndexMap;
             if (!factoryIdToIndexMap.IsEmpty)
                 foreach (var idToIndex in factoryIdToIndexMap.Enumerate().OrderByDescending(it => it.Key))
-                    Scope.DisposeItem(_items[(int)idToIndex.Value]);
+                    Scope.DisposeItem(Items[(int)idToIndex.Value]);
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
-            _items = ArrayTools.Empty<object>();
+            Items = ArrayTools.Empty<object>();
         }
 
         #region Implementation
 
         private ImTreeMapIntToObj _factoryIdToIndexMap;
-        private object[] _items;
+        private readonly object _itemsLocker;
         private int _lastItemIndex;
         private int _disposed;
 
-        // Sync root is required to create object only once. The same reason as for Lazy<T>.
-        private readonly object _itemCreationLocker;
-
-        private void EnsureIndexExist(int index)
+        private void ExtendItemsUpTo(int index)
         {
-            Ref.Swap(ref _items, items =>
+            lock (_itemsLocker)
             {
-                var size = items.Length;
-                if (index < size)
-                    return items;
-
-                var newSize = Math.Max(index + 1, size + MaxItemArrayIncreaseStep);
-                var newItems = new object[newSize];
-                Array.Copy(items, 0, newItems, 0, size);
-                return newItems;
-            });
+                var size = Items.Length;
+                if (index >= size)
+                {
+                    var newSize = Math.Max(index + 1, size + MaxItemArrayIncreaseStep);
+                    var newItems = new object[newSize];
+                    Array.Copy(Items, 0, newItems, 0, size);
+                    Items = newItems;
+                }
+            }
         }
 
-        private object TryGetOrAddToArray(int itemIndex, CreateScopedValue createValue)
+        private object TryGetOrAddToArray(int index, CreateScopedValue createValue)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
 
-            if (itemIndex >= _items.Length)
-                EnsureIndexExist(itemIndex);
+            if (index >= Items.Length)
+                ExtendItemsUpTo(index);
 
             object item;
-            lock (_itemCreationLocker)
+            lock (_itemsLocker)
             {
-                var items = _items;
-                item = items[itemIndex];
+                item = Items[index];
                 if (item != null)
                     return item;
-
                 item = createValue();
-
-                // Assign item to items, then check that items reference is still valid.
-                // If not, and items where swapped in between then try to update new collection until succeed.
-                items[itemIndex] = item;
-                if (items != _items)
-                    Ref.Swap(ref _items, its => { its[itemIndex] = item; return its; });
+                Items[index] = item;
             }
+
             return item;
         }
 

@@ -79,7 +79,7 @@ namespace DryIoc.UnitTests
             Assert.That(client.Service, Is.SameAs(client.Factory()));
         }
 
-        [Test]
+        [Explicit("Modifies static state which is side-effect which may affect other tests run.")]
         public void Given_registered_singleton_Resolving_as_Func_should_NOT_create_service_instance_until_Func_is_invoked()
         {
             var container = new Container();
