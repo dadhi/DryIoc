@@ -268,6 +268,53 @@ namespace DryIoc.UnitTests
             }
         }
 
+        [Test]
+        public void Can_specify_IfAlreadyRegistered_per_Container()
+        {
+            var container = new Container(rules => rules
+                .WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Keep));
+
+            container.Register<I, A>();
+            container.Register<I, B>();
+
+            var i = container.Resolve<I>();
+
+            Assert.IsInstanceOf<A>(i);
+        }
+
+        [Test]
+        public void If_IfAlreadyRegistered_per_Container_is_overriden_by_individual_registrations()
+        {
+            var container = new Container(rules => rules
+                .WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Keep));
+
+            container.Register<I, A>();
+            container.Register<I, B>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            var i = container.Resolve<I>();
+
+            Assert.IsInstanceOf<B>(i);
+        }
+
+        [Test]
+        public void If_IfAlreadyRegistered_per_Container_affects_RegisterMany_as_expected()
+        {
+            var container = new Container(rules => rules
+                .WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Keep));
+
+            container.RegisterMany(new[] { typeof(A), typeof(B)});
+
+            var i = container.Resolve<I>();
+
+            Assert.IsInstanceOf<A>(i);
+        }
+
+        public interface I { }
+
+        public class A : I { }
+
+        public class B : I { }
+
         #region CUT
 
         public class SomeService { }

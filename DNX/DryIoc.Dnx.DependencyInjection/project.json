@@ -9,14 +9,14 @@
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
     "requireLicenseAcceptance": false,
-    "releaseNotes": "Based on rc1-final",
+    "releaseNotes": "DryIoc Adapter for Microsoft.Extensions.DependencyInjection (Asp.NET 5).\r\n Based on DNX rc1-final.",
 
     "compilationOptions": {
         "warningsAsErrors": true
     },
 
     "dependencies": {
-        "DryIoc.Dnx": { "target": "project" }, 
+        "DryIoc.Dnx": "2.0.2-*",
         "Microsoft.Extensions.DependencyInjection.Abstractions": "1.0.0-rc1-final"
     },
 

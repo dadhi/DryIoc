@@ -31,7 +31,8 @@ namespace DryIoc.Dnx.DependencyInjection
     /// <summary>Provides populating of service collection.</summary>
     public static class DryIocDnxDependencyInjection
     {
-        /// <summary>Populates the container using the specified service descriptors. </summary>
+        /// <summary>Registers descriptors services into container. </summary>
+        /// Plus registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>.
         /// <param name="container">The container.</param>
         /// <param name="descriptors">The service descriptors.</param>
         public static void Populate(this IContainer container, IEnumerable<ServiceDescriptor> descriptors)
@@ -40,7 +41,31 @@ namespace DryIoc.Dnx.DependencyInjection
             container.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.Singleton);
 
             foreach (var descriptor in descriptors)
-                RegisterDescriptor(container, descriptor);
+                container.RegisterDescriptor(descriptor);
+        }
+
+        /// <summary>Registers described service into container by mapping DI Lifetime to DryIoc Reuse, 
+        /// and DI registration type to corresponding DryIoc Register, RegisterDelegate or RegisterInstance.</summary>
+        /// <param name="container">The container.</param>
+        /// <param name="descriptor">Service descriptor.</param>
+        public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor)
+        {
+            var reuse = MapLifetimeToReuse(descriptor.Lifetime);
+
+            if (descriptor.ImplementationType != null)
+            {
+                container.Register(descriptor.ServiceType, descriptor.ImplementationType, reuse);
+            }
+            else if (descriptor.ImplementationFactory != null)
+            {
+                container.RegisterDelegate(descriptor.ServiceType,
+                    r => descriptor.ImplementationFactory(r.Resolve<IServiceProvider>()), 
+                    reuse);
+            }
+            else
+            {
+                container.RegisterInstance(descriptor.ServiceType, descriptor.ImplementationInstance, reuse);
+            }
         }
 
         private static IReuse MapLifetimeToReuse(ServiceLifetime lifetime)
@@ -54,26 +79,8 @@ namespace DryIoc.Dnx.DependencyInjection
                 case ServiceLifetime.Transient:
                     return Reuse.Transient;
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime, "Not supported lifetime");
-            }
-        }
-
-        private static void RegisterDescriptor(IContainer container, ServiceDescriptor descriptor)
-        {
-            var reuse = MapLifetimeToReuse(descriptor.Lifetime);
-
-            if (descriptor.ImplementationType != null)
-            {
-                container.Register(descriptor.ServiceType, descriptor.ImplementationType, reuse);
-            }
-            else if (descriptor.ImplementationFactory != null)
-            {
-                Func<IResolver, object> factory = r => descriptor.ImplementationFactory(r.Resolve<IServiceProvider>());
-                container.RegisterDelegate(descriptor.ServiceType, factory, reuse);
-            }
-            else
-            {
-                container.RegisterInstance(descriptor.ServiceType, descriptor.ImplementationInstance, reuse);
+                    throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime, 
+                        "Not supported lifetime");
             }
         }
     }

@@ -1042,7 +1042,7 @@ namespace DryIocZero
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
 
             object item;
-            lock (_itemCreationLocker)
+            lock (_locker)
             {
                 item = _items.GetValueOrDefault(id);
                 if (item != null)
@@ -1089,7 +1089,7 @@ namespace DryIocZero
         private int _disposed;
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
-        private readonly object _itemCreationLocker = new object();
+        private readonly object _locker = new object();
 
         internal static void DisposeItem(object item)
         {
@@ -1131,7 +1131,7 @@ namespace DryIocZero
             _items = new object[0];
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
             _lastItemIndex = -1;
-            _itemCreationLocker = new object();
+            _itemsLocker = new object();
         }
 
         /// <summary>Adds mapping between provide id and index for new stored item. Returns index.</summary>
@@ -1148,16 +1148,19 @@ namespace DryIocZero
                 index = map.GetValueOrDefault(externalId);
                 if (index != null)
                     return map;
-
-                var newIndex = Interlocked.Increment(ref _lastItemIndex);
-                if (newIndex >= _items.Length)
-                    EnsureIndexExist(newIndex);
-
-                index = newIndex;
+                index = GetNewIndex();
                 return map.AddOrUpdate(externalId, index);
             });
 
             return (int)index;
+        }
+
+        private int GetNewIndex()
+        {
+            var newIndex = Interlocked.Increment(ref _lastItemIndex);
+            if (newIndex >= _items.Length)
+                ExtendItemsUpTo(newIndex);
+            return newIndex;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -1176,7 +1179,27 @@ namespace DryIocZero
         public void SetOrAdd(int id, object item)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            Ref.Swap(ref _items, items => { items[id] = item; return items; });
+            lock (_itemsLocker)
+                _items[id] = item;
+        }
+
+        internal int GetOrAdd(object item)
+        {
+            var index = Array.IndexOf(_items, item);
+            if (index != -1)
+                return index;
+
+            lock (_itemsLocker)
+            {
+                index = Array.IndexOf(_items, item);
+                if (index == -1)
+                {
+                    index = GetNewIndex();
+                    _items[index] = item;
+                }
+            }
+
+            return index;
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
@@ -1196,50 +1219,42 @@ namespace DryIocZero
 
         private ImTreeMapIntToObj _factoryIdToIndexMap;
         private object[] _items;
+        private readonly object _itemsLocker;
         private int _lastItemIndex;
         private int _disposed;
 
-        // Sync root is required to create object only once. The same reason as for Lazy<T>.
-        private readonly object _itemCreationLocker;
-
-        private void EnsureIndexExist(int index)
+        private void ExtendItemsUpTo(int index)
         {
-            Ref.Swap(ref _items, items =>
+            lock (_itemsLocker)
             {
-                var size = items.Length;
-                if (index < size)
-                    return items;
-
-                var newSize = Math.Max(index + 1, size + MaxItemArrayIncreaseStep);
-                var newItems = new object[newSize];
-                Array.Copy(items, 0, newItems, 0, size);
-                return newItems;
-            });
+                var size = _items.Length;
+                if (index >= size)
+                {
+                    var newSize = Math.Max(index + 1, size + MaxItemArrayIncreaseStep);
+                    var newItems = new object[newSize];
+                    Array.Copy(_items, 0, newItems, 0, size);
+                    _items = newItems;
+                }
+            }
         }
 
-        private object TryGetOrAddToArray(int itemIndex, CreateScopedValue createValue)
+        private object TryGetOrAddToArray(int index, CreateScopedValue createValue)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
 
-            if (itemIndex >= _items.Length)
-                EnsureIndexExist(itemIndex);
+            if (index >= _items.Length)
+                ExtendItemsUpTo(index);
 
             object item;
-            lock (_itemCreationLocker)
+            lock (_itemsLocker)
             {
-                var items = _items;
-                item = items[itemIndex];
+                item = _items[index];
                 if (item != null)
                     return item;
-
                 item = createValue();
-
-                // Assign item to items, then check that items reference is still valid.
-                // If not, and items where swapped in between then try to update new collection until succeed.
-                items[itemIndex] = item;
-                if (items != _items)
-                    Ref.Swap(ref _items, its => { its[itemIndex] = item; return its; });
+                _items[index] = item;
             }
+
             return item;
         }
 

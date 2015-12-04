@@ -51,7 +51,7 @@ namespace DryIoc.UnitTests
 
             public IEnumerable<object> GetAllInstances(Type serviceType)
             {
-                return _resolver.ResolveMany<object>(serviceType);
+                return _resolver.ResolveMany(serviceType);
             }
         }
 
