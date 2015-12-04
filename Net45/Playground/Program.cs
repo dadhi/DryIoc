@@ -5,6 +5,8 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading;
+using BenchmarkDotNet;
+using BenchmarkDotNet.Tasks;
 
 namespace Playground
 {
@@ -12,9 +14,67 @@ namespace Playground
     {
         static void Main()
         {
-            var result = ExpressionVsEmit();
-            Console.WriteLine("Ignored result: " + result);
+            new BenchmarkRunner().RunCompetition(new ExpressionCompileVsEmit());
+            new BenchmarkRunner().RunCompetition(new RunResultOfCompileVsEmit());
+            //var result = ExpressionVsEmit();
+            //Console.WriteLine("Ignored result: " + result);
             Console.ReadKey();
+        }
+
+        public class ExpressionCompileVsEmit
+        {
+            private Expression<Func<object[], object>> _funcExpr;
+
+            [Setup]
+            public void SetupData()
+            {
+                _funcExpr = CreateExpression();
+            }
+
+            [Benchmark]
+            public void Compile()
+            {
+                _funcExpr.Compile();
+            }
+
+            [Benchmark]
+            public void Emit()
+            {
+                EmitDelegateFromExpression(_funcExpr.Body);
+            }
+        }
+
+        //[BenchmarkTask(platform: BenchmarkPlatform.X86, jitVersion: BenchmarkJitVersion.LegacyJit)]
+        //[BenchmarkTask(platform: BenchmarkPlatform.X64, jitVersion: BenchmarkJitVersion.LegacyJit)]
+        //[BenchmarkTask(platform: BenchmarkPlatform.X64, jitVersion: BenchmarkJitVersion.RyuJit)]
+        public class RunResultOfCompileVsEmit
+        {
+            private Func<object[], object> _funcCompiled;
+            private Func<object[], object> _funcEmitted;
+            private object[] _state;
+
+            [Setup]
+            public void SetupData()
+            {
+                var expression = CreateExpression();
+                _funcCompiled = expression.Compile();
+                _funcEmitted = EmitDelegateFromExpression(expression.Body);
+                _state = new object[15];
+                _state[11] = "x";
+
+            }
+
+            [Benchmark]
+            public void RunCompiled()
+            {
+                _funcCompiled(_state);
+            }
+
+            [Benchmark]
+            public void RunEmitted()
+            {
+                _funcEmitted(_state);
+            }
         }
 
         /// <summary>Result delegate to be created by <see cref="CreateExpression"/></summary>
