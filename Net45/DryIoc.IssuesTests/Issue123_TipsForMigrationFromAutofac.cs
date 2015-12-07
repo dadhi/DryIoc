@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Autofac;
 using Autofac.Features.OwnedInstances;
@@ -287,7 +288,68 @@ namespace DryIoc.IssuesTests
             Assert.IsTrue(a.IsCreatedWithC);
         }
 
+        [Test]
+        public void Module_Autofac()
+        {
+            var builder = new ContainerBuilder();
+
+            builder.RegisterModule<AutofacModule>();
+            builder.RegisterType<B>();
+
+            var container = builder.Build();
+
+            var bb = container.Resolve<BB>();
+            Assert.IsInstanceOf<B>(bb.B);
+        }
+
+        [Test]
+        public void Module_DryIoc()
+        {
+            var container = new Container();
+
+            container.RegisterMany<DryIocModule>();
+            container.Register<B>();
+
+            foreach (var module in container.ResolveMany<IModule>())
+                module.Load(container);
+
+            var bb = container.Resolve<BB>();
+            Assert.IsInstanceOf<B>(bb.B);
+        }
+
+        public class AutofacModule : Module
+        {
+            protected override void Load(ContainerBuilder builder)
+            {
+                builder.RegisterType<BB>().SingleInstance();
+            }
+        }
+
+        public interface IModule
+        {
+            void Load(IRegistrator builder);
+        }
+
+        public class DryIocModule : IModule
+        {
+            public void Load(IRegistrator builder)
+            {
+                builder.Register<BB>(Reuse.Singleton);
+            }
+        }
+
         public class B {}
+
+        public class BB
+        {
+            public B B { get; private set; }
+
+            public BB(B b)
+            {
+                B = b;
+            }
+        }
+
         public class C {}
 
         public class A
