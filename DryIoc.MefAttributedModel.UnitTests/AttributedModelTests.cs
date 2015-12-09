@@ -238,6 +238,50 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(2, composite.Items.Length);
         }
 
+        [Test]
+        public void Can_specify_all_Register_options_for_export()
+        {
+            var container = new Container().WithMefAttributedModel();
+
+            container.RegisterExports(typeof(AllOpts), typeof(AllOpts2));
+
+            IAllOpts opts;
+            using (var s = container.OpenScope("b"))
+            {
+                opts = s.Resolve<IAllOpts>(serviceKey: "a");
+                Assert.IsNotNull(opts);
+            }
+
+            Assert.IsFalse(((AllOpts)opts).IsDisposed);
+        }
+
+        public interface IAllOpts { }
+
+        [ExportEx(typeof(IAllOpts), 
+            ServiceKey = "a",
+            Reuse = ReuseType.CurrentScope, 
+            ReuseScopeName = "b",
+            IfAlreadyExported = IfAlreadyExported.Keep,
+            Metadata = "1",
+            PreventDisposal = true,
+            AsResolutionCall = true)]
+        public class AllOpts : IAllOpts, IDisposable
+        {
+            public bool IsDisposed;
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+
+        [ExportEx(typeof(IAllOpts),
+            ServiceKey = "a",
+            IfAlreadyExported = IfAlreadyExported.Keep)]
+        public class AllOpts2 : IAllOpts
+        {
+        }
+
         #region Implementation
 
         private void WhenIRegisterAllExportedTypes()

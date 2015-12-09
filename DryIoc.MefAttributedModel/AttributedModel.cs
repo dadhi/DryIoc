@@ -41,8 +41,8 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/> 
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
-        public static readonly ImTreeMap<ReuseType, Func<string, IReuse>> SupportedReuseTypes =
-            ImTreeMap<ReuseType, Func<string, IReuse>>.Empty
+        public static readonly ImTreeMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes =
+            ImTreeMap<ReuseType, Func<object, IReuse>>.Empty
             .AddOrUpdate(ReuseType.Singleton, _ => Reuse.Singleton)
             .AddOrUpdate(ReuseType.CurrentScope, Reuse.InCurrentNamedScope)
             .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope);
@@ -116,7 +116,7 @@ namespace DryIoc.MefAttributedModel
                 {
                     var export = info.Exports[i];
                     registrator.Register(factory,
-                        export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
+                        export.ServiceType, export.ServiceKeyInfo.Key, info.IfAlreadyRegistered, false);
                 }
             }
 
@@ -156,7 +156,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="reuseType">Reuse type to find in supported.</param>
         /// <param name="reuseName">(optional) Reuse name to match with scope name.</param>
         /// <returns>Supported reuse object.</returns>
-        public static IReuse GetReuse(ReuseType reuseType, string reuseName = null)
+        public static IReuse GetReuse(ReuseType reuseType, object reuseName = null)
         {
             return reuseType == ReuseType.Transient
                 ? null
@@ -288,13 +288,17 @@ namespace DryIoc.MefAttributedModel
             for (var attrIndex = 0; attrIndex < attributes.Length; attrIndex++)
             {
                 var attribute = attributes[attrIndex];
-                if (attribute is ExportAttribute)
+                if (attribute is ExportExAttribute)
                 {
-                    info.Exports = GetExportsFromExportAttribute((ExportAttribute)attribute, info, implementationType);
+                    info = GetInfoFromExportExAttribute((ExportExAttribute)attribute, info, implementationType);
                 }
                 else if (attribute is ExportManyAttribute)
                 {
-                    info.Exports = GetExportsFromExportManyAttribute(info, implementationType, (ExportManyAttribute)attribute);
+                    info.Exports = GetExportsFromExportManyAttribute((ExportManyAttribute)attribute, info, implementationType);
+                }
+                else if (attribute is ExportAttribute)
+                {
+                    info.Exports = GetExportsFromExportAttribute((ExportAttribute)attribute, info, implementationType);
                 }
                 else if (attribute is PartCreationPolicyAttribute)
                 {
@@ -381,16 +385,43 @@ namespace DryIoc.MefAttributedModel
                 : currentExports.AppendOrUpdate(export);
             return exports;
         }
-
-        private static ExportInfo[] GetExportsFromExportManyAttribute(ExportedRegistrationInfo currentInfo,
-            Type implementationType, ExportManyAttribute exportManyAttribute)
+        private static ExportedRegistrationInfo GetInfoFromExportExAttribute(ExportExAttribute attribute, 
+            ExportedRegistrationInfo info, Type implementationType)
         {
-            var contractTypes = implementationType.GetImplementedServiceTypes(exportManyAttribute.NonPublic);
-            if (!exportManyAttribute.Except.IsNullOrEmpty())
-                contractTypes = contractTypes.Except(exportManyAttribute.Except).ToArrayOrSelf();
+            var export = new ExportInfo(attribute.ContractType ?? implementationType, attribute.ServiceKey);
+            info.Exports = info.Exports.AppendOrUpdate(export);
+
+            info.Reuse = attribute.Reuse;
+            info.ReuseName = attribute.ReuseScopeName;
+            info.IfAlreadyRegistered = GetIfAlreadyRegistered(attribute.IfAlreadyExported);
+            info.PreventDisposal = attribute.PreventDisposal;
+            info.WeaklyReferenced = attribute.WeaklyReferenced;
+            info.AsResolutionCall = attribute.AsResolutionCall;
+            info.OpenResolutionScope = attribute.OpenResolutionScope;
+
+            return info;
+        }
+
+        private static IfAlreadyRegistered GetIfAlreadyRegistered(IfAlreadyExported ifAlreadyExported)
+        {
+            switch (ifAlreadyExported)
+            {
+                case IfAlreadyExported.Throw: return IfAlreadyRegistered.Throw;
+                case IfAlreadyExported.Keep: return IfAlreadyRegistered.Keep;
+                case IfAlreadyExported.Replace: return IfAlreadyRegistered.Replace;
+                default: return IfAlreadyRegistered.AppendNotKeyed;
+            }
+        }
+
+        private static ExportInfo[] GetExportsFromExportManyAttribute(ExportManyAttribute attribute, 
+            ExportedRegistrationInfo currentInfo, Type implementationType)
+        {
+            var contractTypes = implementationType.GetImplementedServiceTypes(attribute.NonPublic);
+            if (!attribute.Except.IsNullOrEmpty())
+                contractTypes = contractTypes.Except(attribute.Except).ToArrayOrSelf();
 
             var manyExports = contractTypes
-                .Select(t => new ExportInfo(t, exportManyAttribute.ContractName ?? exportManyAttribute.ContractKey))
+                .Select(t => new ExportInfo(t, attribute.ContractName ?? attribute.ContractKey))
                 .ToArray();
 
             Throw.If(manyExports.Length == 0, Error.ExportManyDoesNotExportAnyType, implementationType, contractTypes);
@@ -683,6 +714,9 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Type consisting of single method compatible with <see cref="Setup.Condition"/> type.</summary>
         public Type ConditionType;
+
+        /// <summary>If already registered option to pass to container registration.</summary>
+        public IfAlreadyRegistered IfAlreadyRegistered;
 
         /// <summary>Creates factory out of registration info.</summary>
         /// <param name="made">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
