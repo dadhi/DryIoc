@@ -7217,7 +7217,7 @@ namespace DryIoc
             RequestInfo preResolveParent, IScope scope);
     }
 
-    /// <summary>Specifies options to handle situation when registering some service already present in the registry.</summary>
+    /// <summary>Specifies options to handle situation when registered service is already present in the registry.</summary>
     public enum IfAlreadyRegistered
     {
         /// <summary>Appends new default registration or throws registration with the same key.</summary>

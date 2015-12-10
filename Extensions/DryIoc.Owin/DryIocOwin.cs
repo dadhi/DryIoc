@@ -42,7 +42,7 @@ namespace DryIoc.Owin
         /// <param name="app">App builder</param> <param name="container">Container</param>
         /// <param name="registerInScope">(optional) Action for registering something in scope before setting scope into context.</param>
         /// <param name="scopeContext">(optional) Specific scope context to use. 
-        /// If not specified using current container context - <see cref="AsyncExecutionFlowScopeContext"/> is default in .NET 4.5.</param>
+        /// If not specified using current container context. <see cref="AsyncExecutionFlowScopeContext"/> is default in .NET 4.5.</param>
         public static void UseDryIocOwinMiddleware(
             this IAppBuilder app, IContainer container,
             Action<IContainer> registerInScope = null,
@@ -53,12 +53,12 @@ namespace DryIoc.Owin
             
             app.Use(async (context, next) =>
             {
-                using (var scopedContainer = container.OpenScope(Reuse.WebRequestScopeName))
+                using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
                 {
-                    scopedContainer.RegisterInstance(context);
+                    scope.RegisterInstance(context, Reuse.InWebRequest, IfAlreadyRegistered.Replace);
                     if (registerInScope != null)
-                        registerInScope(scopedContainer);
-                    context.Set(ScopedContainerKeyInContext, scopedContainer);
+                        registerInScope(scope);
+                    context.Set(ScopedContainerKeyInContext, scope);
                     await next();
                 }
             });

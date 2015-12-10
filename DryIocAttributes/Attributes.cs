@@ -43,6 +43,70 @@ namespace DryIocAttributes
         ResolutionScope
     }
 
+    /// <summary>Specifies options to handle situation when registered service is already present in the registry.</summary>
+    public enum IfAlreadyExported
+    {
+        /// <summary>Appends new default registration or throws registration with the same key.</summary>
+        AppendNotKeyed,
+        /// <summary>Throws if default or registration with the same key is already exist.</summary>
+        Throw,
+        /// <summary>Keeps old default or keyed registration ignoring new registration: ensures Register-Once semantics.</summary>
+        Keep,
+        /// <summary>Replaces old registration with new one.</summary>
+        Replace
+    }
+
+    /// <summary>Provides whole set of possible/supported export options.</summary>
+    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
+        Justification = "Not available in PCL.")]
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field,
+        AllowMultiple = true, Inherited = false)]
+    public class ExportExAttribute : ExportAttribute
+    {
+        /// <summary>Creates attribute.</summary>
+        /// <param name="contractName">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
+        /// <param name="contractType">Service type.</param>
+        public ExportExAttribute(string contractName, Type contractType = null)
+            : base(contractName, contractType)
+        {
+            ServiceKey = contractName;
+        }
+
+        /// <summary>Creates export with specified service type.</summary> <param name="contractType"></param>
+        public ExportExAttribute(Type contractType) : this(null, contractType) { }
+
+        /// <summary>Optional service key or string <see cref="ExportAttribute.ContractName"/>.</summary>
+        public object ServiceKey { get; set; }
+
+        /// <summary>Specifies ReuseType or Transient if omitted.</summary>
+        public ReuseType Reuse { get; set; }
+
+        /// <summary>Optional scope name for <see cref="Reuse"/> of <see cref="ReuseType.CurrentScope"/> or
+        /// <see cref="ReuseType.ResolutionScope"/>.</summary>
+        public string ReuseScopeName { get; set; }
+
+        /// <summary>Options to handle existing and duplicate exports.</summary>
+        public IfAlreadyExported IfAlreadyExported { get; set; }
+
+        /// <summary>Optional metadata object associated with export.</summary>
+        public object Metadata { get; set; }
+
+        /// <summary>Specifies to prevent disposal for <see cref="IDisposable"/> export with <see cref="Reuse"/>.</summary>
+        public bool PreventDisposal { get; set; }
+
+        /// <summary>Specifies to store reused resolved service as <see cref="WeakReference"/>, and make it eligible for GC.</summary>
+        public bool WeaklyReferenced { get; set; }
+
+        /// <summary>Exported type injected as "dynamic" method call instead of inline creation.</summary>
+        public bool AsResolutionCall { get; set; }
+
+        /// <summary>Exported type should open resolution scope when injected.</summary>
+        public bool OpenResolutionScope { get; set; }
+    }
+
     /// <summary>Base attribute to specify type of reuse for annotated class.</summary>
     [AttributeUsage(AttributeTargets.Class 
         | AttributeTargets.Method 
