@@ -50,7 +50,7 @@ namespace DryIoc.IssuesTests
             [Export, AsDecorator]
             public IFoo<A, B> AddMessage<A>(IFoo<A, B> foo, Func<A> a, Lazy<B> b)
             {
-                foo.Message = $"decorated with {a()} and {b.Value}";
+                foo.Message = "decorated with " + a() + " and " + b.Value;
                 return foo;
             }
         }

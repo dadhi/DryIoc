@@ -57,6 +57,8 @@ namespace DryIocAttributes
     }
 
     /// <summary>Provides whole set of possible/supported export options.</summary>
+    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
+        Justification = "Not available in PCL.")]
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Method
         | AttributeTargets.Property

@@ -40,7 +40,7 @@ Make sure that there are no project build errors or failing tests. Also, check p
 
 ### Develop in Visual Studio
 
-Open _DryIoc.sln_ located in the root folder to develop in Visual Studio 2013 and above. 
+Open _DryIoc.sln_ located in the root folder to develop in Visual Studio 2015. 
 
 Solution combines projects for all supported platforms starting from .NET 3.5 (may be changed in future).
 
