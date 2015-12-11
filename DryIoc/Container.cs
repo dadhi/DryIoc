@@ -7695,7 +7695,7 @@ namespace DryIoc
             UnableToResolveDecorator = Of(
                 "Unable to resolve decorator {0}."),
             UnableToRegisterDuplicateDefault = Of(
-                "Service {0} without key is already registered as {2}."),
+                "Service {0} without key is already registered as {1}."),
             UnableToRegisterDuplicateKey = Of(
                 "Unable to register service {0} - {1} with duplicate key [{2}] " + Environment.NewLine +
                 " Already registered service with the same key is {3}."),
