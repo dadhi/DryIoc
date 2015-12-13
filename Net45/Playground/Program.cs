@@ -14,8 +14,10 @@ namespace Playground
     {
         static void Main()
         {
-            new BenchmarkRunner().RunCompetition(new ExpressionCompileVsEmit());
-            new BenchmarkRunner().RunCompetition(new RunResultOfCompileVsEmit());
+            new BenchmarkRunner().RunCompetition(new ArrayAccessVsGetOrAddItem());
+
+            //new BenchmarkRunner().RunCompetition(new ExpressionCompileVsEmit());
+            //new BenchmarkRunner().RunCompetition(new RunResultOfCompileVsEmit());
             //var result = ExpressionVsEmit();
             //Console.WriteLine("Ignored result: " + result);
             Console.ReadKey();
@@ -174,6 +176,42 @@ namespace Playground
             il.Emit(OpCodes.Ret);
 
             return (Func<object[], object>)method.CreateDelegate(typeof(Func<object[], object>));
+        }
+    }
+
+    public class ArrayAccessVsGetOrAddItem
+    {
+        private readonly object[] _state = new object[32];
+        private object _result;
+
+        [Setup]
+        public void Setup()
+        {
+            _state[15] = "a";
+        }
+
+        [Benchmark]
+        public void ArrayAccess()
+        {
+            _result = _state[15];
+        }
+
+        [Benchmark]
+        public void GetOrAddItem()
+        {
+            var a = _state[15];
+            if (a == null)
+            {
+                lock (_state)
+                {
+                    if (a == null)
+                    {
+                        a = "b";
+                        _state[15] = "b";
+                    }
+                }
+            }
+            _result = a;
         }
     }
 
