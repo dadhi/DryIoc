@@ -278,7 +278,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public interface IAllOpts { }
 
         [ExportEx(typeof(IAllOpts), 
-            CopntractKey = "a",
+            ContractKey = "a",
             IfAlreadyExported = IfAlreadyExported.Keep)]
         public class AllOpts : IAllOpts, IDisposable
         {
@@ -291,7 +291,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [ExportEx(typeof(IAllOpts),
-            CopntractKey = "a",
+            ContractKey = "a",
             IfAlreadyExported = IfAlreadyExported.Keep)]
         public class AllOpts2 : IAllOpts
         {

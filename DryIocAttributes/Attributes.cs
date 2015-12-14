@@ -74,7 +74,7 @@ namespace DryIocAttributes
             IfAlreadyExported ifAlreadyExported = IfAlreadyExported.AppendNotKeyed)
             : base(contractKey as string, contractType)
         {
-            CopntractKey = contractKey;
+            ContractKey = contractKey;
             IfAlreadyExported = ifAlreadyExported;
         }
 
@@ -87,13 +87,12 @@ namespace DryIocAttributes
         /// <summary>Creates export with handling existing export option.</summary>
         /// <param name="ifAlreadyExported">Handles export when other such export is already exist.</param>
         public ExportExAttribute(IfAlreadyExported ifAlreadyExported) :
-            this(null, null, ifAlreadyExported)
-        { }
+            this(null, null, ifAlreadyExported) { }
 
         /// <summary>Optional service key or string <see cref="ExportAttribute.ContractName"/>.</summary>
-        public object CopntractKey { get; set; }
+        public object ContractKey { get; set; }
 
-        /// <summary>Options to handle existing and duplicate exports.</summary>
+        /// <summary>Option to handle existing and duplicate exports.</summary>
         public IfAlreadyExported IfAlreadyExported { get; set; }
     }
 
@@ -181,8 +180,8 @@ namespace DryIocAttributes
     /// <summary>Allows disposable transient to be exported.</summary>
     public class AllowsDisposableTransientAttribute : Attribute { }
 
-    /// <summary>Defines export with arbitrary object key.</summary>
-    [Obsolete("Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.")]
+    /// <summary>OBSOLETE: Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.</summary>
+    //[Obsolete("Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.")]
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
         Justification = "Not available in PCL.")]
     [AttributeUsage(AttributeTargets.Class 
@@ -220,7 +219,8 @@ namespace DryIocAttributes
         /// <summary>Specifies service key if <see cref="ContractName"/> is not specified.</summary>
         public object ContractKey { get; set; }
 
-        /// <summary>If specified has more priority over <see cref="ContractKey"/>.</summary>
+        // [Obsolete("Use ContractKey instead")]
+        /// <summary>OBSOLETE: Use ContractKey instead.</summary>
         public string ContractName { get; set; }
 
         /// <summary>Excludes specified contract types.</summary>
@@ -228,6 +228,9 @@ namespace DryIocAttributes
 
         /// <summary>Public types by default.</summary>
         public bool NonPublic { get; set; }
+
+        /// <summary>Option to handle existing and duplicate exports.</summary>
+        public IfAlreadyExported IfAlreadyExported { get; set; }
     }
 
     /// <summary>Specifies that class exporting static or instance method factories</summary>

@@ -390,7 +390,7 @@ namespace DryIoc.MefAttributedModel
         {
             var export = new ExportInfo(
                 attribute.ContractType ?? implementationType, 
-                attribute.CopntractKey,
+                attribute.ContractKey,
                 GetIfAlreadyRegistered(attribute.IfAlreadyExported));
 
             // Overrides the existing export with new one (will override export from Export Many)
@@ -409,20 +409,21 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static ExportInfo[] GetExportsFromExportManyAttribute(ExportManyAttribute attribute, 
-            ExportedRegistrationInfo currentInfo, Type implementationType)
+            ExportedRegistrationInfo info, Type implementationType)
         {
             var contractTypes = implementationType.GetImplementedServiceTypes(attribute.NonPublic);
             if (!attribute.Except.IsNullOrEmpty())
                 contractTypes = contractTypes.Except(attribute.Except).ToArrayOrSelf();
 
             var manyExports = contractTypes
-                .Select(t => new ExportInfo(t, attribute.ContractName ?? attribute.ContractKey))
+                .Select(contractType => new ExportInfo(contractType, 
+                    attribute.ContractName ?? attribute.ContractKey, GetIfAlreadyRegistered(attribute.IfAlreadyExported)))
                 .ToArray();
 
             Throw.If(manyExports.Length == 0, Error.ExportManyDoesNotExportAnyType, implementationType, contractTypes);
 
             // Filters exports that were already made, because ExportMany has less priority than Export(Ex)
-            var currentExports = currentInfo.Exports;
+            var currentExports = info.Exports;
             if (currentExports.IsNullOrEmpty())
             {
                 currentExports = manyExports;
