@@ -489,27 +489,27 @@ namespace DryIoc
         {
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
-            var container = ((IContainer)this);
-            var itemType = requiredServiceType ?? serviceType;
-            var items = container.GetAllServiceFactories(itemType);
+            var container = (IContainer)this;
+            var requiredItemType = requiredServiceType ?? serviceType;
+            var items = container.GetAllServiceFactories(requiredItemType);
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
-            if (itemType.IsClosedGeneric())
+            if (requiredItemType.IsClosedGeneric())
             {
-                var itemTypeGenericDefinition = itemType.GetGenericDefinitionOrNull();
-                openGenericItems = container.GetAllServiceFactories(itemTypeGenericDefinition)
-                    .Select(x => new ServiceRegistrationInfo(x.Value, itemTypeGenericDefinition, x.Key));
+                var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
+                openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
+                    .Select(x => new ServiceRegistrationInfo(x.Value, requiredItemOpenGenericType, x.Key));
             }
 
             // Append registered generic types with compatible variance, 
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
             IEnumerable<ServiceRegistrationInfo> variantGenericItems = null;
-            if (itemType.IsGeneric() && container.Rules.VariantGenericTypesInResolvedCollection)
+            if (requiredItemType.IsGeneric() && container.Rules.VariantGenericTypesInResolvedCollection)
                 variantGenericItems = container.GetServiceRegistrations()
                     .Where(x => x.ServiceType.IsGeneric()
-                        && x.ServiceType.GetGenericTypeDefinition() == itemType.GetGenericTypeDefinition()
-                        && x.ServiceType != itemType
-                        && x.ServiceType.IsAssignableTo(itemType));
+                        && x.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition()
+                        && x.ServiceType != requiredItemType
+                        && x.ServiceType.IsAssignableTo(requiredItemType));
 
             if (serviceKey != null) // include only single item matching key.
             {
@@ -520,27 +520,27 @@ namespace DryIoc
                     variantGenericItems = variantGenericItems.Where(x => serviceKey.Equals(x.OptionalServiceKey));
             }
 
-            if (compositeParentKey != null) // exclude composite parent from items
+            // exclude composite parent from items
+            var parent = preResolveParent.FactoryType != FactoryType.Wrapper 
+                ? preResolveParent : preResolveParent.Parent;
+            if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
             {
-                if (compositeParentRequiredType == null)
-                    items = items
-                        .Where(x => !compositeParentKey.Equals(x.Key));
+                items = items.Where(x => x.Value.FactoryID != parent.FactoryID);
 
                 if (openGenericItems != null)
-                    openGenericItems = openGenericItems
-                        .Where(x => !compositeParentKey.Equals(x.OptionalServiceKey)
-                            || (compositeParentRequiredType != null
-                            && compositeParentRequiredType.IsOpenGeneric()
-                            && compositeParentRequiredType != x.ServiceType));
+                    openGenericItems = openGenericItems.Where(x => 
+                        !x.Factory.FactoryGenerator.GeneratedFactories.Enumerate().Any(f =>
+                            f.Value.FactoryID == parent.FactoryID &&
+                            f.Key.Key == parent.ServiceType && f.Key.Value == parent.ServiceKey));
 
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems
-                        .Where(x => !compositeParentKey.Equals(x.OptionalServiceKey));
+                    variantGenericItems = variantGenericItems.Where(x => x.Factory.FactoryID != parent.FactoryID);
             }
 
+            IResolver resolver = this;
             foreach (var item in items)
             {
-                var service = ((IResolver)this).Resolve(serviceType, item.Key, true, requiredServiceType, preResolveParent, scope);
+                var service = resolver.Resolve(serviceType, item.Key, true, requiredServiceType, preResolveParent, scope);
                 if (service != null) // skip unresolved items
                     yield return service;
             }
@@ -548,7 +548,8 @@ namespace DryIoc
             if (openGenericItems != null)
                 foreach (var item in openGenericItems)
                 {
-                    var service = ((IResolver)this).Resolve(serviceType, item.OptionalServiceKey, true, item.ServiceType, preResolveParent, scope);
+                    var serviceKeyWithOpenGenericRequiredType = new[] { item.ServiceType, item.OptionalServiceKey };
+                    var service = resolver.Resolve(serviceType, serviceKeyWithOpenGenericRequiredType, true, requiredItemType, preResolveParent, scope);
                     if (service != null) // skip unresolved items
                         yield return service;
                 }
@@ -556,7 +557,7 @@ namespace DryIoc
             if (variantGenericItems != null)
                 foreach (var item in variantGenericItems)
                 {
-                    var service = ((IResolver)this).Resolve(serviceType, item.OptionalServiceKey, true, item.ServiceType, preResolveParent, scope);
+                    var service = resolver.Resolve(serviceType, item.OptionalServiceKey, true, item.ServiceType, preResolveParent, scope);
                     if (service != null) // skip unresolved items
                         yield return service;
                 }
@@ -1034,7 +1035,7 @@ namespace DryIoc
             if (itemType.IsArray)
             {
                 var itType = itemType.GetElementType().ThrowIfNull();
-                var items = ((IEnumerable)item).Cast<object>().Select(it => GetPrimitiveOrArrayExprOrDefault(it, itType));
+                var items = ((IEnumerable)item).Cast<object>().Select(it => GetPrimitiveOrArrayExprOrDefault(it, null));
                 var itExprs = Expression.NewArrayInit(itType, items);
                 return itExprs;
             }
@@ -1151,13 +1152,38 @@ namespace DryIoc
         {
             var serviceType = request.ServiceType;
             var serviceKey = request.ServiceKey;
-            var requiredServiceType = request.RequiredServiceType;
+            var requiredServiceType = request.RequiredServiceType ?? serviceType;
             var serviceFactories = _registry.Value.Services;
 
             object entry;
-            if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
+
+            Type requiredOpenGenericType = null;
+            if (requiredServiceType != null && requiredServiceType.IsGeneric())
             {
-                entry = serviceFactories.GetValueOrDefault(requiredServiceType);
+                if (requiredServiceType.IsOpenGeneric())
+                {
+                    requiredOpenGenericType = requiredServiceType;
+                }
+                else
+                {
+                    // NOTE: Special case when key includes info to lookup specifically for open-generic factory.
+                    var serviceKeyWithOpenGenericRequiredType = serviceKey as object[];
+                    if (serviceKeyWithOpenGenericRequiredType != null && serviceKeyWithOpenGenericRequiredType.Length == 2)
+                    {
+                        var typeFromKey = serviceKeyWithOpenGenericRequiredType[0] as Type;
+                        if (typeFromKey != null && typeFromKey == requiredServiceType.GetGenericDefinitionOrNull())
+                        {
+                            requiredOpenGenericType = typeFromKey;
+                            // NOTE: Unwrap and use an actual key.
+                            request.ChangeServiceKey(serviceKey = serviceKeyWithOpenGenericRequiredType[1]);
+                        }
+                    }
+                }
+            }
+
+            if (requiredOpenGenericType != null)
+            {
+                entry = serviceFactories.GetValueOrDefault(requiredOpenGenericType);
             }
             else
             {
@@ -2177,14 +2203,17 @@ namespace DryIoc
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
             var items = container.GetAllServiceFactories(requiredItemType)
-                .Select(kv => new ServiceRegistrationInfo(kv.Value, null, kv.Key))
+                .Select(kv => new ServiceRegistrationInfo(kv.Value, requiredItemType, kv.Key))
                 .ToArray();
 
             if (requiredItemType.IsClosedGeneric())
             {
-                var requiredItemGenericDefinition = requiredItemType.GetGenericDefinitionOrNull();
-                var openGenericItems = container.GetAllServiceFactories(requiredItemGenericDefinition)
-                    .Select(keyFactory => new ServiceRegistrationInfo(keyFactory.Value, requiredItemGenericDefinition, keyFactory.Key))
+                var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
+                var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
+                    .Select(f => new ServiceRegistrationInfo(f.Value, 
+                            requiredItemType,
+                            // NOTE: Special service key with info about open-generic factory service type
+                            new[] { requiredItemOpenGenericType, f.Key })) 
                     .ToArray();
                 items = items.Append(openGenericItems);
             }
@@ -2206,14 +2235,13 @@ namespace DryIoc
 
             // Composite pattern support: filter out composite root from available keys.
             var parent = request.Parent;
-            if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
+            if (!parent.IsEmpty && 
+                parent.ServiceType == requiredItemType) // check fast for the parent of the same type
             {
-                var compositeParentKey = parent.ServiceKey ?? DefaultKey.Value;
-                items = items
-                    .Where(x => !compositeParentKey.Equals(x.OptionalServiceKey)
-                        || (parent.RequiredServiceType != null
-                        && parent.RequiredServiceType.IsGenericDefinition()
-                        && parent.RequiredServiceType != x.ServiceType))
+                items = items.Where(x => x.Factory.FactoryID != parent.FactoryID &&
+                    (x.Factory.FactoryGenerator == null || !x.Factory.FactoryGenerator.GeneratedFactories.Enumerate().Any(f =>
+                        f.Value.FactoryID == parent.FactoryID &&
+                        f.Key.Key == parent.ServiceType && f.Key.Value == parent.ServiceKey)))
                     .ToArray();
             }
 
@@ -2228,7 +2256,9 @@ namespace DryIoc
                 for (var i = 0; i < items.Length; i++)
                 {
                     var item = items[i];
-                    var itemRequest = request.Push(itemType, item.OptionalServiceKey, IfUnresolved.ReturnDefault, item.ServiceType);
+                    var itemRequest = request.Push(itemType, item.OptionalServiceKey, IfUnresolved.ReturnDefault, 
+                        item.ServiceType);
+
                     var itemFactory = container.ResolveFactory(itemRequest);
                     if (itemFactory != null)
                     {
@@ -2239,7 +2269,7 @@ namespace DryIoc
                 }
             }
 
-            return Expression.NewArrayInit(itemType.ThrowIfNull(), itemExprList ?? Enumerable.Empty<Expression>());
+            return Expression.NewArrayInit(itemType, itemExprList ?? Enumerable.Empty<Expression>());
         }
 
         private static readonly MethodInfo _resolveManyMethod =
@@ -2250,8 +2280,9 @@ namespace DryIoc
             if (request.IsWrappedInFuncWithArgs())
                 return null;
 
+            var container = request.Container;
             var itemType = request.ServiceType.GetGenericParamsAndArgs()[0];
-            var requiredItemType = request.Container.GetWrappedType(itemType, request.RequiredServiceType);
+            var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
             // Composite pattern support: find composite parent key to exclude from result.
             object compositeParentKey = null;
@@ -2265,11 +2296,11 @@ namespace DryIoc
 
             var callResolveManyExpr = Expression.Call(Container.ResolverExpr, _resolveManyMethod,
                 Expression.Constant(itemType),
-                request.Container.GetOrAddStateItemExpression(request.ServiceKey),
+                container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(requiredItemType),
-                request.Container.GetOrAddStateItemExpression(compositeParentKey),
+                container.GetOrAddStateItemExpression(compositeParentKey),
                 Expression.Constant(compositeParentRequiredType, typeof(Type)),
-                Expression.Constant(null, typeof(RequestInfo)),
+                container.RequestInfoToExpression(parent),
                 Container.GetResolutionScopeExpression(request));
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
@@ -2704,7 +2735,7 @@ namespace DryIoc
         /// <summary>Default setting for container. 
         /// Applied to all registrations if setting is not specified 
         /// (or default <see cref="IfAlreadyRegistered.AppendNotKeyed"/>) in the registration.
-        /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection regitrations.</summary>
+        /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
         public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; private set; }
 
         /// <summary>Specifies <see cref="DefaultIfAlreadyRegistered"/>.</summary>
@@ -3919,7 +3950,7 @@ namespace DryIoc
             object serviceKey = null)
         {
             return behavior == ResolveManyBehavior.AsLazyEnumerable
-                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, null, null, null, null).Cast<TService>()
+                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, null, null, RequestInfo.Empty, null).Cast<TService>()
                 : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
         }
 
@@ -4145,13 +4176,7 @@ namespace DryIoc
             var requiredServiceType = details == null ? null : details.RequiredServiceType;
             if (requiredServiceType != null)
             {
-                // Replace serviceType with Required if they are assignable
-                if (requiredServiceType.IsAssignableTo(serviceType))
-                {
-                    serviceType = requiredServiceType; // override service type with required one
-                    details = ServiceDetails.Of(null, details.ServiceKey, details.IfUnresolved);
-                }
-                else if (requiredServiceType.IsOpenGeneric())
+                if (requiredServiceType.IsOpenGeneric())
                 {
                     var serviceGenericDefinition = serviceType.GetGenericDefinitionOrNull();
                     if (serviceGenericDefinition == null ||
@@ -4159,6 +4184,11 @@ namespace DryIoc
                         requiredServiceType.GetImplementedServiceTypes().IndexOf(serviceGenericDefinition) == -1)
                         Throw.It(Error.ServiceIsNotAssignableFromOpenGenericRequiredServiceType,
                             serviceGenericDefinition, requiredServiceType, request);
+                }
+                else if (requiredServiceType.IsAssignableTo(serviceType))
+                {
+                    serviceType = requiredServiceType; // replace service type with required without losing info
+                    details = ServiceDetails.Of(null, details.ServiceKey, details.IfUnresolved);
                 }
                 else
                 {
@@ -7079,6 +7109,9 @@ namespace DryIoc
             if (IsEmpty)
                 return s.Append("{empty}");
 
+            if (FactoryID != 0)
+                s.Append('#').Append(FactoryID).Append(' ');
+
             if (FactoryType != FactoryType.Service)
                 s.Append(FactoryType.ToString().ToLower()).Append(' ');
 
@@ -7208,12 +7241,13 @@ namespace DryIoc
         /// <param name="serviceType">Return type of an service item.</param>
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
-        /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
-        /// <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
+        /// <param name="compositeParentKey">OBSOLETE: Now I can use <paramref name="preResolveParent"/> to identify composite parent.</param>
+        /// <param name="compositeParentRequiredType">OBSOLETE: Now I can use <paramref name="preResolveParent"/> to identify composite parent.</param>
         /// <param name="preResolveParent">Dependency resolution path info.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, object compositeParentKey, Type compositeParentRequiredType, 
+        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, 
+            object compositeParentKey, Type compositeParentRequiredType, 
             RequestInfo preResolveParent, IScope scope);
     }
 
