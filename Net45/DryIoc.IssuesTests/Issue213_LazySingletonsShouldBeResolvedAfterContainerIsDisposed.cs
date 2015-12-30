@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue213_LazySingletonsShouldBeResolvedAfterContainerIsDisposed
     {
-        [Test, Ignore]
+        [Test]
         public void LazySingletons_Should_Resolve_After_Container_Disposed()
         {
             var container = new Container();

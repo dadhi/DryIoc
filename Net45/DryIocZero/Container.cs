@@ -399,12 +399,15 @@ namespace DryIocZero
             Justification = "Does not container any unmanaged resources.")]
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
-
             if (_openedScope != null)
+            {
                 _openedScope.Dispose();
+                if (ScopeContext != null)
+                    ScopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
+            }
             else
             {
+                if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
                 _defaultFactories = Ref.Of(ImTreeMap.Empty);
                 _keyedFactories = Ref.Of(ImTreeMap.Empty);
                 SingletonScope.Dispose();

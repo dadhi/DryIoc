@@ -163,11 +163,9 @@ namespace DryIoc
         /// <summary>Disposes container current scope and that means container itself.</summary>
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
-                return;
-
-            if (_openedScope != null) // for container created with Open(Bound)Scope
+            if (_openedScope != null) // for container created with OpenScope
             {
+                _openedScope.Dispose();
                 if (_scopeContext != null)
                 {
                     // try to revert context to parent scope, otherwise if context and opened scope not in sync - do nothing
@@ -175,10 +173,12 @@ namespace DryIoc
                     _scopeContext.SetCurrent(scope => scope == openedScope ? scope.Parent : scope);
                 }
 
-                _openedScope.Dispose();
             }
             else // for Container created with constructor.
             {
+                if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+                    return;
+
                 Rules = Rules.Default;
                 _registry.Swap(Registry.Empty);
                 _singletonScope.Dispose();
