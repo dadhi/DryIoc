@@ -1174,6 +1174,7 @@ namespace DryIocZero
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
+            // ReSharper disable once InconsistentlySynchronizedField
             return (id < _items.Length ? _items[id] : null) ?? TryGetOrAddToArray(id, createValue);
         }
 
@@ -1613,6 +1614,9 @@ namespace DryIocZero
                 return "{empty}";
 
             var s = new StringBuilder();
+
+            if (FactoryID != 0)
+                s.Append('#').Append(FactoryID).Append(' ');
 
             if (FactoryType != FactoryType.Service)
                 s.Append(FactoryType.ToString().ToLower()).Append(' ');

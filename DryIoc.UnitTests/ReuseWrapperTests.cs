@@ -150,20 +150,5 @@ namespace DryIoc.UnitTests
                 Assert.That(service, Is.InstanceOf<ServiceWithParameterAndDependency>());
             }
         }
-
-        [Explicit]
-        public void Can_resolve_as_swapable_and_swap_based_on_current_value()
-        {
-            var container = new Container();
-            container.Register<Service>(Reuse.Singleton);
-            container.Resolve<Service>();
-
-            var c = container.WithoutCache();
-
-            var another = new Service();
-            c.RegisterInstance(another, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-
-            Assert.AreSame(another, c.Resolve<Service>());
-        }
     }
 }

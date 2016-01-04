@@ -421,6 +421,9 @@ public enum FactoryType
 
             var s = new StringBuilder();
 
+            if (FactoryID != 0)
+                s.Append('#').Append(FactoryID).Append(' ');
+
             if (FactoryType != FactoryType.Service)
                 s.Append(FactoryType.ToString().ToLower()).Append(' ');
             if (ImplementationType != null && ImplementationType != ServiceType)
