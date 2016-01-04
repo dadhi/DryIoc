@@ -10,7 +10,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     public interface INamed { }
 
-    [ExportMany(ContractName = "blah")]
+    [ExportMany(ContractName = "blah", IfAlreadyExported = IfAlreadyExported.Keep)]
     public class NamedOne : INamed, IOne { }
 
     [Export("named", typeof(INamed)), ExportMany, Export("named", typeof(INamed))]

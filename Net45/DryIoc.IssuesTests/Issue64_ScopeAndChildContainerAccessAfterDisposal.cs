@@ -35,7 +35,7 @@ namespace DryIoc.IssuesTests
             await ThrowsAsync<ContainerException>(async () =>
             {
                 var c = new Container();
-                c.Register<XProvider>(Reuse.Singleton);
+                c.Register<XProvider>(Reuse.InCurrentScope);
 
                 Task t;
                 using (var b = c.OpenScope())

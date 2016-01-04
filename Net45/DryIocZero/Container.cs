@@ -399,12 +399,15 @@ namespace DryIocZero
             Justification = "Does not container any unmanaged resources.")]
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
-
             if (_openedScope != null)
+            {
                 _openedScope.Dispose();
+                if (ScopeContext != null)
+                    ScopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
+            }
             else
             {
+                if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
                 _defaultFactories = Ref.Of(ImTreeMap.Empty);
                 _keyedFactories = Ref.Of(ImTreeMap.Empty);
                 SingletonScope.Dispose();
@@ -1171,6 +1174,7 @@ namespace DryIocZero
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
+            // ReSharper disable once InconsistentlySynchronizedField
             return (id < _items.Length ? _items[id] : null) ?? TryGetOrAddToArray(id, createValue);
         }
 
@@ -1610,6 +1614,9 @@ namespace DryIocZero
                 return "{empty}";
 
             var s = new StringBuilder();
+
+            if (FactoryID != 0)
+                s.Append('#').Append(FactoryID).Append(' ');
 
             if (FactoryType != FactoryType.Service)
                 s.Append(FactoryType.ToString().ToLower()).Append(' ');

@@ -86,7 +86,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportWithKey(BlahFooh.Blah, typeof(IHandler))]
+    [ExportEx(BlahFooh.Blah, typeof(IHandler))]
     public class BlahHandler : IHandler { }
 
     [ExportMany(ContractKey = BlahFooh.Fooh)]

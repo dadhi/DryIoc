@@ -67,44 +67,33 @@ namespace DryIocAttributes
     public class ExportExAttribute : ExportAttribute
     {
         /// <summary>Creates attribute.</summary>
-        /// <param name="contractName">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
-        /// <param name="contractType">Service type.</param>
-        public ExportExAttribute(string contractName, Type contractType = null)
-            : base(contractName, contractType)
+        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
+        /// <param name="contractType">(optional) Service type.</param>
+        /// <param name="ifAlreadyExported">(optional) Handles export when other such export is already exist.</param>
+        public ExportExAttribute(object contractKey, Type contractType = null, 
+            IfAlreadyExported ifAlreadyExported = IfAlreadyExported.AppendNotKeyed)
+            : base(contractKey as string, contractType)
         {
-            ServiceKey = contractName;
+            ContractKey = contractKey;
+            IfAlreadyExported = ifAlreadyExported;
         }
 
-        /// <summary>Creates export with specified service type.</summary> <param name="contractType"></param>
-        public ExportExAttribute(Type contractType) : this(null, contractType) { }
+        /// <summary>Creates export with specified service type.</summary> <param name="contractType">Service type.</param>
+        /// <param name="ifAlreadyExported">(optional) Handles export when other such export is already exist.</param>
+        public ExportExAttribute(Type contractType,
+            IfAlreadyExported ifAlreadyExported = IfAlreadyExported.AppendNotKeyed) : 
+            this(null, contractType, ifAlreadyExported) { }
+
+        /// <summary>Creates export with handling existing export option.</summary>
+        /// <param name="ifAlreadyExported">Handles export when other such export is already exist.</param>
+        public ExportExAttribute(IfAlreadyExported ifAlreadyExported) :
+            this(null, null, ifAlreadyExported) { }
 
         /// <summary>Optional service key or string <see cref="ExportAttribute.ContractName"/>.</summary>
-        public object ServiceKey { get; set; }
+        public object ContractKey { get; set; }
 
-        /// <summary>Specifies ReuseType or Transient if omitted.</summary>
-        public ReuseType Reuse { get; set; }
-
-        /// <summary>Optional scope name for <see cref="Reuse"/> of <see cref="ReuseType.CurrentScope"/> or
-        /// <see cref="ReuseType.ResolutionScope"/>.</summary>
-        public string ReuseScopeName { get; set; }
-
-        /// <summary>Options to handle existing and duplicate exports.</summary>
+        /// <summary>Option to handle existing and duplicate exports.</summary>
         public IfAlreadyExported IfAlreadyExported { get; set; }
-
-        /// <summary>Optional metadata object associated with export.</summary>
-        public object Metadata { get; set; }
-
-        /// <summary>Specifies to prevent disposal for <see cref="IDisposable"/> export with <see cref="Reuse"/>.</summary>
-        public bool PreventDisposal { get; set; }
-
-        /// <summary>Specifies to store reused resolved service as <see cref="WeakReference"/>, and make it eligible for GC.</summary>
-        public bool WeaklyReferenced { get; set; }
-
-        /// <summary>Exported type injected as "dynamic" method call instead of inline creation.</summary>
-        public bool AsResolutionCall { get; set; }
-
-        /// <summary>Exported type should open resolution scope when injected.</summary>
-        public bool OpenResolutionScope { get; set; }
     }
 
     /// <summary>Base attribute to specify type of reuse for annotated class.</summary>
@@ -191,7 +180,8 @@ namespace DryIocAttributes
     /// <summary>Allows disposable transient to be exported.</summary>
     public class AllowsDisposableTransientAttribute : Attribute { }
 
-    /// <summary>Defines export with arbitrary object key.</summary>
+    /// <summary>OBSOLETE: Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.</summary>
+    //[Obsolete("Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.")]
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
         Justification = "Not available in PCL.")]
     [AttributeUsage(AttributeTargets.Class 
@@ -229,7 +219,8 @@ namespace DryIocAttributes
         /// <summary>Specifies service key if <see cref="ContractName"/> is not specified.</summary>
         public object ContractKey { get; set; }
 
-        /// <summary>If specified has more priority over <see cref="ContractKey"/>.</summary>
+        // [Obsolete("Use ContractKey instead")]
+        /// <summary>OBSOLETE: Use ContractKey instead.</summary>
         public string ContractName { get; set; }
 
         /// <summary>Excludes specified contract types.</summary>
@@ -237,6 +228,9 @@ namespace DryIocAttributes
 
         /// <summary>Public types by default.</summary>
         public bool NonPublic { get; set; }
+
+        /// <summary>Option to handle existing and duplicate exports.</summary>
+        public IfAlreadyExported IfAlreadyExported { get; set; }
     }
 
     /// <summary>Specifies that class exporting static or instance method factories</summary>
@@ -426,6 +420,9 @@ public enum FactoryType
                 return "{empty}";
 
             var s = new StringBuilder();
+
+            if (FactoryID != 0)
+                s.Append('#').Append(FactoryID).Append(' ');
 
             if (FactoryType != FactoryType.Service)
                 s.Append(FactoryType.ToString().ToLower()).Append(' ');

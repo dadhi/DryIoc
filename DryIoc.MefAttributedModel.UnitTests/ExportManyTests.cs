@@ -1,4 +1,5 @@
 ﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
+using DryIocAttributes;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
@@ -52,6 +53,27 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.DoesNotThrow(() =>
                 container.Resolve<WithBothTheSameExports>());
+        }
+
+        [Test]
+        public void Can_specify_to_throw_on_second_register_many_of_the_same_service()
+        {
+            var container = new Container().WithMefAttributedModel();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+            container.RegisterExports(typeof(A), typeof(B)));
+
+            Assert.AreEqual(DryIoc.Error.UnableToRegisterDuplicateDefault, ex.Error);
+        }
+
+        [ExportMany]
+        public class A
+        {
+        }
+
+        [ExportMany(IfAlreadyExported = IfAlreadyExported.Throw)]
+        public class B : A
+        {
         }
     }
 }

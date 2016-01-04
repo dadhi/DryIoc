@@ -116,7 +116,7 @@ namespace DryIoc.MefAttributedModel
                 {
                     var export = info.Exports[i];
                     registrator.Register(factory,
-                        export.ServiceType, export.ServiceKeyInfo.Key, info.IfAlreadyRegistered, false);
+                        export.ServiceType, export.ServiceKeyInfo.Key, export.IfAlreadyRegistered, false);
                 }
             }
 
@@ -290,7 +290,7 @@ namespace DryIoc.MefAttributedModel
                 var attribute = attributes[attrIndex];
                 if (attribute is ExportExAttribute)
                 {
-                    info = GetInfoFromExportExAttribute((ExportExAttribute)attribute, info, implementationType);
+                    info.Exports = GetExportsFromExportExAttribute((ExportExAttribute)attribute, info, implementationType);
                 }
                 else if (attribute is ExportManyAttribute)
                 {
@@ -373,33 +373,28 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static ExportInfo[] GetExportsFromExportAttribute(ExportAttribute attribute,
-            ExportedRegistrationInfo currentInfo, Type implementationType)
+            ExportedRegistrationInfo info, Type implementationType)
         {
             var export = new ExportInfo(attribute.ContractType ?? implementationType,
                 attribute.ContractName ??
+#pragma warning disable 618 // ExportWithKeyAttribute is Obsolete.
                 (attribute is ExportWithKeyAttribute ? ((ExportWithKeyAttribute)attribute).ContractKey : null));
+#pragma warning restore 618
 
-            var currentExports = currentInfo.Exports;
-            var exports = currentExports == null ? new[] { export }
-                : currentExports.Contains(export) ? currentExports
-                : currentExports.AppendOrUpdate(export);
-            return exports;
+            // Overrides the existing export with new one (will override export from Export Many)
+            return info.Exports.AppendOrUpdate(export, info.Exports.IndexOf(export));
         }
-        private static ExportedRegistrationInfo GetInfoFromExportExAttribute(ExportExAttribute attribute, 
+
+        private static ExportInfo[] GetExportsFromExportExAttribute(ExportExAttribute attribute, 
             ExportedRegistrationInfo info, Type implementationType)
         {
-            var export = new ExportInfo(attribute.ContractType ?? implementationType, attribute.ServiceKey);
-            info.Exports = info.Exports.AppendOrUpdate(export);
+            var export = new ExportInfo(
+                attribute.ContractType ?? implementationType, 
+                attribute.ContractKey,
+                GetIfAlreadyRegistered(attribute.IfAlreadyExported));
 
-            info.Reuse = attribute.Reuse;
-            info.ReuseName = attribute.ReuseScopeName;
-            info.IfAlreadyRegistered = GetIfAlreadyRegistered(attribute.IfAlreadyExported);
-            info.PreventDisposal = attribute.PreventDisposal;
-            info.WeaklyReferenced = attribute.WeaklyReferenced;
-            info.AsResolutionCall = attribute.AsResolutionCall;
-            info.OpenResolutionScope = attribute.OpenResolutionScope;
-
-            return info;
+            // Overrides the existing export with new one (will override export from Export Many)
+            return info.Exports.AppendOrUpdate(export, info.Exports.IndexOf(export));
         }
 
         private static IfAlreadyRegistered GetIfAlreadyRegistered(IfAlreadyExported ifAlreadyExported)
@@ -414,25 +409,36 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static ExportInfo[] GetExportsFromExportManyAttribute(ExportManyAttribute attribute, 
-            ExportedRegistrationInfo currentInfo, Type implementationType)
+            ExportedRegistrationInfo info, Type implementationType)
         {
             var contractTypes = implementationType.GetImplementedServiceTypes(attribute.NonPublic);
             if (!attribute.Except.IsNullOrEmpty())
                 contractTypes = contractTypes.Except(attribute.Except).ToArrayOrSelf();
 
             var manyExports = contractTypes
-                .Select(t => new ExportInfo(t, attribute.ContractName ?? attribute.ContractKey))
+                .Select(contractType => new ExportInfo(contractType, 
+                    attribute.ContractName ?? attribute.ContractKey, GetIfAlreadyRegistered(attribute.IfAlreadyExported)))
                 .ToArray();
 
             Throw.If(manyExports.Length == 0, Error.ExportManyDoesNotExportAnyType, implementationType, contractTypes);
 
-            var currentExports = currentInfo.Exports;
-            if (!currentExports.IsNullOrEmpty())
-                for (var i = 0; i < currentExports.Length; i++)
-                    if (!manyExports.Contains(currentExports[i]))
-                        manyExports = manyExports.AppendOrUpdate(currentExports[i]);
+            // Filters exports that were already made, because ExportMany has less priority than Export(Ex)
+            var currentExports = info.Exports;
+            if (currentExports.IsNullOrEmpty())
+            {
+                currentExports = manyExports;
+            }
+            else
+            {
+                for (var i = 0; i < manyExports.Length; i++)
+                {
+                    var manyExport = manyExports[i];
+                    if (!currentExports.Contains(manyExport))
+                        currentExports = currentExports.AppendOrUpdate(manyExport);
+                }
+            }
 
-            return manyExports;
+            return currentExports;
         }
 
         private static void PopulateWrapperInfoFromAttribute(ExportedRegistrationInfo resultInfo, AsWrapperAttribute attribute,
@@ -715,9 +721,6 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Type consisting of single method compatible with <see cref="Setup.Condition"/> type.</summary>
         public Type ConditionType;
 
-        /// <summary>If already registered option to pass to container registration.</summary>
-        public IfAlreadyRegistered IfAlreadyRegistered;
-
         /// <summary>Creates factory out of registration info.</summary>
         /// <param name="made">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
         /// <returns>Created factory.</returns>
@@ -836,7 +839,10 @@ namespace DryIoc.MefAttributedModel
         public string ServiceTypeFullName;
 
         /// <summary>Wrapped contract name or service key. It is wrapped in order to be serializable.</summary>
-        public ServiceKeyInfo ServiceKeyInfo = ServiceKeyInfo.Default;
+        public ServiceKeyInfo ServiceKeyInfo;
+
+        /// <summary>If already registered option to pass to container registration.</summary>
+        public IfAlreadyRegistered IfAlreadyRegistered;
 
         /// <summary>Default constructor is usually required by deserializer.</summary>
         public ExportInfo() { }
@@ -844,10 +850,13 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Creates exported info out of type and optional key.</summary>
         /// <param name="serviceType">Contract type to store.</param>
         /// <param name="serviceKey">(optional) ContractName string or service key.</param>
-        public ExportInfo(Type serviceType, object serviceKey = null)
+        /// <param name="ifAlreadyRegistered">(optional) Handles the case when the same export is already registered.</param>
+        public ExportInfo(Type serviceType, object serviceKey = null,
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             ServiceType = serviceType;
             ServiceKeyInfo = ServiceKeyInfo.Of(serviceKey);
+            IfAlreadyRegistered = ifAlreadyRegistered;
         }
 
         /// <summary>Compares with another info for equality.</summary>
@@ -857,7 +866,8 @@ namespace DryIoc.MefAttributedModel
             var other = obj as ExportInfo;
             return other != null
                 && other.ServiceType == ServiceType
-                && Equals(other.ServiceKeyInfo.Key, ServiceKeyInfo.Key);
+                && Equals(other.ServiceKeyInfo.Key, ServiceKeyInfo.Key)
+                && other.IfAlreadyRegistered == IfAlreadyRegistered;
         }
 
         /// <summary>Generates valid c# code to "new <see cref="ExportInfo"/>() { ... };" from its state.</summary>
@@ -867,7 +877,9 @@ namespace DryIoc.MefAttributedModel
         {
             return (code ?? new StringBuilder())
                 .Append(@"new ExportInfo(").AppendType(ServiceType).Append(@", ")
-                .AppendCode(ServiceKeyInfo.Key).Append(@")");
+                .AppendCode(ServiceKeyInfo.Key).Append(@", ")
+                .AppendEnum(typeof(IfAlreadyRegistered), IfAlreadyRegistered)
+                .Append(@")");
         }
     }
 

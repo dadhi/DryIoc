@@ -255,16 +255,31 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsFalse(((AllOpts)opts).IsDisposed);
         }
 
+        [Test]
+        public void Can_specify_to_throw_on_second_registration()
+        {
+            var container = new Container().WithMefAttributedModel();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.RegisterExports(typeof(DontThrows), typeof(Throws)));
+
+            Assert.AreEqual(DryIoc.Error.UnableToRegisterDuplicateDefault, ex.Error);
+        }
+
+        public interface I { }
+
+        [ExportEx(IfAlreadyExported.Throw)]
+        public class DontThrows { }
+
+        [ExportMany]
+        [ExportEx(typeof(DontThrows), IfAlreadyExported.Throw)]
+        public class Throws : DontThrows { }
+
         public interface IAllOpts { }
 
         [ExportEx(typeof(IAllOpts), 
-            ServiceKey = "a",
-            Reuse = ReuseType.CurrentScope, 
-            ReuseScopeName = "b",
-            IfAlreadyExported = IfAlreadyExported.Keep,
-            Metadata = "1",
-            PreventDisposal = true,
-            AsResolutionCall = true)]
+            ContractKey = "a",
+            IfAlreadyExported = IfAlreadyExported.Keep)]
         public class AllOpts : IAllOpts, IDisposable
         {
             public bool IsDisposed;
@@ -276,7 +291,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [ExportEx(typeof(IAllOpts),
-            ServiceKey = "a",
+            ContractKey = "a",
             IfAlreadyExported = IfAlreadyExported.Keep)]
         public class AllOpts2 : IAllOpts
         {

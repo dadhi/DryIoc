@@ -77,7 +77,6 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<C>(ies.OfType<M<int>>().Single().Ies.Single());
         }
 
-
         [Test]
         public void Resolving_open_generic_composite_as_ResolveMany_should_work()
         {

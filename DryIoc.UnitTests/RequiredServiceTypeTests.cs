@@ -105,5 +105,18 @@ namespace DryIoc.UnitTests
 
             Assert.That(service, Is.InstanceOf<Service>());
         }
+
+        [Test]
+        public void Can_specify_generic_for_Func_of_object_for_ResolveMany()
+        {
+            var container = new Container();
+            container.Register(typeof(A<>));
+
+            var services = container.ResolveMany<Func<object>>(typeof(A<int>));
+
+            Assert.IsInstanceOf<A<int>>(services.First().Invoke());
+        }
+
+        public class A<T> { }
     }
 }
