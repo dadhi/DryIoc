@@ -3,9 +3,9 @@
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("DryIoc.Owin.UnitTests")]
-[assembly: AssemblyProduct("DryIoc.Owin.UnitTests")]
-[assembly: AssemblyCopyright("Copyright © 2014 Maksim Volkau")]
+[assembly: AssemblyTitle("DryIoc.SignalR.UnitTests")]
+[assembly: AssemblyProduct("DryIoc.SignalR.UnitTests")]
+[assembly: AssemblyCopyright("Copyright © 2016 Maksim Volkau")]
 
 // Version information for an assembly consists of the following four values:
 //
