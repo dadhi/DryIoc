@@ -476,6 +476,32 @@ namespace DryIoc.UnitTests
             op = ((LazyDecorator)op).Decorated.Value;
             Assert.IsInstanceOf<RetryOperationDecorator>(op);
         }
+
+        [Test]
+        public void Can_decorate_service_type_when_required_type_is_different()
+        {
+            var container = new Container();
+            container.Register<IBird, TalkingBirdDecorator>(setup: Setup.Decorator);
+            container.Register<Duck>();
+
+            var bird = container.Resolve<IBird>(typeof(Duck));
+
+            Assert.IsInstanceOf<TalkingBirdDecorator>(bird);
+        }
+
+        public interface IBird {}
+
+        public class Duck : IBird {}
+
+        public class TalkingBirdDecorator : IBird
+        {
+            public IBird Decoratee { get; private set; }
+
+            public TalkingBirdDecorator(IBird bird)
+            {
+                Decoratee = bird;
+            }
+        }
     }
 
     #region CUT

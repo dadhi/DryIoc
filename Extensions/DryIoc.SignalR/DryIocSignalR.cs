@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2014 Maksim Volkau
+Copyright (c) 2015 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@ namespace DryIoc.SignalR
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Diagnostics.CodeAnalysis;
     using Castle.Core.Interceptor;
     using Castle.DynamicProxy;
     using Microsoft.AspNet.SignalR;
@@ -46,34 +47,38 @@ namespace DryIoc.SignalR
                     rules => rules.WithoutThrowOnRegisteringDisposableTransient(),
                     scopeContext ?? new AsyncExecutionFlowScopeContext());
 
+            container.RegisterInstance<IHubActivator>(new DryIocHubActivator(container));
+
+            container.RegisterInstance(new HubToCloseScopeOnDisposeInterceptor(container));
+            container.RegisterInterfaceInterceptor<IHub, HubToCloseScopeOnDisposeInterceptor>();
+
+            container.Register<IDependencyResolver, DryIocDependencyResolver>(Reuse.Singleton);
+
             hubConfiguration = hubConfiguration ?? new HubConfiguration();
-            hubConfiguration.Resolver = new DryIocDependencyResolver(container);
+            hubConfiguration.Resolver = container.Resolve<IDependencyResolver>();
+
             return container;
         }
     }
 
     /// <summary>
     /// </summary>
+    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
+        Justification = "Not available in PCL.")]
     public sealed class DryIocDependencyResolver : DefaultDependencyResolver
     {
         /// <summary>
         /// </summary>
-        public DryIocDependencyResolver(IContainer container)
+        public DryIocDependencyResolver(IResolver resolver)
         {
-            _container = container;
-
-            container.Register<IHubActivator, DryIocHubActivator>();
-            container.RegisterInstance(container);
-
-            container.Register<HubToCloseScopeOnDisposeInterceptor>(Reuse.Singleton);
-            container.RegisterInterfaceInterceptor<IHub, HubToCloseScopeOnDisposeInterceptor>();
+            _containerResolver = resolver;
         }
 
         /// <summary>
         /// </summary>
         public override object GetService(Type serviceType)
         {
-            return _container.Resolve(serviceType, IfUnresolved.ReturnDefault)
+            return _containerResolver.Resolve(serviceType, IfUnresolved.ReturnDefault)
                 ?? base.GetService(serviceType);
         }
 
@@ -81,7 +86,7 @@ namespace DryIoc.SignalR
         /// </summary>
         public override IEnumerable<object> GetServices(Type serviceType)
         {
-            var services = _container.Resolve<object[]>(serviceType);
+            var services = _containerResolver.Resolve<object[]>(serviceType);
             var baseServices = base.GetServices(serviceType);
 
             return baseServices != null
@@ -95,33 +100,36 @@ namespace DryIoc.SignalR
         protected override void Dispose(bool disposing)
         {
             if (disposing)
-                _container.Dispose();
+            {
+                var disposable = _containerResolver as IDisposable;
+                if (disposable != null)
+                    disposable.Dispose();
+            }
             base.Dispose(disposing);
         }
 
-        private readonly IContainer _container;
+        private readonly IResolver _containerResolver;
     }
 
     /// <summary>
     /// </summary>
     public sealed class DryIocHubActivator : IHubActivator
     {
-        private readonly IContainer _resolver;
+        private readonly IContainer _container;
 
         /// <summary>
         /// </summary>
-        public DryIocHubActivator(IContainer resolver)
+        public DryIocHubActivator(IContainer container)
         {
-            _resolver = resolver;
+            _container = container;
         }
 
         /// <summary>
         /// </summary>
         public IHub Create(HubDescriptor descriptor)
         {
-            _resolver.OpenScope();
-            var hub = _resolver.Resolve<IHub>(descriptor.HubType);
-            return hub;
+            _container.OpenScope();
+            return _container.Resolve<IHub>(descriptor.HubType);
         }
     }
 
@@ -170,15 +178,14 @@ namespace DryIoc.SignalR
         public void Intercept(IInvocation invocation)
         {
             var method = invocation.Method;
-            if (method.Name != "Dispose" &&
-                method.GetParameters().IndexOf(p => p.ParameterType == typeof(bool)) != -1)
+            if (method.Name == "Dispose" && method.GetParameters().Length == 0)
             {
                 _container.ScopeContext.SetCurrent(scope =>
                 {
-                    if (scope == null) return null;
-                    var parent = scope.Parent;
+                    if (scope == null)
+                        return null;
                     scope.Dispose();
-                    return parent;
+                    return scope.Parent;
                 });
             }
             invocation.Proceed();
@@ -186,5 +193,4 @@ namespace DryIoc.SignalR
 
         private readonly IContainer _container;
     }
-
 }

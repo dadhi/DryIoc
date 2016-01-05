@@ -82,14 +82,15 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolve_Meta_of_required_type_should_work()
+        public void Resolve_Meta_of_Func_of_required_type_should_work()
         {
             var container = new Container();
-            container.Register<IService, Service>(setup: Setup.With(metadataOrFuncOfMetadata: "a"));
-            container.Register<IService, AnotherService>(setup: Setup.With(metadataOrFuncOfMetadata: "b"));
+            container.Register<IService, Service>(setup: Setup.With("a"));
+            container.Register<IService, AnotherService>(setup: Setup.With("b"));
 
             var services = container.Resolve<Meta<Func<object>, string>[]>(typeof(IService));
 
+            Assert.AreEqual(2, services.Length);
             Assert.That(services[0].Metadata, Is.EqualTo("a"));
             Assert.That(services[0].Value(), Is.InstanceOf<Service>());
             Assert.That(services[1].Metadata, Is.EqualTo("b"));

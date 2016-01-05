@@ -61,8 +61,6 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var rules = configure == null ? Rules : configure(Rules);
             scopeContext = scopeContext ?? _scopeContext;
-            if (rules == Rules && scopeContext == _scopeContext)
-                return this;
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             return new Container(rules, registryWithoutCache, _singletonScope, scopeContext, _openedScope, _disposed);
         }
@@ -165,14 +163,7 @@ namespace DryIoc
         {
             if (_openedScope != null) // for container created with OpenScope
             {
-                _openedScope.Dispose();
-                if (_scopeContext != null)
-                {
-                    // try to revert context to parent scope, otherwise if context and opened scope not in sync - do nothing
-                    var openedScope = _openedScope;
-                    _scopeContext.SetCurrent(scope => scope == openedScope ? scope.Parent : scope);
-                }
-
+                CloseCurrentScope();
             }
             else // for Container created with constructor.
             {
@@ -185,6 +176,21 @@ namespace DryIoc
                 if (_scopeContext != null)
                     _scopeContext.Dispose();
             }
+        }
+
+        // note: in V3: move to IContainer.
+        /// <summary>Disposes current scope and sets the scope parent (if any) back to ambient context (if any).</summary>
+        /// <remarks>May be called safely multiple times.</remarks>
+        public void CloseCurrentScope()
+        {
+            var openedScope = _openedScope;
+            if (openedScope == null)
+                return;
+
+            openedScope.Dispose();
+
+            if (_scopeContext != null)
+                _scopeContext.SetCurrent(scope => scope == openedScope ? scope.Parent : scope);
         }
 
         #region Static state
@@ -311,7 +317,7 @@ namespace DryIoc
                                 implType, implType.GetGenericDefinitionOrNull());
 
                         if (implType != serviceType && serviceType != typeof(object) &&
-                            Array.IndexOf(implType.GetImplementedTypes(), serviceType) == -1)
+                            implType.GetImplementedTypes().IndexOf(t => t == serviceType) == -1)
                             Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
                     }
                     else if (implType != serviceType)
@@ -801,7 +807,7 @@ namespace DryIoc
 
             var container = request.Container;
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
-            var openGenericServiceType = request.ServiceType.GetGenericDefinitionOrNull();
+            var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
             if (openGenericServiceType != null)
                 decorators = decorators.Append(container.GetDecoratorFactoriesOrDefault(openGenericServiceType));
             if (decorators == null)
@@ -1150,63 +1156,11 @@ namespace DryIoc
 
         private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
         {
-            var serviceType = request.ServiceType;
-            var serviceKey = request.ServiceKey;
-            var requiredServiceType = request.RequiredServiceType ?? serviceType;
-            var serviceFactories = _registry.Value.Services;
-
-            object entry;
-
-            Type requiredOpenGenericType = null;
-            if (requiredServiceType != null && requiredServiceType.IsGeneric())
-            {
-                if (requiredServiceType.IsOpenGeneric())
-                {
-                    requiredOpenGenericType = requiredServiceType;
-                }
-                else
-                {
-                    // NOTE: Special case when key includes info to lookup specifically for open-generic factory.
-                    var serviceKeyWithOpenGenericRequiredType = serviceKey as object[];
-                    if (serviceKeyWithOpenGenericRequiredType != null && serviceKeyWithOpenGenericRequiredType.Length == 2)
-                    {
-                        var typeFromKey = serviceKeyWithOpenGenericRequiredType[0] as Type;
-                        if (typeFromKey != null && typeFromKey == requiredServiceType.GetGenericDefinitionOrNull())
-                        {
-                            requiredOpenGenericType = typeFromKey;
-                            // NOTE: Unwrap and use an actual key.
-                            request.ChangeServiceKey(serviceKey = serviceKeyWithOpenGenericRequiredType[1]);
-                        }
-                    }
-                }
-            }
-
-            if (requiredOpenGenericType != null)
-            {
-                entry = serviceFactories.GetValueOrDefault(requiredOpenGenericType);
-            }
-            else
-            {
-                entry = serviceFactories.GetValueOrDefault(serviceType);
-                if (serviceType.IsGeneric()) // only for generic types
-                {
-                    if (entry == null)
-                    {
-                        entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
-                    }
-                    else if (serviceKey != null) // Check if concrete Entry does not contain factory for specified key
-                    {
-                        var factoriesEntry = entry as FactoriesEntry;
-                        if (factoriesEntry != null && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null ||
-                            entry is Factory && !DefaultKey.Value.Equals(serviceKey))
-                            entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) ?? entry;
-                    }
-                }
-            }
-
+            var entry = GetServiceFactoryEntryOrDefault(request);
             if (entry == null) // no entry - no factories: return earlier
                 return null;
 
+            var serviceKey = request.ServiceKey;
             var singleFactory = entry as Factory;
             if (factorySelector != null)
             {
@@ -1239,9 +1193,11 @@ namespace DryIoc
             if (defaultFactories.Length == 1)
             {
                 var defaultFactory = defaultFactories[0];
-                // NOTE: For resolution root sets correct default key to be used in delegate cache.
                 if (request.IsResolutionCall)
+                {
+                    // NOTE: For resolution root sets correct default key to be used in delegate cache.
                     request.ChangeServiceKey(defaultFactory.Key);
+                }
                 return defaultFactory.Value;
             }
 
@@ -1249,6 +1205,64 @@ namespace DryIoc
                 Throw.It(Error.ExpectedSingleDefaultFactory, defaultFactories, request);
 
             return null;
+        }
+
+        private object GetServiceFactoryEntryOrDefault(Request request)
+        {
+            var serviceKey = request.ServiceKey;
+            var serviceFactories = _registry.Value.Services;
+
+            var requiredServiceType = request.RequiredServiceType;
+            Type actualServiceType;
+            if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
+            {
+                actualServiceType = requiredServiceType;
+            }
+            else
+            {
+                actualServiceType = request.GetActualServiceType();
+                // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServType, ServKey }
+                // presumes that required service type is closed generic
+                if (actualServiceType.IsClosedGeneric())
+                {
+                    var serviceKeyWithOpenGenericRequiredType = serviceKey as object[];
+                    if (serviceKeyWithOpenGenericRequiredType != null && serviceKeyWithOpenGenericRequiredType.Length == 2)
+                    {
+                        var openGenericType = serviceKeyWithOpenGenericRequiredType[0] as Type;
+                        if (openGenericType != null && openGenericType == actualServiceType.GetGenericDefinitionOrNull())
+                        {
+                            actualServiceType = openGenericType;
+                            serviceKey = serviceKeyWithOpenGenericRequiredType[1];
+
+                            // Later on proceed with an actual key.
+                            request.ChangeServiceKey(serviceKey);
+                        }
+                    }
+                }
+            }
+
+            var entry = serviceFactories.GetValueOrDefault(actualServiceType);
+
+            // Special case for closed-generic lookup type:
+            // When entry is not found 
+            //   Or the key in entry is not found
+            // Then go to the open-generic services
+            if (actualServiceType.IsClosedGeneric())
+            {
+                if (entry == null ||
+                    serviceKey != null && (
+                        entry is FactoriesEntry &&
+                        ((FactoriesEntry)entry).Factories.GetValueOrDefault(serviceKey) == null ||
+                        entry is Factory &&
+                        !serviceKey.Equals(DefaultKey.Value)))
+                {
+                    var lookupOpenGenericType = actualServiceType.GetGenericTypeDefinition();
+                    var openGenericEntry = serviceFactories.GetValueOrDefault(lookupOpenGenericType);
+                    entry = openGenericEntry ?? entry; // stay with original entry if open generic is not found;
+                }
+            }
+
+            return entry;
         }
 
         #endregion
@@ -2176,12 +2190,13 @@ namespace DryIoc
         /// <returns>Found wrapper factory or default null otherwise.</returns>
         public static Factory ResolveWrapperOrGetDefault(Request request)
         {
-            var serviceType = request.ServiceType;
-            var itemType = serviceType.GetArrayElementTypeOrNull();
-            if (itemType != null)
-                serviceType = typeof(IEnumerable<>).MakeGenericType(itemType);
+            var actualServiceType = request.GetActualServiceType();
 
-            var factory = request.Container.GetWrapperFactoryOrDefault(serviceType);
+            var itemType = actualServiceType.GetArrayElementTypeOrNull();
+            if (itemType != null)
+                actualServiceType = typeof(IEnumerable<>).MakeGenericType(itemType);
+
+            var factory = request.Container.GetWrapperFactoryOrDefault(actualServiceType);
             if (factory != null && factory.FactoryGenerator != null)
                 factory = factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
 
@@ -2190,7 +2205,7 @@ namespace DryIoc
 
         private static Expression GetArrayExpression(Request request)
         {
-            var collectionType = request.ServiceType;
+            var collectionType = request.GetActualServiceType();
             var container = request.Container;
             var rules = container.Rules;
 
@@ -2316,8 +2331,8 @@ namespace DryIoc
             if (request.IsWrappedInFuncWithArgs())
                 return null;
 
-            var wrapperType = request.ServiceType;
-            var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
+            var lazyType = request.GetActualServiceType();
+            var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
             // Note: the conversation is required in .NET 3.5 to handle lack of covariance for Func<out T>
@@ -2326,13 +2341,13 @@ namespace DryIoc
                 serviceExpr = Expression.Convert(serviceExpr, serviceType);
             var factoryExpr = Expression.Lambda(serviceExpr, null);
             var serviceFuncType = typeof(Func<>).MakeGenericType(serviceType);
-            var wrapperCtor = wrapperType.GetConstructorOrNull(args: serviceFuncType);
+            var wrapperCtor = lazyType.GetConstructorOrNull(args: serviceFuncType);
             return Expression.New(wrapperCtor, factoryExpr);
         }
 
         private static Expression GetFuncExpressionOrDefault(Request request)
         {
-            var funcType = request.ServiceType;
+            var funcType = request.GetActualServiceType();
             var funcArgs = funcType.GetGenericParamsAndArgs();
             var serviceType = funcArgs[funcArgs.Length - 1];
 
@@ -2369,7 +2384,8 @@ namespace DryIoc
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request)
         {
-            var typeArgs = request.ServiceType.GetGenericParamsAndArgs();
+            var keyValueType = request.GetActualServiceType();
+            var typeArgs = keyValueType.GetGenericParamsAndArgs();
             var serviceKeyType = typeArgs[0];
             var serviceKey = request.ServiceKey;
             if (serviceKey == null && serviceKeyType.IsValueType() ||
@@ -2383,7 +2399,7 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
-            var pairCtor = request.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
+            var pairCtor = keyValueType.GetSingleConstructorOrNull().ThrowIfNull();
             var keyExpr = request.Container.GetOrAddStateItemExpression(serviceKey, serviceKeyType);
             var pairExpr = Expression.New(pairCtor, keyExpr, serviceExpr);
             return pairExpr;
@@ -2393,7 +2409,8 @@ namespace DryIoc
         /// registered factories with the same metadata type ignoring keys.</remarks>
         private static Expression GetMetaExpressionOrDefault(Request request)
         {
-            var typeArgs = request.ServiceType.GetGenericParamsAndArgs();
+            var metaType = request.GetActualServiceType();
+            var typeArgs = metaType.GetGenericParamsAndArgs();
             var metadataType = typeArgs[1];
             var serviceType = typeArgs[0];
 
@@ -2416,7 +2433,7 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
-            var metaCtor = request.ServiceType.GetSingleConstructorOrNull().ThrowIfNull();
+            var metaCtor = metaType.GetSingleConstructorOrNull().ThrowIfNull();
             var metadataExpr = request.Container.GetOrAddStateItemExpression(result.Value.Setup.Metadata, metadataType);
             var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
             return metaExpr;
@@ -4176,19 +4193,19 @@ namespace DryIoc
             var requiredServiceType = details == null ? null : details.RequiredServiceType;
             if (requiredServiceType != null)
             {
-                if (requiredServiceType.IsOpenGeneric())
+                if (requiredServiceType == serviceType)
                 {
-                    var serviceGenericDefinition = serviceType.GetGenericDefinitionOrNull();
-                    if (serviceGenericDefinition == null ||
-                        requiredServiceType != serviceGenericDefinition &&
-                        requiredServiceType.GetImplementedServiceTypes().IndexOf(serviceGenericDefinition) == -1)
-                        Throw.It(Error.ServiceIsNotAssignableFromOpenGenericRequiredServiceType,
-                            serviceGenericDefinition, requiredServiceType, request);
-                }
-                else if (requiredServiceType.IsAssignableTo(serviceType))
-                {
-                    serviceType = requiredServiceType; // replace service type with required without losing info
                     details = ServiceDetails.Of(null, details.ServiceKey, details.IfUnresolved);
+                }
+                else if (requiredServiceType.IsOpenGeneric())
+                {
+                    // Checks that open-generic has corresponding closed service type to fill in its generic parameters.
+                    var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
+                    if (openGenericServiceType == null ||
+                        requiredServiceType != openGenericServiceType &&
+                        Array.IndexOf(requiredServiceType.GetImplementedTypes(), openGenericServiceType) == -1)
+                        Throw.It(Error.ServiceIsNotAssignableFromOpenGenericRequiredServiceType,
+                            openGenericServiceType, requiredServiceType, request);
                 }
                 else
                 {
@@ -4217,6 +4234,9 @@ namespace DryIoc
         public static IServiceInfo InheritInfoFromDependencyOwner(this IServiceInfo dependency, IServiceInfo owner,
             bool shouldInheritServiceKey = false)
         {
+            // Note: that an actual meaninge parameter should be renamed in next major version.
+            var isNonServiceOwner = shouldInheritServiceKey;
+
             var ownerDetails = owner.Details;
             if (ownerDetails == null || ownerDetails == ServiceDetails.Default)
                 return dependency;
@@ -4228,23 +4248,17 @@ namespace DryIoc
                 : ownerDetails.IfUnresolved;
 
             // Use dependency key if it's non default, otherwise and if owner is not service, the
-            var serviceKey = dependencyDetails.ServiceKey == null && shouldInheritServiceKey
+            var serviceKey = dependencyDetails.ServiceKey == null && isNonServiceOwner
                 ? ownerDetails.ServiceKey
                 : dependencyDetails.ServiceKey;
 
             var serviceType = dependency.ServiceType;
             var requiredServiceType = dependencyDetails.RequiredServiceType;
             var ownerRequiredServiceType = ownerDetails.RequiredServiceType;
-            if (ownerRequiredServiceType != null)
-            {
-                if (ownerRequiredServiceType.IsAssignableTo(serviceType))
-                {
-                    serviceType = ownerRequiredServiceType;
-                    requiredServiceType = null;
-                }
-                else if (!ownerRequiredServiceType.IsOpenGeneric()) // propagates owner required service type further to dependency 
-                    requiredServiceType = ownerRequiredServiceType;
-            }
+
+            if (isNonServiceOwner && ownerRequiredServiceType != null && 
+                requiredServiceType == null) // if only dependency does not have its own
+                requiredServiceType = ownerRequiredServiceType;
 
             if (serviceType == dependency.ServiceType && serviceKey == dependencyDetails.ServiceKey &&
                 ifUnresolved == dependencyDetails.IfUnresolved && requiredServiceType == dependencyDetails.RequiredServiceType)
@@ -4700,9 +4714,20 @@ namespace DryIoc
         /// <summary>Relative number representing reuse lifespan.</summary>
         public int ReuseLifespan { get { return ResolvedFactory == null ? 0 : ResolvedFactory.Reuse == null ? 0 : ResolvedFactory.Reuse.Lifespan; } }
 
+        /// <summary>Returns <see cref="RequiredServiceType"/> if it is specified and assignable to <see cref="ServiceType"/>,
+        /// otherwise returns <see cref="ServiceType"/>.</summary>
+        /// <returns>The type to be used for lookup in registry.</returns>
+        public Type GetActualServiceType()
+        {
+            var serviceInfo = _serviceInfo.ThrowIfNull();
+            var requiredServiceType = serviceInfo.Details.RequiredServiceType;
+            var serviceType = serviceInfo.ServiceType;
+            return requiredServiceType != null && requiredServiceType.IsAssignableTo(serviceType) ? requiredServiceType : serviceType;
+        }
+
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
         /// <param name="info">Info about service to resolve.</param> <param name="scope">(optional) Resolution scope.</param>
-        /// <param name="preResolveParent">(optional) (optional) Request info beyond/preceding Resolve call.</param>
+        /// <param name="preResolveParent">(optional) Request info beyond/preceding Resolve call.</param>
         /// <returns>New request for provided info.</returns>
         /// <remarks>Existing/parent request should be resolved to factory (<see cref="WithResolvedFactory"/>), before pushing info into it.</remarks>
         public Request Push(IServiceInfo info, IScope scope = null, RequestInfo preResolveParent = null)
@@ -5824,7 +5849,8 @@ namespace DryIoc
 
             public Factory GetGeneratedFactoryOrDefault(Request request)
             {
-                var serviceType = request.ServiceType;
+                var serviceType = request.GetActualServiceType();
+
                 var generatedFactoryKey = new KV<Type, object>(serviceType, request.ServiceKey);
 
                 var generatedFactories = _generatedFactories.Value;
@@ -5840,9 +5866,8 @@ namespace DryIoc
                 var implementationType = _openGenericFactory._implementationType;
 
                 var closedTypeArgs = implementationType == null ||
-                    implementationType == serviceType.GetGenericDefinitionOrNull()
-                    ? serviceType.GetGenericParamsAndArgs()
-                    : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, request.ServiceType, request);
+                    implementationType == serviceType.GetGenericDefinitionOrNull() ? serviceType.GetGenericParamsAndArgs()
+                    : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, serviceType, request);
 
                 if (closedTypeArgs == null)
                     return null;
