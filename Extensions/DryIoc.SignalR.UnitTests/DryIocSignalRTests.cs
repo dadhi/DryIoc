@@ -16,6 +16,12 @@ namespace DryIoc.SignalR.UnitTests
             _container = new Container().WithSignalR();
         }
 
+        [TearDown]
+        public void TearDown()
+        {
+            _container.Dispose();
+        }
+
         [Test]
         public void Can_resolve_hub_activator()
         {
