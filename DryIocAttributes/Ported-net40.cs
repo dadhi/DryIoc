@@ -62,7 +62,7 @@ namespace System.ComponentModel.Composition
 
     /// <summary>Specifies that all types inherited from annotated type should be exported (see <see cref="ExportAttribute"/>) 
     /// with these settings.</summary>
-    [AttributeUsageAttribute(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = true)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = true)]
     public class InheritedExportAttribute : ExportAttribute
     {
         /// <summary>Create default attribute without <see cref="ExportAttribute.ContractName"/> 

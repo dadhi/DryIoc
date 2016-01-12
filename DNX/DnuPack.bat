@@ -1,3 +1,4 @@
 call dnu pack DryIoc.Dnx --configuration Release
 call dnu pack DryIoc.Dnx.DependencyInjection --configuration Release
+call dnu pack DryIocAttributes.Dnx --configuration Release
 pause
