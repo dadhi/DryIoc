@@ -70,7 +70,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
 
             var service = container.Resolve(typeof(ISomeDb), false);
-            Assert.NotNull(service);
+            Assert.IsNotNull(service);
             Assert.AreSame(service, container.Resolve(typeof(ISomeDb), false));
         }
 
@@ -80,7 +80,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
 
             var service = container.Resolve(typeof(IMultiExported), "c");
-            Assert.NotNull(service);
+            Assert.IsNotNull(service);
             Assert.AreSame(service, container.Resolve(typeof(IMultiExported), "c"));
         }
 

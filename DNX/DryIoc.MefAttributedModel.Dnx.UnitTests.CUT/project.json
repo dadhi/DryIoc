@@ -1,27 +1,21 @@
 ﻿{
     "version": "2.0.0",
-    "description": "DryIoc.Dnx.UnitTests",
+    "description": "DryIoc.MefAttributedModel.Dnx.UnitTests.CUT",
     "authors": [ "Maksim Volkau" ],
     "owners": [ "Maksim Volkau" ],
-    "copyright": "Copyright © 2013 Maksim Volkau",
-    "tags": [ "IoC", "Container", "Inversion-of-Control", "DI", "Dependency-Injection", "DRY", "Service-Locator", "Abstract-Factory" ],
+    "copyright": "Copyright © 2016 Maksim Volkau",
+    "tags": [ "MEF", "Composition", "IoC", "Container", "Inversion-of-Control", "DI", "Dependency-Injection", "DRY", "Service-Provider", "Factory" ],
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
 
-    "compile": [
-        "..\\..\\DryIoc.UnitTests\\*.cs",
-        "..\\NUnitAdapterForXUnit.cs"
-    ],
-    "exclude": [ "..\\..\\DryIoc.UnitTests\\ThrowTests.cs" ],
+    "compile": [ "..\\..\\DryIoc.MefAttributedModel.UnitTests.CUT\\*.cs" ],
 
     "commands": {
         "test": "xunit.runner.dnx"
     },
 
     "dependencies": {
-        "DryIoc.Dnx": { "target": "project" },
-        "xunit": "2.1.0",
-        "xunit.runner.dnx": "2.1.0-rc1-build204"
+        "DryIocAttributes.Dnx": { "target": "project" }
     },
 
     "frameworks": {

@@ -63,8 +63,8 @@ namespace DryIoc.IssuesTests
 
             container.RegisterMany<FooBar>(serviceTypeCondition: type => type.IsInterface, reuse: Reuse.Singleton);
 
-            Assert.NotNull(container.Resolve<IFoo>());
-            Assert.NotNull(container.Resolve<IBar>());
+            Assert.IsNotNull(container.Resolve<IFoo>());
+            Assert.IsNotNull(container.Resolve<IBar>());
             
             Assert.Null(container.Resolve<FooBar>(IfUnresolved.ReturnDefault));
         }

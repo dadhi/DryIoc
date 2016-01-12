@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
             IContainer container = new Container();
             container.Register(typeof(Service<>));
             var service = container.Resolve<Service<int>>();
-            Assert.NotNull(service);
+            Assert.IsNotNull(service);
 
             container.Unregister(typeof(Service<>));
             container = container.WithoutCache();
@@ -27,7 +27,7 @@ namespace DryIoc.IssuesTests
             IContainer container = new Container();
             container.Register<Service>();
             var lazyService = container.Resolve<Func<Service>>();
-            Assert.NotNull(lazyService());
+            Assert.IsNotNull(lazyService());
 
             container.Unregister(typeof(Func<>), factoryType: FactoryType.Wrapper);
             container = container.WithoutCache();

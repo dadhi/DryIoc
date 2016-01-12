@@ -19,7 +19,7 @@ namespace NUnit.Framework
 
     public static class Assert
     {
-        public static void That(object @object, Action<object> assert)
+        public static void That(object @object, Action<object> assert, string reasonIgnored = null)
         {
             assert(@object);
         }

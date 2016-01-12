@@ -16,7 +16,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var orange = container.Resolve<Orange>();
 
-            Assert.NotNull(orange);
+            Assert.IsNotNull(orange);
         }
 
         [Test]
@@ -28,8 +28,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var orange = container.Resolve<Orange>();
             var apple = container.Resolve<Apple>();
 
-            Assert.NotNull(orange);
-            Assert.NotNull(apple);
+            Assert.IsNotNull(orange);
+            Assert.IsNotNull(apple);
         }
 
         [Test]
@@ -41,8 +41,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var orange = container.Resolve<Orange>("orange");
             var apple = container.Resolve<Apple>("apple");
 
-            Assert.NotNull(orange);
-            Assert.NotNull(apple);
+            Assert.IsNotNull(orange);
+            Assert.IsNotNull(apple);
         }
 
         [Test]
@@ -77,7 +77,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var factory = container.Resolve<Func<string, Orange>>();
 
-            Assert.NotNull(factory("hey"));
+            Assert.IsNotNull(factory("hey"));
         }
 
         [Test]

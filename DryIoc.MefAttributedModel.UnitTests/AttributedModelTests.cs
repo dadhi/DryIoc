@@ -34,7 +34,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var service = _container.Resolve<ITransientService>();
             var anotherService = _container.Resolve<ITransientService>();
 
-            Assert.That(service, Is.Not.Null.And.Not.SameAs(anotherService));
+            Assert.That(service, Is.Not.Null);
+            Assert.That(service, Is.Not.SameAs(anotherService));
         }
 
         [Test]
@@ -46,7 +47,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var service = _container.Resolve<ISingletonService>();
             var anotherService = _container.Resolve<ISingletonService>();
 
-            Assert.That(service, Is.Not.Null.And.SameAs(anotherService));
+            Assert.That(service, Is.Not.Null);
+            Assert.That(service, Is.SameAs(anotherService));
         }
 
         [Test]
@@ -58,7 +60,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var service = _container.Resolve<IOpenGenericService<int>>();
             var anotherService = _container.Resolve<IOpenGenericService<int>>();
 
-            Assert.That(service, Is.Not.Null.And.SameAs(anotherService));
+            Assert.That(service, Is.Not.Null);
+            Assert.That(service, Is.SameAs(anotherService));
         }
 
         [Test]
@@ -70,7 +73,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var service = _container.Resolve<TransientOpenGenericService<object>>();
             var anotherService = _container.Resolve<TransientOpenGenericService<object>>();
 
-            Assert.That(service, Is.Not.Null.And.Not.SameAs(anotherService));
+            Assert.That(service, Is.Not.Null);
+            Assert.That(service, Is.Not.SameAs(anotherService));
         }
 
         [Test]
