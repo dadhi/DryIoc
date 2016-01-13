@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Autofac;
+using Autofac.Core;
 using Autofac.Features.OwnedInstances;
 using NUnit.Framework;
 
@@ -154,6 +156,34 @@ namespace DryIoc.IssuesTests
             Assert.IsTrue(dep.IsDisposed);
             Assert.IsTrue(dep.NestedDep.IsDisposed);
         }
+
+        [Test]
+        public void How_Autofac_IEnumerable_handles_service_with_missing_dependency()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<NoDep>();
+            var container = builder.Build();
+
+            Assert.Throws<DependencyResolutionException>(() => 
+                container.Resolve<IEnumerable<NoDep>>());
+        }
+
+        [Test]
+        public void How_DryIoc_IEnumerable_handles_service_with_missing_dependency()
+        {
+            var container = new Container();
+            container.Register<NoDep>();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<IEnumerable<NoDep>>());
+        }
+
+        public class NoDep
+        {
+            public NoDep(ISomeDep dep) {}
+        }
+
+        public interface ISomeDep { }
 
         public class ANestedDep : IDisposable 
         {

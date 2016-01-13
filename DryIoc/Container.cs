@@ -721,7 +721,7 @@ namespace DryIoc
 
                 // Continue to next parent if factory is not found in first parent by
                 // updating IfUnresolved policy to ReturnDefault.
-                if (containerRequest.IfUnresolved != IfUnresolved.ReturnDefault)
+                if (containerRequest.IfUnresolved == IfUnresolved.Throw)
                     containerRequest = containerRequest.WithChangedServiceInfo(info => // NOTE Code Smell
                         ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfoFromDependencyOwner(info));
 
@@ -2146,17 +2146,46 @@ namespace DryIoc
         /// <summary>Registered wrappers by their concrete or generic definition service type.</summary>
         public static readonly ImTreeMap<Type, Factory> Wrappers;
 
+        /// <summary>Supported open-generic collection types.</summary>
+        public static readonly IEnumerable<Type> ArrayInterfaces = 
+            typeof(object[]).GetImplementedInterfaces()
+                .Where(t => t.IsGeneric())
+                .Select(t => t.GetGenericTypeDefinition())
+                .ToArray();
+
+        /// <summary>Checks if passed type represents supported collection types.</summary>
+        /// <param name="type">Type to examine.</param> <returns>Check result.</returns>
+        public static bool IsSupportedCollectionType(this Type type)
+        {
+            if (type.IsArray) return true;
+            var genericDefinition = type.GetGenericDefinitionOrNull();
+            return genericDefinition != null && (
+                genericDefinition == typeof(LazyEnumerable<>) ||
+                ArrayInterfaces.Contains(genericDefinition));
+        }
+
+        /// <summary>Returns true if type is supported <see cref="FuncTypes"/>, and false otherwise.</summary>
+        /// <param name="type">Type to check.</param><returns>True for func type, false otherwise.</returns>
+        public static bool IsFunc(this Type type)
+        {
+            var genericDefinition = type.GetGenericDefinitionOrNull();
+            return genericDefinition != null && FuncTypes.Contains(genericDefinition);
+        }
+
+        /// <summary>Returns true if type is func with 1 or more input arguments.</summary>
+        /// <param name="type">Type to check.</param><returns>True for func type, false otherwise.</returns>
+        public static bool IsFuncWithArgs(this Type type)
+        {
+            return type.IsFunc() && type.GetGenericTypeDefinition() != typeof(Func<>);
+        }
+
+
         static WrappersSupport()
         {
             Wrappers = ImTreeMap<Type, Factory>.Empty;
 
-            // Register array and its collection/list interfaces.
             var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
-
-            var arrayInterfaces = typeof(object[]).GetImplementedInterfaces()
-                .Where(t => t.IsGeneric()).Select(t => t.GetGenericTypeDefinition());
-
-            foreach (var arrayInterface in arrayInterfaces)
+            foreach (var arrayInterface in ArrayInterfaces)
                 Wrappers = Wrappers.AddOrUpdate(arrayInterface, arrayExpr);
 
             Wrappers = Wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
@@ -2271,8 +2300,8 @@ namespace DryIoc
                 for (var i = 0; i < items.Length; i++)
                 {
                     var item = items[i];
-                    var itemRequest = request.Push(itemType, item.OptionalServiceKey, IfUnresolved.ReturnDefault, 
-                        item.ServiceType);
+                    var itemRequest = request.Push(itemType, item.OptionalServiceKey, 
+                        IfUnresolved.ReturnDefault, item.ServiceType);
 
                     var itemFactory = container.ResolveFactory(itemRequest);
                     if (itemFactory != null)
@@ -2437,21 +2466,6 @@ namespace DryIoc
             var metadataExpr = request.Container.GetOrAddStateItemExpression(result.Value.Setup.Metadata, metadataType);
             var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
             return metaExpr;
-        }
-
-        /// <summary>Returns true if type is supported <see cref="FuncTypes"/>, and false otherwise.</summary>
-        /// <param name="type">Type to check.</param><returns>True for func type, false otherwise.</returns>
-        public static bool IsFunc(this Type type)
-        {
-            var genericDefinition = type.GetGenericDefinitionOrNull();
-            return genericDefinition != null && FuncTypes.Contains(genericDefinition);
-        }
-
-        /// <summary>Returns true if type is func with 1 or more input arguments.</summary>
-        /// <param name="type">Type to check.</param><returns>True for func type, false otherwise.</returns>
-        public static bool IsFuncWithArgs(this Type type)
-        {
-            return type.IsFunc() && type.GetGenericTypeDefinition() != typeof(Func<>);
         }
     }
 
@@ -4062,10 +4076,10 @@ namespace DryIoc
     public class ServiceDetails
     {
         /// <summary>Default details if not specified, use default setting values, e.g. <see cref="DryIoc.IfUnresolved.Throw"/></summary>
-        public static readonly ServiceDetails Default = new ServiceDetails();
+        public static readonly ServiceDetails Default = Of();
 
         /// <summary>The same as <see cref="Default"/> with only difference <see cref="IfUnresolved"/> set to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</summary>
-        public static readonly ServiceDetails IfUnresolvedReturnDefault = new WithIfUnresolvedReturnDefault();
+        public static readonly ServiceDetails IfUnresolvedReturnDefault = Of(ifUnresolved: IfUnresolved.ReturnDefault);
 
         /// <summary>Creates new DTO out of provided settings, or returns default if all settings have default value.</summary>
         /// <param name="requiredServiceType">Registered service type to search for.</param>
@@ -4076,38 +4090,39 @@ namespace DryIoc
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw,
             object defaultValue = null)
         {
-            return ifUnresolved == IfUnresolved.Throw && defaultValue == null
-                ? (requiredServiceType == null
-                    ? (serviceKey == null ? Default : new WithKey(serviceKey))
-                    : new WithType(requiredServiceType, serviceKey))
-                : (requiredServiceType == null
-                    ? (serviceKey == null && defaultValue == null
-                        ? IfUnresolvedReturnDefault
-                        : new WithKeyReturnDefault(serviceKey, defaultValue))
-                    : new WithTypeReturnDefault(requiredServiceType, serviceKey, defaultValue));
+            if (defaultValue != null && ifUnresolved == IfUnresolved.Throw)
+            {
+                ifUnresolved = IfUnresolved.ReturnDefault;
+            }
+
+            return new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, defaultValue);
         }
 
         /// <summary>Sets custom value for service. This setting is orthogonal to the rest.</summary>
         /// <param name="value">Custom value.</param> <returns>Details with custom value.</returns>
         public static ServiceDetails Of(object value)
         {
-            return new WithCustomValue(value);
+            // Using default value with invalid ifUnresolved state to indicate custom value.
+            return new ServiceDetails(null, IfUnresolved.Throw, null, value);
         }
 
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
-        public virtual Type RequiredServiceType { get { return null; } }
+        public readonly Type RequiredServiceType;
 
         /// <summary>Service key provided with registration.</summary>
-        public virtual object ServiceKey { get { return null; } }
+        public readonly object ServiceKey;
 
         /// <summary>Policy to deal with unresolved request.</summary>
-        public virtual IfUnresolved IfUnresolved { get { return IfUnresolved.Throw; } }
+        public readonly IfUnresolved IfUnresolved;
+
+        /// <summary>Either default or custom value depending on <see cref="IfUnresolved"/> setting.</summary>
+        private readonly object _value;
 
         /// <summary>Value to use in case <see cref="IfUnresolved"/> is set to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</summary>
-        public virtual object DefaultValue { get { return null; } }
+        public object DefaultValue { get { return IfUnresolved == IfUnresolved.ReturnDefault ? _value : null; } }
 
         /// <summary>Custom value specified for dependency.</summary>
-        public virtual object CustomValue { get { return null; } }
+        public object CustomValue { get { return IfUnresolved != IfUnresolved.ReturnDefault ? _value : null; } }
 
         /// <summary>Pretty prints service details to string for debugging and errors.</summary> <returns>Details string.</returns>
         public override string ToString()
@@ -4122,61 +4137,17 @@ namespace DryIoc
             if (ServiceKey != null)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("ServiceKey=").Print(ServiceKey, "\"");
             if (IfUnresolved != IfUnresolved.Throw)
-                (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("AllowsDefault");
+                (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append(IfUnresolved);
             return (s.Length == 0 ? s : s.Append('}')).ToString();
         }
 
-        #region Implementation
-
-        private sealed class WithIfUnresolvedReturnDefault : ServiceDetails
+        private ServiceDetails(Type requiredServiceType, IfUnresolved ifUnresolved, object serviceKey, object defaultValue)
         {
-            public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnDefault; } }
+            RequiredServiceType = requiredServiceType;
+            IfUnresolved = ifUnresolved;
+            ServiceKey = serviceKey;
+            _value = defaultValue;
         }
-
-        private class WithCustomValue : ServiceDetails
-        {
-            public override object CustomValue { get { return _value; } }
-            public WithCustomValue(object value) { _value = value; }
-            private readonly object _value;
-        }
-
-        private class WithKey : ServiceDetails
-        {
-            public override object ServiceKey { get { return _serviceKey; } }
-            public WithKey(object serviceKey) { _serviceKey = serviceKey; }
-            private readonly object _serviceKey;
-        }
-
-        private sealed class WithKeyReturnDefault : WithKey
-        {
-            public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnDefault; } }
-            public override object DefaultValue { get { return _defaultValue; } }
-            public WithKeyReturnDefault(object serviceKey, object defaultValue)
-                : base(serviceKey)
-            { _defaultValue = defaultValue; }
-            private readonly object _defaultValue;
-        }
-
-        private class WithType : WithKey
-        {
-            public override Type RequiredServiceType { get { return _requiredServiceType; } }
-            public WithType(Type requiredServiceType, object serviceKey)
-                : base(serviceKey)
-            { _requiredServiceType = requiredServiceType; }
-            private readonly Type _requiredServiceType;
-        }
-
-        private sealed class WithTypeReturnDefault : WithType
-        {
-            public override IfUnresolved IfUnresolved { get { return IfUnresolved.ReturnDefault; } }
-            public override object DefaultValue { get { return _defaultValue; } }
-            public WithTypeReturnDefault(Type requiredServiceType, object serviceKey, object defaultValue)
-                : base(requiredServiceType, serviceKey)
-            { _defaultValue = defaultValue; }
-            private readonly object _defaultValue;
-        }
-
-        #endregion
     }
 
     /// <summary>Contains tools for combining or propagating of <see cref="IServiceInfo"/> independent of its concrete implementations.</summary>
@@ -5296,16 +5267,19 @@ namespace DryIoc
             }
 
             var serviceExpr = isReplacingDecorator ? decoratorExpr : CreateExpressionOrDefault(request);
-            if (serviceExpr != null && reuse != null && !isReplacingDecorator)
+            if (serviceExpr != null && !isReplacingDecorator)
             {
-                // The singleton optimization: eagerly create singleton and put it into state for fast access.
-                if (reuse is SingletonReuse && FactoryType == FactoryType.Service &&
-                    !(this is InstanceFactory) &&
-                    request.Ancestor(r => r.ServiceType.IsFunc()).IsEmpty &&
-                    container.Rules.EagerCachingSingletonForFasterAccess)
-                    serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
-                else
-                    serviceExpr = GetScopedExpressionOrDefault(serviceExpr, reuse, request);
+                if (reuse != null)
+                {
+                    // The singleton optimization: eagerly create singleton and put it into state for fast access.
+                    if (reuse is SingletonReuse && FactoryType == FactoryType.Service &&
+                        !(this is InstanceFactory) &&
+                        request.Ancestor(r => r.ServiceType.IsFunc()).IsEmpty &&
+                        container.Rules.EagerCachingSingletonForFasterAccess)
+                        serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
+                    else
+                        serviceExpr = GetScopedExpressionOrDefault(serviceExpr, reuse, request);
+                }
             }
 
             if (serviceExpr != null)
@@ -5317,8 +5291,23 @@ namespace DryIoc
                     serviceExpr = Expression.Invoke(decoratorExpr, serviceExpr);
             }
 
-            if (serviceExpr == null && request.IfUnresolved == IfUnresolved.Throw)
-                Container.ThrowUnableToResolve(request);
+            if (serviceExpr == null)
+            {
+                if (request.IfUnresolved == IfUnresolved.Throw)
+                    Container.ThrowUnableToResolve(request);
+
+                // Throw in case of collection wrapper with unresolved current service dependency
+                if (FactoryType == FactoryType.Service)
+                {
+                    var wrapper = request.Ancestor(r => r.FactoryType == FactoryType.Wrapper);
+                    if (!wrapper.IsEmpty && wrapper.Enumerate()
+                        .TakeWhile(r => r.FactoryType == FactoryType.Wrapper)
+                        .Any(r => r.GetActualServiceType().IsSupportedCollectionType()))
+                    {
+                        Container.ThrowUnableToResolve(request);
+                    }
+                }
+            }
 
             return serviceExpr;
         }
@@ -5816,7 +5805,7 @@ namespace DryIoc
 
                                     var defaultValue = paramInfo.Details.DefaultValue;
                                     paramExpr = defaultValue != null
-                                        ? paramRequest.Container.GetOrAddStateItemExpression(defaultValue)
+                                        ? paramRequest.Container.GetOrAddStateItemExpression(defaultValue, throwIfStateRequired: true)
                                         : paramRequest.ServiceType.GetDefaultValueExpression();
                                 }
                             }
@@ -7065,6 +7054,14 @@ namespace DryIoc
         /// <summary>Required service type if specified.</summary>
         public readonly Type RequiredServiceType;
 
+        /// <summary>Returns <see cref="RequiredServiceType"/> if it is specified and assignable to <see cref="ServiceType"/>,
+        /// otherwise returns <see cref="ServiceType"/>.</summary>
+        /// <returns>The type to be used for lookup in registry.</returns>
+        public Type GetActualServiceType()
+        {
+            return RequiredServiceType != null && RequiredServiceType.IsAssignableTo(ServiceType) ? RequiredServiceType : ServiceType;
+        }
+
         /// <summary>Optional service key.</summary>
         public readonly object ServiceKey;
 
@@ -7786,8 +7783,8 @@ namespace DryIoc
             InjectedCustomValueIsOfDifferentType = Of(
                 "Injected value {0} is not assignable to {2}."),
             StateIsRequiredToUseItem = Of(
-                "State is required to use (probably to inject) item {0}. " + Environment.NewLine + 
-                "To enable item use you may specify container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_DELEGATE))."),
+                "State is required to inject (or use) the value {0}. " + Environment.NewLine + 
+                "To enable value use you may specify container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_DELEGATE))."),
             ArgOfValueIsProvidedButNoArgValues = Of(
                 "Arg.OfValue index is provided but no arg values specified."),
             ArgOfValueIndesIsOutOfProvidedArgValues = Of(
