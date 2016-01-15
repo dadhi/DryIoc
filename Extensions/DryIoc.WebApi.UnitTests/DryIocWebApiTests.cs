@@ -36,7 +36,7 @@ namespace DryIoc.WebApi.UnitTests
             var resolver = config.DependencyResolver;
 
             var blah = resolver.GetService(typeof(Blah));
-            Assert.NotNull(blah);
+            Assert.IsNotNull(blah);
             Assert.AreSame(blah, resolver.GetService(typeof(Blah)));
 
             var foohs = resolver.GetServices(typeof(Fooh)).ToArray();
@@ -58,7 +58,7 @@ namespace DryIoc.WebApi.UnitTests
             using (var scope = config.DependencyResolver.BeginScope())
             {
                 var blah = scope.GetService(typeof(Blah));
-                Assert.NotNull(blah);
+                Assert.IsNotNull(blah);
                 Assert.AreSame(blah, scope.GetService(typeof(Blah)));
 
                 var foohs = scope.GetServices(typeof(Fooh)).ToArray();
@@ -75,7 +75,7 @@ namespace DryIoc.WebApi.UnitTests
             using (var scope = config.DependencyResolver.BeginScope())
             {
                 var controller = scope.GetService(typeof(MyController));
-                Assert.NotNull(controller);
+                Assert.IsNotNull(controller);
                 Assert.AreSame(controller, scope.GetService(typeof(MyController)));
             }
         }
@@ -89,7 +89,7 @@ namespace DryIoc.WebApi.UnitTests
             using (var scope = config.DependencyResolver.BeginScope())
             {
                 var controller = scope.GetService(typeof(MyController));
-                Assert.NotNull(controller);
+                Assert.IsNotNull(controller);
                 Assert.AreSame(controller, scope.GetService(typeof(MyController)));
             }
         }
@@ -109,7 +109,7 @@ namespace DryIoc.WebApi.UnitTests
             using (var scope = config.DependencyResolver.BeginScope())
             {
                 var controller = scope.GetService(typeof(MyController));
-                Assert.NotNull(controller);
+                Assert.IsNotNull(controller);
                 Assert.AreSame(controller, scope.GetService(typeof(MyController)));
             }
 

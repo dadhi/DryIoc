@@ -74,6 +74,14 @@ echo:============================
 %NUGET% pack "NuGet\DryIoc.WebApi.Owin.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive -Symbols
 
 echo:
+call :ParseVersion "Extensions\DryIoc.SignalR\Properties\AssemblyInfo.cs"
+echo:DryIoc.SignalR v%VER%
+echo:============================
+%NUGET% pack "NuGet\DryIoc.SignalR.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack "NuGet\DryIoc.SignalR.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive -Symbols
+
+
+echo:
 call :ParseVersion "Net45\DryIocZero\Properties\AssemblyInfo.cs"
 echo:DryIocZero v%VER%
 echo:============================

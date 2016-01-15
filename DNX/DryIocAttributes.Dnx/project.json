@@ -1,0 +1,34 @@
+﻿{
+    "version": "2.0.0-rc1",
+    "title": "DryIocAttributes.Dnx",
+    "description": "Superset of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features.",
+    "authors": [ "Maksim Volkau" ],
+    "owners": [ "Maksim Volkau" ],
+    "copyright": "Copyright © 2016 Maksim Volkau",
+    "tags": [ "MEF", "Attributes", "Attributed-Model", "Composition", "IoC", "Container", "Inversion-of-Control", "DI", "Dependency-Injection", "DRY", "Service-Provider", "Factory" ],
+    "projectUrl": "https://bitbucket.org/dadhi/dryioc",
+    "licenseUrl": "http://opensource.org/licenses/MIT",
+    "requireLicenseAcceptance": false,
+    "releaseNotes": "Supports all DryIoc V2 features.",
+
+    "compilationOptions": {
+        "warningsAsErrors": true
+    },
+
+    "compileFiles": [
+        "..\\..\\DryIocAttributes\\Attributes.cs",
+        "..\\..\\DryIocAttributes\\Ported-net40.cs",
+        "..\\..\\DryIocAttributes\\Properties\\AssemblyInfo.cs"
+    ],
+
+    "frameworks": {
+        "net451": { },
+        "dotnet5.1": {
+            "dependencies": {
+                "System.Runtime": "4.0.21-*",
+                "System.Runtime.Extensions": "4.0.11-*",
+                "System.Diagnostics.Tools": "4.0.1-*"
+            }
+        }
+    }
+}

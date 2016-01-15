@@ -30,7 +30,7 @@ namespace DryIoc.Mvc.UnitTests
             var resolver = DependencyResolver.Current;
 
             var blah = resolver.GetService(typeof(Blah));
-            Assert.NotNull(blah);
+            Assert.IsNotNull(blah);
             Assert.AreSame(blah, resolver.GetService(typeof(Blah)));
 
             var foohs = resolver.GetServices(typeof(Fooh)).ToArray();

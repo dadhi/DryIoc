@@ -56,10 +56,10 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void When_non_Import_attribute_used_It_should_throw()
         {
             var container = new Container().WithMefAttributedModel();
-            container.RegisterExports(typeof(WithUnregisteredExternalEdependency));
+            container.RegisterExports(typeof(WithUnregisteredExternalDependency));
 
             Assert.Throws<ContainerException>(() => 
-                container.Resolve<WithUnregisteredExternalEdependency>());
+                container.Resolve<WithUnregisteredExternalDependency>());
         }
 
         [Test]
@@ -71,7 +71,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var one = container.Resolve<OneDependsOnExternalTool>();
             var other = container.Resolve<OtherDependsOnExternalTool>();
 
-            Assert.That(one.Tool, Is.InstanceOf<ExternalTool>().And.SameAs(other.Tool));
+            Assert.That(one.Tool, Is.InstanceOf<ExternalTool>());
+            Assert.That(one.Tool, Is.SameAs(other.Tool));
         }
     }
 }

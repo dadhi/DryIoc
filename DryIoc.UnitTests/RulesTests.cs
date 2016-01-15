@@ -261,10 +261,23 @@ namespace DryIoc.UnitTests
             container.Register<AD>());
         }
 
-        class AD : IDisposable
+        public class AD : IDisposable
         {
+            public bool IsDisposed { get; private set; }
+
             public void Dispose()
             {
+                IsDisposed = true;
+            }
+        }
+
+        public class ADConsumer
+        {
+            public AD Ad { get; private set; }
+
+            public ADConsumer(AD ad)
+            {
+                Ad = ad;
             }
         }
 

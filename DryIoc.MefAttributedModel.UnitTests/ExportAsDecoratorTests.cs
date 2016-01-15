@@ -99,7 +99,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(1, registrations.Length);
         }
 
-        [Test, Explicit("Related to #141: Support Decorators with open-generic factory methods of T")]
+        [Explicit("Related to #141: Support Decorators with open-generic factory methods of T")]
         public void Can_export_decorator_of_T()
         {
             var container = new Container().WithMefAttributedModel();

@@ -41,7 +41,7 @@ namespace DryIoc.WebApi.UnitTests
 
                         var a = scope.Resolve<A>();
                         await Task.Delay(5);//processing request
-                        Assert.NotNull(a.Request);
+                        Assert.IsNotNull(a.Request);
                         Assert.AreSame(a.Request, scope.Resolve<A>().Request);
                     }
                 });

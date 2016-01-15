@@ -81,11 +81,11 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     [ExportMany]
-    public class WithUnregisteredExternalEdependency
+    public class WithUnregisteredExternalDependency
     {
         public ExternalTool Tool { get; set; }
 
-        public WithUnregisteredExternalEdependency([SomeOther]ExternalTool tool)
+        public WithUnregisteredExternalDependency([SomeOther]ExternalTool tool)
         {
             Tool = tool;
         }

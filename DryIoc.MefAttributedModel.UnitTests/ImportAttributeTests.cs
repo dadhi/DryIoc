@@ -132,7 +132,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<BadTypePropertyClient>());
 
-            Assert.That(ex.Message, Is.StringStarting("Service (wrapped) type").And.StringContaining("is not assignable"));
+            Assert.That(ex.Message, Is.StringStarting("Service (wrapped) type"));
+            Assert.That(ex.Message, Is.StringContaining("is not assignable"));
         }
 
         [Test]
@@ -144,7 +145,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.RegisterExports(typeof(Service), typeof(CustomWrapperClient));
 
             var client = container.Resolve<CustomWrapperClient>();
-            Assert.NotNull(client);
+            Assert.IsNotNull(client);
         }
 
         [Test]

@@ -44,7 +44,7 @@ namespace DryIoc.IssuesTests.Samples
                 });
 
             var plugin = container.Resolve<IPlugin>("another");
-            Assert.NotNull(plugin);
+            Assert.IsNotNull(plugin);
             Assert.AreSame(plugin, container.Resolve<IPlugin>("another"));
             Assert.AreEqual(2, container.Resolve<IPlugin[]>().Length);
         }

@@ -504,7 +504,7 @@ namespace DryIoc.IssuesTests
                 b => b.Small));
 
             var smallInterface = container.Resolve<ISmallInterface>();
-            Assert.NotNull(smallInterface);
+            Assert.IsNotNull(smallInterface);
         }
 
         public interface ISmallInterface { }

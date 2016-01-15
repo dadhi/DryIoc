@@ -8,8 +8,22 @@ namespace DryIoc.IssuesTests
     public class Issue143_Mixing_closed_and_open_generics_subsumes_the_latter
     {
         interface I<T> { }
+
         class C : I<int> { }
+
+        class S : I<string> { }
+
         class G<T> : I<T> { }
+
+        class ConsumerOfI
+        {
+            public I<string> Istr { get; private set; }
+
+            public ConsumerOfI(I<string> istr)
+            {
+                Istr = istr;
+            }
+        }
 
         [Test]
         public void Given_registered_close_and_open_generic_I_can_resolve_open_generic_with_required_servic_type()
@@ -21,6 +35,19 @@ namespace DryIoc.IssuesTests
             var i = c.Resolve<I<int>>(typeof(I<>));
 
             Assert.IsInstanceOf<G<int>>(i);
+        }
+
+        [Test]
+        public void Given_registered_close_and_open_generic_I_can_inject_open_generic_with_required_servic_type()
+        {
+            var c = new Container();
+            c.Register(typeof(I<string>), typeof(S));
+            c.Register(typeof(I<>), typeof(G<>));
+            c.Register<ConsumerOfI>(made: Parameters.Of.Type<I<string>>(typeof(I<>)));
+
+            var i = c.Resolve<ConsumerOfI>();
+
+            Assert.IsInstanceOf<G<string>>(i.Istr);
         }
 
         class Unrelated<T> { }

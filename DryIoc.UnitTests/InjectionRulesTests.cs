@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using Me;
@@ -193,27 +194,42 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_specify_for_param_name_default_value_if_unresolved()
+        public void Couldnot_specify_default_value_for_parameter_name_because_it_requires_state()
         {
             var container = new Container();
             var defaultDep = new Dep();
             container.Register<Client>(made: Parameters.Of.Name("dep", defaultValue: defaultDep));
 
-            var client = container.Resolve<Client>();
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<Client>());
 
-            Assert.That(client.Dep, Is.SameAs(defaultDep));
+            Assert.AreEqual(Error.StateIsRequiredToUseItem, ex.Error);
         }
 
         [Test]
-        public void Can_specify_for_param_type_default_value_if_unresolved()
+        public void Couldnot_specify_default_value_for_parameter_name_with_specific_rule()
+        {
+            var container = new Container(r => r.WithItemToExpressionConverter((item, type) => 
+                type != typeof(Dep) ? null : Expression.New(typeof(Dep))));
+            var defaultDep = new Dep();
+            container.Register<Client>(made: Parameters.Of.Name("dep", defaultValue: defaultDep));
+
+            var client = container.Resolve<Client>();
+
+            Assert.IsNotNull(client.Dep);
+        }
+
+        [Test]
+        public void Couldnot_specify_default_value_for_parameter_type_because_it_requires_state()
         {
             var container = new Container();
             var defaultDep = new Dep();
             container.Register<Client>(made: Parameters.Of.Type<Dep>(defaultValue: defaultDep));
 
-            var client = container.Resolve<Client>();
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<Client>());
 
-            Assert.That(client.Dep, Is.SameAs(defaultDep));
+            Assert.AreEqual(Error.StateIsRequiredToUseItem, ex.Error);
         }
 
         [Test]

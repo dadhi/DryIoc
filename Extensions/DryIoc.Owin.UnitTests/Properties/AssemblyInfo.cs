@@ -4,13 +4,8 @@
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("DryIoc.Owin.UnitTests")]
-[assembly: AssemblyDescription("")]
-[assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc.Owin.UnitTests")]
 [assembly: AssemblyCopyright("Copyright © 2014 Maksim Volkau")]
-[assembly: AssemblyTrademark("")]
-[assembly: AssemblyCulture("")]
 
 // Version information for an assembly consists of the following four values:
 //

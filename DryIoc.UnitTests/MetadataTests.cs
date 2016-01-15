@@ -32,14 +32,15 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_not_throw_in_case_of_service_with_provided_is_not_resolvable_due_not_reigstered_dependency()
+        public void Should_throw_in_case_of_service_with_unresolved_dependency()
         {
             var container = new Container();
             container.Register(typeof(ServiceWithDependencyAndWithMetadata), setup: Setup.With(new Metadata { Assigned = true }));
+            
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<Tuple<ServiceWithDependencyAndWithMetadata, Metadata>[]>());
 
-            var services = container.Resolve<Tuple<ServiceWithDependencyAndWithMetadata, Metadata>[]>();
-
-            Assert.AreEqual(0, services.Length);
+            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
         }
 
         [Test]
