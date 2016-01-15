@@ -11,6 +11,9 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.1.2
+          - fixed: #222: Resolving as IEnumerable silence the dependency resolution errors and just skips the unresolved item
+          - fixed: #218: Apply decorators registered for service type when resolving with required service type
           v2.1.1
           - fixed: #213: Lazy Singletons should be resolved after container is disposed
           - fixed: #212: ResolveMany of object with generic required service type is failing with ArgumentException
