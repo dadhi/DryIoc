@@ -2344,7 +2344,7 @@ namespace DryIoc
                 Expression.Constant(requiredItemType),
                 container.GetOrAddStateItemExpression(compositeParentKey),
                 Expression.Constant(compositeParentRequiredType, typeof(Type)),
-                container.RequestInfoToExpression(parent),
+                container.RequestInfoToExpression(request.ParentOrWrapper),
                 Container.GetResolutionScopeExpression(request));
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
@@ -2858,7 +2858,7 @@ namespace DryIoc
             if (request.IsWrappedInFuncWithArgs())
             {
                 // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
-                var funcType = request.Ancestor().ServiceType;
+                var funcType = request.ParentOrWrapper.ServiceType;
                 var funcArgs = funcType.GetGenericParamsAndArgs();
                 var inputArgCount = funcArgs.Length - 1;
 
@@ -4004,7 +4004,7 @@ namespace DryIoc
             var container = request.Container;
             var serviceType = request.ServiceType;
             var serviceKey = request.ServiceKey;
-            var newPreResolveParent = request.Ancestor();
+            var newPreResolveParent = request.ParentOrWrapper;
 
             if (container.Rules.DependencyResolutionCallExpressions != null &&
                 (request.PreResolveParent.IsEmpty ||
@@ -4600,20 +4600,16 @@ namespace DryIoc
         /// <returns>True if has Func ancestor.</returns>
         public bool IsWrappedInFunc()
         {
-            return !IsEmpty && !_parent.IsEmpty
-                && _parent.Enumerate()
-                    .TakeWhile(r => r.FactoryType == FactoryType.Wrapper)
-                    .Any(r => r.ServiceType.IsFunc());
+            return ParentOrWrapper.Enumerate()
+                .Any(r => r.FactoryType == FactoryType.Wrapper && r.GetActualServiceType().IsFunc());
         }
 
         /// <summary>Checks if request has parent with service type of Func with arguments. 
         /// Often required to check in lazy scenarios.</summary> <returns>True if has Func with arguments ancestor.</returns>
         public bool IsWrappedInFuncWithArgs()
         {
-            return !IsEmpty && !_parent.IsEmpty
-                && _parent.Enumerate()
-                    .TakeWhile(r => r.FactoryType == FactoryType.Wrapper)
-                    .Any(r => r.ServiceType.IsFuncWithArgs());
+            return ParentOrWrapper.Enumerate()
+                .Any(r => r.FactoryType == FactoryType.Wrapper && r.GetActualServiceType().IsFuncWithArgs());
         }
 
         /// <summary>Returns service parent of request, skipping intermediate wrappers if any.</summary>
@@ -4628,15 +4624,22 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Returns direct parent either it service or not (wrapper). 
+        /// In comparison with logical <see cref="Parent"/> which returns first service parent skipping wrapper if any.</summary>
+        public RequestInfo ParentOrWrapper
+        {
+            get { return IsEmpty ? RequestInfo.Empty 
+                    : _parent.IsEmpty ? PreResolveParent 
+                    : _parent.ToRequestInfo(); }
+        }
+
         /// <summary>Gets first ancestor request which satisfies the condition, 
         /// or empty if no ancestor is found.</summary>
         /// <param name="condition">(optional) Condition to stop on.</param>
         /// <returns>Request info of found parent.</returns>
         public RequestInfo Ancestor(Func<RequestInfo, bool> condition = null)
         {
-            if (IsEmpty)
-                return RequestInfo.Empty;
-            var parent = _parent.IsEmpty ? PreResolveParent : _parent.ToRequestInfo();
+            var parent = ParentOrWrapper;
             return condition == null ? parent : parent.FirstOrEmpty(condition);
         }
 
@@ -5242,7 +5245,7 @@ namespace DryIoc
             if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolutionCall()
                 || request.Level >= container.Rules.LevelToSplitObjectGraphIntoResolveCalls
                 // note: Split only if not wrapped in Func with args - Propagation of args across Resolve boundaries is not supported at the moment
-                && request.Ancestor(p => p.ServiceType.IsFuncWithArgs()).IsEmpty)
+                && !request.IsWrappedInFuncWithArgs())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             request = request.WithResolvedFactory(this);
@@ -5274,7 +5277,7 @@ namespace DryIoc
                     // The singleton optimization: eagerly create singleton and put it into state for fast access.
                     if (reuse is SingletonReuse && FactoryType == FactoryType.Service &&
                         !(this is InstanceFactory) &&
-                        request.Ancestor(r => r.ServiceType.IsFunc()).IsEmpty &&
+                        !request.IsWrappedInFunc() &&
                         container.Rules.EagerCachingSingletonForFasterAccess)
                         serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
                     else
@@ -5303,30 +5306,35 @@ namespace DryIoc
                     if (!wrapper.IsEmpty && wrapper.Enumerate()
                         .TakeWhile(r => r.FactoryType == FactoryType.Wrapper)
                         .Any(r => r.GetActualServiceType().IsSupportedCollectionType()))
-                    {
                         Container.ThrowUnableToResolve(request);
-                    }
                 }
             }
 
             return serviceExpr;
         }
 
-        /// <summary>Check method name for explanation XD.</summary> <param name="reuse">Reuse to check.</param> <param name="request">Request to resolve.</param>
+        /// <summary>Throws if request direct or further ancestor has longer reuse lifespan,
+        /// and throws if that is true. Until there is a Func wrapper in between.</summary> 
+        /// <param name="reuse">Reuse to check.</param> <param name="request">Request to resolve.</param>
         protected static void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse, Request request)
         {
+            // Fast check: if reuse is not applied or the rule set then skip the check.
             if (reuse == null || reuse.Lifespan == 0 ||
-                !request.Container.Rules.ThrowIfDependencyHasShorterReuseLifespan ||
-                request.IsWrappedInFunc())
+                !request.Container.Rules.ThrowIfDependencyHasShorterReuseLifespan)
                 return;
 
-            var parent = request.Parent; // get nearest non-wrapper parent
+            var parent = request.ParentOrWrapper;
             if (parent.IsEmpty)
                 return;
 
-            if (reuse.Lifespan < parent.ReuseLifespan)
+            var parentWithLongerLifespan = parent.Enumerate()
+                .TakeWhile(r => r.FactoryType != FactoryType.Wrapper || !r.GetActualServiceType().IsFunc())
+                .FirstOrDefault(r => r.FactoryType == FactoryType.Service 
+                    && r.ReuseLifespan > reuse.Lifespan);
+
+            if (parentWithLongerLifespan != null)
                 Throw.It(Error.DependencyHasShorterReuseLifespan,
-                    request.PrintCurrent(), reuse, parent.ReuseLifespan, request.Ancestor());
+                    request.PrintCurrent(), reuse, parentWithLongerLifespan);
         }
 
         /// <summary>Creates factory delegate from service expression and returns it.
@@ -7730,7 +7738,7 @@ namespace DryIoc
             GenericWrapperTypeArgIndexOutOfBounds = Of(
                 "Registered generic wrapper {0} specified type argument index {1} is out of type argument list."),
             DependencyHasShorterReuseLifespan = Of(
-                "Dependency {0} reuse {1} lifespan shorter than its parent's {2}: {3}" + Environment.NewLine +
+                "Dependency {0} reuse {1} lifespan shorter than its parent's: {2}" + Environment.NewLine +
                 "To turn Off this error, specify the rule with new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan())."),
             WeakRefReuseWrapperGCed = Of(
                 "Reused service wrapped in WeakReference is Garbage Collected and no longer available."),

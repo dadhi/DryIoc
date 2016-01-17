@@ -11,6 +11,8 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.1.3
+          - fixed: #224: Enumerable wrapped in Func loses the information about Func wrapper, causing incorrect scope lifetime validation
           v2.1.2
           - fixed: #222: Resolving as IEnumerable silence the dependency resolution errors and just skips the unresolved item
           - fixed: #218: Apply decorators registered for service type when resolving with required service type
