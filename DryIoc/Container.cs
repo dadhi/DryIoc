@@ -2524,6 +2524,7 @@ namespace DryIoc
             return newRules;
         }
 
+        // todo: Convert to property
         /// <summary>Select last registered factory from multiple default.</summary>
         /// <returns>Factory selection rule.</returns>
         public static FactorySelectorRule SelectLastRegisteredFactory()

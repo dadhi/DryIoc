@@ -105,6 +105,115 @@ namespace DryIoc.UnitTests
             CollectionAssert.AreEqual(new[] { "InitializableService" }, log);
         }
 
+        [Test]
+        public void Can_track_disposable_transient_in_scope_via_initializer()
+        {
+            var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
+            RegisterDisposableTransientsTracker(container, Reuse.InCurrentScope);
+
+            container.Register<ADisp>(Reuse.Transient);
+
+            var scope = container.OpenScope();
+            var a = scope.Resolve<ADisp>();
+            scope.Dispose();
+
+            Assert.IsTrue(a.IsDisposed);
+        }
+
+        [Test]
+        public void Can_track_injected_disposable_transient_in_scope_via_initializer()
+        {
+            var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
+            RegisterDisposableTransientsTracker(container, Reuse.InCurrentScope);
+
+            container.Register<ADisp>();
+            container.Register<B>();
+
+            var scope = container.OpenScope();
+            var b = scope.Resolve<B>();
+            scope.Dispose();
+
+            Assert.AreNotSame(b.A1, b.A2);
+            Assert.IsTrue(b.A1.IsDisposed);
+            Assert.IsTrue(b.A2.IsDisposed);
+        }
+
+        [Test, Ignore]
+        public void Can_track_disposable_transient_in_scope_and_singleton_via_initializer()
+        {
+            var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
+            RegisterDisposableTransientsTracker(container, Reuse.Singleton, Reuse.InCurrentScope);
+
+            container.Register<ADisp>(Reuse.Transient);
+
+            var a = container.Resolve<ADisp>();
+
+            var scope = container.OpenScope();
+            var b = scope.Resolve<ADisp>();
+            scope.Dispose();
+
+            Assert.IsTrue(b.IsDisposed);
+            Assert.IsFalse(a.IsDisposed);
+
+            container.Dispose();
+            Assert.IsTrue(a.IsDisposed);
+        }
+
+        public class B
+        {
+            public ADisp A1 { get; private set; }
+
+            public ADisp A2 { get; private set; }
+
+            public B(ADisp a1, ADisp a2)
+            {
+                A1 = a1;
+                A2 = a2;
+            }
+        }
+
+        public class ADisp : IDisposable
+        {
+            public bool IsDisposed { get; private set; }
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+
+        private static void RegisterDisposableTransientsTracker(IRegistrator container, params IReuse[] reuses)
+        {
+            for (var i = 0; i < reuses.Length; i++)
+                container.Register<TransientDisposablesTracker>(reuses[i].ThrowIfNull());
+
+            container.RegisterInitializer<object>((t, r) =>
+            {
+                var disposable = t as IDisposable;
+                if (disposable != null)
+                    r.Resolve<TransientDisposablesTracker>().Track(disposable);
+            },
+            request => request.ReuseLifespan == 0 /* transient */);
+        }
+
+        public class TransientDisposablesTracker : IDisposable
+        {
+            private readonly Ref<IDisposable[]> _items = Ref.Of(ArrayTools.Empty<IDisposable>());
+
+            public void Track(IDisposable disposable)
+            {
+                _items.Swap(i => i.AppendOrUpdate(disposable));
+            }
+
+            public void Dispose()
+            {
+                var items = _items.Value;
+                for (var i = 0; i < items.Length; i++)
+                    items[i].Dispose();
+                _items.Swap(_ => ArrayTools.Empty<IDisposable>());
+            }
+        }
+
         public interface IInitializable<T>
         {
             T Initialize(string data);
