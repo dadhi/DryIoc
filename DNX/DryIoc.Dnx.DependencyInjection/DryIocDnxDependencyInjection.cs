@@ -53,8 +53,11 @@ namespace DryIoc.Dnx.DependencyInjection
         /// with Asp.Net 5 dependency injection:
         /// - First method sets the rules specific for Asp.Net DI.
         /// - Then registers transient disposables tracker.
-        /// - Method opens top scope because AspNet DI assumes that the scoped registration may be resolve without explicit scope creation,
-        /// that means the root scope is explicitly available.</summary>
+        /// - Then registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>.
+        /// - Then opens top scope because AspNet DI assumes that the scoped registration may be resolve without explicit scope creation,
+        /// that means the root scope is explicitly available.
+        /// Plus registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>.
+        /// </summary>
         /// <param name="container">Source container to adapt.</param>
         /// <returns>New container with modified rules.</returns>
         public static IContainer WithDependencyInjectionAdapter(this IContainer container)
@@ -67,21 +70,27 @@ namespace DryIoc.Dnx.DependencyInjection
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory())
                 .WithoutThrowOnRegisteringDisposableTransient());
 
-            adapter.RegisterTransientDisposablesTracker(Reuse.InCurrentScope);
+            // Tracks disposables in current scope
+            // todo: disposable transient dependency of singleton is not supported
+            adapter.RegisterTransientDisposablesTracker();
+
+            // make container available for injection as a scoped resolver
+            adapter.RegisterDelegate(resolver => (IContainer)resolver);
+
+            adapter.Register<IServiceProvider, DryIocServiceProvider>(Reuse.InCurrentScope);
+
+            // factory should be scoped to enable nested scopes creation using outer scope factory
+            adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.InCurrentScope);
 
             return adapter.OpenScope(SingletonsScopeName);
         }
 
-        /// <summary>Registers descriptors services into container. </summary>
-        /// Plus registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>.
+        /// <summary>Registers descriptors services into container and that's all. May be called multiple times with
+        /// different service collections.</summary>
         /// <param name="container">The container.</param>
         /// <param name="descriptors">The service descriptors.</param>
         public static void Populate(this IContainer container, IEnumerable<ServiceDescriptor> descriptors)
         {
-            container.RegisterDelegate(resolver => (IContainer)resolver);
-            container.RegisterMany<DryIocServiceProvider>(Reuse.InCurrentScope);
-            container.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.InCurrentScope);
-
             foreach (var descriptor in descriptors)
                 container.RegisterDescriptor(descriptor);
         }
@@ -173,21 +182,19 @@ namespace DryIoc.Dnx.DependencyInjection
         public IServiceScope CreateScope()
         {
             var scope = _scopedContainer.OpenScope();
-            return new DryIocServiceScope(scope.Resolve<DryIocServiceProvider>());
+            return new DryIocServiceScope(scope.Resolve<IServiceProvider>());
         }
 
         private sealed class DryIocServiceScope : IServiceScope
         {
-            private readonly DryIocServiceProvider _serviceProvider;
+            public IServiceProvider ServiceProvider { get; }
 
-            public IServiceProvider ServiceProvider => _serviceProvider;
-
-            public DryIocServiceScope(DryIocServiceProvider serviceProvider)
+            public DryIocServiceScope(IServiceProvider serviceProvider)
             {
-                _serviceProvider = serviceProvider;
+                ServiceProvider = serviceProvider;
             }
 
-            public void Dispose() => _serviceProvider.Dispose();
+            public void Dispose() => (ServiceProvider as IDisposable)?.Dispose();
         }
     }
 }
@@ -200,18 +207,14 @@ namespace DryIoc
         /// <summary>Registers tracker in specified reuse scope + registers initializer for any object, which will
         /// add disposable object to the tracker.</summary>
         /// <param name="registrator">Container to use.</param>
-        /// <param name="reuse">Tracker reuse defines the scope to store transients.</param>
-        public static void RegisterTransientDisposablesTracker(this IRegistrator registrator, IReuse reuse)
+        public static void RegisterTransientDisposablesTracker(this IRegistrator registrator)
         {
-            registrator.Register<TransientDisposablesTracker>(reuse.ThrowIfNull());
+            registrator.Register<TransientDisposablesTracker>(Reuse.InCurrentScope);
 
-            registrator.RegisterInitializer<object>((t, r) =>
-            {
-                var disposable = t as IDisposable;
-                if (disposable != null)
-                    r.Resolve<TransientDisposablesTracker>().Track(disposable);
-            },
-            request => request.ReuseLifespan == 0 /* applies initializer for transients only */);
+            registrator.RegisterInitializer<object>(
+                (service, r) => r.Resolve<TransientDisposablesTracker>().Track((IDisposable)service),
+                request => request.ReuseLifespan == 0 
+                    && (request.ImplementationType ?? request.GetActualServiceType()).IsAssignableTo(typeof(IDisposable)));
         }
 
         /// <summary>Tracker stores disposable objects, and disposes of them on its own Dispose.

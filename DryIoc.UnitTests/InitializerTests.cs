@@ -109,7 +109,7 @@ namespace DryIoc.UnitTests
         public void Can_track_disposable_transient_in_scope_via_initializer()
         {
             var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
-            RegisterDisposableTransientsTracker(container, Reuse.InCurrentScope);
+            RegisterTransientDisposablesTracker(container);
 
             container.Register<ADisp>(Reuse.Transient);
 
@@ -124,7 +124,7 @@ namespace DryIoc.UnitTests
         public void Can_track_injected_disposable_transient_in_scope_via_initializer()
         {
             var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
-            RegisterDisposableTransientsTracker(container, Reuse.InCurrentScope);
+            RegisterTransientDisposablesTracker(container);
 
             container.Register<ADisp>();
             container.Register<B>();
@@ -136,27 +136,6 @@ namespace DryIoc.UnitTests
             Assert.AreNotSame(b.A1, b.A2);
             Assert.IsTrue(b.A1.IsDisposed);
             Assert.IsTrue(b.A2.IsDisposed);
-        }
-
-        [Test, Ignore]
-        public void Can_track_disposable_transient_in_scope_and_singleton_via_initializer()
-        {
-            var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
-            RegisterDisposableTransientsTracker(container, Reuse.Singleton, Reuse.InCurrentScope);
-
-            container.Register<ADisp>(Reuse.Transient);
-
-            var a = container.Resolve<ADisp>();
-
-            var scope = container.OpenScope();
-            var b = scope.Resolve<ADisp>();
-            scope.Dispose();
-
-            Assert.IsTrue(b.IsDisposed);
-            Assert.IsFalse(a.IsDisposed);
-
-            container.Dispose();
-            Assert.IsTrue(a.IsDisposed);
         }
 
         public class B
@@ -182,18 +161,14 @@ namespace DryIoc.UnitTests
             }
         }
 
-        private static void RegisterDisposableTransientsTracker(IRegistrator container, params IReuse[] reuses)
+        private static void RegisterTransientDisposablesTracker(IRegistrator registrator)
         {
-            for (var i = 0; i < reuses.Length; i++)
-                container.Register<TransientDisposablesTracker>(reuses[i].ThrowIfNull());
+            registrator.Register<TransientDisposablesTracker>(Reuse.InCurrentScope);
 
-            container.RegisterInitializer<object>((t, r) =>
-            {
-                var disposable = t as IDisposable;
-                if (disposable != null)
-                    r.Resolve<TransientDisposablesTracker>().Track(disposable);
-            },
-            request => request.ReuseLifespan == 0 /* transient */);
+            registrator.RegisterInitializer<object>(
+                (service, r) => r.Resolve<TransientDisposablesTracker>().Track((IDisposable)service),
+                request => request.ReuseLifespan == 0
+                    && (request.ImplementationType ?? request.GetActualServiceType()).IsAssignableTo(typeof(IDisposable)));
         }
 
         public class TransientDisposablesTracker : IDisposable

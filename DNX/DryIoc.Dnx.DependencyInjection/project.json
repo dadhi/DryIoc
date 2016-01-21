@@ -1,5 +1,5 @@
 ﻿{
-    "version": "1.1.0-rc1",
+    "version": "1.2.0-rc1",
     "title": "DryIoc.Dnx.DependencyInjection",
     "description": "DryIoc Adapter for Microsoft.Extensions.DependencyInjection (Asp.NET 5)",
     "authors": [ "Maksim Volkau" ],
@@ -9,7 +9,7 @@
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
     "requireLicenseAcceptance": false,
-    "releaseNotes": "DryIoc Adapter for Microsoft.Extensions.DependencyInjection based on DNX rc1-final. Successfully passing DI.Spec.Tests.",
+    "releaseNotes": "DryIoc Adapter for Microsoft.Extensions.DependencyInjection based on DNX rc1-final.\r\nSuccessfully passing DI.Spec.Tests.\r\nPerf tuning.",
 
     "compilationOptions": {
         "warningsAsErrors": true
