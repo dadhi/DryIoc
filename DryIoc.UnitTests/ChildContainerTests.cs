@@ -233,7 +233,7 @@ namespace DryIoc.UnitTests
             var c = new Container();
             c.Register<Foo>(Reuse.Singleton);
 
-            var frozen = c.WithNoMoreRegisrationAllowed();
+            var frozen = c.WithNoMoreRegistrationAllowed();
 
             var ex = Assert.Throws<ContainerException>(() => 
                 frozen.Register<Blah>(Reuse.Singleton));
@@ -247,7 +247,7 @@ namespace DryIoc.UnitTests
             var c = new Container();
             c.Register<Foo>(Reuse.Singleton);
 
-            var frozen = c.WithNoMoreRegisrationAllowed();
+            var frozen = c.WithNoMoreRegistrationAllowed();
 
             var ex = Assert.Throws<ContainerException>(() =>
                 frozen.Unregister<Blah>());

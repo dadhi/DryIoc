@@ -69,7 +69,7 @@ namespace DryIoc
         /// <param name="ignoreInsteadOfThrow">(optional) Controls what to do with the next registration: ignore or throw exception.
         /// Throws exception by default.</param>
         /// <returns>New container preserving all current container state but disallowing registrations.</returns>
-        public IContainer WithNoMoreRegisrationAllowed(bool ignoreInsteadOfThrow = false)
+        public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false)
         {
             var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
             return new Container(Rules, readonlyRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
@@ -7432,7 +7432,7 @@ namespace DryIoc
         /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with registrations: ignore or throw exception.
         /// Throws exception by default.</param>
         /// <returns>New container preserving all current container state but disallowing registrations.</returns>
-        IContainer WithNoMoreRegisrationAllowed(bool ignoreInsteadOfThrow = false);
+        IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false);
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// It will preserve resolved services in Singleton/Current scope.</summary>
