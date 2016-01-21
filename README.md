@@ -26,7 +26,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     * for DNX `PM> Install-Package DryIoc.Dnx`
 * __DryIoc v2.1.3__ is the latest stable version
     * [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
-    * [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
+    * [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
 
 
 ## Benchmarks
