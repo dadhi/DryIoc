@@ -1929,7 +1929,7 @@ namespace DryIoc
         public static Expression RequestInfoToExpression(this IContainer container, RequestInfo request)
         {
             if (request.IsEmpty)
-                return Expression.Field(null, _requestInfoEmptyField);
+                return _emptyRequestInfoExpr;
 
             // recursively ask for parent expression until it is empty
             var parentRequestInfoExpr = container.RequestInfoToExpression(request.ParentOrWrapper);
@@ -1943,7 +1943,7 @@ namespace DryIoc
                     Expression.Constant(request.ServiceType, typeof(Type)),
                     Expression.Constant(request.FactoryID, typeof(int)),
                     Expression.Constant(request.ImplementationType, typeof(Type)),
-                    Expression.Constant(request.ReuseLifespan, typeof(int)));
+                    request.Reuse.ToExpression(container));
             }
             else
             {
@@ -1954,13 +1954,65 @@ namespace DryIoc
                     Expression.Constant(request.FactoryID, typeof(int)),
                     Expression.Constant(request.FactoryType, typeof(FactoryType)),
                     Expression.Constant(request.ImplementationType, typeof(Type)),
-                    Expression.Constant(request.ReuseLifespan, typeof(int))); 
+                    request.Reuse.ToExpression(container)); 
             }
 
             return result;
         }
 
-        private static readonly FieldInfo _requestInfoEmptyField = typeof(RequestInfo).GetFieldOrNull("Empty");
+        private static readonly Expression _emptyRequestInfoExpr = ReflectionTools.ToExpression(() => RequestInfo.Empty);
+    }
+
+    /// <summary>Converter of given reuse to its code representation as expression tree.</summary>
+    public static class ReuseToExpressionConverter
+    {
+        /// <summary>Converts given reuse to its code representation in expression tree.</summary>
+        /// <param name="reuse">Reuse to convert</param> <param name="container"></param>
+        public static Expression ToExpression(this IReuse reuse, IContainer container)
+        {
+            var reuseToExpr = reuse as IConvertibleToExpression;
+            if (reuseToExpr != null)
+                return reuseToExpr.Convert();
+
+            if (reuse is SingletonReuse)
+                return _singletonReuseExpr;
+
+            var currentScopeReuse = reuse as CurrentScopeReuse;
+            if (currentScopeReuse != null)
+            {
+                if (currentScopeReuse.Name == null)
+                    return _inCurrentScopeReuseExpr;
+                return Expression.Call(typeof(Reuse), "InCurrentNamedScope", ArrayTools.Empty<Type>(),
+                        container.GetOrAddStateItemExpression(currentScopeReuse.Name));
+            }
+
+            var resolutionScopeReuse = reuse as ResolutionScopeReuse;
+            if (resolutionScopeReuse != null)
+            {
+                if (resolutionScopeReuse.AssignableFromServiceType == null &&
+                    resolutionScopeReuse.ServiceKey == null &&
+                    resolutionScopeReuse.Outermost == false)
+                    return _inResolutionScopeReuseExpr;
+                return Expression.Call(typeof(Reuse), "InResolutionScopeOf", ArrayTools.Empty<Type>(),
+                    Expression.Constant(resolutionScopeReuse.AssignableFromServiceType, typeof(Type)),
+                    container.GetOrAddStateItemExpression(resolutionScopeReuse.ServiceKey),
+                    Expression.Constant(resolutionScopeReuse.Outermost, typeof(bool)));
+            }
+
+            // transient or no reuse is default
+            return Expression.Constant(null, typeof(IReuse));
+        }
+
+        private static readonly Expression _singletonReuseExpr = ReflectionTools.ToExpression(() => Reuse.Singleton);
+        private static readonly Expression _inCurrentScopeReuseExpr = ReflectionTools.ToExpression(() => Reuse.InCurrentScope);
+        private static readonly Expression _inResolutionScopeReuseExpr = ReflectionTools.ToExpression(() => Reuse.InResolutionScope);
+    }
+
+    /// <summary>Interface used to convert reuse instance to expression.</summary>
+    public interface IConvertibleToExpression
+    {
+        /// <summary>Returns expression representation.</summary> <returns>subj.</returns>
+        Expression Convert();
     }
 
     /// <summary>Used to represent multiple default service keys. 
@@ -2143,9 +2195,6 @@ namespace DryIoc
         /// <summary>Supported Func types up to 4 input parameters.</summary>
         public static readonly Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
 
-        /// <summary>Registered wrappers by their concrete or generic definition service type.</summary>
-        public static readonly ImTreeMap<Type, Factory> Wrappers;
-
         /// <summary>Supported open-generic collection types.</summary>
         public static readonly IEnumerable<Type> ArrayInterfaces = 
             typeof(object[]).GetImplementedInterfaces()
@@ -2179,39 +2228,43 @@ namespace DryIoc
             return type.IsFunc() && type.GetGenericTypeDefinition() != typeof(Func<>);
         }
 
+        /// <summary>Registered wrappers by their concrete or generic definition service type.</summary>
+        public static readonly ImTreeMap<Type, Factory> Wrappers = BuildSupportedWrappers();
 
-        static WrappersSupport()
+        private static ImTreeMap<Type, Factory> BuildSupportedWrappers()
         {
-            Wrappers = ImTreeMap<Type, Factory>.Empty;
+            var wrappers = ImTreeMap<Type, Factory>.Empty;
 
             var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
             foreach (var arrayInterface in ArrayInterfaces)
-                Wrappers = Wrappers.AddOrUpdate(arrayInterface, arrayExpr);
+                wrappers = wrappers.AddOrUpdate(arrayInterface, arrayExpr);
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
+            wrappers = wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
                 new ExpressionFactory(GetLazyEnumerableExpressionOrDefault, setup: Setup.Wrapper));
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(Lazy<>),
+            wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
                 new ExpressionFactory(GetLazyExpressionOrDefault, setup: Setup.Wrapper));
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
                 new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(Meta<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(Meta<,>),
                 new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(Tuple<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(Tuple<,>),
                 new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(LambdaExpression),
+            wrappers = wrappers.AddOrUpdate(typeof(LambdaExpression),
                 new ExpressionFactory(GetLambdaExpressionExpressionOrDefault, setup: Setup.Wrapper));
 
-            Wrappers = Wrappers.AddOrUpdate(typeof(Func<>),
+            wrappers = wrappers.AddOrUpdate(typeof(Func<>),
                 new ExpressionFactory(GetFuncExpressionOrDefault, setup: Setup.Wrapper));
 
             for (var i = 0; i < FuncTypes.Length; i++)
-                Wrappers = Wrappers.AddOrUpdate(FuncTypes[i],
+                wrappers = wrappers.AddOrUpdate(FuncTypes[i],
                     new ExpressionFactory(GetFuncExpressionOrDefault, setup: Setup.WrapperWith(i)));
+
+            return wrappers;
         }
 
         /// <summary>Returns wrapper factory. For open-generic wrapper - generated closed factory first.</summary>
@@ -4574,7 +4627,7 @@ namespace DryIoc
             return new Request(null, resolverContext, null, null, null);
         }
 
-        /// <summary>Indicates that request is empty initial request: there is no <see cref="_serviceInfo"/> in such a request.</summary>
+        /// <summary>Indicates that request is empty initial request: there is no <see cref="RequestInfo"/> in such a request.</summary>
         public bool IsEmpty { get { return _serviceInfo == null; } }
 
         /// <summary>Returns true if request is First in Resolve call.</summary>
@@ -4811,10 +4864,9 @@ namespace DryIoc
             var parent = (_parent.IsEmpty ? PreResolveParent : _parent.ToRequestInfo());
             var factory = ResolvedFactory;
             if (factory == null)
-                return parent.Push(ServiceType, RequiredServiceType, ServiceKey, -1, FactoryType.Service, null, 0);
+                return parent.Push(ServiceType, RequiredServiceType, ServiceKey, -1, FactoryType.Service, null, null);
             return parent.Push(ServiceType, RequiredServiceType, ServiceKey,
-                    factory.FactoryID, factory.FactoryType, factory.ImplementationType, 
-                    factory.Reuse == null ? 0 : factory.Reuse.Lifespan);
+                    factory.FactoryID, factory.FactoryType, factory.ImplementationType, factory.Reuse);
         }
 
         /// <summary>Enumerates all request stack parents. 
@@ -5282,7 +5334,13 @@ namespace DryIoc
                         container.Rules.EagerCachingSingletonForFasterAccess)
                         serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
                     else
-                        serviceExpr = GetScopedExpressionOrDefault(serviceExpr, reuse, request);
+                        serviceExpr = GetScopedExpressionOrDefault(serviceExpr, request, reuse, FactoryID, Setup);
+                }
+                else
+                {
+                    var trackingReuse = GetTrackingReuseIfTransientIsDisposable(request);
+                    if (trackingReuse != null)
+                        serviceExpr = GetScopedExpressionOrDefault(serviceExpr, request, trackingReuse, GetNextID(), Setup.Default);
                 }
             }
 
@@ -5312,6 +5370,26 @@ namespace DryIoc
             }
 
             return serviceExpr;
+        }
+
+        private IReuse GetTrackingReuseIfTransientIsDisposable(Request request)
+        {
+            var transientType = ImplementationType ?? request.GetActualServiceType();
+            if (!transientType.IsAssignableTo(typeof(IDisposable)))
+                return null;
+
+            var parent = request.ParentOrWrapper;
+            if (parent.IsEmpty)
+                return null;
+
+            var nonTransientParent = parent.Enumerate()
+                // stop on Func - tracking across Func boundaries is disabled by design
+                .TakeWhile(r => r.FactoryType != FactoryType.Wrapper || !r.GetActualServiceType().IsFunc())
+                .FirstOrDefault(r => r.FactoryType == FactoryType.Service && r.Reuse != null);
+            if (nonTransientParent == null)
+                return null;
+
+            return nonTransientParent.Reuse;
         }
 
         /// <summary>Throws if request direct or further ancestor has longer reuse lifespan,
@@ -5375,14 +5453,15 @@ namespace DryIoc
 
         // Example: The result for weak reference would be: 
         // ((WeakReference)scope.GetOrAdd(id, () => new WeakReference(new Service()))).Target.ThrowIfNull(Error.Blah)
-        private Expression GetScopedExpressionOrDefault(Expression serviceExpr, IReuse reuse, Request request)
+        private static Expression GetScopedExpressionOrDefault(Expression serviceExpr, Request request,
+            IReuse reuse, int factoryID, Setup setup)
         {
             var getScopeExpr = reuse.GetScopeExpression(request);
             var serviceType = serviceExpr.Type;
-            var scopedInstanceId = reuse.GetScopedItemIdOrSelf(FactoryID, request);
+            var scopedInstanceId = reuse.GetScopedItemIdOrSelf(factoryID, request);
             var scopedInstanceIdExpr = Expression.Constant(scopedInstanceId);
 
-            if (Setup.PreventDisposal == false && Setup.WeaklyReferenced == false)
+            if (setup.PreventDisposal == false && setup.WeaklyReferenced == false)
             {
                 if (serviceExpr.Type.IsValueType())
                     serviceExpr = Expression.Convert(serviceExpr, typeof(object));
@@ -5391,16 +5470,16 @@ namespace DryIoc
                 return Expression.Convert(getFromScope, serviceType);
             }
 
-            if (Setup.PreventDisposal)
+            if (setup.PreventDisposal)
                 serviceExpr = Expression.NewArrayInit(typeof(object), serviceExpr);
 
-            if (Setup.WeaklyReferenced)
+            if (setup.WeaklyReferenced)
                 serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
 
             Expression getScopedServiceExpr = Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
                 scopedInstanceIdExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
 
-            if (Setup.WeaklyReferenced)
+            if (setup.WeaklyReferenced)
             {
                 var weakRefExpr = Expression.Convert(getScopedServiceExpr, typeof(WeakReference));
                 var weakRefTargetExpr = Expression.Property(weakRefExpr, "Target");
@@ -5409,7 +5488,7 @@ namespace DryIoc
                 getScopedServiceExpr = throwIfTargetNullExpr;
             }
 
-            if (Setup.PreventDisposal)
+            if (setup.PreventDisposal)
                 getScopedServiceExpr = Expression.ArrayIndex(
                     Expression.Convert(getScopedServiceExpr, typeof(object[])),
                     Expression.Constant(0, typeof(int)));
@@ -6894,14 +6973,24 @@ namespace DryIoc
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 0; } }
 
+        /// <summary>Indicates consumer with assignable service type that defines resolution scope.</summary>
+        public readonly Type AssignableFromServiceType;
+
+        /// <summary>Indicates service key of the consumer that defines resolution scope.</summary>
+        public readonly object ServiceKey;
+
+        /// <summary>When set indicates to find the outermost matching consumer with resolution scope,
+        /// otherwise nearest consumer scope will be used.</summary>
+        public readonly bool Outermost;
+
         /// <summary>Creates new resolution scope reuse with specified type and key.</summary>
         /// <param name="assignableFromServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
         /// <param name="outermost">(optional)</param>
         public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null, bool outermost = false)
         {
-            _assignableFromServiceType = assignableFromServiceType;
-            _serviceKey = serviceKey;
-            _outermost = outermost;
+            AssignableFromServiceType = assignableFromServiceType;
+            ServiceKey = serviceKey;
+            Outermost = outermost;
         }
 
         /// <summary>Creates or returns already created resolution root scope.</summary>
@@ -6916,7 +7005,7 @@ namespace DryIoc
                 request.Scopes.GetOrCreateResolutionScope(ref scope, parent.ServiceType, parent.ServiceKey);
             }
 
-            return request.Scopes.GetMatchingResolutionScope(scope, _assignableFromServiceType, _serviceKey, _outermost, false);
+            return request.Scopes.GetMatchingResolutionScope(scope, AssignableFromServiceType, ServiceKey, Outermost, false);
         }
 
         /// <summary>Returns <see cref="IScopeAccess.GetMatchingResolutionScope"/> method call expression.</summary>
@@ -6926,9 +7015,9 @@ namespace DryIoc
         {
             return Expression.Call(Container.ScopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
                 Container.GetResolutionScopeExpression(request),
-                Expression.Constant(_assignableFromServiceType, typeof(Type)),
-                request.Container.GetOrAddStateItemExpression(_serviceKey, typeof(object)),
-                Expression.Constant(_outermost, typeof(bool)),
+                Expression.Constant(AssignableFromServiceType, typeof(Type)),
+                request.Container.GetOrAddStateItemExpression(ServiceKey, typeof(object)),
+                Expression.Constant(Outermost, typeof(bool)),
                 Expression.Constant(true, typeof(bool)));
         }
 
@@ -6944,15 +7033,11 @@ namespace DryIoc
         public override string ToString()
         {
             var s = new StringBuilder().Append(GetType().Name)
-                .Append(" {Name={").Print(_assignableFromServiceType)
-                .Append(", ").Print(_serviceKey, "\"")
+                .Append(" {Name={").Print(AssignableFromServiceType)
+                .Append(", ").Print(ServiceKey, "\"")
                 .Append("}}");
             return s.ToString();
         }
-
-        private readonly Type _assignableFromServiceType;
-        private readonly object _serviceKey;
-        private readonly bool _outermost;
     }
 
     /// <summary>Specifies pre-defined reuse behaviors supported by container: 
@@ -7026,7 +7111,7 @@ namespace DryIoc
     public sealed class RequestInfo
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, -1, FactoryType.Service, null, 0, null);
+        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, -1, FactoryType.Service, null, null, null);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty { get { return ServiceType == null; } }
@@ -7084,31 +7169,34 @@ namespace DryIoc
         public readonly Type ImplementationType;
 
         /// <summary>Relative number representing reuse lifespan.</summary>
-        public readonly int ReuseLifespan;
+        public int ReuseLifespan { get { return Reuse == null ? 0 : Reuse.Lifespan; } }
+
+        /// <summary>Service reuse.</summary>
+        public readonly IReuse Reuse;
 
         /// <summary>Simplified version of Push with most common properties.</summary>
         /// <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
-        /// <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
-        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, int reuseLifespan)
+        /// <param name="reuse"></param> <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse)
         {
-            return Push(serviceType, null, null, factoryID, FactoryType.Service, implementationType, reuseLifespan);
+            return Push(serviceType, null, null, factoryID, FactoryType.Service, implementationType, reuse);
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
         /// <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
+        /// <param name="implementationType"></param> <param name="reuse"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
-            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan)
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse)
         {
             return new RequestInfo(serviceType, requiredServiceType, serviceKey, 
-                factoryID, factoryType, implementationType, reuseLifespan, this);
+                factoryID, factoryType, implementationType, reuse, this);
         }
 
         private RequestInfo(
             Type serviceType, Type requiredServiceType, object serviceKey,
-            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
             RequestInfo parentOrWrapper)
         {
             ParentOrWrapper = parentOrWrapper;
@@ -7122,7 +7210,7 @@ namespace DryIoc
             FactoryID = factoryID;
             FactoryType = factoryType;
             ImplementationType = implementationType;
-            ReuseLifespan = reuseLifespan;
+            Reuse = reuse;
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>
@@ -8416,6 +8504,14 @@ namespace DryIoc
         public static Expression GetDefaultValueExpression(this Type type)
         {
             return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), ArrayTools.Empty<Expression>());
+        }
+
+        /// <summary>Utility to convert passed func/delegate to expression.</summary>
+        /// <typeparam name="T">Type of expression result.</typeparam> <param name="func">Delegate to convert.</param>
+        /// <returns>Delegate expression.</returns>
+        public static Expression ToExpression<T>(Expression<Func<T>> func)
+        {
+            return func.Body;
         }
 
         #region Implementation
