@@ -261,6 +261,96 @@ namespace DryIoc.UnitTests
             container.Register<AD>());
         }
 
+        [Test]
+        public void Should_track_transient_disposable_dependency_in_singleton_scope()
+        {
+            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+
+            container.Register<AD>();
+            container.Register<ADConsumer>(Reuse.Singleton);
+            var singleton = container.Resolve<ADConsumer>();
+
+            container.Dispose();
+
+            Assert.IsTrue(singleton.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_not_track_func_of_transient_disposable_dependency_in_singleton_scope()
+        {
+            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+
+            container.Register<AD>();
+            container.Register<ADFuncConsumer>(Reuse.Singleton);
+            var singleton = container.Resolve<ADFuncConsumer>();
+
+            container.Dispose();
+
+            Assert.IsFalse(singleton.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_lazy_of_transient_disposable_dependency_in_singleton_scope()
+        {
+            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+
+            container.Register<AD>();
+            container.Register<ADLazyConsumer>(Reuse.Singleton);
+            var singleton = container.Resolve<ADLazyConsumer>();
+
+            container.Dispose();
+
+            Assert.IsTrue(singleton.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_transient_disposable_dependency_in_current_scope()
+        {
+            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+
+            container.Register<AD>();
+            container.Register<ADConsumer>(Reuse.InCurrentScope);
+
+            ADConsumer scoped;
+            using (var scope = container.OpenScope())
+            {
+                scoped = scope.Resolve<ADConsumer>();
+            }
+
+            Assert.IsTrue(scoped.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_transient_disposable_dependency_in_resolution_scope()
+        {
+            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+
+            container.Register<AD>();
+            container.Register<ADConsumer>(Reuse.InResolutionScope);
+            container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
+
+            var scoped = container.Resolve<AResolutionScoped>();
+            scoped.Dependencies.Dispose();
+
+            Assert.IsTrue(scoped.Consumer.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_transient_disposable_dependency_in_resolution_scope_of_specific_service()
+        {
+            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+
+            container.Register<AD>();
+            container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
+            container.Register<AResolutionScopedConsumer>(setup: Setup.With(openResolutionScope: true));
+            container.Register<ADConsumer>(Reuse.InResolutionScopeOf<AResolutionScopedConsumer>());
+
+            var consumer = container.Resolve<AResolutionScopedConsumer>();
+            consumer.Dependencies.Dispose();
+
+            Assert.IsTrue(consumer.AScoped.Consumer.Ad.IsDisposed);
+        }
+
         public class AD : IDisposable
         {
             public bool IsDisposed { get; private set; }
@@ -278,6 +368,52 @@ namespace DryIoc.UnitTests
             public ADConsumer(AD ad)
             {
                 Ad = ad;
+            }
+        }
+
+        public class AResolutionScoped
+        {
+            public ADConsumer Consumer { get; private set; }
+
+            public IDisposable Dependencies { get; private set; }
+
+            public AResolutionScoped(ADConsumer consumer, IDisposable dependencies)
+            {
+                Consumer = consumer;
+                Dependencies = dependencies;
+            }
+        }
+
+        public class AResolutionScopedConsumer
+        {
+            public AResolutionScoped AScoped { get; private set; }
+
+            public IDisposable Dependencies { get; private set; }
+
+            public AResolutionScopedConsumer(AResolutionScoped aScoped, IDisposable dependencies)
+            {
+                AScoped = aScoped;
+                Dependencies = dependencies;
+            }
+        }
+
+        public class ADFuncConsumer
+        {
+            public AD Ad { get; private set; }
+
+            public ADFuncConsumer(Func<AD> ad)
+            {
+                Ad = ad();
+            }
+        }
+
+        public class ADLazyConsumer
+        {
+            public AD Ad { get; private set; }
+
+            public ADLazyConsumer(Lazy<AD> ad)
+            {
+                Ad = ad.Value;
             }
         }
 

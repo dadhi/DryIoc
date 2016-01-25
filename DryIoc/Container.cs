@@ -4861,7 +4861,7 @@ namespace DryIoc
         {
             if (IsEmpty)
                 return RequestInfo.Empty;
-            var parent = (_parent.IsEmpty ? PreResolveParent : _parent.ToRequestInfo());
+            var parent = _parent.IsEmpty ? PreResolveParent : _parent.ToRequestInfo();
             var factory = ResolvedFactory;
             if (factory == null)
                 return parent.Push(ServiceType, RequiredServiceType, ServiceKey, -1, FactoryType.Service, null, null);
