@@ -1,0 +1,3427 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>ReportGenerator</name>
+    </assembly>
+    <members>
+        <member name="T:Palmmedia.ReportGenerator.Common.FileSearch">
+            <summary>
+            Searches files based on file pattern with support for wildcards.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Common.FileSearch.GetFiles(System.String)">
+            <summary>
+            Gets the files matching the given file pattern..
+            </summary>
+            <param name="pattern">The file pattern.</param>
+            <returns>The files.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Common.FileSearch.GetDirectories(System.String,System.String[],System.Int32,System.Boolean)">
+            <summary>
+            Gets the directories matching the given directory parts.
+            </summary>
+            <param name="directory">The directory.</param>
+            <param name="directoryParts">The directory parts.</param>
+            <param name="currentIndex">Index of the current part.</param>
+            <param name="directoryIsUNCPath">if set to <c>true</c> directory is UNC path.</param>
+            <returns>The directories.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Common.LinqExtensions">
+            <summary>
+            Linq extensions.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Common.LinqExtensions.ToHashSet``1(System.Collections.Generic.IEnumerable{``0})">
+            <summary>
+            Creates a <see cref="T:System.Collections.Generic.HashSet`1"/> from an <see cref="T:System.Collections.Generic.IEnumerable`1"/>.
+            </summary>
+            <typeparam name="T">The type.</typeparam>
+            <param name="input">The input.</param>
+            <returns>A <see cref="T:System.Collections.Generic.HashSet`1"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Common.LinqExtensions.ToQueue``1(System.Collections.Generic.IEnumerable{``0})">
+            <summary>
+            Creates a <see cref="T:System.Collections.Generic.Queue`1"/> from an <see cref="T:System.Collections.Generic.IEnumerable`1"/>.
+            </summary>
+            <typeparam name="T">The type.</typeparam>
+            <param name="input">The input.</param>
+            <returns>A <see cref="T:System.Collections.Generic.Queue`1"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Common.LinqExtensions.HasAttributeWithValue(System.Xml.Linq.XElement,System.Xml.Linq.XName,System.String)">
+            <summary>
+            Determines whether a <see cref="T:System.Xml.Linq.XElement"/> has an <see cref="T:System.Xml.Linq.XAttribute"/> with the given value..
+            </summary>
+            <param name="element">The <see cref="T:System.Xml.Linq.XElement"/>.</param>
+            <param name="attributeName">The name of the attribute.</param>
+            <param name="attributeValue">The attribute value.</param>
+            <returns>
+              <c>true</c> if <see cref="T:System.Xml.Linq.XElement"/> has an <see cref="T:System.Xml.Linq.XAttribute"/> with the given value; otherwise, <c>false</c>.
+            </returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Logging.ConsoleLogger">
+            <summary>
+            <see cref="T:Palmmedia.ReportGenerator.Logging.ILogger"/> that writes to the console.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Logging.ConsoleLogger.VerbosityLevel">
+            <summary>
+            Gets or sets the verbosity level.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ConsoleLogger.Debug(System.String)">
+            <summary>
+            Log a message at DEBUG level.
+            </summary>
+            <param name="message">The message</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ConsoleLogger.DebugFormat(System.String,System.Object[])">
+            <summary>
+            Log a formatted message at DEBUG level.
+            </summary>
+            <param name="format">The template string.</param>
+            <param name="args">The arguments</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ConsoleLogger.Info(System.String)">
+            <summary>
+            Log a message at INFO level.
+            </summary>
+            <param name="message">The message</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ConsoleLogger.InfoFormat(System.String,System.Object[])">
+            <summary>
+            Log a formatted message at INFO level.
+            </summary>
+            <param name="format">The template string.</param>
+            <param name="args">The arguments</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ConsoleLogger.Warn(System.String)">
+            <summary>
+            Log a message at WARN level.
+            </summary>
+            <param name="message">The message</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ConsoleLogger.WarnFormat(System.String,System.Object[])">
+            <summary>
+            Log a formatted message at WARN level.
+            </summary>
+            <param name="format">The template string.</param>
+            <param name="args">The arguments</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ConsoleLogger.Error(System.String)">
+            <summary>
+            Log a message at INFO level.
+            </summary>
+            <param name="message">The message</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ConsoleLogger.ErrorFormat(System.String,System.Object[])">
+            <summary>
+            Log a formatted message at ERROR level.
+            </summary>
+            <param name="format">The template string.</param>
+            <param name="args">The arguments</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Logging.ILogger">
+            <summary>
+            Interface for loggers.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Logging.ILogger.VerbosityLevel">
+            <summary>
+            Sets the verbosity level.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ILogger.Debug(System.String)">
+            <summary>
+            Log a message at DEBUG level.
+            </summary>
+            <param name="message">The message</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ILogger.DebugFormat(System.String,System.Object[])">
+            <summary>
+            Log a formatted message at DEBUG level.
+            </summary>
+            <param name="format">The template string.</param>
+            <param name="args">The arguments</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ILogger.Info(System.String)">
+            <summary>
+            Log a message at INFO level.
+            </summary>
+            <param name="message">The message</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ILogger.InfoFormat(System.String,System.Object[])">
+            <summary>
+            Log a formatted message at INFO level.
+            </summary>
+            <param name="format">The template string.</param>
+            <param name="args">The arguments</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ILogger.Warn(System.String)">
+            <summary>
+            Log a message at WARN level.
+            </summary>
+            <param name="message">The message</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ILogger.WarnFormat(System.String,System.Object[])">
+            <summary>
+            Log a formatted message at WARN level.
+            </summary>
+            <param name="format">The template string.</param>
+            <param name="args">The arguments</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ILogger.Error(System.String)">
+            <summary>
+            Log a message at INFO level.
+            </summary>
+            <param name="message">The message</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.ILogger.ErrorFormat(System.String,System.Object[])">
+            <summary>
+            Log a formatted message at ERROR level.
+            </summary>
+            <param name="format">The template string.</param>
+            <param name="args">The arguments</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Logging.LoggerFactory">
+            <summary>
+            Factory for loggers.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Logging.LoggerFactory.Logger">
+            <summary>
+            The cached logger.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Logging.LoggerFactory.VerbosityLevel">
+            <summary>
+            Sets the verbosity level.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Logging.LoggerFactory.GetLogger(System.Type)">
+            <summary>
+            Initializes the logger for the given type.
+            </summary>
+            <param name="tpye">The type of the class that uses the logger.</param>
+            <returns>The logger.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Logging.VerbosityLevel">
+            <summary>
+            Enumeration for the logging verbosity.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Logging.VerbosityLevel.Verbose">
+            <summary>
+            All messages are logged.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Logging.VerbosityLevel.Info">
+            <summary>
+            Only important messages are logged.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Logging.VerbosityLevel.Error">
+            <summary>
+            Only errors are logged.
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.Branch">
+            <summary>
+            Represents a branch.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.Branch.identifier">
+            <summary>
+            The unique identifier of the branch.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Branch.#ctor(System.Int32,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Branch" /> class.
+            </summary>
+            <param name="branchVisits">The number of branch visits.</param>
+            <param name="identifier">The identifier.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Branch.BranchVisits">
+            <summary>
+            Gets the number of branch visits.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Branch.Equals(System.Object)">
+            <summary>
+            Determines whether the specified <see cref="T:System.Object"/> is equal to this instance.
+            </summary>
+            <param name="obj">The <see cref="T:System.Object"/> to compare with this instance.</param>
+            <returns>
+              <c>true</c> if the specified <see cref="T:System.Object"/> is equal to this instance; otherwise, <c>false</c>.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Branch.GetHashCode">
+            <summary>
+            Returns a hash code for this instance.
+            </summary>
+            <returns>
+            A hash code for this instance, suitable for use in hashing algorithms and data structures like a hash table. 
+            </returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage">
+            <summary>
+            Coverage information of a <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Class"/> of a specific date.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.#ctor(System.DateTime)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage" /> class.
+            </summary>
+            <param name="executionTime">The execution time.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.#ctor(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.DateTime)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage" /> class.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="executionTime">The execution time.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.ExecutionTime">
+            <summary>
+            Gets the execution time.
+            </summary>
+            <value>
+            The execution time.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.CoveredLines">
+            <summary>
+            Gets or sets the number of covered lines.
+            </summary>
+            <value>The covered lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.CoverableLines">
+            <summary>
+            Gets or sets the number of coverable lines.
+            </summary>
+            <value>The coverable lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.CoverageQuota">
+            <summary>
+            Gets the coverage quota of the class.
+            </summary>
+            <value>The coverage quota.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.TotalLines">
+            <summary>
+            Gets or sets the number of total lines.
+            </summary>
+            <value>The total lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.CoveredBranches">
+            <summary>
+            Gets or sets the number of covered branches.
+            </summary>
+            <value>
+            The number of covered branches.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.TotalBranches">
+            <summary>
+            Gets or sets the number of total branches.
+            </summary>
+            <value>
+            The number of total branches.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.BranchCoverageQuota">
+            <summary>
+            Gets the branch coverage quota of the class.
+            </summary>
+            <value>The branch coverage quota.</value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.Equals(System.Object)">
+            <summary>
+            Determines whether the specified <see cref="T:System.Object" />, is equal to this instance.
+            </summary>
+            <param name="obj">The <see cref="T:System.Object" /> to compare with this instance.</param>
+            <returns>
+              <c>true</c> if the specified <see cref="T:System.Object" /> is equal to this instance; otherwise, <c>false</c>.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage.GetHashCode">
+            <summary>
+            Returns a hash code for this instance.
+            </summary>
+            <returns>
+            A hash code for this instance, suitable for use in hashing algorithms and data structures like a hash table. 
+            </returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult">
+            <summary>
+            Overall result of all assemblies.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult.#ctor(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.Assembly},System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult" /> class.
+            </summary>
+            <param name="assemblies">The assemblies.</param>
+            <param name="usedParser">The used parser.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult.Assemblies">
+            <summary>
+            Gets the assemblies.
+            </summary>
+            <value>
+            The assemblies.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult.UsedParser">
+            <summary>
+            Gets the used parser.
+            </summary>
+            <value>
+            The used parser.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult.CoveredLines">
+            <summary>
+            Gets the number of covered lines.
+            </summary>
+            <value>The covered lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult.CoverableLines">
+            <summary>
+            Gets the number of coverable lines.
+            </summary>
+            <value>The coverable lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult.TotalLines">
+            <summary>
+            Gets the number of total lines.
+            </summary>
+            <value>The total lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult.CoverageQuota">
+            <summary>
+            Gets the coverage quota of the class.
+            </summary>
+            <value>The coverage quota.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult.CoveredBranches">
+            <summary>
+            Gets the number of covered branches.
+            </summary>
+            <value>
+            The number of covered branches.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult.TotalBranches">
+            <summary>
+            Gets the number of total branches.
+            </summary>
+            <value>
+            The number of total branches.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult.BranchCoverageQuota">
+            <summary>
+            Gets the branch coverage quota of the class.
+            </summary>
+            <value>The branch coverage quota.</value>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis">
+            <summary>
+            Full coverage information of a line in a source file.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis.#ctor(System.Int32,System.Collections.Generic.IDictionary{Palmmedia.ReportGenerator.Parser.Analysis.TestMethod,Palmmedia.ReportGenerator.Parser.Analysis.ShortLineAnalysis},System.Int32,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis" /> class.
+            </summary>
+            <param name="lineVisits">The number of line visits.</param>
+            <param name="lineCoverageByTestMethod">The line coverage by test method.</param>
+            <param name="lineNumber">The line number.</param>
+            <param name="lineContent">Content of the line.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis.#ctor(System.Int32,System.Collections.Generic.IDictionary{Palmmedia.ReportGenerator.Parser.Analysis.TestMethod,Palmmedia.ReportGenerator.Parser.Analysis.ShortLineAnalysis},System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis"/> class.
+            </summary>
+            <param name="lineVisits">The number of line visits.</param>
+            <param name="lineCoverageByTestMethod">The line coverage by test method.</param>
+            <param name="lineNumber">The line number.</param>
+            <param name="lineContent">Content of the line.</param>
+            <param name="coveredBranches">The covered branches.</param>
+            <param name="totalBranches">The total branches.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis.LineNumber">
+            <summary>
+            Gets the line number.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis.LineContent">
+            <summary>
+            Gets the content of the line.
+            </summary>
+            <value>
+            The content of the line.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis.LineCoverageByTestMethod">
+            <summary>
+            Gets the line coverage by test method.
+            </summary>
+            <value>
+            The line coverage by test method.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis.CoveredBranches">
+            <summary>
+            Gets the number of covered branches.
+            </summary>
+            <value>
+            The number of covered branches.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis.TotalBranches">
+            <summary>
+            Gets the number of total branches.
+            </summary>
+            <value>
+            The number of total branches.
+            </value>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.TestMethod">
+            <summary>
+            Name of a test method.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.TestMethod.counter">
+            <summary>
+            Counter for unique ids.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.TestMethod.#ctor(System.String,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.TestMethod" /> class.
+            </summary>
+            <param name="name">The name.</param>
+            <param name="shortName">The short name.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.TestMethod.Name">
+            <summary>
+            Gets the name.
+            </summary>
+            <value>
+            The name.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.TestMethod.ShortName">
+            <summary>
+            Gets the short name.
+            </summary>
+            <value>
+            The short name.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.TestMethod.Id">
+            <summary>
+            Gets the id of the test method.
+            </summary>
+            <value>
+            The id.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.TestMethod.Equals(System.Object)">
+            <summary>
+            Determines whether the specified <see cref="T:System.Object"/> is equal to this instance.
+            </summary>
+            <param name="obj">The <see cref="T:System.Object"/> to compare with this instance.</param>
+            <returns>
+              <c>true</c> if the specified <see cref="T:System.Object"/> is equal to this instance; otherwise, <c>false</c>.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.TestMethod.GetHashCode">
+            <summary>
+            Returns a hash code for this instance.
+            </summary>
+            <returns>
+            A hash code for this instance, suitable for use in hashing algorithms and data structures like a hash table. 
+            </returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile">
+            <summary>
+            Represents a source code file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.lineCoveragesByTestMethod">
+            <summary>
+            The line coverage by test method.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.lineCoverage">
+            <summary>
+            Array containing the coverage information by line number.
+            -1: Not coverable
+            0: Not visited
+            >0: Number of visits
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.branches">
+            <summary>
+            The branches by line number.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.#ctor(System.String,System.Int32[])">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile"/> class.
+            </summary>
+            <param name="path">The path of the file.</param>
+            <param name="lineCoverage">The line coverage.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.#ctor(System.String,System.Int32[],System.Collections.Generic.IDictionary{System.Int32,System.Collections.Generic.List{Palmmedia.ReportGenerator.Parser.Analysis.Branch}})">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile"/> class.
+            </summary>
+            <param name="path">The path.</param>
+            <param name="lineCoverage">The line coverage.</param>
+            <param name="branches">The branches.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.Path">
+            <summary>
+            Gets the path.
+            </summary>
+            <value>The path.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.TestMethods">
+            <summary>
+            Gets the test methods.
+            </summary>
+            <value>
+            The test methods.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.CoveredLines">
+            <summary>
+            Gets the number of covered lines.
+            </summary>
+            <value>The number of covered lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.CoverableLines">
+            <summary>
+            Gets the number of coverable lines.
+            </summary>
+            <value>The number of coverable lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.TotalLines">
+            <summary>
+            Gets the number of total lines.
+            </summary>
+            <value>The number of total lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.CoveredBranches">
+            <summary>
+            Gets the number of covered branches.
+            </summary>
+            <value>
+            The number of covered branches.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.TotalBranches">
+            <summary>
+            Gets the number of total branches.
+            </summary>
+            <value>
+            The number of total branches.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.Equals(System.Object)">
+            <summary>
+            Determines whether the specified <see cref="T:System.Object"/> is equal to this instance.
+            </summary>
+            <param name="obj">The <see cref="T:System.Object"/> to compare with this instance.</param>
+            <returns>
+              <c>true</c> if the specified <see cref="T:System.Object"/> is equal to this instance; otherwise, <c>false</c>.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.GetHashCode">
+            <summary>
+            Returns a hash code for this instance.
+            </summary>
+            <returns>
+            A hash code for this instance, suitable for use in hashing algorithms and data structures like a hash table. 
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.AddCoverageByTestMethod(Palmmedia.ReportGenerator.Parser.Analysis.TestMethod,System.Int32[])">
+            <summary>
+            Adds the coverage by test method.
+            </summary>
+            <param name="testMethod">The test method.</param>
+            <param name="coverage">The coverage.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.AnalyzeFile">
+            <summary>
+            Performs the analysis of the source file.
+            </summary>
+            <returns>The analysis result.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile.Merge(Palmmedia.ReportGenerator.Parser.Analysis.CodeFile)">
+            <summary>
+            Merges the given file with the current instance.
+            </summary>
+            <param name="file">The file to merge.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.CoverageType">
+            <summary>
+            Indicates the method how coverage of a class was measured.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.CoverageType.LineCoverage">
+            <summary>
+            Coverage was measured line by line.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.CoverageType.MethodCoverage">
+            <summary>
+            Coverage was measured by methods.
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric">
+            <summary>
+            Represents the metrics of a method.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.MethodRegex">
+            <summary>
+            Regex to analyze/split a method name.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.metrics">
+            <summary>
+            List of metrics.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric"/> class.
+            </summary>
+            <param name="name">The name.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.#ctor(System.String,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.Metric})">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric"/> class.
+            </summary>
+            <param name="name">The name.</param>
+            <param name="metrics">The metrics.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.Metrics">
+            <summary>
+            Gets the list of metrics.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.Name">
+            <summary>
+            Gets the name of the method.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.ShortName">
+            <summary>
+            Gets the short name of the method (method arguments are omitted).
+            </summary>
+            <value>The short name of the method.</value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.Equals(System.Object)">
+            <summary>
+            Determines whether the specified <see cref="T:System.Object"/> is equal to this instance.
+            </summary>
+            <param name="obj">The <see cref="T:System.Object"/> to compare with this instance.</param>
+            <returns>
+              <c>true</c> if the specified <see cref="T:System.Object"/> is equal to this instance; otherwise, <c>false</c>.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.GetHashCode">
+            <summary>
+            Returns a hash code for this instance.
+            </summary>
+            <returns>
+            A hash code for this instance, suitable for use in hashing algorithms and data structures like a hash table. 
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.AddMetric(Palmmedia.ReportGenerator.Parser.Analysis.Metric)">
+            <summary>
+            Adds the given metric.
+            </summary>
+            <param name="metric">The metric.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.AddMetrics(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.Metric})">
+            <summary>
+            Adds the given metrics.
+            </summary>
+            <param name="metrics">The metrics to add.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric.Merge(Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric)">
+            <summary>
+            Merges the given method metric with the current instance.
+            </summary>
+            <param name="methodMetric">The method metric to merge.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.Metric">
+            <summary>
+            Represents a metric, which is a key/value pair.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Metric.#ctor(System.String,System.Decimal)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Metric"/> class.
+            </summary>
+            <param name="name">The name.</param>
+            <param name="value">The value.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Metric.Name">
+            <summary>
+            Gets the name.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Metric.Value">
+            <summary>
+            Gets the value.
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis">
+            <summary>
+            Coverage information of a source file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis.lineAnalysis">
+            <summary>
+            The coverage information of the lines in the source file.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis"/> class.
+            </summary>
+            <param name="path">The path of the source file.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis.#ctor(System.String,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis"/> class.
+            </summary>
+            <param name="path">The path of the source file.</param>
+            <param name="error">The error.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis.Path">
+            <summary>
+            Gets the path.
+            </summary>
+            <value>The path.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis.Error">
+            <summary>
+            Gets the error.
+            </summary>
+            <value>The error.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis.Lines">
+            <summary>
+            Gets the coverage information of the lines in the file.
+            </summary>
+            <value>The lines.</value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis.AddLineAnalysis(Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis)">
+            <summary>
+            Adds the given line analysis to the file analysis.
+            </summary>
+            <param name="lineAnalysis">The line analysis.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.ShortLineAnalysis">
+            <summary>
+            Coverage information of a line in a source file.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.ShortLineAnalysis.#ctor(System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.ShortLineAnalysis"/> class.
+            </summary>
+            <param name="lineVisits">The number of line visits.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.ShortLineAnalysis.LineVisitStatus">
+            <summary>
+            Gets the line visit status.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.ShortLineAnalysis.LineVisits">
+            <summary>
+            Gets the number of line visits.
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.LineVisitStatus">
+            <summary>
+            Indicates the coverage status of a line in a source file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.LineVisitStatus.NotCoverable">
+            <summary>
+            Line can not be covered.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.LineVisitStatus.NotCovered">
+            <summary>
+            Line was not covered.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.LineVisitStatus.Covered">
+            <summary>
+            Line was covered.
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.Class">
+            <summary>
+            Represents a class.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.Class.files">
+            <summary>
+            List of files that define this class.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.Class.methodMetrics">
+            <summary>
+            The method metrics of the class.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.Class.historicCoverages">
+            <summary>
+            List of historic coverage information.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.Class.coverageQuota">
+            <summary>
+            The coverage quota.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Class.#ctor(System.String,Palmmedia.ReportGenerator.Parser.Analysis.Assembly)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Class"/> class.
+            </summary>
+            <param name="name">The name of the class.</param>
+            <param name="assembly">The assembly.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.Name">
+            <summary>
+            Gets the name of the class.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.Assembly">
+            <summary>
+            Gets the assembly.
+            </summary>
+            <value>The assembly.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.Files">
+            <summary>
+            Gets the files.
+            </summary>
+            <value>The files.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.MethodMetrics">
+            <summary>
+            Gets the method metrics.
+            </summary>
+            <value>The method metrics.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.HistoricCoverages">
+            <summary>
+            Gets the historic coverage information.
+            </summary>
+            <value>The historic coverage information.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.CoverageType">
+            <summary>
+            Gets the coverage type.
+            </summary>
+            <value>The coverage type.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.CoveredLines">
+            <summary>
+            Gets the number of covered lines.
+            </summary>
+            <value>The covered lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.CoverableLines">
+            <summary>
+            Gets the number of coverable lines.
+            </summary>
+            <value>The coverable lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.TotalLines">
+            <summary>
+            Gets the number of total lines.
+            </summary>
+            <value>The total lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.CoverageQuota">
+            <summary>
+            Gets or sets the coverage quota of the class.
+            </summary>
+            <value>The coverage quota.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.CoveredBranches">
+            <summary>
+            Gets the number of covered branches.
+            </summary>
+            <value>
+            The number of covered branches.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.TotalBranches">
+            <summary>
+            Gets the number of total branches.
+            </summary>
+            <value>
+            The number of total branches.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Class.BranchCoverageQuota">
+            <summary>
+            Gets the branch coverage quota of the class.
+            </summary>
+            <value>The branch coverage quota.</value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Class.Equals(System.Object)">
+            <summary>
+            Determines whether the specified <see cref="T:System.Object"/> is equal to this instance.
+            </summary>
+            <param name="obj">The <see cref="T:System.Object"/> to compare with this instance.</param>
+            <returns>
+              <c>true</c> if the specified <see cref="T:System.Object"/> is equal to this instance; otherwise, <c>false</c>.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Class.GetHashCode">
+            <summary>
+            Returns a hash code for this instance.
+            </summary>
+            <returns>
+            A hash code for this instance, suitable for use in hashing algorithms and data structures like a hash table. 
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Class.AddFile(Palmmedia.ReportGenerator.Parser.Analysis.CodeFile)">
+            <summary>
+            Adds the given file.
+            </summary>
+            <param name="codeFile">The code file.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Class.AddMethodMetric(Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric)">
+            <summary>
+            Adds the given method metric.
+            </summary>
+            <param name="methodMetric">The method metric.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Class.AddHistoricCoverage(Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage)">
+            <summary>
+            Adds the given historic coverage.
+            </summary>
+            <param name="historicCoverage">The historic coverage.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Class.Merge(Palmmedia.ReportGenerator.Parser.Analysis.Class)">
+            <summary>
+            Merges the given class with the current instance.
+            </summary>
+            <param name="class">The class to merge.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Analysis.Assembly">
+            <summary>
+            Represents one assembly.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.classes">
+            <summary>
+            List of classes in assembly.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Assembly"/> class.
+            </summary>
+            <param name="name">The name of the assembly.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.Classes">
+            <summary>
+            Gets the list of classes in assembly.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.Name">
+            <summary>
+            Gets the name of the assembly.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.ShortName">
+            <summary>
+            Gets the short name of the assembly.
+            </summary>
+            <value>The short name of the assembly.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.CoveredLines">
+            <summary>
+            Gets the number of covered lines.
+            </summary>
+            <value>The covered lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.CoverableLines">
+            <summary>
+            Gets the number of coverable lines.
+            </summary>
+            <value>The coverable lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.TotalLines">
+            <summary>
+            Gets the number of total lines.
+            </summary>
+            <value>The total lines.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.CoverageQuota">
+            <summary>
+            Gets the coverage quota of the class.
+            </summary>
+            <value>The coverage quota.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.CoveredBranches">
+            <summary>
+            Gets the number of covered branches.
+            </summary>
+            <value>
+            The number of covered branches.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.TotalBranches">
+            <summary>
+            Gets the number of total branches.
+            </summary>
+            <value>
+            The number of total branches.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.BranchCoverageQuota">
+            <summary>
+            Gets the branch coverage quota of the class.
+            </summary>
+            <value>The branch coverage quota.</value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.Equals(System.Object)">
+            <summary>
+            Determines whether the specified <see cref="T:System.Object"/> is equal to this instance.
+            </summary>
+            <param name="obj">The <see cref="T:System.Object"/> to compare with this instance.</param>
+            <returns>
+              <c>true</c> if the specified <see cref="T:System.Object"/> is equal to this instance; otherwise, <c>false</c>.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.GetHashCode">
+            <summary>
+            Returns a hash code for this instance.
+            </summary>
+            <returns>
+            A hash code for this instance, suitable for use in hashing algorithms and data structures like a hash table. 
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.AddClass(Palmmedia.ReportGenerator.Parser.Analysis.Class)">
+            <summary>
+            Adds the given class to the assembly.
+            </summary>
+            <param name="class">The class to add.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Analysis.Assembly.Merge(Palmmedia.ReportGenerator.Parser.Analysis.Assembly)">
+            <summary>
+            Merges the given assembly with the current instance.
+            </summary>
+            <param name="assembly">The assembly to merge.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.DynamicCodeCoverageParser">
+            <summary>
+            Parser for XML reports generated by CodeCoverage.exe.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.DynamicCodeCoverageParser.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.DynamicCodeCoverageParser.#ctor(System.Xml.Linq.XContainer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.DynamicCodeCoverageParser"/> class.
+            </summary>
+            <param name="report">The report file as XContainer.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.DynamicCodeCoverageParser.ProcessAssembly(System.Xml.Linq.XElement)">
+            <summary>
+            Processes the given assembly.
+            </summary>
+            <param name="module">The module.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Assembly"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.DynamicCodeCoverageParser.ProcessClass(System.Xml.Linq.XElement,Palmmedia.ReportGenerator.Parser.Analysis.Assembly,System.String)">
+            <summary>
+            Processes the given class.
+            </summary>
+            <param name="module">The module.</param>
+            <param name="assembly">The assembly.</param>
+            <param name="className">Name of the class.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Class"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.DynamicCodeCoverageParser.ProcessFile(System.Xml.Linq.XElement,System.String,Palmmedia.ReportGenerator.Parser.Analysis.Class,System.String)">
+            <summary>
+            Processes the file.
+            </summary>
+            <param name="module">The module.</param>
+            <param name="fileId">The file id.</param>
+            <param name="class">The class.</param>
+            <param name="filePath">The file path.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.DynamicCodeCoverageParser.SetMethodMetrics(System.Collections.Generic.IEnumerable{System.Xml.Linq.XElement},Palmmedia.ReportGenerator.Parser.Analysis.Class)">
+            <summary>
+            Extracts the metrics from the given <see cref="T:System.Xml.Linq.XElement">XElements</see>.
+            </summary>
+            <param name="methods">The methods.</param>
+            <param name="class">The class.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.DotCoverParser">
+            <summary>
+            Parser for XML reports generated by dotCover.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.DotCoverParser.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.DotCoverParser.modules">
+            <summary>
+            The module elements of the report.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.DotCoverParser.files">
+            <summary>
+            The file elements of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.DotCoverParser.#ctor(System.Xml.Linq.XContainer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.DotCoverParser"/> class.
+            </summary>
+            <param name="report">The report file as XContainer.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.DotCoverParser.ProcessAssembly(System.String)">
+            <summary>
+            Processes the given assembly.
+            </summary>
+            <param name="assemblyName">Name of the assembly.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Assembly"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.DotCoverParser.ProcessClass(Palmmedia.ReportGenerator.Parser.Analysis.Assembly,System.String)">
+            <summary>
+            Processes the given class.
+            </summary>
+            <param name="assembly">The assembly.</param>
+            <param name="className">Name of the class.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Class"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.DotCoverParser.ProcessFile(System.String,Palmmedia.ReportGenerator.Parser.Analysis.Class)">
+            <summary>
+            Processes the file.
+            </summary>
+            <param name="fileId">The id of the file.</param>
+            <param name="class">The class.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile"/>.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.DynamicCodeCoverageReportPreprocessor">
+            <summary>
+            Preprocessor for reports generated by CodeCoverage.exe.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.DynamicCodeCoverageReportPreprocessor.report">
+            <summary>
+            The report file as XContainer.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.DynamicCodeCoverageReportPreprocessor.#ctor(System.Xml.Linq.XContainer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.DynamicCodeCoverageReportPreprocessor"/> class.
+            </summary>
+            <param name="report">The report.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.DynamicCodeCoverageReportPreprocessor.Execute">
+            <summary>
+            Executes the preprocessing of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.DynamicCodeCoverageReportPreprocessor.ApplyClassNameToStartupCodeElements(System.Xml.Linq.XElement)">
+            <summary>
+            Applies the class name of the parent class to startup code elements.
+            </summary>
+            <param name="module">The module.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.DotCoverReportPreprocessor">
+            <summary>
+            Preprocessor for OpenCover reports.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.DotCoverReportPreprocessor.report">
+            <summary>
+            The report file as XContainer.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.DotCoverReportPreprocessor.#ctor(System.Xml.Linq.XContainer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.DotCoverReportPreprocessor"/> class.
+            </summary>
+            <param name="report">The report.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.DotCoverReportPreprocessor.Execute">
+            <summary>
+            Executes the preprocessing of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.DotCoverReportPreprocessor.MoveStartupCodeElementsToParentType(System.Xml.Linq.XElement)">
+            <summary>
+            Moves startup code elements to the parent class.
+            </summary>
+            <param name="module">The module.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.VisualStudioReportPreprocessor">
+            <summary>
+            Preprocessor for Visual Studio reports.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.VisualStudioReportPreprocessor.report">
+            <summary>
+            The report file as XContainer.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.VisualStudioReportPreprocessor.#ctor(System.Xml.Linq.XContainer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.VisualStudioReportPreprocessor"/> class.
+            </summary>
+            <param name="report">The report.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.VisualStudioReportPreprocessor.Execute">
+            <summary>
+            Executes the preprocessing of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.VisualStudioReportPreprocessor.ApplyClassNameToStartupCodeElements(System.Xml.Linq.XElement)">
+            <summary>
+            Applies the class name of the parent class to startup code elements.
+            </summary>
+            <param name="module">The module.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.SafeDirectorySearcher">
+            <summary>
+            Searches directories for files and ignores directories that are not accessible.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.SafeDirectorySearcher.EnumerateFiles(System.String,System.String,System.IO.SearchOption)">
+            <summary>
+            Returns an enumerable collection of files names that match a search patter in a specified path.
+            Directories that can not be accessed are ignored.
+            </summary>
+            <param name="path">The path.</param>
+            <param name="searchPattern">The search pattern.</param>
+            <param name="searchOption">The search option.</param>
+            <returns>The found files.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcherFactory">
+            <summary>
+            Factory which provides <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher"/> instances.
+            Instances are cached and reused if the directory of a <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher"/> starts with the desired path.
+            This avoids scanning the same directory several times.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcherFactory.cachedClassSearchers">
+            <summary>
+            The cached <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher">ClassSearchers</see>.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcherFactory.CreateClassSearcher(System.String)">
+            <summary>
+            Creates the class searcher.
+            </summary>
+            <param name="directory">The directory that should be searched for class files.</param>
+            <returns>The class searcher.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcherFactory.CreateClassSearcher(System.String[])">
+            <summary>
+            Creates the class searcher.
+            </summary>
+            <param name="directories">The directories that should be searched for class files.</param>
+            <returns>The class searcher.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.MultiDirectoryClassSearcher">
+            <summary>
+            Searches several directories for class files.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.MultiDirectoryClassSearcher.classSearchers">
+            <summary>
+            The <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher">ClassSearchers</see>.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.MultiDirectoryClassSearcher.#ctor(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher})">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.MultiDirectoryClassSearcher"/> class.
+            </summary>
+            <param name="classSearchers">The <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher">ClassSearchers</see>.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.MultiDirectoryClassSearcher.GetFilesOfClass(System.String)">
+            <summary>
+            Gets the files the given class is defined in.
+            </summary>
+            <param name="className">Name of the class (with full namespace).</param>
+            <returns>The files the class is defined in.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher">
+            <summary>
+            Searches one directory for class files.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher.filesByClassName">
+            <summary>
+            Dictionary containing the files a class is defined in by its classname.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher.initialized">
+            <summary>
+            Indicates whether file search was executed.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher"/> class.
+            </summary>
+            <param name="directory">The directory that should be searched for class files.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher"/> class.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher.Directory">
+            <summary>
+            Gets the directory that should be searched for class files.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher.GetFilesOfClass(System.String)">
+            <summary>
+            Gets the files the given class is defined in.
+            </summary>
+            <param name="className">Name of the class (with full namespace).</param>
+            <returns>The files the class is defined in.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher.SearchClassFiles">
+            <summary>
+            Searches the class files.
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.CommonDirectorySearcher">
+            <summary>
+            Searches a list of paths for the longest common directory.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.CommonDirectorySearcher.GetCommonDirectory(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Gets the longest common directory of the given paths.
+            </summary>
+            <param name="files">The files.</param>
+            <returns>The longest common directory of the given paths.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PropertyElement">
+            <summary>
+            Represents a property in a source file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PropertyElement.GetterPrefix">
+            <summary>
+            Prefix of GET property.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PropertyElement.SetterPrefix">
+            <summary>
+            Prefix of SET property.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PropertyElement.name">
+            <summary>
+            The name of the property.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PropertyElement.#ctor(System.String,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PropertyElement"/> class.
+            </summary>
+            <param name="classname">The classname.</param>
+            <param name="name">The name of the property.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PropertyElement.GetSourceElementPosition(ICSharpCode.NRefactory.PatternMatching.INode)">
+            <summary>
+            Determines whether the given <see cref="T:ICSharpCode.NRefactory.PatternMatching.INode"/> matches the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement"/>.
+            </summary>
+            <param name="node">The node.</param>
+            <returns>
+            A <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition"/> or <c>null</c> if <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement"/> does not match the <see cref="T:ICSharpCode.NRefactory.PatternMatching.INode"/>.
+            </returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement">
+            <summary>
+            Represents an element in a source code file.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement"/> class.
+            </summary>
+            <param name="classname">The classname.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement.Classname">
+            <summary>
+            Gets the classname.
+            </summary>
+            <value>The classname.</value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement.GetSourceElementPosition(ICSharpCode.NRefactory.PatternMatching.INode)">
+            <summary>
+            Determines whether the given <see cref="T:ICSharpCode.NRefactory.PatternMatching.INode"/> matches the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement"/>.
+            </summary>
+            <param name="node">The node.</param>
+            <returns>A <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition"/> or <c>null</c> if <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement"/> does not match the <see cref="T:ICSharpCode.NRefactory.PatternMatching.INode"/>.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceCodeAnalyzer">
+            <summary>
+            Helper class to determine the begin and end line number of source code elements within a source code file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceCodeAnalyzer.lastFilename">
+            <summary>
+            The name of the last source code file that has successfully been parsed.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceCodeAnalyzer.lastNode">
+            <summary>
+            The <see cref="T:ICSharpCode.NRefactory.CSharp.AstNode"/> of the last source code file that has successfully been parsed.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceCodeAnalyzer.GetClassesInFile(System.String)">
+            <summary>
+            Gets all classes in the given file.
+            </summary>
+            <param name="filename">The filename.</param>
+            <returns>All classes (with full namespace).</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceCodeAnalyzer.FindSourceElement(System.String,Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement)">
+            <summary>
+            Searches the given source code file for a source element matching the given <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement"/>.
+            If the source element can be found, a <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition"/> containing the start and end line numbers is returned.
+            Otherwise <c>null</c> is returned.
+            </summary>
+            <param name="filename">The filename.</param>
+            <param name="sourceElement">The source element.</param>
+            <returns>A <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition"/> or <c>null</c> if source element can not be found.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceCodeAnalyzer.FindClasses(System.Collections.Generic.IEnumerable{ICSharpCode.NRefactory.CSharp.AstNode})">
+            <summary>
+            Searches the given <see cref="T:ICSharpCode.NRefactory.PatternMatching.INode">INodes</see> recursively for classes.
+            </summary>
+            <param name="nodes">The nodes.</param>
+            <returns>The type declarations corresponding to all classes.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceCodeAnalyzer.FindSourceElement(System.Collections.Generic.IEnumerable{ICSharpCode.NRefactory.CSharp.AstNode},Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement)">
+            <summary>
+            Searches the given <see cref="T:ICSharpCode.NRefactory.PatternMatching.INode">INodes</see> recursively for the given <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement"/>.
+            </summary>
+            <param name="nodes">The nodes.</param>
+            <param name="sourceElement">The source element.</param>
+            <returns>A <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition"/> or <c>null</c> if source element can not be found.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceCodeAnalyzer.GetParentNode(System.String)">
+            <summary>
+            Gets the topmost <see cref="T:ICSharpCode.NRefactory.PatternMatching.INode"/> in the given source file.
+            </summary>
+            <param name="filename">The filename.</param>
+            <returns>The topmost <see cref="T:ICSharpCode.NRefactory.PatternMatching.INode"/> in the given source file.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceCodeAnalyzer.GetFullClassName(ICSharpCode.NRefactory.CSharp.TypeDeclaration)">
+            <summary>
+            Gets the full name of the class.
+            </summary>
+            <param name="typeDeclaration">The type declaration.</param>
+            <returns>The full name of the class.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement">
+            <summary>
+            Represents method information extracted from a PartCover report.
+            This class is used to compensate a deficiency of PartCover 2.3.0.35109.
+            PartCover does not record coverage information for unexecuted methods any more.
+            To provide correct reports the line numbers are determined from the source code files instead of
+            PartCover's coverage information.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.ParameterDelimiter">
+            <summary>
+            The delimiters between parameters.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.TypeReplacements">
+            <summary>
+            Dictionary containing some type mappings.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.methodname">
+            <summary>
+             The name of the method.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.returnType">
+            <summary>
+            The return type of the method.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.parameters">
+            <summary>
+            The parameters extracted from the method signature contained in the report generated by PartCover.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.#ctor(System.String,System.String,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement"/> class.
+            </summary>
+            <param name="classname">The name of the class.</param>
+            <param name="methodname">The name of the method.</param>
+            <param name="signature">The signature of the method.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.IsConstructor">
+            <summary>
+            Gets a value indicating whether this method is a constructor.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.GetSourceElementPosition(ICSharpCode.NRefactory.PatternMatching.INode)">
+            <summary>
+            Determines whether the given <see cref="T:ICSharpCode.NRefactory.PatternMatching.INode"/> matches the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement"/>.
+            </summary>
+            <param name="node">The node.</param>
+            <returns>
+            A <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition"/> or <c>null</c> if <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement"/> does not match the <see cref="T:ICSharpCode.NRefactory.PatternMatching.INode"/>.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.AreTypesEqual(System.String,ICSharpCode.NRefactory.CSharp.AstType)">
+            <summary>
+            Determines whether the types are equal.
+            </summary>
+            <param name="expectedType">The expected type.</param>
+            <param name="typeReference">The type reference.</param>
+            <returns><c>true</c> if parameters are equal, otherwise <c>false</c>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.InitializeTypeReplacements">
+            <summary>
+            Initializes the type replacements.
+            </summary>
+            <returns>The type replacements.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.AreParametersMatching(System.Collections.Generic.ICollection{ICSharpCode.NRefactory.CSharp.ParameterDeclaration})">
+            <summary>
+            Determines whether all parameters match.
+            </summary>
+            <param name="parameters">The parameters.</param>
+            <returns><c>true</c> if all parameters are equal, otherwise <c>false</c>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.PartCoverMethodElement.DoesMethodnameMatch(System.String)">
+            <summary>
+            Determines whether the method name matches.
+            </summary>
+            <param name="methodname">The name of the method.</param>
+            <returns><c>true</c> if method names are equal, otherwise <c>false</c>.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition">
+            <summary>
+            Contains information about the position of a method/property within a source code file.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition.#ctor(System.Int32,System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition"/> class.
+            </summary>
+            <param name="start">The start line number.</param>
+            <param name="end">The end line number.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition.Start">
+            <summary>
+            Gets the start line number.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition.End">
+            <summary>
+            Gets the end line number
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase">
+            <summary>
+            Base class for report preprocessing.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.classSearcherFactory">
+            <summary>
+            The <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcherFactory"/> used to create instances of <see cref="P:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.ClassSearcher"/>.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.globalClassSearcher">
+            <summary>
+            The global <see cref="P:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.ClassSearcher"/> instance which is instantiated depending on the source directories entered by the user.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.currentFileId">
+            <summary>
+            The id of the last added file.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.#ctor(System.Xml.Linq.XContainer,Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcherFactory,Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase"/> class.
+            </summary>
+            <param name="report">The report.</param>
+            <param name="classSearcherFactory">The class searcher factory.</param>
+            <param name="globalClassSearcher">The global class searcher.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.Report">
+            <summary>
+            Gets the report file as XContainer.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.ClassSearcher">
+            <summary>
+            Gets or sets the <see cref="P:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.ClassSearcher"/> instance which is instantiated during preprocessing depending on the source directories used in the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.Execute">
+            <summary>
+            Executes the preprocessing of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.AddNewFile(System.Xml.Linq.XContainer,System.String,System.String)">
+            <summary>
+            Adds a new source code file to the report.
+            </summary>
+            <param name="filesContainer">The files container.</param>
+            <param name="fileId">The file id.</param>
+            <param name="file">The file path.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.SearchElement(Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElement,System.Collections.Generic.Dictionary{System.String,System.String},System.Collections.Generic.IEnumerable{System.String},System.Xml.Linq.XContainer,System.Action{System.Xml.Linq.XContainer,Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition,System.String},System.Xml.Linq.XContainer)">
+            <summary>
+            Searches the given source element (e.g. property) and updates the report if element can be found in source code files.
+            </summary>
+            <param name="sourceElement">The source element.</param>
+            <param name="filenameByFileIdDictionary">Dictionary containing all files used in the report by their corresponding id.</param>
+            <param name="fileIdsOfClass">The file ids of class.</param>
+            <param name="reportElement">The report element.</param>
+            <param name="updateReportElement">Action that updates the report element.</param>
+            <param name="filesContainer">The files container.</param>
+            <returns><c>true</c> if source element has been found.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.ReportPreprocessorBase.TryToFindFileIdsOfClass(Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Xml.Linq.XContainer)">
+            <summary>
+            Tries to find file ids of class.
+            </summary>
+            <param name="classSearcher">The class searcher.</param>
+            <param name="className">Name of the class.</param>
+            <param name="filenameByFileIdDictionary">Dictionary containing all files used in the report by their corresponding id.</param>
+            <param name="filesContainer">The files container.</param>
+            <returns>The ids of the files the class is defined in.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover23ReportPreprocessor">
+            <summary>
+            Preprocessor for PartCover 2.3 reports.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover23ReportPreprocessor.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover23ReportPreprocessor.#ctor(System.Xml.Linq.XContainer,Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcherFactory,Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover23ReportPreprocessor"/> class.
+            </summary>
+            <param name="report">The report.</param>
+            <param name="classSearcherFactory">The class searcher factory.</param>
+            <param name="globalClassSearcher">The global class searcher.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover23ReportPreprocessor.Execute">
+            <summary>
+            Executes the preprocessing of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover23ReportPreprocessor.AddNewFile(System.Xml.Linq.XContainer,System.String,System.String)">
+            <summary>
+            Adds a new source code file to the report.
+            </summary>
+            <param name="filesContainer">The files container.</param>
+            <param name="fileId">The file id.</param>
+            <param name="file">The file path.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover23ReportPreprocessor.UpdateMethodElement(System.Xml.Linq.XContainer,Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition,System.String)">
+            <summary>
+            Updates the method element.
+            </summary>
+            <param name="method">The method.</param>
+            <param name="elementPosition">The element position.</param>
+            <param name="fileId">The file id.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover23ReportPreprocessor.UpdatePropertyElement(System.Xml.Linq.XContainer,Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition,System.String)">
+            <summary>
+            Updates the property element.
+            </summary>
+            <param name="property">The property.</param>
+            <param name="elementPosition">The element position.</param>
+            <param name="fileId">The file id.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover23ReportPreprocessor.AddCoverageDataOfUnexecutedMethods(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Adds the coverage data of unexecuted methods.
+            </summary>
+            <param name="filenameByFileIdDictionary">Dictionary containing all files used in the report by their corresponding id.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover23ReportPreprocessor.AddCoverageDataOfAutoProperties(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Adds the coverage data of auto properties.
+            </summary>
+            <param name="filenameByFileIdDictionary">Dictionary containing all files used in the report by their corresponding id.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover22ReportPreprocessor">
+            <summary>
+            Preprocessor for PartCover 2.2 reports.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover22ReportPreprocessor.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover22ReportPreprocessor.#ctor(System.Xml.Linq.XContainer,Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcherFactory,Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover22ReportPreprocessor"/> class.
+            </summary>
+            <param name="report">The report.</param>
+            <param name="classSearcherFactory">The class searcher factory.</param>
+            <param name="globalClassSearcher">The global class searcher.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover22ReportPreprocessor.Execute">
+            <summary>
+            Executes the preprocessing of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover22ReportPreprocessor.AddNewFile(System.Xml.Linq.XContainer,System.String,System.String)">
+            <summary>
+            Adds a new source code file to the report.
+            </summary>
+            <param name="filesContainer">The files container.</param>
+            <param name="fileId">The file id.</param>
+            <param name="file">The file path.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover22ReportPreprocessor.UpdatePropertyElement(System.Xml.Linq.XContainer,Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition,System.String)">
+            <summary>
+            Updates the property element.
+            </summary>
+            <param name="property">The property.</param>
+            <param name="elementPosition">The element position.</param>
+            <param name="fileId">The file id.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.PartCover22ReportPreprocessor.AddCoverageDataOfAutoProperties(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Adds the coverage data of auto properties.
+            </summary>
+            <param name="filenameByFileIdDictionary">Dictionary containing all files used in the report by their corresponding id.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.Preprocessing.OpenCoverReportPreprocessor">
+            <summary>
+            Preprocessor for OpenCover reports.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.OpenCoverReportPreprocessor.MethodRegex">
+            <summary>
+            Regex to analyze/split a method name.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.Preprocessing.OpenCoverReportPreprocessor.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.OpenCoverReportPreprocessor.#ctor(System.Xml.Linq.XContainer,Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcherFactory,Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.Preprocessing.OpenCoverReportPreprocessor"/> class.
+            </summary>
+            <param name="report">The report.</param>
+            <param name="classSearcherFactory">The class searcher factory.</param>
+            <param name="globalClassSearcher">The global class searcher.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.OpenCoverReportPreprocessor.Execute">
+            <summary>
+            Executes the preprocessing of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.OpenCoverReportPreprocessor.AddNewFile(System.Xml.Linq.XContainer,System.String,System.String)">
+            <summary>
+            Adds a new source code file to the report.
+            </summary>
+            <param name="filesContainer">The files container.</param>
+            <param name="fileId">The file id.</param>
+            <param name="file">The file path.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.OpenCoverReportPreprocessor.UpdatePropertyElement(System.Xml.Linq.XContainer,Palmmedia.ReportGenerator.Parser.Preprocessing.CodeAnalysis.SourceElementPosition,System.String)">
+            <summary>
+            Updates the property element.
+            </summary>
+            <param name="property">The property.</param>
+            <param name="elementPosition">The element position.</param>
+            <param name="fileId">The file id.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.OpenCoverReportPreprocessor.ApplyClassNameToStartupCodeElements(System.Xml.Linq.XElement)">
+            <summary>
+            Applies the class name of the parent class to startup code elements.
+            </summary>
+            <param name="module">The module.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.Preprocessing.OpenCoverReportPreprocessor.AddCoverageDataOfAutoProperties(System.Xml.Linq.XElement)">
+            <summary>
+            Adds the coverage data of auto properties.
+            </summary>
+            <param name="module">The module.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.VisualStudioParser">
+            <summary>
+            Parser for XML reports generated by Visual Studio.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.VisualStudioParser.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.VisualStudioParser.modules">
+            <summary>
+            The module elements of the report.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.VisualStudioParser.files">
+            <summary>
+            The file elements of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.VisualStudioParser.#ctor(System.Xml.Linq.XContainer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.VisualStudioParser"/> class.
+            </summary>
+            <param name="report">The report file as XContainer.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.VisualStudioParser.SetMethodMetrics(System.Collections.Generic.IEnumerable{System.Xml.Linq.XElement},Palmmedia.ReportGenerator.Parser.Analysis.Class)">
+            <summary>
+            Extracts the metrics from the given <see cref="T:System.Xml.Linq.XElement">XElements</see>.
+            </summary>
+            <param name="methods">The methods.</param>
+            <param name="class">The class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.VisualStudioParser.ProcessAssembly(System.String)">
+            <summary>
+            Processes the given assembly.
+            </summary>
+            <param name="assemblyName">Name of the assembly.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Assembly"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.VisualStudioParser.ProcessClass(Palmmedia.ReportGenerator.Parser.Analysis.Assembly,System.String)">
+            <summary>
+            Processes the given class.
+            </summary>
+            <param name="assembly">The assembly.</param>
+            <param name="className">Name of the class.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Class"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.VisualStudioParser.ProcessFile(System.String,Palmmedia.ReportGenerator.Parser.Analysis.Class,System.String)">
+            <summary>
+            Processes the file.
+            </summary>
+            <param name="fileId">The file id.</param>
+            <param name="class">The class.</param>
+            <param name="filePath">The file path.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile"/>.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.OpenCoverParser">
+            <summary>
+            Parser for XML reports generated by OpenCover.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.OpenCoverParser.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.OpenCoverParser.modules">
+            <summary>
+            The module elements of the report.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.OpenCoverParser.files">
+            <summary>
+            The file elements of the report.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.OpenCoverParser.trackedMethods">
+            <summary>
+            The tracked methods by id.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.OpenCoverParser.#ctor(System.Xml.Linq.XContainer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.OpenCoverParser"/> class.
+            </summary>
+            <param name="report">The report file as XContainer.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.OpenCoverParser.SetMethodMetrics(System.Collections.Generic.IEnumerable{System.Xml.Linq.XElement},Palmmedia.ReportGenerator.Parser.Analysis.Class)">
+            <summary>
+            Extracts the metrics from the given <see cref="T:System.Xml.Linq.XElement">XElements</see>.
+            </summary>
+            <param name="methods">The methods.</param>
+            <param name="class">The class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.OpenCoverParser.GetBranches(System.Xml.Linq.XElement[],System.Collections.Generic.HashSet{System.String})">
+            <summary>
+            Gets the branches by line number.
+            </summary>
+            <param name="methods">The methods.</param>
+            <param name="fileIds">The file ids of the class.</param>
+            <returns>The branches by line number.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.OpenCoverParser.ProcessAssembly(System.String)">
+            <summary>
+            Processes the given assembly.
+            </summary>
+            <param name="assemblyName">Name of the assembly.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Assembly"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.OpenCoverParser.ProcessClass(System.Collections.Generic.Dictionary{System.String,System.Collections.Generic.HashSet{System.String}},Palmmedia.ReportGenerator.Parser.Analysis.Assembly,System.String)">
+            <summary>
+            Processes the given class.
+            </summary>
+            <param name="fileIdsByFilename">Dictionary containing the file ids by filename.</param>
+            <param name="assembly">The assembly.</param>
+            <param name="className">Name of the class.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Class"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.OpenCoverParser.ProcessFile(System.Collections.Generic.HashSet{System.String},Palmmedia.ReportGenerator.Parser.Analysis.Class,System.String)">
+            <summary>
+            Processes the file.
+            </summary>
+            <param name="fileIds">The file ids of the class.</param>
+            <param name="class">The class.</param>
+            <param name="filePath">The file path.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.OpenCoverParser.GetCoverageQuotaOfClass(Palmmedia.ReportGenerator.Parser.Analysis.Assembly,System.String)">
+            <summary>
+            Gets the coverage quota of a class.
+            This method is used to get coverage quota if line coverage is not available.
+            </summary>
+            <param name="assembly">The assembly.</param>
+            <param name="className">Name of the class.</param>
+            <returns>The coverage quota.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.IParser">
+            <summary>
+            Interface for different parsers.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.IParser.Assemblies">
+            <summary>
+            Gets the assemblies that have been found in the report.
+            </summary>
+            <value>The assemblies.</value>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.MultiReportParser">
+            <summary>
+            Parser that aggregates several parsers.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.MultiReportParser.parserNames">
+            <summary>
+            The names of the aggregated parsers.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.MultiReportParser.ToString">
+            <summary>
+            Returns a <see cref="T:System.String"/> that represents this instance.
+            </summary>
+            <returns>
+            A <see cref="T:System.String"/> that represents this instance.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.MultiReportParser.AddParser(Palmmedia.ReportGenerator.Parser.IParser)">
+            <summary>
+            Adds the parser.
+            </summary>
+            <param name="parser">The parser to add.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.MultiReportParser.MergeAssemblies(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.Assembly})">
+            <summary>
+            Merges the given assemblies with the existing assemblies.
+            </summary>
+            <param name="assemblies">The assemblies to merge.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.NCoverParser">
+            <summary>
+            Parser for XML reports generated by NCover.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.NCoverParser.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.NCoverParser.modules">
+            <summary>
+            The module elements of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.NCoverParser.#ctor(System.Xml.Linq.XContainer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.NCoverParser"/> class.
+            </summary>
+            <param name="report">The report file as XContainer.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.NCoverParser.ProcessAssembly(System.String)">
+            <summary>
+            Processes the given assembly.
+            </summary>
+            <param name="assemblyName">Name of the assembly.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Assembly"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.NCoverParser.ProcessClass(Palmmedia.ReportGenerator.Parser.Analysis.Assembly,System.String)">
+            <summary>
+            Processes the given class.
+            </summary>
+            <param name="assembly">The assembly.</param>
+            <param name="className">Name of the class.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Class"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.NCoverParser.ProcessFile(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.String)">
+            <summary>
+            Processes the file.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="filePath">The file path.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile"/>.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.ParserBase">
+            <summary>
+            Base class for the <see cref="T:Palmmedia.ReportGenerator.Parser.IParser"/> implementations.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.ParserBase.assemblies">
+            <summary>
+            The assemblies found in the report.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Parser.ParserBase.Assemblies">
+            <summary>
+            Gets the assemblies that have been found in the report.
+            </summary>
+            <value>The assemblies.</value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.ParserBase.ToString">
+            <summary>
+            Returns a <see cref="T:System.String"/> that represents this instance.
+            </summary>
+            <returns>
+            A <see cref="T:System.String"/> that represents this instance.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.ParserBase.AddAssembly(Palmmedia.ReportGenerator.Parser.Analysis.Assembly)">
+            <summary>
+            Adds the given assembly.
+            </summary>
+            <param name="assembly">The assembly.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.ParserFactory">
+            <summary>
+            Initiates the corresponding parser to the given report file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.ParserFactory.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.ParserFactory.CreateParser(System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Tries to initiate the correct parsers for the given reports.
+            </summary>
+            <param name="reportFiles">The report files to parse.</param>
+            <param name="sourceDirectories">The source directories.</param>
+            <returns>
+            The IParser instance.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.ParserFactory.GetParsersOfFile(System.String,Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcherFactory,Palmmedia.ReportGenerator.Parser.Preprocessing.FileSearch.ClassSearcher)">
+            <summary>
+            Tries to initiate the correct parsers for the given report. An empty list is returned if no parser has been found.
+            The report may contain several reports. For every report an extra parser is initiated.
+            </summary>
+            <param name="reportFile">The report file to parse.</param>
+            <param name="classSearcherFactory">The class searcher factory.</param>
+            <param name="globalClassSearcher">The global class searcher.</param>
+            <returns>
+            The IParser instances or an empty list if no matching parser has been found.
+            </returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.PartCover22Parser">
+            <summary>
+            Parser for XML reports generated by PartCover 2.2.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.PartCover22Parser.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.PartCover22Parser.fileIdByFilenameDictionary">
+            <summary>
+            Dictionary containing the file ids by the file's path.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.PartCover22Parser.types">
+            <summary>
+            The type elements of the report.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.PartCover22Parser.files">
+            <summary>
+            The file elements of the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.PartCover22Parser.#ctor(System.Xml.Linq.XContainer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.PartCover22Parser"/> class.
+            </summary>
+            <param name="report">The report file as XContainer.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.PartCover22Parser.ProcessAssembly(System.String)">
+            <summary>
+            Processes the given assembly.
+            </summary>
+            <param name="assemblyName">Name of the assembly.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Assembly"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.PartCover22Parser.ProcessClass(Palmmedia.ReportGenerator.Parser.Analysis.Assembly,System.String)">
+            <summary>
+            Processes the given class.
+            </summary>
+            <param name="assembly">The assembly.</param>
+            <param name="className">Name of the class.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Class"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.PartCover22Parser.ProcessFile(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.String)">
+            <summary>
+            Processes the file.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="filePath">The file path.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile"/>.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Parser.PartCover23Parser">
+            <summary>
+            Parser for XML reports generated by PartCover 2.3 and above.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.PartCover23Parser.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.PartCover23Parser.assembliesByIdDictionary">
+            <summary>
+            Dictionary containing the assembly names by id.
+            In PartCover 2.3.0.35109 the assemblies are referenced by an id.
+            Before only their name was required.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.PartCover23Parser.fileIdByFilenameDictionary">
+            <summary>
+            Dictionary containing the file ids by the file's path.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.PartCover23Parser.types">
+            <summary>
+            The type elements of the report.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.PartCover23Parser.files">
+            <summary>
+            The file elements of the report.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Parser.PartCover23Parser.assemblyAttribute">
+            <summary>
+            The attribute name to the corresponding assembly.
+            In PartCover 2.3.0.35109 this is "asmref".
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.PartCover23Parser.#ctor(System.Xml.Linq.XContainer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Parser.PartCover23Parser"/> class.
+            </summary>
+            <param name="report">The report file as XContainer.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.PartCover23Parser.ProcessAssembly(System.String)">
+            <summary>
+            Processes the given assembly.
+            </summary>
+            <param name="assemblyName">Name of the assembly.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Assembly"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.PartCover23Parser.ProcessClass(Palmmedia.ReportGenerator.Parser.Analysis.Assembly,System.String)">
+            <summary>
+            Processes the given class.
+            </summary>
+            <param name="assembly">The assembly.</param>
+            <param name="className">Name of the class.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.Class"/>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Parser.PartCover23Parser.ProcessFile(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.String)">
+            <summary>
+            Processes the file.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="filePath">The file path.</param>
+            <returns>The <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.CodeFile"/>.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Properties.ReportResources">
+            <summary>
+              A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.ResourceManager">
+            <summary>
+              Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Culture">
+            <summary>
+              Overrides the current thread's CurrentUICulture property for all
+              resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.All">
+            <summary>
+              Looks up a localized string similar to All.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Assemblies">
+            <summary>
+              Looks up a localized string similar to Assemblies.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Assemblies2">
+            <summary>
+              Looks up a localized string similar to Assemblies:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Assembly">
+            <summary>
+              Looks up a localized string similar to Assembly:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.BranchCoverage">
+            <summary>
+              Looks up a localized string similar to Branch coverage.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.BranchCoverage2">
+            <summary>
+              Looks up a localized string similar to Branch coverage:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Branches">
+            <summary>
+              Looks up a localized string similar to Branches.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.ByAssembly">
+            <summary>
+              Looks up a localized string similar to By assembly.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.ByNamespace">
+            <summary>
+              Looks up a localized string similar to By namespace, Level:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Class">
+            <summary>
+              Looks up a localized string similar to Class:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Classes">
+            <summary>
+              Looks up a localized string similar to Classes:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.CodeCoverage">
+            <summary>
+              Looks up a localized string similar to Code coverage.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.CollapseAll">
+            <summary>
+              Looks up a localized string similar to Collapse all.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Coverable">
+            <summary>
+              Looks up a localized string similar to Coverable.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.CoverableLines">
+            <summary>
+              Looks up a localized string similar to Coverable lines:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Coverage">
+            <summary>
+              Looks up a localized string similar to Line coverage.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Coverage2">
+            <summary>
+              Looks up a localized string similar to Line coverage:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Coverage3">
+            <summary>
+              Looks up a localized string similar to Coverage.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.CoverageReport">
+            <summary>
+              Looks up a localized string similar to Coverage Report.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Covered">
+            <summary>
+              Looks up a localized string similar to Covered.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.CoveredBranches">
+            <summary>
+              Looks up a localized string similar to {0} of {1} branches are covered.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.CoveredLines">
+            <summary>
+              Looks up a localized string similar to Covered lines:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.ExpandAll">
+            <summary>
+              Looks up a localized string similar to Expand all.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Files">
+            <summary>
+              Looks up a localized string similar to File(s).
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Files2">
+            <summary>
+              Looks up a localized string similar to Files:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Files3">
+            <summary>
+              Looks up a localized string similar to File(s):.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Filter">
+            <summary>
+              Looks up a localized string similar to Filter:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.GeneratedBy">
+            <summary>
+              Looks up a localized string similar to Generated by:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.GeneratedOn">
+            <summary>
+              Looks up a localized string similar to Generated on:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Grouping">
+            <summary>
+              Looks up a localized string similar to Grouping:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.History">
+            <summary>
+              Looks up a localized string similar to History.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Line">
+            <summary>
+              Looks up a localized string similar to Line.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Method">
+            <summary>
+              Looks up a localized string similar to Method.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Metrics">
+            <summary>
+              Looks up a localized string similar to Metrics.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Name">
+            <summary>
+              Looks up a localized string similar to Name.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.NoCoveredAssemblies">
+            <summary>
+              Looks up a localized string similar to No assemblies have been covered..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.NoFilesFound">
+            <summary>
+              Looks up a localized string similar to No files found. This usually happens if a file isn&apos;t covered by a test or the class does not contain any sequence points (e.g. a class that only contains auto properties)..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.NoGrouping">
+            <summary>
+              Looks up a localized string similar to No grouping.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Parser">
+            <summary>
+              Looks up a localized string similar to Parser:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.ShowCustomizeBox">
+            <summary>
+              Looks up a localized string similar to Enable filtering.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.ShowCustomizeBoxHelp">
+            <summary>
+              Looks up a localized string similar to This may take some time since the report contains many classes..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Summary">
+            <summary>
+              Looks up a localized string similar to Summary.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Testmethods">
+            <summary>
+              Looks up a localized string similar to Test methods.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Total">
+            <summary>
+              Looks up a localized string similar to Total.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.TotalLines">
+            <summary>
+              Looks up a localized string similar to Total lines:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.Uncovered">
+            <summary>
+              Looks up a localized string similar to Uncovered.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.ReportResources.UncoveredLines">
+            <summary>
+              Looks up a localized string similar to Uncovered lines:.
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Properties.Help">
+            <summary>
+              A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.ResourceManager">
+            <summary>
+              Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Culture">
+            <summary>
+              Overrides the current thread's CurrentUICulture property for all
+              resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.DefaultValues">
+            <summary>
+              Looks up a localized string similar to Default values:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Examples">
+            <summary>
+              Looks up a localized string similar to Examples:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations">
+            <summary>
+              Looks up a localized string similar to Explanations:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations1">
+            <summary>
+              Looks up a localized string similar to Reports: The coverage reports that should be parsed (separated by semicolon). Wildcards are allowed..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations10">
+            <summary>
+              Looks up a localized string similar to                   Exclusion filters take precedence over inclusion filters. Wildcards are allowed..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations11">
+            <summary>
+              Looks up a localized string similar to Verbosity: The verbosity level of the log messages..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations2">
+            <summary>
+              Looks up a localized string similar to Target directory: The directory where the generated report should be saved..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations3">
+            <summary>
+              Looks up a localized string similar to Reporttypes: The output formats and scope (separated by semicolon)..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations4">
+            <summary>
+              Looks up a localized string similar to Source directories: Optional directories which contain the corresponding source code (separated by semicolon)..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations5">
+            <summary>
+              Looks up a localized string similar to                     The source files are used if coverage report contains classes without path information..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations6">
+            <summary>
+              Looks up a localized string similar to History directory: Optional directory for storing persistent coverage information..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations7">
+            <summary>
+              Looks up a localized string similar to                    Can be used in future reports to show coverage evolution..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations8">
+            <summary>
+              Looks up a localized string similar to Assembly Filters: Optional list of assemblies that should be included or excluded in the report..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Explanations9">
+            <summary>
+              Looks up a localized string similar to Class Filters:    Optional list of classes that should be included or excluded in the report..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Parameters">
+            <summary>
+              Looks up a localized string similar to Parameters:.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Parameters1">
+            <summary>
+              Looks up a localized string similar to [&quot;]-reports:&lt;report&gt;[;&lt;report&gt;][;&lt;report&gt;][&quot;].
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Parameters2">
+            <summary>
+              Looks up a localized string similar to [&quot;]-targetdir:&lt;target directory&gt;[&quot;].
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Parameters3">
+            <summary>
+              Looks up a localized string similar to [[&quot;]-reporttypes:&lt;{0}&gt;[;&lt;{0}&gt;][&quot;]]&quot;.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Parameters4">
+            <summary>
+              Looks up a localized string similar to [[&quot;]-sourcedirs:&lt;directory&gt;[;&lt;directory&gt;][;&lt;directory&gt;][&quot;]].
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Parameters5">
+            <summary>
+              Looks up a localized string similar to [[&quot;]-historydir:&lt;history directory&gt;[&quot;]].
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Parameters6">
+            <summary>
+              Looks up a localized string similar to [[&quot;]-assemblyfilters:&lt;(+|-)filter&gt;[;&lt;(+|-)filter&gt;][;&lt;(+|-)filter&gt;][&quot;]].
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Parameters7">
+            <summary>
+              Looks up a localized string similar to [[&quot;]-classfilters:&lt;(+|-)filter&gt;[;&lt;(+|-)filter&gt;][;&lt;(+|-)filter&gt;][&quot;]].
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.Parameters8">
+            <summary>
+              Looks up a localized string similar to [[&quot;]-verbosity:&lt;{0}&gt;[&quot;]].
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.ReportTypeValues">
+            <summary>
+              Looks up a localized string similar to              Values: {0}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Help.VerbosityValues">
+            <summary>
+              Looks up a localized string similar to            Values: {0}.
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Properties.Resources">
+            <summary>
+              A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.ResourceManager">
+            <summary>
+              Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.Culture">
+            <summary>
+              Overrides the current thread's CurrentUICulture property for all
+              resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.AddedCoverageInformationOfProperties">
+            <summary>
+              Looks up a localized string similar to Added coverage information of {0}/{1} auto properties.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.AddedCoverageInformationOfPropertiesOpenCover">
+            <summary>
+              Looks up a localized string similar to Added coverage information of {0}/{1} auto properties to module &apos;{2}&apos;.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.AddedCoverageInformationUnexecutedMethods">
+            <summary>
+              Looks up a localized string similar to Added coverage information of {0}/{1} unexecuted methods.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.AnalyzingClasses">
+            <summary>
+              Looks up a localized string similar to Analyzing {0} classes.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.CreatingHistoryReport">
+            <summary>
+              Looks up a localized string similar to Creating history report.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.CreatingReport">
+            <summary>
+              Looks up a localized string similar to Creating report {0}/{1} (Assembly: {2}, Class: {3}).
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.CreatingSummary">
+            <summary>
+              Looks up a localized string similar to Creating summary.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.CssNotSaved">
+            <summary>
+              Looks up a localized string similar to CSS &apos;{0}&apos; could not be saved: {1}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.CurrentAssembly">
+            <summary>
+              Looks up a localized string similar to Current Assembly: {0}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.DefaultReportBuilderReplaced">
+            <summary>
+              Looks up a localized string similar to The default report builder for report type &apos;{0}&apos; was replaced..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.ErrorDuringReadingFile">
+            <summary>
+              Looks up a localized string similar to Error during reading file &apos;{0}&apos;: {1}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.ErrorDuringReadingHistoricReport">
+            <summary>
+              Looks up a localized string similar to Error during reading historic report &apos;{0}&apos;: {1}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.ErrorDuringReadingReport">
+            <summary>
+              Looks up a localized string similar to Error during reading report &apos;{0}&apos;: {1}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.ErrorDuringRenderingClassReport">
+            <summary>
+              Looks up a localized string similar to Error during rendering report for class &apos;{0}&apos; (Report type: &apos;{1}&apos;): {2}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.ErrorDuringRenderingSummaryReport">
+            <summary>
+              Looks up a localized string similar to Error during rendering summary report (Report type: &apos;{0}&apos;): {1}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.FailedReportFilePattern">
+            <summary>
+              Looks up a localized string similar to The report file pattern &apos;{0}&apos; is invalid..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.FileDoesNotExist">
+            <summary>
+              Looks up a localized string similar to File &apos;{0}&apos; does not exist (any more)..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.FileLoadError">
+            <summary>
+              Looks up a localized string similar to Failed to load file &apos;{0}&apos;. Please unblock all files in installation directory. See https://github.com/danielpalme/ReportGenerator/wiki/FAQ#i-get-a-fileloadexception-when-executing-reportgenerator-how-can-i-fix-this for details..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.FileReflectionLoadError">
+             <summary>
+               Looks up a localized string similar to Failed to load file &apos;{0}&apos;. Errors:
+            {1}.
+             </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.HistoryDirectoryCouldNotBeCreated">
+            <summary>
+              Looks up a localized string similar to The history directory &apos;{0}&apos; could not be created: {1}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.IndexingClasses">
+            <summary>
+              Looks up a localized string similar to Indexing classes in directory &apos;{0}&apos;.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.InitializingReportBuilders">
+            <summary>
+              Looks up a localized string similar to Initializing report builders for report types: {0}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.InitiatingParser">
+            <summary>
+              Looks up a localized string similar to Initiating parser for {0}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.InvalidFilter">
+            <summary>
+              Looks up a localized string similar to The filter &apos;{0}&apos; is invalid. Filters must start with &apos;+&apos; or &apos;-&apos;..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.LoadingReport">
+            <summary>
+              Looks up a localized string similar to Loading report &apos;{0}&apos;.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.NoAssembliesHaveBeenCovered">
+            <summary>
+              Looks up a localized string similar to No assemblies have been covered..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.NoReportFiles">
+            <summary>
+              Looks up a localized string similar to No report files specified..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.NoTargetDirectory">
+            <summary>
+              Looks up a localized string similar to No target directory specified..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.NotExistingReportFile">
+            <summary>
+              Looks up a localized string similar to The report file &apos;{0}&apos; does not exist..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.PreprocessingReport">
+            <summary>
+              Looks up a localized string similar to Preprocessing report.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.ReadingHistoricReports">
+            <summary>
+              Looks up a localized string similar to Reading historic reports.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.ReportGenerationTook">
+            <summary>
+              Looks up a localized string similar to Report generation took {0:f1} seconds.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.SeveralCustomReportBuildersWithSameReportType">
+            <summary>
+              Looks up a localized string similar to Several custom report builders for report type &apos;{0}&apos; exist. This may cause problems if they try to write to the same files/directory..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.SourceDirectoryDoesNotExist">
+            <summary>
+              Looks up a localized string similar to The source code directory &apos;{0}&apos; does not exist..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.TargetDirectoryCouldNotBeCreated">
+            <summary>
+              Looks up a localized string similar to The target directory &apos;{0}&apos; could not be created: {1}.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.UnknownReportType">
+            <summary>
+              Looks up a localized string similar to Unknown report type &apos;{0}&apos;..
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Properties.Resources.UnknownVerbosityLevel">
+            <summary>
+              Looks up a localized string similar to Unknown verbosity level..
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.ReportConfigurationBuilder">
+            <summary>
+            Builder for <see cref="T:Palmmedia.ReportGenerator.ReportConfiguration"/>.
+            Creates instances of <see cref="T:Palmmedia.ReportGenerator.ReportConfiguration"/> based on command line parameters.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.ReportConfigurationBuilder.reportBuilderFactory">
+            <summary>
+            The report builder factory.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.ReportConfigurationBuilder.#ctor(Palmmedia.ReportGenerator.Reporting.IReportBuilderFactory)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.ReportConfigurationBuilder"/> class.
+            </summary>
+            <param name="reportBuilderFactory">The report builder factory.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.ReportConfigurationBuilder.Create(System.String[])">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.ReportConfiguration"/> class.
+            </summary>
+            <param name="args">The command line arguments.</param>
+            <returns>The report configuration.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.ReportConfigurationBuilder.ShowHelp">
+            <summary>
+            Shows the help of the program.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.ReportConfigurationBuilder.CreateBasedOnNamedArguments(System.String[])">
+            <summary>
+            Initializes a <see cref="T:Palmmedia.ReportGenerator.ReportConfiguration"/> instance based on "named" command line parameters.
+            E.g. -reports:test.xml (Key: "reports", Value: "test.xml")
+            </summary>
+            <param name="args">The command line arguments.</param>
+            <returns>The report configuration.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.ReportConfigurationBuilder.CreateBasedOnLegacyArguments(System.String[])">
+            <summary>
+            Initializes a <see cref="T:Palmmedia.ReportGenerator.ReportConfiguration"/> instance based on "legacy" command line parameters.
+            Only the parameters of ReportGenerator 1.2.7.0 are applied to provide legacy support.
+            </summary>
+            <param name="args">The command line arguments.</param>
+            <returns>The report configuration.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.ReportConfiguration">
+            <summary>
+            Provides all parameters that are required for report generation.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.ReportConfiguration.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.ReportConfiguration.reportFiles">
+            <summary>
+            The report files.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.ReportConfiguration.failedReportFilePatterns">
+            <summary>
+            The report file pattern that could not be parsed.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.ReportConfiguration.verbosityLevelValid">
+            <summary>
+            Determines whether the verbosity level was successfully parsed during initialization.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.ReportConfiguration.#ctor(Palmmedia.ReportGenerator.Reporting.IReportBuilderFactory,System.Collections.Generic.IEnumerable{System.String},System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String},System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.ReportConfiguration" /> class.
+            </summary>
+            <param name="reportBuilderFactory">The report builder factory.</param>
+            <param name="reportFilePatterns">The report file patterns.</param>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="historyDirectory">The history directory.</param>
+            <param name="reportTypes">The report types.</param>
+            <param name="sourceDirectories">The source directories.</param>
+            <param name="assemblyFilters">The assembly filters.</param>
+            <param name="classFilters">The class filters.</param>
+            <param name="verbosityLevel">The verbosity level.</param>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.ReportConfiguration.ReportBuilderFactory">
+            <summary>
+            Gets the report builder factory.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.ReportConfiguration.ReportFiles">
+            <summary>
+            Gets the report files.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.ReportConfiguration.TargetDirectory">
+            <summary>
+            Gets the target directory.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.ReportConfiguration.HistoryDirectory">
+            <summary>
+            Gets the history directory.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.ReportConfiguration.ReportTypes">
+            <summary>
+            Gets the type of the report.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.ReportConfiguration.SourceDirectories">
+            <summary>
+            Gets the source directories.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.ReportConfiguration.AssemblyFilters">
+            <summary>
+            Gets the assembly filters.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.ReportConfiguration.ClassFilters">
+            <summary>
+            Gets the class filters.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.ReportConfiguration.VerbosityLevel">
+            <summary>
+            Gets the verbosity level.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.ReportConfiguration.Validate">
+            <summary>
+            Validates all parameters.
+            </summary>
+            <returns>
+              <c>true</c> if all parameters are in a valid state; otherwise <c>false</c>.
+            </returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.MSBuild.ReportGenerator">
+            <summary>
+            MSBuild Task for generating reports.
+            </summary>
+            <example>
+            &lt;?xml version="1.0" encoding="utf-8"?&gt;<br/>
+            &lt;Project DefaultTargets="Coverage" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0"&gt;<br/>
+              &lt;UsingTask TaskName="ReportGenerator" AssemblyFile="ReportGenerator.exe" /&gt;<br/>
+              &lt;ItemGroup&gt;<br/>
+                  &lt;CoverageFiles Include="partcover.xml" /&gt;<br/>
+              &lt;/ItemGroup&gt;<br/>
+              &lt;Target Name="Coverage"&gt;<br/>
+                &lt;ReportGenerator ReportFiles="@(CoverageFiles)" TargetDirectory="report" ReportTypes="Html" /&gt;<br/>
+              &lt;/Target&gt;<br/>
+            &lt;/Project&gt;
+            </example>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.MSBuild.ReportGenerator.ReportFiles">
+            <summary>
+            Gets or sets the report files.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.MSBuild.ReportGenerator.TargetDirectory">
+            <summary>
+            Gets or sets the directory the report will be created in. This must be a directory, not a file. If the directory does not exist, it is created automatically. 
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.MSBuild.ReportGenerator.HistoryDirectory">
+            <summary>
+            Gets or sets the directory the historic data will be created in. This must be a directory, not a file. If the directory does not exist, it is created automatically. 
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.MSBuild.ReportGenerator.ReportTypes">
+            <summary>
+            Gets or sets the types of the report.
+            </summary>
+            <value>The types of the report.</value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.MSBuild.ReportGenerator.SourceDirectories">
+            <summary>
+            Gets or sets the source directories. Optional directories which contain the corresponding source code. The source files are used if coverage report contains classes without path information.
+            </summary>
+            <value>
+            The source directories.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.MSBuild.ReportGenerator.Filters">
+            <summary>
+            Gets or sets the assembly filters (old property).
+            </summary>
+            <value>
+            The assembly filters.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.MSBuild.ReportGenerator.AssemblyFilters">
+            <summary>
+            Gets or sets the assembly filters (new property).
+            </summary>
+            <value>
+            The assembly filters.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.MSBuild.ReportGenerator.ClassFilters">
+            <summary>
+            Gets or sets the class filters.
+            </summary>
+            <value>
+            The class filters.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.MSBuild.ReportGenerator.VerbosityLevel">
+            <summary>
+            Gets or sets the verbosity level.
+            </summary>
+            <value>
+            The verbosity level.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.MSBuild.ReportGenerator.Execute">
+            <summary>
+            When overridden in a derived class, executes the task.
+            </summary>
+            <returns>
+            true if the task successfully executed; otherwise, false.
+            </returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Program">
+            <summary>
+            Command line access to the ReportBuilder.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Program.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Program.Execute(Palmmedia.ReportGenerator.ReportConfiguration)">
+            <summary>
+            Executes the report generation.
+            </summary>
+            <param name="configuration">The configuration.</param>
+            <returns><c>true</c> if report was generated successfully; otherwise <c>false</c>.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Program.Main(System.String[])">
+            <summary>
+            The main method.
+            </summary>
+            <param name="args">The command line arguments.</param>
+            <returns>Return code indicating success/failure.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.DefaultFilter">
+            <summary>
+            Default implementation of <see cref="T:Palmmedia.ReportGenerator.Reporting.IFilter"/>.
+            An element is included if at least one include filter matches their name.
+            The assembly is excluded if at least one exclude filter matches its name.
+            Exclusion filters take precedence over inclusion filters. Wildcards are allowed in filters.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.DefaultFilter.includeFilters">
+            <summary>
+            The include filters.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.DefaultFilter.excludeFilters">
+            <summary>
+            The exclude filters.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.DefaultFilter.#ctor(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Reporting.DefaultFilter"/> class.
+            </summary>
+            <param name="filters">The filters.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.DefaultFilter.IsElementIncludedInReport(System.String)">
+            <summary>
+            Determines whether the given element should be included in the report.
+            </summary>
+            <param name="name">Name of the element.</param>
+            <returns>
+              <c>true</c> if element should be included in the report; otherwise, <c>false</c>.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.DefaultFilter.CreateFilterRegex(System.String)">
+            <summary>
+            Converts the given filter to a corresponding regular expression.
+            Special characters are escaped. Wildcards '*' are converted to '.*'.
+            </summary>
+            <param name="filter">The filter.</param>
+            <returns>The regular expression.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.FileUnblocker">
+            <summary>
+            Helper class for unblocking files.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.FileUnblocker.Unblock(System.String)">
+            <summary>
+            Unblocks the given file.
+            </summary>
+            <param name="fileName">Name of the file.</param>
+            <returns><c>true</c> if file was unblocked successfully; otherwise, <c>false</c></returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.FileUnblocker.DeleteFile(System.String)">
+            <summary>
+            Deletes the file.
+            </summary>
+            <param name="name">The name.</param>
+            <returns><c>true</c> if file was deleted successfully; otherwise, <c>false</c></returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.HistoryParser">
+            <summary>
+            Reads all historic coverage files created by <see cref="T:Palmmedia.ReportGenerator.Reporting.HistoryReportGenerator"/> and adds the information to all classes.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.HistoryParser.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.HistoryParser.assemblies">
+            <summary>
+            The assemblies.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.HistoryParser.historyDirectory">
+            <summary>
+            The history directory.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.HistoryParser.#ctor(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.Assembly},System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Reporting.HistoryParser"/> class.
+            </summary>
+            <param name="assemblies">The assemblies.</param>
+            <param name="historyDirectory">The history directory.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.HistoryParser.ApplyHistoricCoverage">
+            <summary>
+            Reads all historic coverage files created by <see cref="T:Palmmedia.ReportGenerator.Reporting.HistoryReportGenerator"/> and adds the information to all classes.
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.IFilter">
+            <summary>
+            Interface to filter assemblies and classes based on their name during report generation.
+            This can be used to include only a subset of all assemblies/classes in the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.IFilter.IsElementIncludedInReport(System.String)">
+            <summary>
+            Determines whether the given element should be included in the report.
+            </summary>
+            <param name="name">Name of the element.</param>
+            <returns>
+              <c>true</c> if element should be included in the report; otherwise, <c>false</c>.
+            </returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.IReportBuilder">
+            <summary>
+            Interface that has to be implemented by classes capable of rendering reports.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.IReportBuilder.ReportType">
+            <summary>
+            Gets the report type.
+            </summary>
+            <value>
+            The report type.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.IReportBuilder.TargetDirectory">
+            <summary>
+            Gets or sets the target directory where reports are stored.
+            </summary>
+            <value>
+            The target directory.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.IReportBuilder.CreateClassReport(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.IReportBuilder.CreateSummaryReport(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.IReportBuilderFactory">
+            <summary>
+            Interface for factories that create instances of <see cref="T:Palmmedia.ReportGenerator.Reporting.IReportBuilder"/>.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.IReportBuilderFactory.GetAvailableReportTypes">
+            <summary>
+            Gets the available report types.
+            </summary>
+            <returns>The available report types.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.IReportBuilderFactory.GetReportBuilders(System.String,System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Gets the report builders that correspond to the given <paramref name="reportTypes"/>.
+            </summary>
+            <param name="targetDirectory">The target directory where reports are stored.</param>
+            <param name="reportTypes">The report types.</param>
+            <returns>The report builders.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.MefReportBuilderFactory">
+            <summary>
+            Implementation of <see cref="T:Palmmedia.ReportGenerator.Reporting.IReportBuilderFactory"/> based on MEF.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.MefReportBuilderFactory.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.MefReportBuilderFactory.GetAvailableReportTypes">
+            <summary>
+            Gets the available report types.
+            </summary>
+            <returns>
+            The available report types.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.MefReportBuilderFactory.GetReportBuilders(System.String,System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Gets the report builders that correspond to the given <paramref name="reportTypes" />.
+            </summary>
+            <param name="targetDirectory">The target directory where reports are stored.</param>
+            <param name="reportTypes">The report types.</param>
+            <returns>
+            The report builders.
+            </returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.MefReportBuilderFactory.LoadReportBuilders">
+            <summary>
+            Loads the report builders.
+            </summary>
+            <returns>The report builders.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.HistoryReportGenerator">
+            <summary>
+            Generates historic report containing coverage information of current test run.
+            This information is used to create historic charts in reports.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.HistoryReportGenerator.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.HistoryReportGenerator.parser">
+            <summary>
+            The parser to use.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.HistoryReportGenerator.historyDirectory">
+            <summary>
+            The history directory.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.HistoryReportGenerator.#ctor(Palmmedia.ReportGenerator.Parser.IParser,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Reporting.HistoryReportGenerator"/> class.
+            </summary>
+            <param name="parser">The parser.</param>
+            <param name="historyDirectory">The history directory.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.HistoryReportGenerator.CreateReport(System.DateTime)">
+            <summary>
+            Starts the generation of the report.
+            </summary>
+            <param name="executionTime">The execution time.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.ReportGenerator">
+            <summary>
+            Converts a coverage report generated by PartCover, OpenCover or NCover into a readable report.
+            In contrast to the XSLT-Transformation included in PartCover, the report is more detailed.
+            It does not only show the coverage quota, but also includes the source code and visualizes which line has been covered.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.ReportGenerator.Logger">
+            <summary>
+            The Logger.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.ReportGenerator.parser">
+            <summary>
+            The parser to use.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.ReportGenerator.renderers">
+            <summary>
+            The renderers.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.ReportGenerator.assemblyFilter">
+            <summary>
+            The assembly filter.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.ReportGenerator.classFilter">
+            <summary>
+            The class filter.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.ReportGenerator.#ctor(Palmmedia.ReportGenerator.Parser.IParser,Palmmedia.ReportGenerator.Reporting.IFilter,Palmmedia.ReportGenerator.Reporting.IFilter,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Reporting.IReportBuilder})">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Reporting.ReportGenerator" /> class.
+            </summary>
+            <param name="parser">The IParser to use.</param>
+            <param name="assemblyFilter">The assembly filter.</param>
+            <param name="classFilter">The class filter.</param>
+            <param name="renderers">The renderers.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.ReportGenerator.CreateReport(System.Boolean,System.DateTime)">
+            <summary>
+            Starts the generation of the report.
+            </summary>
+            <param name="addHistoricCoverage">if set to <c>true</c> historic coverage information is added to classes.</param>
+            <param name="executionTime">The execution time.</param>
+        </member>
+    </members>
+</doc>

@@ -1,0 +1,1123 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>ReportGenerator.Reporting</name>
+    </assembly>
+    <members>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder">
+            <summary>
+            Creates badges in SVG format.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder.Template">
+            <summary>
+            The SVG template.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder.LineCoverageSymbol">
+            <summary>
+            The template for the line coverage symbol.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder.BranchCoverageSymbol">
+            <summary>
+            The template for the branch coverage symbol.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder.CoverageText">
+            <summary>
+            The template for the coverage text.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder.CoverageTooltip">
+            <summary>
+            The template for the coverage tooltip.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder.ReportType">
+            <summary>
+            Gets the report type.
+            </summary>
+            <value>
+            The report type.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder.TargetDirectory">
+            <summary>
+            Gets or sets the target directory where reports are stored.
+            </summary>
+            <value>
+            The target directory.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder.CreateClassReport(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder.CreateSummaryReport(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.BadgeReportBuilder.CreateBadge(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult,System.Boolean,System.Boolean)">
+            <summary>
+            Renderes the SVG.
+            </summary>
+            <param name="summaryResult">Indicates whether </param>
+            <param name="includeLineCoverage">Indicates whether line coverage should be included.</param>
+            <param name="includeBranchCoverage">Indicates whether branch coverage should be included.</param>
+            <returns>The rendered SVG.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.TextSummaryReportBuilder">
+            <summary>
+            Creates summary report in Text format (no reports for classes are generated).
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.TextSummaryReportBuilder.ReportType">
+            <summary>
+            Gets the report type.
+            </summary>
+            <value>
+            The report type.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.TextSummaryReportBuilder.TargetDirectory">
+            <summary>
+            Gets or sets the target directory where reports are stored.
+            </summary>
+            <value>
+            The target directory.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.TextSummaryReportBuilder.CreateClassReport(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.TextSummaryReportBuilder.CreateSummaryReport(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.XmlReportBuilder">
+            <summary>
+            Creates report in XML format.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.XmlReportBuilder.ReportType">
+            <summary>
+            Gets the report type.
+            </summary>
+            <value>
+            The report format.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.XmlReportBuilder.CreateClassReport(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.XmlReportBuilder.CreateSummaryReport(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.XmlSummaryReportBuilder">
+            <summary>
+            Creates summary report in XML format (no reports for classes are generated).
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.XmlSummaryReportBuilder.ReportType">
+            <summary>
+            Gets the report type.
+            </summary>
+            <value>
+            The report format.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.XmlSummaryReportBuilder.CreateClassReport(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.XmlSummaryReportBuilder.CreateSummaryReport(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.LatexReportBuilder">
+            <summary>
+            Creates report in Latex format.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.LatexReportBuilder.renderer">
+            <summary>
+            The shared renderer.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.LatexReportBuilder.ReportType">
+            <summary>
+            Gets the type of the report.
+            </summary>
+            <value>
+            The type of the report.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.LatexReportBuilder.CreateClassReport(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.LatexReportBuilder.CreateSummaryReport(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.LatexReportBuilder.Dispose">
+            <summary>
+            Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged ReportResources.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.LatexReportBuilder.Dispose(System.Boolean)">
+            <summary>
+            Releases unmanaged and - optionally - managed resources
+            </summary>
+            <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged ReportResources.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.LatexSummaryReportBuilder">
+            <summary>
+            Creates summary report in Latex format (no reports for classes are generated).
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.LatexSummaryReportBuilder.ReportType">
+            <summary>
+            Gets the report type.
+            </summary>
+            <value>
+            The report format.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.LatexSummaryReportBuilder.CreateClassReport(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.LatexSummaryReportBuilder.CreateSummaryReport(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.HtmlSummaryReportBuilder">
+            <summary>
+            Creates summary report in HTML format (no reports for classes are generated).
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.HtmlSummaryReportBuilder.ReportType">
+            <summary>
+            Gets the report type.
+            </summary>
+            <value>
+            The report format.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.HtmlSummaryReportBuilder.CreateClassReport(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.HtmlSummaryReportBuilder.CreateSummaryReport(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer">
+            <summary>
+            HTML report renderer.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.HtmlStart">
+            <summary>
+            The head of each generated HTML file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.HtmlEnd">
+            <summary>
+            The end of each generated HTML file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.CssLink">
+            <summary>
+            The link to the static CSS file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.FileNameByClass">
+            <summary>
+            Dictionary containing the filenames of the class reports by class.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.onlySummary">
+            <summary>
+            Indicates that only a summary report is created (no class reports).
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.javaScriptContent">
+            <summary>
+            Contains report specific JavaScript content.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.reportTextWriter">
+            <summary>
+            The report builder.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.#ctor(System.Boolean,System.Text.StringBuilder)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer" /> class.
+            </summary>
+            <param name="onlySummary">if set to <c>true</c> only a summary report is created (no class reports).</param>
+            <param name="javaScriptContent">StringBuilder used to collect report specific JavaScript.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.BeginSummaryReport(System.String,System.String)">
+            <summary>
+            Begins the summary report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="title">The title.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.BeginClassReport(System.String,System.String,System.String)">
+            <summary>
+            Begins the class report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="assemblyName">Name of the assembly.</param>
+            <param name="className">Name of the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.Header(System.String)">
+            <summary>
+            Adds a header to the report.
+            </summary>
+            <param name="text">The text.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.TestMethods(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.TestMethod})">
+            <summary>
+            Adds the test methods to the report.
+            </summary>
+            <param name="testMethods">The test methods.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.File(System.String)">
+            <summary>
+            Adds a file of a class to a report.
+            </summary>
+            <param name="path">The path of the file.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.Paragraph(System.String)">
+            <summary>
+            Adds a paragraph to the report.
+            </summary>
+            <param name="text">The text.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.BeginKeyValueTable">
+            <summary>
+            Adds a table with two columns to the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.BeginSummaryTable">
+            <summary>
+            Adds a summary table to the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.CustomSummary(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.Assembly})">
+            <summary>
+            Adds custom summary elements to the report.
+            </summary>
+            <param name="assemblies">The assemblies.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.BeginMetricsTable(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a metrics table to the report.
+            </summary>
+            <param name="headers">The headers.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.BeginLineAnalysisTable(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a file analysis table to the report.
+            </summary>
+            <param name="headers">The headers.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.KeyValueRow(System.String,System.String)">
+            <summary>
+            Adds a table row with two cells to the report.
+            </summary>
+            <param name="key">The text of the first column.</param>
+            <param name="value">The text of the second column.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.KeyValueRow(System.String,System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a table row with two cells to the report.
+            </summary>
+            <param name="key">The text of the first column.</param>
+            <param name="files">The files.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.MetricsRow(Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric)">
+            <summary>
+            Adds the given metric values to the report.
+            </summary>
+            <param name="metric">The metric.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.LineAnalysis(Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis)">
+            <summary>
+            Adds the coverage information of a single line of a file to the report.
+            </summary>
+            <param name="analysis">The line analysis.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.FinishTable">
+            <summary>
+            Finishes the current table.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.Chart(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage})">
+            <summary>
+            Charts the specified historic coverages.
+            </summary>
+            <param name="historicCoverages">The historic coverages.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.SummaryAssembly(Palmmedia.ReportGenerator.Parser.Analysis.Assembly)">
+            <summary>
+            Adds the coverage information of an assembly to the report.
+            </summary>
+            <param name="assembly">The assembly.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.SummaryClass(Palmmedia.ReportGenerator.Parser.Analysis.Class)">
+            <summary>
+            Adds the coverage information of a class to the report.
+            </summary>
+            <param name="class">The class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.SaveSummaryReport(System.String)">
+            <summary>
+            Saves a summary report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.SaveClassReport(System.String,System.String,System.String)">
+            <summary>
+            Saves a class report.
+            </summary><param name="targetDirectory">The target directory.</param>
+            <param name="assemblyName">Name of the assembly.</param>
+            <param name="className">Name of the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.Dispose">
+            <summary>
+            Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.Dispose(System.Boolean)">
+            <summary>
+            Releases unmanaged and - optionally - managed resources
+            </summary>
+            <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.CreateCoverageTable(System.Nullable{System.Decimal})">
+            <summary>
+            Builds a table showing the coverage quota with red and green bars.
+            </summary>
+            <param name="coverage">The coverage quota.</param>
+            <returns>Table showing the coverage quota with red and green bars.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.ConvertToCssClass(Palmmedia.ReportGenerator.Parser.Analysis.LineVisitStatus,System.Boolean)">
+            <summary>
+            Converts the <see cref="T:Palmmedia.ReportGenerator.Parser.Analysis.LineVisitStatus" /> to the corresponding CSS class.
+            </summary>
+            <param name="lineVisitStatus">The line visit status.</param>
+            <param name="lightcolor">if set to <c>true</c> a CSS class representing a light color is returned.</param>
+            <returns>The corresponding CSS class.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.GetClassReportFilename(System.String,System.String)">
+            <summary>
+            Gets the file name of the report file for the given class.
+            </summary>
+            <param name="assemblyName">Name of the assembly.</param>
+            <param name="className">Name of the class.</param>
+            <returns>The file name.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.SaveCss(System.String)">
+            <summary>
+            Saves the CSS.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.SaveJavaScript(System.String)">
+            <summary>
+            Saves the java script.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.GetCombinedCss">
+            <summary>
+            Gets the combined CSS.
+            </summary>
+            <returns>The combined CSS.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.GetCombinedJavascript">
+            <summary>
+            Gets the combined javascript.
+            </summary>
+            <returns>The combined javascript.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.CreateTextWriter(System.String)">
+            <summary>
+            Initializes the text writer.
+            </summary>
+            <param name="targetPath">The target path.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.SaveReport">
+            <summary>
+            Saves the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.FinishReport">
+            <summary>
+            Finishes the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.HtmlRenderer.FilterHistoricCoverages(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage},System.Int32)">
+            <summary>
+            Filters the historic coverages (equal elements are removed).
+            </summary>
+            <param name="historicCoverages">The historic coverages.</param>
+            <param name="maximum">The maximum.</param>
+            <returns>The filtered historic coverages.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer">
+            <summary>
+            Interface for report renderers.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.BeginSummaryReport(System.String,System.String)">
+            <summary>
+            Begins the summary report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="title">The title.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.BeginClassReport(System.String,System.String,System.String)">
+            <summary>
+            Begins the class report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="assemblyName">Name of the assembly.</param>
+            <param name="className">Name of the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.SaveSummaryReport(System.String)">
+            <summary>
+            Saves a summary report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.SaveClassReport(System.String,System.String,System.String)">
+            <summary>
+            Saves a class report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="assemblyName">Name of the assembly.</param>
+            <param name="className">Name of the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.Header(System.String)">
+            <summary>
+            Adds a header to the report.
+            </summary>
+            <param name="text">The text.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.TestMethods(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.TestMethod})">
+            <summary>
+            Adds the test methods to the report.
+            </summary>
+            <param name="testMethods">The test methods.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.File(System.String)">
+            <summary>
+            Adds a file of a class to a report.
+            </summary>
+            <param name="path">The path of the file.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.Paragraph(System.String)">
+            <summary>
+            Adds a paragraph to the report.
+            </summary>
+            <param name="text">The text.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.BeginKeyValueTable">
+            <summary>
+            Adds a table with two columns to the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.BeginSummaryTable">
+            <summary>
+            Adds a summary table to the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.CustomSummary(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.Assembly})">
+            <summary>
+            Adds custom summary elements to the report.
+            </summary>
+            <param name="assemblies">The assemblies.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.BeginMetricsTable(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a metrics table to the report.
+            </summary>
+            <param name="headers">The headers.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.BeginLineAnalysisTable(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a file analysis table to the report.
+            </summary>
+            <param name="headers">The headers.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.KeyValueRow(System.String,System.String)">
+            <summary>
+            Adds a table row with two cells to the report.
+            </summary>
+            <param name="key">The text of the first column.</param>
+            <param name="value">The text of the second column.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.KeyValueRow(System.String,System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a table row with two cells to the report.
+            </summary>
+            <param name="key">The text of the first column.</param>
+            <param name="files">The files.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.SummaryAssembly(Palmmedia.ReportGenerator.Parser.Analysis.Assembly)">
+            <summary>
+            Adds the coverage information of an assembly to the report.
+            </summary>
+            <param name="assembly">The assembly.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.SummaryClass(Palmmedia.ReportGenerator.Parser.Analysis.Class)">
+            <summary>
+            Adds the coverage information of a class to the report.
+            </summary>
+            <param name="class">The class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.MetricsRow(Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric)">
+            <summary>
+            Adds the given metric values to the report.
+            </summary>
+            <param name="metric">The metric.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.LineAnalysis(Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis)">
+            <summary>
+            Adds the coverage information of a single line of a file to the report.
+            </summary>
+            <param name="analysis">The line analysis.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.FinishTable">
+            <summary>
+            Finishes the current table.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer.Chart(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage})">
+            <summary>
+            Charts the specified historic coverages.
+            </summary>
+            <param name="historicCoverages">The historic coverages.</param>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer">
+            <summary>
+            Latex report renderer.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.LatexStart">
+            <summary>
+            The head of each generated Latex file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.LatexEnd">
+            <summary>
+            The end of each generated Latex file.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.reportTextWriter">
+            <summary>
+            The current report text writer.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.summaryReportTextWriter">
+            <summary>
+            The report text writers for the summary and the classes report.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.classReportTextWriter">
+            <summary>
+            The report text writers for the summary and the classes report.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.summaryReportStream">
+            <summary>
+            The underlying streams for the summary and the classes report.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.classReportStream">
+            <summary>
+            The underlying streams for the summary and the classes report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.BeginSummaryReport(System.String,System.String)">
+            <summary>
+            Begins the summary report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="title">The title.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.BeginClassReport(System.String,System.String,System.String)">
+            <summary>
+            Begins the class report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="assemblyName">Name of the assembly.</param>
+            <param name="className">Name of the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.Header(System.String)">
+            <summary>
+            Adds a header to the report.
+            </summary>
+            <param name="text">The text.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.TestMethods(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.TestMethod})">
+            <summary>
+            Adds the test methods to the report.
+            </summary>
+            <param name="testMethods">The test methods.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.File(System.String)">
+            <summary>
+            Adds a file of a class to a report.
+            </summary>
+            <param name="path">The path of the file.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.Paragraph(System.String)">
+            <summary>
+            Adds a paragraph to the report.
+            </summary>
+            <param name="text">The text.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.BeginKeyValueTable">
+            <summary>
+            Adds a table with two columns to the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.BeginSummaryTable">
+            <summary>
+            Adds a summary table to the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.CustomSummary(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.Assembly})">
+            <summary>
+            Adds custom summary elements to the report.
+            </summary>
+            <param name="assemblies">The assemblies.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.BeginMetricsTable(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a metrics table to the report.
+            </summary>
+            <param name="headers">The headers.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.BeginLineAnalysisTable(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a file analysis table to the report.
+            </summary>
+            <param name="headers">The headers.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.KeyValueRow(System.String,System.String)">
+            <summary>
+            Adds a table row with two cells to the report.
+            </summary>
+            <param name="key">The text of the first column.</param>
+            <param name="value">The text of the second column.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.KeyValueRow(System.String,System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a table row with two cells to the report.
+            </summary>
+            <param name="key">The text of the first column.</param>
+            <param name="files">The files.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.MetricsRow(Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric)">
+            <summary>
+            Adds the given metric values to the report.
+            </summary>
+            <param name="metric">The metric.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.LineAnalysis(Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis)">
+            <summary>
+            Adds the coverage information of a single line of a file to the report.
+            </summary>
+            <param name="analysis">The line analysis.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.FinishTable">
+            <summary>
+            Finishes the current table.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.Chart(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage})">
+            <summary>
+            Charts the specified historic coverages.
+            </summary>
+            <param name="historicCoverages">The historic coverages.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.SummaryAssembly(Palmmedia.ReportGenerator.Parser.Analysis.Assembly)">
+            <summary>
+            Adds the coverage information of an assembly to the report.
+            </summary>
+            <param name="assembly">The assembly.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.SummaryClass(Palmmedia.ReportGenerator.Parser.Analysis.Class)">
+            <summary>
+            Adds the coverage information of a class to the report.
+            </summary>
+            <param name="class">The class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.SaveSummaryReport(System.String)">
+            <summary>
+            Saves a summary report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.SaveClassReport(System.String,System.String,System.String)">
+            <summary>
+            Saves a class report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="assemblyName">Name of the assembly.</param>
+            <param name="className">Name of the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.Dispose">
+            <summary>
+            Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.Dispose(System.Boolean)">
+            <summary>
+            Releases unmanaged and - optionally - managed resources
+            </summary>
+            <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.ShortenString(System.String)">
+            <summary>
+            Shortens the given string.
+            </summary>
+            <param name="text">The text to shorten.</param>
+            <returns>The shortened string.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.ShortenString(System.String,System.Int32)">
+            <summary>
+            Shortens the given string.
+            </summary>
+            <param name="text">The text to shorten.</param>
+            <param name="maxLength">Maximum length.</param>
+            <returns>The shortened string.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.LatexRenderer.EscapeLatexChars(System.String)">
+            <summary>
+            Escapes the latex chars.
+            </summary>
+            <param name="text">The text.</param>
+            <returns>The text with escaped latex chars.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.Rendering.RendererBase">
+            <summary>
+            Base class for the <see cref="T:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer"/> implementations.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.RendererBase.ReplaceInvalidPathChars(System.String)">
+            <summary>
+            Replaces the invalid chars in the given path.
+            </summary>
+            <param name="path">The path.</param>
+            <returns>The path with replaced invalid chars.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.RendererBase.ReplaceNonLetterChars(System.String)">
+            <summary>
+            Replaces all non letter chars in the given string.
+            </summary>
+            <param name="text">The text.</param>
+            <returns>The text with replaced invalid chars.</returns>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.RendererBase.ReplaceInvalidXmlChars(System.String)">
+            <summary>
+            Replaces the invalid XML chars in the given string.
+            </summary>
+            <param name="text">The text.</param>
+            <returns>The text with replaced invalid chars.</returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer">
+            <summary>
+            XML report renderer.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.closeAssemblyNode">
+            <summary>
+            Indicates that the current node representing an assembly has to be closed before adding further elements.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.reportTextWriter">
+            <summary>
+            The report builder.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.BeginSummaryReport(System.String,System.String)">
+            <summary>
+            Begins the summary report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="title">The title.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.CustomSummary(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.Assembly})">
+            <summary>
+            Adds custom summary elements to the report.
+            </summary>
+            <param name="assemblies">The assemblies.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.BeginClassReport(System.String,System.String,System.String)">
+            <summary>
+            Begins the class report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="assemblyName">Name of the assembly.</param>
+            <param name="className">Name of the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.Header(System.String)">
+            <summary>
+            Adds a header to the report.
+            </summary>
+            <param name="text">The text.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.TestMethods(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.TestMethod})">
+            <summary>
+            Adds the test methods to the report.
+            </summary>
+            <param name="testMethods">The test methods.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.File(System.String)">
+            <summary>
+            Adds a file of a class to a report.
+            </summary>
+            <param name="path">The path of the file.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.Paragraph(System.String)">
+            <summary>
+            Adds a paragraph to the report.
+            </summary>
+            <param name="text">The text.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.BeginKeyValueTable">
+            <summary>
+            Adds a table with two columns to the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.BeginSummaryTable">
+            <summary>
+            Adds a summary table to the report.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.BeginMetricsTable(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a metrics table to the report.
+            </summary>
+            <param name="headers">The headers.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.BeginLineAnalysisTable(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a file analysis table to the report.
+            </summary>
+            <param name="headers">The headers.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.KeyValueRow(System.String,System.String)">
+            <summary>
+            Adds a table row with two cells to the report.
+            </summary>
+            <param name="key">The text of the first column.</param>
+            <param name="value">The text of the second column.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.KeyValueRow(System.String,System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds a table row with two cells to the report.
+            </summary>
+            <param name="key">The text of the first column.</param>
+            <param name="files">The files.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.MetricsRow(Palmmedia.ReportGenerator.Parser.Analysis.MethodMetric)">
+            <summary>
+            Adds the given metric values to the report.
+            </summary>
+            <param name="metric">The metric.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.LineAnalysis(Palmmedia.ReportGenerator.Parser.Analysis.LineAnalysis)">
+            <summary>
+            Adds the coverage information of a single line of a file to the report.
+            </summary>
+            <param name="analysis">The line analysis.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.FinishTable">
+            <summary>
+            Finishes the current table.
+            </summary>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.Chart(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.HistoricCoverage})">
+            <summary>
+            Charts the specified historic coverages.
+            </summary>
+            <param name="historicCoverages">The historic coverages.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.SummaryAssembly(Palmmedia.ReportGenerator.Parser.Analysis.Assembly)">
+            <summary>
+            Adds the coverage information of an assembly to the report.
+            </summary>
+            <param name="assembly">The assembly.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.SummaryClass(Palmmedia.ReportGenerator.Parser.Analysis.Class)">
+            <summary>
+            Adds the coverage information of a class to the report.
+            </summary>
+            <param name="class">The class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.SaveSummaryReport(System.String)">
+            <summary>
+            Saves a summary report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.SaveClassReport(System.String,System.String,System.String)">
+            <summary>
+            Saves a class report.
+            </summary>
+            <param name="targetDirectory">The target directory.</param>
+            <param name="assemblyName">Name of the assembly.</param>
+            <param name="className">Name of the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.CreateXmlWriter(System.String)">
+            <summary>
+            Initializes the xml writer.
+            </summary>
+            <param name="targetPath">The target path.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.Rendering.XmlRenderer.SaveReport">
+            <summary>
+            Saves the report.
+            </summary>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.ReportBuilderBase">
+            <summary>
+            Implementation of <see cref="T:Palmmedia.ReportGenerator.Reporting.IReportBuilder"/> that uses <see cref="T:Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer"/> to create reports.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.ReportBuilderBase.ReportType">
+            <summary>
+            Gets the report type.
+            </summary>
+            <value>
+            The report type.
+            </value>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.ReportBuilderBase.TargetDirectory">
+            <summary>
+            Gets or sets the target directory where reports are stored.
+            </summary>
+            <value>
+            The target directory.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.ReportBuilderBase.CreateClassReport(Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer,Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="reportRenderer">The report renderer.</param>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.ReportBuilderBase.CreateSummaryReport(Palmmedia.ReportGenerator.Reporting.Rendering.IReportRenderer,Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="reportRenderer">The report renderer.</param>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.ReportBuilderBase.CreateClassReport(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.ReportBuilderBase.CreateSummaryReport(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.ReportBuilderBase.GetOverallHistoricCoverages(System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.Class})">
+            <summary>
+            Gets the overall historic coverages from all classes.
+            </summary>
+            <param name="classes">The classes.</param>
+            <returns>
+            The overall historic coverages from all classes.
+            </returns>
+        </member>
+        <member name="T:Palmmedia.ReportGenerator.Reporting.HtmlReportBuilder">
+            <summary>
+            Creates report in HTML format.
+            </summary>
+        </member>
+        <member name="F:Palmmedia.ReportGenerator.Reporting.HtmlReportBuilder.javaScriptContent">
+            <summary>
+            Contains report specific JavaScript content.
+            </summary>
+        </member>
+        <member name="P:Palmmedia.ReportGenerator.Reporting.HtmlReportBuilder.ReportType">
+            <summary>
+            Gets the report type.
+            </summary>
+            <value>
+            The report format.
+            </value>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.HtmlReportBuilder.CreateClassReport(Palmmedia.ReportGenerator.Parser.Analysis.Class,System.Collections.Generic.IEnumerable{Palmmedia.ReportGenerator.Parser.Analysis.FileAnalysis})">
+            <summary>
+            Creates a class report.
+            </summary>
+            <param name="class">The class.</param>
+            <param name="fileAnalyses">The file analyses that correspond to the class.</param>
+        </member>
+        <member name="M:Palmmedia.ReportGenerator.Reporting.HtmlReportBuilder.CreateSummaryReport(Palmmedia.ReportGenerator.Parser.Analysis.SummaryResult)">
+            <summary>
+            Creates the summary report.
+            </summary>
+            <param name="summaryResult">The summary result.</param>
+        </member>
+    </members>
+</doc>

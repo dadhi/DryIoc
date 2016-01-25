@@ -3374,6 +3374,13 @@ namespace DryIoc
         /// <returns>Ignored default of Service type.</returns>
         public static TService Of<TService, TRequired>(IfUnresolved ifUnresolved, object serviceKey) { return default(TService); }
 
+        /// <summary>Specifies required service type, default value and <see cref="IfUnresolved.ReturnDefault"/>.</summary>
+        /// <typeparam name="TRequired">Required service type.</typeparam>
+        /// <param name="defaultValue">Primitive default value.</param>
+        /// <param name="ifUnresolved">Only the <see cref="IfUnresolved.ReturnDefault"/> value is accepted.</param>
+        /// <returns>Ignored.</returns>
+        public static TRequired Of<TRequired>(object defaultValue, IfUnresolved ifUnresolved) { return default(TRequired); }
+
         /// <summary>Specifies argument index starting from 0 to use corresponding custom value factory, 
         /// similar to String.Format <c>"{0}, {1}, etc"</c>.</summary>
         /// <typeparam name="T">Type of dependency. Difference from actual parameter type is ignored.</typeparam>

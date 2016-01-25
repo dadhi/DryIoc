@@ -80,6 +80,7 @@ namespace DryIoc.UnitTests
 
             Assert.IsInstanceOf<Melon>(container.Resolve<FruitJuice>().Fruit);
             Assert.IsInstanceOf<Orange>(childContainer.Resolve<FruitJuice>().Fruit);
+            GC.KeepAlive(container);
         }
 
         [Test]

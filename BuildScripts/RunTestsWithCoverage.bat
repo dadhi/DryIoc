@@ -2,9 +2,9 @@
 pushd ".."
 setlocal EnableDelayedExpansion
 
-set NUNIT="packages\NUnit.Runners\tools\nunit-console.exe"
-set OPENCOVER="packages\OpenCover\OpenCover.Console.exe"
-set REPORTGEN="packages\ReportGenerator.2.3.2.0\tools\ReportGenerator.exe"
+set NUNIT="packages\NUnit.Console.3.0.1\tools\nunit3-console.exe"
+set OPENCOVER="packages\OpenCover.4.6.166\tools\OpenCover.Console.exe"
+set REPORTGEN="packages\ReportGenerator.2.4.0.0\tools\ReportGenerator.exe"
 set REPORTS=bin\Reports
 set COVERAGE="%REPORTS%\Coverage.xml"
 
@@ -24,7 +24,7 @@ echo:
 %OPENCOVER%^
  -register:user^
  -target:%NUNIT%^
- -targetargs:"%TESTLIBS% /nologo /noshadow"^
+ -targetargs:"%TESTLIBS%"^
  -filter:"+[*]* -[*Test*]* -[protobuf*]* -[Microsoft*]* -[xunit*]* -[Dnx*]*"^
  -excludebyattribute:*.ExcludeFromCodeCoverageAttribute^
  -hideskipped:all^

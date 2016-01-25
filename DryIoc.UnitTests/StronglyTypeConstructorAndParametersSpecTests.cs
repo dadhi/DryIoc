@@ -151,6 +151,27 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(default(ICheese), Arg.Of<ICheese>(IfUnresolved.Throw, "key"));
         }
 
+        [Test]
+        public void Can_specify_default_parameter()
+        {
+            var container = new Container();
+            container.Register(Made.Of(() => new D(Arg.Of<string>("d", IfUnresolved.ReturnDefault))));
+
+            var burger = container.Resolve<D>();
+
+        }
+
+        public class D
+        {
+            public string S { get; private set; }
+
+            public D(string s)
+            {
+                S = s;
+            }
+        }
+
+
         internal interface ICheese { }
 
         internal class BlueCheese : ICheese { }
