@@ -30,21 +30,25 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 
 ## Benchmarks
+
 * [Performance](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
 * [Features](http://featuretests.apphb.com/DependencyInjection.html)
 
 
 ## Performance
+
 * General use-cases optimized for max speed.
 * Memory footprint preserved as small as possible.
 
 
 ## Code/Library
+
 * No dependencies on the other libraries.
 * Public API is fully documented.
 
 
 ## Reliability
+
 * Unit-test suit with ~700 tests.
 * Thread-safe and lock-free: registrations and resolutions could be made in parallel without corrupting container state. 
 * Detects recursive dependencies aka cycles in object graph.

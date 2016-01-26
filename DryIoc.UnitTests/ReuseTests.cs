@@ -576,6 +576,69 @@ namespace DryIoc.UnitTests
             }
         }
 
+        [Test]
+        public void Resolution_scope_should_be_propagated_through_resolution_call_intermediate_dependencies()
+        {
+            var container = new Container();
+
+            container.Register<AD>(Reuse.InResolutionScopeOf<AResolutionScoped>());
+            container.Register<ADConsumer>(setup: Setup.With(asResolutionCall: true));
+            container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
+
+            var scoped = container.Resolve<AResolutionScoped>();
+            Assert.IsNotNull(scoped);
+            Assert.AreSame(scoped.Consumer.Ad, scoped.Consumer.Ad2);
+        }
+
+        [Test]
+        public void Resolution_call_should_not_create_resolution_scope()
+        {
+            var container = new Container();
+
+            container.Register<AD>(Reuse.InResolutionScopeOf<ADConsumer>());
+            container.Register<ADConsumer>(setup: Setup.With(asResolutionCall: true));
+            container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
+
+            Assert.Throws<ContainerException>(() => 
+            container.Resolve<AResolutionScoped>());
+        }
+
+        public class AD
+        {
+            public bool IsDisposed { get; private set; }
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+
+        public class ADConsumer
+        {
+            public AD Ad { get; private set; }
+
+            public AD Ad2 { get; private set; }
+
+            public ADConsumer(AD ad, AD ad2)
+            {
+                Ad = ad;
+                Ad2 = ad2;
+            }
+        }
+
+        public class AResolutionScoped
+        {
+            public ADConsumer Consumer { get; private set; }
+
+            public IDisposable Dependencies { get; private set; }
+
+            public AResolutionScoped(ADConsumer consumer, IDisposable dependencies)
+            {
+                Consumer = consumer;
+                Dependencies = dependencies;
+            }
+        }
+
         public class Abc { }
 
         #region CUT

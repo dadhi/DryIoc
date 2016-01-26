@@ -151,14 +151,15 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(default(ICheese), Arg.Of<ICheese>(IfUnresolved.Throw, "key"));
         }
 
-        [Test]
+        [Test, Ignore]
         public void Can_specify_default_parameter()
         {
             var container = new Container();
             container.Register(Made.Of(() => new D(Arg.Of<string>("d", IfUnresolved.ReturnDefault))));
 
-            var burger = container.Resolve<D>();
+            var d = container.Resolve<D>();
 
+            Assert.AreEqual("d", d.S);
         }
 
         public class D

@@ -220,13 +220,14 @@ namespace DryIoc
             if (request.Scope != null)
                 return ResolutionScopeParamExpr;
 
-            var container = request.Container;
-
+            // the only situation when we could here is: where are in first resolution call (in the root)
+            // and scope was not created on the boundary of Resolve call.
             var parent = request.Enumerate().Last();
 
+            var container = request.Container;
             var registeredServiceType = container.GetWrappedType(parent.ServiceType, parent.RequiredServiceType);
-            var parentServiceTypeExpr = container.GetOrAddStateItemExpression(registeredServiceType, typeof(Type));
-            var parentServiceKeyExpr = Expression.Convert(container.GetOrAddStateItemExpression(parent.ServiceKey), typeof(object));
+            var parentServiceTypeExpr = Expression.Constant(registeredServiceType, typeof(Type));
+            var parentServiceKeyExpr = container.GetOrAddStateItemExpression(parent.ServiceKey, typeof(object));
             return Expression.Call(ScopesExpr, "GetOrCreateResolutionScope", ArrayTools.Empty<Type>(),
                 ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
@@ -280,12 +281,14 @@ namespace DryIoc
             var setup = factory.Setup;
             if (setup.FactoryType != FactoryType.Wrapper)
             {
-                if (factory.Reuse == null && (factory.ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable)) &&
-                    (setup.AllowDisposableTransient == false && Rules.ThrowOnRegisteringDisposableTransient))
+                if (factory.Reuse == null && 
+                    (factory.ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable)) && 
+                    setup.AllowDisposableTransient == false && Rules.ThrowOnRegisteringDisposableTransient)
                     Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType,
                         serviceKey ?? "{no key}", this);
             }
-            else if (serviceType.IsGeneric() && !((Setup.WrapperSetup)setup).AlwaysWrapsRequiredServiceType)
+            else if (serviceType.IsGeneric() && 
+                !((Setup.WrapperSetup)setup).AlwaysWrapsRequiredServiceType)
             {
                 var typeArgCount = serviceType.GetGenericParamsAndArgs().Length;
                 var typeArgIndex = ((Setup.WrapperSetup)setup).WrappedServiceTypeArgIndex;
@@ -408,9 +411,6 @@ namespace DryIoc
             if (!preResolveParent.IsEmpty)
                 cacheContextKey = cacheContextKey == null ? (object)preResolveParent
                      : new KV<object, RequestInfo>(cacheContextKey, preResolveParent);
-
-            if (scope != null)
-                scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
 
             // Check cache first:
             var registryValue = _registry.Value;
@@ -3297,9 +3297,13 @@ namespace DryIoc
                 if (argValueExpr != null)
                 {
                     if (argValueExpr.Type == typeof(IfUnresolved))
+                    {
                         ifUnresolved = (IfUnresolved)argValueExpr.Value;
-                    else // service key
+                    }
+                    else
+                    {
                         serviceKey = argValueExpr.Value;
+                    }
                 }
             }
 
@@ -4062,14 +4066,54 @@ namespace DryIoc
 
         internal static Expression CreateResolutionExpression(Request request, bool openResolutionScope = false)
         {
+            PopulateDependencyResolutionCallExpressions(request);
+
             var container = request.Container;
+
             var serviceType = request.ServiceType;
             var serviceKey = request.ServiceKey;
             var newPreResolveParent = request.ParentOrWrapper;
 
+            var serviceTypeExpr = Expression.Constant(serviceType, typeof(Type));
+            var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.ReturnDefault, typeof(bool));
+            var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
+            var serviceKeyExpr = container.GetOrAddStateItemExpression(serviceKey, typeof(object));
+
+            // first ensure that we have parent scope if any to propagate it across resolution call boundaries
+            var scopeExpr = Container.GetResolutionScopeExpression(request);
+            if (openResolutionScope)
+            {
+                // creates new scope and link it to existing (or new) parent
+                // Here the code looks: scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
+                var actualServiceTypeExpr = Expression.Constant(request.GetActualServiceType(), typeof(Type));
+                var scopeCtor = typeof(Scope).GetSingleConstructorOrNull().ThrowIfNull();
+                scopeExpr = Expression.New(scopeCtor, scopeExpr,
+                    Expression.New(typeof(KV<Type, object>).GetSingleConstructorOrNull().ThrowIfNull(), 
+                        actualServiceTypeExpr, serviceKeyExpr));
+            }
+
+            // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
+            var preResolveParentExpr = container.RequestInfoToExpression(newPreResolveParent);
+
+            var resolveCallExpr = Expression.Call(
+                Container.ResolverExpr, "Resolve", ArrayTools.Empty<Type>(),
+                serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr, 
+                preResolveParentExpr, scopeExpr);
+
+            var resolveExpr = Expression.Convert(resolveCallExpr, serviceType);
+            return resolveExpr;
+        }
+
+        private static void PopulateDependencyResolutionCallExpressions(Request request)
+        {
+            var serviceType = request.ServiceType;
+            var serviceKey = request.ServiceKey;
+            var newPreResolveParent = request.ParentOrWrapper;
+
+            var container = request.Container;
             if (container.Rules.DependencyResolutionCallExpressions != null &&
                 (request.PreResolveParent.IsEmpty ||
-                !request.PreResolveParent.EqualsWithoutParent(newPreResolveParent)))
+                 !request.PreResolveParent.EqualsWithoutParent(newPreResolveParent)))
             {
                 var scope = request.Scope;
                 if (scope != null)
@@ -4085,26 +4129,6 @@ namespace DryIoc
                     container.Rules.DependencyResolutionCallExpressions.Swap(
                         expr => expr.AddOrUpdate(newRequest.ToRequestInfo(), factoryExpr));
             }
-
-            var serviceTypeExpr = container.GetOrAddStateItemExpression(serviceType, typeof(Type));
-            var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.ReturnDefault, typeof(bool));
-            var requiredServiceTypeExpr = container.GetOrAddStateItemExpression(request.RequiredServiceType, typeof(Type));
-            var serviceKeyExpr = Expression.Convert(container.GetOrAddStateItemExpression(serviceKey), typeof(object));
-
-            var getOrNewScopeExpr = openResolutionScope
-                ? Container.GetResolutionScopeExpression(request)
-                : Container.ResolutionScopeParamExpr;
-
-            // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
-            var preResolveParentExpr = container.RequestInfoToExpression(newPreResolveParent);
-
-            var resolveCallExpr = Expression.Call(
-                Container.ResolverExpr, "Resolve", ArrayTools.Empty<Type>(),
-                serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr, 
-                preResolveParentExpr, getOrNewScopeExpr);
-
-            var resolveExpr = Expression.Convert(resolveCallExpr, serviceType);
-            return resolveExpr;
         }
     }
 
@@ -5000,7 +5024,7 @@ namespace DryIoc
         /// <summary>Stores reused instance as WeakReference.</summary>
         public virtual bool WeaklyReferenced { get { return false; } }
 
-        /// <summary> Allows registering transient disposable. </summary>
+        /// <summary>Allows registering transient disposable.</summary>
         public virtual bool AllowDisposableTransient { get { return false; } }
 
         /// <summary>Default setup for service factories.</summary>
@@ -5261,7 +5285,7 @@ namespace DryIoc
         /// <param name="request"></param> <returns>True if matching Scope exists.</returns>
         public bool HasMatchingReuseScope(Request request)
         {
-            if (!request.Container.Rules.ImplicitCheckForReuseMatchingScope)
+            if (Reuse == null || !request.Container.Rules.ImplicitCheckForReuseMatchingScope)
                 return true;
 
             if (Reuse is ResolutionScopeReuse)

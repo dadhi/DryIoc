@@ -325,8 +325,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
 
-            container.Register<AD>();
-            container.Register<ADConsumer>(Reuse.InResolutionScope);
+            container.Register<AD>(setup: Setup.With(asResolutionCall: true));
+            container.Register<ADConsumer>(Reuse.InResolutionScopeOf<AResolutionScoped>(), setup: Setup.With(asResolutionCall: true));
             container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
 
             var scoped = container.Resolve<AResolutionScoped>();
@@ -335,21 +335,6 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(scoped.Consumer.Ad.IsDisposed);
         }
 
-        [Test]
-        public void Should_track_transient_disposable_dependency_in_resolution_scope_of_specific_service()
-        {
-            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
-
-            container.Register<AD>();
-            container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
-            container.Register<AResolutionScopedConsumer>(setup: Setup.With(openResolutionScope: true));
-            container.Register<ADConsumer>(Reuse.InResolutionScopeOf<AResolutionScopedConsumer>());
-
-            var consumer = container.Resolve<AResolutionScopedConsumer>();
-            consumer.Dependencies.Dispose();
-
-            Assert.IsTrue(consumer.AScoped.Consumer.Ad.IsDisposed);
-        }
 
         public class AD : IDisposable
         {
@@ -365,9 +350,12 @@ namespace DryIoc.UnitTests
         {
             public AD Ad { get; private set; }
 
-            public ADConsumer(AD ad)
+            public AD Ad2 { get; private set; }
+
+            public ADConsumer(AD ad, AD ad2)
             {
                 Ad = ad;
+                Ad2 = ad2;
             }
         }
 

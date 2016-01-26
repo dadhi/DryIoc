@@ -39,7 +39,7 @@ namespace DryIoc.IssuesTests
     }
 
 
-    class ShortReuse : IReuse
+    class ShortReuse : IReuse, IConvertibleToExpression
     {
         public int Lifespan { get { return 50; } }
 
@@ -56,6 +56,11 @@ namespace DryIoc.IssuesTests
         public int GetScopedItemIdOrSelf(int factoryID, Request request)
         {
             return request.Scopes.SingletonScope.GetScopedItemIdOrSelf(factoryID);
+        }
+
+        public Expression Convert()
+        {
+            return Expression.New(GetType().GetConstructors()[0], ArrayTools.Empty<Expression>());
         }
     }
 }
