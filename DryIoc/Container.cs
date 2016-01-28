@@ -22,8 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-using System.CodeDom;
-
 namespace DryIoc
 {
     using System;
@@ -5916,7 +5914,7 @@ namespace DryIoc
                         {
                             var paramInfo = parameterSelector(param) ?? ParameterServiceInfo.Of(param);
 
-                            paramExprs[i] = TryInjectResolver(paramInfo) ?? TryInjectResolutionScope(paramInfo, request);
+                            paramExprs[i] = TryInjectImplicitlyAvailableDependency(paramInfo, request);
                             if (paramExprs[i] != null)
                                 continue;
 
@@ -6220,20 +6218,26 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        private static Expression TryInjectResolver(IServiceInfo serviceInfo)
+        private static Expression TryInjectImplicitlyAvailableDependency(IServiceInfo serviceInfo, Request request)
         {
-            return serviceInfo.ServiceType == typeof(IResolver) &&
-                   serviceInfo.Details.ServiceKey == null && serviceInfo.Details.RequiredServiceType == null
-                ? Container.ResolverExpr
-                : null;
-        }
+            // ignore non default registrations
+            if (serviceInfo.Details.ServiceKey != null ||
+                serviceInfo.Details.RequiredServiceType != null)
+                return null;
+        
+            var serviceType = serviceInfo.ServiceType;
 
-        private static Expression TryInjectResolutionScope(IServiceInfo serviceInfo, Request request)
-        {
-            return serviceInfo.ServiceType == typeof(IDisposable) &&
-                   serviceInfo.Details.ServiceKey == null && serviceInfo.Details.RequiredServiceType == null
-                ? Container.GetResolutionScopeExpression(request)
-                : null;
+            if (serviceType == typeof(IResolver))
+                return Container.ResolverExpr;
+
+            if (serviceType == typeof(IRegistrator) ||
+                serviceType == typeof(IContainer))
+                return Expression.Convert(Container.ResolverExpr, serviceType);
+
+            if (serviceType == typeof(IDisposable))
+                return Container.GetResolutionScopeExpression(request);
+
+            return null;
         }
 
         private FactoryMethod GetFactoryMethod(Request request)
@@ -6272,7 +6276,7 @@ namespace DryIoc
             foreach (var member in members)
                 if (member != null)
                 {
-                    var memberExpr = TryInjectResolver(member) ?? TryInjectResolutionScope(member, request);
+                    var memberExpr = TryInjectImplicitlyAvailableDependency(member, request);
                     if (memberExpr == null)
                     {
                         var memberRequest = request.Push(member);

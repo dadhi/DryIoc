@@ -173,9 +173,6 @@ namespace DryIoc.UnitTests
             Assert.AreEqual("d", d.S);
         }
 
-
-
-
         [Test]
         public void If_default_parameter_is_specified_Then_IfUnresolved_should_be_set_to_ReturnDefault()
         {
@@ -208,7 +205,6 @@ namespace DryIoc.UnitTests
                 S = s;
             }
         }
-
 
         internal interface ICheese { }
 
@@ -353,6 +349,7 @@ namespace DryIoc.UnitTests
 
             container.Resolve<UseMyWrapper>();
         }
+
 
         public class MyWrapper {
             public readonly object Service;
