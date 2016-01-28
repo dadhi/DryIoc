@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+using System.CodeDom;
+
 namespace DryIoc
 {
     using System;
@@ -3210,8 +3212,12 @@ namespace DryIoc
                 }
                 else
                 {
-                    GetArgConstantExpressionOrDefault(argExprs[i])
+                    var argConstantExpr = GetArgConstantExpressionOrDefault(argExprs[i])
                         .ThrowIfNull(Error.UnexpectedExpressionInsteadOfConstant, argExprs[i]);
+
+                    // if constant is not null use it directly as a custom value
+                    var customValue = argConstantExpr.Value;
+                    parameters = parameters.Details((r, p) => p.Equals(parameter) ? ServiceDetails.Of(customValue) : null);
                 }
             }
             return parameters;
@@ -3290,6 +3296,8 @@ namespace DryIoc
             var serviceKey = default(object);
             var ifUnresolved = defaultIfUnresolved;
 
+            var hasPrevArg = false;
+
             var argExpr = methodCallExpr.Arguments;
             for (var j = 0; j < argExpr.Count; j++)
             {
@@ -3299,15 +3307,20 @@ namespace DryIoc
                     if (argValueExpr.Type == typeof(IfUnresolved))
                     {
                         ifUnresolved = (IfUnresolved)argValueExpr.Value;
+                        if (hasPrevArg) // the only possible argument is default value.
+                        {
+                            defaultValue = serviceKey;
+                            serviceKey = null;
+                        }
                     }
                     else
                     {
                         serviceKey = argValueExpr.Value;
+                        hasPrevArg = true;
                     }
                 }
             }
 
-            defaultValue = ifUnresolved == IfUnresolved.ReturnDefault ? defaultValue : null;
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
@@ -3383,7 +3396,15 @@ namespace DryIoc
         /// <param name="defaultValue">Primitive default value.</param>
         /// <param name="ifUnresolved">Only the <see cref="IfUnresolved.ReturnDefault"/> value is accepted.</param>
         /// <returns>Ignored.</returns>
-        public static TRequired Of<TRequired>(object defaultValue, IfUnresolved ifUnresolved) { return default(TRequired); }
+        public static TRequired Of<TRequired>(TRequired defaultValue, IfUnresolved ifUnresolved) { return default(TRequired); }
+
+        /// <summary>Specifies required service type, default value and <see cref="IfUnresolved.ReturnDefault"/>.</summary>
+        /// <typeparam name="TRequired">Required service type.</typeparam>
+        /// <param name="defaultValue">Primitive default value.</param>
+        /// <param name="ifUnresolved">Only the <see cref="IfUnresolved.ReturnDefault"/> value is accepted.</param>
+        /// <param name="serviceKey">Service key object.</param>
+        /// <returns>Ignored.</returns>
+        public static TRequired Of<TRequired>(TRequired defaultValue, IfUnresolved ifUnresolved, object serviceKey) { return default(TRequired); }
 
         /// <summary>Specifies argument index starting from 0 to use corresponding custom value factory, 
         /// similar to String.Format <c>"{0}, {1}, etc"</c>.</summary>
@@ -4176,9 +4197,7 @@ namespace DryIoc
             object defaultValue = null)
         {
             if (defaultValue != null && ifUnresolved == IfUnresolved.Throw)
-            {
                 ifUnresolved = IfUnresolved.ReturnDefault;
-            }
 
             return new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, defaultValue);
         }

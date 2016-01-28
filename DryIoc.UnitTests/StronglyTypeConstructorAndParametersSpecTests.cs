@@ -108,7 +108,7 @@ namespace DryIoc.UnitTests
         public void Can_handle_default_parameters()
         {
             var container = new Container();
-            container.Register<IBurger, Burger>(Made.Of(() => new Burger(Arg.Of<string>("key"), default(int))));
+            container.Register<IBurger, Burger>(Made.Of(() => new Burger(Arg.Of<string>("key"), Arg.Of<int>())));
             container.RegisterInstance("King", serviceKey: "key");
 
             var burger = container.Resolve<IBurger>();
@@ -151,11 +151,48 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(default(ICheese), Arg.Of<ICheese>(IfUnresolved.Throw, "key"));
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_specify_default_parameter()
         {
             var container = new Container();
-            container.Register(Made.Of(() => new D(Arg.Of<string>("d", IfUnresolved.ReturnDefault))));
+            container.Register(Made.Of(() => new D(Arg.Of("d", IfUnresolved.ReturnDefault))));
+
+            var d = container.Resolve<D>();
+
+            Assert.AreEqual("d", d.S);
+        }
+
+        [Test]
+        public void Can_specify_default_parameter_and_service_key()
+        {
+            var container = new Container();
+            container.Register(Made.Of(() => new D(Arg.Of("d", IfUnresolved.ReturnDefault, "someKey"))));
+
+            var d = container.Resolve<D>();
+
+            Assert.AreEqual("d", d.S);
+        }
+
+
+
+
+        [Test]
+        public void If_default_parameter_is_specified_Then_IfUnresolved_should_be_set_to_ReturnDefault()
+        {
+            var container = new Container();
+            container.Register(Made.Of(() => new D(Arg.Of("d", 
+                IfUnresolved.Throw))));
+            
+            var d = container.Resolve<D>();
+
+            Assert.AreEqual("d", d.S);
+        }
+
+        [Test]
+        public void I_should_be_able_to_specify_custom_constant_value_instead_of_Arg()
+        {
+            var container = new Container();
+            container.Register(Made.Of(() => new D("d")));
 
             var d = container.Resolve<D>();
 
