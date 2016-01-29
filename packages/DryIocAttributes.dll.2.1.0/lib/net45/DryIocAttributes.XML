@@ -19,6 +19,44 @@
         <member name="F:DryIocAttributes.ReuseType.ResolutionScope">
             <summary>subj.</summary>
         </member>
+        <member name="T:DryIocAttributes.IfAlreadyExported">
+            <summary>Specifies options to handle situation when registered service is already present in the registry.</summary>
+        </member>
+        <member name="F:DryIocAttributes.IfAlreadyExported.AppendNotKeyed">
+            <summary>Appends new default registration or throws registration with the same key.</summary>
+        </member>
+        <member name="F:DryIocAttributes.IfAlreadyExported.Throw">
+            <summary>Throws if default or registration with the same key is already exist.</summary>
+        </member>
+        <member name="F:DryIocAttributes.IfAlreadyExported.Keep">
+            <summary>Keeps old default or keyed registration ignoring new registration: ensures Register-Once semantics.</summary>
+        </member>
+        <member name="F:DryIocAttributes.IfAlreadyExported.Replace">
+            <summary>Replaces old registration with new one.</summary>
+        </member>
+        <member name="T:DryIocAttributes.ExportExAttribute">
+            <summary>Provides whole set of possible/supported export options.</summary>
+        </member>
+        <member name="M:DryIocAttributes.ExportExAttribute.#ctor(System.Object,System.Type,DryIocAttributes.IfAlreadyExported)">
+            <summary>Creates attribute.</summary>
+            <param name="contractKey">Service key object, should implement <see cref="M:System.Object.GetHashCode"/> and <see cref="M:System.Object.Equals(System.Object)"/></param> 
+            <param name="contractType">(optional) Service type.</param>
+            <param name="ifAlreadyExported">(optional) Handles export when other such export is already exist.</param>
+        </member>
+        <member name="M:DryIocAttributes.ExportExAttribute.#ctor(System.Type,DryIocAttributes.IfAlreadyExported)">
+            <summary>Creates export with specified service type.</summary> <param name="contractType">Service type.</param>
+            <param name="ifAlreadyExported">(optional) Handles export when other such export is already exist.</param>
+        </member>
+        <member name="M:DryIocAttributes.ExportExAttribute.#ctor(DryIocAttributes.IfAlreadyExported)">
+            <summary>Creates export with handling existing export option.</summary>
+            <param name="ifAlreadyExported">Handles export when other such export is already exist.</param>
+        </member>
+        <member name="P:DryIocAttributes.ExportExAttribute.ContractKey">
+            <summary>Optional service key or string <see cref="P:System.ComponentModel.Composition.ExportAttribute.ContractName"/>.</summary>
+        </member>
+        <member name="P:DryIocAttributes.ExportExAttribute.IfAlreadyExported">
+            <summary>Option to handle existing and duplicate exports.</summary>
+        </member>
         <member name="T:DryIocAttributes.ReuseAttribute">
             <summary>Base attribute to specify type of reuse for annotated class.</summary>
         </member>
@@ -87,7 +125,10 @@
             <summary>Allows disposable transient to be exported.</summary>
         </member>
         <member name="T:DryIocAttributes.ExportWithKeyAttribute">
-            <summary>Defines export with arbitrary object key.</summary>
+            <summary>OBSOLETE: Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.</summary>
+        </member>
+        <member name="P:DryIocAttributes.ExportWithKeyAttribute.ContractKey">
+            <remarks>Specifies service key if <see cref="P:System.ComponentModel.Composition.ExportAttribute.ContractName"/> is not specified.</remarks>
         </member>
         <member name="M:DryIocAttributes.ExportWithKeyAttribute.#ctor(System.Object,System.Type)">
             <summary>Creates attribute.</summary>
@@ -98,9 +139,6 @@
             <summary>Creates attribute using implementation type as <see cref="P:System.ComponentModel.Composition.ExportAttribute.ContractType"/></summary>
             <param name="contractKey">Service key object, should implement <see cref="M:System.Object.GetHashCode"/> and <see cref="M:System.Object.Equals(System.Object)"/></param> 
         </member>
-        <member name="P:DryIocAttributes.ExportWithKeyAttribute.ContractKey">
-            <remarks>Specifies service key if <see cref="P:System.ComponentModel.Composition.ExportAttribute.ContractName"/> is not specified.</remarks>
-        </member>
         <member name="T:DryIocAttributes.ExportManyAttribute">
             <summary>Specifies to export all implemented contract types automatically.</summary>
         </member>
@@ -108,7 +146,7 @@
             <summary>Specifies service key if <see cref="P:DryIocAttributes.ExportManyAttribute.ContractName"/> is not specified.</summary>
         </member>
         <member name="P:DryIocAttributes.ExportManyAttribute.ContractName">
-            <summary>If specified has more priority over <see cref="P:DryIocAttributes.ExportManyAttribute.ContractKey"/>.</summary>
+            <summary>OBSOLETE: Use ContractKey instead.</summary>
         </member>
         <member name="P:DryIocAttributes.ExportManyAttribute.Except">
             <summary>Excludes specified contract types.</summary>
@@ -116,16 +154,14 @@
         <member name="P:DryIocAttributes.ExportManyAttribute.NonPublic">
             <summary>Public types by default.</summary>
         </member>
+        <member name="P:DryIocAttributes.ExportManyAttribute.IfAlreadyExported">
+            <summary>Option to handle existing and duplicate exports.</summary>
+        </member>
         <member name="T:DryIocAttributes.AsFactoryAttribute">
             <summary>Specifies that class exporting static or instance method factories</summary>
         </member>
         <member name="T:DryIocAttributes.AsWrapperAttribute">
             <summary>Exports service as custom wrapper.</summary>
-        </member>
-        <member name="M:DryIocAttributes.AsWrapperAttribute.#ctor(System.Int32,System.Boolean)">
-            <summary>Creates attribute with <see cref="P:DryIocAttributes.AsWrapperAttribute.WrappedServiceTypeArgIndex"/>.</summary>
-            <param name="wrappedServiceTypeArgIndex">(optional) To use single generic type arg.</param>
-            <param name="alwaysWrapsRequiredServiceType">(optional) Required for generic wrapper to ignore its type arguments.</param>
         </member>
         <member name="P:DryIocAttributes.AsWrapperAttribute.WrappedServiceTypeArgIndex">
             <summary>For open-generic wrapper indicates wrapped argument type index.</summary>
@@ -133,16 +169,13 @@
         <member name="P:DryIocAttributes.AsWrapperAttribute.AlwaysWrapsRequiredServiceType">
             <summary>Per name.</summary>
         </member>
+        <member name="M:DryIocAttributes.AsWrapperAttribute.#ctor(System.Int32,System.Boolean)">
+            <summary>Creates attribute with <see cref="P:DryIocAttributes.AsWrapperAttribute.WrappedServiceTypeArgIndex"/>.</summary>
+            <param name="wrappedServiceTypeArgIndex">(optional) To use single generic type arg.</param>
+            <param name="alwaysWrapsRequiredServiceType">(optional) Required for generic wrapper to ignore its type arguments.</param>
+        </member>
         <member name="T:DryIocAttributes.AsDecoratorAttribute">
             <summary>Specifies that exported service is decorator of services of <see cref="P:System.ComponentModel.Composition.ExportAttribute.ContractType"/>.</summary>
-        </member>
-        <member name="M:DryIocAttributes.AsDecoratorAttribute.#ctor(System.Object,System.Int32)">
-            <summary>Creates attribute by providing its optional properties.</summary>
-            <param name="contractKey">(optional)</param> <param name="order">(optional)</param>
-        </member>
-        <member name="M:DryIocAttributes.AsDecoratorAttribute.#ctor(System.String,System.Int32)">
-            <summary>Creates attributes with <see cref="P:DryIocAttributes.AsDecoratorAttribute.ContractName"/> and optional order.</summary>
-            <param name="contractName"></param> <param name="order">(optional)</param>
         </member>
         <member name="P:DryIocAttributes.AsDecoratorAttribute.ContractName">
             <summary>If <see cref="P:DryIocAttributes.AsDecoratorAttribute.ContractName"/> specified, it has more priority over <see cref="P:DryIocAttributes.AsDecoratorAttribute.ContractKey"/>. </summary>
@@ -153,16 +186,24 @@
         <member name="P:DryIocAttributes.AsDecoratorAttribute.Order">
             <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
         </member>
-        <member name="T:DryIocAttributes.RegistrationType">
+        <member name="M:DryIocAttributes.AsDecoratorAttribute.#ctor(System.Object,System.Int32)">
+            <summary>Creates attribute by providing its optional properties.</summary>
+            <param name="contractKey">(optional)</param> <param name="order">(optional)</param>
+        </member>
+        <member name="M:DryIocAttributes.AsDecoratorAttribute.#ctor(System.String,System.Int32)">
+            <summary>Creates attributes with <see cref="P:DryIocAttributes.AsDecoratorAttribute.ContractName"/> and optional order.</summary>
+            <param name="contractName"></param> <param name="order">(optional)</param>
+        </member>
+        <member name="T:DryIocAttributes.FactoryType">
             <summary>Type of services supported by Container.</summary>
         </member>
-        <member name="F:DryIocAttributes.RegistrationType.Service">
+        <member name="F:DryIocAttributes.FactoryType.Service">
             <summary>(default) Defines normal service factory</summary>
         </member>
-        <member name="F:DryIocAttributes.RegistrationType.Decorator">
+        <member name="F:DryIocAttributes.FactoryType.Decorator">
             <summary>Defines decorator factory</summary>
         </member>
-        <member name="F:DryIocAttributes.RegistrationType.Wrapper">
+        <member name="F:DryIocAttributes.FactoryType.Wrapper">
             <summary>Defines wrapper factory.</summary>
         </member>
         <member name="T:DryIocAttributes.RequestInfo">
@@ -171,8 +212,22 @@
         <member name="F:DryIocAttributes.RequestInfo.Empty">
             <summary>Represents empty info (indicated by null <see cref="F:DryIocAttributes.RequestInfo.ServiceType"/>).</summary>
         </member>
-        <member name="F:DryIocAttributes.RequestInfo.Parent">
+        <member name="P:DryIocAttributes.RequestInfo.IsEmpty">
+            <summary>Returns true for an empty request.</summary>
+        </member>
+        <member name="P:DryIocAttributes.RequestInfo.IsResolutionRoot">
+            <summary>Returns true if request is the first in a chain.</summary>
+        </member>
+        <member name="F:DryIocAttributes.RequestInfo.ParentOrWrapper">
             <summary>Parent request or null for root resolution request.</summary>
+        </member>
+        <member name="P:DryIocAttributes.RequestInfo.Parent">
+            <summary>Returns service parent skipping wrapper if any. To get immediate parent us <see cref="F:DryIocAttributes.RequestInfo.ParentOrWrapper"/>.</summary>
+        </member>
+        <member name="M:DryIocAttributes.RequestInfo.FirstOrEmpty(System.Func{DryIocAttributes.RequestInfo,System.Boolean})">
+            <summary>Gets first request info starting with itself which satisfies the condition, or empty otherwise.</summary>
+            <param name="condition">Condition to stop on. Should not be null.</param>
+            <returns>Request info of found parent.</returns>
         </member>
         <member name="F:DryIocAttributes.RequestInfo.ServiceType">
             <summary>Asked service type.</summary>
@@ -183,6 +238,9 @@
         <member name="F:DryIocAttributes.RequestInfo.ServiceKey">
             <summary>Optional service key.</summary>
         </member>
+        <member name="F:DryIocAttributes.RequestInfo.FactoryID">
+            <summary>Resolved factory ID, used to identify applied decorator.</summary>
+        </member>
         <member name="F:DryIocAttributes.RequestInfo.FactoryType">
             <summary>False for Decorators and Wrappers.</summary>
         </member>
@@ -192,15 +250,15 @@
         <member name="F:DryIocAttributes.RequestInfo.ReuseLifespan">
             <summary>Relative number representing reuse lifespan.</summary>
         </member>
-        <member name="M:DryIocAttributes.RequestInfo.Push(System.Type,System.Type,System.Int32)">
+        <member name="M:DryIocAttributes.RequestInfo.Push(System.Type,System.Int32,System.Type,System.Int32)">
             <summary>Simplified version of Push with most common properties.</summary>
-            <param name="serviceType"></param> <param name="implementationType"></param>
+            <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
             <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
         </member>
-        <member name="M:DryIocAttributes.RequestInfo.Push(System.Type,System.Type,System.Object,DryIocAttributes.RegistrationType,System.Type,System.Int32)">
+        <member name="M:DryIocAttributes.RequestInfo.Push(System.Type,System.Type,System.Object,System.Int32,DryIocAttributes.FactoryType,System.Type,System.Int32)">
             <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
             <param name="serviceType"></param> <param name="requiredServiceType"></param>
-            <param name="serviceKey"></param> <param name="factoryType"></param>
+            <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
             <param name="implementationType"></param> <param name="reuseLifespan"></param>
             <returns>Created info chain to current (parent) info.</returns>
         </member>
@@ -227,12 +285,6 @@
             <summary>Returns hash code combined from info fields plus its parent.</summary>
             <returns>Combined hash code.</returns>
         </member>
-        <member name="P:DryIocAttributes.RequestInfo.IsEmpty">
-            <summary>Returns true for an empty request.</summary>
-        </member>
-        <member name="P:DryIocAttributes.RequestInfo.IsResolutionRoot">
-            <summary>Returns true if request is the first in a chain.</summary>
-        </member>
         <member name="T:DryIocAttributes.ExportConditionAttribute">
             <summary>Base type for exported type Setup Condition.</summary>
         </member>
@@ -243,6 +295,9 @@
         <member name="T:DryIocAttributes.ImportWithKeyAttribute">
             <summary>Imports service Only with equal <see cref="P:DryIocAttributes.ImportWithKeyAttribute.ContractKey"/>.</summary>
         </member>
+        <member name="P:DryIocAttributes.ImportWithKeyAttribute.ContractKey">
+            <summary>Arbitrary object to match with service key.</summary>
+        </member>
         <member name="M:DryIocAttributes.ImportWithKeyAttribute.#ctor(System.Object,System.Type)">
             <summary>Creates attribute object service key.</summary> <param name="contractKey"></param>
             <param name="contractType">(optional) If missing then imported member type will be used as service type.</param>
@@ -250,9 +305,6 @@
         <member name="M:DryIocAttributes.ImportWithKeyAttribute.#ctor(System.String,System.Type)">
             <summary>Creates attribute with string service name.</summary> <param name="contractKey"></param>
             <param name="contractType">(optional) If missing then imported member type will be used as service type.</param>
-        </member>
-        <member name="P:DryIocAttributes.ImportWithKeyAttribute.ContractKey">
-            <summary>Arbitrary object to match with service key.</summary>
         </member>
         <member name="T:DryIocAttributes.WithMetadataAttribute">
             <summary>Exports service with associated metadata object.</summary>
@@ -266,14 +318,6 @@
         <member name="T:DryIocAttributes.ImportExternalAttribute">
             <summary>Indicate to import service and in case it is not registered, register it using provided
             implementation info. Useful for ad-hoc/quick-prototyping registration of types from not controlled libraries.</summary>
-        </member>
-        <member name="M:DryIocAttributes.ImportExternalAttribute.#ctor(System.Type,System.Type[],System.Object,System.Object,System.Type)">
-            <summary>Creates attributes.</summary>
-            <param name="implementationType">(optional) Implementation type of registered service.</param>
-            <param name="constructorSignature">(optional) Use specific constructor for registration.</param>
-            <param name="metadata">(optional) Metadata associated with registration.</param>
-            <param name="contractKey">(optional) Registering (and importing) with specified service key.</param>
-            <param name="contractType">(optional) Registering (and importing) with specified service type.</param>
         </member>
         <member name="P:DryIocAttributes.ImportExternalAttribute.ImplementationType">
             <summary>Implementation type of registered service.</summary>
@@ -289,6 +333,14 @@
         </member>
         <member name="P:DryIocAttributes.ImportExternalAttribute.ContractType">
             <summary>Registering (and importing) with specified service type.</summary>
+        </member>
+        <member name="M:DryIocAttributes.ImportExternalAttribute.#ctor(System.Type,System.Type[],System.Object,System.Object,System.Type)">
+            <summary>Creates attributes.</summary>
+            <param name="implementationType">(optional) Implementation type of registered service.</param>
+            <param name="constructorSignature">(optional) Use specific constructor for registration.</param>
+            <param name="metadata">(optional) Metadata associated with registration.</param>
+            <param name="contractKey">(optional) Registering (and importing) with specified service key.</param>
+            <param name="contractType">(optional) Registering (and importing) with specified service type.</param>
         </member>
         <member name="T:DryIocAttributes.OpenResolutionScopeAttribute">
             <summary>Exported type should open resolution scope when injected.</summary>

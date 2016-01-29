@@ -1502,13 +1502,110 @@ namespace DryIocZero
         Decorator,
         /// <summary>Defines wrapper factory.</summary>
         Wrapper
-    };
+    }
+
+    /// <summary>Reuse goal is to locate or create scope where reused objects will be stored.</summary>
+    /// <remarks><see cref="IReuse"/> implementors supposed to be stateless, and provide scope location behavior only.
+    /// The reused service instances should be stored in scope(s).</remarks>
+    public interface IReuse
+    {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        int Lifespan { get; }
+    }
+
+    /// <summary>Specifies pre-defined reuse behaviors supported by container: 
+    /// used when registering services into container with <see cref="Registrator"/> methods.</summary>
+    public static class Reuse
+    {
+        /// <summary>Specifies to store single service instance per <see cref="Container"/>.</summary>
+        public static readonly IReuse Singleton = new SingletonReuse();
+
+        /// <summary>Specifies to store single service instance per resolution root created by <see cref="Resolver"/> methods.</summary>
+        public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
+
+        /// <summary>Specifies to store single service instance per current/open scope created with <see cref="Container.OpenScope"/>.</summary>
+        public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
+
+        /// <summary>Returns current scope reuse with specific name to match with scope.
+        /// If name is not specified then function returns <see cref="InCurrentScope"/>.</summary>
+        /// <param name="name">(optional) Name to match with scope.</param>
+        /// <returns>Created current scope reuse.</returns>
+        public static IReuse InCurrentNamedScope(object name = null)
+        {
+            return name == null ? InCurrentScope : new CurrentScopeReuse(name);
+        }
+
+        /// <summary>Creates reuse to search for <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/>
+        /// in existing resolution scope hierarchy. If parameters are not specified or null, then <see cref="InResolutionScope"/> will be returned.</summary>
+        /// <param name="assignableFromServiceType">(optional) To search for scope with service type assignable to type specified in parameter.</param>
+        /// <param name="serviceKey">(optional) Search for specified key.</param>
+        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
+        /// <returns>New reuse with specified parameters or <see cref="InResolutionScope"/> if nothing specified.</returns>
+        public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null, bool outermost = false)
+        {
+            return assignableFromServiceType == null && serviceKey == null ? InResolutionScope
+                : new ResolutionScopeReuse(assignableFromServiceType, serviceKey, outermost);
+        }
+    }
+
+    /// <summary>Returns container bound scope for storing singleton objects.</summary>
+    public sealed class SingletonReuse : IReuse
+    {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        public int Lifespan { get { return 1000; } }
+    }
+
+    /// <summary>Returns container bound current scope created by <see cref="Container.OpenScope"/> method.</summary>
+    /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
+    public sealed class CurrentScopeReuse : IReuse
+    {
+        /// <summary>Name to find current scope or parent with equal name.</summary>
+        public readonly object Name;
+
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        public int Lifespan { get { return 100; } }
+
+        /// <summary>Creates reuse optionally specifying its name.</summary> 
+        /// <param name="name">(optional) Used to find matching current scope or parent.</param>
+        public CurrentScopeReuse(object name = null)
+        {
+            Name = name;
+        }
+    }
+
+    /// <summary>Represents services created once per resolution root (when some of Resolve methods called).</summary>
+    /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
+    public sealed class ResolutionScopeReuse : IReuse
+    {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        public int Lifespan { get { return 0; } }
+
+        /// <summary>Indicates consumer with assignable service type that defines resolution scope.</summary>
+        public readonly Type AssignableFromServiceType;
+
+        /// <summary>Indicates service key of the consumer that defines resolution scope.</summary>
+        public readonly object ServiceKey;
+
+        /// <summary>When set indicates to find the outermost matching consumer with resolution scope,
+        /// otherwise nearest consumer scope will be used.</summary>
+        public readonly bool Outermost;
+
+        /// <summary>Creates new resolution scope reuse with specified type and key.</summary>
+        /// <param name="assignableFromServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
+        /// <param name="outermost">(optional)</param>
+        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null, bool outermost = false)
+        {
+            AssignableFromServiceType = assignableFromServiceType;
+            ServiceKey = serviceKey;
+            Outermost = outermost;
+        }
+    }
 
     /// <summary>Dependency request path information.</summary>
     public sealed class RequestInfo
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, -1, FactoryType.Service, null, 0, null);
+        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, -1, FactoryType.Service, null, null, null);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty { get { return ServiceType == null; } }
@@ -1558,31 +1655,34 @@ namespace DryIocZero
         public readonly Type ImplementationType;
 
         /// <summary>Relative number representing reuse lifespan.</summary>
-        public readonly int ReuseLifespan;
+        public int ReuseLifespan { get { return Reuse == null ? 0 : Reuse.Lifespan; } }
+
+        /// <summary>Service reuse.</summary>
+        public readonly IReuse Reuse;
 
         /// <summary>Simplified version of Push with most common properties.</summary>
         /// <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
-        /// <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
-        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, int reuseLifespan)
+        /// <param name="reuse"></param> <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse)
         {
-            return Push(serviceType, null, null, factoryID, FactoryType.Service, implementationType, reuseLifespan);
+            return Push(serviceType, null, null, factoryID, FactoryType.Service, implementationType, reuse);
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
         /// <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
+        /// <param name="implementationType"></param> <param name="reuse"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
-            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan)
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse)
         {
             return new RequestInfo(serviceType, requiredServiceType, serviceKey,
-                factoryID, factoryType, implementationType, reuseLifespan, this);
+                factoryID, factoryType, implementationType, reuse, this);
         }
 
         private RequestInfo(
             Type serviceType, Type requiredServiceType, object serviceKey,
-            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
             RequestInfo parentOrWrapper)
         {
             ParentOrWrapper = parentOrWrapper;
@@ -1596,7 +1696,7 @@ namespace DryIocZero
             FactoryID = factoryID;
             FactoryType = factoryType;
             ImplementationType = implementationType;
-            ReuseLifespan = reuseLifespan;
+            Reuse = reuse;
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>

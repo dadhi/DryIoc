@@ -70,7 +70,7 @@
             <param name="implementationType">Type to convert into registration info.</param>
             <returns>Created DTO.</returns>
         </member>
-        <member name="M:DryIoc.MefAttributedModel.AttributedModel.GetReuse(DryIocAttributes.ReuseType,System.String)">
+        <member name="M:DryIoc.MefAttributedModel.AttributedModel.GetReuse(DryIocAttributes.ReuseType,System.Object)">
             <summary>Returns reuse object by mapping provided type to <see cref="F:DryIoc.MefAttributedModel.AttributedModel.SupportedReuseTypes"/>.
             Returns null (transient or no reuse) if null provided reuse type.</summary>
             <param name="reuseType">Reuse type to find in supported.</param>
@@ -215,13 +215,17 @@
         <member name="F:DryIoc.MefAttributedModel.ExportInfo.ServiceKeyInfo">
             <summary>Wrapped contract name or service key. It is wrapped in order to be serializable.</summary>
         </member>
+        <member name="F:DryIoc.MefAttributedModel.ExportInfo.IfAlreadyRegistered">
+            <summary>If already registered option to pass to container registration.</summary>
+        </member>
         <member name="M:DryIoc.MefAttributedModel.ExportInfo.#ctor">
             <summary>Default constructor is usually required by deserializer.</summary>
         </member>
-        <member name="M:DryIoc.MefAttributedModel.ExportInfo.#ctor(System.Type,System.Object)">
+        <member name="M:DryIoc.MefAttributedModel.ExportInfo.#ctor(System.Type,System.Object,DryIoc.IfAlreadyRegistered)">
             <summary>Creates exported info out of type and optional key.</summary>
             <param name="serviceType">Contract type to store.</param>
             <param name="serviceKey">(optional) ContractName string or service key.</param>
+            <param name="ifAlreadyRegistered">(optional) Handles the case when the same export is already registered.</param>
         </member>
         <member name="M:DryIoc.MefAttributedModel.ExportInfo.Equals(System.Object)">
             <summary>Compares with another info for equality.</summary>

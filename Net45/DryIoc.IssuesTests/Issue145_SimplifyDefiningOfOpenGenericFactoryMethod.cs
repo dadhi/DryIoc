@@ -125,6 +125,17 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
+        public void Should_Not_throw_with_IfUnresolvedReturnDefault_when_mapping_factory_mathod_declaring_type_with_incompatible_type_arguments()
+        {
+            var container = new Container();
+            container.RegisterExports(typeof(X<>));
+
+            var y = container.Resolve<IY<List<string>, Tuple<int, string>>>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNull(y);
+        }
+
+        [Test]
         public void Should_throw_when_mapping_factory_method_with_incompatible_type_arguments()
         {
             var container = new Container();

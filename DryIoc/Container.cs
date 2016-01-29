@@ -37,6 +37,10 @@ namespace DryIoc
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IContainer, IScopeAccess
     {
+        /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
+        public Container() : this(Rules.Default, Ref.Of(Registry.Default), new SingletonScope())
+        { }
+
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
         /// <param name="rules">(optional) Rules to modify container default resolution behavior. 
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
@@ -132,7 +136,7 @@ namespace DryIoc
                     : _scopeContext != null ? _scopeContext.RootScopeName
                     : NonAmbientRootScopeName;
 
-            var nestedOpenedScope = new Scope(_openedScope, scopeName);
+            var nestedOpenedScope = new SingletonScope(_openedScope, scopeName);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             if (_scopeContext != null)
@@ -161,7 +165,9 @@ namespace DryIoc
         /// <summary>Disposes container current scope and that means container itself.</summary>
         public void Dispose()
         {
-            if (_openedScope != null) // for container created with OpenScope
+            // for container created with OpenScope
+            if (_openedScope != null && 
+                _openedScope != _singletonScope) 
             {
                 CloseCurrentScope();
             }
@@ -1724,8 +1730,8 @@ namespace DryIoc
             }
         }
 
-        private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope, IScopeContext scopeContext,
-            IScope openedScope = null, int disposed = 0)
+        private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope, 
+            IScopeContext scopeContext = null, IScope openedScope = null, int disposed = 0)
         {
             Rules = rules;
 
@@ -1734,7 +1740,11 @@ namespace DryIoc
 
             _singletonScope = singletonScope;
             _scopeContext = scopeContext;
-            _openedScope = openedScope;
+
+            if (openedScope != null)
+                _openedScope = openedScope;
+            else if (scopeContext == null && rules.SingletonScopeAsRootOpenScope) // only valid for non ambient context
+                _openedScope = singletonScope;
 
             _containerWeakRef = new ContainerWeakRef(this);
             _emptyRequest = Request.CreateEmpty(_containerWeakRef);
@@ -2832,6 +2842,22 @@ namespace DryIoc
             return newRules;
         }
 
+        /// <summary>Flag specifies that Singleton scope will be used as already opene root scope. 
+        /// So Client may not OpenScope to resolve scoped resgitrations.</summary>
+        /// <remarks>The setting is only valid for container without ambient scope context.</remarks>
+        public bool SingletonScopeAsRootOpenScope
+        {
+            get { return (_settings & Settings.SingletonScopeAsRootOpenScope) != 0; }
+        }
+
+        /// <summary>Produces new rules with <see cref="SingletonScopeAsRootOpenScope"/>.</summary> <returns>New rules.</returns>
+        public Rules WithSingletonScopeAsRootOpenScope()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules._settings |= Settings.SingletonScopeAsRootOpenScope;
+            return newRules;
+        }
+
         #region Implementation
 
         private Rules()
@@ -2850,7 +2876,8 @@ namespace DryIoc
             ImplicitCheckForReuseMatchingScope = 4,
             VariantGenericTypesInResolvedCollection = 8,
             ResolveIEnumerableAsLazyEnumerable = 16,
-            EagerCachingSingletonForFasterAccess = 32
+            EagerCachingSingletonForFasterAccess = 32,
+            SingletonScopeAsRootOpenScope = 64 
         }
 
         private const Settings DEFAULT_SETTINGS =
@@ -5351,10 +5378,6 @@ namespace DryIoc
 
             request = request.WithResolvedFactory(this);
 
-            var reuse = Reuse ?? container.Rules.DefaultReuseInsteadOfTransient;
-
-            ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
-
             // Here's lookup for decorators
             var decoratorExpr = FactoryType == FactoryType.Service
                     ? container.GetDecoratorExpressionOrDefault(request)
@@ -5372,25 +5395,7 @@ namespace DryIoc
 
             var serviceExpr = isReplacingDecorator ? decoratorExpr : CreateExpressionOrDefault(request);
             if (serviceExpr != null && !isReplacingDecorator)
-            {
-                if (reuse != null)
-                {
-                    // The singleton optimization: eagerly create singleton and put it into state for fast access.
-                    if (reuse is SingletonReuse && FactoryType == FactoryType.Service &&
-                        !(this is InstanceFactory) &&
-                        !request.IsWrappedInFunc() &&
-                        container.Rules.EagerCachingSingletonForFasterAccess)
-                        serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
-                    else
-                        serviceExpr = GetScopedExpressionOrDefault(serviceExpr, request, reuse, FactoryID, Setup);
-                }
-                else
-                {
-                    var trackingReuse = GetTrackingReuseIfTransientIsDisposable(request);
-                    if (trackingReuse != null)
-                        serviceExpr = GetScopedExpressionOrDefault(serviceExpr, request, trackingReuse, GetNextID(), Setup.Default);
-                }
-            }
+                serviceExpr = ApplyReuse(serviceExpr, request);
 
             if (serviceExpr != null)
             {
@@ -5415,6 +5420,34 @@ namespace DryIoc
                         .Any(r => r.GetActualServiceType().IsSupportedCollectionType()))
                         Container.ThrowUnableToResolve(request);
                 }
+            }
+
+            return serviceExpr;
+        }
+
+        private Expression ApplyReuse(Expression serviceExpr, Request request)
+        {
+            var container = request.Container;
+            var reuse = Reuse ?? container.Rules.DefaultReuseInsteadOfTransient;
+            ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
+
+            if (reuse != null)
+            {
+                // The singleton optimization: eagerly create singleton and put it into state for fast access.
+                if (Reuse is SingletonReuse &&
+                    FactoryType == FactoryType.Service &&
+                    !(this is InstanceFactory) &&
+                    !request.IsWrappedInFunc() &&
+                    container.Rules.EagerCachingSingletonForFasterAccess)
+                    serviceExpr = CreateSingletonAndGetExpressionOrDefault(serviceExpr, request);
+                else
+                    serviceExpr = GetScopedExpressionOrDefault(serviceExpr, request, reuse, FactoryID, Setup);
+            }
+            else
+            {
+                var trackingReuse = GetTrackingReuseIfTransientIsDisposable(request);
+                if (trackingReuse != null)
+                    serviceExpr = GetScopedExpressionOrDefault(serviceExpr, request, trackingReuse, GetNextID(), Setup.Default);
             }
 
             return serviceExpr;
@@ -5504,19 +5537,10 @@ namespace DryIoc
         private static Expression GetScopedExpressionOrDefault(Expression serviceExpr, Request request,
             IReuse reuse, int factoryID, Setup setup)
         {
-            var getScopeExpr = reuse.GetScopeExpression(request);
             var serviceType = serviceExpr.Type;
-            var scopedInstanceId = reuse.GetScopedItemIdOrSelf(factoryID, request);
-            var scopedInstanceIdExpr = Expression.Constant(scopedInstanceId);
 
-            if (setup.PreventDisposal == false && setup.WeaklyReferenced == false)
-            {
-                if (serviceExpr.Type.IsValueType())
-                    serviceExpr = Expression.Convert(serviceExpr, typeof(object));
-                var getFromScope = Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(), scopedInstanceIdExpr,
-                    Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
-                return Expression.Convert(getFromScope, serviceType);
-            }
+            if (serviceExpr.Type.IsValueType())
+                serviceExpr = Expression.Convert(serviceExpr, typeof(object));
 
             if (setup.PreventDisposal)
                 serviceExpr = Expression.NewArrayInit(typeof(object), serviceExpr);
@@ -5524,31 +5548,31 @@ namespace DryIoc
             if (setup.WeaklyReferenced)
                 serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
 
-            Expression getScopedServiceExpr = Expression.Call(getScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
-                scopedInstanceIdExpr, Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
+            var scopeExpr = reuse.GetScopeExpression(request);
+            var scopedServiceId = reuse.GetScopedItemIdOrSelf(factoryID, request);
+
+            serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(), 
+                Expression.Constant(scopedServiceId),
+                Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
 
             if (setup.WeaklyReferenced)
-            {
-                var weakRefExpr = Expression.Convert(getScopedServiceExpr, typeof(WeakReference));
-                var weakRefTargetExpr = Expression.Property(weakRefExpr, "Target");
-                var throwIfTargetNullExpr = Expression.Call(typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull", ArrayTools.Empty<Type>(),
-                    weakRefTargetExpr, Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
-                getScopedServiceExpr = throwIfTargetNullExpr;
-            }
+                serviceExpr = Expression.Call(typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull",
+                    ArrayTools.Empty<Type>(),
+                    Expression.Property(Expression.Convert(serviceExpr, typeof(WeakReference)), "Target"),
+                    Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
 
             if (setup.PreventDisposal)
-                getScopedServiceExpr = Expression.ArrayIndex(
-                    Expression.Convert(getScopedServiceExpr, typeof(object[])),
+                serviceExpr = Expression.ArrayIndex(
+                    Expression.Convert(serviceExpr, typeof(object[])),
                     Expression.Constant(0, typeof(int)));
 
-            return Expression.Convert(getScopedServiceExpr, serviceType);
+            return Expression.Convert(serviceExpr, serviceType);
         }
 
         private Expression CreateSingletonAndGetExpressionOrDefault(Expression serviceExpr, Request request)
         {
+            var serviceType = serviceExpr.Type;
             var factoryDelegate = serviceExpr.CompileToDelegate(request.Container);
-            var singletonScope = request.Scopes.SingletonScope;
-            var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
 
             if (Setup.PreventDisposal)
             {
@@ -5562,24 +5586,25 @@ namespace DryIoc
                 factoryDelegate = (st, cs, rs) => new WeakReference(serviceFactory(st, cs, rs));
             }
 
-            var serviceType = serviceExpr.Type;
-            if (!Setup.PreventDisposal && !Setup.WeaklyReferenced)
-            {
-                singletonScope.GetOrAdd(singletonId, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope));
-                return Expression.Convert(
-                    Expression.ArrayIndex(Container.StateParamExpr, Expression.Constant(singletonId, typeof(int))), 
-                    serviceType);
-            }
+            var singletonScope = request.Scopes.SingletonScope;
+            var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
+            singletonScope.GetOrAdd(singletonId, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope));
 
-            var wrappedService = singletonScope.GetOrAdd(singletonId, () => factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, null));
+            Expression singletonExpr = Expression.ArrayIndex(
+                Container.StateParamExpr, 
+                Expression.Constant(singletonId, typeof(int)));
 
             if (Setup.WeaklyReferenced)
-                wrappedService = ((WeakReference)wrappedService).Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed);
+                singletonExpr = Expression.Call(typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull", ArrayTools.Empty<Type>(),
+                    Expression.Property(Expression.Convert(singletonExpr, typeof(WeakReference)), "Target"),
+                    Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
 
             if (Setup.PreventDisposal)
-                wrappedService = ((object[])wrappedService)[0];
+                singletonExpr = Expression.ArrayIndex(
+                    Expression.Convert(singletonExpr, typeof(object[])),
+                    Expression.Constant(0, typeof(int)));
 
-            return request.Container.GetOrAddStateItemExpression(wrappedService, serviceType);
+            return Expression.Convert(singletonExpr, serviceType);
         }
 
         #endregion
@@ -6084,8 +6109,6 @@ namespace DryIoc
                                 () => factoryServiceType.MakeGenericType(resultFactoryServiceTypeArgs),
                                 request.IfUnresolved == IfUnresolved.Throw,
                                 Error.NoMatchedGenericParamConstraints, factoryServiceType, request);
-                            if (closedFactoryServiceType == null)
-                                return null;
 
                             // Copy factory info with closed factory type
                             factoryInfo = ServiceInfo.Of(closedFactoryServiceType)
@@ -6099,8 +6122,6 @@ namespace DryIoc
                         () => factoryImplType.MakeGenericType(resultFactoryImplTypeArgs),
                         request.IfUnresolved == IfUnresolved.Throw,
                         Error.NoMatchedGenericParamConstraints, factoryImplType, request);
-                    if (closedFactoryImplType == null)
-                        return null;
 
                     // Find corresponding member again, now from closed type
                     var factoryMethodBase = factoryMember as MethodBase;
@@ -6156,9 +6177,6 @@ namespace DryIoc
                         () => openFactoryMethod.MakeGenericMethod(resultMethodTypeArgs),
                         request.IfUnresolved == IfUnresolved.Throw,
                         Error.NoMatchedGenericParamConstraints, factoryImplType, request);
-
-                    if (factoryMember == null)
-                        return null;
                 }
 
                 return FactoryMethod.Of(factoryMember, factoryInfo);
@@ -6466,7 +6484,7 @@ namespace DryIoc
         public override Type ImplementationType { get { return _knownImplementationType; } }
 
         /// <summary>Creates factory by providing:</summary>
-        /// <param name="factoryDelegate">User specified service creation delegate.</param>
+        /// <param name="factoryDelegate">Specified service creation delegate.</param>
         /// <param name="reuse">(optional) Reuse behavior for created service.</param>
         /// <param name="setup">(optional) Additional settings.</param>
         /// <param name="knownImplementationType">(optional) Implementation type if known, e.g. when registering existing instance.</param>
@@ -6650,11 +6668,13 @@ namespace DryIoc
             }
 
             if (disposable != null)
+            {
                 try { disposable.Dispose(); }
                 catch (Exception)
                 {
                     // NOTE Ignoring disposing exception, they not so important for program to proceed.
                 }
+            }
         }
 
         #endregion
@@ -6667,17 +6687,20 @@ namespace DryIoc
         private static readonly int MaxItemArrayIncreaseStep = 32;
 
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
-        public IScope Parent { get { return null; } }
+        public IScope Parent { get; private set; }
 
         /// <summary>Optional name object associated with scope.</summary>
-        public object Name { get { return null; } }
+        public object Name { get; private set; }
 
         /// <summary>Exposes singleton items collection for faster read.</summary>
         internal object[] Items;
 
         /// <summary>Creates scope.</summary>
-        public SingletonScope()
+        /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
+        public SingletonScope(IScope parent = null, object name = null)
         {
+            Parent = parent;
+            Name = name;
             Items = new object[0];
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
             _lastItemIndex = -1;
@@ -6762,10 +6785,15 @@ namespace DryIoc
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
-            var factoryIdToIndexMap = _factoryIdToIndexMap;
-            if (!factoryIdToIndexMap.IsEmpty)
-                foreach (var idToIndex in factoryIdToIndexMap.Enumerate().OrderByDescending(it => it.Key))
-                    Scope.DisposeItem(Items[(int)idToIndex.Value]);
+            var items = Items;
+            for (var i = 0; i < items.Length; i++)
+                Scope.DisposeItem(items[i]);
+
+
+            //var factoryIdToIndexMap = _factoryIdToIndexMap;
+            //if (!factoryIdToIndexMap.IsEmpty)
+            //    foreach (var idToIndex in factoryIdToIndexMap.Enumerate().OrderByDescending(it => it.Key))
+            //        Scope.DisposeItem(Items[(int)idToIndex.Value]);
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
             Items = ArrayTools.Empty<object>();
         }
@@ -6961,8 +6989,11 @@ namespace DryIoc
             return request.Scopes.SingletonScope.GetScopedItemIdOrSelf(factoryID);
         }
 
-        /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
-        public override string ToString() { return GetType().Name + " {Lifespan=" + Lifespan + "}"; }
+        /// <summary>Pretty prints reuse name and lifespan</summary> <returns>Printed string.</returns>
+        public override string ToString()
+        {
+            return GetType().Name + " {Lifespan=" + Lifespan + "}";
+        }
     }
 
     /// <summary>Returns container bound current scope created by <see cref="Container.OpenScope"/> method.</summary>
@@ -7002,12 +7033,14 @@ namespace DryIoc
                 nameExpr, Expression.Constant(true));
         }
 
-        /// <summary>Just returns back passed id without changes.</summary>
-        /// <param name="factoryID">Id to return back.</param> <param name="request">Ignored.</param>
-        /// <returns><paramref name="factoryID"/></returns>
+        /// <summary>Asks the scope to convert factory ID into internal representation and returns it.
+        /// If scope is not available then return passed factory ID.</summary>
+        /// <param name="factoryID">Input factory ID.</param> <param name="request">Used to get scope back.</param>
+        /// <returns>Scope mapping of factory ID or passed factory ID without changes if scope is not available.</returns>
         public int GetScopedItemIdOrSelf(int factoryID, Request request)
         {
-            return factoryID;
+            var scope = GetScopeOrDefault(request);
+            return scope == null ? factoryID : scope.GetScopedItemIdOrSelf(factoryID);
         }
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
@@ -7022,7 +7055,7 @@ namespace DryIoc
 
     /// <summary>Represents services created once per resolution root (when some of Resolve methods called).</summary>
     /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
-    public sealed class ResolutionScopeReuse : IReuse
+    public sealed class ResolutionScopeReuse: IReuse
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 0; } }
@@ -7083,7 +7116,7 @@ namespace DryIoc
             return factoryID;
         }
 
-        /// <summary>Pretty print reuse name and lifespan</summary> <returns>Printed string.</returns>
+        /// <summary>Pretty prints reuse name and lifespan</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
             var s = new StringBuilder().Append(GetType().Name)

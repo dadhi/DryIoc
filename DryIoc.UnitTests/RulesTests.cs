@@ -199,7 +199,7 @@ namespace DryIoc.UnitTests
         internal class RedMe { public RedMe(IMe me) { } }
 
         [Test]
-        public void I_can_support_for_specific_primitive_value_injection_via_container_rule()
+        public void Exist_support_for_non_primitive_value_injection_via_container_rule()
         {
             var container = new Container(rules => rules.WithItemToExpressionConverter(
                 (item, type) => type == typeof(ConnectionString)
@@ -214,6 +214,22 @@ namespace DryIoc.UnitTests
             Assert.AreEqual("aaa", user.S.Value);
         }
 
+        [Test]
+        public void Container_rule_for_serializing_custom_value_to_expression_should_throw_proper_exception_for_not_supported_type()
+        {
+            var container = new Container(rules => rules.WithItemToExpressionConverter(
+                (item, type) => type == typeof(ConnectionString)
+                ? Expression.New(type.GetSingleConstructorOrNull(),
+                    Expression.Constant(((ConnectionString)item).Value))
+                : null));
+
+            var s = new ConnectionStringImpl("aaa");
+            container.Register(Made.Of(() => new ConStrUser(Arg.Index<ConnectionString>(0)), r => s));
+
+            var ex = Assert.Throws<ContainerException>(() => container.Resolve<ConStrUser>());
+            Assert.AreEqual(Error.StateIsRequiredToUseItem, ex.Error);
+        }
+
         public class ConnectionString
         {
             public string Value;
@@ -221,6 +237,10 @@ namespace DryIoc.UnitTests
             {
                 Value = value;
             }
+        }
+
+        public class ConnectionStringImpl : ConnectionString {
+            public ConnectionStringImpl(string value) : base(value) {}
         }
 
         public class ConStrUser 

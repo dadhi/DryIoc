@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Linq.Expressions;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 // ReSharper disable MemberHidesStaticFromOuterClass
@@ -303,6 +304,51 @@ namespace DryIoc.UnitTests
             scope2.Dispose(); 
         }
 
+        [Test]
+        public void Exist_rule_to_use_singleton_scope_as_root_open_scope()
+        {
+            var container = new Container(rules => rules.WithSingletonScopeAsRootOpenScope());
+            container.Register<Blah>(Reuse.InCurrentScope);
+
+            var blah = container.Resolve<Blah>();
+
+            container.Dispose();
+            container.Dispose();
+            Assert.IsTrue(blah.IsDisposed);
+        }
+
+        [Test]
+        public void With_rule_to_use_singleton_scope_as_root_open_scope_I_can_open_and_dispose_nested_scope()
+        {
+            var container = new Container(rules => rules.WithSingletonScopeAsRootOpenScope());
+            container.Register<Blah>(Reuse.InCurrentScope);
+
+            Blah blah;
+            using (var scope = container.OpenScope())
+                blah = scope.Resolve<Blah>();
+
+            Assert.IsTrue(blah.IsDisposed);
+
+            blah = container.Resolve<Blah>();
+            var blahExpr = container.Resolve<LambdaExpression>(typeof(Blah));
+            container.Dispose();
+            Assert.IsTrue(blah.IsDisposed);
+        }
+
+        [Test]
+        public void Rule_to_use_singleton_scope_as_root_open_scope_Is_not_valid_for_ambient_scope_context()
+        {
+            var container = new Container(rules => rules.WithSingletonScopeAsRootOpenScope(), new ThreadScopeContext());
+            Assert.IsNotNull(container.ScopeContext);
+
+            container.Register<Blah>(Reuse.InCurrentScope);
+
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.Resolve<Blah>());
+
+            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
+        }
+
         internal class IndependentService : IService { }
 
         internal class ServiceWithFuncConstructorDependency
@@ -350,9 +396,15 @@ namespace DryIoc.UnitTests
         internal class Dep : IDep { }
         internal class DepScoped : IDep { }
         internal class Serv : IServ { }
- 
-        internal class Blah
+
+        internal class Blah : IDisposable
         {
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+
+            public bool IsDisposed { get; private set; }
         }
     }
 }
