@@ -3836,7 +3836,6 @@ namespace DryIoc
             Throw.If(reuse is ResolutionScopeReuse, Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
             reuse = reuse ?? Reuse.Singleton;
 
-            var originalInstance = instance;
             var setup = Setup.Default;
             if (preventDisposal)
             {
@@ -3876,9 +3875,9 @@ namespace DryIoc
 
             var canReuseAlreadyRegisteredFactory = factory != null && factory.Reuse == reuse && factory.Setup == setup;
             if (canReuseAlreadyRegisteredFactory)
-                factory.ReplaceInstance(originalInstance);
+                factory.ReplaceInstance(instance);
             else
-                factory = new InstanceFactory(originalInstance, reuse, setup);
+                factory = new InstanceFactory(instance, reuse, setup);
 
             if (!canReuseAlreadyRegisteredFactory)
                 container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
@@ -5399,7 +5398,12 @@ namespace DryIoc
 
             var serviceExpr = isReplacingDecorator ? decoratorExpr : CreateExpressionOrDefault(request);
             if (serviceExpr != null && !isReplacingDecorator)
-                serviceExpr = ApplyReuse(serviceExpr, request);
+            {
+                var reuse = Reuse ?? container.Rules.DefaultReuseInsteadOfTransient;
+                ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
+
+                serviceExpr = ApplyReuse(serviceExpr, reuse, request);
+            }
 
             if (serviceExpr != null)
             {
@@ -5429,12 +5433,14 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        private Expression ApplyReuse(Expression serviceExpr, Request request)
+        /// <summary>Applies reuse to created expression. 
+        /// Actually wraps passed expression in scoped access and produces another expression.</summary>
+        /// <param name="serviceExpr">Raw service creation (or receiving) expression.</param>
+        /// <param name="reuse">Reuse - may be different from <see cref="Reuse"/> if set <see cref="Rules.DefaultReuseInsteadOfTransient"/>.</param>
+        /// <param name="request">Context.</param>
+        /// <returns>Scoped expression or originally passed expression.</returns>
+        protected virtual Expression ApplyReuse(Expression serviceExpr, IReuse reuse, Request request)
         {
-            var container = request.Container;
-            var reuse = Reuse ?? container.Rules.DefaultReuseInsteadOfTransient;
-            ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
-
             var isTrackedTransientDisposable = false;
             var externalId = FactoryID;
             if (reuse == null)
@@ -5453,9 +5459,8 @@ namespace DryIoc
             if (reuse is SingletonReuse &&
                 !isTrackedTransientDisposable &&
                 FactoryType == FactoryType.Service &&
-                !(this is InstanceFactory) &&
                 !request.IsWrappedInFunc() &&
-                container.Rules.EagerCachingSingletonForFasterAccess)
+                request.Container.Rules.EagerCachingSingletonForFasterAccess)
             {
                 var factoryDelegate = serviceExpr.CompileToDelegate(request.Container);
 
@@ -5478,27 +5483,8 @@ namespace DryIoc
 
                 serviceExpr = Expression.ArrayIndex(Container.StateParamExpr, Expression.Constant(singletonId, typeof(int)));
             }
-            //else if (this is InstanceFactory)
-            //{
-            //    var instance = ((ConstantExpression)serviceExpr).Value;
-
-            //    if (Setup.PreventDisposal)
-            //        instance = new[] {instance};
-
-            //    if (Setup.WeaklyReferenced)
-            //        instance = new WeakReference(instance);
-
-            //    var scopedId = reuse.GetScopedItemIdOrSelf(externalId, request);
-            //    reuse.GetScopeOrDefault(request)
-            //        .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
-            //        .SetOrAdd(scopedId, instance);
-            //}
             else
             {
-
-                if (serviceType.IsValueType())
-                    serviceExpr = Expression.Convert(serviceExpr, typeof(object));
-
                 if (Setup.PreventDisposal)
                     serviceExpr = Expression.NewArrayInit(typeof(object), serviceExpr);
 
@@ -6472,7 +6458,34 @@ namespace DryIoc
         /// <param name="request">Context</param> <returns>Expression throwing exception.</returns>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            return Expression.Constant(_instance);
+            return Expression.Constant(null); // ignored later in ApplyReuse
+        }
+
+        /// <summary>Puts instance directly to available scope.</summary>
+        protected override Expression ApplyReuse(Expression ignored, IReuse reuse, Request request)
+        {
+            var scope = Reuse.GetScopeOrDefault(request).ThrowIfNull(Error.NoCurrentScope);
+            var externalId = scope.GetScopedItemIdOrSelf(FactoryID);
+            scope.GetOrAdd(externalId, () => _instance);
+            var scopeExpr = Reuse.GetScopeExpression(request);
+
+            Expression serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
+                Expression.Constant(externalId),
+                Expression.Lambda<CreateScopedValue>(Expression.Constant(null), ArrayTools.Empty<ParameterExpression>()));
+
+            // Unwrap WeakReference and/or array preventing disposal
+            if (Setup.WeaklyReferenced)
+                serviceExpr = Expression.Call(typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull",
+                    ArrayTools.Empty<Type>(),
+                    Expression.Property(Expression.Convert(serviceExpr, typeof(WeakReference)), "Target"),
+                    Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
+
+            if (Setup.PreventDisposal)
+                serviceExpr = Expression.ArrayIndex(
+                    Expression.Convert(serviceExpr, typeof(object[])),
+                    Expression.Constant(0, typeof(int)));
+
+            return Expression.Convert(serviceExpr, request.ServiceType);
         }
     }
 

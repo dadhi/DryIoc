@@ -168,6 +168,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SignalR", "Extension
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SignalR.UnitTests", "Extensions\DryIoc.SignalR.UnitTests\DryIoc.SignalR.UnitTests.csproj", "{E68325C4-FD55-42DB-A083-ACD58FF8DF82}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shared", "shared", "{3A727470-8D04-4F7D-9F1E-AE0CB21521D7}"
+	ProjectSection(SolutionItems) = preProject
+		shared\RequestInfo.shared.cs = shared\RequestInfo.shared.cs
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
