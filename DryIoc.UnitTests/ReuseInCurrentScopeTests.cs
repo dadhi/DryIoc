@@ -305,9 +305,9 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Exist_rule_to_use_singleton_scope_as_root_open_scope()
+        public void Exist_rule_to_open_scope_with_container()
         {
-            var container = new Container(rules => rules.WithSingletonScopeAsRootOpenScope());
+            var container = new Container(rules => rules.WithImplicitRootOpenScope());
             container.Register<Blah>(Reuse.InCurrentScope);
 
             var blah = container.Resolve<Blah>();
@@ -318,9 +318,16 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void With_rule_to_use_singleton_scope_as_root_open_scope_I_can_open_and_dispose_nested_scope()
+        public void Exist_rule_to_open_scope_with_container_and_scope_has_root_name()
         {
-            var container = new Container(rules => rules.WithSingletonScopeAsRootOpenScope());
+            var container = new Container(rules => rules.WithImplicitRootOpenScope());
+            Assert.AreEqual(Container.NonAmbientRootScopeName, ((IScopeAccess)container).GetCurrentScope().Name);
+        }
+
+        [Test]
+        public void With_rule_to_open_implicit_scope_with_container_I_can_open_and_dispose_nested_scope()
+        {
+            var container = new Container(rules => rules.WithImplicitRootOpenScope());
             container.Register<Blah>(Reuse.InCurrentScope);
 
             Blah blah;
@@ -336,9 +343,9 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Rule_to_use_singleton_scope_as_root_open_scope_Is_not_valid_for_ambient_scope_context()
+        public void Rule_to_open_implicit_scope_with_container_Will_not_work_with_ambient_scope_context()
         {
-            var container = new Container(rules => rules.WithSingletonScopeAsRootOpenScope(), new ThreadScopeContext());
+            var container = new Container(rules => rules.WithImplicitRootOpenScope(), new ThreadScopeContext());
             Assert.IsNotNull(container.ScopeContext);
 
             container.Register<Blah>(Reuse.InCurrentScope);
