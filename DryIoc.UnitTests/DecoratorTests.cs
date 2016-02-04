@@ -1,4 +1,5 @@
 ﻿using System;
+using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -487,6 +488,57 @@ namespace DryIoc.UnitTests
             var bird = container.Resolve<IBird>(typeof(Duck));
 
             Assert.IsInstanceOf<TalkingBirdDecorator>(bird);
+        }
+
+        [Test]
+        public void Can_register_custom_Disposer()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton);
+
+            container.Register<FooDisposer>(setup: Setup.With(useParentReuse: true));
+            container.Register<Foo>(
+                Made.Of(() => CustomDisposer.WithDispose(Arg.Of<Foo>(), Arg.Of<FooDisposer>())),
+                setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            var foo = container.Resolve<Foo>();
+
+            container.Dispose();
+            Assert.IsTrue(foo.IsReleased);
+        }
+
+        public class Foo
+        {
+            public bool IsReleased { get; set; }
+        }
+
+        public class FooDisposer : Disposer<Foo>
+        {
+            public override void Dispose()
+            {
+                Item.IsReleased = true;
+            }
+        }
+
+        public static class CustomDisposer
+        {
+            public static T WithDispose<T>(T foo, Disposer<T> disposer)
+            {
+                disposer.TrackForDispose(foo);
+                return foo;
+            }
+        }
+
+        public abstract class Disposer<T> : IDisposable
+        {
+            protected T Item;
+
+            public void TrackForDispose(T item)
+            {
+                Item = item;
+            }
+
+            public abstract void Dispose();
         }
 
         public interface IBird {}

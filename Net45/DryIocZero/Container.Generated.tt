@@ -43,14 +43,15 @@ var errors = container.GenerateResolutionExpressions(out resolutionsRoots, out r
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 var objectToCode = ObjectStringify.WithFullTypeNames;
 Func<object, string> code = null;
-code = x => x == null ? "null"
-    : x is DefaultKey ? "DefaultKey.Of(" + ((DefaultKey)x).RegistrationOrder + ")" 
-    : x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x))
-    : x is Expression ? exprToCode.ToCode((Expression)x)
-		.Replace("DryIoc.RequestInfo", "RequestInfo")
-		.Replace("DryIoc.Reuse", "Reuse")
-		.Replace("DryIoc.IReuse", "IReuse")
-    : objectToCode.PlainObjectToCode(x);
+	code = x => x == null ? "null"
+		: x is DefaultKey ? "DefaultKey.Of(" + ((DefaultKey)x).RegistrationOrder + ")" 
+		: x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x))
+		: x is Expression ? exprToCode.ToCode((Expression)x)
+			.Replace("DryIoc.RequestInfo", "RequestInfo")
+			.Replace("DryIoc.Reuse", "Reuse")
+			.Replace("DryIoc.IReuse", "IReuse")
+			.Replace("DryIoc.FactoryType", "FactoryType")
+		: objectToCode.PlainObjectToCode(x);
 
 var roots = resolutionsRoots.Select((r, i) => 
     new { Index = i, ServiceType = code(r.Key.ServiceType), ServiceKey = code(r.Key.OptionalServiceKey), Expression = code(r.Value.Body) });

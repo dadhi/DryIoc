@@ -288,7 +288,7 @@ namespace DryIoc
             var setup = factory.Setup;
             if (setup.FactoryType != FactoryType.Wrapper)
             {
-                if (factory.Reuse == null && 
+                if (factory.Reuse == null && !factory.Setup.UseParentReuse &&
                     (factory.ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable)) && 
                     setup.AllowDisposableTransient == false && Rules.ThrowOnRegisteringDisposableTransient)
                     Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType,
@@ -858,8 +858,7 @@ namespace DryIoc
                     return resultDecoratorExpr;
             }
 
-            var decoratorRequest = request.WithResolvedFactory(decorator);
-            var decoratorExpr = decorator.GetExpressionOrDefault(decoratorRequest);
+            var decoratorExpr = decorator.GetExpressionOrDefault(request);
             resultDecoratorExpr = resultDecoratorExpr == null
                 ? decoratorExpr
                 : Expression.Invoke(resultDecoratorExpr, decoratorExpr);
@@ -1070,7 +1069,7 @@ namespace DryIoc
             var container = request.Container;
 
             // Look first for Action<ImplementedType> initializer-decorator
-            var implementationType = request.ImplementationType ?? serviceType;
+            var implementationType = request.ImplementationType ?? request.GetActualServiceType();
             var implementedTypes = implementationType.GetImplementedTypes(
                 ReflectionTools.AsImplementedType.SourceType | ReflectionTools.AsImplementedType.ObjectType);
 
@@ -1088,9 +1087,7 @@ namespace DryIoc
                         var condition = initializerFactory.Setup.Condition;
                         if (condition == null || condition(request.ToRequestInfo()))
                         {
-                            var decoratorRequest =
-                                request.WithChangedServiceInfo(_ => ServiceInfo.Of(initializerActionType))
-                                    .WithResolvedFactory(initializerFactory);
+                            var decoratorRequest = request.WithChangedServiceInfo(_ => ServiceInfo.Of(initializerActionType));
                             var actionExpr = initializerFactory.GetExpressionOrDefault(decoratorRequest);
                             if (actionExpr != null)
                                 ComposeDecoratorFuncExpression(ref funcDecoratorExpr, serviceType,
@@ -1107,9 +1104,7 @@ namespace DryIoc
                 for (var i = 0; i < funcDecoratorFactories.Length; i++)
                 {
                     var decoratorFactory = funcDecoratorFactories[i];
-                    var decoratorRequest = request
-                        .WithChangedServiceInfo(_ => ServiceInfo.Of(decoratorFuncType))
-                        .WithResolvedFactory(decoratorFactory);
+                    var decoratorRequest = request.WithChangedServiceInfo(_ => ServiceInfo.Of(decoratorFuncType));
 
                     var condition = decoratorFactory.Setup.Condition;
                     if (condition == null || condition(request.ToRequestInfo()))
@@ -3932,7 +3927,7 @@ namespace DryIoc
             Action<TTarget, IResolver> initialize, Func<RequestInfo, bool> condition = null)
         {
             registrator.RegisterDelegate<Action<TTarget>>(r => target => initialize(target, r),
-                setup: Setup.DecoratorWith(condition));
+                setup: Setup.DecoratorWith(condition, useDecorateeReuse: true));
         }
 
         /// <summary>Returns true if <paramref name="serviceType"/> is registered in container or its open generic definition is registered in container.</summary>
@@ -4115,7 +4110,7 @@ namespace DryIoc
 
         internal static Expression CreateResolutionExpression(Request request, bool openResolutionScope = false)
         {
-            PopulateDependencyResolutionCallExpressions(request);
+            PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
 
             var container = request.Container;
 
@@ -4153,19 +4148,25 @@ namespace DryIoc
             return resolveExpr;
         }
 
-        private static void PopulateDependencyResolutionCallExpressions(Request request)
+        private static void PopulateDependencyResolutionCallExpressions(Request request, bool openResolutionScope)
         {
             var serviceType = request.ServiceType;
             var serviceKey = request.ServiceKey;
             var newPreResolveParent = request.ParentOrWrapper;
 
             var container = request.Container;
+
+            // Actually calls nested Resolution Call and stores produced expression in collection:
+            // - if the collection to accumulate call expressions is defined and:
+            //   - Resolve call is the first nested in chain
+            //   - Resolve call is not repeated for recursive dependency, e.g. new A(new Lazy<r => r.Resolve<B>()>) and new B(new A())
             if (container.Rules.DependencyResolutionCallExpressions != null &&
                 (request.PreResolveParent.IsEmpty ||
                  !request.PreResolveParent.EqualsWithoutParent(newPreResolveParent)))
             {
+                // Create scope for first nesting level or where corresponding setting is saying so
                 var scope = request.Scope;
-                if (scope != null)
+                if (scope == null || openResolutionScope)
                     scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
 
                 var newRequest = request.Container.EmptyRequest.Push(serviceType, serviceKey,
@@ -5071,8 +5072,12 @@ namespace DryIoc
         /// <summary>Stores reused instance as WeakReference.</summary>
         public virtual bool WeaklyReferenced { get { return false; } }
 
-        /// <summary>Allows registering transient disposable.</summary>
+        /// <summary>Allows registering transient disposable.
+        /// IMPROTANT: turns On tracking of transient in parent scope.</summary>
         public virtual bool AllowDisposableTransient { get { return false; } }
+
+        /// <summary>Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</summary>
+        public virtual bool UseParentReuse { get { return false; } }
 
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
@@ -5084,24 +5089,25 @@ namespace DryIoc
         /// <param name="asResolutionRoot">(optional) Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
         /// <param name="weaklyReferenced">(optional) Stores reused instance as WeakReference.</param>
-        /// <param name="allowDisposableTransient">(optional) Allows registering transient disposable.</param>
+        /// <param name="allowDisposableTransient">(optional) Allows registering transient disposable and IMPROTANT: turns On tracking of transient in parent scope.</param>
+        /// <param name="useParentReuse">(optional) Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</param>
         /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
         public static Setup With(
             object metadataOrFuncOfMetadata = null,
             Func<RequestInfo, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
-            bool allowDisposableTransient = false)
+            bool allowDisposableTransient = false, bool useParentReuse = false)
         {
             if (metadataOrFuncOfMetadata == null && condition == null &&
                 openResolutionScope == false && asResolutionCall == false && asResolutionRoot == false &&
                 preventDisposal == false && weaklyReferenced == false &&
-                allowDisposableTransient == false)
+                allowDisposableTransient == false && useParentReuse == false)
                 return Default;
 
             return new ServiceSetup(condition,
                 metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, asResolutionRoot,
-                preventDisposal, weaklyReferenced, allowDisposableTransient);
+                preventDisposal, weaklyReferenced, allowDisposableTransient, useParentReuse);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -5123,10 +5129,13 @@ namespace DryIoc
         /// <summary>Creates setup with optional condition.</summary>
         /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
         /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
-        /// <returns>New setup with condition or <see cref="Setup.Decorator"/>.</returns>
-        public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0)
+        /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
+        /// Decorated service may be decorator itself.</param>
+        /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
+        public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0, bool useDecorateeReuse = false)
         {
-            return condition == null && order == 0 ? Decorator : new DecoratorSetup(condition, order);
+            return condition == null && order == 0 && !useDecorateeReuse ? Decorator 
+                : new DecoratorSetup(condition, order, useDecorateeReuse);
         }
 
         private sealed class ServiceSetup : Setup
@@ -5152,11 +5161,12 @@ namespace DryIoc
             public override bool PreventDisposal { get { return (_settings & Settings.PreventDisposal) != 0; } }
             public override bool WeaklyReferenced { get { return (_settings & Settings.WeaklyReferenced) != 0; } }
             public override bool AllowDisposableTransient { get { return (_settings & Settings.AllowDisposableTransient) != 0; } }
+            public override bool UseParentReuse { get { return (_settings & Settings.UseParentReuse) != 0; } }
 
             public ServiceSetup(Func<RequestInfo, bool> condition = null, object metadataOrFuncOfMetadata = null,
                 bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
                 bool preventDisposal = false, bool weaklyReferenced = false,
-                bool allowDisposableTransient = false)
+                bool allowDisposableTransient = false, bool useParentReuse = false)
             {
                 Condition = condition;
                 _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
@@ -5173,6 +5183,8 @@ namespace DryIoc
                     _settings |= Settings.AllowDisposableTransient;
                 if (asResolutionRoot)
                     _settings |= Settings.AsResolutionRoot;
+                if (useParentReuse)
+                    _settings |= Settings.UseParentReuse;
             }
 
             private object _metadataOrFuncOfMetadata;
@@ -5185,7 +5197,8 @@ namespace DryIoc
                 PreventDisposal = 4,
                 WeaklyReferenced = 8,
                 AllowDisposableTransient = 16,
-                AsResolutionRoot = 32
+                AsResolutionRoot = 32,
+                UseParentReuse = 64
             }
 
             private readonly Settings _settings;
@@ -5242,13 +5255,19 @@ namespace DryIoc
             /// <summary>If provided specifies relative decorator position in decorators chain.</summary>
             public readonly int Order;
 
+            /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
+            public readonly bool UseDecorateeReuse;
+
             /// <summary>Creates decorator setup with optional condition.</summary>
             /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
             /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
-            public DecoratorSetup(Func<RequestInfo, bool> condition = null, int order = 0)
+            /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
+            /// Decorated service may be decorator itself.</param>
+            public DecoratorSetup(Func<RequestInfo, bool> condition = null, int order = 0, bool useDecorateeReuse = false)
             {
                 Condition = condition;
                 Order = order;
+                UseDecorateeReuse = useDecorateeReuse;
             }
         }
     }
@@ -5379,6 +5398,7 @@ namespace DryIoc
                 && !request.IsWrappedInFuncWithArgs())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
+            var originalRequest = request;
             request = request.WithResolvedFactory(this);
 
             // Here's lookup for decorators
@@ -5399,10 +5419,30 @@ namespace DryIoc
             var serviceExpr = isReplacingDecorator ? decoratorExpr : CreateExpressionOrDefault(request);
             if (serviceExpr != null && !isReplacingDecorator)
             {
-                var reuse = Reuse ?? container.Rules.DefaultReuseInsteadOfTransient;
+                var reuse = Reuse;
+                var tracksTransientDisposable = false;
+                if (reuse == null)
+                {
+                    if (Setup.UseParentReuse)
+                    {
+                        reuse = GetParentReuseUntilFunc(request, anyReuse: true);
+                    }
+                    else if (Setup is Setup.DecoratorSetup && ((Setup.DecoratorSetup)Setup).UseDecorateeReuse)
+                    {
+                        reuse = originalRequest.ResolvedFactory.Reuse;
+                    }
+                    else if ((ImplementationType ?? request.GetActualServiceType()).IsAssignableTo(typeof(IDisposable)))
+                    {
+                        reuse = GetParentReuseUntilFunc(request, anyReuse: false);
+                        tracksTransientDisposable = true;
+                    }
+                }
+
+                reuse = reuse ?? container.Rules.DefaultReuseInsteadOfTransient;
                 ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
 
-                serviceExpr = ApplyReuse(serviceExpr, reuse, request);
+                if (reuse != null)
+                    serviceExpr = ApplyReuse(serviceExpr, reuse, tracksTransientDisposable, request);
             }
 
             if (serviceExpr != null)
@@ -5437,27 +5477,17 @@ namespace DryIoc
         /// Actually wraps passed expression in scoped access and produces another expression.</summary>
         /// <param name="serviceExpr">Raw service creation (or receiving) expression.</param>
         /// <param name="reuse">Reuse - may be different from <see cref="Reuse"/> if set <see cref="Rules.DefaultReuseInsteadOfTransient"/>.</param>
+        /// <param name="tracksTransientDisposable">Specifies that reuse is to track transient disposable.</param>
         /// <param name="request">Context.</param>
         /// <returns>Scoped expression or originally passed expression.</returns>
-        protected virtual Expression ApplyReuse(Expression serviceExpr, IReuse reuse, Request request)
+        protected virtual Expression ApplyReuse(Expression serviceExpr, IReuse reuse, bool tracksTransientDisposable, Request request)
         {
-            var isTrackedTransientDisposable = false;
-            var externalId = FactoryID;
-            if (reuse == null)
-            {
-                reuse = GetTrackingReuseIfTransientIsDisposable(request);
-                if (reuse == null)
-                    return serviceExpr;
-
-                isTrackedTransientDisposable = true;
-                externalId = GetNextID();
-            }
-
             var serviceType = serviceExpr.Type;
-            
+            var externalId = tracksTransientDisposable ? GetNextID() : FactoryID;
+
             // The singleton optimization: eagerly create singleton during the construction of object graph.
             if (reuse is SingletonReuse &&
-                !isTrackedTransientDisposable &&
+                !tracksTransientDisposable &&
                 FactoryType == FactoryType.Service &&
                 !request.IsWrappedInFunc() &&
                 request.Container.Rules.EagerCachingSingletonForFasterAccess)
@@ -5514,12 +5544,8 @@ namespace DryIoc
             return Expression.Convert(serviceExpr, serviceType);
         }
 
-        private IReuse GetTrackingReuseIfTransientIsDisposable(Request request)
+        private static IReuse GetParentReuseUntilFunc(Request request, bool anyReuse)
         {
-            var transientType = ImplementationType ?? request.GetActualServiceType();
-            if (!transientType.IsAssignableTo(typeof(IDisposable)))
-                return null;
-
             var parent = request.ParentOrWrapper;
             if (parent.IsEmpty)
                 return null;
@@ -5527,7 +5553,8 @@ namespace DryIoc
             var nonTransientParent = parent.Enumerate()
                 // stop on Func - tracking across Func boundaries is disabled by design
                 .TakeWhile(r => r.FactoryType != FactoryType.Wrapper || !r.GetActualServiceType().IsFunc())
-                .FirstOrDefault(r => r.FactoryType == FactoryType.Service && r.Reuse != null);
+                .FirstOrDefault(r => r.FactoryType == FactoryType.Service &&
+                    (anyReuse || r.Reuse != null));
             if (nonTransientParent == null)
                 return null;
 
@@ -6462,7 +6489,7 @@ namespace DryIoc
         }
 
         /// <summary>Puts instance directly to available scope.</summary>
-        protected override Expression ApplyReuse(Expression ignored, IReuse reuse, Request request)
+        protected override Expression ApplyReuse(Expression ignored, IReuse reuse, bool tracksTransientDisposableIgnored, Request request)
         {
             var scope = Reuse.GetScopeOrDefault(request).ThrowIfNull(Error.NoCurrentScope);
             var externalId = scope.GetScopedItemIdOrSelf(FactoryID);

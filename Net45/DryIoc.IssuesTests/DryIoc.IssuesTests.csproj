@@ -106,6 +106,7 @@
     <Compile Include="Issue212_ResolveManyOfObjectWithGenericRequiredServiceTypeIsFailingWithArgumentException.cs" />
     <Compile Include="Issue213_LazySingletonsShouldBeResolvedAfterContainerIsDisposed.cs" />
     <Compile Include="Issue224_EnumerableWrappedInFuncLosesTheInformationAboutFuncWrapperCausingIncorrectScopeLifetimeValidation.cs" />
+    <Compile Include="Issue230_CustomInitializerAttachedToLazilyResolvedDependencyIsCalledOncePerResolution.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

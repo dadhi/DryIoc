@@ -89,7 +89,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Register<LazyDep>();
 
             var request = container.EmptyRequest.Push(typeof(LazyUser));
-            var factoryExpr = container.GetServiceFactoryOrDefault(request).GetExpressionOrDefault(request);
+            container.GetServiceFactoryOrDefault(request).GetExpressionOrDefault(request);
 
             var depList = container.Rules.DependencyResolutionCallExpressions.Value.Enumerate().ToArray();
             Assert.AreEqual(1, depList.Length);

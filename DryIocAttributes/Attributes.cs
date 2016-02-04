@@ -282,20 +282,26 @@ namespace DryIocAttributes
         /// <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
         public int Order { get; set; }
 
+        /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
+        public bool UseDecorateeReuse { get; set; }
+
         /// <summary>Creates attribute by providing its optional properties.</summary>
         /// <param name="contractKey">(optional)</param> <param name="order">(optional)</param>
-        public AsDecoratorAttribute(object contractKey = null, int order = 0)
+        /// <param name="useDecorateeReuse">(optional)</param>
+        public AsDecoratorAttribute(object contractKey = null, int order = 0, bool useDecorateeReuse = false)
         {
             ContractKey = contractKey;
             Order = order;
+            UseDecorateeReuse = useDecorateeReuse;
         }
 
         /// <summary>Creates attributes with <see cref="ContractName"/> and optional order.</summary>
         /// <param name="contractName"></param> <param name="order">(optional)</param>
-        public AsDecoratorAttribute(string contractName, int order = 0)
+        public AsDecoratorAttribute(string contractName, int order = 0, bool useDecorateeReuse = false)
         {
             ContractName = contractName;
             Order = order;
+            UseDecorateeReuse = useDecorateeReuse;
         }
 }
 
@@ -627,7 +633,7 @@ public enum FactoryType
         | AttributeTargets.Method
         | AttributeTargets.Property
         | AttributeTargets.Field)]
-    public class AsResolutionCall : Attribute { }
+    public class AsResolutionCallAttribute : Attribute { }
 
     /// <summary>Marker for resolution root exports.</summary>
     [AttributeUsage(AttributeTargets.Class
@@ -635,6 +641,13 @@ public enum FactoryType
         | AttributeTargets.Method
         | AttributeTargets.Property
         | AttributeTargets.Field)]
-    public class AsResolutionRoot : Attribute { }
+    public class AsResolutionRootAttibute : Attribute { }
 
+    /// <summary>Marker for resolution root exports.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field)]
+    public class UseParentReuseAttribute : Attribute { }
 }
