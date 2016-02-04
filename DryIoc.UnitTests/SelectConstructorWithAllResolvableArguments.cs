@@ -101,7 +101,53 @@ namespace DryIoc.UnitTests
             Assert.That(client.Seed, Is.EqualTo(1));
         }
 
+        [Test]
+        public void When_using_all_arg_ctor_selector_implicitly_injected_services_should_be_honored()
+        {
+            var container = new Container(rules =>
+                rules.With(FactoryMethod.ConstructorWithResolvableArguments));
+
+            container.Register<Blah>();
+
+            var blah = container.Resolve<Blah>();
+            Assert.IsNotNull(blah.R);
+        }
+
+        [Test]
+        public void When_using_all_arg_ctor_selector_implicit_custom_value_dependency_should_be_honored()
+        {
+            var container = new Container(rules =>
+                rules.With(FactoryMethod.ConstructorWithResolvableArguments));
+
+            container.Register<Blah>(made: Parameters.Of.Type<string>(_ => "a"));
+
+            var blah = container.Resolve<Blah>();
+            Assert.AreEqual("a", blah.S);
+        }
+
         #region CUT
+
+        public interface INo { }
+
+        public class Blah
+        {
+            public IResolver R { get; private set; }
+
+            public string S { get; private set; }
+
+            public Blah(IResolver r)
+            {
+                R = r;
+            }
+
+            public Blah(INo no) { }
+
+            public Blah(IResolver r, string s)
+            {
+                R = r;
+                S = s;
+            }
+        }
 
         public interface IDependency { }
 

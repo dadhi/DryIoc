@@ -2957,7 +2957,7 @@ namespace DryIoc
                                     return false;
                                 matchedIndecesMask |= inputArgIndex << 1;
                                 return true;
-                            })).All(p => ResolveParameter(p, parameterSelector, request) != null);
+                            })).All(p => IsResolvableParameter(p, parameterSelector, request));
                     });
 
                 var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindMatchingCtorForFuncWithArgs, funcType, request).Ctor;
@@ -2966,19 +2966,28 @@ namespace DryIoc
             else
             {
                 var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(x =>
-                    x.Params.All(p => ResolveParameter(p, parameterSelector, request) != null));
+                    x.Params.All(p => IsResolvableParameter(p, parameterSelector, request)));
                 var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request).Ctor;
                 return Of(ctor);
             }
         };
 
-        private static Expression ResolveParameter(ParameterInfo parameter,
+        private static bool IsResolvableParameter(ParameterInfo parameter,
             Func<ParameterInfo, ParameterServiceInfo> parameterSelector, Request request)
         {
             var parameterServiceInfo = parameterSelector(parameter) ?? ParameterServiceInfo.Of(parameter);
+
+            var implicitParamExpr = ReflectionFactory.TryInjectImplicitlyAvailableDependency(parameterServiceInfo, request);
+            if (implicitParamExpr != null)
+                return true;
+
             var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault, request));
+            var customValue = parameterServiceInfo.Details.CustomValue;
+            if (customValue != null && customValue.GetType().IsAssignableTo(parameterRequest.ServiceType))
+                return true;
+
             var parameterFactory = request.Container.ResolveFactory(parameterRequest);
-            return parameterFactory == null ? null : parameterFactory.GetExpressionOrDefault(parameterRequest);
+            return parameterFactory != null && parameterFactory.GetExpressionOrDefault(parameterRequest) != null;
         }
 
         private FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
@@ -6249,7 +6258,7 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        private static Expression TryInjectImplicitlyAvailableDependency(IServiceInfo serviceInfo, Request request)
+        internal static Expression TryInjectImplicitlyAvailableDependency(IServiceInfo serviceInfo, Request request)
         {
             // ignore non default registrations
             if (serviceInfo.Details.ServiceKey != null ||
