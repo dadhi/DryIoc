@@ -111,6 +111,7 @@ namespace DryIoc.UnitTests
 
             var blah = container.Resolve<Blah>();
             Assert.IsNotNull(blah.R);
+            //Assert.AreEqual(3, blah.I);
         }
 
         [Test]
@@ -133,11 +134,19 @@ namespace DryIoc.UnitTests
         {
             public IResolver R { get; private set; }
 
+            public int I { get; private set; }
+
             public string S { get; private set; }
 
             public Blah(IResolver r)
             {
                 R = r;
+            }
+
+            public Blah(IResolver r, int i = 3)
+            {
+                R = r;
+                I = i;
             }
 
             public Blah(INo no) { }

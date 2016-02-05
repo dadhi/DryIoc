@@ -1,5 +1,4 @@
 ﻿using System;
-using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -279,8 +278,6 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
-
             container.RegisterDelegateDecorator<IOperation>(_ => op => new MeasureExecutionTimeOperationDecorator(op));
 
             var operation = container.Resolve<IOperation>();
@@ -329,23 +326,37 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_registering_one_decorator_as_delegate_and_another_as_service_Then_delegate_will_be_applied_last()
+        public void When_mixing_Type_and_Delegate_decorators_the_registration_order_is_preserved()
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
             container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
             container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.Decorator);
-            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
+
+            var operation = container.Resolve<IOperation>();
+
+            Assert.IsInstanceOf<AsyncOperationDecorator>(operation);
+
+            var decorated1 = ((AsyncOperationDecorator)operation).Decorated();
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(decorated1);
+
+            var decorated2 = ((MeasureExecutionTimeOperationDecorator)decorated1).Decorated;
+            Assert.IsInstanceOf<RetryOperationDecorator>(decorated2);
+        }
+
+        [Test]
+        public void Delegate_decorator_will_use_decoratee_reuse()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.RegisterDelegateDecorator<IOperation>(r => 
+                op => new MeasureExecutionTimeOperationDecorator(op));
 
             var operation = container.Resolve<IOperation>();
 
             Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
-
-            var decorated1 = ((MeasureExecutionTimeOperationDecorator)operation).Decorated;
-            Assert.IsInstanceOf<RetryOperationDecorator>(decorated1);
-
-            var decorated2 = ((RetryOperationDecorator)decorated1).Decorated;
-            Assert.IsInstanceOf<AsyncOperationDecorator>(decorated2);
+            Assert.AreSame(operation, container.Resolve<IOperation>());
         }
 
         [Test]
@@ -490,14 +501,16 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<TalkingBirdDecorator>(bird);
         }
 
-        [Test]
+        [Test, Ignore]
         public void Can_register_custom_Disposer()
         {
             var container = new Container();
             container.Register<Foo>(Reuse.Singleton);
 
-            container.Register<FooDisposer>(setup: Setup.With(useParentReuse: true));
-            container.Register<Foo>(
+            container.Register<FooDisposer>(
+                setup: Setup.With(useParentReuse: true));
+
+            container.Register(
                 Made.Of(() => CustomDisposer.WithDispose(Arg.Of<Foo>(), Arg.Of<FooDisposer>())),
                 setup: Setup.DecoratorWith(useDecorateeReuse: true));
 
@@ -506,6 +519,58 @@ namespace DryIoc.UnitTests
             container.Dispose();
             Assert.IsTrue(foo.IsReleased);
         }
+
+        [Test]
+        public void Decorator_created_by_factory_should_be_compasable_with_other_decorator()
+        {
+            var container = new Container();
+            container.Register<A>();
+
+            container.Register<FB>();
+            container.Register(
+                Made.Of(r => ServiceInfo.Of<FB>(),
+                f => f.Decorate(Arg.Of<A>())),
+                setup: Setup.Decorator);
+
+            container.Register<A, C>(setup: Setup.Decorator);
+
+            var a = container.Resolve<A>();
+            Assert.IsInstanceOf<C>(a);
+
+            var c = (C)a;
+            Assert.IsInstanceOf<B>(c.A);
+        }
+
+        public class A { }
+
+        public class FB : A
+        {
+            public A Decorate(A a)
+            {
+                return new B(a);
+            }     
+        }
+
+        class B : A
+        {
+            public A A { get; private set; }
+
+            public B(A a)
+            {
+                A = a;
+            }
+        }
+
+        class C : A
+        {
+            public A A { get; private set; }
+
+            public C(A a)
+            {
+                A = a;
+            }
+        }
+
 
         public class Foo
         {

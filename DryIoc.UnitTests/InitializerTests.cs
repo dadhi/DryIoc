@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -13,11 +12,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<InitializableService>();
-            container.RegisterDelegate<Func<InitializableService, InitializableService>>(r => x =>
+            container.RegisterDelegateDecorator<InitializableService>(r => (x =>
             {
                 x.Initialize("blah");
                 return x;
-            }, setup: Setup.Decorator);
+            }));
 
             var service = container.Resolve<InitializableService>();
 
@@ -29,9 +28,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IInitializable<InitializableService>, InitializableService>();
-            container.RegisterDelegate<Func<IInitializable<InitializableService>, IInitializable<InitializableService>>>(
-                r => x => x.Initialize("blah"), 
-                setup: Setup.Decorator);
+            container.RegisterDelegateDecorator<IInitializable<InitializableService>>(
+                r => x => x.Initialize("blah"));
 
             var service = (InitializableService)container.Resolve<IInitializable<InitializableService>>();
 
@@ -99,7 +97,7 @@ namespace DryIoc.UnitTests
             container.Register<InitializableService>();
 
             var log = new List<string>();
-            container.RegisterInitializer<object>((x, _) => log.Add(x.GetType().Name));
+            container.RegisterInitializer<object>((x, r) => log.Add(x.GetType().Name));
 
             container.Resolve<InitializableService>();
 

@@ -803,22 +803,24 @@ namespace DryIoc
             var parent = request.Parent;
             var prevDecoratorID = parent.FactoryType == FactoryType.Decorator ? parent.FactoryID : -1;
 
-            // If no decorators applied, then look for delegate decorators, otherwise - they are already applied
-            Expression resultDecoratorExpr = null;
-            if (prevDecoratorID == -1)
-            {
-                // First look for Func decorators Func<TService,TService> and initializers Action<TService>.
-                var decoratorFuncType = typeof(Func<,>).MakeGenericType(serviceType, serviceType);
-                resultDecoratorExpr = GetFuncDecoratorExpressionOrDefault(decoratorFuncType, request);
-            }
-
             var container = request.Container;
+
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
+
+            // append less specific open-generic decorators
             var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
             if (openGenericServiceType != null)
                 decorators = decorators.Append(container.GetDecoratorFactoriesOrDefault(openGenericServiceType));
-            if (decorators == null)
-                return resultDecoratorExpr;
+
+            // append even lesser specific object decorators
+            var objectDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object))
+                .Where(d => d.CheckCondition(request))
+                .ToArrayOrSelf();
+            if (!objectDecorators.IsNullOrEmpty())
+                decorators = decorators.Append(objectDecorators);
+
+            if (decorators.IsNullOrEmpty())
+                return null;
 
             // Decorators are applied in a reverse order, so the first registered decorator will be closer to decorated service
             // comparing to next registered one.
@@ -842,28 +844,19 @@ namespace DryIoc
                 }
 
                 if (prevDecoratorIndex - 1 < 0)
-                    return resultDecoratorExpr;
+                    return null;
 
                 decorator = decorators[prevDecoratorIndex - 1];
             }
 
             var condition = decorator.Setup.Condition;
             if (condition != null && !condition(request.ToRequestInfo()))
-                return resultDecoratorExpr;
+                return null;
 
             if (decorator.FactoryGenerator != null)
-            {
                 decorator = decorator.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
-                if (decorator == null)
-                    return resultDecoratorExpr;
-            }
 
-            var decoratorExpr = decorator.GetExpressionOrDefault(request);
-            resultDecoratorExpr = resultDecoratorExpr == null
-                ? decoratorExpr
-                : Expression.Invoke(resultDecoratorExpr, decoratorExpr);
-
-            return resultDecoratorExpr;
+            return decorator == null ? null : decorator.GetExpressionOrDefault(request);
         }
 
         private static int IndexOfDecorator(Factory[] decorators, int decoratorID, Request request)
@@ -887,21 +880,19 @@ namespace DryIoc
 
         Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
         {
-            Factory[] decorators = null;
+            var decorators = ArrayTools.Empty<Factory>();
 
             var allDecorators = _registry.Value.Decorators;
             if (!allDecorators.IsEmpty)
-                decorators = allDecorators.GetValueOrDefault(serviceType);
+                decorators = allDecorators.GetValueOrDefault(serviceType) ?? ArrayTools.Empty<Factory>();
 
             if (!Rules.FallbackContainers.IsNullOrEmpty())
             {
-                var fallbackDecorators = Rules.FallbackContainers.SelectMany(c =>
-                    c.Container.GetDecoratorFactoriesOrDefault(serviceType) ?? ArrayTools.Empty<Factory>())
+                var fallbackDecorators = Rules.FallbackContainers
+                    .SelectMany(c => c.Container.GetDecoratorFactoriesOrDefault(serviceType))
                     .ToArrayOrSelf();
                 if (!fallbackDecorators.IsNullOrEmpty())
-                    decorators = decorators == null
-                        ? fallbackDecorators
-                        : decorators.Append(fallbackDecorators);
+                    decorators = decorators.Append(fallbackDecorators);
             }
 
             return decorators;
@@ -1055,89 +1046,6 @@ namespace DryIoc
             return itemType.IsPrimitive() || itemType.IsAssignableTo(typeof(Type))
                 ? Expression.Constant(item, itemType)
                 : null;
-        }
-
-        #endregion
-
-        #region Decorators support
-
-        private static LambdaExpression GetFuncDecoratorExpressionOrDefault(Type decoratorFuncType, Request request)
-        {
-            LambdaExpression funcDecoratorExpr = null;
-
-            var serviceType = request.ServiceType;
-            var container = request.Container;
-
-            // Look first for Action<ImplementedType> initializer-decorator
-            var implementationType = request.ImplementationType ?? request.GetActualServiceType();
-            var implementedTypes = implementationType.GetImplementedTypes(
-                ReflectionTools.AsImplementedType.SourceType | ReflectionTools.AsImplementedType.ObjectType);
-
-            for (var i = 0; i < implementedTypes.Length; i++)
-            {
-                var implementedType = implementedTypes[i];
-                var initializerActionType = typeof(Action<>).MakeGenericType(implementedType);
-                var initializerFactories = container.GetDecoratorFactoriesOrDefault(initializerActionType);
-                if (initializerFactories != null)
-                {
-                    var doAction = _doMethod.MakeGenericMethod(implementedType, implementationType);
-                    for (var j = 0; j < initializerFactories.Length; j++)
-                    {
-                        var initializerFactory = initializerFactories[j];
-                        var condition = initializerFactory.Setup.Condition;
-                        if (condition == null || condition(request.ToRequestInfo()))
-                        {
-                            var decoratorRequest = request.WithChangedServiceInfo(_ => ServiceInfo.Of(initializerActionType));
-                            var actionExpr = initializerFactory.GetExpressionOrDefault(decoratorRequest);
-                            if (actionExpr != null)
-                                ComposeDecoratorFuncExpression(ref funcDecoratorExpr, serviceType,
-                                    Expression.Call(doAction, actionExpr));
-                        }
-                    }
-                }
-            }
-
-            // Then look for decorators registered as Func of decorated service returning decorator - Func<TService, TService>.
-            var funcDecoratorFactories = container.GetDecoratorFactoriesOrDefault(decoratorFuncType);
-            if (funcDecoratorFactories != null)
-            {
-                for (var i = 0; i < funcDecoratorFactories.Length; i++)
-                {
-                    var decoratorFactory = funcDecoratorFactories[i];
-                    var decoratorRequest = request.WithChangedServiceInfo(_ => ServiceInfo.Of(decoratorFuncType));
-
-                    var condition = decoratorFactory.Setup.Condition;
-                    if (condition == null || condition(request.ToRequestInfo()))
-                    {
-                        var funcExpr = decoratorFactory.GetExpressionOrDefault(decoratorRequest);
-                        if (funcExpr != null)
-                            ComposeDecoratorFuncExpression(ref funcDecoratorExpr, serviceType, funcExpr);
-                    }
-                }
-            }
-
-            return funcDecoratorExpr;
-        }
-
-        private static void ComposeDecoratorFuncExpression(ref LambdaExpression result, Type serviceType, Expression decoratorFuncExpr)
-        {
-            if (result == null)
-            {
-                var decorated = Expression.Parameter(serviceType, "decorated" + serviceType.Name);
-                result = Expression.Lambda(Expression.Invoke(decoratorFuncExpr, decorated), decorated);
-            }
-            else
-            {
-                var decorateDecorator = Expression.Invoke(decoratorFuncExpr, result.Body);
-                result = Expression.Lambda(decorateDecorator, result.Parameters[0]);
-            }
-        }
-
-        private static readonly MethodInfo _doMethod = typeof(Container)
-            .GetSingleMethodOrNull("DoAction", includeNonPublic: true);
-        internal static Func<T, R> DoAction<T, R>(Action<T> action) where R : T
-        {
-            return x => { action(x); return (R)x; };
         }
 
         #endregion
@@ -2935,7 +2843,14 @@ namespace DryIoc
             var rules = request.Container.Rules;
             var parameterSelector = rules.Parameters.And(factory.Made.Parameters)(request);
 
-            if (request.IsWrappedInFuncWithArgs())
+            if (!request.IsWrappedInFuncWithArgs())
+            {
+                var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(x =>
+                    x.Params.All(p => IsResolvableParameter(p, parameterSelector, request)));
+                var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request).Ctor;
+                return Of(ctor);
+            }
+            else
             {
                 // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
                 var funcType = request.ParentOrWrapper.ServiceType;
@@ -2961,13 +2876,6 @@ namespace DryIoc
                     });
 
                 var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindMatchingCtorForFuncWithArgs, funcType, request).Ctor;
-                return Of(ctor);
-            }
-            else
-            {
-                var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(x =>
-                    x.Params.All(p => IsResolvableParameter(p, parameterSelector, request)));
-                var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request).Ctor;
                 return Of(ctor);
             }
         };
@@ -3809,7 +3717,8 @@ namespace DryIoc
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
         }
 
-        /// <summary>Registers decorator function that gets decorated value as input and return decorator.</summary>
+        /// <summary>Registers decorator function that gets decorated value as input and returns decorator.
+        /// Note: Delegate decorator will use <see cref="Reuse"/> of decoratee service.</summary>
         /// <typeparam name="TService">Registered service type to decorate.</typeparam>
         /// <param name="registrator">Registrator/Container.</param>
         /// <param name="getDecorator">Delegate returning decorating function.</param>
@@ -3817,8 +3726,36 @@ namespace DryIoc
         public static void RegisterDelegateDecorator<TService>(this IRegistrator registrator,
             Func<IResolver, Func<TService, TService>> getDecorator, Func<RequestInfo, bool> condition = null)
         {
-            registrator.RegisterDelegate(getDecorator, setup: Setup.DecoratorWith(condition));
+            getDecorator.ThrowIfNull();
+
+            // unique key to binds decorator factory and decorator registrations
+            var factoryKey = new object();
+
+            registrator.RegisterDelegate(_ => 
+                new DecoratorDelegateFactory<TService>(getDecorator),
+                serviceKey: factoryKey);
+
+            registrator.Register(Made.Of(
+                _ => ServiceInfo.Of<DecoratorDelegateFactory<TService>>(serviceKey: factoryKey),
+                f => f.Decorate(Arg.Of<TService>(), Arg.Of<IResolver>())),
+                setup: Setup.DecoratorWith(condition, useDecorateeReuse: true));
         }
+
+        internal sealed class DecoratorDelegateFactory<TDecoratee>
+        {
+            private readonly Func<IResolver, Func<TDecoratee, TDecoratee>> _getDecorator;
+
+            public DecoratorDelegateFactory(Func<IResolver, Func<TDecoratee, TDecoratee>> getDecorator)
+            {
+                _getDecorator = getDecorator;
+            }
+
+            public TDecoratee Decorate(TDecoratee decoratee, IResolver resolver)
+            {
+                return _getDecorator(resolver)(decoratee);
+            }
+        }
+
 
         /// <summary>Registers an externally created object of<paramref name= "serviceType" />.
         /// If no reuse specified instance will be stored in Singleton Scope, and disposed when container is disposed.</summary>
@@ -3918,8 +3855,7 @@ namespace DryIoc
         /// Check example below for using initializer to automatically subscribe to singleton event aggregator.
         /// You can register multiple initializers for single service. 
         /// Or you can register initializer for <see cref="Object"/> type to be applied for all services and use <paramref name="condition"/> 
-        /// to filter target services.</summary>
-        /// <remarks>Initializer internally implemented as decorator registered as Action delegate, so all decorators behavior is applied.</remarks>
+        /// to filter target services. </summary>
         /// <typeparam name="TTarget">Any type implemented by requested service type including service type itself and object type.</typeparam>
         /// <param name="registrator">Usually is <see cref="Container"/> object.</param>
         /// <param name="initialize">Delegate with <typeparamref name="TTarget"/> object and 
@@ -3935,8 +3871,43 @@ namespace DryIoc
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
             Action<TTarget, IResolver> initialize, Func<RequestInfo, bool> condition = null)
         {
-            registrator.RegisterDelegate<Action<TTarget>>(r => target => initialize(target, r),
-                setup: Setup.DecoratorWith(condition, useDecorateeReuse: true));
+            initialize.ThrowIfNull();
+
+            // unique key to binds decorator factory and decorator registrations
+            var factoryKey = new object();
+
+            registrator.RegisterDelegate(
+                _ => new InitializerFactory<TTarget>(initialize),
+                serviceKey: factoryKey);
+
+            registrator.Register(
+                new Made.TypedMade<object>(request => FactoryMethod.Of(
+                    typeof(InitializerFactory<TTarget>)
+                        .GetSingleMethodOrNull("Decorate")
+                        .MakeGenericMethod(request.ServiceType),
+                    ServiceInfo.Of<InitializerFactory<TTarget>>(serviceKey: factoryKey))),
+
+                setup: Setup.DecoratorWith(
+                    r => (r.ImplementationType ?? r.GetActualServiceType()).IsAssignableTo(typeof(TTarget))
+                    && (condition == null || condition(r)), 
+                    useDecorateeReuse: true));
+        }
+
+        internal sealed class InitializerFactory<TTarget>
+        {
+            private readonly Action<TTarget, IResolver> _initialize;
+
+            public InitializerFactory(Action<TTarget, IResolver> initialize)
+            {
+                _initialize = initialize;
+            }
+
+            public TService Decorate<TService>(TService service, IResolver resolver)
+                where TService : TTarget
+            {
+                _initialize(service, resolver);
+                return service;
+            }
         }
 
         /// <summary>Returns true if <paramref name="serviceType"/> is registered in container or its open generic definition is registered in container.</summary>
@@ -4715,11 +4686,14 @@ namespace DryIoc
             return new Request(null, resolverContext, null, null, null);
         }
 
+        /// <summary>Request parent with all runtime info available.</summary>
+        public readonly Request RawParent;
+
         /// <summary>Indicates that request is empty initial request: there is no <see cref="RequestInfo"/> in such a request.</summary>
         public bool IsEmpty { get { return _serviceInfo == null; } }
 
         /// <summary>Returns true if request is First in Resolve call.</summary>
-        public bool IsResolutionCall { get { return !IsEmpty && _parent.IsEmpty; } }
+        public bool IsResolutionCall { get { return !IsEmpty && RawParent.IsEmpty; } }
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
         public bool IsResolutionRoot { get { return IsResolutionCall && PreResolveParent.IsEmpty; } }
@@ -4730,11 +4704,11 @@ namespace DryIoc
         /// <summary>Returns true for the First Service in resolve call.</summary> <returns></returns>
         public bool IsFirstNonWrapperInResolutionCall()
         {
-            if (IsResolutionCall && _parent.FactoryType != FactoryType.Wrapper)
+            if (IsResolutionCall && RawParent.FactoryType != FactoryType.Wrapper)
                 return true;
-            var p = _parent;
+            var p = RawParent;
             while (!p.IsEmpty && p.ResolvedFactory.FactoryType == FactoryType.Wrapper)
-                p = p._parent;
+                p = p.RawParent;
             return p.IsEmpty;
         }
 
@@ -4760,9 +4734,9 @@ namespace DryIoc
             get
             {
                 return IsEmpty ? RequestInfo.Empty
-                    : _parent.IsEmpty ? PreResolveParent.FirstOrEmpty(p => p.FactoryType != FactoryType.Wrapper)
-                    : _parent.FactoryType != FactoryType.Wrapper ? _parent.ToRequestInfo() 
-                    : _parent.Parent;
+                    : RawParent.IsEmpty ? PreResolveParent.FirstOrEmpty(p => p.FactoryType != FactoryType.Wrapper)
+                    : RawParent.FactoryType != FactoryType.Wrapper ? RawParent.ToRequestInfo() 
+                    : RawParent.Parent;
             }
         }
 
@@ -4771,8 +4745,8 @@ namespace DryIoc
         public RequestInfo ParentOrWrapper
         {
             get { return IsEmpty ? RequestInfo.Empty 
-                    : _parent.IsEmpty ? PreResolveParent 
-                    : _parent.ToRequestInfo(); }
+                    : RawParent.IsEmpty ? PreResolveParent 
+                    : RawParent.ToRequestInfo(); }
         }
 
         /// <summary>Gets first ancestor request which satisfies the condition, 
@@ -4882,7 +4856,7 @@ namespace DryIoc
         public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
             var changedServiceInfo = getInfo(_serviceInfo);
-            return new Request(_parent, _resolverContext, changedServiceInfo, ResolvedFactory, FuncArgs, Level);
+            return new Request(RawParent, _resolverContext, changedServiceInfo, ResolvedFactory, FuncArgs, Level);
         }
 
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -4914,7 +4888,7 @@ namespace DryIoc
 
             var funcArgsUsage = new bool[funcArgExprs.Length];
             var funcArgsUsageAndExpr = new KV<bool[], ParameterExpression[]>(funcArgsUsage, funcArgExprs);
-            return new Request(_parent, _resolverContext, _serviceInfo, ResolvedFactory, funcArgsUsageAndExpr, Level);
+            return new Request(RawParent, _resolverContext, _serviceInfo, ResolvedFactory, funcArgsUsageAndExpr, Level);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container, 
@@ -4923,7 +4897,7 @@ namespace DryIoc
         /// <returns>Request with replaced container.</returns>
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
-            return new Request(_parent, _resolverContext.With(newContainer), 
+            return new Request(RawParent, _resolverContext.With(newContainer), 
                 _serviceInfo, ResolvedFactory, FuncArgs, Level);
         }
 
@@ -4936,11 +4910,11 @@ namespace DryIoc
                 return this; // resolving only once, no need to check recursion again.
 
             if (factory.FactoryType == FactoryType.Service)
-                for (var p = _parent; !p.IsEmpty; p = p._parent)
+                for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID,
                         Error.RecursiveDependencyDetected, Print(factory.FactoryID));
 
-            return new Request(_parent, _resolverContext, _serviceInfo, factory, FuncArgs, Level);
+            return new Request(RawParent, _resolverContext, _serviceInfo, factory, FuncArgs, Level);
         }
 
         /// <summary>Converts input request into its slim version of <see cref="RequestInfo"/> </summary>
@@ -4949,7 +4923,7 @@ namespace DryIoc
         {
             if (IsEmpty)
                 return RequestInfo.Empty;
-            var parent = _parent.IsEmpty ? PreResolveParent : _parent.ToRequestInfo();
+            var parent = RawParent.IsEmpty ? PreResolveParent : RawParent.ToRequestInfo();
             var factory = ResolvedFactory;
             if (factory == null)
                 return parent.Push(ServiceType, RequiredServiceType, ServiceKey, -1, FactoryType.Service, null, null);
@@ -4962,7 +4936,7 @@ namespace DryIoc
         /// <returns>Unfolding parents.</returns>
         public IEnumerable<Request> Enumerate()
         {
-            for (var r = this; !r.IsEmpty; r = r._parent)
+            for (var r = this; !r.IsEmpty; r = r.RawParent)
                 yield return r;
         }
 
@@ -4998,7 +4972,7 @@ namespace DryIoc
                 return s;
 
             s = recursiveFactoryID == -1 ? s : s.Append(" <--recursive");
-            foreach (var r in _parent.Enumerate())
+            foreach (var r in RawParent.Enumerate())
             {
                 s = r.PrintCurrent(s.AppendLine().Append("  in "));
                 if (r.ResolvedFactory.FactoryID == recursiveFactoryID)
@@ -5025,7 +4999,7 @@ namespace DryIoc
             KV<bool[], ParameterExpression[]> funcArgs, 
             int level = 0)
         {
-            _parent = parent;
+            RawParent = parent;
             _resolverContext = resolverContext;
             _serviceInfo = serviceInfo;
             ResolvedFactory = resolvedFactory;
@@ -5033,7 +5007,6 @@ namespace DryIoc
             Level = level;
         }
 
-        private readonly Request _parent;
         private readonly ResolverContext _resolverContext;
         private IServiceInfo _serviceInfo; // note: Mutable so the default key could be set
 
@@ -5398,6 +5371,9 @@ namespace DryIoc
         /// <returns>Service expression.</returns>
         public virtual Expression GetExpressionOrDefault(Request request)
         {
+            var originalRequest = request;
+            request = request.WithResolvedFactory(this);
+
             var container = request.Container;
             
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
@@ -5407,26 +5383,22 @@ namespace DryIoc
                 && !request.IsWrappedInFuncWithArgs())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
-            var originalRequest = request;
-            request = request.WithResolvedFactory(this);
-
             // Here's lookup for decorators
             var decoratorExpr = FactoryType == FactoryType.Service
                     ? container.GetDecoratorExpressionOrDefault(request)
                     : null;
 
-            var isReplacingDecorator = decoratorExpr != null && !(decoratorExpr is LambdaExpression);
-
-            var isCacheable = IsFactoryExpressionCacheable(request) && !isReplacingDecorator;
+            var isDecorated = decoratorExpr != null;
+            var isCacheable = IsFactoryExpressionCacheable(request) && !isDecorated;
             if (isCacheable)
             {
                 var cachedServiceExpr = container.GetCachedFactoryExpressionOrDefault(FactoryID);
                 if (cachedServiceExpr != null)
-                    return decoratorExpr == null ? cachedServiceExpr : Expression.Invoke(decoratorExpr, cachedServiceExpr);
+                    return cachedServiceExpr;
             }
 
-            var serviceExpr = isReplacingDecorator ? decoratorExpr : CreateExpressionOrDefault(request);
-            if (serviceExpr != null && !isReplacingDecorator)
+            var serviceExpr = decoratorExpr ?? CreateExpressionOrDefault(request);
+            if (serviceExpr != null && !isDecorated)
             {
                 var reuse = Reuse;
                 var tracksTransientDisposable = false;
@@ -5454,14 +5426,8 @@ namespace DryIoc
                     serviceExpr = ApplyReuse(serviceExpr, reuse, tracksTransientDisposable, request);
             }
 
-            if (serviceExpr != null)
-            {
-                if (isCacheable)
-                    container.CacheFactoryExpression(FactoryID, serviceExpr);
-
-                if (!isReplacingDecorator && decoratorExpr != null)
-                    serviceExpr = Expression.Invoke(decoratorExpr, serviceExpr);
-            }
+            if (serviceExpr != null && isCacheable)
+                container.CacheFactoryExpression(FactoryID, serviceExpr);
 
             if (serviceExpr == null)
             {
