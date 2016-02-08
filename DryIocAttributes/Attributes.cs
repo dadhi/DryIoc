@@ -297,6 +297,7 @@ namespace DryIocAttributes
 
         /// <summary>Creates attributes with <see cref="ContractName"/> and optional order.</summary>
         /// <param name="contractName"></param> <param name="order">(optional)</param>
+        /// <param name="useDecorateeReuse">(optional)</param>
         public AsDecoratorAttribute(string contractName, int order = 0, bool useDecorateeReuse = false)
         {
             ContractName = contractName;

@@ -5,16 +5,6 @@ using DryIocAttributes;
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
     [Export]
-    public class YYY { }
-
-    [Export, AsResolutionRootAttibute]
-    public class XXX
-    {
-        public XXX(Lazy<YYY> yyy) { }
-    }
-
-
-    [Export]
     public class FactoryConsumer
     {
         public FactoryConsumer(IFactory<One>[] ones)
