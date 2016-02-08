@@ -405,7 +405,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Unregister_singleton_injected_redendency()
+        public void Unregister_singleton_injected_dependency()
         {
             var container = new Container();
             container.Register<A>(setup: Setup.With(allowDisposableTransient: true));

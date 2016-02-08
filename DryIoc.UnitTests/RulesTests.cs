@@ -355,6 +355,44 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(scoped.Consumer.Ad.IsDisposed);
         }
 
+        [Test]
+        public void Should_track_transient_service_in_open_scope_if_present()
+        {
+            var container = new Container();
+            container.Register<AD>(setup: Setup.With(allowDisposableTransient: true));
+
+            AD ad;
+            using (var scope = container.OpenScope())
+                ad = scope.Resolve<AD>();
+
+            Assert.IsTrue(ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_transient_service_in_open_scope_of_any_name_if_present()
+        {
+            var container = new Container();
+            container.Register<AD>(setup: Setup.With(allowDisposableTransient: true));
+
+            AD ad;
+            using (var scope = container.OpenScope("hey"))
+                ad = scope.Resolve<AD>();
+
+            Assert.IsTrue(ad.IsDisposed);
+        }
+
+
+        [Test]
+        public void Should_NOT_track_transient_service_in_singleton_scope_if_no_open_scope_because_it_is_most_definitely_a_leak()
+        {
+            var container = new Container();
+            container.Register<AD>(setup: Setup.With(allowDisposableTransient: true));
+
+            var ad = container.Resolve<AD>();
+
+            container.Dispose();
+            Assert.IsFalse(ad.IsDisposed);
+        }
 
         public class AD : IDisposable
         {

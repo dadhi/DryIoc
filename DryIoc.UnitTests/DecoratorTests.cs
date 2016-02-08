@@ -501,7 +501,7 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<TalkingBirdDecorator>(bird);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_register_custom_Disposer()
         {
             var container = new Container();
