@@ -541,6 +541,81 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<B>(c.A);
         }
 
+        [Test]
+        public void Can_register_decorator_of_any_T_As_object()
+        {
+            var container = new Container();
+
+            container.Register<S>();
+            container.Register<object>(made: Made.Of(r => 
+                GetType().GetSingleMethodOrNull("PutMessage").MakeGenericMethod(r.ServiceType)),
+                setup: Setup.Decorator);
+
+            var s = container.Resolve<S>();
+            Assert.AreEqual("Ok", s.Message);
+        }
+
+        [Test]
+        public void If_decorator_of_any_T_has_not_compatible_decoratee_type_It_should_throw()
+        {
+            var container = new Container();
+
+            container.Register<S>();
+
+            container.Register<object>(made: Made.Of(r =>
+                GetType().GetSingleMethodOrNull("PutMessage2").MakeGenericMethod(r.ServiceType)),
+                setup: Setup.Decorator);
+
+            Assert.Throws<ArgumentException>(() =>
+            container.Resolve<S>());
+        }
+
+        [Test]
+        public void If_decorator_of_any_T_returns_unexpected_decorator_type_It_should_throw()
+        {
+            var container = new Container();
+
+            container.Register<S>();
+
+            container.Register<object>(made: Made.Of(r =>
+                GetType().GetSingleMethodOrNull("PutMessage3").MakeGenericMethod(r.ServiceType)),
+                setup: Setup.Decorator);
+
+            var ex = Assert.Throws<ContainerException>(() =>
+            container.Resolve<S>());
+
+            Assert.AreEqual(Error.ServiceIsNotAssignableFromFactoryMethod, ex.Error);
+        }
+
+        public class S
+        {
+            public string Message;
+        }
+
+        public static T PutMessage<T>(T t)
+        {
+            var s = t as S;
+            if (s != null)
+                s.Message = "Ok";
+            return t;
+        }
+
+        public static T PutMessage2<T>(T t) where T : IDisposable
+        {
+            var s = t as S;
+            if (s != null)
+                s.Message = "Ok";
+            return t;
+        }
+
+        public static string PutMessage3<T>(T t) 
+        {
+            var s = t as S;
+            if (s != null)
+                s.Message = "Ok";
+            return "nope";
+        }
+
         public class A { }
 
         public class FB : A

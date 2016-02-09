@@ -2987,6 +2987,15 @@ namespace DryIoc
             return Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo));
         }
 
+        /// <summary>Creates factory specification with method or member selector based on request.</summary>
+        /// <param name="getMethodOrMember">Method, or constructor, or member selector.</param>
+        /// <param name="factoryInfo">(optional) Factory info to resolve in case of instance method/member.</param>
+        /// <returns>New specification.</returns>
+        public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null)
+        {
+            return Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo));
+        }
+
         /// <summary>Defines how to select constructor from implementation type.</summary>
         /// <param name="getConstructor">Delegate taking implementation type as input and returning selected constructor info.</param>
         /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
@@ -3882,8 +3891,7 @@ namespace DryIoc
 
             registrator.Register<object>(made: 
                 Made.Of(request => FactoryMethod.Of(
-                    typeof(InitializerFactory<TTarget>)
-                        .GetSingleMethodOrNull("Decorate")
+                    typeof(InitializerFactory<TTarget>).GetSingleMethodOrNull("Decorate")
                         .MakeGenericMethod(request.ServiceType),
                     ServiceInfo.Of<InitializerFactory<TTarget>>(serviceKey: factoryKey))),
 
@@ -4916,16 +4924,13 @@ namespace DryIoc
                     Throw.If(p.ResolvedFactory.FactoryID == factory.FactoryID,
                         Error.RecursiveDependencyDetected, Print(factory.FactoryID));
 
-            var reuse = factory.Reuse;
-            if (reuse == null)
-            {
-                reuse = factory.Setup.UseParentReuse
-                    ? GetParentOrFuncOrEmpty().Reuse
-                    : ResolvedFactory != null && factory.Setup is Setup.DecoratorSetup &&
-                      ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse
-                        ? Reuse
-                        : null;
-            }
+            var reuse = factory.Reuse ?? 
+                (factory.Setup.UseParentReuse
+                ? GetParentOrFuncOrEmpty().Reuse
+                : ResolvedFactory != null && factory.Setup is Setup.DecoratorSetup &&
+                  ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse
+                    ? Reuse
+                    : null);
 
             return new Request(RawParent, _resolverContext, _serviceInfo, factory, reuse, FuncArgs, Level);
         }
