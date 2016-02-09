@@ -3880,8 +3880,8 @@ namespace DryIoc
                 _ => new InitializerFactory<TTarget>(initialize),
                 serviceKey: factoryKey);
 
-            registrator.Register(
-                new Made.TypedMade<object>(request => FactoryMethod.Of(
+            registrator.Register<object>(made: 
+                Made.Of(request => FactoryMethod.Of(
                     typeof(InitializerFactory<TTarget>)
                         .GetSingleMethodOrNull("Decorate")
                         .MakeGenericMethod(request.ServiceType),
@@ -5443,12 +5443,15 @@ namespace DryIoc
             if (serviceExpr != null && !isDecorated)
             {
                 // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account 
-                var reuse = request.Reuse; 
+                var reuse = request.Reuse;
 
                 // Track transient disposable in parent scope (if any), or singleton
+                var tracksTransientDisposable = false;
                 if (reuse == null && IsDisposableService(request))
+                {
                     reuse = GetTransientDisposableTrackingReuse(request);
-                var tracksTransientDisposable = reuse != null;
+                    tracksTransientDisposable = true;
+                }
 
                 // At last apply container wide default reuse
                 if (reuse == null)
