@@ -284,7 +284,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_track_transient_disposable_dependency_in_singleton_scope()
         {
-            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
 
             container.Register<AD>();
             container.Register<ADConsumer>(Reuse.Singleton);
@@ -298,7 +298,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_not_track_func_of_transient_disposable_dependency_in_singleton_scope()
         {
-            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
 
             container.Register<AD>();
             container.Register<ADFuncConsumer>(Reuse.Singleton);
@@ -312,7 +312,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_track_lazy_of_transient_disposable_dependency_in_singleton_scope()
         {
-            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
 
             container.Register<AD>();
             container.Register<ADLazyConsumer>(Reuse.Singleton);
@@ -326,7 +326,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_track_transient_disposable_dependency_in_current_scope()
         {
-            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
 
             container.Register<AD>();
             container.Register<ADConsumer>(Reuse.InCurrentScope);
@@ -343,7 +343,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_track_transient_disposable_dependency_in_resolution_scope()
         {
-            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
 
             container.Register<AD>(setup: Setup.With(asResolutionCall: true));
             container.Register<ADConsumer>(Reuse.InResolutionScopeOf<AResolutionScoped>(), setup: Setup.With(asResolutionCall: true));
@@ -359,7 +359,7 @@ namespace DryIoc.UnitTests
         public void Should_track_transient_service_in_open_scope_if_present()
         {
             var container = new Container();
-            container.Register<AD>(setup: Setup.With(allowDisposableTransient: true));
+            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
 
             AD ad;
             using (var scope = container.OpenScope())
@@ -372,7 +372,7 @@ namespace DryIoc.UnitTests
         public void Should_track_transient_service_in_open_scope_of_any_name_if_present()
         {
             var container = new Container();
-            container.Register<AD>(setup: Setup.With(allowDisposableTransient: true));
+            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
 
             AD ad;
             using (var scope = container.OpenScope("hey"))
@@ -386,7 +386,7 @@ namespace DryIoc.UnitTests
         public void Should_NOT_track_transient_service_in_singleton_scope_if_no_open_scope_because_it_is_most_definitely_a_leak()
         {
             var container = new Container();
-            container.Register<AD>(setup: Setup.With(allowDisposableTransient: true));
+            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
 
             var ad = container.Resolve<AD>();
 

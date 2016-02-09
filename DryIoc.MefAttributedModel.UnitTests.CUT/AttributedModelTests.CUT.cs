@@ -409,8 +409,40 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export, AllowsDisposableTransient]
-    public sealed class Abc { }
+    [Export, SingletonReuse]
+    public sealed class DTUser
+    {
+        public readonly DT Dt;
+        public readonly DT2 Dt2;
+
+        public DTUser(DT dt, DT2 dt2)
+        {
+            Dt = dt;
+            Dt2 = dt2;
+        }
+    }
+
+    [Export, TransientReuse, AllowDisposableTransient]
+    public sealed class DT : IDisposable
+    {
+        public bool IsDisposed;
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export, TransientReuse, TrackDisposableTransient]
+    public sealed class DT2 : IDisposable
+    {
+        public bool IsDisposed;
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
 
     public class Daah
     {

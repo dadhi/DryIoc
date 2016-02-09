@@ -333,9 +333,13 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.PreventDisposal = true;
                 }
-                else if (attribute is AllowsDisposableTransientAttribute)
+                else if (attribute is AllowDisposableTransientAttribute)
                 {
-                    info.AllowsDisposableTransient = true;
+                    info.AllowDisposableTransient = true;
+                }
+                else if (attribute is TrackDisposableTransientAttribute)
+                {
+                    info.TrackDisposableTransient = true;
                 }
                 else if (attribute is UseParentReuseAttribute)
                 {
@@ -709,9 +713,11 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Specifies to store reused instance as WeakReference.</summary>
         public bool WeaklyReferenced;
 
-        /// <summary>Allows registering transient disposable.
-        /// IMPROTANT: turns On tracking of transient in parent scope.</summary>
-        public bool AllowsDisposableTransient;
+        /// <summary>Allows registering transient disposable. But the disposal is up to you.</summary>
+        public bool AllowDisposableTransient;
+
+        /// <summary>Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</summary>
+        public bool TrackDisposableTransient;
 
         /// <summary>Instructs to use parent reuse. Applied only if Reuse is not specified.</summary>
         public bool UseParentReuse;
@@ -764,7 +770,8 @@ namespace DryIoc.MefAttributedModel
             return Setup.With(metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot, 
                 PreventDisposal, WeaklyReferenced, 
-                AllowsDisposableTransient, UseParentReuse);
+                AllowDisposableTransient, TrackDisposableTransient,
+                UseParentReuse);
         }
 
         private static DryIocAttributes.RequestInfo ConvertRequestInfo(DryIoc.RequestInfo source)

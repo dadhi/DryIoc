@@ -178,7 +178,10 @@ namespace DryIocAttributes
     public class PreventDisposalAttribute : Attribute { }
 
     /// <summary>Allows disposable transient to be exported.</summary>
-    public class AllowsDisposableTransientAttribute : Attribute { }
+    public class AllowDisposableTransientAttribute : Attribute { }
+
+    /// <summary>Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</summary>
+    public class TrackDisposableTransientAttribute : Attribute { }
 
     /// <summary>OBSOLETE: Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.</summary>
     //[Obsolete("Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.")]

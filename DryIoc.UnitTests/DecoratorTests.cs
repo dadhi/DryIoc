@@ -346,6 +346,27 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void I_can_ensure_Decorator_order_with_Order_option()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.DecoratorWith(order: 3));
+            container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
+            container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.DecoratorWith(order: 1));
+
+            var operation = container.Resolve<IOperation>();
+
+            Assert.IsInstanceOf<RetryOperationDecorator>(operation);
+
+            var decorated1 = ((RetryOperationDecorator)operation).Decorated;
+            Assert.IsInstanceOf<AsyncOperationDecorator>(decorated1);
+
+            var decorated2 = ((AsyncOperationDecorator)decorated1).Decorated();
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(decorated2);
+        }
+
+
+        [Test]
         public void Delegate_decorator_will_use_decoratee_reuse()
         {
             var container = new Container();
@@ -587,16 +608,39 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(Error.ServiceIsNotAssignableFromFactoryMethod, ex.Error);
         }
 
+        [Test]
+        public void Can_register_decorator_of_any_T_As_object_and_specified_order_of_application()
+        {
+            var container = new Container();
+
+            container.Register<S>();
+            container.Register<S, SS>(setup: Setup.Decorator);
+            container.Register<object>(made: Made.Of(r =>
+                GetType().GetSingleMethodOrNull("PutMessage").MakeGenericMethod(r.ServiceType)),
+                setup: Setup.DecoratorWith(order: 1));
+
+            var s = container.Resolve<S>();
+            Assert.AreEqual("OkNot", s.Message);
+        }
+
         public class S
         {
-            public string Message;
+            public string Message = "";
+        }
+
+        public class SS : S
+        {
+            public SS(S s)
+            {
+                Message = s.Message + "Not";
+            }
         }
 
         public static T PutMessage<T>(T t)
         {
             var s = t as S;
             if (s != null)
-                s.Message = "Ok";
+                s.Message += "Ok";
             return t;
         }
 

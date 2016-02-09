@@ -2651,7 +2651,9 @@ namespace DryIoc
         }
 
         /// <summary>Turns Off the rule <see cref="ThrowOnRegisteringDisposableTransient"/>.
-        /// IMPORTANT: turning this setting off automatically turns On tracking of disposable transients in parent's scope.</summary>
+        /// Allows to register disposable transient but it is up to you to handle their disposal.
+        /// You can use <see cref="WithTrackingDisposableTransients"/> to actually track disposable transient in
+        /// container, so that disposal will be handled by container.</summary>
         /// <returns>New rules with setting turned off.</returns>
         public Rules WithoutThrowOnRegisteringDisposableTransient()
         {
@@ -2659,6 +2661,33 @@ namespace DryIoc
             newRules._settings ^= Settings.ThrowOnRegisteringDisposableTransient;
             return newRules;
         }
+
+        /// <summary><see cref="WithTrackingDisposableTransients"/></summary>
+        public bool TrackingDisposableTransients
+        {
+            get { return (_settings & Settings.TrackingDisposableTransients) != 0; }
+        }
+
+        /// <summary>Turns tracking of disposable transients in dependency parent scope, or in current scope if service
+        /// is resolved directly. 
+        /// 
+        /// If no open scope at the moment then resolved transient won't be tracked and it is up to you
+        /// to dispose it! That's is similar situation to creating service by new - you have full control.
+        /// 
+        /// If dependency wrapped in Func somewhere in parent chain then it also won't be tracked, because
+        /// Func supposedly means multiple object aquisition and for container it is not clear what to do, so container
+        /// delegates that to user. Func here is the similar to Owned relationship type in Autofac library.
+        /// </summary>
+        /// <remarks>Turning this setting On automatically turns off <see cref="ThrowOnRegisteringDisposableTransient"/>.</remarks>
+        /// <returns>New rules with setting turned On.</returns>
+        public Rules WithTrackingDisposableTransients()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules._settings |= Settings.TrackingDisposableTransients;
+            newRules._settings ^= Settings.ThrowOnRegisteringDisposableTransient;
+            return newRules;
+        }
+
 
         /// <summary><see cref="WithoutEagerCachingSingletonForFasterAccess"/>.</summary>
         public bool EagerCachingSingletonForFasterAccess
@@ -2776,15 +2805,16 @@ namespace DryIoc
         private Made _made;
 
         [Flags]
-        private enum Settings : short
+        private enum Settings
         {
             ThrowIfDependencyHasShorterReuseLifespan = 1,
             ThrowOnRegisteringDisposableTransient = 2,
-            ImplicitCheckForReuseMatchingScope = 4,
-            VariantGenericTypesInResolvedCollection = 8,
-            ResolveIEnumerableAsLazyEnumerable = 16,
-            EagerCachingSingletonForFasterAccess = 32,
-            ImplicitRootOpenScope = 64 
+            TrackingDisposableTransients = 4,
+            ImplicitCheckForReuseMatchingScope = 8,
+            VariantGenericTypesInResolvedCollection = 16,
+            ResolveIEnumerableAsLazyEnumerable = 32,
+            EagerCachingSingletonForFasterAccess = 64,
+            ImplicitRootOpenScope = 128 
         }
 
         private const Settings DEFAULT_SETTINGS =
@@ -5097,9 +5127,11 @@ namespace DryIoc
         /// <summary>Stores reused instance as WeakReference.</summary>
         public virtual bool WeaklyReferenced { get { return false; } }
 
-        /// <summary>Allows registering transient disposable.
-        /// IMPROTANT: turns On tracking of transient in parent scope.</summary>
+        /// <summary>Allows registering transient disposable.</summary>
         public virtual bool AllowDisposableTransient { get { return false; } }
+
+        /// <summary>Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</summary>
+        public virtual bool TrackDisposableTransient { get { return false; } }
 
         /// <summary>Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</summary>
         public virtual bool UseParentReuse { get { return false; } }
@@ -5114,7 +5146,8 @@ namespace DryIoc
         /// <param name="asResolutionRoot">(optional) Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
         /// <param name="weaklyReferenced">(optional) Stores reused instance as WeakReference.</param>
-        /// <param name="allowDisposableTransient">(optional) Allows registering transient disposable and IMPROTANT: turns On tracking of transient in parent scope.</param>
+        /// <param name="allowDisposableTransient">(optional) Allows registering transient disposable.</param>
+        /// <param name="trackDisposableTransient">(optional) Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</param>
         /// <param name="useParentReuse">(optional) Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</param>
         /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
         public static Setup With(
@@ -5122,17 +5155,20 @@ namespace DryIoc
             Func<RequestInfo, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
-            bool allowDisposableTransient = false, bool useParentReuse = false)
+            bool allowDisposableTransient = false, bool trackDisposableTransient = false,
+            bool useParentReuse = false)
         {
             if (metadataOrFuncOfMetadata == null && condition == null &&
                 openResolutionScope == false && asResolutionCall == false && asResolutionRoot == false &&
                 preventDisposal == false && weaklyReferenced == false &&
-                allowDisposableTransient == false && useParentReuse == false)
+                allowDisposableTransient == false && trackDisposableTransient == false &&
+                useParentReuse == false)
                 return Default;
 
             return new ServiceSetup(condition,
                 metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, asResolutionRoot,
-                preventDisposal, weaklyReferenced, allowDisposableTransient, useParentReuse);
+                preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
+                useParentReuse);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -5186,26 +5222,36 @@ namespace DryIoc
             public override bool PreventDisposal { get { return (_settings & Settings.PreventDisposal) != 0; } }
             public override bool WeaklyReferenced { get { return (_settings & Settings.WeaklyReferenced) != 0; } }
             public override bool AllowDisposableTransient { get { return (_settings & Settings.AllowDisposableTransient) != 0; } }
+            public override bool TrackDisposableTransient { get { return (_settings & Settings.TrackDisposableTransient) != 0; } }
             public override bool UseParentReuse { get { return (_settings & Settings.UseParentReuse) != 0; } }
 
             public ServiceSetup(Func<RequestInfo, bool> condition = null, object metadataOrFuncOfMetadata = null,
                 bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
                 bool preventDisposal = false, bool weaklyReferenced = false,
-                bool allowDisposableTransient = false, bool useParentReuse = false)
+                bool allowDisposableTransient = false, bool trackDisposableTransients = false,
+                bool useParentReuse = false)
             {
                 Condition = condition;
                 _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
 
-                if (asResolutionCall || openResolutionScope)
+                if (asResolutionCall)
                     _settings |= Settings.AsResolutionCall;
                 if (openResolutionScope)
+                {
                     _settings |= Settings.OpenResolutionScope;
+                    _settings |= Settings.AsResolutionCall;
+                }
                 if (preventDisposal)
                     _settings |= Settings.PreventDisposal;
                 if (weaklyReferenced)
                     _settings |= Settings.WeaklyReferenced;
                 if (allowDisposableTransient)
                     _settings |= Settings.AllowDisposableTransient;
+                if (trackDisposableTransients)
+                {
+                    _settings |= Settings.TrackDisposableTransient;
+                    _settings |= Settings.AllowDisposableTransient;
+                }
                 if (asResolutionRoot)
                     _settings |= Settings.AsResolutionRoot;
                 if (useParentReuse)
@@ -5215,15 +5261,16 @@ namespace DryIoc
             private object _metadataOrFuncOfMetadata;
 
             [Flags]
-            private enum Settings : short
+            private enum Settings
             {
                 AsResolutionCall = 1,
                 OpenResolutionScope = 2,
                 PreventDisposal = 4,
                 WeaklyReferenced = 8,
                 AllowDisposableTransient = 16,
-                AsResolutionRoot = 32,
-                UseParentReuse = 64
+                TrackDisposableTransient = 32,
+                AsResolutionRoot = 64,
+                UseParentReuse = 128
             }
 
             private readonly Settings _settings;
@@ -5409,8 +5456,10 @@ namespace DryIoc
                    && Setup.Condition == null
                    && !Setup.AsResolutionCall 
                    && !Setup.UseParentReuse
-                   && !Setup.AllowDisposableTransient 
-                   && !(request.Reuse == null && IsDisposableService(request) && !request.Container.Rules.ThrowOnRegisteringDisposableTransient);
+                   // tracking disposable transient
+                   && !(request.Reuse == null 
+                    && (Setup.TrackDisposableTransient || request.Container.Rules.TrackingDisposableTransients) 
+                    && IsDisposableService(request));
         }
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
@@ -5452,7 +5501,9 @@ namespace DryIoc
 
                 // Track transient disposable in parent scope (if any), or singleton
                 var tracksTransientDisposable = false;
-                if (reuse == null && IsDisposableService(request))
+                if (reuse == null && 
+                    (Setup.TrackDisposableTransient || container.Rules.TrackingDisposableTransients) &&
+                    IsDisposableService(request))
                 {
                     reuse = GetTransientDisposableTrackingReuse(request);
                     tracksTransientDisposable = true;
