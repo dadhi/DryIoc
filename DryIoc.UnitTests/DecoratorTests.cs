@@ -608,7 +608,7 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(Error.ServiceIsNotAssignableFromFactoryMethod, ex.Error);
         }
 
-        [Test]
+        [Test, Ignore]
         public void Can_register_decorator_of_any_T_As_object_and_specified_order_of_application()
         {
             var container = new Container();

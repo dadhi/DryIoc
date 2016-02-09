@@ -369,6 +369,45 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Tracked_disposables_should_be_different()
+        {
+            var container = new Container();
+            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
+
+            using (var scope = container.OpenScope())
+            {
+                var ad = scope.Resolve<AD>();
+                Assert.AreNotSame(ad, scope.Resolve<AD>());
+            }
+        }
+
+        [Test]
+        public void Should_track_transient_service_in_implicit_open_scope()
+        {
+            var container = new Container(rules => rules.WithImplicitRootOpenScope());
+            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
+
+            var ad = container.Resolve<AD>();
+
+            container.Dispose();
+
+            Assert.IsTrue(ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_transient_service_in_nested_open_scope_if_present()
+        {
+            var container = new Container(rules => rules.WithImplicitRootOpenScope().WithTrackingDisposableTransients());
+            container.Register<AD>();
+
+            AD ad;
+            using (var scope = container.OpenScope())
+                ad = scope.Resolve<AD>();
+
+            Assert.IsTrue(ad.IsDisposed);
+        }
+
+        [Test]
         public void Should_track_transient_service_in_open_scope_of_any_name_if_present()
         {
             var container = new Container();

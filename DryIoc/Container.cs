@@ -176,13 +176,17 @@ namespace DryIoc
                 if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                     return;
 
-                Rules = Rules.Default;
-                _registry.Swap(Registry.Empty);
-                _singletonScope.Dispose();
                 if (_openedScope != null)
                     _openedScope.Dispose();
+
                 if (_scopeContext != null)
                     _scopeContext.Dispose();
+
+                _singletonScope.Dispose();
+
+                _registry.Swap(Registry.Empty);
+
+                Rules = Rules.Default;
             }
         }
 
@@ -477,14 +481,18 @@ namespace DryIoc
             if (request.ServiceKey != null)
                 return ((IResolver)this).Resolve(serviceType, request.ServiceKey, ifUnresolvedReturnDefault, null, null, scope);
 
-            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
+            var cacheable = true;
+            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request, out cacheable);
             if (factoryDelegate == null)
                 return null;
 
             var registryValue = _registry.Value;
             var service = factoryDelegate(_singletonScope.Items, _containerWeakRef, scope);
 
-            if (!registryValue.Services.IsEmpty)
+            // Caching disabled only if:
+            // - if caching is off by factory itself
+            // - if no services were registered, so the service probably empty collection wrapper or alike.
+            if (cacheable && !registryValue.Services.IsEmpty)
             {
                 var cacheRef = registryValue.DefaultFactoryDelegateCache;
                 var cacheVal = cacheRef.Value;
@@ -5460,10 +5468,8 @@ namespace DryIoc
         public abstract Expression CreateExpressionOrDefault(Request request);
 
         /// <summary>Allows derived factories to override or reuse caching policy used by
-        /// <see cref="GetExpressionOrDefault"/>. By default only service setup and no 
-        /// user passed arguments may be cached.</summary>
-        /// <param name="request">Context.</param>
-        /// <returns>True if factory expression could be cached.</returns>
+        /// GetExpressionOrDefault. By default only service setup and no  user passed arguments may be cached.</summary>
+        /// <param name="request">Context.</param> <returns>True if factory expression could be cached.</returns>
         protected virtual bool IsFactoryExpressionCacheable(Request request)
         {
             return request.FuncArgs == null
@@ -5481,14 +5487,23 @@ namespace DryIoc
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
-        /// <param name="request">Request for service.</param>
-        /// <returns>Service expression.</returns>
+        /// <param name="request">Request for service.</param> <returns>Service expression.</returns>
         public virtual Expression GetExpressionOrDefault(Request request)
         {
+            bool ignoreCacheability;
+            return GetExpressionOrDefault(request, out ignoreCacheability);
+        }
+
+        /// <summary><see cref="GetExpressionOrDefault(DryIoc.Request)"/>.</summary>
+        /// <param name="request">Request for service.</param> <param name="cacheable">Returns true if expression is cahcebale</param>
+        /// <returns>Service expression.</returns>
+        public Expression GetExpressionOrDefault(Request request, out bool cacheable)
+        {
+            cacheable = false;
             request = request.WithResolvedFactory(this);
 
             var container = request.Container;
-            
+
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
             if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolutionCall()
                 || request.Level >= container.Rules.LevelToSplitObjectGraphIntoResolveCalls
@@ -5502,8 +5517,8 @@ namespace DryIoc
                     : null;
 
             var isDecorated = decoratorExpr != null;
-            var isCacheable = IsFactoryExpressionCacheable(request) && !isDecorated;
-            if (isCacheable)
+            cacheable = IsFactoryExpressionCacheable(request) && !isDecorated;
+            if (cacheable)
             {
                 var cachedServiceExpr = container.GetCachedFactoryExpressionOrDefault(FactoryID);
                 if (cachedServiceExpr != null)
@@ -5518,7 +5533,7 @@ namespace DryIoc
 
                 // Track transient disposable in parent scope (if any), or singleton
                 var tracksTransientDisposable = false;
-                if (reuse == null && 
+                if (reuse == null &&
                     (Setup.TrackDisposableTransient || container.Rules.TrackingDisposableTransients) &&
                     IsDisposableService(request))
                 {
@@ -5536,7 +5551,7 @@ namespace DryIoc
                     serviceExpr = ApplyReuse(serviceExpr, reuse, tracksTransientDisposable, request);
             }
 
-            if (serviceExpr != null && isCacheable)
+            if (cacheable && serviceExpr != null)
                 container.CacheFactoryExpression(FactoryID, serviceExpr);
 
             if (serviceExpr == null)
@@ -5556,6 +5571,7 @@ namespace DryIoc
             }
 
             return serviceExpr;
+
         }
 
         private static IReuse GetTransientDisposableTrackingReuse(Request request)
@@ -5677,6 +5693,15 @@ namespace DryIoc
             if (parentWithLongerLifespan != null)
                 Throw.It(Error.DependencyHasShorterReuseLifespan,
                     request.PrintCurrent(), reuse, parentWithLongerLifespan);
+        }
+
+        /// <summary><see cref="GetDelegateOrDefault(DryIoc.Request)"/></summary>
+        /// <param name="request">Service request.</param><param name="cacheable">returns true if result delegate is cacheable</param>
+        /// <returns>Factory delegate created from service expression.</returns>
+        public FactoryDelegate GetDelegateOrDefault(Request request, out bool cacheable)
+        {
+            var expression = GetExpressionOrDefault(request, out cacheable);
+            return expression == null ? null : expression.CompileToDelegate(request.Container);
         }
 
         /// <summary>Creates factory delegate from service expression and returns it.
@@ -5976,8 +6001,7 @@ namespace DryIoc
         }
 
         /// <summary>Add to base rules: do not cache if Made is context based.</summary>
-        /// <param name="request">Context.</param>
-        /// <returns>True if factory expression could be cached.</returns>
+        /// <param name="request">Context.</param> <returns>True if factory expression could be cached.</returns>
         protected override bool IsFactoryExpressionCacheable(Request request)
         {
             return base.IsFactoryExpressionCacheable(request)
@@ -6819,9 +6843,9 @@ namespace DryIoc
     public sealed class SingletonScope : IScope
     {
         // todo:
-        // <wip>
+        // <WIP>
 
-        private object[] _locks = 
+        private object[] _lockers = 
         {
             new object(), new object(), new object(), new object(), 
             new object(), new object(), new object(), new object() 
@@ -6834,10 +6858,32 @@ namespace DryIoc
 
         private object GetOrAdd2(int id, CreateScopedValue createValue)
         {
-            return null;
+            if (id < BATCH_SIZE)
+            {
+                var value = _values[id];
+                if (value != null)
+                    return value;
+
+                var locker = _lockers[id % _lockers.Length];
+                lock (locker)
+                {
+                    value = _values[id];
+                    if (value != null)
+                        _values[id] = value = createValue();
+                }
+
+                return value;
+            }
+            else
+            {
+                //var rest = _values[0] as object[][];
+                //if (rest == null)
+
+                return null;
+            }
         }
 
-        // </wip>
+        // </WIP>
 
         private static readonly int MaxItemArrayIncreaseStep = 32;
 
@@ -7177,9 +7223,12 @@ namespace DryIoc
         /// <returns>Method call expression returning matched current scope.</returns>
         public Expression GetScopeExpression(Request request)
         {
-            var nameExpr = request.Container.GetOrAddStateItemExpression(Name, typeof(object));
+            var nameExpr = request.Container.GetOrAddStateItemExpression(Name);
+            if (Name != null && Name.GetType().IsValueType())
+                nameExpr = Expression.Convert(nameExpr, typeof(object));
             return Expression.Call(Container.ScopesExpr, "GetCurrentNamedScope", ArrayTools.Empty<Type>(),
-                nameExpr, Expression.Constant(true));
+                nameExpr, 
+                Expression.Constant(true));
         }
 
         /// <summary>Asks the scope to convert factory ID into internal representation and returns it.

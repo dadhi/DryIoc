@@ -31,9 +31,6 @@ namespace DryIoc.Dnx.DependencyInjection
     /// <summary>Provides populating of service collection.</summary>
     public static class DryIocDnxDependencyInjection
     {
-        /// <summary>Scope name for singletons. The root scope name which is implicitly opened for DI.</summary>
-        public static string SingletonsScopeName = "root";
-
         /// <summary>Entry method with all DI adaptations applied which returns configured DryIoc container wrapped in <see cref="IServiceProvider"/>
         /// populated from <paramref name="services"/>.</summary>
         /// <param name="container">DryIoc container to adapt. Passed container will stay intact, instead the new adapted container instance will be
@@ -52,11 +49,7 @@ namespace DryIoc.Dnx.DependencyInjection
         /// <summary>Creates new container from the <paramref name="container"/> adapted to be used
         /// with Asp.Net 5 dependency injection:
         /// - First method sets the rules specific for Asp.Net DI.
-        /// - Then registers transient disposables tracker.
         /// - Then registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>.
-        /// - Then opens top scope because AspNet DI assumes that the scoped registration may be resolve without explicit scope creation,
-        /// that means the root scope is explicitly available.
-        /// Plus registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>.
         /// </summary>
         /// <param name="container">Source container to adapt.</param>
         /// <returns>New container with modified rules.</returns>
@@ -68,21 +61,15 @@ namespace DryIoc.Dnx.DependencyInjection
             var adapter = container.With(rules => rules
                 .With(FactoryMethod.ConstructorWithResolvableArguments)
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                .WithoutThrowOnRegisteringDisposableTransient());
-
-            // Tracks disposables in current scope
-            // todo: disposable transient dependency of singleton is not supported
-            adapter.RegisterTransientDisposablesTracker();
-
-            // make container available for injection as a scoped resolver
-            adapter.RegisterDelegate(resolver => (IContainer)resolver);
+                .WithTrackingDisposableTransients()
+                .WithImplicitRootOpenScope());
 
             adapter.Register<IServiceProvider, DryIocServiceProvider>(Reuse.InCurrentScope);
 
-            // factory should be scoped to enable nested scopes creation using outer scope factory
+            // Scope factory should be scoped itself to enable nested scopes creation
             adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.InCurrentScope);
 
-            return adapter.OpenScope(SingletonsScopeName);
+            return adapter;
         }
 
         /// <summary>Registers descriptors services into container and that's all. May be called multiple times with
@@ -124,7 +111,7 @@ namespace DryIoc.Dnx.DependencyInjection
             switch (lifetime)
             {
                 case ServiceLifetime.Singleton:
-                    return Reuse.InCurrentNamedScope(SingletonsScopeName);
+                    return Reuse.Singleton;
                 case ServiceLifetime.Scoped:
                     return Reuse.InCurrentScope;
                 case ServiceLifetime.Transient:
@@ -195,50 +182,6 @@ namespace DryIoc.Dnx.DependencyInjection
             }
 
             public void Dispose() => (ServiceProvider as IDisposable)?.Dispose();
-        }
-    }
-}
-
-namespace DryIoc
-{
-    /// <summary>Tool to allow disposable transients tracking, which is not supported by DryIoc by default.</summary>
-    public static class TrackTransientDisposables
-    {
-        /// <summary>Registers tracker in specified reuse scope + registers initializer for any object, which will
-        /// add disposable object to the tracker.</summary>
-        /// <param name="registrator">Container to use.</param>
-        public static void RegisterTransientDisposablesTracker(this IRegistrator registrator)
-        {
-            registrator.Register<TransientDisposablesTracker>(Reuse.InCurrentScope);
-
-            registrator.RegisterInitializer<object>(
-                (service, r) => r.Resolve<TransientDisposablesTracker>().Track((IDisposable)service),
-                request => request.ReuseLifespan == 0 
-                    && (request.ImplementationType ?? request.GetActualServiceType()).IsAssignableTo(typeof(IDisposable)));
-        }
-
-        /// <summary>Tracker stores disposable objects, and disposes of them on its own Dispose.
-        /// Actually it is a composite disposable.</summary>
-        public sealed class TransientDisposablesTracker : IDisposable
-        {
-            private readonly Ref<IDisposable[]> _items = Ref.Of(ArrayTools.Empty<IDisposable>());
-
-            /// <summary>Adds <paramref name="disposable"/> to tracked items which later will be disposed.</summary>
-            /// <param name="disposable">Item to track.</param>
-            public void Track(IDisposable disposable)
-            {
-                _items.Swap(i => i.AppendOrUpdate(disposable));
-            }
-
-            /// <summary>Disposes of the tracked items.</summary>
-            public void Dispose()
-            {
-                var items = _items.Value;
-                if (items.IsNullOrEmpty()) return;
-                for (var i = 0; i < items.Length; i++)
-                    items[i].Dispose();
-                _items.Swap(_ => ArrayTools.Empty<IDisposable>());
-            }
         }
     }
 }

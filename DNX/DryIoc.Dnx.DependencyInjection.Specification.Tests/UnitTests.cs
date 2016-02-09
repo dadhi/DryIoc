@@ -12,7 +12,7 @@ namespace DryIoc.Dnx.DependencyInjection.Specification.Tests
             var services = new ServiceCollection();
 
             services.AddTransient<A>();
-            services.AddTransient<B>(provider => new B(provider.GetRequiredService<A>()));
+            services.AddTransient(provider => new B(provider.GetRequiredService<A>()));
 
             var container = new Container().WithDependencyInjectionAdapter();
             container.Populate(services);
@@ -28,7 +28,7 @@ namespace DryIoc.Dnx.DependencyInjection.Specification.Tests
             var services = new ServiceCollection();
 
             services.AddTransient<A>();
-            services.AddScoped<B>(provider => new B(provider.GetRequiredService<A>()));
+            services.AddScoped(provider => new B(provider.GetRequiredService<A>()));
 
             var container = new Container().WithDependencyInjectionAdapter();
             container.Populate(services);
