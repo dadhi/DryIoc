@@ -34,7 +34,8 @@ THE SOFTWARE.
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 <#@ include File="YourServiceRegistrations.tt.include" #><#
 
-var container = GetContainerWithRegistrations();
+var container = GetContainerWithRegistrations()
+	.With(rules => rules.WithThrowIfRuntimeStateRequired());
 
 KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
 KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
@@ -80,8 +81,8 @@ Errors during resolution:
     foreach (var e in errors)
     {
 #>
-<#=objectToCode.TypeNameToCode(e.Value.GetType())#>:
-<#=e.Value.Message#>
+SERVICE: <#=e.Key#>
+ERROR: <#=e.Value.Message#>
 
 <#
     }
