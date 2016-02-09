@@ -1016,7 +1016,7 @@ namespace DryIoc
                     return itemExpr;
             }
 
-            Throw.If(throwIfStateRequired, Error.StateIsRequiredToUseItem, item);
+            Throw.If(throwIfStateRequired || Rules.ThrowIfRuntimeStateRequired, Error.StateIsRequiredToUseItem, item);
 
             var itemIndex = GetOrAddStateItem(item);
 
@@ -2794,6 +2794,22 @@ namespace DryIoc
             return newRules;
         }
 
+        /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
+        public bool ThrowIfRuntimeStateRequired
+        {
+            get { return (_settings & Settings.ThrowIfRuntimeStateRequired) != 0; }
+        }
+
+        /// <summary>Specifies to throw an exception in attempt to resolve service which require runtime state for resolution.
+        /// Runtime state may be introduced by RegisterDelegate, RegisterInstance, or registering with non-primitive service key, or metadata.</summary>
+        /// <returns>Returns new rules with flag set.</returns>
+        public Rules WithThrowIfRuntimeStateRequired()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules._settings |= Settings.ThrowIfRuntimeStateRequired;
+            return newRules;
+        }
+
         #region Implementation
 
         private Rules()
@@ -2814,7 +2830,8 @@ namespace DryIoc
             VariantGenericTypesInResolvedCollection = 16,
             ResolveIEnumerableAsLazyEnumerable = 32,
             EagerCachingSingletonForFasterAccess = 64,
-            ImplicitRootOpenScope = 128 
+            ImplicitRootOpenScope = 128,
+            ThrowIfRuntimeStateRequired = 256
         }
 
         private const Settings DEFAULT_SETTINGS =
@@ -6562,7 +6579,7 @@ namespace DryIoc
         /// <param name="request">Context</param> <returns>Expression throwing exception.</returns>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            return Expression.Constant(null); // ignored later in ApplyReuse
+            return Expression.Constant(null); // todo: Review 
         }
 
         /// <summary>Puts instance directly to available scope.</summary>
@@ -6801,6 +6818,27 @@ namespace DryIoc
     /// Locking is used internally to ensure that object factory called only once.</summary>
     public sealed class SingletonScope : IScope
     {
+        // todo:
+        // <wip>
+
+        private object[] _locks = 
+        {
+            new object(), new object(), new object(), new object(), 
+            new object(), new object(), new object(), new object() 
+        };
+
+        private const int BATCH_SIZE = 32;
+
+        // value at 0 index is reserved for [][] structure to accomodate more values
+        private object[] _values = new object[BATCH_SIZE];
+
+        private object GetOrAdd2(int id, CreateScopedValue createValue)
+        {
+            return null;
+        }
+
+        // </wip>
+
         private static readonly int MaxItemArrayIncreaseStep = 32;
 
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
@@ -8078,8 +8116,9 @@ namespace DryIoc
             InjectedCustomValueIsOfDifferentType = Of(
                 "Injected value {0} is not assignable to {2}."),
             StateIsRequiredToUseItem = Of(
-                "State is required to inject (or use) the value {0}. " + Environment.NewLine + 
-                "To enable value use you may specify container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_DELEGATE))."),
+                "Runtime state is required to inject (or use) the value {0}. " + Environment.NewLine +
+                "The source of runtime state is RegisterDelegate, RegisterInstance, or registering with non-primitive service key, or metadata." + Environment.NewLine +
+                "To allow the value you can use container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_DELEGATE))."),
             ArgOfValueIsProvidedButNoArgValues = Of(
                 "Arg.OfValue index is provided but no arg values specified."),
             ArgOfValueIndesIsOutOfProvidedArgValues = Of(

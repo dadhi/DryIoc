@@ -152,6 +152,25 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(2, resolutionCallDependencies.Length);
         }
 
+        [Test]
+        public void I_can_setup_to_throw_on_generating_expressions_with_runtime_state()
+        {
+            var container = new Container()
+                .WithMefAttributedModel()
+                .With(rules => rules.WithThrowIfRuntimeStateRequired());
+
+            container.RegisterDelegate(resolver => "runtime state");
+
+            KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
+            KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
+            var errors = container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies);
+
+            Assert.AreEqual(1, errors.Length);
+            Assert.AreEqual(DryIoc.Error.StateIsRequiredToUseItem, errors[0].Value.Error);
+            Assert.AreEqual(0, resolutionsRoots.Length);
+            Assert.AreEqual(0, resolutionCallDependencies.Length);
+        }
+
         public class LazyUser
         {
             public LazyUser(Lazy<LazyDep> s) {}
