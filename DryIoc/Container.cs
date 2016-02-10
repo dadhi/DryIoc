@@ -33,6 +33,7 @@ namespace DryIoc
     using System.Text;
     using System.Threading;
     using System.Diagnostics.CodeAnalysis;
+    using System.Runtime.CompilerServices; // for MethodImpl attribute
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IContainer, IScopeAccess
@@ -402,9 +403,13 @@ namespace DryIoc
 
         #region IResolver
 
+        [MethodImpl(MethodImplHints.AggressingInlining)]
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             var factoryDelegate = _registry.Value.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+
+            // todo: Replace _singletonScope.Items with _singletonItems after completed refactoring of singletonScope.
+
             return factoryDelegate != null
                 ? factoryDelegate(_singletonScope.Items, _containerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
@@ -4024,6 +4029,13 @@ namespace DryIoc
         }
     }
 
+    /// <summary>Portable aggressive inlining option for MethodImpl.</summary>
+    public static class MethodImplHints
+    {
+        /// <summary>Value of MethodImplOptions.AggressingInlining</summary>
+        public const MethodImplOptions AggressingInlining = (MethodImplOptions)256;
+    }
+
     /// <summary>Defines convenient extension methods for <see cref="IResolver"/>.</summary>
     public static class Resolver
     {
@@ -4031,6 +4043,7 @@ namespace DryIoc
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <returns>The requested service instance.</returns>
+        [MethodImpl(MethodImplHints.AggressingInlining)]
         public static object Resolve(this IResolver resolver, Type serviceType)
         {
             return resolver.Resolve(serviceType, false);
@@ -9403,6 +9416,7 @@ namespace DryIoc
         /// <summary>Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.</summary>
         /// <param name="key">Key to look for.</param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
         /// <returns>Found value or <paramref name="defaultValue"/>.</returns>
+        [MethodImpl(MethodImplHints.AggressingInlining)]
         public V GetValueOrDefault(K key, V defaultValue = default(V))
         {
             var t = this;

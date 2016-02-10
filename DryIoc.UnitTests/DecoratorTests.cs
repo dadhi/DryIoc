@@ -608,7 +608,7 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(Error.ServiceIsNotAssignableFromFactoryMethod, ex.Error);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_register_decorator_of_any_T_As_object_and_specified_order_of_application()
         {
             var container = new Container();
@@ -706,10 +706,10 @@ namespace DryIoc.UnitTests
 
         public static class CustomDisposer
         {
-            public static T WithDispose<T>(T foo, Disposer<T> disposer)
+            public static T WithDispose<T>(T item, Disposer<T> disposer)
             {
-                disposer.TrackForDispose(foo);
-                return foo;
+                disposer.TrackForDispose(item);
+                return item;
             }
         }
 

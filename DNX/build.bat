@@ -1,6 +1,9 @@
 @echo off
 echo:BUILD AND RUN TESTS:
 
+rem Restores packages for the first time
+rem call dnu restore
+
 dnx -p "DryIoc.Dnx.UnitTests" test
 dnx -p "DryIoc.MefAttributedModel.Dnx.UnitTests" test
 dnx -p "DryIoc.Dnx.DependencyInjection.Specification.Tests" test
