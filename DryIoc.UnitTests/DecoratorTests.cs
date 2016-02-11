@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -523,16 +524,18 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_register_custom_Disposer()
+        public void Can_register_custom_Disposer_as_decorator()
         {
             var container = new Container();
             container.Register<Foo>(Reuse.Singleton);
 
-            container.Register<FooDisposer>(
+            container.RegisterDelegate(
+                _ => new Disposer<Foo>(f => f.IsReleased = true),
                 setup: Setup.With(useParentReuse: true));
 
-            container.Register(
-                Made.Of(() => CustomDisposer.WithDispose(Arg.Of<Foo>(), Arg.Of<FooDisposer>())),
+            container.Register(Made.Of(
+                r => ServiceInfo.Of<Disposer<Foo>>(),
+                f => f.TrackForDispose(Arg.Of<Foo>())),
                 setup: Setup.DecoratorWith(useDecorateeReuse: true));
 
             var foo = container.Resolve<Foo>();
@@ -542,24 +545,31 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_register_custom_Disposer_just_with_Disposer_and_without_Factory()
+        public void Can_register_custom_Disposer_via_specific_register_method()
         {
             var container = new Container();
             container.Register<Foo>(Reuse.Singleton);
-
-            container.Register<FooDisposer>(
-                setup: Setup.With(useParentReuse: true));
-
-            container.Register(Made.Of(
-                r => ServiceInfo.Of<FooDisposer>(),
-                f => f.TrackForDispose(Arg.Of<Foo>())),
-                setup: Setup.DecoratorWith(useDecorateeReuse: true));
+            container.RegisterDisposer<Foo>(f => f.IsReleased = true);
 
             var foo = container.Resolve<Foo>();
 
             container.Dispose();
             Assert.IsTrue(foo.IsReleased);
         }
+
+        [Test]
+        public void Can_register_custom_Disposer_via_specific_register_method_with_condition()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton, serviceKey: "blah");
+            container.RegisterDisposer<Foo>(f => f.IsReleased = true, r => r.ServiceKey == "blah");
+
+            var foo = container.Resolve<Foo>("blah");
+
+            container.Dispose();
+            Assert.IsTrue(foo.IsReleased);
+        }
+
 
         [Test]
         public void Decorator_created_by_factory_should_be_compasable_with_other_decorator()
@@ -716,34 +726,37 @@ namespace DryIoc.UnitTests
             public bool IsReleased { get; set; }
         }
 
-        public class FooDisposer : Disposer<Foo>
+        public sealed class Disposer<T> : IDisposable
         {
-            public override void Dispose()
-            {
-                Item.IsReleased = true;
-            }
-        }
+            private readonly Action<T> _dispose;
+            private int _state;
+            private const int Tracked = 1, Disposed = 2;
+            private T _item;
 
-        public static class CustomDisposer
-        {
-            public static T WithDispose<T>(T item, Disposer<T> disposer)
+            public Disposer(Action<T> dispose)
             {
-                disposer.TrackForDispose(item);
-                return item;
+                _dispose = dispose.ThrowIfNull();
             }
-        }
-
-        public abstract class Disposer<T> : IDisposable
-        {
-            protected T Item;
 
             public T TrackForDispose(T item)
             {
-                Item = item;
+                if (Interlocked.CompareExchange(ref _state, Tracked, 0) != 0)
+                    Throw.It(Error.Of("Something is {0} already."), _state == Tracked ? " tracked" : "disposed");
+                _item = item;
                 return item;
             }
 
-            public abstract void Dispose();
+            public void Dispose()
+            {
+                if (Interlocked.CompareExchange(ref _state, Disposed, Tracked) != Tracked)
+                    return;    
+                var item = _item;
+                if (item != null)
+                {
+                    _dispose(item);
+                    _item = default(T);
+                }
+            }
         }
 
         public interface IBird {}

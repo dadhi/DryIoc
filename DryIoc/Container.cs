@@ -3951,6 +3951,60 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Registers dispose action for reused target service.</summary>
+        /// <typeparam name="TService">Target service type.</typeparam>
+        /// <param name="registrator">Registrator to use.</param> <param name="dispose"></param>
+        /// <param name="condition">Additional way to identify the service.</param>
+        public static void RegisterDisposer<TService>(this IRegistrator registrator, 
+            Action<TService> dispose, Func<RequestInfo, bool> condition = null)
+        {
+            dispose.ThrowIfNull();
+
+            var disposerKey = new object();
+
+            registrator.RegisterDelegate(_ => new Disposer<TService>(dispose), 
+                serviceKey: disposerKey,
+                setup: Setup.With(useParentReuse: true));
+
+            registrator.Register(Made.Of(
+                r => ServiceInfo.Of<Disposer<TService>>(serviceKey: disposerKey),
+                f => f.TrackForDispose(Arg.Of<TService>())),
+                setup: Setup.DecoratorWith(condition: condition, useDecorateeReuse: true));
+        }
+
+        internal sealed class Disposer<T> : IDisposable
+        {
+            private readonly Action<T> _dispose;
+            private int _state;
+            private const int Tracked = 1, Disposed = 2;
+            private T _item;
+
+            public Disposer(Action<T> dispose)
+            {
+                _dispose = dispose.ThrowIfNull();
+            }
+
+            public T TrackForDispose(T item)
+            {
+                if (Interlocked.CompareExchange(ref _state, Tracked, 0) != 0)
+                    Throw.It(Error.Of("Something is {0} already."), _state == Tracked ? " tracked" : "disposed");
+                _item = item;
+                return item;
+            }
+
+            public void Dispose()
+            {
+                if (Interlocked.CompareExchange(ref _state, Disposed, Tracked) != Tracked)
+                    return;
+                var item = _item;
+                if (item != null)
+                {
+                    _dispose(item);
+                    _item = default(T);
+                }
+            }
+        }
+
         /// <summary>Returns true if <paramref name="serviceType"/> is registered in container or its open generic definition is registered in container.</summary>
         /// <param name="registrator">Usually <see cref="Container"/> to explore or any other <see cref="IRegistrator"/> implementation.</param>
         /// <param name="serviceType">The type of the registered service.</param>
